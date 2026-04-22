@@ -81,4 +81,14 @@ extension HarnessMonitorAPIClient {
       return .server(code: statusCode, message: message)
     }
   }
+
+  static func classifyAdoptError(
+    statusCode: Int,
+    payload: JSONValue?
+  ) -> HarnessMonitorAPIError? {
+    guard let payload, let data = try? JSONEncoder().encode(payload) else {
+      return nil
+    }
+    return classifyAdoptErrorFromData(statusCode: statusCode, data: data)
+  }
 }

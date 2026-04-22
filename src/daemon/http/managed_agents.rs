@@ -10,7 +10,7 @@ use axum::{Json, Router};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentListResponse,
-    ManagedAgentSnapshot,
+    ManagedAgentSnapshot, http_paths,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -22,49 +22,46 @@ mod attach;
 
 pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
     Router::new()
+        .route(http_paths::SESSION_MANAGED_AGENTS, get(get_managed_agents))
         .route(
-            "/v1/sessions/{session_id}/managed-agents",
-            get(get_managed_agents),
-        )
-        .route(
-            "/v1/sessions/{session_id}/managed-agents/terminal",
+            http_paths::SESSION_MANAGED_AGENTS_TERMINAL,
             post(post_terminal_agent_start),
         )
         .route(
-            "/v1/sessions/{session_id}/managed-agents/codex",
+            http_paths::SESSION_MANAGED_AGENTS_CODEX,
             post(post_codex_agent_start),
         )
-        .route("/v1/managed-agents/{agent_id}", get(get_managed_agent))
+        .route(http_paths::MANAGED_AGENT_DETAIL, get(get_managed_agent))
         .route(
-            "/v1/managed-agents/{agent_id}/input",
+            http_paths::MANAGED_AGENT_INPUT,
             post(post_terminal_agent_input),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/resize",
+            http_paths::MANAGED_AGENT_RESIZE,
             post(post_terminal_agent_resize),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/stop",
+            http_paths::MANAGED_AGENT_STOP,
             post(post_terminal_agent_stop),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/ready",
+            http_paths::MANAGED_AGENT_READY,
             post(post_terminal_agent_ready),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/attach",
+            http_paths::MANAGED_AGENT_ATTACH,
             get(attach::get_terminal_agent_attach),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/steer",
+            http_paths::MANAGED_AGENT_STEER,
             post(post_codex_agent_steer),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/interrupt",
+            http_paths::MANAGED_AGENT_INTERRUPT,
             post(post_codex_agent_interrupt),
         )
         .route(
-            "/v1/managed-agents/{agent_id}/approvals/{approval_id}",
+            http_paths::MANAGED_AGENT_APPROVAL,
             post(post_codex_agent_approval),
         )
 }
@@ -82,7 +79,7 @@ pub(super) async fn get_managed_agents(
     let result = managed_agent_list_response(&state, &session_id);
     timed_json(
         "GET",
-        "/v1/sessions/{id}/managed-agents",
+        http_paths::SESSION_MANAGED_AGENTS,
         &request_id,
         start,
         result,
@@ -101,7 +98,7 @@ pub(super) async fn get_managed_agent(
     }
     timed_json(
         "GET",
-        "/v1/managed-agents/{id}",
+        http_paths::MANAGED_AGENT_DETAIL,
         &request_id,
         start,
         managed_agent_snapshot(&state, &agent_id),
@@ -125,7 +122,7 @@ async fn post_terminal_agent_start(
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
-        "/v1/sessions/{id}/managed-agents/terminal",
+        http_paths::SESSION_MANAGED_AGENTS_TERMINAL,
         &request_id,
         start,
         result,
@@ -149,7 +146,7 @@ async fn post_codex_agent_start(
         .map(ManagedAgentSnapshot::Codex);
     timed_json(
         "POST",
-        "/v1/sessions/{id}/managed-agents/codex",
+        http_paths::SESSION_MANAGED_AGENTS_CODEX,
         &request_id,
         start,
         result,
@@ -172,7 +169,7 @@ async fn post_terminal_agent_input(
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/input",
+        http_paths::MANAGED_AGENT_INPUT,
         &request_id,
         start,
         result,
@@ -195,7 +192,7 @@ async fn post_terminal_agent_resize(
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/resize",
+        http_paths::MANAGED_AGENT_RESIZE,
         &request_id,
         start,
         result,
@@ -217,7 +214,7 @@ async fn post_terminal_agent_stop(
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/stop",
+        http_paths::MANAGED_AGENT_STOP,
         &request_id,
         start,
         result,
@@ -239,7 +236,7 @@ async fn post_terminal_agent_ready(
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/ready",
+        http_paths::MANAGED_AGENT_READY,
         &request_id,
         start,
         result,
@@ -262,7 +259,7 @@ async fn post_codex_agent_steer(
         .map(ManagedAgentSnapshot::Codex);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/steer",
+        http_paths::MANAGED_AGENT_STEER,
         &request_id,
         start,
         result,
@@ -284,7 +281,7 @@ async fn post_codex_agent_interrupt(
         .map(ManagedAgentSnapshot::Codex);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/interrupt",
+        http_paths::MANAGED_AGENT_INTERRUPT,
         &request_id,
         start,
         result,
@@ -311,7 +308,7 @@ async fn post_codex_agent_approval(
         .map(ManagedAgentSnapshot::Codex);
     timed_json(
         "POST",
-        "/v1/managed-agents/{id}/approvals/{id}",
+        http_paths::MANAGED_AGENT_APPROVAL,
         &request_id,
         start,
         result,
@@ -360,7 +357,10 @@ fn managed_agent_snapshot(
         .map(ManagedAgentSnapshot::Codex)
 }
 
-fn ensure_terminal_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), CliError> {
+pub(crate) fn ensure_terminal_agent(
+    state: &DaemonHttpState,
+    agent_id: &str,
+) -> Result<(), CliError> {
     if state.agent_tui_manager.get(agent_id).is_ok() {
         return Ok(());
     }
@@ -373,7 +373,7 @@ fn ensure_terminal_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), 
     Err(CliErrorKind::session_not_active(format!("managed agent '{agent_id}' not found")).into())
 }
 
-fn ensure_codex_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), CliError> {
+pub(crate) fn ensure_codex_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), CliError> {
     if state.codex_controller.run(agent_id).is_ok() {
         return Ok(());
     }

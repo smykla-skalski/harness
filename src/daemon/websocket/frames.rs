@@ -22,14 +22,23 @@ pub(crate) fn ok_response(request_id: &str, result: Value) -> WsResponse {
 }
 
 pub(crate) fn error_response(request_id: &str, code: &str, message: &str) -> WsResponse {
-    WsResponse {
-        id: request_id.into(),
-        result: None,
-        error: Some(WsErrorPayload {
+    error_response_with_payload(
+        request_id,
+        WsErrorPayload {
             code: code.into(),
             message: message.into(),
             details: vec![],
-        }),
+            status_code: None,
+            data: None,
+        },
+    )
+}
+
+pub(crate) fn error_response_with_payload(request_id: &str, error: WsErrorPayload) -> WsResponse {
+    WsResponse {
+        id: request_id.into(),
+        result: None,
+        error: Some(error),
         batch_index: None,
         batch_count: None,
     }
@@ -144,17 +153,7 @@ pub(crate) fn serialize_error_response_frames(
     code: &str,
     message: &str,
 ) -> Vec<Message> {
-    let response = WsResponse {
-        id: request_id.unwrap_or("").into(),
-        result: None,
-        error: Some(WsErrorPayload {
-            code: code.into(),
-            message: message.into(),
-            details: vec![],
-        }),
-        batch_index: None,
-        batch_count: None,
-    };
+    let response = error_response(request_id.unwrap_or(""), code, message);
     serialize_response_frames(&response).unwrap_or_else(|_| vec![Message::text("{}")])
 }
 

@@ -8,60 +8,65 @@ use tracing::field::display;
 use crate::errors::{CliError, CliErrorKind};
 use crate::telemetry::record_daemon_http_metrics;
 
+pub(crate) fn error_status_and_body(error: &CliError) -> (StatusCode, serde_json::Value) {
+    if error.code() == "SANDBOX001" {
+        let feature = match error.kind() {
+            CliErrorKind::Common(common) => common.sandbox_feature().unwrap_or(""),
+            _ => "",
+        };
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            serde_json::json!({
+                "error": "sandbox-disabled",
+                "feature": feature,
+            }),
+        );
+    }
+    if error.code() == "CODEX001" {
+        let endpoint = match error.kind() {
+            CliErrorKind::Common(common) => common.codex_endpoint().unwrap_or(""),
+            _ => "",
+        };
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({
+                "error": "codex-unavailable",
+                "endpoint": endpoint,
+                "hint": "run: harness bridge start",
+            }),
+        );
+    }
+    if error.code() == "KSRCLI092" {
+        return (
+            StatusCode::CONFLICT,
+            serde_json::json!({
+                "error": {
+                    "code": error.code(),
+                    "message": error.message(),
+                    "details": error.details(),
+                }
+            }),
+        );
+    }
+    (
+        StatusCode::BAD_REQUEST,
+        serde_json::json!({
+            "error": {
+                "code": error.code(),
+                "message": error.message(),
+                "details": error.details(),
+            }
+        }),
+    )
+}
+
 pub(super) fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     match result {
         Ok(value) => Json(value).into_response(),
-        Err(error) if error.code() == "SANDBOX001" => {
-            let feature = match error.kind() {
-                CliErrorKind::Common(common) => common.sandbox_feature().unwrap_or(""),
-                _ => "",
-            };
-            (
-                StatusCode::NOT_IMPLEMENTED,
-                Json(serde_json::json!({
-                    "error": "sandbox-disabled",
-                    "feature": feature,
-                })),
-            )
-                .into_response()
+        Err(error) => {
+            let (status, body) = error_status_and_body(&error);
+            (status, Json(body)).into_response()
         }
-        Err(error) if error.code() == "CODEX001" => {
-            let endpoint = match error.kind() {
-                CliErrorKind::Common(common) => common.codex_endpoint().unwrap_or(""),
-                _ => "",
-            };
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({
-                    "error": "codex-unavailable",
-                    "endpoint": endpoint,
-                    "hint": "run: harness bridge start",
-                })),
-            )
-                .into_response()
-        }
-        Err(error) if error.code() == "KSRCLI092" => (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({
-                "error": {
-                    "code": error.code(),
-                    "message": error.message(),
-                    "details": error.details(),
-                }
-            })),
-        )
-            .into_response(),
-        Err(error) => (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "error": {
-                    "code": error.code(),
-                    "message": error.message(),
-                    "details": error.details(),
-                }
-            })),
-        )
-            .into_response(),
     }
 }
 

@@ -6,6 +6,7 @@ mod mutations;
 #[cfg(test)]
 mod observe_tests;
 mod params;
+mod parity;
 mod queries;
 mod relay;
 #[cfg(test)]

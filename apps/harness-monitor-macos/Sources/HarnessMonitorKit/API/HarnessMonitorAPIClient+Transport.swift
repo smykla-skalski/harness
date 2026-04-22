@@ -110,7 +110,7 @@ extension HarnessMonitorAPIClient {
     logHTTPResponse(method: method, path: path, response: httpResponse, durationMs: durationMs)
 
     guard (200..<300).contains(httpResponse.statusCode) else {
-      let error = try decodeError(statusCode: httpResponse.statusCode, data: data)
+      let error = Self.decodeError(statusCode: httpResponse.statusCode, data: data)
       span.status = .error(description: error.localizedDescription)
       HarnessMonitorTelemetry.shared.recordError(error, on: span)
       HarnessMonitorTelemetry.shared.recordHTTPRequest(
@@ -355,7 +355,10 @@ extension HarnessMonitorAPIClient {
     return request
   }
 
-  func decodeError(statusCode: Int, data: Data) throws -> HarnessMonitorAPIError {
+  static func decodeError(statusCode: Int, data: Data) -> HarnessMonitorAPIError {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+
     if let envelope = try? decoder.decode(ErrorEnvelope.self, from: data) {
       return .server(code: statusCode, message: envelope.error.message)
     }
@@ -376,6 +379,10 @@ extension HarnessMonitorAPIClient {
 
     let message = String(data: data, encoding: .utf8) ?? "Unknown daemon error"
     return .server(code: statusCode, message: message)
+  }
+
+  func decodeError(statusCode: Int, data: Data) -> HarnessMonitorAPIError {
+    Self.decodeError(statusCode: statusCode, data: data)
   }
 
 }

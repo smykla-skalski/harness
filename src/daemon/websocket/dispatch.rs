@@ -6,6 +6,17 @@ use super::mutations::{
     dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
     dispatch_mutation_with_task_prefer_async, dispatch_session_start, dispatch_set_log_level,
 };
+use super::parity::{
+    dispatch_bridge_reconfigure, dispatch_managed_agent_input,
+    dispatch_managed_agent_interrupt_codex, dispatch_managed_agent_ready,
+    dispatch_managed_agent_resize, dispatch_managed_agent_resolve_codex_approval,
+    dispatch_managed_agent_start_codex, dispatch_managed_agent_start_terminal,
+    dispatch_managed_agent_steer_codex, dispatch_managed_agent_stop, dispatch_session_adopt,
+    dispatch_session_delete, dispatch_session_join, dispatch_session_leave,
+    dispatch_session_runtime_session, dispatch_session_title, dispatch_signal_ack,
+    dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,
+    dispatch_voice_start_session,
+};
 use super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
     handle_stream_subscribe, handle_stream_unsubscribe,
@@ -15,7 +26,7 @@ use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SignalCancelRequest, SignalSendRequest, TaskAssignRequest,
     TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskUpdateRequest, WsRequest, WsResponse,
+    TaskUpdateRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use crate::telemetry::{
@@ -136,7 +147,13 @@ async fn dispatch_known_method(
     if let Some(response) = dispatch_agent_mutation(request, state).await {
         return Some(response);
     }
-    dispatch_session_mutation(request, state).await
+    if let Some(response) = dispatch_session_mutation(request, state).await {
+        return Some(response);
+    }
+    if let Some(response) = dispatch_managed_agent_mutation(request, state).await {
+        return Some(response);
+    }
+    dispatch_voice_mutation(request, state).await
 }
 
 async fn dispatch_core_method(
@@ -156,15 +173,19 @@ async fn dispatch_misc_method(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "ping" => Some(ok_response(
+        ws_methods::PING => Some(ok_response(
             &request.id,
             serde_json::json!({ "pong": true }),
         )),
-        "daemon.set_log_level" => Some(dispatch_set_log_level(request, state)),
-        "session.subscribe" => Some(handle_session_subscribe(request, state, connection).await),
-        "session.unsubscribe" => Some(handle_session_unsubscribe(request, connection)),
-        "stream.subscribe" => Some(handle_stream_subscribe(request, state, connection).await),
-        "stream.unsubscribe" => Some(handle_stream_unsubscribe(request, connection)),
+        ws_methods::DAEMON_SET_LOG_LEVEL => Some(dispatch_set_log_level(request, state)),
+        ws_methods::SESSION_SUBSCRIBE => {
+            Some(handle_session_subscribe(request, state, connection).await)
+        }
+        ws_methods::SESSION_UNSUBSCRIBE => Some(handle_session_unsubscribe(request, connection)),
+        ws_methods::STREAM_SUBSCRIBE => {
+            Some(handle_stream_subscribe(request, state, connection).await)
+        }
+        ws_methods::STREAM_UNSUBSCRIBE => Some(handle_stream_unsubscribe(request, connection)),
         _ => None,
     }
 }
@@ -172,16 +193,17 @@ async fn dispatch_misc_method(
 async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> Option<WsResponse> {
     if matches!(
         request.method.as_str(),
-        "health"
-            | "diagnostics"
-            | "daemon.stop"
-            | "daemon.log_level"
-            | "projects"
-            | "sessions"
-            | "session.detail"
-            | "session.timeline"
-            | "session.managed_agents"
-            | "managed_agent.detail"
+        ws_methods::HEALTH
+            | ws_methods::DIAGNOSTICS
+            | ws_methods::DAEMON_STOP
+            | ws_methods::DAEMON_LOG_LEVEL
+            | ws_methods::PROJECTS
+            | ws_methods::SESSIONS
+            | ws_methods::RUNTIME_SESSION_RESOLVE
+            | ws_methods::SESSION_DETAIL
+            | ws_methods::SESSION_TIMELINE
+            | ws_methods::SESSION_MANAGED_AGENTS
+            | ws_methods::MANAGED_AGENT_DETAIL
     ) {
         Some(dispatch_read_query(request, state).await)
     } else {
@@ -204,9 +226,9 @@ async fn dispatch_task_work_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "task.create" => Some(dispatch_task_create(request, state).await),
-        "task.assign" => Some(dispatch_task_assign(request, state).await),
-        "task.checkpoint" => Some(dispatch_task_checkpoint(request, state).await),
+        ws_methods::TASK_CREATE => Some(dispatch_task_create(request, state).await),
+        ws_methods::TASK_ASSIGN => Some(dispatch_task_assign(request, state).await),
+        ws_methods::TASK_CHECKPOINT => Some(dispatch_task_checkpoint(request, state).await),
         _ => None,
     }
 }
@@ -216,9 +238,9 @@ async fn dispatch_task_lifecycle_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "task.drop" => Some(dispatch_task_drop(request, state).await),
-        "task.queue_policy" => Some(dispatch_task_queue_policy(request, state).await),
-        "task.update" => Some(dispatch_task_update(request, state).await),
+        ws_methods::TASK_DROP => Some(dispatch_task_drop(request, state).await),
+        ws_methods::TASK_QUEUE_POLICY => Some(dispatch_task_queue_policy(request, state).await),
+        ws_methods::TASK_UPDATE => Some(dispatch_task_update(request, state).await),
         _ => None,
     }
 }
@@ -227,8 +249,8 @@ async fn dispatch_agent_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "agent.change_role" => Some(dispatch_agent_change_role(request, state).await),
-        "agent.remove" => Some(dispatch_agent_remove(request, state).await),
+        ws_methods::AGENT_CHANGE_ROLE => Some(dispatch_agent_change_role(request, state).await),
+        ws_methods::AGENT_REMOVE => Some(dispatch_agent_remove(request, state).await),
         _ => None,
     }
 }
@@ -248,9 +270,18 @@ async fn dispatch_session_control_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "session.start" => Some(dispatch_session_start(request, state).await),
-        "leader.transfer" => Some(dispatch_leader_transfer(request, state).await),
-        "session.end" => Some(dispatch_session_end(request, state).await),
+        ws_methods::SESSION_START => Some(dispatch_session_start(request, state).await),
+        ws_methods::SESSION_ADOPT => Some(dispatch_session_adopt(request, state).await),
+        ws_methods::SESSION_DELETE => Some(dispatch_session_delete(request, state).await),
+        ws_methods::SESSION_JOIN => Some(dispatch_session_join(request, state).await),
+        ws_methods::SESSION_RUNTIME_SESSION => {
+            Some(dispatch_session_runtime_session(request, state).await)
+        }
+        ws_methods::SESSION_TITLE => Some(dispatch_session_title(request, state).await),
+        ws_methods::LEADER_TRANSFER => Some(dispatch_leader_transfer(request, state).await),
+        ws_methods::SESSION_END => Some(dispatch_session_end(request, state).await),
+        ws_methods::SESSION_LEAVE => Some(dispatch_session_leave(request, state).await),
+        ws_methods::BRIDGE_RECONFIGURE => Some(dispatch_bridge_reconfigure(request, state).await),
         _ => None,
     }
 }
@@ -260,9 +291,57 @@ async fn dispatch_session_signal_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "signal.send" => Some(dispatch_signal_send(request, state).await),
-        "signal.cancel" => Some(dispatch_signal_cancel(request, state).await),
-        "session.observe" => Some(dispatch_session_observe(request, state).await),
+        ws_methods::SIGNAL_SEND => Some(dispatch_signal_send(request, state).await),
+        ws_methods::SIGNAL_CANCEL => Some(dispatch_signal_cancel(request, state).await),
+        ws_methods::SIGNAL_ACK => Some(dispatch_signal_ack(request, state).await),
+        ws_methods::SESSION_OBSERVE => Some(dispatch_session_observe(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_managed_agent_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::MANAGED_AGENT_START_TERMINAL => {
+            Some(dispatch_managed_agent_start_terminal(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_START_CODEX => {
+            Some(dispatch_managed_agent_start_codex(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_INPUT => Some(dispatch_managed_agent_input(request, state).await),
+        ws_methods::MANAGED_AGENT_RESIZE => {
+            Some(dispatch_managed_agent_resize(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_STOP => Some(dispatch_managed_agent_stop(request, state).await),
+        ws_methods::MANAGED_AGENT_READY => Some(dispatch_managed_agent_ready(request, state).await),
+        ws_methods::MANAGED_AGENT_STEER_CODEX => {
+            Some(dispatch_managed_agent_steer_codex(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_INTERRUPT_CODEX => {
+            Some(dispatch_managed_agent_interrupt_codex(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_RESOLVE_CODEX_APPROVAL => {
+            Some(dispatch_managed_agent_resolve_codex_approval(request, state).await)
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_voice_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::VOICE_START_SESSION => Some(dispatch_voice_start_session(request, state).await),
+        ws_methods::VOICE_APPEND_AUDIO => Some(dispatch_voice_append_audio(request, state).await),
+        ws_methods::VOICE_APPEND_TRANSCRIPT => {
+            Some(dispatch_voice_append_transcript(request, state).await)
+        }
+        ws_methods::VOICE_FINISH_SESSION => {
+            Some(dispatch_voice_finish_session(request, state).await)
+        }
         _ => None,
     }
 }

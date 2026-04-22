@@ -18,6 +18,7 @@ use crate::workspace::layout::sessions_root;
 use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
+use crate::daemon::protocol::http_paths;
 
 pub(super) async fn post_session_adopt(
     headers: HeaderMap,
@@ -46,7 +47,7 @@ pub(super) async fn post_session_adopt(
                 Err(error) => {
                     return timed_json(
                         "POST",
-                        "/v1/sessions/adopt",
+                        http_paths::SESSIONS_ADOPT,
                         &request_id,
                         start,
                         Err::<SessionMutationResponse, _>(error),
@@ -67,7 +68,7 @@ pub(super) async fn post_session_adopt(
             record_adopt_in_db(&state, &outcome).await;
             timed_json(
                 "POST",
-                "/v1/sessions/adopt",
+                http_paths::SESSIONS_ADOPT,
                 &request_id,
                 start,
                 Ok::<_, CliError>(SessionMutationResponse {
@@ -79,7 +80,7 @@ pub(super) async fn post_session_adopt(
     }
 }
 
-fn adopt_session(session_root: &Path) -> Result<AdoptionOutcome, AdoptionError> {
+pub(crate) fn adopt_session(session_root: &Path) -> Result<AdoptionOutcome, AdoptionError> {
     let probed = SessionAdopter::probe(session_root)?;
     let data_root_sessions = sessions_root(&harness_data_root());
     SessionAdopter::register(probed, &data_root_sessions)
@@ -89,7 +90,7 @@ fn adopt_session(session_root: &Path) -> Result<AdoptionOutcome, AdoptionError> 
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn record_adopt_in_db(state: &DaemonHttpState, outcome: &AdoptionOutcome) {
+pub(crate) async fn record_adopt_in_db(state: &DaemonHttpState, outcome: &AdoptionOutcome) {
     if let Some(async_db) = state.async_db.get() {
         if let Err(error) = service::adopt_session_record_async(outcome, async_db.as_ref()).await {
             tracing::warn!(%error, "adopt: failed to write session to async db");
@@ -105,7 +106,14 @@ async fn record_adopt_in_db(state: &DaemonHttpState, outcome: &AdoptionOutcome) 
 }
 
 fn adoption_error_response(error: &AdoptionError) -> Response {
-    let (status, body) = match error {
+    let (status, body) = adoption_error_status_and_body(error);
+    (status, Json(body)).into_response()
+}
+
+pub(crate) fn adoption_error_status_and_body(
+    error: &AdoptionError,
+) -> (StatusCode, serde_json::Value) {
+    match error {
         AdoptionError::LayoutViolation { reason } => (
             StatusCode::UNPROCESSABLE_ENTITY,
             serde_json::json!({ "error": "layout-violation", "reason": reason }),
@@ -137,8 +145,7 @@ fn adoption_error_response(error: &AdoptionError) -> Response {
             StatusCode::INTERNAL_SERVER_ERROR,
             serde_json::json!({ "error": "internal", "detail": error.to_string() }),
         ),
-    };
-    (status, Json(body)).into_response()
+    }
 }
 
 #[cfg(test)]

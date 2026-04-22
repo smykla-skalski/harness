@@ -6,7 +6,7 @@ use tokio::sync::broadcast;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     ManagedAgentListResponse, ManagedAgentSnapshot, StreamEvent, TimelineWindowRequest, WsRequest,
-    WsResponse,
+    WsResponse, ws_methods,
 };
 use crate::daemon::service;
 
@@ -38,13 +38,13 @@ async fn dispatch_daemon_read_query(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "health" => Some(dispatch_health_query(&request.id, state).await),
-        "diagnostics" => Some(dispatch_diagnostics_query(&request.id, state).await),
-        "daemon.stop" => Some(dispatch_query(&request.id, service::request_shutdown)),
-        "daemon.log_level" => Some(dispatch_query(&request.id, service::get_log_level)),
-        "projects" => Some(dispatch_projects_query(&request.id, state).await),
-        "sessions" => Some(dispatch_sessions_query(&request.id, state).await),
-        "runtime_session.resolve" => {
+        ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
+        ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
+        ws_methods::DAEMON_STOP => Some(dispatch_query(&request.id, service::request_shutdown)),
+        ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
+        ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
+        ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
+        ws_methods::RUNTIME_SESSION_RESOLVE => {
             Some(dispatch_runtime_session_resolve_query(request, state).await)
         }
         _ => None,
@@ -56,10 +56,14 @@ async fn dispatch_session_read_query(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        "session.detail" => Some(dispatch_session_detail_query(request, state).await),
-        "session.timeline" => Some(dispatch_session_timeline_query(request, state).await),
-        "session.managed_agents" => Some(dispatch_session_managed_agents_query(request, state)),
-        "managed_agent.detail" => Some(dispatch_managed_agent_detail_query(request, state)),
+        ws_methods::SESSION_DETAIL => Some(dispatch_session_detail_query(request, state).await),
+        ws_methods::SESSION_TIMELINE => Some(dispatch_session_timeline_query(request, state).await),
+        ws_methods::SESSION_MANAGED_AGENTS => {
+            Some(dispatch_session_managed_agents_query(request, state))
+        }
+        ws_methods::MANAGED_AGENT_DETAIL => {
+            Some(dispatch_managed_agent_detail_query(request, state))
+        }
         _ => None,
     }
 }

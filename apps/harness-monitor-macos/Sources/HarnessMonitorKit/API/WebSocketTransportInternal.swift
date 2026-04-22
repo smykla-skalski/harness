@@ -5,8 +5,6 @@ import OpenTelemetryApi
 
 private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
 private typealias IntPingContinuation = CheckedContinuation<Int, Error>
-typealias ResponseBatchHandler =
-  @Sendable (_ batchIndex: Int, _ batchCount: Int, _ result: JSONValue?) async throws -> Void
 
 extension WebSocketTransport {
   func sendPing() async throws {
@@ -47,11 +45,14 @@ extension WebSocketTransport {
   }
 
   @discardableResult
-  func send(
-    method: String,
+  func rpc(
+    method: WebSocketRPCMethod,
     params: JSONValue? = nil,
     onSemanticBatch: ResponseBatchHandler? = nil
   ) async throws -> JSONValue {
+    if let rpcSender {
+      return try await rpcSender(method, params, onSemanticBatch)
+    }
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
@@ -61,7 +62,7 @@ extension WebSocketTransport {
       attributes: [
         "transport.kind": .string("websocket"),
         "rpc.system": .string("harness-daemon"),
-        "rpc.method": .string(method),
+        "rpc.method": .string(method.rawValue),
       ]
     )
     defer { span.end() }
@@ -69,9 +70,10 @@ extension WebSocketTransport {
     let startedAt = ContinuousClock.now
     let id = UUID().uuidString
     span.setAttribute(key: "rpc.request_id", value: id)
+    pendingRPCMethods[id] = method
     let request = makeRequest(
       id: id,
-      method: method,
+      method: method.rawValue,
       params: params,
       spanContext: span.context
     )
@@ -89,9 +91,10 @@ extension WebSocketTransport {
           if let error {
             let errorDescription = error.localizedDescription
             HarnessMonitorLogger.websocket.warning(
-              "WebSocket send failed for \(method, privacy: .public): \(errorDescription, privacy: .public)"
+              "WebSocket send failed for \(method.rawValue, privacy: .public): \(errorDescription, privacy: .public)"
             )
             Task { await self.clearResponseBatchHandler(for: id) }
+            Task { await self.clearPendingRPCMethod(for: id) }
             store.fail(id: id, error: error)
           }
         }
@@ -100,7 +103,7 @@ extension WebSocketTransport {
         startedAt.duration(to: ContinuousClock.now)
       )
       HarnessMonitorTelemetry.shared.recordWebSocketRPC(
-        method: method,
+        method: method.rawValue,
         durationMs: durationMs,
         failed: false
       )
@@ -112,7 +115,7 @@ extension WebSocketTransport {
       span.status = .error(description: error.localizedDescription)
       HarnessMonitorTelemetry.shared.recordError(error, on: span)
       HarnessMonitorTelemetry.shared.recordWebSocketRPC(
-        method: method,
+        method: method.rawValue,
         durationMs: durationMs,
         failed: true
       )
@@ -121,7 +124,7 @@ extension WebSocketTransport {
         severity: .error,
         body: "WebSocket RPC failed",
         attributes: [
-          "rpc.method": .string(method),
+          "rpc.method": .string(method.rawValue),
           "rpc.request_id": .string(id),
           "request.duration_ms": .double(durationMs),
           "error.message": .string(error.localizedDescription),
@@ -232,14 +235,14 @@ extension WebSocketTransport {
 
   func resubscribe() async throws {
     if globalSubscriptionActive {
-      _ = try await send(
-        method: "stream.subscribe",
+      _ = try await rpc(
+        method: .streamSubscribe,
         params: .object(["scope": .string("global")])
       )
     }
     for sessionID in activeSubscriptions {
-      _ = try await send(
-        method: "session.subscribe",
+      _ = try await rpc(
+        method: .sessionSubscribe,
         params: .object(["session_id": .string(sessionID)])
       )
     }
@@ -323,6 +326,10 @@ extension WebSocketTransport {
     responseBatchHandlers[id] = nil
   }
 
+  func clearPendingRPCMethod(for id: String) {
+    pendingRPCMethods[id] = nil
+  }
+
   func clearResponseBatchHandlers() {
     responseBatchHandlers.removeAll()
   }
@@ -334,14 +341,13 @@ extension WebSocketTransport {
     batchIndex: Int?,
     batchCount: Int?
   ) async {
+    let method = pendingRPCMethods[id]
     if let error {
       clearResponseBatchHandler(for: id)
+      clearPendingRPCMethod(for: id)
       pending.fail(
         id: id,
-        error: WebSocketTransportError.serverError(
-          code: error.code,
-          message: error.message
-        )
+        error: responseError(method: method, error: error)
       )
       return
     }
@@ -359,20 +365,55 @@ extension WebSocketTransport {
         )
         if completed {
           clearResponseBatchHandler(for: id)
+          clearPendingRPCMethod(for: id)
         }
       } catch {
         clearResponseBatchHandler(for: id)
+        clearPendingRPCMethod(for: id)
         pending.fail(id: id, error: error)
       }
       return
     }
 
     clearResponseBatchHandler(for: id)
+    clearPendingRPCMethod(for: id)
     if let result {
       pending.resume(id: id, result: result)
     } else {
       pending.resume(id: id, result: .null)
     }
+  }
+
+  func responseError(
+    method: WebSocketRPCMethod?,
+    error: WsErrorPayload
+  ) -> any Error {
+    guard let statusCode = error.statusCode else {
+      return WebSocketTransportError.serverError(
+        code: error.code,
+        message: error.message
+      )
+    }
+
+    if method == .sessionAdopt,
+      let adoptError = HarnessMonitorAPIClient.classifyAdoptError(
+        statusCode: statusCode,
+        payload: error.data
+      )
+    {
+      return adoptError
+    }
+
+    if let data = error.data,
+      let encoded = try? encoder.encode(data)
+    {
+      return HarnessMonitorAPIClient.decodeError(
+        statusCode: statusCode,
+        data: encoded
+      )
+    }
+
+    return HarnessMonitorAPIError.server(code: statusCode, message: error.message)
   }
 
   private func handlePushFrame(

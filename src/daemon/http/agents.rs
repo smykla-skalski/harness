@@ -7,7 +7,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail,
+    AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, http_paths,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -18,16 +18,10 @@ use super::response::{extract_request_id, timed_json};
 
 pub(super) fn agent_routes() -> Router<DaemonHttpState> {
     Router::new()
+        .route(http_paths::SESSION_AGENT_ROLE, post(post_role_change))
+        .route(http_paths::SESSION_AGENT_REMOVE, post(post_remove_agent))
         .route(
-            "/v1/sessions/{session_id}/agents/{agent_id}/role",
-            post(post_role_change),
-        )
-        .route(
-            "/v1/sessions/{session_id}/agents/{agent_id}/remove",
-            post(post_remove_agent),
-        )
-        .route(
-            "/v1/sessions/{session_id}/leader",
+            http_paths::SESSION_LEADER_TRANSFER,
             post(post_transfer_leader),
         )
 }
@@ -49,7 +43,7 @@ pub(super) async fn post_role_change(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/agents/{id}/role",
+        http_paths::SESSION_AGENT_ROLE,
         &request_id,
         start,
         result,
@@ -73,7 +67,7 @@ pub(super) async fn post_remove_agent(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/agents/{id}/remove",
+        http_paths::SESSION_AGENT_REMOVE,
         &request_id,
         start,
         result,
@@ -97,7 +91,7 @@ pub(super) async fn post_transfer_leader(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/leader",
+        http_paths::SESSION_LEADER_TRANSFER,
         &request_id,
         start,
         result,
