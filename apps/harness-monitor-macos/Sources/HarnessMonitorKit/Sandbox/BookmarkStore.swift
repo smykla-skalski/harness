@@ -9,6 +9,7 @@ import os
 public actor BookmarkStore {
   public static let mruCap = 20
   public static let logger = Logger(subsystem: "io.harnessmonitor", category: "sandbox")
+  private static let uiTestSeedBookmarkID = "B-preseed"
 
   public struct ResolvedScope: Sendable {
     public let url: URL
@@ -16,10 +17,12 @@ public actor BookmarkStore {
   }
 
   private let storeFile: URL
+  private let allowsUITestSeedRecords: Bool
   private var cached: PersistedStore?
 
-  public init(containerURL: URL) {
+  public init(containerURL: URL, allowsUITestSeedRecords: Bool = false) {
     self.storeFile = SandboxPaths.bookmarksFileURL(containerURL: containerURL)
+    self.allowsUITestSeedRecords = allowsUITestSeedRecords
     try? FileManager.default.createDirectory(
       at: storeFile.deletingLastPathComponent(),
       withIntermediateDirectories: true
@@ -50,14 +53,12 @@ public actor BookmarkStore {
         expected: PersistedStore.currentSchemaVersion
       )
     }
-    // Dedupe on load: keep first occurrence of each id. Rewrite if we changed anything.
-    let originalCount = decoded.bookmarks.count
-    var seen = Set<String>()
-    decoded.bookmarks = decoded.bookmarks.filter { seen.insert($0.id).inserted }
-    if decoded.bookmarks.count != originalCount {
+    let dedupedBookmarks = deduplicatedBookmarks(decoded.bookmarks)
+    if dedupedBookmarks.count != decoded.bookmarks.count {
       Self.logger.warning(
-        "deduplicated \(originalCount - decoded.bookmarks.count) stale bookmark record(s) on load"
+        "deduplicated \(decoded.bookmarks.count - dedupedBookmarks.count) stale bookmark record(s) on load"
       )
+      decoded.bookmarks = dedupedBookmarks
       try? save(decoded)
     }
     cached = decoded
@@ -65,6 +66,7 @@ public actor BookmarkStore {
   }
 
   public func add(url: URL, kind: Record.Kind) throws -> Record {
+    let normalizedPath = Self.normalizedPath(for: url.path)
     let appBookmark = try url.bookmarkData(
       options: .withSecurityScope,
       includingResourceValuesForKeys: nil,
@@ -76,13 +78,26 @@ public actor BookmarkStore {
       relativeTo: nil
     )
     var store = try loadForMutation()
-    let record = Record(
-      kind: kind,
-      displayName: url.lastPathComponent,
-      lastResolvedPath: url.path,
-      bookmarkData: appBookmark,
-      handoffBookmarkData: handoffBookmark
-    )
+    let record: Record
+    if let existingIndex = store.bookmarks.firstIndex(where: {
+      $0.kind == kind && Self.normalizedPath(for: $0.lastResolvedPath) == normalizedPath
+    }) {
+      var existing = store.bookmarks.remove(at: existingIndex)
+      existing.displayName = url.lastPathComponent
+      existing.lastResolvedPath = normalizedPath
+      existing.bookmarkData = appBookmark
+      existing.handoffBookmarkData = handoffBookmark
+      existing.lastAccessedAt = .now
+      record = existing
+    } else {
+      record = Record(
+        kind: kind,
+        displayName: url.lastPathComponent,
+        lastResolvedPath: normalizedPath,
+        bookmarkData: appBookmark,
+        handoffBookmarkData: handoffBookmark
+      )
+    }
     store.bookmarks.insert(record, at: 0)
     if store.bookmarks.count > Self.mruCap {
       store.bookmarks.removeLast(store.bookmarks.count - Self.mruCap)
@@ -216,4 +231,43 @@ public actor BookmarkStore {
       try save(store)
     }
   #endif
+
+  private func deduplicatedBookmarks(_ bookmarks: [Record]) -> [Record] {
+    var seenIDs = Set<String>()
+    var seenPaths = Set<String>()
+
+    return bookmarks.compactMap { record in
+      if allowsUITestSeedRecords == false, Self.isUITestSeed(record) {
+        return nil
+      }
+
+      guard seenIDs.insert(record.id).inserted else {
+        return nil
+      }
+
+      if seenPaths.insert(Self.deduplicationKey(for: record)).inserted == false {
+        return nil
+      }
+
+      return Self.normalizedRecord(record)
+    }
+  }
+
+  private static func isUITestSeed(_ record: Record) -> Bool {
+    record.id == uiTestSeedBookmarkID
+  }
+
+  private static func deduplicationKey(for record: Record) -> String {
+    "\(record.kind.rawValue)|\(normalizedPath(for: record.lastResolvedPath))"
+  }
+
+  private static func normalizedRecord(_ record: Record) -> Record {
+    var normalized = record
+    normalized.lastResolvedPath = normalizedPath(for: record.lastResolvedPath)
+    return normalized
+  }
+
+  private static func normalizedPath(for path: String) -> String {
+    URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+  }
 }

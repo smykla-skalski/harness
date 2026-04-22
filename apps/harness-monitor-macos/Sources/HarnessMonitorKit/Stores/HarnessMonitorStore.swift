@@ -236,7 +236,10 @@ public final class HarnessMonitorStore {
         // HARNESS_MONITOR_UI_TESTS launch contract the same way so the host
         // stays on a temp bookmark store and never touches the shared app-group
         // container that triggers macOS app-data permission prompts.
-        return BookmarkStore(containerURL: debugBookmarkStoreContainerURL())
+        return BookmarkStore(
+          containerURL: debugBookmarkStoreContainerURL(),
+          allowsUITestSeedRecords: true
+        )
       }
     #endif
     if let groupContainer = SandboxPaths.appGroupContainerURL() {
