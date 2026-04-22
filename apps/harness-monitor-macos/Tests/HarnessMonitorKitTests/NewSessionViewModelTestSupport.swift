@@ -7,8 +7,12 @@ func makeNewSessionStore() -> HarnessMonitorStore {
   HarnessMonitorStore(daemonController: RecordingDaemonController())
 }
 
-func makeNewSessionBookmarkStore() -> BookmarkStore {
-  BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
+func makeNewSessionBookmarkStore(containerURL: URL? = nil) -> BookmarkStore {
+  let resolvedContainerURL =
+    containerURL
+    ?? FileManager.default.temporaryDirectory
+    .appendingPathComponent("NewSessionBookmarkStore-\(UUID().uuidString)", isDirectory: true)
+  return BookmarkStore(containerURL: resolvedContainerURL)
 }
 
 func makeNewSessionDaemonStatus(sandboxed: Bool) -> DaemonStatusReport {
@@ -44,6 +48,7 @@ func makeNewSessionDaemonStatus(sandboxed: Bool) -> DaemonStatusReport {
 @MainActor
 func makeNewSessionViewModel(
   store: HarnessMonitorStore? = nil,
+  bookmarkStore: BookmarkStore? = nil,
   client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
   isSandboxed: @Sendable @escaping () -> Bool = { true },
   bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
@@ -51,7 +56,7 @@ func makeNewSessionViewModel(
 ) -> NewSessionViewModel {
   NewSessionViewModel(
     store: store ?? makeNewSessionStore(),
-    bookmarkStore: makeNewSessionBookmarkStore(),
+    bookmarkStore: bookmarkStore ?? makeNewSessionBookmarkStore(),
     client: client,
     isSandboxed: isSandboxed,
     bookmarkResolver: bookmarkResolver,

@@ -255,6 +255,51 @@ struct NewSessionViewModelTests {
     #expect(bookmarks.isEmpty)
   }
 
+  @Test("availableBookmarks drops the UI test seed bookmark outside UI test stores")
+  func availableBookmarksDropsUITestSeedOutsideUITestStores() async throws {
+    let containerURL = try makeBookmarkContainer()
+    try writeBookmarksFile(
+      """
+        {
+          "schemaVersion": 1,
+          "bookmarks": [
+            {
+              "id": "B-preseed",
+              "kind": "project-root",
+              "displayName": "Sample Project Folder",
+              "lastResolvedPath": "/tmp/sample",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            },
+            {
+              "id": "B-real",
+              "kind": "project-root",
+              "displayName": "harness",
+              "lastResolvedPath": "/tmp/harness",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            }
+          ]
+        }
+      """,
+      containerURL: containerURL
+    )
+
+    let vm = makeNewSessionViewModel(
+      bookmarkStore: BookmarkStore(containerURL: containerURL)
+    )
+
+    let bookmarks = await vm.availableBookmarks()
+
+    #expect(bookmarks.count == 1)
+    #expect(bookmarks.first?.id == "B-real")
+    #expect(bookmarks.first?.displayName == "harness")
+  }
+
   // MARK: - lastError cleared on success
 
   @Test("lastError is nil after successful submit following a prior error")
@@ -310,5 +355,18 @@ struct NewSessionViewModelTests {
     _ = await vm.submit()
 
     #expect(spy.errorMessages.contains { $0.contains("kind=daemonUnreachable") })
+  }
+
+  private func makeBookmarkContainer() throws -> URL {
+    let containerURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("NewSessionViewModelTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+    return containerURL
+  }
+
+  private func writeBookmarksFile(_ json: String, containerURL: URL) throws {
+    let sandboxURL = containerURL.appendingPathComponent("sandbox", isDirectory: true)
+    try FileManager.default.createDirectory(at: sandboxURL, withIntermediateDirectories: true)
+    try Data(json.utf8).write(to: sandboxURL.appendingPathComponent("bookmarks.json"))
   }
 }
