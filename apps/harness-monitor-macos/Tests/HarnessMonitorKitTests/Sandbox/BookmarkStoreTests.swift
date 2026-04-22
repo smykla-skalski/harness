@@ -11,11 +11,13 @@ final class BookmarkStoreTests: XCTestCase {
     let record = try await store.add(url: tmp, kind: .projectRoot)
     XCTAssertEqual(record.displayName, tmp.lastPathComponent)
     XCTAssertFalse(record.bookmarkData.isEmpty)
+    XCTAssertFalse(record.handoffBookmarkData?.isEmpty ?? true)
 
     let reloaded = BookmarkStore(containerURL: dir)
     let all = await reloaded.all()
     XCTAssertEqual(all.count, 1)
     XCTAssertEqual(all.first?.id, record.id)
+    XCTAssertEqual(all.first?.handoffBookmarkData, record.handoffBookmarkData)
   }
 
   func testMRUCapEvictsOldest() async throws {
@@ -89,14 +91,16 @@ final class BookmarkStoreTests: XCTestCase {
         kind: .projectRoot,
         displayName: "first",
         lastResolvedPath: "/tmp/first",
-        bookmarkData: Data([0x01])
+        bookmarkData: Data([0x01]),
+        handoffBookmarkData: Data([0x03])
       )
       let second = BookmarkStore.Record(
         id: "B-x",
         kind: .projectRoot,
         displayName: "second",
         lastResolvedPath: "/tmp/second",
-        bookmarkData: Data([0x02])
+        bookmarkData: Data([0x02]),
+        handoffBookmarkData: Data([0x04])
       )
       try await store.insertForTesting(first)
       try await store.insertForTesting(second)

@@ -26,6 +26,8 @@ pub struct Record {
     pub last_resolved_path: String,
     #[serde(with = "base64_bytes")]
     pub bookmark_data: Vec<u8>,
+    #[serde(default, with = "base64_bytes_option")]
+    pub handoff_bookmark_data: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
     pub last_accessed_at: DateTime<Utc>,
     pub stale_count: u32,
@@ -55,6 +57,9 @@ pub enum BookmarkError {
     #[cfg(target_os = "macos")]
     #[error("resolution failed: {0}")]
     Resolution(String),
+    #[cfg(target_os = "macos")]
+    #[error("creation failed: {0}")]
+    Creation(String),
 }
 
 /// Load the bookmark store from `path`.
@@ -132,6 +137,26 @@ mod base64_bytes {
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
         let raw = String::deserialize(d)?;
         STANDARD.decode(raw).map_err(D::Error::custom)
+    }
+}
+
+mod base64_bytes_option {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    use super::DeError;
+
+    pub fn serialize<S: Serializer>(bytes: &Option<Vec<u8>>, s: S) -> Result<S::Ok, S::Error> {
+        match bytes {
+            Some(bytes) => s.serialize_some(&STANDARD.encode(bytes)),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec<u8>>, D::Error> {
+        let raw = Option::<String>::deserialize(d)?;
+        raw.map(|raw| STANDARD.decode(raw).map_err(D::Error::custom))
+            .transpose()
     }
 }
 

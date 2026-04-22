@@ -12,6 +12,7 @@ extension BookmarkStore {
     public var displayName: String
     public var lastResolvedPath: String
     public var bookmarkData: Data
+    public var handoffBookmarkData: Data?
     public var createdAt: Date
     public var lastAccessedAt: Date
     public var staleCount: Int
@@ -22,6 +23,7 @@ extension BookmarkStore {
       displayName: String,
       lastResolvedPath: String,
       bookmarkData: Data,
+      handoffBookmarkData: Data? = nil,
       createdAt: Date = .now,
       lastAccessedAt: Date = .now,
       staleCount: Int = 0
@@ -31,6 +33,7 @@ extension BookmarkStore {
       self.displayName = displayName
       self.lastResolvedPath = lastResolvedPath
       self.bookmarkData = bookmarkData
+      self.handoffBookmarkData = handoffBookmarkData
       self.createdAt = createdAt
       self.lastAccessedAt = lastAccessedAt
       self.staleCount = staleCount

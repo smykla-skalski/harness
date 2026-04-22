@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::resolve_project_input;
+use super::{helper_bookmark_store_path, resolve_project_input};
 use tempfile::TempDir;
 
 #[test]
@@ -28,7 +28,7 @@ fn errors_when_path_does_not_exist() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn resolves_bookmark_from_shared_sandbox_store() {
+fn resolves_bookmark_from_shared_sandbox_store_and_bootstraps_helper_store() {
     use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
 
     let tmp = TempDir::new().expect("tempdir");
@@ -47,7 +47,8 @@ fn resolves_bookmark_from_shared_sandbox_store() {
                         kind: Kind::ProjectRoot,
                         display_name: "repo".into(),
                         last_resolved_path: project_dir.display().to_string(),
-                        bookmark_data: synthesize_bookmark(&project_dir),
+                        bookmark_data: synthesize_bookmark(&project_dir, true),
+                        handoff_bookmark_data: Some(synthesize_bookmark(&project_dir, false)),
                         created_at: chrono::Utc::now(),
                         last_accessed_at: chrono::Utc::now(),
                         stale_count: 0,
@@ -60,6 +61,14 @@ fn resolves_bookmark_from_shared_sandbox_store() {
             assert_eq!(
                 scope.path().canonicalize().expect("canonicalize"),
                 project_dir.canonicalize().expect("canonicalize")
+            );
+            let helper_store =
+                bookmarks::load(&helper_bookmark_store_path()).expect("load helper store");
+            let helper_record = bookmarks::find(&helper_store, bookmark_id).expect("helper record");
+            assert!(helper_record.handoff_bookmark_data.is_none());
+            assert!(
+                !helper_record.bookmark_data.is_empty(),
+                "helper bookmark should be seeded for future resolutions"
             );
         });
     });
@@ -86,7 +95,8 @@ fn resolves_bookmark_from_legacy_harness_store_path() {
                         kind: Kind::ProjectRoot,
                         display_name: "repo".into(),
                         last_resolved_path: project_dir.display().to_string(),
-                        bookmark_data: synthesize_bookmark(&project_dir),
+                        bookmark_data: synthesize_bookmark(&project_dir, true),
+                        handoff_bookmark_data: None,
                         created_at: chrono::Utc::now(),
                         last_accessed_at: chrono::Utc::now(),
                         stale_count: 0,
@@ -106,7 +116,7 @@ fn resolves_bookmark_from_legacy_harness_store_path() {
 
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
-fn synthesize_bookmark(path: &Path) -> Vec<u8> {
+fn synthesize_bookmark(path: &Path, with_security_scope: bool) -> Vec<u8> {
     use core_foundation::base::TCFType;
     use core_foundation::data::CFData;
     use core_foundation::url::{
@@ -120,7 +130,11 @@ fn synthesize_bookmark(path: &Path) -> Vec<u8> {
         CFURLCreateBookmarkData(
             std::ptr::null(),
             cf_url.as_concrete_TypeRef(),
-            kCFURLBookmarkCreationWithSecurityScope,
+            if with_security_scope {
+                kCFURLBookmarkCreationWithSecurityScope
+            } else {
+                0
+            },
             std::ptr::null(),
             std::ptr::null(),
             &mut err,

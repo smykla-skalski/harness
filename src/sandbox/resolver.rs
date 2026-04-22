@@ -14,8 +14,9 @@ use core_foundation::base::{Boolean, TCFType};
 use core_foundation::data::CFData;
 use core_foundation::error::CFError;
 use core_foundation::url::{
-    CFURL, CFURLCreateByResolvingBookmarkData, CFURLStartAccessingSecurityScopedResource,
-    CFURLStopAccessingSecurityScopedResource, kCFURLBookmarkResolutionWithSecurityScope,
+    CFURL, CFURLCreateBookmarkData, CFURLCreateByResolvingBookmarkData,
+    CFURLStartAccessingSecurityScopedResource, CFURLStopAccessingSecurityScopedResource,
+    kCFURLBookmarkCreationWithSecurityScope, kCFURLBookmarkResolutionWithSecurityScope,
     kCFURLBookmarkResolutionWithoutUIMask,
 };
 
@@ -28,7 +29,7 @@ use crate::sandbox::bookmarks::BookmarkError;
 pub struct ResolvedBookmark {
     path: PathBuf,
     is_stale: bool,
-    _scope: BookmarkScope,
+    _scope: Option<BookmarkScope>,
 }
 
 impl ResolvedBookmark {
@@ -92,6 +93,70 @@ pub fn is_sandboxed() -> bool {
 /// Returns [`BookmarkError::Resolution`] when the Core Foundation call fails
 /// (invalid bytes, path no longer reachable, etc.).
 pub fn resolve(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
+    resolve_internal(
+        bytes,
+        kCFURLBookmarkResolutionWithSecurityScope | kCFURLBookmarkResolutionWithoutUIMask,
+        true,
+    )
+}
+
+/// Resolve bookmark bytes without requesting a security scope.
+///
+/// This is used to bootstrap helper-owned security-scoped bookmarks from the
+/// shared app store, whose bookmark data may be readable across processes only
+/// as a regular bookmark.
+///
+/// # Errors
+///
+/// Returns [`BookmarkError::Resolution`] when the bookmark cannot be decoded.
+pub fn resolve_without_security_scope(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
+    resolve_internal(bytes, kCFURLBookmarkResolutionWithoutUIMask, false)
+}
+
+/// Create a helper-owned security-scoped bookmark for `path`.
+///
+/// # Errors
+///
+/// Returns [`BookmarkError::Creation`] when Core Foundation rejects the
+/// bookmark generation call.
+pub fn create_security_scoped_bookmark(path: &Path) -> Result<Vec<u8>, BookmarkError> {
+    let cf_url = CFURL::from_path(path, true)
+        .ok_or_else(|| BookmarkError::Creation("CFURL::from_path failed".into()))?;
+    let mut err = ptr::null_mut();
+    // SAFETY: cf_url is valid and the null pointer arguments are accepted
+    // sentinels for allocator/relative URL/resource keys.
+    let data_ref = unsafe {
+        CFURLCreateBookmarkData(
+            ptr::null(),
+            cf_url.as_concrete_TypeRef(),
+            kCFURLBookmarkCreationWithSecurityScope,
+            ptr::null(),
+            ptr::null(),
+            &raw mut err,
+        )
+    };
+    if data_ref.is_null() {
+        let detail = if err.is_null() {
+            "no CFError provided".to_string()
+        } else {
+            // SAFETY: err is a +1-retain CFErrorRef from the call above.
+            let cf_err = unsafe { CFError::wrap_under_create_rule(err) };
+            describe_cf_error(&cf_err)
+        };
+        return Err(BookmarkError::Creation(format!(
+            "CFURLCreateBookmarkData failed: {detail}"
+        )));
+    }
+    // SAFETY: data_ref is a non-null +1-retain CFDataRef from the call above.
+    let cf_data = unsafe { CFData::wrap_under_create_rule(data_ref) };
+    Ok(cf_data.bytes().to_vec())
+}
+
+fn resolve_internal(
+    bytes: &[u8],
+    options: usize,
+    start_scope: bool,
+) -> Result<ResolvedBookmark, BookmarkError> {
     let cf_data = CFData::from_buffer(bytes);
     let mut is_stale: Boolean = 0;
     let mut err = ptr::null_mut();
@@ -102,7 +167,7 @@ pub fn resolve(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
         CFURLCreateByResolvingBookmarkData(
             ptr::null(),
             cf_data.as_concrete_TypeRef(),
-            kCFURLBookmarkResolutionWithSecurityScope | kCFURLBookmarkResolutionWithoutUIMask,
+            options,
             ptr::null(),
             ptr::null(),
             &raw mut is_stale,
@@ -127,7 +192,7 @@ pub fn resolve(bytes: &[u8]) -> Result<ResolvedBookmark, BookmarkError> {
     let path = cf_url
         .to_path()
         .ok_or_else(|| BookmarkError::Resolution("CFURL::to_path failed".into()))?;
-    let scope = BookmarkScope::start(cf_url);
+    let scope = start_scope.then(|| BookmarkScope::start(cf_url));
     Ok(ResolvedBookmark {
         path,
         is_stale: is_stale != 0,

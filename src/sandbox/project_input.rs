@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 use crate::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::workspace::harness_data_root;
+#[cfg(target_os = "macos")]
+use tracing::warn;
 
 #[cfg(target_os = "macos")]
 use super::resolver::ResolvedBookmark;
@@ -74,38 +76,129 @@ mod tests;
 #[cfg(target_os = "macos")]
 fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
     use super::bookmarks;
-    for store_path in bookmark_store_paths() {
-        let store = bookmarks::load(&store_path).map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!(
-                "load bookmarks store '{}': {error}",
-                store_path.display()
-            ))
-            .into()
-        })?;
-        let Some(record) = bookmarks::find(&store, input) else {
-            continue;
-        };
-        let resolved =
-            super::resolver::resolve(&record.bookmark_data).map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
-            })?;
-        let path = resolved.path().to_path_buf();
-        return Ok(Some(ProjectInputScope {
-            path,
-            _bookmark: Some(resolved),
-        }));
+    let helper_path = helper_bookmark_store_path();
+    let helper_store = load_bookmark_store(&helper_path)?;
+    if let Some(record) = bookmarks::find(&helper_store, input) {
+        match super::resolver::resolve(&record.bookmark_data) {
+            Ok(resolved) => {
+                let path = resolved.path().to_path_buf();
+                return Ok(Some(ProjectInputScope {
+                    path,
+                    _bookmark: Some(resolved),
+                }));
+            }
+            Err(error) => {
+                warn!(
+                    %error,
+                    bookmark_id = input,
+                    store = %helper_path.display(),
+                    "helper-local bookmark resolution failed; attempting shared-store bootstrap"
+                );
+            }
+        }
     }
-    Ok(None)
+
+    let shared_path = shared_bookmark_store_path();
+    let shared_store = load_bookmark_store(&shared_path)?;
+    let Some(record) = bookmarks::find(&shared_store, input) else {
+        return Ok(None);
+    };
+
+    let handoff_bytes = record
+        .handoff_bookmark_data
+        .as_deref()
+        .unwrap_or(&record.bookmark_data);
+    let plain_resolved = super::resolver::resolve_without_security_scope(handoff_bytes).map_err(
+        |error| -> CliError {
+            CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+        },
+    )?;
+    let plain_path = plain_resolved.path().to_path_buf();
+    if let Some(scope) = seed_helper_bookmark(input, record, &plain_path)? {
+        return Ok(Some(scope));
+    }
+    Ok(Some(ProjectInputScope {
+        path: plain_path,
+        _bookmark: None,
+    }))
 }
 
 #[cfg(target_os = "macos")]
-fn bookmark_store_paths() -> [PathBuf; 2] {
+fn load_bookmark_store(path: &Path) -> Result<super::bookmarks::PersistedStore, CliError> {
+    super::bookmarks::load(path).map_err(|error| -> CliError {
+        CliErrorKind::workflow_io(format!("load bookmarks store '{}': {error}", path.display()))
+            .into()
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn seed_helper_bookmark(
+    input: &str,
+    record: &super::bookmarks::Record,
+    path: &Path,
+) -> Result<Option<ProjectInputScope>, CliError> {
+    use super::bookmarks;
+
+    let bookmark_data = match super::resolver::create_security_scoped_bookmark(path) {
+        Ok(bookmark_data) => bookmark_data,
+        Err(error) => {
+            warn!(
+                %error,
+                bookmark_id = input,
+                path = %path.display(),
+                "helper-local security-scoped bookmark creation failed; falling back to shared bookmark path"
+            );
+            return Ok(None);
+        }
+    };
+    let helper_path = helper_bookmark_store_path();
+    let mut helper_store = load_bookmark_store(&helper_path)?;
+    let helper_record = bookmarks::Record {
+        id: record.id.clone(),
+        kind: record.kind.clone(),
+        display_name: record.display_name.clone(),
+        last_resolved_path: path.display().to_string(),
+        bookmark_data,
+        handoff_bookmark_data: None,
+        created_at: record.created_at,
+        last_accessed_at: record.last_accessed_at,
+        stale_count: record.stale_count,
+    };
+    if let Some(existing) = helper_store.bookmarks.iter_mut().find(|existing| existing.id == input) {
+        *existing = helper_record.clone();
+    } else {
+        helper_store.bookmarks.insert(0, helper_record.clone());
+    }
+    bookmarks::save(&helper_path, &helper_store).map_err(|error| -> CliError {
+        CliErrorKind::workflow_io(format!(
+            "save helper bookmarks store '{}': {error}",
+            helper_path.display()
+        ))
+        .into()
+    })?;
+    let resolved = super::resolver::resolve(&helper_record.bookmark_data).map_err(
+        |error| -> CliError {
+            CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+        },
+    )?;
+    let resolved_path = resolved.path().to_path_buf();
+    Ok(Some(ProjectInputScope {
+        path: resolved_path,
+        _bookmark: Some(resolved),
+    }))
+}
+
+#[cfg(target_os = "macos")]
+fn shared_bookmark_store_path() -> PathBuf {
     let harness_root = harness_data_root();
-    let shared_root = harness_root
+    harness_root
         .parent()
-        .map_or_else(|| harness_root.clone(), Path::to_path_buf);
-    [
-        shared_root.join("sandbox").join("bookmarks.json"),
-        harness_root.join("bookmarks.json"),
-    ]
+        .map_or_else(|| harness_root.clone(), Path::to_path_buf)
+        .join("sandbox")
+        .join("bookmarks.json")
+}
+
+#[cfg(target_os = "macos")]
+fn helper_bookmark_store_path() -> PathBuf {
+    harness_data_root().join("bookmarks.json")
 }

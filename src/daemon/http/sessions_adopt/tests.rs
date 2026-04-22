@@ -135,6 +135,7 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
                     display_name: "demo session".into(),
                     last_resolved_path: session_dir.to_string_lossy().into_owned(),
                     bookmark_data: synthesize_bookmark(&session_dir),
+                    handoff_bookmark_data: None,
                     created_at: chrono::Utc::now(),
                     last_accessed_at: chrono::Utc::now(),
                     stale_count: 0,
