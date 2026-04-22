@@ -3,6 +3,8 @@ import OpenTelemetryApi
 struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
   private let appLifecycleCounter: HarnessMonitorLongCounterRecorder
   private let appBootstrapDuration: HarnessMonitorDoubleHistogramRecorder
+  private let bootstrapPhaseCounter: HarnessMonitorLongCounterRecorder
+  private let bootstrapPhaseDuration: HarnessMonitorDoubleHistogramRecorder
   private let userInteractionCounter: HarnessMonitorLongCounterRecorder
   private let userInteractionDuration: HarnessMonitorDoubleHistogramRecorder
   private let cacheHitCounter: HarnessMonitorLongCounterRecorder
@@ -23,6 +25,14 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
     let appBootstrapDuration =
       meter
       .histogramBuilder(name: "harness_monitor_bootstrap_duration_ms")
+      .build()
+    let bootstrapPhaseCounter =
+      meter
+      .counterBuilder(name: "harness_monitor_bootstrap_phases_total")
+      .build()
+    let bootstrapPhaseDuration =
+      meter
+      .histogramBuilder(name: "harness_monitor_bootstrap_phase_duration_ms")
       .build()
     let userInteractionCounter =
       meter
@@ -72,6 +82,10 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
     self.appBootstrapDuration = HarnessMonitorDoubleHistogramRecorder(
       histogram: appBootstrapDuration
     )
+    self.bootstrapPhaseCounter = HarnessMonitorLongCounterRecorder(counter: bootstrapPhaseCounter)
+    self.bootstrapPhaseDuration = HarnessMonitorDoubleHistogramRecorder(
+      histogram: bootstrapPhaseDuration
+    )
     self.userInteractionCounter = HarnessMonitorLongCounterRecorder(counter: userInteractionCounter)
     self.userInteractionDuration = HarnessMonitorDoubleHistogramRecorder(
       histogram: userInteractionDuration
@@ -100,6 +114,21 @@ struct HarnessMonitorTelemetryPhase1Instruments: @unchecked Sendable {
     if let durationMs, event == "bootstrap" {
       appBootstrapDuration.record(value: durationMs, attributes: attributes)
     }
+  }
+
+  func recordBootstrapPhase(
+    phase: String,
+    launchMode: String,
+    durationMs: Double,
+    failed: Bool
+  ) {
+    let attributes: [String: AttributeValue] = [
+      "bootstrap.phase": .string(phase),
+      "app.launch_mode": .string(launchMode),
+      "bootstrap.failed": .bool(failed),
+    ]
+    bootstrapPhaseCounter.add(value: 1, attributes: attributes)
+    bootstrapPhaseDuration.record(value: durationMs, attributes: attributes)
   }
 
   func recordUserInteraction(

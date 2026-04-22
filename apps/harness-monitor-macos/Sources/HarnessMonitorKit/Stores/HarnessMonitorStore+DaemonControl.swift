@@ -1,5 +1,14 @@
 import Foundation
 
+enum HarnessMonitorBootstrapTelemetryPhase: String, Sendable {
+  case managedLaunchAgentReady = "managed_launch_agent_ready"
+  case managedDaemonWarmUp = "managed_daemon_warm_up"
+  case managedLaunchAgentRefreshRecovery = "managed_launch_agent_refresh_recovery"
+  case managedInitialConnect = "managed_initial_connect"
+  case externalDaemonWarmUp = "external_daemon_warm_up"
+  case externalInitialConnect = "external_initial_connect"
+}
+
 extension HarnessMonitorStore {
   private var hasLiveConnectionActivity: Bool {
     client != nil
@@ -34,6 +43,17 @@ extension HarnessMonitorStore {
     self.client = nil
     await client.shutdown()
     connectionState = .idle
+  }
+
+  func withBootstrapTelemetryPhase<T>(
+    _ phase: HarnessMonitorBootstrapTelemetryPhase,
+    _ operation: () async throws -> T
+  ) async rethrows -> T {
+    try await HarnessMonitorTelemetry.shared.withBootstrapPhase(
+      phase: phase.rawValue,
+      launchMode: HarnessMonitorLaunchMode.live.rawValue,
+      operation
+    )
   }
 
   func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
@@ -75,21 +95,23 @@ extension HarnessMonitorStore {
         kind: .reconnecting,
         detail: "Managed daemon did not become healthy; refreshing the bundled launch agent"
       )
-      _ = try await daemonController.removeLaunchAgent()
-      let registrationState = try await daemonController.registerLaunchAgent()
-      switch registrationState {
-      case .enabled:
-        break
-      case .requiresApproval:
-        throw DaemonControlError.commandFailed(
-          "Launch agent needs approval in System Settings > General > Login Items."
+      return try await withBootstrapTelemetryPhase(.managedLaunchAgentRefreshRecovery) {
+        _ = try await daemonController.removeLaunchAgent()
+        let registrationState = try await daemonController.registerLaunchAgent()
+        switch registrationState {
+        case .enabled:
+          break
+        case .requiresApproval:
+          throw DaemonControlError.commandFailed(
+            "Launch agent needs approval in System Settings > General > Login Items."
+          )
+        case .notRegistered, .notFound:
+          throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
+        }
+        return try await daemonController.awaitManifestWarmUp(
+          timeout: bootstrapWarmUpTimeout
         )
-      case .notRegistered, .notFound:
-        throw DaemonControlError.commandFailed("Launch agent registration did not complete.")
       }
-      return try await daemonController.awaitManifestWarmUp(
-        timeout: bootstrapWarmUpTimeout
-      )
     }
   }
 

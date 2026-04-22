@@ -190,6 +190,20 @@ final class HarnessMonitorTelemetryInstruments: @unchecked Sendable {
     phase1.recordAppLifecycleEvent(event: event, launchMode: launchMode, durationMs: durationMs)
   }
 
+  func recordBootstrapPhase(
+    phase: String,
+    launchMode: String,
+    durationMs: Double,
+    failed: Bool
+  ) {
+    phase1.recordBootstrapPhase(
+      phase: phase,
+      launchMode: launchMode,
+      durationMs: durationMs,
+      failed: failed
+    )
+  }
+
   func recordUserInteraction(
     interaction: String,
     sessionID: String?,
