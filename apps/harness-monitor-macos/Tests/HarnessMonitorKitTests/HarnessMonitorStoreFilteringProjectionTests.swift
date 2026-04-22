@@ -199,11 +199,11 @@ struct HarnessMonitorStoreProjectionTests {
     ]
     store.sessionFilter = .all
 
-    // In the new layout every session is its own worktree checkout, so checkouts are
-    // ordered alphabetically by worktreeDisplayName (== sessionId when branchRef is empty).
+    // Repository-backed sessions share one checkout group, so default ordering follows
+    // recent activity inside that group.
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
-        == ["alpha", "bravo", "zeta"]
+        == ["bravo", "zeta", "alpha"]
     )
 
     let initialCatalogRebuilds = store.sessionIndex.debugCatalogRebuildCount
@@ -224,10 +224,113 @@ struct HarnessMonitorStoreProjectionTests {
 
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
-        == ["alpha", "bravo", "zeta"]
+        == ["bravo", "alpha", "zeta"]
     )
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == projectionAfterNameSort + 1)
+  }
+
+  @Test("Repository-backed sessions collapse into one sidebar checkout group")
+  func repositoryBackedSessionsShareOneCheckoutGroup() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
+
+    var first = SessionFixture(
+      sessionId: "repo-first",
+      context: "Repository lane",
+      status: .active,
+      leaderId: "leader-first",
+      observeId: nil,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    )
+    first.lastActivityAt = "2026-03-28T14:05:00Z"
+
+    var second = SessionFixture(
+      sessionId: "repo-second",
+      context: "Repository lane",
+      status: .active,
+      leaderId: "leader-second",
+      observeId: nil,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    )
+    second.lastActivityAt = "2026-03-28T14:20:00Z"
+
+    store.sessions = [
+      makeSession(first),
+      makeSession(second),
+    ]
+
+    guard
+      let projectGroup = store.groupedSessions.first,
+      let checkoutGroup = projectGroup.checkoutGroups.first
+    else {
+      Issue.record("Expected one grouped repository checkout")
+      return
+    }
+
+    #expect(projectGroup.checkoutGroups.count == 1)
+    #expect(checkoutGroup.isWorktree == false)
+    #expect(checkoutGroup.title == "Repository")
+    #expect(checkoutGroup.sessionIDs == ["repo-second", "repo-first"])
+  }
+
+  @Test("Linked-worktree sessions reuse one named sidebar checkout group")
+  func linkedWorktreeSessionsReuseOneCheckoutGroup() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
+    let worktreeRoot = "/Users/example/Projects/harness/.claude/worktrees/feature-branch"
+
+    var first = SessionFixture(
+      sessionId: "wt-first",
+      context: "Worktree lane",
+      status: .active,
+      leaderId: "leader-first",
+      observeId: nil,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    )
+    first.originPath = worktreeRoot
+    first.lastActivityAt = "2026-03-28T14:05:00Z"
+
+    var second = SessionFixture(
+      sessionId: "wt-second",
+      context: "Worktree lane",
+      status: .paused,
+      leaderId: "leader-second",
+      observeId: nil,
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 0
+    )
+    second.originPath = worktreeRoot
+    second.lastActivityAt = "2026-03-28T14:20:00Z"
+
+    store.sessions = [
+      makeSession(first),
+      makeSession(second),
+    ]
+
+    guard
+      let projectGroup = store.groupedSessions.first,
+      let checkoutGroup = projectGroup.checkoutGroups.first
+    else {
+      Issue.record("Expected one grouped worktree checkout")
+      return
+    }
+
+    #expect(projectGroup.checkoutGroups.count == 1)
+    #expect(checkoutGroup.isWorktree)
+    #expect(checkoutGroup.title == "feature-branch")
+    #expect(checkoutGroup.sessionIDs == ["wt-second", "wt-first"])
   }
 
   @Test("Session summary patch updates projection without a full catalog rebuild")
@@ -344,9 +447,7 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(didChange)
     #expect(store.sessionIndex.debugCatalogRebuildCount == initialCatalogRebuilds)
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
-    // In the new layout each session is its own checkout, ordered alphabetically by
-    // worktreeDisplayName. Within-session activity changes no longer reorder across checkouts.
-    #expect(store.visibleSessionIDs == ["first", "second"])
+    #expect(store.visibleSessionIDs == ["second", "first"])
   }
 
 }
