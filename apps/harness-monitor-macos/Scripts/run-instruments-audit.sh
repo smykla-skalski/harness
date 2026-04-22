@@ -52,6 +52,7 @@ BUILD_SHIPPING="${HARNESS_MONITOR_AUDIT_BUILD_SHIPPING:-0}"
 STAGED_HOST_APP_PATH=""
 STAGED_HOST_BINARY_PATH=""
 STAGED_HOST_BUNDLE_ID=""
+STAGED_HOST_STAGE_ROOT=""
 AUDIT_DAEMON_BUNDLE_MODE="unknown"
 AUDIT_DAEMON_CARGO_TARGET_DIR=""
 AUDIT_BUILD_ARCH=""
@@ -190,6 +191,7 @@ duration_for() {
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root)"
 RUNS_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/runs"
+STAGED_HOST_STAGE_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/staged-host"
 AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"
 AUDIT_LOCK_INFO_PATH="$AUDIT_LOCK_DIR/owner.tsv"
 DERIVED_DATA_PATH="$COMMON_REPO_ROOT/xcode-derived-instruments"
@@ -362,23 +364,22 @@ strip_app_attrs() {
 }
 
 stage_launch_host() {
-  local stage_root="$run_dir/launch-host"
-  local staged_bundle_name="Harness Monitor UI Testing ${run_id}.app"
-  local staged_bundle_id_suffix
-  staged_bundle_id_suffix="$(printf '%s' "$run_id" | tr -cd '[:alnum:]')"
+  local stage_root="$STAGED_HOST_STAGE_ROOT"
+  local staged_bundle_name="Harness Monitor UI Testing.app"
+  local info_plist_path
 
   STAGED_HOST_APP_PATH="$stage_root/$staged_bundle_name"
   STAGED_HOST_BINARY_PATH="$STAGED_HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
-  STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit.${staged_bundle_id_suffix}"
+  STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit"
+  info_plist_path="$STAGED_HOST_APP_PATH/Contents/Info.plist"
 
   rm -rf "$stage_root"
   mkdir -p "$stage_root"
   /usr/bin/ditto "$HOST_APP_PATH" "$STAGED_HOST_APP_PATH"
   strip_app_attrs "$STAGED_HOST_APP_PATH"
 
-  /usr/libexec/PlistBuddy \
-    -c "Set :CFBundleIdentifier $STAGED_HOST_BUNDLE_ID" \
-    "$STAGED_HOST_APP_PATH/Contents/Info.plist"
+  plist_upsert_string "$info_plist_path" "CFBundleIdentifier" "$STAGED_HOST_BUNDLE_ID"
+  plist_upsert_bool "$info_plist_path" "LSUIElement" "YES"
 }
 
 trace_launched_process_path() {
@@ -582,6 +583,24 @@ plist_value() {
   local key="$2"
 
   /usr/libexec/PlistBuddy -c "Print :$key" "$plist_path" 2>/dev/null || true
+}
+
+plist_upsert_string() {
+  local plist_path="$1"
+  local key="$2"
+  local value="$3"
+
+  /usr/libexec/PlistBuddy -c "Set :$key $value" "$plist_path" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :$key string $value" "$plist_path"
+}
+
+plist_upsert_bool() {
+  local plist_path="$1"
+  local key="$2"
+  local value="$3"
+
+  /usr/libexec/PlistBuddy -c "Set :$key $value" "$plist_path" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :$key bool $value" "$plist_path"
 }
 
 bundle_provenance_value() {

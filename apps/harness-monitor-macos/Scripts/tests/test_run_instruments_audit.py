@@ -22,8 +22,14 @@ class RunInstrumentsAuditScriptTests(unittest.TestCase):
         self.assertNotIn("launch-staged-host", self.script)
         self.assertNotIn("STAGED_HOST_LAUNCHER_PATH", self.script)
 
-    def test_stages_host_bundle_with_run_specific_name(self) -> None:
-        self.assertIn('local staged_bundle_name="Harness Monitor UI Testing ${run_id}.app"', self.script)
+    def test_stages_host_bundle_at_stable_path(self) -> None:
+        self.assertIn('STAGED_HOST_STAGE_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/staged-host"', self.script)
+        self.assertIn('local staged_bundle_name="Harness Monitor UI Testing.app"', self.script)
+        self.assertNotIn('Harness Monitor UI Testing ${run_id}.app', self.script)
+
+    def test_staged_host_becomes_agent_app_with_stable_audit_bundle_id(self) -> None:
+        self.assertIn('STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit"', self.script)
+        self.assertIn('plist_upsert_bool "$info_plist_path" "LSUIElement" "YES"', self.script)
 
 
 if __name__ == "__main__":
