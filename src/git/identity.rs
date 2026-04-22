@@ -172,7 +172,10 @@ mod tests {
         run_git(root, &["config", "user.email", "test@example.com"]);
         run_git(root, &["config", "user.name", "test"]);
         run_git(root, &["add", "README.md"]);
-        run_git(root, &["-c", "commit.gpgsign=false", "commit", "-m", "init"]);
+        run_git(
+            root,
+            &["-c", "commit.gpgsign=false", "commit", "-m", "init"],
+        );
 
         run_git_output(root, &["rev-parse", "HEAD"])
     }
