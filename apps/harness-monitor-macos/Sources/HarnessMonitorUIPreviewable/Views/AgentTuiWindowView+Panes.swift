@@ -37,6 +37,23 @@ extension AgentTuiWindowView {
       } else {
         unavailableSessionPane
       }
+    case .agent(let agentID):
+      agentDetailPane(agentID: agentID)
+    }
+  }
+
+  @ViewBuilder
+  func agentDetailPane(agentID: String) -> some View {
+    if let session = store.selectedSession,
+      let agent = session.agents.first(where: { $0.agentId == agentID })
+    {
+      AgentInspectorCard(
+        store: store,
+        agent: agent,
+        activity: session.agentActivity.first(where: { $0.agentId == agentID })
+      )
+    } else {
+      unavailableSessionPane
     }
   }
 

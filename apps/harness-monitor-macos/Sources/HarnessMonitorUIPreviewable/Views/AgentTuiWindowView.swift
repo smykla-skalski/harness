@@ -162,6 +162,11 @@ public struct AgentTuiWindowView: View {
       let status = selectedCodexRun?.status.rawValue ?? "missing"
       let approvalCount = selectedCodexRun?.pendingApprovals.count ?? 0
       return "selection=codex:\(runID),status=\(status),approvals=\(approvalCount)"
+    case .agent(let agentID):
+      let agentStatus =
+        store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.status.rawValue
+        ?? "missing"
+      return "selection=agent:\(agentID),status=\(agentStatus)"
     }
   }
 
@@ -173,6 +178,8 @@ public struct AgentTuiWindowView: View {
       "terminal:\(sessionID)"
     case .codex(let runID):
       "codex:\(runID)"
+    case .agent(let agentID):
+      "agent:\(agentID)"
     }
   }
 
@@ -276,6 +283,8 @@ public struct AgentTuiWindowView: View {
       case .codex(let runID):
         guard oldValue.codexRunID != runID else { return }
         store.selectCodexRun(runID: runID)
+      case .agent:
+        break
       }
     }
     .onDisappear {
