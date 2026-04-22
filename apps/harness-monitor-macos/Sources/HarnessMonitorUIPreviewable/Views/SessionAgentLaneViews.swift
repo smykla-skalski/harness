@@ -8,7 +8,7 @@ struct SessionAgentListSection: View {
   let agents: [AgentRegistration]
   let tasks: [WorkItem]
   let isSessionReadOnly: Bool
-  let inspectAgent: (String) -> Void
+  let openAgent: (String) -> Void
   let tuiStatusByAgent: [String: AgentTuiStatus]
 
   var body: some View {
@@ -41,7 +41,7 @@ struct SessionAgentListSection: View {
               agent: agent,
               queuedTasks: tasks.queued(for: agent.agentId),
               isSessionReadOnly: isSessionReadOnly,
-              inspectAgent: inspectAgent,
+              openAgent: openAgent,
               tuiStatus: tuiStatusByAgent[agent.agentId]
             )
           }
@@ -59,7 +59,7 @@ struct SessionAgentSummaryCard: View {
   let agent: AgentRegistration
   let queuedTasks: [WorkItem]
   let isSessionReadOnly: Bool
-  let inspectAgent: (String) -> Void
+  let openAgent: (String) -> Void
   let tuiStatus: AgentTuiStatus?
   @State private var isDropTargeted = false
 
@@ -146,7 +146,7 @@ struct SessionAgentSummaryCard: View {
   var body: some View {
     ZStack {
       Button {
-        inspectAgent(agent.agentId)
+        openAgent(agent.agentId)
       } label: {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(alignment: .top) {
@@ -227,9 +227,9 @@ struct SessionAgentSummaryCard: View {
       .harnessInteractiveCardButtonStyle()
       .contextMenu {
         Button {
-          inspectAgent(agent.agentId)
+          openAgent(agent.agentId)
         } label: {
-          Label("Inspect", systemImage: "info.circle")
+          Label("Open in Agents", systemImage: "rectangle.on.rectangle.angled")
         }
         Button {
           store.presentSendSignalSheet(agentID: agent.agentId)
@@ -348,7 +348,7 @@ struct SessionAgentSummaryCard: View {
     agent: PreviewFixtures.agents[1],
     queuedTasks: [],
     isSessionReadOnly: false,
-    inspectAgent: { _ in },
+    openAgent: { _ in },
     tuiStatus: .running
   )
   .padding()
@@ -362,7 +362,7 @@ struct SessionAgentSummaryCard: View {
     agent: PreviewFixtures.agents[1],
     queuedTasks: [],
     isSessionReadOnly: false,
-    inspectAgent: { _ in },
+    openAgent: { _ in },
     tuiStatus: nil
   )
   .padding()

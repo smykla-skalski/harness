@@ -13,6 +13,11 @@ struct SessionCockpitView: View {
   @Environment(\.openWindow)
   private var openWindow
 
+  private func openAgent(_ agentID: String) {
+    store.requestAgentsWindowSelection(.agent(agentID))
+    openWindow(id: HarnessMonitorWindowID.agents)
+  }
+
   private var tuiStatusByAgent: [String: AgentTuiStatus] {
     var snapshotStatus: [String: AgentTuiStatus] = [:]
     snapshotStatus.reserveCapacity(store.selectedAgentTuis.count)
@@ -59,7 +64,7 @@ struct SessionCockpitView: View {
           SessionActionDock(
             detail: detail,
             inspectTask: store.inspect(taskID:),
-            inspectAgent: store.inspect(agentID:),
+            openAgent: openAgent,
             inspectObserver: store.inspectObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
@@ -109,7 +114,7 @@ struct SessionCockpitView: View {
       agents: detail.agents,
       tasks: detail.tasks,
       isSessionReadOnly: isSessionReadOnly,
-      inspectAgent: store.inspect(agentID:),
+      openAgent: openAgent,
       tuiStatusByAgent: tuiStatusByAgent
     )
   }
