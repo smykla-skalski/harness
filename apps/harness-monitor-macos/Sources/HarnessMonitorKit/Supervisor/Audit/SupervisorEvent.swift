@@ -6,7 +6,8 @@ import SwiftData
 /// row. Public field list is part of the Phase 1 signature freeze.
 @Model
 public final class SupervisorEvent {
-  @Attribute(.unique) public var id: String
+  @Attribute(.unique)
+  public var id: String
   public var tickID: String
   public var kind: String
   public var ruleID: String?

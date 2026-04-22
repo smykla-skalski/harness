@@ -6,7 +6,8 @@ import SwiftData
 /// Schema membership lives in `HarnessMonitorSchemaV7`.
 @Model
 public final class Decision {
-  @Attribute(.unique) public var id: String
+  @Attribute(.unique)
+  public var id: String
   public var severityRaw: String
   public var ruleID: String
   public var sessionID: String?
