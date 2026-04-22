@@ -5,11 +5,15 @@ private final class SemanticBatchDeliveryTracker: @unchecked Sendable {
 }
 
 public actor WebSocketTransport: HarnessMonitorClientProtocol {
+  typealias RPCSender =
+    @Sendable (_ method: WebSocketRPCMethod, _ params: JSONValue?, _ onSemanticBatch: ResponseBatchHandler?)
+      async throws -> JSONValue
+
   let connection: HarnessMonitorConnection
   let encoder: JSONEncoder
   let decoder: JSONDecoder
   let session: URLSession
-  let httpFallbackClient: HarnessMonitorAPIClient
+  let rpcSender: RPCSender?
   let pending = PendingRequestStore()
   var webSocketTask: URLSessionWebSocketTask?
   var receiveTask: Task<Void, Never>?
@@ -18,6 +22,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var sessionStreamContinuations:
     [String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation] = [:]
   var responseBatchHandlers: [String: ResponseBatchHandler] = [:]
+  var pendingRPCMethods: [String: WebSocketRPCMethod] = [:]
   var partialFrames: [String: PendingFrameChunks] = [:]
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
@@ -34,26 +39,16 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     configuration.timeoutIntervalForRequest = 15
     configuration.timeoutIntervalForResource = 0
     let session = URLSession(configuration: configuration)
-
-    let httpConfiguration = URLSessionConfiguration.default
-    httpConfiguration.timeoutIntervalForRequest = 15
-    httpConfiguration.timeoutIntervalForResource = 30
-    let httpSession = URLSession(configuration: httpConfiguration)
-    let httpFallbackClient = HarnessMonitorAPIClient(
-      connection: connection,
-      session: httpSession
-    )
     self.init(
       connection: connection,
-      session: session,
-      httpFallbackClient: httpFallbackClient
+      session: session
     )
   }
 
   init(
     connection: HarnessMonitorConnection,
     session: URLSession,
-    httpFallbackClient: HarnessMonitorAPIClient
+    rpcSender: RPCSender? = nil
   ) {
     self.connection = connection
     encoder = JSONEncoder()
@@ -61,7 +56,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     self.session = session
-    self.httpFallbackClient = httpFallbackClient
+    self.rpcSender = rpcSender
   }
 
   public func connect() async throws {
@@ -110,6 +105,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     cancelWebSocketTaskIfNeeded(closeCode: .normalClosure)
     webSocketTask = nil
     responseBatchHandlers.removeAll()
+    pendingRPCMethods.removeAll()
     partialFrames.removeAll()
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
@@ -123,7 +119,6 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   public func shutdown() async {
     isShutDown = true
     disconnect()
-    await httpFallbackClient.shutdown()
     session.invalidateAndCancel()
   }
 }
@@ -136,33 +131,35 @@ extension WebSocketTransport {
   }
 
   public func health() async throws -> HealthResponse {
-    let value = try await send(method: "health")
+    let value = try await rpc(method: .health)
     return try decode(value)
   }
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
-    let value = try await send(method: "diagnostics")
+    let value = try await rpc(method: .diagnostics)
     return try decode(value)
   }
 
   public func stopDaemon() async throws -> DaemonControlResponse {
-    let value = try await send(method: "daemon.stop")
+    let value = try await rpc(method: .daemonStop)
     return try decode(value)
   }
 
   public func reconfigureHostBridge(
     request: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
-    try await httpFallbackClient.reconfigureHostBridge(request: request)
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .bridgeReconfigure, params: params)
+    return try decode(value)
   }
 
   public func projects() async throws -> [ProjectSummary] {
-    let value = try await send(method: "projects")
+    let value = try await rpc(method: .projects)
     return try decode(value)
   }
 
   public func sessions() async throws -> [SessionSummary] {
-    let value = try await send(method: "sessions")
+    let value = try await rpc(method: .sessions)
     return try decode(value)
   }
 
@@ -171,7 +168,7 @@ extension WebSocketTransport {
     if let scope {
       params["scope"] = .string(scope)
     }
-    let value = try await send(method: "session.detail", params: .object(params))
+    let value = try await rpc(method: .sessionDetail, params: .object(params))
     return try decode(value)
   }
 
@@ -190,8 +187,8 @@ extension WebSocketTransport {
     request: TimelineWindowRequest,
     onBatch: @escaping TimelineWindowBatchHandler
   ) async throws -> TimelineWindowResponse {
-    let value = try await send(
-      method: "session.timeline",
+    let value = try await rpc(
+      method: .sessionTimeline,
       params: timelineWindowParams(sessionID: sessionID, request: request)
     )
     let response: TimelineWindowResponse = try decode(value)
@@ -220,8 +217,8 @@ extension WebSocketTransport {
       params["scope"] = .string(scope.rawValue)
     }
     let deliveryTracker = SemanticBatchDeliveryTracker()
-    let value = try await send(
-      method: "session.timeline",
+    let value = try await rpc(
+      method: .sessionTimeline,
       params: .object(params),
       onSemanticBatch: { [weak self] batchIndex, batchCount, result in
         guard let self else { return }
@@ -282,8 +279,8 @@ extension WebSocketTransport {
 
     Task {
       do {
-        _ = try await self.send(
-          method: "stream.subscribe",
+        _ = try await self.rpc(
+          method: .streamSubscribe,
           params: .object(["scope": .string("global")])
         )
       } catch {
@@ -298,8 +295,8 @@ extension WebSocketTransport {
     globalStreamContinuation = nil
     globalSubscriptionActive = false
     Task {
-      try? await send(
-        method: "stream.unsubscribe",
+      try? await rpc(
+        method: .streamUnsubscribe,
         params: .object(["scope": .string("global")])
       )
     }
@@ -317,8 +314,8 @@ extension WebSocketTransport {
 
     Task {
       do {
-        _ = try await self.send(
-          method: "session.subscribe",
+        _ = try await self.rpc(
+          method: .sessionSubscribe,
           params: .object(["session_id": .string(sessionID)])
         )
       } catch {
@@ -333,8 +330,8 @@ extension WebSocketTransport {
     sessionStreamContinuations[sessionID] = nil
     activeSubscriptions.remove(sessionID)
     Task {
-      try? await send(
-        method: "session.unsubscribe",
+      try? await rpc(
+        method: .sessionUnsubscribe,
         params: .object(["session_id": .string(sessionID)])
       )
     }

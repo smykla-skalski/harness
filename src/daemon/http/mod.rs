@@ -42,6 +42,11 @@ mod tests;
 mod voice;
 
 pub(crate) use auth::require_auth;
+pub(crate) use managed_agents::{ensure_codex_agent, ensure_terminal_agent};
+pub(crate) use response::error_status_and_body;
+pub(crate) use sessions_adopt::{
+    adopt_session, adoption_error_status_and_body, record_adopt_in_db,
+};
 
 #[derive(Clone, Default)]
 pub struct AsyncDaemonDbSlot {

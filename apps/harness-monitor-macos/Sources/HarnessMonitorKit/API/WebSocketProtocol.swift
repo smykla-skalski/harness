@@ -41,7 +41,59 @@ struct WsErrorPayload: Codable, Sendable {
   let code: String
   let message: String
   let details: [String]?
+  let statusCode: Int?
+  let data: JSONValue?
 }
+
+enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
+  case health = "health"
+  case diagnostics = "diagnostics"
+  case daemonStop = "daemon.stop"
+  case bridgeReconfigure = "bridge.reconfigure"
+  case daemonLogLevel = "daemon.log_level"
+  case daemonSetLogLevel = "daemon.set_log_level"
+  case projects = "projects"
+  case sessions = "sessions"
+  case runtimeSessionResolve = "runtime_session.resolve"
+  case streamSubscribe = "stream.subscribe"
+  case streamUnsubscribe = "stream.unsubscribe"
+  case sessionDetail = "session.detail"
+  case sessionTimeline = "session.timeline"
+  case sessionSubscribe = "session.subscribe"
+  case sessionUnsubscribe = "session.unsubscribe"
+  case sessionStart = "session.start"
+  case sessionAdopt = "session.adopt"
+  case sessionEnd = "session.end"
+  case signalSend = "signal.send"
+  case signalCancel = "signal.cancel"
+  case sessionObserve = "session.observe"
+  case sessionManagedAgents = "session.managed_agents"
+  case managedAgentDetail = "managed_agent.detail"
+  case taskCreate = "task.create"
+  case taskAssign = "task.assign"
+  case taskDrop = "task.drop"
+  case taskQueuePolicy = "task.queue_policy"
+  case taskUpdate = "task.update"
+  case taskCheckpoint = "task.checkpoint"
+  case agentChangeRole = "agent.change_role"
+  case agentRemove = "agent.remove"
+  case leaderTransfer = "leader.transfer"
+  case managedAgentStartTerminal = "managed_agent.start_terminal"
+  case managedAgentStartCodex = "managed_agent.start_codex"
+  case managedAgentInput = "managed_agent.input"
+  case managedAgentResize = "managed_agent.resize"
+  case managedAgentStop = "managed_agent.stop"
+  case managedAgentSteerCodex = "managed_agent.steer_codex"
+  case managedAgentInterruptCodex = "managed_agent.interrupt_codex"
+  case managedAgentResolveCodexApproval = "managed_agent.resolve_codex_approval"
+  case voiceStartSession = "voice.start_session"
+  case voiceAppendAudio = "voice.append_audio"
+  case voiceAppendTranscript = "voice.append_transcript"
+  case voiceFinishSession = "voice.finish_session"
+}
+
+typealias ResponseBatchHandler =
+  @Sendable (_ batchIndex: Int, _ batchCount: Int, _ result: JSONValue?) async throws -> Void
 
 enum WsFrameKind {
   case response(

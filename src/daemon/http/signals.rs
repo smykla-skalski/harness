@@ -7,7 +7,7 @@ use axum::routing::post;
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    SessionDetail, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+    SessionDetail, SignalAckRequest, SignalCancelRequest, SignalSendRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -18,15 +18,9 @@ use super::response::{extract_request_id, timed_json};
 
 pub(super) fn signal_routes() -> Router<DaemonHttpState> {
     Router::new()
-        .route("/v1/sessions/{session_id}/signal", post(post_send_signal))
-        .route(
-            "/v1/sessions/{session_id}/signal-cancel",
-            post(post_cancel_signal),
-        )
-        .route(
-            "/v1/sessions/{session_id}/signal-ack",
-            post(post_signal_ack),
-        )
+        .route(http_paths::SESSION_SIGNAL_SEND, post(post_send_signal))
+        .route(http_paths::SESSION_SIGNAL_CANCEL, post(post_cancel_signal))
+        .route(http_paths::SESSION_SIGNAL_ACK, post(post_signal_ack))
 }
 
 pub(super) async fn post_send_signal(
@@ -43,7 +37,7 @@ pub(super) async fn post_send_signal(
     let result = send_signal_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
-        "/v1/sessions/{id}/signal",
+        http_paths::SESSION_SIGNAL_SEND,
         &request_id,
         start,
         result,
@@ -97,7 +91,7 @@ pub(super) async fn post_cancel_signal(
     let result = cancel_signal_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
-        "/v1/sessions/{id}/signal-cancel",
+        http_paths::SESSION_SIGNAL_CANCEL,
         &request_id,
         start,
         result,
@@ -118,7 +112,7 @@ pub(super) async fn post_signal_ack(
     let result = signal_ack_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
-        "/v1/sessions/{id}/signal-ack",
+        http_paths::SESSION_SIGNAL_ACK,
         &request_id,
         start,
         result.map(|()| serde_json::json!({"ok": true})),

@@ -34,6 +34,10 @@ pub struct WsErrorPayload {
     pub message: String,
     #[serde(default)]
     pub details: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_code: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

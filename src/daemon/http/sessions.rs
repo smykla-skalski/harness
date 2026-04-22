@@ -10,7 +10,7 @@ use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, ObserveSessionRequest, SessionDetail, SessionEndRequest,
     SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    SessionTitleRequest, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse,
+    SessionTitleRequest, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse, http_paths,
 };
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
@@ -25,29 +25,29 @@ use super::{DaemonHttpState, require_async_db};
 
 pub(super) fn session_routes() -> Router<DaemonHttpState> {
     Router::new()
-        .route("/v1/sessions", get(get_sessions).post(post_session_start))
         .route(
-            "/v1/sessions/adopt",
+            http_paths::SESSIONS,
+            get(get_sessions).post(post_session_start),
+        )
+        .route(
+            http_paths::SESSIONS_ADOPT,
             post(super::sessions_adopt::post_session_adopt),
         )
         .route(
-            "/v1/sessions/{session_id}",
+            http_paths::SESSION_DETAIL,
             get(get_session).delete(delete_session),
         )
-        .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
-        .route("/v1/sessions/{session_id}/stream", get(stream_session))
-        .route("/v1/sessions/{session_id}/join", post(post_session_join))
+        .route(http_paths::SESSION_TIMELINE, get(get_timeline))
+        .route(http_paths::SESSION_STREAM, get(stream_session))
+        .route(http_paths::SESSION_JOIN, post(post_session_join))
         .route(
-            "/v1/sessions/{session_id}/runtime-session",
+            http_paths::SESSION_RUNTIME_SESSION,
             post(post_runtime_session),
         )
-        .route("/v1/sessions/{session_id}/title", post(post_session_title))
-        .route("/v1/sessions/{session_id}/end", post(post_end_session))
-        .route("/v1/sessions/{session_id}/leave", post(post_leave_session))
-        .route(
-            "/v1/sessions/{session_id}/observe",
-            post(post_observe_session),
-        )
+        .route(http_paths::SESSION_TITLE, post(post_session_title))
+        .route(http_paths::SESSION_END, post(post_end_session))
+        .route(http_paths::SESSION_LEAVE, post(post_leave_session))
+        .route(http_paths::SESSION_OBSERVE, post(post_observe_session))
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -117,7 +117,7 @@ pub(super) async fn get_sessions(
         Ok(async_db) => service::list_sessions_async(true, Some(async_db)).await,
         Err(error) => Err(error),
     };
-    timed_json("GET", "/v1/sessions", &request_id, start, result)
+    timed_json("GET", http_paths::SESSIONS, &request_id, start, result)
 }
 
 pub(super) async fn get_session(
@@ -135,14 +135,20 @@ pub(super) async fn get_session(
         let result = read_session_detail(&state, &session_id, true).await;
         return timed_json(
             "GET",
-            "/v1/sessions/{id}?scope=core",
+            http_paths::SESSION_DETAIL,
             &request_id,
             start,
             result,
         );
     }
     let result = read_session_detail(&state, &session_id, false).await;
-    timed_json("GET", "/v1/sessions/{id}", &request_id, start, result)
+    timed_json(
+        "GET",
+        http_paths::SESSION_DETAIL,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 async fn read_session_detail(
@@ -188,12 +194,13 @@ pub(super) async fn get_timeline(
         "session timeline"
     };
     let result = read_timeline_window(&state, &session_id, &timeline_request, read_name).await;
-    let route = if payload_scope == TimelinePayloadScope::Summary {
-        "/v1/sessions/{id}/timeline?scope=summary"
-    } else {
-        "/v1/sessions/{id}/timeline"
-    };
-    timed_json("GET", route, &request_id, start, result)
+    timed_json(
+        "GET",
+        http_paths::SESSION_TIMELINE,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 async fn read_timeline_window(
@@ -222,7 +229,7 @@ pub(super) async fn post_end_session(
     if result.is_ok() {
         broadcast_session_end(&state, &session_id).await;
     }
-    timed_json("POST", "/v1/sessions/{id}/end", &request_id, start, result)
+    timed_json("POST", http_paths::SESSION_END, &request_id, start, result)
 }
 
 pub(super) async fn post_leave_session(
@@ -242,7 +249,7 @@ pub(super) async fn post_leave_session(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/leave",
+        http_paths::SESSION_LEAVE,
         &request_id,
         start,
         result,
@@ -270,7 +277,7 @@ pub(super) async fn post_observe_session(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/observe",
+        http_paths::SESSION_OBSERVE,
         &request_id,
         start,
         result,
@@ -319,7 +326,7 @@ pub(super) async fn post_session_start(
     if result.is_ok() {
         broadcast_sessions_list_changed(&state).await;
     }
-    timed_json("POST", "/v1/sessions", &request_id, start, result)
+    timed_json("POST", http_paths::SESSIONS, &request_id, start, result)
 }
 
 pub(super) async fn post_session_join(
@@ -337,7 +344,7 @@ pub(super) async fn post_session_join(
     if result.is_ok() {
         broadcast_session_join(&state, &session_id).await;
     }
-    timed_json("POST", "/v1/sessions/{id}/join", &request_id, start, result)
+    timed_json("POST", http_paths::SESSION_JOIN, &request_id, start, result)
 }
 
 pub(super) async fn post_session_title(
@@ -357,7 +364,7 @@ pub(super) async fn post_session_title(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/title",
+        http_paths::SESSION_TITLE,
         &request_id,
         start,
         result,
