@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn sessions_updated_event_includes_projects_and_sessions() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon stream index payload",
             "",
             project,
@@ -27,7 +27,7 @@ fn sessions_updated_event_includes_projects_and_sessions() {
 #[test]
 fn global_stream_initial_events_include_current_session_index() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon stream initial index payload",
             "",
             project,
@@ -58,7 +58,7 @@ fn global_stream_initial_events_include_current_session_index() {
 #[test]
 fn session_stream_initial_events_include_current_session_snapshot() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon stream initial session payload",
             "",
             project,
@@ -92,7 +92,7 @@ fn session_stream_initial_events_include_current_session_snapshot() {
 #[test]
 fn session_updated_event_includes_detail_without_timeline() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon stream session payload",
             "",
             project,

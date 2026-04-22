@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
     with_temp_project(|project| {
-        start_session(
+        start_active_session(
             "test",
             "",
             project,
@@ -52,7 +52,7 @@ fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
 #[test]
 fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
     with_temp_project(|project| {
-        start_session(
+        start_active_session(
             "test",
             "",
             project,
@@ -112,7 +112,7 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
 #[test]
 fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,

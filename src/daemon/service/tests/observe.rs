@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn observe_session_with_db_persists_tasks_without_touching_state_file() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "observe db direct test",
             "",
             project,
@@ -72,7 +72,7 @@ fn observe_session_with_actor_creates_tasks() {
         .build()
         .expect("runtime");
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "observe test",
             "",
             project,
@@ -131,7 +131,7 @@ fn observe_session_restarts_running_loop_when_actor_changes() {
         .build()
         .expect("runtime");
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "observe restart test",
             "",
             project,
@@ -217,7 +217,7 @@ fn observe_session_async_creates_tasks_without_sync_db() {
         .build()
         .expect("runtime");
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "observe async test",
             "",
             project,

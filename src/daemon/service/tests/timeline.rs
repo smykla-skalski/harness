@@ -3,7 +3,21 @@ use super::*;
 #[test]
 fn session_timeline_window_known_revision_reloads_when_visible_rows_change_without_count_change() {
     with_temp_project(|project| {
-        let (db, state) = setup_db_only_session(project);
+        use crate::session::service::build_new_session;
+
+        let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+        let project_record = index::discovered_project_for_checkout(project);
+        db.sync_project(&project_record).expect("sync project");
+        let state = build_new_session(
+            "db-only test",
+            "",
+            "db-only-sess",
+            "claude",
+            Some("test-session"),
+            &utc_now(),
+        );
+        db.sync_session(&project_record.project_id, &state)
+            .expect("sync session");
         let request = TimelineWindowRequest {
             scope: Some("summary".into()),
             limit: Some(20),

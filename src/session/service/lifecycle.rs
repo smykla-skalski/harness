@@ -15,47 +15,34 @@ use super::{
 ///
 /// # Errors
 /// Returns `CliError` on storage failures.
-///
-/// # Panics
-/// Panics if the new session state has no leader.
 pub fn start_session(
     context: &str,
     title: &str,
     project_dir: &Path,
-    runtime_name: Option<&str>,
+    _runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    start_session_with_policy(context, title, project_dir, runtime_name, session_id, None)
+    start_session_with_policy(context, title, project_dir, _runtime_name, session_id, None)
 }
 
-/// Start a new session with an optional policy preset for the leader.
+/// Start a new leaderless session with an optional policy preset.
 ///
 /// # Errors
 /// Returns `CliError` on storage failures.
-///
-/// # Panics
-/// Panics if the new session state has no leader.
 pub fn start_session_with_policy(
     context: &str,
     title: &str,
     project_dir: &Path,
-    runtime_name: Option<&str>,
+    _runtime_name: Option<&str>,
     session_id: Option<&str>,
     policy_preset: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    let runtime_name = runtime_name.ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(
-            "session start requires --runtime for leader session tracking".to_string(),
-        ))
-    })?;
-    ensure_known_runtime(runtime_name, "session start requires a known runtime")?;
     validate_policy_preset(policy_preset)?;
 
     if let Some(client) = DaemonClient::try_connect() {
         return client.start_session(&protocol::SessionStartRequest {
             title: title.to_string(),
             context: context.to_string(),
-            runtime: runtime_name.to_string(),
             session_id: session_id.map(ToString::to_string),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: policy_preset.map(ToString::to_string),
@@ -64,27 +51,16 @@ pub fn start_session_with_policy(
     }
 
     let now = utc_now();
-    let leader_runtime = resolve_registered_runtime(runtime_name).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "session start requires a known runtime, got '{runtime_name}'"
-        )))
-    })?;
-    let leader_agent_session_id =
-        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
     let state = create_initial_session(
         context,
         title,
-        runtime_name,
+        "leaderless",
         session_id,
-        leader_agent_session_id.as_deref(),
+        None,
         &now,
         project_dir,
         policy_preset,
     )?;
-    let leader_id = state
-        .leader_id
-        .as_deref()
-        .expect("new session always has a leader");
 
     let layout = storage::layout_from_project_dir(project_dir, &state.session_id)?;
     storage::register_active(&layout)?;
@@ -92,7 +68,7 @@ pub fn start_session_with_policy(
     storage::append_log_entry(
         &layout,
         log_session_started(title, context),
-        Some(leader_id),
+        None,
         None,
     )?;
 

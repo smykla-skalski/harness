@@ -1,6 +1,6 @@
 use super::{CliError, DaemonDb, db_error, session_status_db_label};
 use crate::session::service::canonicalize_active_session_without_leader;
-use crate::session::types::{SessionState, SessionStatus};
+use crate::session::types::SessionState;
 use crate::workspace::utc_now;
 
 pub(super) fn repair_stale_active_sessions_without_leader(db: &DaemonDb) -> Result<(), CliError> {
@@ -52,7 +52,7 @@ fn session_row_needs_resync(
     stored_is_active: i64,
 ) -> Result<bool, CliError> {
     let canonical_status = session_status_db_label(state.status)?;
-    let canonical_is_active = i64::from(state.status == SessionStatus::Active);
+    let canonical_is_active = i64::from(state.status.is_default_visible());
     Ok(stored_status != canonical_status
         || stored_leader_id != state.leader_id.as_deref()
         || stored_is_active != canonical_is_active)

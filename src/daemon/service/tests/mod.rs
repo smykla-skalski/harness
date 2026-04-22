@@ -51,7 +51,7 @@ fn daemon_service_round_trip_smoke_covers_public_surface() {
     };
 
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon service smoke",
             "round trip",
             project,

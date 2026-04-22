@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn remove_agent_returns_tasks() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s4")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("s4")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session("s4", SessionRole::Worker, "codex", &[], None, project, None)
             .expect("join");
@@ -36,7 +36,7 @@ fn remove_agent_returns_tasks() {
 fn assign_task_keeps_task_open_until_worker_starts() {
     with_temp_project(|project| {
         let state =
-            start_session("test", "", project, Some("claude"), Some("assign-open")).expect("start");
+            start_active_session("test", "", project, Some("claude"), Some("assign-open")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("assign-worker"))], || {
             join_session(
@@ -91,7 +91,7 @@ fn assign_task_keeps_task_open_until_worker_starts() {
 #[test]
 fn drop_task_queues_for_busy_worker() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("drop-queue-busy"))
+        let state = start_active_session("test", "", project, Some("claude"), Some("drop-queue-busy"))
             .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("busy-worker"))], || {
@@ -168,7 +168,7 @@ fn drop_task_queues_for_busy_worker() {
 #[test]
 fn reassignable_drop_starts_on_free_worker() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,
@@ -276,7 +276,7 @@ fn reassignable_drop_starts_on_free_worker() {
 #[test]
 fn observer_can_create_task_in_leaderless_degraded_session() {
     with_temp_project(|project| {
-        start_session(
+        start_active_session(
             "degraded observer triage",
             "",
             project,
@@ -341,7 +341,7 @@ fn observer_can_create_task_in_leaderless_degraded_session() {
 #[test]
 fn locked_queue_advances_when_worker_finishes_current_task() {
     with_temp_project(|project| {
-        let state = start_session(
+        let state = start_active_session(
             "test",
             "",
             project,
@@ -428,7 +428,7 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
 #[test]
 fn task_start_signal_acceptance_marks_task_in_progress() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("drop-ack-accept"))
+        let state = start_active_session("test", "", project, Some("claude"), Some("drop-ack-accept"))
             .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("accept-worker"))], || {

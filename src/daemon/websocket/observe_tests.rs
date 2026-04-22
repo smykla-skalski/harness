@@ -153,7 +153,17 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     Some("ws-sync-observe"),
                 )
                 .expect("start session");
-                let leader_id = state.leader_id.clone().expect("leader id");
+                let active = session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    None,
+                    &project_dir,
+                    None,
+                )
+                .expect("join leader");
+                let leader_id = active.leader_id.clone().expect("leader id");
                 let joined = session_service::join_session(
                     &state.session_id,
                     SessionRole::Worker,

@@ -10,7 +10,6 @@ fn session_start_request_round_trips() {
     let request = SessionStartRequest {
         title: "auth fix session".into(),
         context: "fix auth bug".into(),
-        runtime: "claude".into(),
         session_id: Some("my-session".into()),
         project_dir: "/tmp/project".into(),
         policy_preset: Some("swarm-default".into()),
@@ -19,7 +18,6 @@ fn session_start_request_round_trips() {
     let json = serde_json::to_value(&request).expect("serialize");
     assert_eq!(json["title"], "auth fix session");
     assert_eq!(json["context"], "fix auth bug");
-    assert_eq!(json["runtime"], "claude");
     assert_eq!(json["session_id"], "my-session");
     assert_eq!(json["project_dir"], "/tmp/project");
     assert_eq!(json["policy_preset"], "swarm-default");
@@ -35,7 +33,6 @@ fn session_start_request_round_trips() {
 fn session_start_request_optional_session_id() {
     let json = json!({
         "context": "goal",
-        "runtime": "codex",
         "project_dir": "/tmp/p"
     });
     let request: SessionStartRequest = serde_json::from_value(json).expect("deserialize");
@@ -136,15 +133,14 @@ fn session_mutation_response_contains_state() {
 
 #[test]
 fn session_start_request_accepts_optional_base_ref() {
-    let raw =
-        r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp","base_ref":"main"}"#;
+    let raw = r#"{"title":"t","context":"c","project_dir":"/tmp","base_ref":"main"}"#;
     let req: SessionStartRequest = serde_json::from_str(raw).expect("parse");
     assert_eq!(req.base_ref.as_deref(), Some("main"));
 }
 
 #[test]
 fn session_start_request_base_ref_optional_on_wire() {
-    let raw = r#"{"title":"t","context":"c","runtime":"claude","project_dir":"/tmp"}"#;
+    let raw = r#"{"title":"t","context":"c","project_dir":"/tmp"}"#;
     let req: SessionStartRequest = serde_json::from_str(raw).expect("parse");
     assert!(req.base_ref.is_none());
     let back = serde_json::to_string(&req).expect("serialize");

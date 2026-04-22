@@ -18,7 +18,7 @@ use crate::workspace::worktree::WorktreeController;
 use crate::workspace::{harness_data_root, project_context_dir, utc_now};
 
 use super::session_service;
-use super::{agents_service, resolve_hook_agent, session_storage};
+use super::session_storage;
 
 pub(super) struct PreparedSession {
     pub(super) layout: SessionLayout,
@@ -29,21 +29,13 @@ pub(super) struct PreparedSession {
 pub(super) fn prepare_session(
     request: &super::protocol::SessionStartRequest,
 ) -> Result<PreparedSession, CliError> {
-    let runtime_name = &request.runtime;
     session_service::validate_policy_preset(request.policy_preset.as_deref())?;
-    let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "session start requires a known runtime, got '{runtime_name}'"
-        )))
-    })?;
 
     // Sandboxed callers may pass a bookmark id; the scope guard MUST stay
     // alive while the origin is touched (WorktreeController::create runs the
     // git subprocess against it).
     let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
     let canonical_origin = project_scope.path().to_path_buf();
-    let leader_agent_session_id =
-        agents_service::resolve_known_session_id(leader_runtime, &canonical_origin, None)?;
 
     let sessions_root = workspace_sessions_root(&harness_data_root());
     fs::create_dir_all(&sessions_root).map_err(|error| {
@@ -98,8 +90,8 @@ pub(super) fn prepare_session(
         &request.context,
         &request.title,
         &session_id,
-        runtime_name,
-        leader_agent_session_id.as_deref(),
+        "leaderless",
+        None,
         &now,
         request.policy_preset.as_deref(),
     );

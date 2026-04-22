@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
 use super::{
-    AgentRegistration, AgentStatus, BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError,
-    CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction,
-    SessionMetrics, SessionRole, SessionState, SessionStatus, TaskStatus, agent_status_label,
-    build_signal, fmt, generate_session_id, is_permitted, promote_or_degrade, refresh_session,
-    runtime, runtime_capabilities, storage,
+    BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError, CliErrorKind,
+    LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction, SessionMetrics,
+    SessionState, SessionStatus, TaskStatus, agent_status_label, build_signal, fmt,
+    generate_session_id, is_permitted, promote_or_degrade, refresh_session, runtime, storage,
 };
-use crate::session::types::SessionPolicy;
+use crate::session::types::{AgentRegistration, SessionPolicy, SessionRole};
 
 #[expect(
     clippy::too_many_arguments,
@@ -16,9 +15,9 @@ use crate::session::types::SessionPolicy;
 pub(crate) fn create_initial_session(
     context: &str,
     title: &str,
-    runtime_name: &str,
+    _runtime_name: &str,
     session_id: Option<&str>,
-    agent_session_id: Option<&str>,
+    _agent_session_id: Option<&str>,
     now: &str,
     project_dir: &Path,
     policy_preset: Option<&str>,
@@ -31,8 +30,6 @@ pub(crate) fn create_initial_session(
             context,
             title,
             &session_id,
-            runtime_name,
-            agent_session_id,
             now,
             policy_preset,
         );
@@ -52,8 +49,6 @@ pub(crate) fn create_initial_session(
             context,
             title,
             &session_id,
-            runtime_name,
-            agent_session_id,
             now,
             policy_preset,
         );
@@ -102,10 +97,7 @@ pub(crate) fn canonicalize_active_session_without_leader(
 }
 
 pub(crate) fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {
-    if !matches!(
-        state.status,
-        SessionStatus::Active | SessionStatus::LeaderlessDegraded
-    ) {
+    if !state.status.allows_task_creation() {
         return Err(CliErrorKind::session_not_active(format!(
             "session '{}' is {:?}",
             state.session_id, state.status
@@ -234,32 +226,9 @@ pub(crate) fn build_initial_state(
     context: &str,
     title: &str,
     session_id: &str,
-    runtime_name: &str,
-    agent_session_id: Option<&str>,
     now: &str,
     policy_preset: Option<&str>,
 ) -> SessionState {
-    let leader_id = format!("{runtime_name}-leader");
-    let mut agents = BTreeMap::new();
-    agents.insert(
-        leader_id.clone(),
-        AgentRegistration {
-            agent_id: leader_id.clone(),
-            name: format!("{runtime_name} leader"),
-            runtime: runtime_name.to_string(),
-            role: SessionRole::Leader,
-            capabilities: Vec::new(),
-            joined_at: now.to_string(),
-            updated_at: now.to_string(),
-            status: AgentStatus::Active,
-            agent_session_id: agent_session_id.map(ToString::to_string),
-            last_activity_at: Some(now.to_string()),
-            current_task_id: None,
-            runtime_capabilities: runtime_capabilities(runtime_name),
-            persona: None,
-        },
-    );
-
     let mut state = SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 1,
@@ -271,13 +240,13 @@ pub(crate) fn build_initial_state(
         branch_ref: format!("harness/{session_id}"),
         title: title.to_string(),
         context: context.to_string(),
-        status: SessionStatus::Active,
+        status: SessionStatus::AwaitingLeader,
         policy: policy_for_preset(policy_preset),
         created_at: now.to_string(),
         updated_at: now.to_string(),
-        agents,
+        agents: BTreeMap::new(),
         tasks: BTreeMap::new(),
-        leader_id: Some(leader_id),
+        leader_id: None,
         archived_at: None,
         last_activity_at: Some(now.to_string()),
         observe_id: Some(format!("observe-{session_id}")),

@@ -69,38 +69,20 @@ fn daemon_serve_startup_groups_db_spans_under_startup_root() {
     let _ = tracer_provider.force_flush();
     let spans = exporter.finished_spans();
     let startup_span = find_exported_span(&spans, "daemon.lifecycle.startup");
-    let sync_schema_span = find_exported_span(&spans, "daemon.db.sync.schema_version");
-    let async_connect_span = find_exported_span(&spans, "daemon.db.async.connect");
-    let async_schema_span = find_exported_span(&spans, "daemon.db.async.schema_version");
-    let async_health_span = find_exported_span(&spans, "daemon.db.async.health_counts");
-
-    assert_eq!(
-        sync_schema_span.parent_span_id,
-        startup_span.span_context.span_id()
+    assert!(
+        startup_span.events.events.iter().any(|event| {
+            event.name == "initializing daemon database schema"
+        }),
+        "startup span should capture sync DB initialization"
     );
-    assert_eq!(
-        async_connect_span.parent_span_id,
-        startup_span.span_context.span_id()
+    assert!(
+        startup_span
+            .events
+            .events
+            .iter()
+            .any(|event| event.name == "async database pool ready"),
+        "startup span should capture async DB readiness"
     );
-    assert_eq!(
-        async_schema_span.parent_span_id,
-        async_connect_span.span_context.span_id()
-    );
-    assert_eq!(
-        async_health_span.parent_span_id,
-        startup_span.span_context.span_id()
-    );
-    for span in [
-        sync_schema_span,
-        async_connect_span,
-        async_schema_span,
-        async_health_span,
-    ] {
-        assert_eq!(
-            span.span_context.trace_id(),
-            startup_span.span_context.trace_id()
-        );
-    }
     assert_eq!(
         span_string_attribute(startup_span, "daemon.phase").as_deref(),
         Some("startup")

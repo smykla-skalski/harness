@@ -1,18 +1,14 @@
 use super::*;
 
 #[test]
-fn start_creates_session_with_leader() {
+fn start_creates_leaderless_session() {
     with_temp_project(|project| {
         let state = start_session("test goal", "", project, Some("claude"), None).expect("start");
-        assert_eq!(state.status, SessionStatus::Active);
-        assert_eq!(state.agents.len(), 1);
-        assert_eq!(state.metrics.agent_count, 1);
-        let leader = state.agents.values().next().expect("leader");
-        assert_eq!(leader.role, SessionRole::Leader);
-        assert_eq!(leader.runtime, "claude");
-        assert_eq!(leader.agent_session_id.as_deref(), Some("test-service"));
-        assert_eq!(leader.runtime_capabilities.runtime, "claude");
-        assert!(leader.last_activity_at.is_some());
+        assert_eq!(state.status, SessionStatus::AwaitingLeader);
+        assert!(state.leader_id.is_none());
+        assert!(state.agents.is_empty());
+        assert_eq!(state.metrics.agent_count, 0);
+        assert_eq!(state.metrics.active_agent_count, 0);
     });
 }
 
@@ -30,15 +26,17 @@ fn join_adds_agent() {
             None,
         )
         .expect("join");
-        assert_eq!(state.agents.len(), 2);
-        assert_eq!(state.metrics.agent_count, 2);
+        assert_eq!(state.status, SessionStatus::AwaitingLeader);
+        assert!(state.leader_id.is_none());
+        assert_eq!(state.agents.len(), 1);
+        assert_eq!(state.metrics.agent_count, 1);
     });
 }
 
 #[test]
 fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
     with_temp_project(|project| {
-        let state = start_session_with_policy(
+        let state = start_active_session_with_policy(
             "swarm contract",
             "",
             project,
@@ -76,7 +74,7 @@ fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
 #[test]
 fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
     with_temp_project(|project| {
-        start_session_with_policy(
+        start_active_session_with_policy(
             "swarm contract",
             "",
             project,
@@ -154,23 +152,14 @@ fn start_session_rejects_unsafe_session_id() {
 }
 
 #[test]
-fn start_session_requires_known_runtime() {
+fn start_session_ignores_runtime_compat_inputs() {
     with_temp_project(|project| {
-        let missing_runtime = start_session("goal", "", project, None, Some("no-runtime"))
-            .expect_err("runtime is required");
-        assert_eq!(missing_runtime.code(), "KSRCLI092");
-
-        let unknown_runtime = start_session("goal", "", project, Some("unknown"), Some("bad"))
-            .expect_err("unknown runtime should be rejected");
-        assert_eq!(unknown_runtime.code(), "KSRCLI092");
-    });
-}
-
-#[test]
-fn start_session_accepts_vibe_and_opencode_as_distinct_runtime_names() {
-    with_temp_project(|project| {
+        let missing_runtime =
+            start_session("goal", "", project, None, Some("no-runtime")).expect("start");
+        let unknown_runtime =
+            start_session("goal", "", project, Some("unknown"), Some("bad")).expect("start");
         let vibe = start_session("goal", "", project, Some("vibe"), Some("vibe-runtime"))
-            .expect("vibe runtime should be accepted");
+            .expect("vibe runtime should be ignored");
         let opencode = start_session(
             "goal",
             "",
@@ -178,23 +167,14 @@ fn start_session_accepts_vibe_and_opencode_as_distinct_runtime_names() {
             Some("opencode"),
             Some("opencode-runtime"),
         )
-        .expect("opencode runtime should remain accepted");
+        .expect("opencode runtime should be ignored");
 
-        let vibe_leader = vibe
-            .agents
-            .values()
-            .find(|agent| agent.role == SessionRole::Leader)
-            .expect("vibe leader");
-        assert_eq!(vibe_leader.runtime, "vibe");
-        assert_eq!(vibe_leader.runtime_capabilities.runtime, "vibe");
-
-        let opencode_leader = opencode
-            .agents
-            .values()
-            .find(|agent| agent.role == SessionRole::Leader)
-            .expect("opencode leader");
-        assert_eq!(opencode_leader.runtime, "opencode");
-        assert_eq!(opencode_leader.runtime_capabilities.runtime, "opencode");
+        for state in [missing_runtime, unknown_runtime, vibe, opencode] {
+            assert_eq!(state.status, SessionStatus::AwaitingLeader);
+            assert!(state.leader_id.is_none());
+            assert!(state.agents.is_empty());
+            assert_eq!(state.metrics.agent_count, 0);
+        }
     });
 }
 
@@ -233,7 +213,8 @@ fn auto_generated_session_ids_are_unique() {
 #[test]
 fn join_same_runtime_keeps_distinct_agents() {
     with_temp_project(|project| {
-        start_session("test", "", project, Some("claude"), Some("join-unique")).expect("start");
+        start_active_session("test", "", project, Some("claude"), Some("join-unique"))
+            .expect("start");
 
         let (first, second) =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
@@ -274,7 +255,8 @@ fn join_same_runtime_keeps_distinct_agents() {
 #[test]
 fn join_records_runtime_session_id_when_available() {
     with_temp_project(|project| {
-        start_session("test", "", project, Some("claude"), Some("join-runtime")).unwrap();
+        start_active_session("test", "", project, Some("claude"), Some("join-runtime"))
+            .unwrap();
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
             join_session(
@@ -304,7 +286,8 @@ fn join_records_runtime_session_id_when_available() {
 #[test]
 fn end_session_requires_leader() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s2")).expect("start");
+        let state =
+            start_active_session("test", "", project, Some("claude"), Some("s2")).expect("start");
         let joined = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -329,7 +312,8 @@ fn end_session_requires_leader() {
 #[test]
 fn task_lifecycle() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s3")).expect("start");
+        let state =
+            start_active_session("test", "", project, Some("claude"), Some("s3")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
 
         let item = create_task(

@@ -22,9 +22,6 @@ pub struct SessionStartArgs {
     /// Project directory (defaults to cwd).
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
-    /// Agent runtime of the leader starting this session.
-    #[arg(long, value_enum)]
-    pub runtime: Option<HookAgent>,
     /// Explicit session ID (auto-generated if omitted).
     #[arg(long)]
     pub session_id: Option<String>,
@@ -40,7 +37,7 @@ impl Execute for SessionStartArgs {
             &self.context,
             &self.title,
             project.as_ref(),
-            self.runtime.map(agent_to_str),
+            None,
             self.session_id.as_deref(),
             self.policy_preset.as_deref(),
         )?;

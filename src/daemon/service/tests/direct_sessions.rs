@@ -154,20 +154,15 @@ fn remove_agent_async_direct_sends_abort_signal() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async remove session".into(),
-                        context: "async remove".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-remove".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-remove",
+                    "async remove session",
+                    "async remove",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-remove",
@@ -227,7 +222,6 @@ fn start_session_db_direct_creates_in_sqlite() {
             &SessionStartRequest {
                 title: "db-direct start session".into(),
                 context: "db-direct start".into(),
-                runtime: "claude".into(),
                 session_id: Some("daemon-start-1".into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
@@ -238,14 +232,19 @@ fn start_session_db_direct_creates_in_sqlite() {
         .expect("start session via db");
 
         assert_eq!(state.context, "db-direct start");
-        assert!(state.leader_id.is_some());
-        assert_eq!(state.agents.len(), 1);
+        assert_eq!(state.status, SessionStatus::AwaitingLeader);
+        assert!(state.leader_id.is_none());
+        assert!(state.agents.is_empty());
+        assert_eq!(state.metrics.agent_count, 0);
 
         let db_state = db
             .load_session_state("daemon-start-1")
             .expect("load")
             .expect("present");
         assert_eq!(db_state.context, "db-direct start");
+        assert_eq!(db_state.status, SessionStatus::AwaitingLeader);
+        assert!(db_state.leader_id.is_none());
+        assert!(db_state.agents.is_empty());
     });
 }
 
@@ -262,20 +261,15 @@ fn end_session_async_direct_marks_inactive() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async end session".into(),
-                        context: "async end".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-end".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-end",
+                    "async end session",
+                    "async end",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-end",
@@ -336,7 +330,6 @@ fn start_session_db_direct_registers_fresh_project_for_discovery() {
             &SessionStartRequest {
                 title: "fresh-project start session".into(),
                 context: "fresh-project start".into(),
-                runtime: "claude".into(),
                 session_id: Some("daemon-start-fresh".into()),
                 project_dir: canonical_project.to_string_lossy().into_owned(),
                 policy_preset: None,
@@ -379,7 +372,6 @@ fn join_session_db_direct_adds_agent() {
             &SessionStartRequest {
                 title: "join test session".into(),
                 context: "join test".into(),
-                runtime: "claude".into(),
                 session_id: Some("daemon-join-1".into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
@@ -404,13 +396,17 @@ fn join_session_db_direct_adds_agent() {
         )
         .expect("join session via db");
 
-        assert_eq!(joined.agents.len(), 2);
+        assert_eq!(joined.status, SessionStatus::AwaitingLeader);
+        assert!(joined.leader_id.is_none());
+        assert_eq!(joined.agents.len(), 1);
 
         let db_state = db
             .load_session_state("daemon-join-1")
             .expect("load")
             .expect("present");
-        assert_eq!(db_state.agents.len(), 2);
+        assert_eq!(db_state.status, SessionStatus::AwaitingLeader);
+        assert!(db_state.leader_id.is_none());
+        assert_eq!(db_state.agents.len(), 1);
     });
 }
 
@@ -431,7 +427,6 @@ fn start_session_direct_async_creates_in_sqlite() {
                 &crate::daemon::protocol::SessionStartRequest {
                     title: "async direct start session".into(),
                     context: "async direct start".into(),
-                    runtime: "claude".into(),
                     session_id: Some("daemon-async-start-1".into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
@@ -443,8 +438,10 @@ fn start_session_direct_async_creates_in_sqlite() {
             .expect("start session via async db");
 
             assert_eq!(state.context, "async direct start");
-            assert!(state.leader_id.is_some());
-            assert_eq!(state.agents.len(), 1);
+            assert_eq!(state.status, SessionStatus::AwaitingLeader);
+            assert!(state.leader_id.is_none());
+            assert!(state.agents.is_empty());
+            assert_eq!(state.metrics.agent_count, 0);
 
             let resolved = async_db
                 .resolve_session("daemon-async-start-1")
@@ -452,6 +449,9 @@ fn start_session_direct_async_creates_in_sqlite() {
                 .expect("resolve")
                 .expect("present");
             assert_eq!(resolved.state.context, "async direct start");
+            assert_eq!(resolved.state.status, SessionStatus::AwaitingLeader);
+            assert!(resolved.state.leader_id.is_none());
+            assert!(resolved.state.agents.is_empty());
             assert_eq!(
                 resolved.project.project_dir.as_deref(),
                 Some(project.canonicalize().expect("canonical project").as_path())
@@ -478,7 +478,6 @@ fn join_session_direct_async_adds_agent() {
                     &crate::daemon::protocol::SessionStartRequest {
                         title: "async join test session".into(),
                         context: "async join test".into(),
-                        runtime: "claude".into(),
                         session_id: Some("daemon-async-join-1".into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
@@ -505,14 +504,18 @@ fn join_session_direct_async_adds_agent() {
                 .await
                 .expect("join session via async db");
 
-                assert_eq!(joined.agents.len(), 2);
+                assert_eq!(joined.status, SessionStatus::AwaitingLeader);
+                assert!(joined.leader_id.is_none());
+                assert_eq!(joined.agents.len(), 1);
 
                 let resolved = async_db
                     .resolve_session("daemon-async-join-1")
                     .await
                     .expect("resolve")
                     .expect("present");
-                assert_eq!(resolved.state.agents.len(), 2);
+                assert_eq!(resolved.state.status, SessionStatus::AwaitingLeader);
+                assert!(resolved.state.leader_id.is_none());
+                assert_eq!(resolved.state.agents.len(), 1);
             });
         });
     });

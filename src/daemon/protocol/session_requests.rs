@@ -105,7 +105,6 @@ pub struct SessionStartRequest {
     #[serde(default)]
     pub title: String,
     pub context: String,
-    pub runtime: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     pub project_dir: String,

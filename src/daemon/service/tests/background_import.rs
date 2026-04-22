@@ -8,7 +8,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
     use crate::daemon::codex_transport::CodexTransportKind;
 
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon serve helpers smoke",
             "",
             project,
@@ -94,7 +94,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
 #[test]
 fn session_import_required_skips_matching_db_versions() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon version skip",
             "",
             project,
@@ -127,7 +127,7 @@ fn session_import_required_skips_matching_db_versions() {
 #[test]
 fn session_import_required_detects_newer_file_versions() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon version refresh",
             "",
             project,

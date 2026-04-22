@@ -35,8 +35,8 @@ fn apply_join_session_idempotent_by_marker() {
     .expect("second join");
 
     assert_eq!(first, second, "same marker should return same agent_id");
-    // Only the leader + one worker, no duplicate
-    assert_eq!(state.agents.len(), 2);
+    // Only one worker, no duplicate
+    assert_eq!(state.agents.len(), 1);
 }
 
 #[test]
@@ -81,6 +81,6 @@ fn apply_join_session_different_markers_create_distinct() {
         first, second,
         "different markers should create distinct agents"
     );
-    // Leader + two distinct workers
-    assert_eq!(state.agents.len(), 3);
+    // Two distinct workers
+    assert_eq!(state.agents.len(), 2);
 }

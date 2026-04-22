@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn create_task_uses_suggested_fix_from_request() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon task request",
             "",
             project,
@@ -38,7 +38,7 @@ fn create_task_uses_suggested_fix_from_request() {
 #[test]
 fn change_role_records_reason_from_request() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon role request",
             "",
             project,
@@ -111,20 +111,15 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                     .await
                     .expect("open async daemon db");
 
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async task mutation".into(),
-                        context: "async task flow".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-task".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-task",
+                    "async task mutation",
+                    "async task flow",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-task",
@@ -217,20 +212,15 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                     .await
                     .expect("open async daemon db");
 
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async role mutation".into(),
-                        context: "async role flow".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-role".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-role",
+                    "async role mutation",
+                    "async role flow",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-role",
@@ -310,20 +300,15 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                         .await
                         .expect("open async daemon db");
 
-                    let state = start_session_direct_async(
-                        &crate::daemon::protocol::SessionStartRequest {
-                            title: "async task lifecycle".into(),
-                            context: "async task lifecycle flow".into(),
-                            runtime: "claude".into(),
-                            session_id: Some("daemon-async-task-lifecycle".into()),
-                            project_dir: project.to_string_lossy().into(),
-                            policy_preset: None,
-                            base_ref: None,
-                        },
+                    let state = start_direct_session_async(
                         &async_db,
+                        project,
+                        "daemon-async-task-lifecycle",
+                        "async task lifecycle",
+                        "async task lifecycle flow",
+                        None,
                     )
-                    .await
-                    .expect("start session");
+                    .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
                         "daemon-async-task-lifecycle",

@@ -45,8 +45,6 @@ fn parse_session_start() {
         "start",
         "--context",
         "test goal",
-        "--runtime",
-        "claude",
     ])
     .unwrap();
     match cli.command {
@@ -54,10 +52,6 @@ fn parse_session_start() {
             command: crate::session::transport::SessionCommand::Start(args),
         } => {
             assert_eq!(args.context, "test goal");
-            assert_eq!(
-                args.runtime,
-                Some(crate::hooks::adapters::HookAgent::Claude)
-            );
         }
         _ => panic!("expected Session Start"),
     }
@@ -71,8 +65,6 @@ fn parse_session_start_with_policy_preset() {
         "start",
         "--context",
         "test goal",
-        "--runtime",
-        "claude",
         "--policy-preset",
         "swarm-default",
     ])
@@ -82,10 +74,6 @@ fn parse_session_start_with_policy_preset() {
             command: crate::session::transport::SessionCommand::Start(args),
         } => {
             assert_eq!(args.context, "test goal");
-            assert_eq!(
-                args.runtime,
-                Some(crate::hooks::adapters::HookAgent::Claude)
-            );
             assert_eq!(args.policy_preset.as_deref(), Some("swarm-default"));
         }
         _ => panic!("expected Session Start"),

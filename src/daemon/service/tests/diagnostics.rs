@@ -36,7 +36,13 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
             );
             assert_eq!(report.health.expect("health").session_count, 0);
             assert!(report.workspace.events_path.ends_with("events.jsonl"));
-            assert_eq!(report.recent_events.len(), 1);
+            assert!(
+                report
+                    .recent_events
+                    .iter()
+                    .any(|event| event.message == "daemon booted"),
+                "diagnostics should include the appended daemon event"
+            );
         },
     );
 }

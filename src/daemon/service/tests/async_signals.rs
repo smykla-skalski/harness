@@ -53,20 +53,15 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async signal send".into(),
-                        context: "async signal send".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-signal-send".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-signal-send",
+                    "async signal send",
+                    "async signal send",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-signal-send",
@@ -131,20 +126,15 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                         .await
                         .expect("open async daemon db");
-                    let state = start_session_direct_async(
-                        &crate::daemon::protocol::SessionStartRequest {
-                            title: "async signal cancel".into(),
-                            context: "async signal cancel".into(),
-                            runtime: "claude".into(),
-                            session_id: Some("daemon-async-signal-cancel".into()),
-                            project_dir: project.to_string_lossy().into(),
-                            policy_preset: None,
-                            base_ref: None,
-                        },
+                    let state = start_direct_session_async(
                         &async_db,
+                        project,
+                        "daemon-async-signal-cancel",
+                        "async signal cancel",
+                        "async signal cancel",
+                        None,
                     )
-                    .await
-                    .expect("start session");
+                    .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
                         "daemon-async-signal-cancel",
@@ -220,20 +210,15 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
-                let state = start_session_direct_async(
-                    &crate::daemon::protocol::SessionStartRequest {
-                        title: "async signal ack".into(),
-                        context: "async signal ack".into(),
-                        runtime: "claude".into(),
-                        session_id: Some("daemon-async-signal-ack".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        policy_preset: None,
-                        base_ref: None,
-                    },
+                let state = start_direct_session_async(
                     &async_db,
+                    project,
+                    "daemon-async-signal-ack",
+                    "async signal ack",
+                    "async signal ack",
+                    None,
                 )
-                .await
-                .expect("start session");
+                .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
                     "daemon-async-signal-ack",
@@ -315,20 +300,15 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                         .await
                         .expect("open async daemon db");
-                    let state = start_session_direct_async(
-                        &crate::daemon::protocol::SessionStartRequest {
-                            title: "async signal expired".into(),
-                            context: "async signal expired".into(),
-                            runtime: "claude".into(),
-                            session_id: Some("daemon-async-signal-expired".into()),
-                            project_dir: project.to_string_lossy().into(),
-                            policy_preset: None,
-                            base_ref: None,
-                        },
+                    let state = start_direct_session_async(
                         &async_db,
+                        project,
+                        "daemon-async-signal-expired",
+                        "async signal expired",
+                        "async signal expired",
+                        None,
                     )
-                    .await
-                    .expect("start session");
+                    .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
                         "daemon-async-signal-expired",

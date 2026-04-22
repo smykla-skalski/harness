@@ -10,6 +10,42 @@ pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     });
 }
 
+pub(super) fn join_test_leader(session_id: &str, project: &Path) -> Result<SessionState, CliError> {
+    join_session(
+        session_id,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        Some("test leader"),
+        project,
+        None,
+    )
+}
+
+pub(super) fn start_active_session(
+    context: &str,
+    title: &str,
+    project: &Path,
+    _runtime_name: Option<&str>,
+    session_id: Option<&str>,
+) -> Result<SessionState, CliError> {
+    let state = start_session(context, title, project, None, session_id)?;
+    join_test_leader(&state.session_id, project)
+}
+
+pub(super) fn start_active_session_with_policy(
+    context: &str,
+    title: &str,
+    project: &Path,
+    _runtime_name: Option<&str>,
+    session_id: Option<&str>,
+    policy_preset: Option<&str>,
+) -> Result<SessionState, CliError> {
+    let state =
+        start_session_with_policy(context, title, project, None, session_id, policy_preset)?;
+    join_test_leader(&state.session_id, project)
+}
+
 pub(super) fn find_agent_by_runtime<'a>(
     state: &'a SessionState,
     runtime: &str,
