@@ -3,7 +3,7 @@ use std::process::Command;
 
 use tempfile::tempdir;
 
-use super::support::{parse_env_output, parse_output_lines};
+use super::support::{parse_env_output, parse_output_lines, write_fake_shell_tool};
 
 #[test]
 fn cargo_local_script_falls_back_to_repo_local_tmpdir_when_tmpdir_is_missing() {
@@ -199,4 +199,83 @@ fn observability_script_test_helper_writes_shared_config_to_both_runtime_roots()
             "expected gRPC endpoint in {path}: {body}"
         );
     }
+}
+
+#[test]
+fn cargo_local_script_prefers_rtk_for_supported_subcommands() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_bin = tmp.path().join("fake-bin");
+    let log_path = tmp.path().join("fake-script.log");
+
+    write_fake_shell_tool(
+        &fake_bin.join("rtk"),
+        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
+    );
+    write_fake_shell_tool(
+        &fake_bin.join("cargo"),
+        "#!/bin/sh\nset -eu\nprintf 'CARGO=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("test")
+        .arg("--lib")
+        .current_dir(&repo)
+        .env("FAKE_SCRIPT_LOG", &log_path)
+        .env("HOME", tmp.path().join("home"))
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
+        .output()
+        .expect("run cargo-local test wrapper");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = std::fs::read_to_string(&log_path).expect("read fake script log");
+    assert_eq!(log.trim(), "RTK=cargo test --lib");
+}
+
+#[test]
+fn cargo_local_script_keeps_run_subcommand_raw_when_rtk_is_available() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_bin = tmp.path().join("fake-bin");
+    let log_path = tmp.path().join("fake-script.log");
+
+    write_fake_shell_tool(
+        &fake_bin.join("rtk"),
+        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
+    );
+    write_fake_shell_tool(
+        &fake_bin.join("cargo"),
+        "#!/bin/sh\nset -eu\nprintf 'CARGO=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("run")
+        .arg("--quiet")
+        .arg("--")
+        .arg("daemon")
+        .arg("serve")
+        .current_dir(&repo)
+        .env("FAKE_SCRIPT_LOG", &log_path)
+        .env("HOME", tmp.path().join("home"))
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
+        .output()
+        .expect("run cargo-local run wrapper");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = std::fs::read_to_string(&log_path).expect("read fake script log");
+    assert_eq!(log.trim(), "CARGO=run --quiet -- daemon serve");
 }

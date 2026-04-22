@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
 CARGO_LOCK="$ROOT/Cargo.lock"

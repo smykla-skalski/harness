@@ -10,7 +10,7 @@
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf 'error: jq not found on PATH. Install with `brew install jq`.\n' >&2
+  printf "error: jq not found on PATH. Install with \`brew install jq\`.\n" >&2
   exit 2
 fi
 

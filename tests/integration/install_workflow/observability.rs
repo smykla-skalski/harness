@@ -214,10 +214,9 @@ fn sqlite_snapshot_sync_copies_live_databases_into_stable_read_targets() {
 #[test]
 fn grafana_star_initializer_uses_v2_uid_star_endpoint() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let script = fs::read_to_string(
-        repo.join("resources/observability/grafana/init-star-dashboards.sh"),
-    )
-    .expect("read init-star-dashboards.sh");
+    let script =
+        fs::read_to_string(repo.join("resources/observability/grafana/init-star-dashboards.sh"))
+            .expect("read init-star-dashboards.sh");
 
     assert!(
         script.contains("/api/user/stars/dashboard/uid/$uid"),
@@ -232,8 +231,8 @@ fn grafana_star_initializer_uses_v2_uid_star_endpoint() {
 #[test]
 fn observability_v2_dashboard_verifier_uses_uid_not_legacy_provisioned_flag() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let script = fs::read_to_string(repo.join("scripts/observability.sh"))
-        .expect("read observability.sh");
+    let script =
+        fs::read_to_string(repo.join("scripts/observability.sh")).expect("read observability.sh");
 
     assert!(
         script.contains(".dashboard.uid == $uid"),
@@ -242,5 +241,53 @@ fn observability_v2_dashboard_verifier_uses_uid_not_legacy_provisioned_flag() {
     assert!(
         !script.contains(".meta.provisioned == true"),
         "v2 dashboard verification should not rely on the legacy provisioned flag"
+    );
+}
+
+#[test]
+fn observability_status_prefers_rtk_wrapped_compose_output_when_available() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fake_bin = tmp.path().join("fake-bin");
+    let log_path = tmp.path().join("fake-compose.log");
+
+    write_fake_shell_tool(
+        &fake_bin.join("rtk"),
+        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_OBSERVABILITY_LOG\"\n",
+    );
+    write_fake_shell_tool(
+        &fake_bin.join("docker"),
+        "#!/bin/sh\nset -eu\nprintf 'DOCKER=%s\\n' \"$*\" >\"$FAKE_OBSERVABILITY_LOG\"\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/observability.sh"))
+        .arg("status")
+        .current_dir(&repo)
+        .env("FAKE_OBSERVABILITY_LOG", &log_path)
+        .env("HOME", tmp.path().join("home"))
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
+        .output()
+        .expect("run observability status");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = std::fs::read_to_string(&log_path).expect("read fake observability log");
+    assert!(
+        log.contains(&format!(
+            "RTK=docker compose -p harness-observability -f {} ps",
+            repo.join("resources/observability/docker-compose.yml")
+                .display()
+        )),
+        "expected observability status to prefer RTK-wrapped docker compose ps, got: {log}"
+    );
+    assert!(
+        !log.contains("DOCKER="),
+        "expected observability status to avoid raw docker compose output when RTK is available: {log}"
     );
 }

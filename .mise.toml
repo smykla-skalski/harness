@@ -1,5 +1,6 @@
 [tools]
 rust = "nightly"
+shellcheck = "0.11.0"
 
 [env]
 HARNESS_APP_GROUP_ID = "Q498EB36N4.io.harnessmonitor"
@@ -24,6 +25,10 @@ run = "./scripts/version.sh sync"
 description = "Verify all derived version surfaces are in sync"
 run = "./scripts/version.sh check"
 
+[tasks."check:scripts"]
+description = "Run shell and Python script lint plus syntax checks for repo-local helpers"
+run = "./scripts/check-scripts.sh"
+
 [tasks."test:unit"]
 description = "Run unit tests"
 run = "./scripts/cargo-local.sh test --lib"
@@ -46,7 +51,7 @@ run = "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"
 
 [tasks.check]
 description = "Type-check without building"
-run = ["./scripts/version.sh check", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib", "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"]
+run = ["./scripts/version.sh check", "./scripts/check-scripts.sh", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib", "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"

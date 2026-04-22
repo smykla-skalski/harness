@@ -9,7 +9,7 @@
 set -euo pipefail
 
 if ! command -v harness >/dev/null 2>&1; then
-  printf 'error: `harness` not on PATH. Run `mise run install` first.\n' >&2
+  printf "error: \`harness\` not on PATH. Run \`mise run install\` first.\n" >&2
   exit 2
 fi
 

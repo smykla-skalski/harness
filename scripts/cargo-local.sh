@@ -23,6 +23,17 @@ sanitize_segment() {
   printf '%s' "$1" | tr -cs '[:alnum:]._-' '-'
 }
 
+rtk_supports_cargo_subcommand() {
+  case "${1:-}" in
+    build|check|clippy|install|nextest|test)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 tmpdir_is_usable() {
   local candidate probe
   candidate="${1:-}"
@@ -189,6 +200,10 @@ if [[ "${1:-}" == "--print-env" ]]; then
     sleep "${HARNESS_CARGO_LEASE_HOLD_SECONDS}"
   fi
   exit 0
+fi
+
+if [[ $# -gt 0 ]] && command -v rtk >/dev/null 2>&1 && rtk_supports_cargo_subcommand "$1"; then
+  exec rtk cargo "$@"
 fi
 
 exec cargo "$@"
