@@ -1,6 +1,14 @@
 import Foundation
 
 extension DaemonController {
+  private struct DaemonListeningEvent: Sendable {
+    let endpoint: String
+    let recordedAt: String
+  }
+
+  private static let daemonListeningEventPrefix = "daemon listening on "
+  private static let daemonEventTailBytes: UInt64 = 64 * 1024
+
   func daemonConnection(from manifest: DaemonManifest) throws -> HarnessMonitorConnection {
     let endpoint = try endpointURL(from: manifest.endpoint)
     let token = try loadToken(path: manifest.tokenPath)
@@ -18,12 +26,13 @@ extension DaemonController {
     }
 
     let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
+    let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
     let manifestFilePath = manifestURL.path
-    let pid = manifest.pid
+    let pid = resolvedManifest.pid
     HarnessMonitorLogger.lifecycle.trace(
       "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
     )
-    return manifest
+    return resolvedManifest
   }
 
   func loadToken(path: String) throws -> String {
@@ -46,6 +55,102 @@ extension DaemonController {
       )
     }
     return url
+  }
+
+  private func recoverManifestEndpointIfNeeded(_ manifest: DaemonManifest) -> DaemonManifest {
+    guard let event = latestDaemonListeningEvent(),
+      shouldRecoverManifestEndpoint(manifest, with: event)
+    else {
+      return manifest
+    }
+
+    HarnessMonitorLogger.lifecycle.notice(
+      """
+      Recovered daemon endpoint from events log \
+      \(manifest.endpoint, privacy: .public) -> \
+      \(event.endpoint, privacy: .public)
+      """
+    )
+    return DaemonManifest(
+      version: manifest.version,
+      pid: manifest.pid,
+      endpoint: event.endpoint,
+      startedAt: event.recordedAt,
+      tokenPath: manifest.tokenPath,
+      sandboxed: manifest.sandboxed,
+      hostBridge: manifest.hostBridge,
+      revision: manifest.revision,
+      updatedAt: event.recordedAt,
+      binaryStamp: manifest.binaryStamp
+    )
+  }
+
+  private func shouldRecoverManifestEndpoint(
+    _ manifest: DaemonManifest,
+    with event: DaemonListeningEvent
+  ) -> Bool {
+    guard event.endpoint != manifest.endpoint else {
+      return false
+    }
+    if Self.endpointNeedsRecovery(manifest.endpoint) {
+      return true
+    }
+    let manifestTimestamp = manifest.updatedAt ?? manifest.startedAt
+    return event.recordedAt > manifestTimestamp
+  }
+
+  private func latestDaemonListeningEvent() -> DaemonListeningEvent? {
+    let eventsURL = HarnessMonitorPaths.daemonRoot(using: environment)
+      .appendingPathComponent("events.jsonl")
+    guard let handle = try? FileHandle(forReadingFrom: eventsURL) else {
+      return nil
+    }
+    defer { try? handle.close() }
+
+    let fileSize = (try? handle.seekToEnd()) ?? 0
+    let chunkSize = min(fileSize, Self.daemonEventTailBytes)
+    if chunkSize > 0 {
+      try? handle.seek(toOffset: fileSize - chunkSize)
+    } else {
+      try? handle.seek(toOffset: 0)
+    }
+    guard let data = try? handle.readToEnd(), !data.isEmpty else {
+      return nil
+    }
+    let decoder = makeDecoder()
+
+    for line in data.split(separator: UInt8(ascii: "\n")).reversed() {
+      guard let event = try? decoder.decode(DaemonAuditEvent.self, from: Data(line)),
+        let endpoint = Self.daemonListeningEndpoint(from: event.message)
+      else {
+        continue
+      }
+      return DaemonListeningEvent(endpoint: endpoint, recordedAt: event.recordedAt)
+    }
+    return nil
+  }
+
+  static func daemonListeningEndpoint(from message: String) -> String? {
+    guard message.hasPrefix(daemonListeningEventPrefix) else {
+      return nil
+    }
+    let endpoint = String(message.dropFirst(daemonListeningEventPrefix.count))
+    return endpointNeedsRecovery(endpoint) ? nil : endpoint
+  }
+
+  static func endpointNeedsRecovery(_ endpoint: String) -> Bool {
+    guard
+      let url = URL(string: endpoint),
+      let scheme = url.scheme?.lowercased(),
+      ["http", "https"].contains(scheme),
+      let host = url.host,
+      !host.isEmpty,
+      let port = url.port,
+      port > 0
+    else {
+      return true
+    }
+    return false
   }
 
   func validatedTokenURL(from path: String) throws -> URL {
