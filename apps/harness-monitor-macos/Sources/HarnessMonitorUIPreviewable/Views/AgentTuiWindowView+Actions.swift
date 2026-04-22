@@ -219,8 +219,10 @@ extension AgentTuiWindowView {
 
   func stopTui(_ tui: AgentTuiSnapshot) {
     viewModel.isSubmitting = true
+    let tuiID = tui.tuiId
+    let stopper = StoreBackedAgentTuiStopper(store: store)
     Task {
-      _ = await store.stopAgentTui(tuiID: tui.tuiId)
+      await performGracefulStop(tuiID: tuiID, stopper: stopper)
       viewModel.isSubmitting = false
     }
   }
