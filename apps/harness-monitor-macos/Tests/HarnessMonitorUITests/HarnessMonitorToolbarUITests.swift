@@ -3,6 +3,54 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
+  private func distinctVisibleToolbarFrames(for query: XCUIElementQuery) -> Set<String> {
+    var frames = Set<String>()
+    let searchCount = min(query.count, 8)
+    for index in 0..<searchCount {
+      let element = query.element(boundBy: index)
+      guard element.exists else {
+        continue
+      }
+      let frame = element.frame
+      // macOS toolbars expose inner icon buttons inside the outer
+      // toolbar control. Only count the outer control frame.
+      guard frame.width >= 40, frame.height >= 40 else {
+        continue
+      }
+      frames.insert(
+        "\(Int(frame.minX.rounded())):"
+          + "\(Int(frame.minY.rounded())):"
+          + "\(Int(frame.width.rounded())):"
+          + "\(Int(frame.height.rounded()))"
+      )
+    }
+    return frames
+  }
+
+  func testDashboardLandingUsesSingleNewSessionToolbarAction() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
+    )
+    let newSessionButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.sidebarNewSessionButton
+    )
+
+    let hasSingleToolbarAction = waitUntil(timeout: Self.actionTimeout) {
+      self.distinctVisibleToolbarFrames(for: newSessionButtons).count == 1
+    }
+
+    if !hasSingleToolbarAction {
+      attachWindowScreenshot(in: app, named: "dashboard-landing-new-session-toolbar")
+      attachAppHierarchy(in: app, named: "dashboard-landing-new-session-toolbar-hierarchy")
+    }
+
+    XCTAssertTrue(
+      hasSingleToolbarAction,
+      "Expected exactly one visible New Session toolbar control on dashboard landing"
+    )
+  }
+
   func testCockpitUsesSingleToolbarActionSet() throws {
     let app = launch(
       mode: "preview",
@@ -13,27 +61,9 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       identifier: Accessibility.inspectorToggleButton
     )
 
-    func distinctVisibleFrames(for query: XCUIElementQuery) -> Set<String> {
-      Set(
-        query.allElementsBoundByIndex.compactMap { element in
-          guard element.exists else {
-            return nil
-          }
-          let frame = element.frame
-          guard frame.width >= 40, frame.height >= 40 else {
-            return nil
-          }
-          return
-            "\(Int(frame.minX.rounded())):"
-            + "\(Int(frame.minY.rounded())):"
-            + "\(Int(frame.width.rounded())):"
-            + "\(Int(frame.height.rounded()))"
-        })
-    }
-
     let hasSingleToolbarSet = waitUntil(timeout: Self.actionTimeout) {
-      distinctVisibleFrames(for: refreshButtons).count == 1
-        && distinctVisibleFrames(for: inspectorButtons).count == 1
+      self.distinctVisibleToolbarFrames(for: refreshButtons).count == 1
+        && self.distinctVisibleToolbarFrames(for: inspectorButtons).count == 1
     }
 
     if !hasSingleToolbarSet {
@@ -60,30 +90,9 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
     let refreshButtons = app.toolbars.buttons.matching(identifier: Accessibility.refreshButton)
 
-    func distinctVisibleFrames(for query: XCUIElementQuery) -> Set<String> {
-      Set(
-        query.allElementsBoundByIndex.compactMap { element in
-          guard element.exists else {
-            return nil
-          }
-          let frame = element.frame
-          // macOS toolbars expose an inner icon button inside the outer
-          // toolbar control. We only want the outer control frame when
-          // checking for duplicated visible buttons.
-          guard frame.width >= 40, frame.height >= 40 else {
-            return nil
-          }
-          return
-            "\(Int(frame.minX.rounded())):"
-            + "\(Int(frame.minY.rounded())):"
-            + "\(Int(frame.width.rounded())):"
-            + "\(Int(frame.height.rounded()))"
-        })
-    }
-
     let hasSingleToolbarSet = waitUntil(timeout: Self.actionTimeout) {
-      (distinctVisibleFrames(for: refreshButtons).count == 1
-        && distinctVisibleFrames(for: showInspectorButtons).count == 1)
+      (self.distinctVisibleToolbarFrames(for: refreshButtons).count == 1
+        && self.distinctVisibleToolbarFrames(for: showInspectorButtons).count == 1)
     }
 
     if !hasSingleToolbarSet {
@@ -91,8 +100,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       attachAppHierarchy(in: app, named: "hidden-inspector-toolbar-hierarchy")
 
       let diagnostics = """
-        refresh: \(distinctVisibleFrames(for: refreshButtons).sorted())
-        inspector: \(distinctVisibleFrames(for: showInspectorButtons).sorted())
+        refresh: \(distinctVisibleToolbarFrames(for: refreshButtons).sorted())
+        inspector: \(distinctVisibleToolbarFrames(for: showInspectorButtons).sorted())
         """
       let attachment = XCTAttachment(string: diagnostics)
       attachment.name = "hidden-inspector-toolbar-diagnostics"

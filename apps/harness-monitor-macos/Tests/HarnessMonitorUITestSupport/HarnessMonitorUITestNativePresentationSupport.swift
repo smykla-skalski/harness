@@ -3,7 +3,9 @@ import XCTest
 extension HarnessMonitorUITestCase {
   func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
     let control = popUpButton(in: app, identifier: controlIdentifier)
-    XCTAssertTrue(control.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      control.exists || control.waitForExistence(timeout: Self.fastActionTimeout)
+    )
 
     app.activate()
     if control.isHittable {
@@ -24,7 +26,9 @@ extension HarnessMonitorUITestCase {
     }
 
     let menuItem = presentedMenuOption(in: app, title: optionTitle)
-    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      menuItem.exists || menuItem.waitForExistence(timeout: Self.fastActionTimeout)
+    )
 
     if menuItem.isHittable {
       menuItem.tap()
@@ -32,7 +36,7 @@ extension HarnessMonitorUITestCase {
       let frameMarker = frameElement(in: app, identifier: "\(optionTitle).frame")
       if let coordinate = centerCoordinate(in: app, for: menuItem) {
         coordinate.tap()
-      } else if frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
+      } else if (frameMarker.exists || frameMarker.waitForExistence(timeout: Self.fastActionTimeout)),
         let coordinate = centerCoordinate(in: app, for: frameMarker)
       {
         coordinate.tap()
