@@ -69,6 +69,9 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
+      SupervisorToolbarItem(slice: store.supervisorToolbarSlice)
+    }
+    ToolbarItem(placement: .primaryAction) {
       Button {
         setInspectorVisibility(!model.showInspector, .explicitUserPreference)
       } label: {

@@ -76,6 +76,18 @@ enum HarnessMonitorNotificationRequestFactory {
     }
   }
 
+  /// Placeholder supervisor notification draft. Phase 2 worker 21 replaces the body with a
+  /// severity → category mapping and a `userInfo` payload carrying `decisionID` for tap
+  /// routing into the Decisions window.
+  static func supervisorDecision(
+    severity: DecisionSeverity,
+    summary: String,
+    decisionID: String
+  ) -> HarnessMonitorNotificationDraft {
+    _ = (severity, summary, decisionID)
+    return HarnessMonitorNotificationDraft()
+  }
+
   static func categories() -> Set<UNNotificationCategory> {
     let acknowledge = UNNotificationAction(
       identifier: HarnessMonitorNotificationActionID.acknowledge,

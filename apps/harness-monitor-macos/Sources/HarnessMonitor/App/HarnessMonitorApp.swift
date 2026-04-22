@@ -116,6 +116,14 @@ struct HarnessMonitorApp: App {
     .windowStyle(.titleBar)
     .defaultSize(width: 980, height: 620)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+
+    Window("Decisions", id: HarnessMonitorWindowID.decisions) {
+      DecisionsWindowView()
+        .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+    }
+    .windowStyle(.titleBar)
+    .defaultSize(width: 900, height: 640)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 
   private var allowsWindowRestoration: Bool {

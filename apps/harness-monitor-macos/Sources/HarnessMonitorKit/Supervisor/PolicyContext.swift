@@ -23,7 +23,7 @@ public struct PolicyContext: Sendable {
     self.history = history
   }
 
-  public static let empty = PolicyContext(
+  public static let empty = Self(
     now: Date(timeIntervalSince1970: 0),
     lastFiredAt: nil,
     recentActionKeys: [],
