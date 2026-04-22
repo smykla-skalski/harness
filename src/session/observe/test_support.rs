@@ -9,6 +9,8 @@ use crate::hooks::adapters::HookAgent;
 use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
 };
+use crate::session::service;
+use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::project_context_dir;
 
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
@@ -20,6 +22,25 @@ pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
             test_fn(&project);
         });
     });
+}
+
+pub(super) fn start_active_session(
+    project_dir: &Path,
+    session_id: &str,
+    context: &str,
+) -> SessionState {
+    let state =
+        service::start_session(context, "", project_dir, Some(session_id)).expect("start session");
+    service::join_session(
+        &state.session_id,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        Some("leader"),
+        project_dir,
+        None,
+    )
+    .expect("join leader")
 }
 
 pub(super) fn write_agent_log_lines(

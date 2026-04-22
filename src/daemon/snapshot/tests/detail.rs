@@ -1,3 +1,4 @@
+use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::super::{
@@ -7,12 +8,16 @@ use super::super::{
 };
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index;
+use crate::session::service as session_service;
+use crate::session::storage;
 
 use super::support::{
     sample_state, sample_state_for_runtime, sample_work_item, seed_snapshot_fixture, write_json,
     write_json_line,
 };
-use crate::session::types::{AgentRegistration, AgentStatus, SessionRole, TaskSeverity};
+use crate::session::types::{
+    AgentRegistration, AgentStatus, SessionRole, SessionStatus, TaskSeverity,
+};
 
 #[test]
 fn snapshot_round_trip_smoke_covers_public_surface() {
@@ -258,6 +263,118 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
             );
         },
     );
+}
+
+#[test]
+fn session_summaries_default_visibility_includes_awaiting_leader_active_and_leaderless_degraded() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let project_dir = tmp.path().join("project-snapshot");
+
+        let awaiting = session_service::start_session(
+            "awaiting snapshot",
+            "",
+            &project_dir,
+            Some("snap-awaiting"),
+        )
+        .expect("start awaiting session");
+
+        let active = session_service::start_session(
+            "active snapshot",
+            "",
+            &project_dir,
+            Some("snap-active"),
+        )
+        .expect("start active seed");
+        let active = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-active"), || {
+            session_service::join_session(
+                &active.session_id,
+                SessionRole::Leader,
+                "claude",
+                &[],
+                Some("leader"),
+                &project_dir,
+                None,
+            )
+        })
+        .expect("join active leader");
+
+        let degraded = session_service::start_session(
+            "degraded snapshot",
+            "",
+            &project_dir,
+            Some("snap-degraded"),
+        )
+        .expect("start degraded seed");
+        let degraded = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-degraded"), || {
+            session_service::join_session(
+                &degraded.session_id,
+                SessionRole::Leader,
+                "claude",
+                &[],
+                Some("leader"),
+                &project_dir,
+                None,
+            )
+        })
+        .expect("join degraded leader");
+        let degraded_leader = degraded.leader_id.clone().expect("degraded leader");
+        let degraded_layout =
+            storage::layout_from_project_dir(&project_dir, &degraded.session_id).expect("layout");
+        storage::update_state(&degraded_layout, |state| {
+            state.status = SessionStatus::LeaderlessDegraded;
+            state.leader_id = None;
+            state
+                .agents
+                .get_mut(&degraded_leader)
+                .expect("degraded leader")
+                .status = AgentStatus::Disconnected;
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let ended =
+            session_service::start_session("ended snapshot", "", &project_dir, Some("snap-ended"))
+                .expect("start ended seed");
+        let ended = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-ended"), || {
+            session_service::join_session(
+                &ended.session_id,
+                SessionRole::Leader,
+                "claude",
+                &[],
+                Some("leader"),
+                &project_dir,
+                None,
+            )
+        })
+        .expect("join ended leader");
+        session_service::end_session(
+            &ended.session_id,
+            ended.leader_id.as_deref().expect("ended leader"),
+            &project_dir,
+        )
+        .expect("end session");
+
+        let visible_ids = session_summaries(false)
+            .expect("visible summaries")
+            .into_iter()
+            .map(|summary| summary.session_id)
+            .collect::<Vec<_>>();
+        assert!(visible_ids.iter().any(|id| id == &awaiting.session_id));
+        assert!(visible_ids.iter().any(|id| id == &active.session_id));
+        assert!(visible_ids.iter().any(|id| id == &degraded.session_id));
+        assert!(!visible_ids.iter().any(|id| id == &ended.session_id));
+
+        let all_ids = session_summaries(true)
+            .expect("all summaries")
+            .into_iter()
+            .map(|summary| summary.session_id)
+            .collect::<Vec<_>>();
+        assert!(all_ids.iter().any(|id| id == &awaiting.session_id));
+        assert!(all_ids.iter().any(|id| id == &active.session_id));
+        assert!(all_ids.iter().any(|id| id == &degraded.session_id));
+        assert!(all_ids.iter().any(|id| id == &ended.session_id));
+    });
 }
 
 #[test]

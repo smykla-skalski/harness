@@ -71,13 +71,16 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let body =
+                    let _ =
                         start_async_http_session(state.clone(), &project_dir, "http-async-observe")
                             .await;
-                    let leader_id = body["state"]["leader_id"]
-                        .as_str()
-                        .expect("leader id")
-                        .to_string();
+                    let async_db = state.async_db.get().expect("async db");
+                    let resolved = async_db
+                        .resolve_session("http-async-observe")
+                        .await
+                        .expect("resolve session")
+                        .expect("session present");
+                    let leader_id = resolved.state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
                         "http-async-observe",
                         &SessionJoinRequest {
@@ -89,7 +92,7 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
                             project_dir: project_dir.to_string_lossy().into_owned(),
                             persona: None,
                         },
-                        state.async_db.get().expect("async db").as_ref(),
+                        async_db.as_ref(),
                     )
                     .await
                     .expect("join worker");
@@ -147,11 +150,20 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     "http sync observe test",
                     "",
                     &project_dir,
-                    Some("claude"),
                     Some("http-sync-observe"),
                 )
                 .expect("start session");
-                let leader_id = state.leader_id.clone().expect("leader id");
+                let active = session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    None,
+                    &project_dir,
+                    None,
+                )
+                .expect("join leader");
+                let leader_id = active.leader_id.clone().expect("leader id");
                 let joined = session_service::join_session(
                     &state.session_id,
                     SessionRole::Worker,

@@ -39,14 +39,8 @@ fn parse_session_observe_with_actor() {
 
 #[test]
 fn parse_session_start() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "session",
-        "start",
-        "--context",
-        "test goal",
-    ])
-    .unwrap();
+    let cli =
+        Cli::try_parse_from(["harness", "session", "start", "--context", "test goal"]).unwrap();
     match cli.command {
         Command::Session {
             command: crate::session::transport::SessionCommand::Start(args),

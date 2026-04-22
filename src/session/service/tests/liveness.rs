@@ -3,8 +3,8 @@ use super::*;
 #[test]
 fn sync_liveness_transitions_stale_agent_to_disconnected() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("sync-1")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("sync-1"))
+            .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess"), || {
@@ -70,7 +70,8 @@ fn sync_liveness_updates_last_activity_from_runtime() {
 #[test]
 fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("sync-legacy")).expect("start");
+        start_active_session("test", "", project, Some("claude"), Some("sync-legacy"))
+            .expect("start");
 
         join_session(
             "sync-legacy",
@@ -119,8 +120,8 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
 #[test]
 fn sync_liveness_marks_session_leaderless_degraded_when_dead_leader_has_no_successor() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("sync-leader")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("sync-leader"))
+            .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
         let leader = state.agents.get(&leader_id).expect("leader agent");
         age_agent_activity(project, "sync-leader", &leader_id, 1_200);
@@ -242,8 +243,8 @@ fn sync_liveness_promotes_highest_priority_successor_within_same_role() {
 #[test]
 fn sync_liveness_returns_dead_agent_task_to_open() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("sync-3")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("sync-3"))
+            .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess-3"), || {
@@ -355,7 +356,8 @@ fn sync_liveness_seven_agents_six_die() {
 #[test]
 fn sync_liveness_skips_rewrite_when_state_is_unchanged() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("sync-noop")).expect("start");
+        start_active_session("test", "", project, Some("claude"), Some("sync-noop"))
+            .expect("start");
         let leader_log = crate::workspace::project_context_dir(project)
             .join("agents/sessions/claude/test-service/raw.jsonl");
         fs_err::create_dir_all(leader_log.parent().unwrap()).expect("dirs");
@@ -377,8 +379,8 @@ fn sync_liveness_skips_rewrite_when_state_is_unchanged() {
 #[test]
 fn leave_session_marks_agent_disconnected() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("leave-1")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("leave-1"))
+            .expect("start");
         let leader_id = state.leader_id.clone().expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-leave"), || {

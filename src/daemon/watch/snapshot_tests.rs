@@ -7,19 +7,12 @@ use crate::session::types::{SessionRole, TaskSeverity};
 
 use super::refresh::refresh_watch_snapshot;
 use super::state::{RefreshScope, WatchSnapshot};
-use super::test_support::{append_project_ledger_entry, with_temp_project};
+use super::test_support::{append_project_ledger_entry, start_active_session, with_temp_project};
 
 #[test]
 fn refresh_watch_snapshot_detects_timeline_only_changes() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
-            "watch test",
-            "",
-            project,
-            Some("claude"),
-            Some("watch-sess"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "watch-sess", "watch test");
         let leader_id = state.leader_id.expect("leader id");
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {

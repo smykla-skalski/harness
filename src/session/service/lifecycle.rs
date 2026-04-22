@@ -11,7 +11,7 @@ use super::{
     write_prepared_leave_signals,
 };
 
-/// Start a new orchestration session and register the caller as leader.
+/// Start a new leaderless orchestration session.
 ///
 /// # Errors
 /// Returns `CliError` on storage failures.
@@ -19,10 +19,9 @@ pub fn start_session(
     context: &str,
     title: &str,
     project_dir: &Path,
-    _runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    start_session_with_policy(context, title, project_dir, _runtime_name, session_id, None)
+    start_session_with_policy(context, title, project_dir, session_id, None)
 }
 
 /// Start a new leaderless session with an optional policy preset.
@@ -33,7 +32,6 @@ pub fn start_session_with_policy(
     context: &str,
     title: &str,
     project_dir: &Path,
-    _runtime_name: Option<&str>,
     session_id: Option<&str>,
     policy_preset: Option<&str>,
 ) -> Result<SessionState, CliError> {
@@ -51,26 +49,13 @@ pub fn start_session_with_policy(
     }
 
     let now = utc_now();
-    let state = create_initial_session(
-        context,
-        title,
-        "leaderless",
-        session_id,
-        None,
-        &now,
-        project_dir,
-        policy_preset,
-    )?;
+    let state =
+        create_initial_session(context, title, session_id, &now, project_dir, policy_preset)?;
 
     let layout = storage::layout_from_project_dir(project_dir, &state.session_id)?;
     storage::register_active(&layout)?;
     let _ = storage::record_project_origin(project_dir);
-    storage::append_log_entry(
-        &layout,
-        log_session_started(title, context),
-        None,
-        None,
-    )?;
+    storage::append_log_entry(&layout, log_session_started(title, context), None, None)?;
 
     Ok(state)
 }
