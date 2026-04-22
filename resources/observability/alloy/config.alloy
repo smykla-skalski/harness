@@ -73,6 +73,22 @@ otelcol.connector.spanmetrics "harness" {
     name = "hook.event"
   }
 
+  dimension {
+    name = "harness.view.name"
+  }
+
+  dimension {
+    name = "harness.view.surface"
+  }
+
+  dimension {
+    name = "harness.view.display_mode"
+  }
+
+  dimension {
+    name = "perf.signpost.name"
+  }
+
   output {
     metrics = [
       otelcol.exporter.prometheus.harness.input,
