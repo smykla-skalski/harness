@@ -194,29 +194,10 @@ extension HarnessMonitorStore {
   }
 
   private func syncContentToolbarUI() {
-    let toolbarMetrics = ToolbarMetricsState(
-      projectCount: indexedProjectCount,
-      worktreeCount: indexedWorktreeCount,
-      sessionCount: indexedSessionCount,
-      openWorkCount: sessionIndex.totalOpenWorkCount,
-      blockedCount: sessionIndex.totalBlockedCount
-    )
-    assign(
-      toolbarMetrics,
-      to: \.toolbarMetrics,
-      on: contentUI.toolbar
-    )
-    assign(
-      resolveStatusMessages(sessionCount: toolbarMetrics.sessionCount),
-      to: \.statusMessages,
-      on: contentUI.toolbar
-    )
     assign(canNavigateBack, to: \.canNavigateBack, on: contentUI.toolbar)
     assign(canNavigateForward, to: \.canNavigateForward, on: contentUI.toolbar)
     assign(isRefreshing, to: \.isRefreshing, on: contentUI.toolbar)
     assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentUI.toolbar)
-    assign(connectionState, to: \.connectionState, on: contentUI.toolbar)
-    assign(isBusy, to: \.isBusy, on: contentUI.toolbar)
   }
 
   private func syncContentChromeUI() {
@@ -319,55 +300,6 @@ extension HarnessMonitorStore {
         actionContext: resolvedActionContext
       )
     )
-  }
-
-  private func resolveStatusMessages(
-    sessionCount: Int
-  ) -> [StatusMessageState] {
-    var messages: [StatusMessageState] = []
-
-    switch connectionState {
-    case .connecting:
-      messages.append(
-        .init(
-          id: "connecting",
-          text: "Connecting to daemon",
-          systemImage: "arrow.trianglehead.2.clockwise",
-          tone: .caution
-        )
-      )
-    case .offline(let reason):
-      let offlineText =
-        isShowingCachedCatalog
-          || isShowingCachedSelectedSession
-          || persistedSessionCount > 0
-          || sessionCount > 0
-        ? cachedDataStatusMessage
-        : reason
-      messages.append(
-        .init(
-          id: "offline",
-          text: offlineText,
-          systemImage: "wifi.slash",
-          tone: .secondary
-        )
-      )
-    case .online:
-      if isRefreshing {
-        messages.append(
-          .init(
-            id: "refreshing",
-            text: "Refreshing sessions",
-            systemImage: "arrow.clockwise",
-            tone: .secondary
-          )
-        )
-      }
-    case .idle:
-      break
-    }
-
-    return messages
   }
 
   func assign<Root: AnyObject, Value: Equatable>(

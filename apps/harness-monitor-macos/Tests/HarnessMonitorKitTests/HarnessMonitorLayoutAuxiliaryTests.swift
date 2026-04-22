@@ -7,12 +7,12 @@ import Testing
 
 @Suite("Content inspector visibility policy")
 struct ContentInspectorVisibilityPolicyTests {
-  @Test("Initial presentation uses the registered default when no persisted preference exists")
-  func initialPresentationFallsBackToRegisteredDefault() {
+  @Test("Initial presentation keeps the inspector hidden when no preference exists")
+  func initialPresentationKeepsInspectorHiddenWithoutPreference() {
     let defaults = UserDefaults(suiteName: #function)!
     defaults.removePersistentDomain(forName: #function)
 
-    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == true)
+    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == false)
   }
 
   @Test("Initial presentation uses the persisted preference without a hydration pass")
@@ -24,7 +24,7 @@ struct ContentInspectorVisibilityPolicyTests {
     #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == false)
   }
 
-  @Test("Explicit user toggles persist the preference and suppress layout geometry")
+  @Test("Explicit user toggles persist the preference")
   func explicitUserTogglesPersistPreference() {
     let change = ContentInspectorVisibilityPolicy.resolve(
       currentPresentation: true,
@@ -35,10 +35,9 @@ struct ContentInspectorVisibilityPolicyTests {
 
     #expect(change?.nextPresentation == false)
     #expect(change?.persistedPreference == false)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
   }
 
-  @Test("Framework-driven presentation changes do not persist or suppress layout geometry")
+  @Test("Framework-driven presentation changes do not persist preference")
   func frameworkDrivenChangesRemainEphemeral() {
     let change = ContentInspectorVisibilityPolicy.resolve(
       currentPresentation: true,
@@ -49,7 +48,6 @@ struct ContentInspectorVisibilityPolicyTests {
 
     #expect(change?.nextPresentation == false)
     #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == false)
   }
 
   @Test("Contextual auto-open keeps the persisted preference unchanged")
@@ -63,7 +61,6 @@ struct ContentInspectorVisibilityPolicyTests {
 
     #expect(change?.nextPresentation == true)
     #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
   }
 
   @Test("Persisted preference sync updates presentation without writing back to storage")
@@ -77,7 +74,6 @@ struct ContentInspectorVisibilityPolicyTests {
 
     #expect(change?.nextPresentation == true)
     #expect(change?.persistedPreference == nil)
-    #expect(change?.shouldSuppressLayoutGeometry == true)
   }
 }
 
@@ -116,115 +112,6 @@ struct HarnessMonitorAdaptiveGridLayoutCacheTests {
         newSubviewCount: 5
       ) == true
     )
-  }
-}
-
-@Suite("Content toolbar initial width")
-struct ContentToolbarInitialWidthTests {
-  @Test("Initial width uses the default launch window estimate")
-  func initialWidthUsesDefaultLaunchWindowEstimate() {
-    #expect(ContentToolbarLayoutWidth.initialValue(environment: [:]) == 1_344)
-  }
-
-  @Test("Initial width honors the UI testing window width override")
-  func initialWidthHonorsUITestingWindowWidthOverride() {
-    #expect(
-      ContentToolbarLayoutWidth.initialValue(
-        environment: ["HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1180"]
-      ) == 896
-    )
-  }
-
-  @Test("Initial width clamps very narrow launches to the minimum width")
-  func initialWidthClampsVeryNarrowLaunchesToMinimumWidth() {
-    #expect(
-      ContentToolbarLayoutWidth.initialValue(
-        environment: ["HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "500"]
-      ) == ContentToolbarLayoutWidth.minimumWidth
-    )
-  }
-}
-
-@Suite("Toolbar centerpiece display mode stabilization")
-struct ToolbarCenterpieceDisplayModeStabilizationTests {
-  @Test("Standard mode ignores single-bucket activation jitter near the compact threshold")
-  func standardModeIgnoresSingleBucketActivationJitter() {
-    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
-      current: .standard,
-      detailWidth: 1_024
-    )
-
-    #expect(stabilized == .standard)
-  }
-
-  @Test("Compact mode ignores single-bucket activation jitter near the standard threshold")
-  func compactModeIgnoresSingleBucketStandardThresholdJitter() {
-    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
-      current: .compact,
-      detailWidth: 1_056
-    )
-
-    #expect(stabilized == .compact)
-  }
-
-  @Test("Compact mode ignores single-bucket activation jitter near the compressed threshold")
-  func compactModeIgnoresSingleBucketCompressedThresholdJitter() {
-    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
-      current: .compact,
-      detailWidth: 928
-    )
-
-    #expect(stabilized == .compact)
-  }
-
-  @Test("Compressed mode only promotes after width moves beyond the compact entry band")
-  func compressedModePromotesOnlyAfterMeaningfulGrowth() {
-    let stabilized = ToolbarCenterpieceDisplayMode.resolve(
-      current: .compressed,
-      detailWidth: 992
-    )
-
-    #expect(stabilized == .compact)
-  }
-}
-
-@Suite("Toolbar centerpiece layout state")
-struct ToolbarCenterpieceLayoutStateTests {
-  @Test("Initial state seeds the launch width estimate and display mode")
-  func initialStateSeedsLaunchWidthEstimateAndDisplayMode() {
-    let state = ToolbarCenterpieceLayoutState(environment: [:])
-
-    #expect(state.detailColumnWidth == 1_344)
-    #expect(state.displayMode == .standard)
-    #expect(state.pendingDetailColumnWidth == nil)
-  }
-
-  @Test("Unsuppressed measurements update width and display mode immediately")
-  func unsuppressedMeasurementsUpdateWidthAndDisplayModeImmediately() {
-    var state = ToolbarCenterpieceLayoutState(environment: [:])
-
-    state.recordMeasurement(900, isSuppressed: false)
-
-    #expect(state.detailColumnWidth == 896)
-    #expect(state.displayMode == .compressed)
-    #expect(state.pendingDetailColumnWidth == nil)
-  }
-
-  @Test("Suppressed measurements queue width changes until flush")
-  func suppressedMeasurementsQueueWidthChangesUntilFlush() {
-    var state = ToolbarCenterpieceLayoutState(environment: [:])
-
-    state.recordMeasurement(900, isSuppressed: true)
-
-    #expect(state.detailColumnWidth == 1_344)
-    #expect(state.displayMode == .standard)
-    #expect(state.pendingDetailColumnWidth == 896)
-
-    state.flushPendingMeasurement()
-
-    #expect(state.detailColumnWidth == 896)
-    #expect(state.displayMode == .compressed)
-    #expect(state.pendingDetailColumnWidth == nil)
   }
 }
 

@@ -23,9 +23,6 @@ public struct ContentView<CornerContent: View>: View {
   @State private var showInspector = false
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
   @State private var shouldIgnoreNextInspectorMeasurement = false
-  @State private var detailColumnLayoutSuppressionPhase = 0
-  @State private var isLayoutAnimating = false
-  @State private var layoutSuppressionTask: Task<Void, Never>?
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -112,9 +109,6 @@ public struct ContentView<CornerContent: View>: View {
     .onChange(of: persistedShowInspector) { _, newValue in
       applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
     }
-    .onChange(of: columnVisibility) { _, _ in
-      suppressLayoutGeometry()
-    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
     .overlay(contentAccessibilityOverlay)
@@ -199,7 +193,6 @@ public struct ContentView<CornerContent: View>: View {
       contentSessionDetail: contentSessionDetail,
       dashboardUI: contentDashboard,
       showInspector: showInspector,
-      layoutSuppressionPhase: detailColumnLayoutSuppressionPhase,
       setInspectorVisibility: applyInspectorVisibilityChange,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
@@ -223,20 +216,6 @@ public struct ContentView<CornerContent: View>: View {
       ideal: inspectorColumnWidth,
       max: HarnessMonitorInspectorLayout.maxWidth
     )
-  }
-
-  private func suppressLayoutGeometry() {
-    detailColumnLayoutSuppressionPhase += 1
-    layoutSuppressionTask?.cancel()
-    isLayoutAnimating = true
-    layoutSuppressionTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(400))
-      guard !Task.isCancelled else {
-        return
-      }
-      isLayoutAnimating = false
-      layoutSuppressionTask = nil
-    }
   }
 
   private func updateInspectorWidth(_ width: CGFloat) {
@@ -289,9 +268,6 @@ public struct ContentView<CornerContent: View>: View {
       persistedShowInspector != persistedPreference
     {
       persistedShowInspector = persistedPreference
-    }
-    if change.shouldSuppressLayoutGeometry {
-      suppressLayoutGeometry()
     }
   }
 }

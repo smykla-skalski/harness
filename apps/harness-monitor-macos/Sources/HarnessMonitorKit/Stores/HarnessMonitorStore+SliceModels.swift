@@ -80,47 +80,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public struct StatusMessageState: Equatable, Identifiable {
-    public let id: String
-    public let text: String
-    public let systemImage: String?
-    public let tone: StatusMessageTone
-
-    public init(
-      id: String,
-      text: String,
-      systemImage: String? = nil,
-      tone: StatusMessageTone = .secondary
-    ) {
-      self.id = id
-      self.text = text
-      self.systemImage = systemImage
-      self.tone = tone
-    }
-  }
-
-  public struct ToolbarMetricsState: Equatable {
-    public var projectCount = 0
-    public var worktreeCount = 0
-    public var sessionCount = 0
-    public var openWorkCount = 0
-    public var blockedCount = 0
-
-    public init(
-      projectCount: Int = 0,
-      worktreeCount: Int = 0,
-      sessionCount: Int = 0,
-      openWorkCount: Int = 0,
-      blockedCount: Int = 0
-    ) {
-      self.projectCount = projectCount
-      self.worktreeCount = worktreeCount
-      self.sessionCount = sessionCount
-      self.openWorkCount = openWorkCount
-      self.blockedCount = blockedCount
-    }
-  }
-
   public enum SidebarEmptyState: Equatable, Sendable {
     case noSessions
     case noMatches

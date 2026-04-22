@@ -63,7 +63,6 @@ struct SidebarFilterStateMarker: View {
   let controls: HarnessMonitorStore.SessionControlsSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let isSidebarSearchPresented: Bool
-  let isSearchActive: Bool
 
   private var sidebarFilterStateValue: String {
     [
@@ -79,12 +78,11 @@ struct SidebarFilterStateMarker: View {
   private var sidebarSearchStateValue: String {
     let isVisible = SidebarFilterVisibilityPolicy.showsControls(
       for: controls,
-      isSearchPresented: isSidebarSearchPresented,
-      isSearchActive: isSearchActive
+      isSearchPresented: isSidebarSearchPresented
     )
     return [
       "presented=\(isSidebarSearchPresented)",
-      "active=\(isSearchActive)",
+      "active=\(isSidebarSearchPresented)",
       "visible=\(isVisible)",
     ].joined(separator: ", ")
   }
@@ -195,10 +193,9 @@ enum SidebarFilterVisibilityPolicy {
 
   static func showsControls(
     for controls: HarnessMonitorStore.SessionControlsSlice,
-    isSearchPresented: Bool,
-    isSearchActive: Bool
+    isSearchPresented: Bool
   ) -> Bool {
-    isSearchPresented || isSearchActive || hasActiveFilters(in: controls)
+    isSearchPresented || hasActiveFilters(in: controls)
   }
 }
 
