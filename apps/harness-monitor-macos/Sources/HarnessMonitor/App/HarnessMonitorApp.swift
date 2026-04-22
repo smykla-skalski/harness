@@ -162,7 +162,7 @@ struct HarnessMonitorApp: App {
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
-    await store.handleImportedFolder(result)
+    _ = await store.handleImportedFolder(result)
   }
 
   private func increaseTextSize() {

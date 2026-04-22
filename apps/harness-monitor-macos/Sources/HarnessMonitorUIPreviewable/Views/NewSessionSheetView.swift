@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -28,7 +29,9 @@ struct NewSessionSheetView: View {
       allowsMultipleSelection: false
     ) { result in
       Task {
-        await store.handleImportedFolder(result)
+        if let importedBookmark = await store.handleImportedFolder(result) {
+          viewModel.selectedBookmarkId = importedBookmark.id
+        }
         bookmarks = await viewModel.availableBookmarks()
       }
     }
@@ -51,82 +54,105 @@ struct NewSessionSheetView: View {
   // MARK: - Form
 
   private var formContent: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Form {
+    ScrollView {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         projectSection
         detailsSection
         advancedSection
+        if let error = viewModel.lastError {
+          errorBanner(for: error)
+        }
       }
-      .harnessNativeFormContainer()
-      if let error = viewModel.lastError {
-        errorBanner(for: error)
-          .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-          .padding(.bottom, HarnessMonitorTheme.spacingSM)
-      }
+      .padding(HarnessMonitorTheme.spacingLG)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var projectSection: some View {
-    Section {
-      Picker("Project folder", selection: $viewModel.selectedBookmarkId) {
-        Text("Choose a folder…").tag(String?.none)
-        ForEach(bookmarks, id: \.id) { record in
-          Text(record.displayName)
-            .tag(Optional(record.id))
+    NewSessionSectionCard(
+      footer: "Choose a Git project folder to start a session"
+    ) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        NewSessionFieldLabel("Project folder")
+        NewSessionFieldSurface {
+          Picker("Project folder", selection: $viewModel.selectedBookmarkId) {
+            Text("Choose a folder…").tag(String?.none)
+            ForEach(bookmarks, id: \.id) { record in
+              Text(record.displayName)
+                .tag(Optional(record.id))
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
         }
-      }
-      .pickerStyle(.menu)
-      .harnessNativeFormControl()
-      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionProjectPicker)
 
-      if let selectedBookmark {
-        LabeledContent("Path") {
+        if let selectedBookmark {
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+            Text("Path")
+              .scaledFont(.caption)
+              .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+              .frame(width: 34, alignment: .leading)
+
           Text(abbreviateHomePath(selectedBookmark.lastResolvedPath))
             .scaledFont(.caption.monospaced())
             .lineLimit(1)
             .truncationMode(.middle)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .layoutPriority(1)
+          }
         }
-      }
 
-      Button("Add Folder…") {
-        showImporter = true
+        Button("Add Folder…") {
+          showImporter = true
+        }
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       }
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    } footer: {
-      Text("Choose a Git project folder to start a session.")
     }
   }
 
   private var detailsSection: some View {
-    Section {
-      LabeledContent("Session title") {
-        TextField("", text: $viewModel.title)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
-      }
+    NewSessionSectionCard {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          NewSessionFieldLabel("Session title")
+          NewSessionFieldSurface {
+            TextField("", text: $viewModel.title)
+              .harnessNativeFormControl()
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTitle)
+          }
+        }
 
-      LabeledContent("Context") {
-        TextField("", text: $viewModel.context, axis: .vertical)
-          .harnessNativeFormControl()
-          .lineLimit(4, reservesSpace: true)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          NewSessionFieldLabel("Context")
+          NewSessionTextArea(
+            text: $viewModel.context,
+            accessibilityIdentifier: HarnessMonitorAccessibility.newSessionContext
+          )
+        }
       }
     }
   }
 
   private var advancedSection: some View {
-    Section {
-      LabeledContent("Base ref") {
-        TextField("", text: $viewModel.baseRef)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
+    NewSessionSectionCard(
+      title: "Advanced",
+      footer: "Leave blank to use the default branch."
+    ) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        NewSessionFieldLabel("Base ref")
+        NewSessionFieldSurface {
+          TextField("", text: $viewModel.baseRef)
+            .harnessNativeFormControl()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)
+        }
       }
-    } header: {
-      Text("Advanced")
-    } footer: {
-      Text("Leave blank to use the default branch.")
     }
   }
 
@@ -207,6 +233,113 @@ struct NewSessionSheetView: View {
     let result = await viewModel.submit()
     if case .success = result {
       dismiss()
+    }
+  }
+}
+
+private struct NewSessionSectionCard<Content: View>: View {
+  let title: String?
+  let footer: String?
+  @ViewBuilder let content: Content
+
+  init(
+    title: String? = nil,
+    footer: String? = nil,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.title = title
+    self.footer = footer
+    self.content = content()
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      if let title {
+        Text(title)
+          .scaledFont(.headline)
+          .foregroundStyle(HarnessMonitorTheme.ink)
+      }
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        content
+      }
+      .padding(HarnessMonitorTheme.spacingLG)
+      .background(sectionBackground, in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+          .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.28), lineWidth: 1)
+      }
+
+      if let footer {
+        Text(footer)
+          .scaledFont(.subheadline)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    }
+  }
+
+  private var sectionBackground: Color {
+    Color(nsColor: .windowBackgroundColor).opacity(0.36)
+  }
+}
+
+private struct NewSessionFieldLabel: View {
+  let text: String
+
+  init(_ text: String) {
+    self.text = text
+  }
+
+  var body: some View {
+    Text(text)
+      .scaledFont(.headline)
+      .foregroundStyle(HarnessMonitorTheme.ink)
+  }
+}
+
+private struct NewSessionFieldSurface<Content: View>: View {
+  @ViewBuilder let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    content
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .background(fieldBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.52), lineWidth: 1)
+      }
+  }
+
+  private var fieldBackground: Color {
+    Color(nsColor: .controlBackgroundColor)
+  }
+}
+
+private struct NewSessionTextArea: View {
+  @Binding var text: String
+  let accessibilityIdentifier: String
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor))
+
+      TextEditor(text: $text)
+        .harnessNativeFormControl()
+        .scrollContentBackground(.hidden)
+        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+        .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+    .frame(minHeight: 112)
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.52), lineWidth: 1)
     }
   }
 }
