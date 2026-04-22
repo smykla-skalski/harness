@@ -51,7 +51,8 @@ public struct ContentStatusBackdrop: View {
           )
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .clipped()
+      .ignoresSafeArea(.container, edges: .top)
+      .backgroundExtensionEffect()
       .allowsHitTesting(false)
       .accessibilityHidden(true)
   }
