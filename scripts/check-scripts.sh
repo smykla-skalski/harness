@@ -23,7 +23,7 @@ for script_path in "${shell_scripts[@]}"; do
 done
 
 if (( ${#shell_scripts[@]} > 0 )); then
-  shellcheck "${shell_scripts[@]}"
+  shellcheck -x "${shell_scripts[@]}"
 fi
 
 if (( ${#python_scripts[@]} > 0 )); then
