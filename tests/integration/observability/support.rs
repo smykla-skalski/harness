@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 #[derive(Debug)]
 pub(super) struct DashboardLink {
@@ -21,7 +21,205 @@ pub(super) fn load_dashboard(name: &str) -> Value {
         .join(name);
     let content = fs::read_to_string(&path).unwrap();
     let dashboard: Value = serde_json::from_str(&content).unwrap();
-    dashboard.get("spec").cloned().unwrap_or(dashboard)
+    match dashboard.get("spec") {
+        Some(spec) if spec.get("elements").is_some() && spec.get("layout").is_some() => {
+            normalize_v2_dashboard(spec)
+        }
+        Some(spec) => spec.clone(),
+        None => dashboard,
+    }
+}
+
+fn normalize_v2_dashboard(spec: &Value) -> Value {
+    json!({
+        "annotations": {
+            "list": spec.get("annotations").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
+        },
+        "editable": spec.get("editable").cloned().unwrap_or(Value::Bool(false)),
+        "layout": spec.get("layout").cloned().unwrap_or(Value::Null),
+        "links": spec.get("links").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
+        "panels": normalize_v2_panels(spec),
+        "templating": {
+            "list": normalize_v2_variables(spec.get("variables").and_then(Value::as_array)),
+        },
+        "time": {
+            "from": spec.pointer("/timeSettings/from").cloned().unwrap_or_else(|| Value::String("now-6h".to_string())),
+            "to": spec.pointer("/timeSettings/to").cloned().unwrap_or_else(|| Value::String("now".to_string())),
+        },
+        "timepicker": {
+            "quick_ranges": spec.pointer("/timeSettings/quickRanges").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
+            "refresh_intervals": spec.pointer("/timeSettings/autoRefreshIntervals").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
+        },
+        "title": spec.get("title").cloned().unwrap_or_else(|| Value::String(String::new())),
+    })
+}
+
+fn normalize_v2_panels(spec: &Value) -> Value {
+    let mut panels = Vec::new();
+    let elements = spec["elements"]
+        .as_object()
+        .unwrap_or_else(|| panic!("v2 dashboard should declare elements"));
+    collect_v2_panels(spec.get("layout").unwrap_or(&Value::Null), elements, &mut panels);
+    Value::Array(panels)
+}
+
+fn collect_v2_panels(layout: &Value, elements: &serde_json::Map<String, Value>, panels: &mut Vec<Value>) {
+    match layout["kind"].as_str() {
+        Some("GridLayout") => {
+            for item in layout["spec"]["items"].as_array().into_iter().flatten() {
+                if let Some(name) = item["spec"]["element"]["name"].as_str() {
+                    if let Some(element) = elements.get(name) {
+                        panels.push(normalize_v2_panel(element, item));
+                    }
+                }
+            }
+        }
+        Some("TabsLayout") => {
+            for tab in layout["spec"]["tabs"].as_array().into_iter().flatten() {
+                collect_v2_panels(&tab["spec"]["layout"], elements, panels);
+            }
+        }
+        Some("RowsLayout") => {
+            for row in layout["spec"]["rows"].as_array().into_iter().flatten() {
+                collect_v2_panels(&row["spec"]["layout"], elements, panels);
+            }
+        }
+        Some("AutoGridLayout") | None | Some(_) => {}
+    }
+}
+
+fn normalize_v2_panel(element: &Value, layout_item: &Value) -> Value {
+    let spec = element["spec"]
+        .as_object()
+        .unwrap_or_else(|| panic!("v2 dashboard panel should declare spec"));
+    let mut panel = spec.clone();
+
+    panel.insert(
+        "fieldConfig".to_string(),
+        element["spec"]["vizConfig"]["spec"]["fieldConfig"]
+            .clone(),
+    );
+    panel.insert(
+        "gridPos".to_string(),
+        json!({
+            "x": layout_item["spec"]["x"].as_i64().unwrap_or(0),
+            "y": layout_item["spec"]["y"].as_i64().unwrap_or(0),
+            "w": layout_item["spec"]["width"].as_i64().unwrap_or(0),
+            "h": layout_item["spec"]["height"].as_i64().unwrap_or(0),
+        }),
+    );
+    panel.insert(
+        "options".to_string(),
+        element["spec"]["vizConfig"]["spec"]["options"]
+            .clone(),
+    );
+    panel.insert(
+        "targets".to_string(),
+        normalize_v2_targets(element["spec"]["data"]["spec"]["queries"].as_array()),
+    );
+    panel.insert(
+        "type".to_string(),
+        Value::String(
+            element["spec"]["vizConfig"]["group"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+        ),
+    );
+
+    if let Some(datasource) = first_query_datasource(element) {
+        panel.insert("datasource".to_string(), datasource);
+    }
+
+    Value::Object(panel)
+}
+
+fn normalize_v2_targets(queries: Option<&Vec<Value>>) -> Value {
+    let mut targets = Vec::new();
+    for query in queries.into_iter().flatten() {
+        let mut target = query["spec"]["query"]["spec"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+
+        if let Some(ref_id) = query["spec"]["refId"].as_str() {
+            target.insert("refId".to_string(), Value::String(ref_id.to_string()));
+        }
+
+        if let Some(datasource) = query["spec"]["query"]["datasource"]["name"].as_str() {
+            target.insert(
+                "datasource".to_string(),
+                json!({
+                    "type": query["spec"]["query"]["group"].as_str().unwrap_or_default(),
+                    "uid": datasource,
+                }),
+            );
+        }
+
+        targets.push(Value::Object(target));
+    }
+
+    Value::Array(targets)
+}
+
+fn first_query_datasource(element: &Value) -> Option<Value> {
+    let query = element["spec"]["data"]["spec"]["queries"]
+        .as_array()
+        .and_then(|queries| queries.first())?;
+    let name = query["spec"]["query"]["datasource"]["name"].as_str()?;
+    Some(json!({
+        "type": query["spec"]["query"]["group"].as_str().unwrap_or_default(),
+        "uid": name,
+    }))
+}
+
+fn normalize_v2_variables(variables: Option<&Vec<Value>>) -> Value {
+    let mut normalized = Vec::new();
+
+    for variable in variables.into_iter().flatten() {
+        let spec = variable["spec"].as_object().cloned().unwrap_or_default();
+        let mut mapped = spec;
+        mapped.insert(
+            "type".to_string(),
+            Value::String(variable_kind_to_type(variable["kind"].as_str())),
+        );
+
+        if let Some(query) = variable["spec"]["definition"].as_str() {
+            mapped.insert("query".to_string(), Value::String(query.to_string()));
+        } else if let Some(query) = variable["spec"]["query"]["spec"]["__legacyStringValue"].as_str()
+        {
+            mapped.insert("query".to_string(), Value::String(query.to_string()));
+        }
+
+        if let Some(datasource) = variable["spec"]["query"]["datasource"]["name"].as_str() {
+            mapped.insert(
+                "datasource".to_string(),
+                json!({
+                    "uid": datasource,
+                }),
+            );
+        }
+
+        normalized.push(Value::Object(mapped));
+    }
+
+    Value::Array(normalized)
+}
+
+fn variable_kind_to_type(kind: Option<&str>) -> String {
+    match kind.unwrap_or_default() {
+        "AdhocVariable" => "adhoc",
+        "ConstantVariable" => "constant",
+        "CustomVariable" => "custom",
+        "DatasourceVariable" => "datasource",
+        "GroupByVariable" => "groupby",
+        "IntervalVariable" => "interval",
+        "QueryVariable" => "query",
+        "SwitchVariable" => "switch",
+        "TextVariable" => "textbox",
+        other => other,
+    }
+    .to_string()
 }
 
 pub(super) fn load_yaml_file<T>(relative_path: &str) -> T

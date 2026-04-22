@@ -1,21 +1,14 @@
 use super::support::{load_dashboard, load_yaml_file, panel_expr, panel_exprs};
 
 #[test]
-fn host_machine_dashboard_uses_auto_grid_and_surfaces_host_and_process_views() {
+fn host_machine_dashboard_uses_v2_grid_layout_and_surfaces_host_and_process_views() {
     let dashboard = load_dashboard("host-machine.json");
 
-    assert_eq!(dashboard["layout"]["kind"].as_str(), Some("auto-grid"));
+    assert_eq!(dashboard["layout"]["kind"].as_str(), Some("GridLayout"));
     assert_eq!(
-        dashboard["layout"]["spec"]["maxColumnCount"].as_i64(),
-        Some(4)
-    );
-    assert_eq!(
-        dashboard["layout"]["spec"]["columnWidthMode"].as_str(),
-        Some("custom")
-    );
-    assert_eq!(
-        dashboard["layout"]["spec"]["columnWidth"].as_i64(),
-        Some(300)
+        dashboard["panels"].as_array().map(Vec::len),
+        Some(16),
+        "host machine dashboard should keep all v2 grid panels reachable for tests"
     );
     assert_eq!(
         dashboard["timepicker"]["refresh_intervals"]

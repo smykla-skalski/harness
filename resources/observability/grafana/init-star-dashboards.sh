@@ -16,11 +16,9 @@ echo "Grafana is ready"
 DASHBOARDS="harness-investigation-cockpit harness-host-machine harness-host-processes harness-daemon-transport harness-monitor-client harness-runtime-execution harness-sqlite-forensics harness-service-map"
 
 for uid in $DASHBOARDS; do
-  # get dashboard id from uid
-  id=$(curl -sf -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/dashboards/uid/$uid" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
-  if [ -n "$id" ]; then
-    curl -sf -X POST -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/user/stars/dashboard/$id" > /dev/null
-    echo "Starred: $uid (id=$id)"
+  if curl -sf -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/dashboards/uid/$uid" > /dev/null; then
+    curl -sf -X POST -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/user/stars/dashboard/uid/$uid" > /dev/null
+    echo "Starred: $uid"
   else
     echo "Dashboard not found: $uid"
   fi

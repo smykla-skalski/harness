@@ -521,7 +521,7 @@ recreate_sqlite_mount_consumers() {
   done < <(sqlite_mount_consumer_services)
 
   reset_sqlite_snapshots
-  compose up -d --force-recreate "${services[@]}" >/dev/null
+  compose up -d --build --force-recreate "${services[@]}" >/dev/null
   wait_for_sqlite_snapshots
   wait_for_url "$SQLITE_EXPORTER_URL/metrics" "SQLite query exporter"
   wait_for_url "$GRAFANA_URL/api/health" "Grafana"
@@ -541,7 +541,7 @@ start_stack() {
   require_tool curl
   prepare_sqlite_exporter_env
   reset_sqlite_snapshots
-  compose up -d
+  compose up -d --build
   wait_for_url "$PROMETHEUS_URL/-/ready" "Prometheus"
   wait_for_url "$TEMPO_URL/ready" "Tempo"
   wait_for_url "$LOKI_URL/ready" "Loki"
@@ -574,8 +574,19 @@ start_stack() {
   printf 'Grafana MCP Launcher: %s\n' "$launcher_path"
 }
 
+cleanup_stale_network() {
+  local network="${PROJECT_NAME}_default"
+  local endpoints
+  endpoints="$(docker network inspect "$network" --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null || true)"
+  for endpoint in $endpoints; do
+    docker network disconnect -f "$network" "$endpoint" 2>/dev/null || true
+  done
+  docker network rm "$network" 2>/dev/null || true
+}
+
 stop_stack() {
-  compose down --remove-orphans
+  compose down --remove-orphans --timeout 5
+  cleanup_stale_network
   remove_shared_config
   remove_monitor_smoke_data_home_marker
 }
@@ -983,6 +994,62 @@ wait_for_grafana_dashboard() {
   done
 }
 
+wait_for_grafana_v2_dashboard() {
+  local uid="$1"
+  local title="$2"
+  local attempt=0
+  local v2_response classic_response
+  while true; do
+    v2_response="$(
+      grafana_api \
+        "$GRAFANA_URL/apis/dashboard.grafana.app/v2/namespaces/default/dashboards/$uid" \
+        2>/dev/null || true
+    )"
+    classic_response="$(
+      grafana_api \
+        "$GRAFANA_URL/api/dashboards/uid/$uid" \
+        2>/dev/null || true
+    )"
+    if [ -n "$v2_response" ] \
+      && [ -n "$classic_response" ] \
+      && printf '%s' "$v2_response" | jq -e --arg title "$title" '
+        .apiVersion == "dashboard.grafana.app/v2"
+        and .kind == "Dashboard"
+        and .spec.title == $title
+        and (((.spec.elements // {}) | keys | length) > 0)
+        and (
+          (.spec.layout.kind == "GridLayout" and (((.spec.layout.spec.items // []) | length) > 0))
+          or (.spec.layout.kind == "TabsLayout" and (((.spec.layout.spec.tabs // []) | length) > 0))
+          or (.spec.layout.kind == "RowsLayout" and (((.spec.layout.spec.rows // []) | length) > 0))
+          or (.spec.layout.kind == "AutoGridLayout" and (((.spec.layout.spec.items // []) | length) > 0))
+        )
+      ' >/dev/null \
+      && printf '%s' "$classic_response" | jq -e --arg uid "$uid" --arg title "$title" '
+        .dashboard.uid == $uid
+        and .dashboard.title == $title
+        and (((.dashboard.panels // []) | length) > 0)
+      ' >/dev/null; then
+      return
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+      printf 'timed out waiting for provisioned Grafana v2 dashboard %s (%s)\n' "$uid" "$title" >&2
+      if [ -n "$v2_response" ]; then
+        printf '%s\n' "$v2_response" \
+          | jq '{apiVersion,kind,title:.spec.title,layoutKind:.spec.layout.kind,elementCount:(((.spec.elements // {}) | keys) | length)}' >&2 \
+          || true
+      fi
+      if [ -n "$classic_response" ]; then
+        printf '%s\n' "$classic_response" \
+          | jq '{uid:.dashboard.uid,provisioned:.meta.provisioned,title:.dashboard.title,panelCount:(((.dashboard.panels // []) | length))}' >&2 \
+          || true
+      fi
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
 wait_for_grafana_resource() {
   local path="$1"
   local description="$2"
@@ -1025,13 +1092,14 @@ verify_grafana_provisioning() {
   wait_for_grafana_datasource tempo "Tempo"
   wait_for_grafana_datasource pyroscope "Pyroscope"
   wait_for_grafana_resource "/api/datasources/uid/loki/resources/drilldown-limits" "Loki drilldown limits"
-  wait_for_grafana_dashboard "Harness Investigation Cockpit"
-  wait_for_grafana_dashboard "Harness Host Machine"
-  wait_for_grafana_dashboard "Harness Runtime & Hooks"
-  wait_for_grafana_dashboard "Harness Daemon Transport"
-  wait_for_grafana_dashboard "Harness Monitor Client"
-  wait_for_grafana_dashboard "Harness Storage & SQLite"
-  wait_for_grafana_dashboard "Harness Service Flow"
+  wait_for_grafana_v2_dashboard harness-investigation-cockpit "Harness Investigation Cockpit"
+  wait_for_grafana_v2_dashboard harness-host-machine "Harness Host Machine"
+  wait_for_grafana_v2_dashboard harness-host-processes "Harness Host Processes"
+  wait_for_grafana_v2_dashboard harness-runtime-execution "Harness Runtime & Hooks"
+  wait_for_grafana_v2_dashboard harness-daemon-transport "Harness Daemon Transport"
+  wait_for_grafana_v2_dashboard harness-monitor-client "Harness Monitor Client"
+  wait_for_grafana_v2_dashboard harness-sqlite-forensics "Harness Storage & SQLite"
+  wait_for_grafana_v2_dashboard harness-service-map "Harness Service Flow"
 }
 
 smoke_stack() {

@@ -3,9 +3,10 @@ apiVersion: 1
 providers:
   - name: Harness Observability
     folder: Harness Observability
+    folderUid: harness-observability
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 10
+    updateIntervalSeconds: 30
     allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards
