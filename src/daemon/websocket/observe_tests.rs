@@ -149,7 +149,6 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     "ws sync observe test",
                     "",
                     &project_dir,
-                    Some("claude"),
                     Some("ws-sync-observe"),
                 )
                 .expect("start session");

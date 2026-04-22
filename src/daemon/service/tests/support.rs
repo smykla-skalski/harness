@@ -126,7 +126,7 @@ pub(super) fn start_active_file_session(
     _runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<crate::session::types::SessionState, CliError> {
-    let state = session_service::start_session(context, title, project, None, session_id)?;
+    let state = session_service::start_session(context, title, project, session_id)?;
     session_service::join_session(
         &state.session_id,
         SessionRole::Leader,
@@ -143,9 +143,8 @@ pub(super) fn setup_session_with_worker_logs(
     title: &str,
     session_id: &str,
 ) -> SessionReadFixture {
-    let state =
-        start_active_file_session(title, "", project, Some("claude"), Some(session_id))
-            .expect("start active session");
+    let state = start_active_file_session(title, "", project, Some("claude"), Some(session_id))
+        .expect("start active session");
     let worker_session_id = format!("{session_id}-worker");
     temp_env::with_var("CODEX_SESSION_ID", Some(worker_session_id.as_str()), || {
         session_service::join_session(

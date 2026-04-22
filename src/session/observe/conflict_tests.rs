@@ -4,14 +4,12 @@ use crate::session::service;
 use crate::session::types::SessionRole;
 
 use super::scan::scan_all_agents;
-use super::test_support::{with_temp_project, write_agent_log_lines};
+use super::test_support::{start_active_session, with_temp_project, write_agent_log_lines};
 
 #[test]
 fn observe_detects_cross_agent_file_conflicts_across_agents() {
     with_temp_project(|project| {
-        let state =
-            service::start_session("observe test", "", project, Some("claude"), Some("sess-4"))
-                .expect("start session");
+        let state = start_active_session(project, "sess-4", "observe test");
 
         temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
             service::join_session(

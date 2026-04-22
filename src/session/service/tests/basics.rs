@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn start_creates_leaderless_session() {
     with_temp_project(|project| {
-        let state = start_session("test goal", "", project, Some("claude"), None).expect("start");
+        let state = start_session("test goal", "", project, None).expect("start");
         assert_eq!(state.status, SessionStatus::AwaitingLeader);
         assert!(state.leader_id.is_none());
         assert!(state.agents.is_empty());
@@ -15,7 +15,7 @@ fn start_creates_leaderless_session() {
 #[test]
 fn join_adds_agent() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s1")).expect("start");
+        let state = start_session("test", "", project, Some("s1")).expect("start");
         let state = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -122,11 +122,93 @@ fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
 }
 
 #[test]
+fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_sessions() {
+    with_temp_project(|project| {
+        start_session_with_policy(
+            "awaiting recovery",
+            "",
+            project,
+            Some("recover-awaiting"),
+            Some("swarm-default"),
+        )
+        .expect("start leaderless session");
+
+        let awaiting =
+            build_recovery_tui_request("recover-awaiting", "swarm-default", "codex", project)
+                .expect("awaiting leader should accept recovery");
+        assert_eq!(awaiting.runtime, "codex");
+        assert_eq!(awaiting.role, SessionRole::Leader);
+
+        let degraded = start_active_session_with_policy(
+            "degraded recovery",
+            "",
+            project,
+            Some("claude"),
+            Some("recover-degraded"),
+            Some("swarm-default"),
+        )
+        .expect("start active session");
+        let degraded_leader = degraded.leader_id.clone().expect("leader");
+        let layout = storage::layout_from_project_dir(project, "recover-degraded").expect("layout");
+        storage::update_state(&layout, |state| {
+            state.status = SessionStatus::LeaderlessDegraded;
+            state.leader_id = None;
+            state
+                .agents
+                .get_mut(&degraded_leader)
+                .expect("leader")
+                .status = AgentStatus::Disconnected;
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let degraded_request =
+            build_recovery_tui_request("recover-degraded", "swarm-default", "claude", project)
+                .expect("leaderless degraded should accept recovery");
+        assert_eq!(degraded_request.runtime, "claude");
+        assert_eq!(degraded_request.role, SessionRole::Leader);
+    });
+}
+
+#[test]
+fn build_recovery_tui_request_rejects_active_and_ended_sessions() {
+    with_temp_project(|project| {
+        let active = start_active_session_with_policy(
+            "active recovery reject",
+            "",
+            project,
+            Some("claude"),
+            Some("recover-active"),
+            Some("swarm-default"),
+        )
+        .expect("start active session");
+        let active_error =
+            build_recovery_tui_request("recover-active", "swarm-default", "codex", project)
+                .expect_err("active sessions must reject managed recovery");
+        assert!(active_error.to_string().contains(
+            "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
+        ));
+
+        end_session(
+            &active.session_id,
+            active.leader_id.as_deref().expect("leader"),
+            project,
+        )
+        .expect("end session");
+        let ended_error =
+            build_recovery_tui_request("recover-active", "swarm-default", "codex", project)
+                .expect_err("ended sessions must reject managed recovery");
+        assert!(ended_error.to_string().contains(
+            "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
+        ));
+    });
+}
+
+#[test]
 fn start_session_rejects_duplicate_session_id() {
     with_temp_project(|project| {
-        start_session("goal1", "", project, Some("claude"), Some("dup")).expect("first");
-        let error =
-            start_session("goal2", "", project, Some("codex"), Some("dup")).expect_err("dup");
+        start_session("goal1", "", project, Some("dup")).expect("first");
+        let error = start_session("goal2", "", project, Some("dup")).expect_err("dup");
 
         assert_eq!(error.code(), "KSRCLI092");
         assert_eq!(
@@ -143,38 +225,10 @@ fn start_session_rejects_unsafe_session_id() {
         let escape_dir = tmp_root.join("unsafe-session");
         let unsafe_id = escape_dir.to_string_lossy().into_owned();
 
-        let error =
-            start_session("goal", "", project, Some("claude"), Some(&unsafe_id)).expect_err("id");
+        let error = start_session("goal", "", project, Some(&unsafe_id)).expect_err("id");
 
         assert_eq!(error.code(), "KSRCLI059");
         assert!(!escape_dir.join("state.json").exists());
-    });
-}
-
-#[test]
-fn start_session_ignores_runtime_compat_inputs() {
-    with_temp_project(|project| {
-        let missing_runtime =
-            start_session("goal", "", project, None, Some("no-runtime")).expect("start");
-        let unknown_runtime =
-            start_session("goal", "", project, Some("unknown"), Some("bad")).expect("start");
-        let vibe = start_session("goal", "", project, Some("vibe"), Some("vibe-runtime"))
-            .expect("vibe runtime should be ignored");
-        let opencode = start_session(
-            "goal",
-            "",
-            project,
-            Some("opencode"),
-            Some("opencode-runtime"),
-        )
-        .expect("opencode runtime should be ignored");
-
-        for state in [missing_runtime, unknown_runtime, vibe, opencode] {
-            assert_eq!(state.status, SessionStatus::AwaitingLeader);
-            assert!(state.leader_id.is_none());
-            assert!(state.agents.is_empty());
-            assert_eq!(state.metrics.agent_count, 0);
-        }
     });
 }
 
@@ -185,7 +239,6 @@ fn start_session_with_policy_rejects_unknown_preset() {
             "goal",
             "",
             project,
-            Some("claude"),
             Some("unknown-preset"),
             Some("swarm-future"),
         )
@@ -204,8 +257,8 @@ fn start_session_with_policy_rejects_unknown_preset() {
 #[test]
 fn auto_generated_session_ids_are_unique() {
     with_temp_project(|project| {
-        let first = start_session("goal1", "", project, Some("claude"), None).expect("first");
-        let second = start_session("goal2", "", project, Some("codex"), None).expect("second");
+        let first = start_session("goal1", "", project, None).expect("first");
+        let second = start_session("goal2", "", project, None).expect("second");
         assert_ne!(first.session_id, second.session_id);
     });
 }
@@ -255,8 +308,7 @@ fn join_same_runtime_keeps_distinct_agents() {
 #[test]
 fn join_records_runtime_session_id_when_available() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("join-runtime"))
-            .unwrap();
+        start_active_session("test", "", project, Some("claude"), Some("join-runtime")).unwrap();
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
             join_session(

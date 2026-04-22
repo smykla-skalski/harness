@@ -9,19 +9,12 @@ use super::paths::{
     WatchPathTarget, session_id_from_path, session_id_from_path_with, watch_target_from_path,
 };
 use super::state::RuntimeSessionResolveCache;
-use super::test_support::with_temp_project;
+use super::test_support::{start_active_session, with_temp_project};
 
 #[test]
 fn session_id_from_path_extracts_known_layouts() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
-            "watch mapping",
-            "",
-            project,
-            Some("claude"),
-            Some("watch-map"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "watch-map", "watch mapping");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
             session_service::join_session(
                 "watch-map",
@@ -164,14 +157,7 @@ fn runtime_session_cache_reuses_negative_resolution_until_orchestration_changes(
 #[test]
 fn watch_target_from_path_marks_runtime_transcripts_as_targeted_refreshes() {
     with_temp_project(|project| {
-        let _state = session_service::start_session(
-            "watch mapping",
-            "",
-            project,
-            Some("claude"),
-            Some("watch-map"),
-        )
-        .expect("start session");
+        let _state = start_active_session(project, "watch-map", "watch mapping");
         temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
             session_service::join_session(
                 "watch-map",

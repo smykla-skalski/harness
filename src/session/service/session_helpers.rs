@@ -15,9 +15,7 @@ use crate::session::types::{AgentRegistration, SessionPolicy, SessionRole};
 pub(crate) fn create_initial_session(
     context: &str,
     title: &str,
-    _runtime_name: &str,
     session_id: Option<&str>,
-    _agent_session_id: Option<&str>,
     now: &str,
     project_dir: &Path,
     policy_preset: Option<&str>,
@@ -26,13 +24,7 @@ pub(crate) fn create_initial_session(
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
     {
-        let candidate = build_initial_state(
-            context,
-            title,
-            &session_id,
-            now,
-            policy_preset,
-        );
+        let candidate = build_initial_state(context, title, &session_id, now, policy_preset);
         let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
         if !storage::create_state(&layout, &candidate)? {
             return Err(CliErrorKind::session_agent_conflict(format!(
@@ -45,13 +37,7 @@ pub(crate) fn create_initial_session(
 
     for _ in 0..8 {
         let session_id = generate_session_id();
-        let candidate = build_initial_state(
-            context,
-            title,
-            &session_id,
-            now,
-            policy_preset,
-        );
+        let candidate = build_initial_state(context, title, &session_id, now, policy_preset);
         let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
         if storage::create_state(&layout, &candidate)? {
             return Ok(candidate);

@@ -4,19 +4,14 @@ use crate::hooks::adapters::HookAgent;
 use crate::session::service;
 
 use super::scan::{AgentLogTailState, resolve_agent_runtime, scan_all_agents_incremental};
-use super::test_support::{append_agent_log_lines, with_temp_project, write_agent_log};
+use super::test_support::{
+    append_agent_log_lines, start_active_session, with_temp_project, write_agent_log,
+};
 
 #[test]
 fn incremental_scan_skips_previously_consumed_log_bytes() {
     with_temp_project(|project| {
-        let state = service::start_session(
-            "observe test",
-            "",
-            project,
-            Some("claude"),
-            Some("sess-incremental-1"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "sess-incremental-1", "observe test");
         let leader = state
             .agents
             .values()
@@ -76,14 +71,7 @@ fn incremental_scan_skips_previously_consumed_log_bytes() {
 #[test]
 fn incremental_scan_detects_appended_log_lines() {
     with_temp_project(|project| {
-        let state = service::start_session(
-            "observe test",
-            "",
-            project,
-            Some("claude"),
-            Some("sess-incremental-2"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "sess-incremental-2", "observe test");
         let leader = state
             .agents
             .values()

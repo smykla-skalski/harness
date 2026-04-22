@@ -3,8 +3,8 @@ use super::*;
 #[test]
 fn expired_task_start_signal_reopens_task_and_clears_assignment() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("drop-expire")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("drop-expire"))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("expire-worker"))], || {
             join_session(
