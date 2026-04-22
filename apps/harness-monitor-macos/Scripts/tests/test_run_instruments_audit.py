@@ -31,6 +31,11 @@ class RunInstrumentsAuditScriptTests(unittest.TestCase):
         self.assertIn('STAGED_HOST_BUNDLE_ID="${HOST_BUNDLE_ID}.audit"', self.script)
         self.assertIn('plist_upsert_bool "$info_plist_path" "LSUIElement" "YES"', self.script)
 
+    def test_purges_legacy_per_run_launch_hosts_before_staging(self) -> None:
+        self.assertIn("purge_legacy_launch_hosts() {", self.script)
+        self.assertIn("-name 'launch-host' \\", self.script)
+        self.assertIn("purge_legacy_launch_hosts", self.script)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -189,6 +189,30 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(taskStat.label, "arrow.triangle.2.circlepath")
   }
 
+  func testSelectedSidebarSessionOffersContextMenuActions() throws {
+    let app = launch(mode: "preview")
+    let sessionRow = previewSessionTrigger(in: app)
+
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
+
+    tapPreviewSession(in: app)
+    sessionRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+
+    let bookmarkItem = app.menuItems["Bookmark"].firstMatch
+    let copySessionIDItem = app.menuItems["Copy Session ID"].firstMatch
+
+    XCTAssertTrue(
+      bookmarkItem.waitForExistence(timeout: Self.fastActionTimeout),
+      "Selected sidebar rows should keep the native bookmark context menu action"
+    )
+    XCTAssertTrue(
+      copySessionIDItem.waitForExistence(timeout: Self.fastActionTimeout),
+      "Selected sidebar rows should keep the native copy context menu action"
+    )
+
+    app.typeKey(.escape, modifierFlags: [])
+  }
+
   func testSidebarSessionRowKeepsStatClusterAndTimestampSeparatedAtLargeTextSize() throws {
     let app = launch(
       mode: "preview",
