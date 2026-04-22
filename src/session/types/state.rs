@@ -117,6 +117,11 @@ impl SessionStatus {
     }
 
     #[must_use]
+    pub const fn allows_end_session(self) -> bool {
+        !matches!(self, Self::Ended)
+    }
+
+    #[must_use]
     pub const fn is_liveness_eligible(self) -> bool {
         matches!(
             self,

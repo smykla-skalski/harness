@@ -61,6 +61,17 @@ pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(crate) fn require_endable_session(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_end_session() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 /// Canonicalize a persisted session that is still marked active without a
 /// leader.
 ///

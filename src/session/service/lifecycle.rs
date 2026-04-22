@@ -168,7 +168,7 @@ pub fn join_session_with_fallback(
     Ok(state)
 }
 
-/// End an active session (leader only).
+/// End a session that has not already ended (leader or control plane only).
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission, workers have active tasks,
