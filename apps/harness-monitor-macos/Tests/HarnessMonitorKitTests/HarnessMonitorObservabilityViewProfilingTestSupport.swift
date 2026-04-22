@@ -59,18 +59,11 @@ func renderLaunchDashboardProfiledViews() -> HarnessMonitorStore {
       controls: store.sessionIndex.controls,
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
-      sidebarUI: store.sidebarUI
+      sidebarUI: store.sidebarUI,
+      isSidebarSearchPresented: false
     ),
     width: 340,
     height: 900
-  )
-  render(
-    SidebarSearchAccessoryBar(
-      store: store,
-      controls: store.sessionIndex.controls
-    ),
-    width: 340,
-    height: 56
   )
   render(
     ToolbarCenterpieceView(
