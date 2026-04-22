@@ -34,6 +34,81 @@ fn init_origin_repo(tmp: &std::path::Path) {
         .unwrap();
 }
 
+fn git_output(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
+    Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .unwrap()
+}
+
+fn git_sha(dir: &std::path::Path, reference: &str) -> String {
+    let output = git_output(dir, &["rev-parse", reference]);
+    assert!(output.status.success(), "git rev-parse failed for {reference}");
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str) {
+    std::fs::write(dir.join(path), contents).unwrap();
+    git_output(dir, &["add", path]);
+    let commit = git_output(
+        dir,
+        &[
+            "-c",
+            "user.email=a@b",
+            "-c",
+            "user.name=a",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+    );
+    assert!(commit.status.success(), "git commit failed: {message}");
+}
+
+fn init_checkout_with_upstream_remote() -> TempDir {
+    let upstream = TempDir::new().unwrap();
+    let init_remote = Command::new("git")
+        .args(["init", "--bare", "-q"])
+        .arg(upstream.path())
+        .output()
+        .unwrap();
+    assert!(init_remote.status.success(), "init bare remote");
+
+    let seed = TempDir::new().unwrap();
+    init_origin_repo(seed.path());
+    let add_remote = Command::new("git")
+        .current_dir(seed.path())
+        .args(["remote", "add", "upstream"])
+        .arg(upstream.path())
+        .output()
+        .unwrap();
+    assert!(add_remote.status.success(), "add upstream remote");
+    let push = Command::new("git")
+        .current_dir(seed.path())
+        .args(["push", "-u", "upstream", "HEAD:refs/heads/main"])
+        .output()
+        .unwrap();
+    assert!(push.status.success(), "push seed to upstream");
+    let set_head = Command::new("git")
+        .current_dir(upstream.path())
+        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+        .output()
+        .unwrap();
+    assert!(set_head.status.success(), "set upstream HEAD");
+
+    let checkout = TempDir::new().unwrap();
+    let clone = Command::new("git")
+        .args(["clone", "--origin", "upstream"])
+        .arg(upstream.path())
+        .arg(checkout.path())
+        .output()
+        .unwrap();
+    assert!(clone.status.success(), "clone checkout from upstream");
+    checkout
+}
+
 #[test]
 fn creates_worktree_and_branch() {
     let origin = TempDir::new().unwrap();
@@ -118,4 +193,22 @@ fn rollback_on_memory_create_failure() {
             .is_empty(),
         "harness branch should have been deleted by rollback"
     );
+}
+
+#[test]
+fn resolve_base_ref_prefers_tracking_remote_head_over_local_head() {
+    let checkout = init_checkout_with_upstream_remote();
+    let remote_tip = git_sha(checkout.path(), "upstream/main");
+
+    commit_file(
+        checkout.path(),
+        "LOCAL",
+        b"local-only",
+        "local-only diverges from upstream/main",
+    );
+    let local_tip = git_sha(checkout.path(), "HEAD");
+    assert_ne!(local_tip, remote_tip, "test setup must diverge from upstream");
+
+    let resolved = resolve_base_ref(checkout.path()).expect("resolve base ref");
+    assert_eq!(resolved, "upstream/main");
 }

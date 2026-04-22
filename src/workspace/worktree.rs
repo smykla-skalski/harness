@@ -1,9 +1,10 @@
 //! Git worktree lifecycle for per-session workspaces.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use thiserror::Error;
 use tracing::{info, warn};
@@ -146,28 +147,85 @@ fn run_branch_delete(origin: &Path, branch: &str) -> Result<(), WorktreeError> {
 }
 
 fn resolve_base_ref(origin: &Path) -> Result<String, WorktreeError> {
-    let origin_head = Command::new("git")
-        .arg("-C")
-        .arg(origin)
-        .args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
-        .output()?;
-    if origin_head.status.success() {
-        let s = String::from_utf8_lossy(&origin_head.stdout)
-            .trim()
-            .to_string();
-        if !s.is_empty() && s != "HEAD" {
-            return Ok(s);
+    if let Some(remote) = current_branch_remote(origin)?
+        && let Some(remote_head) = resolve_remote_head(origin, &remote)?
+    {
+        return Ok(remote_head);
+    }
+    let mut resolved_remote_heads = BTreeSet::new();
+    for remote in git_lines(origin, &["remote"])? {
+        if let Some(remote_head) = resolve_remote_head(origin, &remote)? {
+            resolved_remote_heads.insert(remote_head);
         }
     }
-    let head = Command::new("git")
-        .arg("-C")
-        .arg(origin)
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()?;
+    if resolved_remote_heads.len() == 1
+        && let Some(remote_head) = resolved_remote_heads.into_iter().next()
+    {
+        return Ok(remote_head);
+    }
+    let head = git_output(origin, &["rev-parse", "--abbrev-ref", "HEAD"])?;
     if !head.status.success() {
         return Err(WorktreeError::CreateFailed("no HEAD".into()));
     }
     Ok(String::from_utf8_lossy(&head.stdout).trim().to_string())
+}
+
+fn current_branch_remote(origin: &Path) -> Result<Option<String>, WorktreeError> {
+    let head = git_output(origin, &["symbolic-ref", "--quiet", "--short", "HEAD"])?;
+    if !head.status.success() {
+        return Ok(None);
+    }
+    let branch = String::from_utf8_lossy(&head.stdout).trim().to_string();
+    if branch.is_empty() {
+        return Ok(None);
+    }
+    let config_key = format!("branch.{branch}.remote");
+    let remote = git_output(origin, &["config", "--get", &config_key])?;
+    if !remote.status.success() {
+        return Ok(None);
+    }
+    let remote = String::from_utf8_lossy(&remote.stdout).trim().to_string();
+    if remote.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(remote))
+}
+
+fn resolve_remote_head(origin: &Path, remote: &str) -> Result<Option<String>, WorktreeError> {
+    let ref_name = format!("refs/remotes/{remote}/HEAD");
+    let remote_head = git_output(origin, &["symbolic-ref", "--quiet", "--short", &ref_name])?;
+    if !remote_head.status.success() {
+        return Ok(None);
+    }
+    let remote_head = String::from_utf8_lossy(&remote_head.stdout)
+        .trim()
+        .to_string();
+    if remote_head.is_empty() || remote_head == "HEAD" {
+        return Ok(None);
+    }
+    Ok(Some(remote_head))
+}
+
+fn git_lines(origin: &Path, args: &[&str]) -> Result<Vec<String>, WorktreeError> {
+    let output = git_output(origin, args)?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect())
+}
+
+fn git_output(origin: &Path, args: &[&str]) -> Result<Output, WorktreeError> {
+    Ok(Command::new("git")
+        .arg("-C")
+        .arg(origin)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .args(args)
+        .output()?)
 }
 
 #[cfg(test)]
