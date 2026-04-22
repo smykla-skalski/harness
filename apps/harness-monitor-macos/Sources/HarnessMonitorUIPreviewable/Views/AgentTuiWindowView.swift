@@ -35,9 +35,7 @@ public struct AgentTuiWindowView: View {
       selectedTerminalID: store.selectedAgentTui?.tuiId,
       selectedCodexRunID: store.selectedCodexRun?.runId
     )
-    _stateViewModel = State(
-      wrappedValue: ViewModel(displayState: initialDisplayState, selection: initialSelection)
-    )
+    _stateViewModel = State(wrappedValue: ViewModel(selection: initialSelection))
   }
 
   let commonKeys: [AgentTuiKey] = [
@@ -45,6 +43,9 @@ public struct AgentTuiWindowView: View {
   ]
 
   var viewModel: ViewModel { stateViewModel }
+  @MainActor var displayState: AgentTuiDisplayState {
+    AgentTuiDisplayState(store: store)
+  }
 
   var fontScale: CGFloat { stateFontScale }
 
@@ -65,14 +66,14 @@ public struct AgentTuiWindowView: View {
     guard let selectedTuiID = viewModel.selection.terminalID else {
       return nil
     }
-    return viewModel.displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
+    return displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
   var selectedCodexRun: CodexRunSnapshot? {
     guard let selectedRunID = viewModel.selection.codexRunID else {
       return nil
     }
-    return viewModel.displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
+    return displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
   }
 
   var trimmedInput: String {
@@ -172,15 +173,16 @@ public struct AgentTuiWindowView: View {
     }
   }
 
+    let displayState = displayState
   public var body: some View {
     @Bindable var viewModel = viewModel
     return NavigationSplitView {
       AgentTuiSidebar(
         selection: $viewModel.selection,
-        agentTuis: viewModel.displayState.sortedAgentTuis,
-        sessionTitlesByID: viewModel.displayState.sessionTitlesByID,
-        codexRuns: viewModel.displayState.sortedCodexRuns,
-        codexTitlesByID: viewModel.displayState.codexTitlesByID,
+        agentTuis: displayState.sortedAgentTuis,
+        sessionTitlesByID: displayState.sessionTitlesByID,
+        codexRuns: displayState.sortedCodexRuns,
+        codexTitlesByID: displayState.codexTitlesByID,
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
@@ -221,26 +223,19 @@ public struct AgentTuiWindowView: View {
       if viewModel.availableRuntimeModels != loadedRuntimeModels {
         viewModel.availableRuntimeModels = loadedRuntimeModels
       }
-      refreshDisplayState()
       reconcileSheetState(afterRefresh: true)
     }
     .onChange(of: store.selectedAgentTuis) { _, _ in
-      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.selectedCodexRuns) { _, _ in
-      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
-    .onChange(of: selectedAgentNames) { _, _ in
-      refreshDisplayState()
     }
     .onChange(of: store.agentTuiUnavailable) { _, _ in
-      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.codexUnavailable) { _, _ in
-      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
@@ -253,9 +248,6 @@ public struct AgentTuiWindowView: View {
         }
         enforceExpectedSize()
       }
-    }
-    .onChange(of: store.selectedCodexRun?.runId) { _, _ in
-      refreshDisplayState()
     }
     .onChange(of: viewModel.selection) { oldValue, newValue in
       if oldValue != newValue {

@@ -1,16 +1,8 @@
 import HarnessMonitorKit
 
 extension AgentTuiWindowView {
-  func refreshDisplayState() {
-    let nextState = AgentTuiDisplayState(store: store)
-    guard viewModel.displayState != nextState else {
-      return
-    }
-    viewModel.displayState = nextState
-  }
-
   func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
-    viewModel.displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
+    displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
   }
 
   func resolvedRuntimeTitle(for tui: AgentTuiSnapshot) -> String {
@@ -18,7 +10,7 @@ extension AgentTuiWindowView {
   }
 
   func resolvedTitle(for run: CodexRunSnapshot) -> String {
-    viewModel.displayState.codexTitlesByID[run.runId] ?? Self.codexTitle(for: run)
+    displayState.codexTitlesByID[run.runId] ?? Self.codexTitle(for: run)
   }
 
   static func runtimeTitle(for tui: AgentTuiSnapshot) -> String {

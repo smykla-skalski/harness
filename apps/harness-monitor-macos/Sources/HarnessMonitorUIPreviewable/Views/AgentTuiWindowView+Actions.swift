@@ -313,7 +313,7 @@ extension AgentTuiWindowView {
 
   func reconcileSheetState(afterRefresh: Bool) {
     let preferredSelection = Self.initialSelection(
-      displayState: viewModel.displayState,
+      displayState: displayState,
       selectedTerminalID: store.selectedAgentTui?.tuiId,
       selectedCodexRunID: store.selectedCodexRun?.runId
     )
