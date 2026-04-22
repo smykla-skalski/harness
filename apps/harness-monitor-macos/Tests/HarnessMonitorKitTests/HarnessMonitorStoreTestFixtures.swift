@@ -7,6 +7,9 @@ struct SessionFixture {
   var status: SessionStatus
   var projectName: String = "harness"
   var projectId: String = "project-a"
+  var projectDir: String = "/Users/example/Projects/harness"
+  var originPath: String = ""
+  var branchRef: String = ""
   var leaderId: String?
   var observeId: String?
   var openTaskCount: Int
@@ -134,9 +137,11 @@ func makeSession(_ fixture: SessionFixture) -> SessionSummary {
   SessionSummary(
     projectId: fixture.projectId,
     projectName: fixture.projectName,
-    projectDir: "/Users/example/Projects/harness",
+    projectDir: fixture.projectDir,
     contextRoot: "/Users/example/Library/Application Support/harness/projects/\(fixture.projectId)",
     sessionId: fixture.sessionId,
+    originPath: fixture.originPath,
+    branchRef: fixture.branchRef,
     title: fixture.title,
     context: fixture.context,
     status: fixture.status,
