@@ -13,7 +13,10 @@ fn init_origin_repo(tmp: &std::path::Path) {
 fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str) {
     std::fs::write(dir.join(path), contents).unwrap();
     run_git(dir, &["add", path]);
-    run_git(dir, &["-c", "commit.gpgsign=false", "commit", "-m", message]);
+    run_git(
+        dir,
+        &["-c", "commit.gpgsign=false", "commit", "-m", message],
+    );
 }
 
 fn run_git(dir: &std::path::Path, args: &[&str]) {
@@ -23,7 +26,12 @@ fn run_git(dir: &std::path::Path, args: &[&str]) {
         .args(args)
         .output()
         .expect("run git");
-    assert!(output.status.success(), "git {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn init_checkout_with_upstream_remote() -> TempDir {
