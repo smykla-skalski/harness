@@ -118,6 +118,71 @@ struct HarnessMonitorObservabilityPhase2Tests {
     #expect(metricNames.contains("harness_monitor_bootstrap_duration_ms"))
   }
 
+  @Test("Bootstrap phase records counter duration and span")
+  func bootstrapPhaseRecordsCounterDurationAndSpan() async throws {
+    let collector = try GRPCCollectorServer()
+    defer {
+      collector.shutdown()
+      HarnessMonitorTelemetry.shared.resetForTests()
+    }
+
+    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
+    defer { try? FileManager.default.removeItem(at: temporaryHome) }
+
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+
+    try await HarnessMonitorTelemetry.shared.withBootstrapPhase(
+      phase: "managed_daemon_warm_up",
+      launchMode: "live"
+    ) {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    HarnessMonitorTelemetry.shared.shutdown()
+
+    try await waitForTraceExport(timeout: .seconds(3)) {
+      collector.metricCollector.hasReceivedMetrics && collector.traceCollector.hasReceivedSpans
+    }
+
+    let metricNames = collector.metricCollector.metricNames
+    #expect(metricNames.contains("harness_monitor_bootstrap_phases_total"))
+    #expect(metricNames.contains("harness_monitor_bootstrap_phase_duration_ms"))
+
+    let counterPoints = collector.metricCollector.dataPointsForMetric(
+      "harness_monitor_bootstrap_phases_total"
+    )
+    #expect(
+      counterPoints.contains { dataPoint in
+        dataPoint.attributes["bootstrap.phase"] == "managed_daemon_warm_up"
+          && dataPoint.attributes["app.launch_mode"] == "live"
+          && dataPoint.attributes["bootstrap.failed"] == "false"
+      }
+    )
+
+    let durationPoints = collector.metricCollector.dataPointsForMetric(
+      "harness_monitor_bootstrap_phase_duration_ms"
+    )
+    #expect(
+      durationPoints.contains { dataPoint in
+        dataPoint.attributes["bootstrap.phase"] == "managed_daemon_warm_up"
+          && dataPoint.attributes["app.launch_mode"] == "live"
+          && dataPoint.attributes["bootstrap.failed"] == "false"
+      }
+    )
+
+    let spans = collector.traceCollector.exportedSpans
+    #expect(spans.contains { $0.name == "app.lifecycle.bootstrap.managed_daemon_warm_up" })
+
+    let attributes = try #require(
+      lifecycleSpanAttributes(
+        in: collector.traceCollector,
+        spanName: "app.lifecycle.bootstrap.managed_daemon_warm_up"
+      )
+    )
+    #expect(attributes["bootstrap.phase"] == "managed_daemon_warm_up")
+    #expect(attributes["app.launch_mode"] == "live")
+  }
+
   // MARK: - User Interaction Spans
 
   @Test("User interaction records counter and duration")

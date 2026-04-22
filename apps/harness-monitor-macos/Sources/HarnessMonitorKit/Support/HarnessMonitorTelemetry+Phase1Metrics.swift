@@ -17,6 +17,53 @@ extension HarnessMonitorTelemetry {
     return try withActiveSpan(span, operation)
   }
 
+  @discardableResult
+  @MainActor
+  public func withBootstrapPhase<T>(
+    phase: String,
+    launchMode: String,
+    _ operation: () async throws -> T
+  ) async rethrows -> T {
+    let span = startSpan(
+      name: "app.lifecycle.bootstrap.\(phase)",
+      kind: .internal,
+      attributes: [
+        "app.launch_mode": .string(launchMode),
+        "bootstrap.phase": .string(phase),
+      ]
+    )
+    let startedAt = ContinuousClock.now
+
+    do {
+      let result = try await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(
+        span.context
+      ) {
+        try await operation()
+      }
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      stateLock.withLock { state.instruments }?.recordBootstrapPhase(
+        phase: phase,
+        launchMode: launchMode,
+        durationMs: durationMs,
+        failed: false
+      )
+      span.end()
+      return result
+    } catch {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      span.status = .error(description: error.localizedDescription)
+      recordError(error, on: span)
+      stateLock.withLock { state.instruments }?.recordBootstrapPhase(
+        phase: phase,
+        launchMode: launchMode,
+        durationMs: durationMs,
+        failed: true
+      )
+      span.end()
+      throw error
+    }
+  }
+
   public func recordAppLifecycleEvent(event: String, launchMode: String, durationMs: Double?) {
     bootstrap()
     let instruments = stateLock.withLock { state.instruments }
