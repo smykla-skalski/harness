@@ -86,6 +86,40 @@ struct GracefulAgentTuiStopTests {
     #expect(stops == ["tui-1"])
   }
 
+  @Test("skips graceful sequence when daemon reports agent not alive")
+  func skipsWhenDaemonReportsNotAlive() async {
+    let stopper = RecordingStopper(activeSequence: [true], liveness: .notAlive)
+
+    await performGracefulStop(
+      tuiID: "tui-1",
+      stopper: stopper,
+      timing: Self.fastTiming,
+      sleep: noSleep
+    )
+
+    let inputs = await stopper.capturedInputs
+    #expect(inputs.isEmpty)
+    let stops = await stopper.capturedStops
+    #expect(stops.isEmpty)
+    let pings = await stopper.pingCount
+    #expect(pings == 1)
+  }
+
+  @Test("proceeds with graceful stop when daemon liveness is unknown")
+  func proceedsWhenLivenessUnknown() async {
+    let stopper = RecordingStopper(activeSequence: [false], liveness: .unknown)
+
+    await performGracefulStop(
+      tuiID: "tui-1",
+      stopper: stopper,
+      timing: Self.fastTiming,
+      sleep: noSleep
+    )
+
+    let inputs = await stopper.capturedInputs
+    #expect(inputs == Self.expectedCooperativeSequence)
+  }
+
   @Test("respects configured timing for escape gap and post-escape pause")
   func respectsCustomTiming() async {
     let stopper = RecordingStopper(activeSequence: [false])
@@ -117,19 +151,28 @@ private actor RecordingStopper: GracefulAgentTuiStopper {
   private let inputResult: Bool
   private let stopResult: Bool
   private let activeSequence: [Bool]
+  private let liveness: DaemonLiveness
   private var activeCallCount = 0
   private(set) var capturedInputs: [AgentTuiInput] = []
   private(set) var capturedTargets: [String] = []
   private(set) var capturedStops: [String] = []
+  private(set) var pingCount = 0
 
   init(
     activeSequence: [Bool],
     inputResult: Bool = true,
-    stopResult: Bool = true
+    stopResult: Bool = true,
+    liveness: DaemonLiveness = .alive
   ) {
     self.activeSequence = activeSequence
     self.inputResult = inputResult
     self.stopResult = stopResult
+    self.liveness = liveness
+  }
+
+  func pingLiveness(tuiID _: String) async -> DaemonLiveness {
+    pingCount += 1
+    return liveness
   }
 
   func sendInput(tuiID: String, input: AgentTuiInput) async -> Bool {

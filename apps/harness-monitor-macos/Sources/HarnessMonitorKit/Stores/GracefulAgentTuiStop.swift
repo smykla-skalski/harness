@@ -1,9 +1,16 @@
 import Foundation
 
+public enum DaemonLiveness: Sendable {
+  case alive
+  case notAlive
+  case unknown
+}
+
 public protocol GracefulAgentTuiStopper: Sendable {
   func sendInput(tuiID: String, input: AgentTuiInput) async -> Bool
   func stop(tuiID: String) async -> Bool
   func isActive(tuiID: String) async -> Bool
+  func pingLiveness(tuiID: String) async -> DaemonLiveness
 }
 
 public struct GracefulAgentTuiStopTiming: Sendable {
@@ -33,6 +40,14 @@ public func performGracefulStop(
     try? await Task.sleep(for: duration)
   }
 ) async {
+  let liveness = await stopper.pingLiveness(tuiID: tuiID)
+  if liveness == .notAlive {
+    HarnessMonitorLogger.store.info(
+      "graceful stop skipped, agent not alive on daemon: \(tuiID, privacy: .public)"
+    )
+    return
+  }
+
   var anyInputFailed = false
 
   func deliver(_ input: AgentTuiInput) async {
@@ -103,5 +118,26 @@ public struct StoreBackedAgentTuiStopper: GracefulAgentTuiStopper {
 
   public func isActive(tuiID: String) -> Bool {
     store.selectedAgentTuis.first(where: { $0.tuiId == tuiID })?.status.isActive ?? false
+  }
+
+  public func pingLiveness(tuiID: String) async -> DaemonLiveness {
+    guard let client = store.client else { return .unknown }
+    do {
+      let snapshot = try await client.agentTui(tuiID: tuiID)
+      return snapshot.status.isActive ? .alive : .notAlive
+    } catch let error as HarnessMonitorAPIError {
+      if case .server(let code, _) = error, code == 404 {
+        return .notAlive
+      }
+      HarnessMonitorLogger.store.warning(
+        "liveness ping failed for \(tuiID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+      return .unknown
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "liveness ping failed for \(tuiID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+      return .unknown
+    }
   }
 }
