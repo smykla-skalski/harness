@@ -159,7 +159,7 @@ struct NewSessionSheetView: View {
       "Base ref",
       help: "Optional. Leave blank to use the repository default branch."
     ) {
-      TextField("origin/main", text: $viewModel.baseRef)
+      TextField("main", text: $viewModel.baseRef)
         .harnessNativeFormControl()
         .focused($focusedField, equals: .baseRef)
         .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionBaseRef)

@@ -124,7 +124,7 @@ public final class NewSessionViewModel {
     logSink.info("new-session submit started")
     logSink.debug("new-session bookmark id=\(bookmarkId)")
 
-    let projectDir = isSandboxedCheck() ? bookmarkId : resolved.projectDir
+    let projectDir = isSandboxed() ? bookmarkId : resolved.projectDir
     let request = SessionStartRequest(
       title: trimmedTitle,
       context: context,
@@ -161,6 +161,10 @@ public final class NewSessionViewModel {
 
   // MARK: - Private
 
+  private func isSandboxed() -> Bool {
+    store.daemonStatus?.manifest?.sandboxed ?? isSandboxedCheck()
+  }
+
   private func submitErrorKind(_ error: SubmitError) -> String {
     switch error {
     case .validation(let validationError):
@@ -196,17 +200,20 @@ public final class NewSessionViewModel {
     if let urlError = error as? URLError, urlError.code == .cannotConnectToHost {
       return .daemonUnreachable
     }
-    if let apiError = error as? HarnessMonitorAPIError,
-      case .server(let code, let message) = apiError
-    {
-      if code == 400, isInvalidProjectFailure(message: message) {
-        return .invalidProject(reason: message)
+    if let serverError = normalizedServerError(from: error) {
+      if isBookmarkResolutionFailure(message: serverError.message),
+        let bookmarkId = selectedBookmarkId
+      {
+        return .bookmarkRevoked(id: bookmarkId)
       }
-      if code == 500, message.contains("create session worktree") {
-        return .worktreeCreateFailed(reason: message)
+      if isInvalidProjectFailure(message: serverError.message) {
+        return .invalidProject(reason: serverError.message)
       }
-      if code == 400, message.contains("base_ref") || message.contains("rev-parse") {
-        return .invalidBaseRef(ref: baseRef, reason: message)
+      if isInvalidBaseRefFailure(message: serverError.message) {
+        return .invalidBaseRef(ref: baseRef, reason: serverError.message)
+      }
+      if isWorktreeCreateFailure(message: serverError.message) {
+        return .worktreeCreateFailed(reason: serverError.message)
       }
     }
     return .unexpected(String(describing: error))
@@ -232,5 +239,42 @@ public final class NewSessionViewModel {
     return normalized.contains("no head")
       || normalized.contains("not a git repository")
       || normalized.contains("not in a git directory")
+  }
+
+  private func isBookmarkResolutionFailure(message: String) -> Bool {
+    let normalized = message.lowercased()
+    return normalized.contains("resolve bookmark")
+      && normalized.contains("resolution failed")
+  }
+
+  private func isInvalidBaseRefFailure(message: String) -> Bool {
+    guard !baseRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return false
+    }
+    let normalized = message.lowercased()
+    return normalized.contains("base_ref")
+      || normalized.contains("rev-parse")
+      || normalized.contains("invalid reference")
+      || normalized.contains("unknown revision")
+      || normalized.contains("not a valid object name")
+      || normalized.contains("ambiguous argument")
+  }
+
+  private func isWorktreeCreateFailure(message: String) -> Bool {
+    message.lowercased().contains("create session worktree")
+  }
+
+  private func normalizedServerError(from error: any Error) -> (code: String?, message: String)? {
+    if let apiError = error as? HarnessMonitorAPIError,
+      case .server(let code, let message) = apiError
+    {
+      return (String(code), message)
+    }
+    if let transportError = error as? WebSocketTransportError,
+      case .serverError(let code, let message) = transportError
+    {
+      return (code, message)
+    }
+    return nil
   }
 }
