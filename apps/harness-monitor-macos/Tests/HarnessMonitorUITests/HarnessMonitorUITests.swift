@@ -164,16 +164,23 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   }
 
   func testSidebarFilterMenuHidesWhenSidebarIsCollapsed() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
 
     let sidebarToggle = sidebarToggleButton(in: app)
     let sidebarShellQuery = app.otherElements
       .matching(identifier: Accessibility.sidebarShellFrame)
     let sidebarShell = sidebarShellQuery.firstMatch
+    let searchState = element(in: app, identifier: Accessibility.sidebarSearchState)
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
 
     XCTAssertTrue(sidebarToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(searchState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      button(in: app, identifier: Accessibility.sidebarFilterMenu)
+      sidebarFilterControl(in: app)
         .waitForExistence(timeout: Self.actionTimeout)
     )
     XCTAssertTrue(sidebarShell.waitForExistence(timeout: Self.actionTimeout))
@@ -192,7 +199,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(
       waitUntil {
-        !self.button(in: app, identifier: Accessibility.sidebarFilterMenu).exists
+        !self.sidebarFilterControl(in: app).exists
       },
       "Sidebar-only filter controls should leave the toolbar when the sidebar is collapsed"
     )
@@ -209,9 +216,18 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(
       waitUntil {
-        self.button(in: app, identifier: Accessibility.sidebarFilterMenu).isHittable
+        let filterMenu = self.sidebarFilterControl(in: app)
+        return searchState.label.contains("visible=true")
+          && filterMenu.exists
+          && !filterMenu.frame.isEmpty
       },
-      "Sidebar filter controls should return when the sidebar is visible again"
+      """
+      Sidebar filter controls should return when the sidebar is visible again.
+      searchState=\(searchState.label)
+      searchFieldFrame=\(searchField.frame)
+      sidebarShellFrame=\(sidebarShell.frame)
+      filterDiagnostics=\(sidebarFilterControlDiagnostics(in: app))
+      """
     )
   }
 
