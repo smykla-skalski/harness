@@ -387,3 +387,127 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
     assert!(saw_sessions_updated, "expected global session refresh");
     assert!(saw_session_updated, "expected scoped session refresh");
 }
+
+#[test]
+fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    with_agent_tui_home(tmp.path(), || {
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-child-exit".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-child-exit".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "child exit test",
+            "managed tui child exit",
+            "sess-tui-child-exit",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(64);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+
+        let snapshot = manager
+            .start(
+                "sess-tui-child-exit",
+                &crate::daemon::agent_tui::AgentTuiStartRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    fallback_role: None,
+                    capabilities: vec![],
+                    name: Some("Fast exit".into()),
+                    prompt: None,
+                    project_dir: None,
+                    persona: None,
+                    argv: vec![
+                        "sh".into(),
+                        "-c".into(),
+                        "printf 'ready\\n'; sleep 0.1; exit 0".into(),
+                    ],
+                    rows: 5,
+                    cols: 40,
+                    model: None,
+                    effort: None,
+                    allow_custom_model: false,
+                },
+            )
+            .expect("start manager TUI");
+
+        let joined_agent_id = "joined-worker".to_string();
+        {
+            let db_arc = db_slot.get().expect("db slot");
+            let db_guard = db_arc.lock().expect("db lock");
+            let mut state = db_guard
+                .load_session_state("sess-tui-child-exit")
+                .expect("load state")
+                .expect("state present");
+            state.agents.insert(
+                joined_agent_id.clone(),
+                crate::session::types::AgentRegistration {
+                    agent_id: joined_agent_id.clone(),
+                    name: "Joined worker".into(),
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![format!("agent-tui:{}", snapshot.tui_id)],
+                    joined_at: "2026-04-22T09:00:00Z".into(),
+                    updated_at: "2026-04-22T09:00:00Z".into(),
+                    status: crate::session::types::AgentStatus::Active,
+                    agent_session_id: Some("joined-worker-session".into()),
+                    last_activity_at: Some("2026-04-22T09:00:00Z".into()),
+                    current_task_id: None,
+                    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                    persona: None,
+                },
+            );
+            db_guard
+                .save_session_state(&project.project_id, &state)
+                .expect("persist joined agent");
+        }
+
+        wait_until(WAIT_TIMEOUT, || {
+            manager
+                .load_snapshot(&snapshot.tui_id)
+                .map(|persisted| persisted.status == AgentTuiStatus::Exited)
+                .unwrap_or(false)
+        });
+
+        let persisted = manager
+            .load_snapshot(&snapshot.tui_id)
+            .expect("load snapshot");
+        assert_eq!(persisted.status, AgentTuiStatus::Exited);
+        assert_eq!(persisted.agent_id, joined_agent_id);
+
+        wait_until(WAIT_TIMEOUT, || {
+            let db_arc = db_slot.get().expect("db slot");
+            let db_guard = db_arc.lock().expect("db lock");
+            let session_state = db_guard
+                .load_session_state("sess-tui-child-exit")
+                .expect("load state")
+                .expect("state present");
+            session_state
+                .agents
+                .get(&joined_agent_id)
+                .map(|agent| agent.status)
+                == Some(crate::session::types::AgentStatus::Disconnected)
+        });
+    });
+}
