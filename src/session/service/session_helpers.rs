@@ -8,10 +8,6 @@ use super::{
 };
 use crate::session::types::{AgentRegistration, SessionPolicy, SessionRole};
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "session creation threads transport fields through file-backed persistence"
-)]
 pub(crate) fn create_initial_session(
     context: &str,
     title: &str,

@@ -6,14 +6,7 @@ fn join_session_with_persona_stores_resolved_persona() {
     with_session_test_env(tmp.path(), "integ-persona-resolve", || {
         let project = tmp.path().join("project");
 
-        service::start_session(
-            "persona test",
-            "",
-            &project,
-            Some("claude"),
-            Some("persona-1"),
-        )
-        .unwrap();
+        service::start_session("", "persona test", &project, Some("persona-1")).unwrap();
 
         let state = service::join_session(
             "persona-1",
@@ -43,14 +36,7 @@ fn join_session_with_unknown_persona_stores_none() {
     with_session_test_env(tmp.path(), "integ-persona-unknown", || {
         let project = tmp.path().join("project");
 
-        service::start_session(
-            "persona test",
-            "",
-            &project,
-            Some("claude"),
-            Some("persona-2"),
-        )
-        .unwrap();
+        service::start_session("", "persona test", &project, Some("persona-2")).unwrap();
 
         let state = service::join_session(
             "persona-2",
@@ -81,14 +67,7 @@ fn join_session_without_persona_backward_compat() {
     with_session_test_env(tmp.path(), "integ-persona-none", || {
         let project = tmp.path().join("project");
 
-        service::start_session(
-            "persona test",
-            "",
-            &project,
-            Some("claude"),
-            Some("persona-3"),
-        )
-        .unwrap();
+        service::start_session("", "persona test", &project, Some("persona-3")).unwrap();
 
         let state = service::join_session(
             "persona-3",
