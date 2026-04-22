@@ -116,14 +116,13 @@ impl GitRepository {
 #[cfg(test)]
 mod tests {
     use fs_err as fs;
-    use git2::Repository;
     use tempfile::tempdir;
 
     use super::GitRepository;
 
     fn init_repo(root: &std::path::Path) {
         fs::create_dir_all(root).expect("create repo");
-        Repository::init(root).expect("init repo");
+        gix::init(root).expect("init repo");
     }
 
     #[test]

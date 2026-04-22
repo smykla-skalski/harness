@@ -1,6 +1,5 @@
 use std::path::Path;
-
-use git2::{BranchType, IndexAddOption, Repository, Signature, build::CheckoutBuilder};
+use std::process::Command;
 
 /// Initialize an empty git repository at `path` with a single seed commit so
 /// downstream callers (notably the daemon's `WorktreeController`) have a
@@ -13,10 +12,15 @@ use git2::{BranchType, IndexAddOption, Repository, Signature, build::CheckoutBui
 /// Panics on any git failure because tests rely on a deterministic repo state.
 pub fn init_git_repo_with_seed(path: &Path) {
     std::fs::create_dir_all(path).expect("create git repo dir");
-    let repo = Repository::init(path).expect("init repo");
+
+    run_git(path, &["init"]);
+    run_git(path, &["config", "user.email", "test@example.com"]);
+    run_git(path, &["config", "user.name", "test"]);
+
     std::fs::write(path.join("README.md"), b"seed\n").expect("seed README");
-    stage_path(&repo, Path::new("README.md"));
-    commit_head(&repo, "seed");
+
+    run_git(path, &["add", "README.md"]);
+    run_git(path, &["-c", "commit.gpgsign=false", "commit", "-m", "seed"]);
 }
 
 /// Initialize a git repository at `path` with a seed commit on the default
@@ -31,86 +35,66 @@ pub fn init_git_repo_with_seed(path: &Path) {
 /// Panics on any git failure.
 pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
     init_git_repo_with_seed(path);
-    let repo = Repository::open(path).expect("open repo");
-    let default_branch = current_branch_name(&repo);
-    let head_commit = repo
-        .head()
-        .expect("repo head")
-        .peel_to_commit()
-        .expect("head commit");
-    repo.branch(branch_name, &head_commit, false)
-        .expect("create branch");
-    checkout_branch(&repo, branch_name);
+
+    let default_branch = run_git_output(path, &["rev-parse", "--abbrev-ref", "HEAD"]);
+
+    run_git(path, &["branch", branch_name]);
+    run_git(path, &["checkout", branch_name]);
+
     std::fs::write(path.join("branch.txt"), branch_name.as_bytes()).expect("write branch.txt");
-    stage_path(&repo, Path::new("branch.txt"));
-    commit_head(&repo, branch_name);
-    checkout_branch(&repo, &default_branch);
+
+    run_git(path, &["add", "branch.txt"]);
+    run_git(path, &["-c", "commit.gpgsign=false", "commit", "-m", branch_name]);
+    run_git(path, &["checkout", &default_branch]);
 }
 
 pub fn git_head_sha(repo_path: &Path, reference: &str) -> String {
-    let repo = Repository::open(repo_path).expect("open repo");
-    repo.revparse_single(reference)
-        .expect("resolve reference")
-        .id()
-        .to_string()
+    run_git_output(repo_path, &["rev-parse", reference])
 }
 
 pub fn git_branches_matching(repo_path: &Path, prefix: &str) -> Vec<String> {
-    let repo = Repository::open(repo_path).expect("open repo");
-    repo.branches(Some(BranchType::Local))
-        .expect("list branches")
-        .filter_map(|branch| {
-            let (branch, _) = branch.ok()?;
-            let name = branch.name().ok().flatten()?.to_string();
-            name.starts_with(prefix).then_some(name)
-        })
+    let output = run_git_output(repo_path, &["branch", "--list", &format!("{prefix}*")]);
+    output
+        .lines()
+        .map(|line| line.trim().trim_start_matches("* ").to_string())
+        .filter(|name| !name.is_empty())
         .collect()
 }
 
-fn stage_path(repo: &Repository, path: &Path) {
-    let mut index = repo.index().expect("open index");
-    index
-        .add_all([path], IndexAddOption::DEFAULT, None)
-        .expect("stage path");
-    index.write().expect("write index");
+fn run_git(dir: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git command");
+
+    if !output.status.success() {
+        panic!(
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
-fn commit_head(repo: &Repository, message: &str) {
-    let mut index = repo.index().expect("open index");
-    let tree_id = index.write_tree().expect("write tree");
-    let tree = repo.find_tree(tree_id).expect("find tree");
-    let signature = Signature::now("test", "test@example.com").expect("signature");
-    let parents = repo
-        .head()
-        .ok()
-        .and_then(|head| head.peel_to_commit().ok())
-        .into_iter()
-        .collect::<Vec<_>>();
-    let parent_refs = parents.iter().collect::<Vec<_>>();
-    repo.commit(
-        Some("HEAD"),
-        &signature,
-        &signature,
-        message,
-        &tree,
-        &parent_refs,
-    )
-    .expect("create commit");
-}
+fn run_git_output(dir: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git command");
 
-fn current_branch_name(repo: &Repository) -> String {
-    repo.head()
-        .expect("repo head")
-        .shorthand()
-        .expect("branch shorthand")
-        .to_owned()
-}
+    if !output.status.success() {
+        panic!(
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
-fn checkout_branch(repo: &Repository, branch_name: &str) {
-    repo.set_head(&format!("refs/heads/{branch_name}"))
-        .expect("set head");
-    repo.checkout_head(Some(CheckoutBuilder::new().force()))
-        .expect("checkout head");
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
 /// Run a closure inside an isolated Harness filesystem scope.

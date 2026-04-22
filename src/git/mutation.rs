@@ -2,16 +2,17 @@
 
 use std::path::Path;
 
-use git2::{BranchType, Oid, Repository, WorktreePruneOptions, build::CheckoutBuilder};
+use fs_err as fs;
+use gix::refs::transaction::{Change, PreviousValue, RefEdit, RefLog};
 
 use crate::git::{GitError, GitResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LinkedWorktreeBackend {
-    Git2,
+    Gix,
 }
 
-pub(crate) const LINKED_WORKTREE_BACKEND: LinkedWorktreeBackend = LinkedWorktreeBackend::Git2;
+pub(crate) const LINKED_WORKTREE_BACKEND: LinkedWorktreeBackend = LinkedWorktreeBackend::Gix;
 
 pub(crate) fn create_linked_worktree(
     repo_path: &Path,
@@ -21,29 +22,95 @@ pub(crate) fn create_linked_worktree(
     base_commit: &str,
 ) -> GitResult<()> {
     let repo = open(repo_path)?;
-    let commit = repo
-        .find_commit(
-            Oid::from_str(base_commit).map_err(|error| GitError::mutation(repo_path, error))?,
-        )
+    let common_dir = repo.common_dir().to_path_buf();
+
+    let commit_id = repo
+        .rev_parse_single(base_commit.as_bytes())
+        .map_err(|error| GitError::mutation(repo_path, error))?
+        .detach();
+
+    repo.reference(
+        format!("refs/heads/{branch_name}"),
+        commit_id,
+        PreviousValue::MustNotExist,
+        format!("branch: Created from {base_commit}"),
+    )
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    let worktree_git_dir = common_dir.join("worktrees").join(worktree_name);
+    fs::create_dir_all(&worktree_git_dir)
         .map_err(|error| GitError::mutation(repo_path, error))?;
-    let branch = repo
-        .branch(branch_name, &commit, false)
+
+    let worktree_dot_git = worktree_path.join(".git");
+    fs::write(
+        worktree_git_dir.join("gitdir"),
+        format!("{}\n", worktree_dot_git.display()),
+    )
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    fs::write(
+        worktree_git_dir.join("HEAD"),
+        format!("ref: refs/heads/{branch_name}\n"),
+    )
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    let relative_common = pathdiff::diff_paths(&common_dir, &worktree_git_dir)
+        .unwrap_or_else(|| common_dir.clone());
+    fs::write(
+        worktree_git_dir.join("commondir"),
+        format!("{}\n", relative_common.display()),
+    )
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    fs::create_dir_all(worktree_path)
         .map_err(|error| GitError::mutation(repo_path, error))?;
-    let reference = branch.into_reference();
-    let mut options = git2::WorktreeAddOptions::new();
-    options.reference(Some(&reference));
-    let worktree = repo
-        .worktree(worktree_name, worktree_path, Some(&options))
-        .map_err(|error| GitError::mutation(repo_path, error))?;
-    let branch_ref = format!("refs/heads/{branch_name}");
-    Repository::open_from_worktree(&worktree)
-        .and_then(|worktree_repo| {
-            let object = worktree_repo.revparse_single(&branch_ref)?;
-            worktree_repo.checkout_tree(&object, Some(CheckoutBuilder::new().force()))?;
-            worktree_repo.set_head(&branch_ref)?;
-            Ok(())
-        })
-        .map_err(|error| GitError::mutation(repo_path, error))
+    fs::write(
+        &worktree_dot_git,
+        format!("gitdir: {}\n", worktree_git_dir.display()),
+    )
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    let worktree_repo =
+        gix::open(worktree_path).map_err(|error| GitError::mutation(repo_path, error))?;
+
+    checkout_head(&worktree_repo, repo_path)?;
+
+    Ok(())
+}
+
+fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
+    let head_commit = repo
+        .head_commit()
+        .map_err(|error| GitError::mutation(error_path, error))?;
+    let tree_id = head_commit
+        .tree_id()
+        .map_err(|error| GitError::mutation(error_path, error))?;
+
+    let index = repo
+        .index_from_tree(&tree_id)
+        .map_err(|error| GitError::mutation(error_path, error))?;
+
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| GitError::mutation(error_path, "repository has no work directory"))?;
+
+    let options = gix::worktree::state::checkout::Options {
+        overwrite_existing: true,
+        ..Default::default()
+    };
+
+    gix::worktree::state::checkout(
+        &mut index.into(),
+        workdir,
+        repo.objects.clone().into_arc().expect("object cache"),
+        &gix::progress::Discard,
+        &gix::progress::Discard,
+        &std::sync::atomic::AtomicBool::new(false),
+        options,
+    )
+    .map_err(|error| GitError::mutation(error_path, error))?;
+
+    Ok(())
 }
 
 pub(crate) fn remove_linked_worktree(
@@ -52,50 +119,49 @@ pub(crate) fn remove_linked_worktree(
     worktree_path: &Path,
 ) -> GitResult<()> {
     let repo = open(repo_path)?;
-    let Some(worktree) = find_worktree(&repo, worktree_name, worktree_path)? else {
-        return Ok(());
-    };
-    let mut options = WorktreePruneOptions::new();
-    options.valid(true).locked(true).working_tree(true);
-    worktree
-        .prune(Some(&mut options))
-        .map_err(|error| GitError::mutation(repo_path, error))
+    let common_dir = repo.common_dir();
+    let worktree_git_dir = common_dir.join("worktrees").join(worktree_name);
+
+    if worktree_path.exists() {
+        fs::remove_dir_all(worktree_path)
+            .map_err(|error| GitError::mutation(repo_path, error))?;
+    }
+
+    if worktree_git_dir.exists() {
+        fs::remove_dir_all(&worktree_git_dir)
+            .map_err(|error| GitError::mutation(repo_path, error))?;
+    }
+
+    Ok(())
 }
 
 pub(crate) fn delete_local_branch(repo_path: &Path, branch_name: &str) -> GitResult<()> {
     let repo = open(repo_path)?;
-    let Ok(mut branch) = repo.find_branch(branch_name, BranchType::Local) else {
+    let ref_name = format!("refs/heads/{branch_name}");
+
+    let full_name: gix::refs::FullName = ref_name
+        .try_into()
+        .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    if repo.try_find_reference(&full_name).ok().flatten().is_none() {
         return Ok(());
-    };
-    branch
-        .delete()
-        .map_err(|error| GitError::mutation(repo_path, error))
+    }
+
+    repo.edit_reference(RefEdit {
+        change: Change::Delete {
+            expected: PreviousValue::Any,
+            log: RefLog::AndReference,
+        },
+        name: full_name,
+        deref: false,
+    })
+    .map_err(|error| GitError::mutation(repo_path, error))?;
+
+    Ok(())
 }
 
-fn open(path: &Path) -> GitResult<Repository> {
-    Repository::open(path).map_err(|error| GitError::open(path, error))
-}
-
-fn find_worktree(
-    repo: &Repository,
-    worktree_name: &str,
-    worktree_path: &Path,
-) -> GitResult<Option<git2::Worktree>> {
-    if let Ok(worktree) = repo.find_worktree(worktree_name) {
-        return Ok(Some(worktree));
-    }
-    let names = repo
-        .worktrees()
-        .map_err(|error| GitError::mutation(repo.path(), error))?;
-    for name in names.iter().flatten() {
-        let worktree = repo
-            .find_worktree(name)
-            .map_err(|error| GitError::mutation(repo.path(), error))?;
-        if worktree.path() == worktree_path {
-            return Ok(Some(worktree));
-        }
-    }
-    Ok(None)
+fn open(path: &Path) -> GitResult<gix::Repository> {
+    gix::open(path).map_err(|error| GitError::open(path, error))
 }
 
 #[cfg(test)]
@@ -103,7 +169,7 @@ mod tests {
     use super::{LINKED_WORKTREE_BACKEND, LinkedWorktreeBackend};
 
     #[test]
-    fn linked_worktree_backend_defaults_to_git2() {
-        assert_eq!(LINKED_WORKTREE_BACKEND, LinkedWorktreeBackend::Git2);
+    fn linked_worktree_backend_defaults_to_gix() {
+        assert_eq!(LINKED_WORKTREE_BACKEND, LinkedWorktreeBackend::Gix);
     }
 }
