@@ -16,12 +16,10 @@ mod integration {
     pub mod helpers;
     mod install_workflow;
     mod mcp;
-    mod observability;
 
     mod cluster;
     mod commands;
     mod compact;
-    mod grafana_connector;
     mod hooks;
     mod preflight;
     mod sandbox;
