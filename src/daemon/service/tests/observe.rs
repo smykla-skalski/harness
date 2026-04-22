@@ -53,10 +53,18 @@ fn observe_session_with_db_persists_tasks_without_touching_state_file() {
             .load_session_state(&state.session_id)
             .expect("load db state")
             .expect("db state");
+        let observer = detail.observer.as_ref().expect("observer summary");
+        let context_root = crate::workspace::project_context_dir(project);
+        let snapshot_path = crate::daemon::index::observe_snapshot_path(
+            &context_root,
+            state.observe_id.as_deref().expect("observe id"),
+        );
 
         assert!(file_state.tasks.is_empty());
         assert_eq!(db_state.tasks.len(), 1);
         assert_eq!(detail.tasks.len(), 1);
+        assert_eq!(observer.open_issue_count, 1);
+        assert!(snapshot_path.is_file());
         assert_eq!(
             detail.tasks[0].source,
             crate::session::types::TaskSource::Observe
@@ -114,8 +122,16 @@ fn observe_session_with_actor_creates_tasks() {
                 )
             })
             .expect("observe session");
+        let observer = detail.observer.as_ref().expect("observer summary");
+        let context_root = crate::workspace::project_context_dir(project);
+        let snapshot_path = crate::daemon::index::observe_snapshot_path(
+            &context_root,
+            state.observe_id.as_deref().expect("observe id"),
+        );
 
         assert_eq!(detail.tasks.len(), 1);
+        assert_eq!(observer.open_issue_count, 1);
+        assert!(snapshot_path.is_file());
         assert_eq!(
             detail.tasks[0].source,
             crate::session::types::TaskSource::Observe
@@ -136,7 +152,7 @@ fn observe_session_restarts_running_loop_when_actor_changes() {
             "",
             project,
             Some("claude"),
-            Some("daemon-observe"),
+            Some("daemon-observe-restart"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
@@ -259,8 +275,16 @@ fn observe_session_async_creates_tasks_without_sync_db() {
             .await
             .expect("observe session async")
         });
+        let observer = detail.observer.as_ref().expect("observer summary");
+        let context_root = crate::workspace::project_context_dir(project);
+        let snapshot_path = crate::daemon::index::observe_snapshot_path(
+            &context_root,
+            state.observe_id.as_deref().expect("observe id"),
+        );
 
         assert_eq!(detail.tasks.len(), 1);
+        assert_eq!(observer.open_issue_count, 1);
+        assert!(snapshot_path.is_file());
         assert_eq!(
             detail.tasks[0].source,
             crate::session::types::TaskSource::Observe

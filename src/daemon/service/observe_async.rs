@@ -2,15 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use tokio::time::sleep;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::index::ResolvedSession;
-use crate::observe::types::Issue;
 use super::{
     CliError, Duration, ObserveSessionRequest, Path, PathBuf, SessionDetail,
     apply_heuristic_gap_tasks_to_async_db, apply_issue_tasks_to_async_db, effective_project_dir,
     observe_actor_id, session_detail_from_async_daemon_db, session_not_found, session_observe,
     start_daemon_observe_loop, sync_resolved_liveness_async,
 };
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::index::ResolvedSession;
+use crate::observe::types::Issue;
 
 const SWEEP_CYCLE_COUNT: u64 = 100;
 
@@ -41,6 +41,7 @@ pub(crate) async fn observe_session_async(
         .ok_or_else(|| session_not_found(session_id))?;
     let project_dir = effective_project_dir(&resolved).to_path_buf();
     let issues = session_observe::scan_all_agents(&resolved.state, session_id, &project_dir)?;
+    session_observe::persist_observer_snapshot(&resolved.state, &project_dir, &issues)?;
     apply_issue_tasks_to_async_db(async_db, &mut resolved, actor_id, &issues).await?;
     async_db.sync_runtime_transcripts(&resolved).await?;
     let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
@@ -134,10 +135,12 @@ async fn process_incremental_observe(
         .into_iter()
         .filter(|issue| cycle.realtime_seen.insert(issue.fingerprint.clone()))
         .collect::<Vec<_>>();
+    session_observe::persist_observer_snapshot(&resolved.state, project_dir, &new_issues)?;
     if !new_issues.is_empty() {
         cycle.total_issues += new_issues.len();
         apply_issue_tasks_to_async_db(async_db, resolved, actor_id, &new_issues).await?;
     }
+    async_db.bump_change(&resolved.state.session_id).await?;
     Ok(tail_offsets_changed(&offsets_before, &cycle.tail_states))
 }
 
@@ -170,10 +173,13 @@ async fn run_periodic_sweep_async(
     }
 
     cycle.total_issues += missed.len();
+    session_observe::persist_observer_snapshot(&resolved.state, project_dir, &missed)?;
     apply_issue_tasks_to_async_db(async_db, resolved, actor_id, &missed).await?;
     apply_heuristic_gap_tasks_to_async_db(async_db, resolved, actor_id, &missed)
         .await
-        .map(|_| ())
+        .map(|_| ())?;
+    async_db.bump_change(&resolved.state.session_id).await?;
+    Ok(())
 }
 
 fn tail_offsets(

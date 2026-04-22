@@ -68,6 +68,9 @@ where
     if let Some(session_id) = orchestration_session_id_from_path(path) {
         return Ok(Some(WatchPathTarget::Session(session_id)));
     }
+    if let Some(session_id) = observe_snapshot_session_id(path) {
+        return Ok(Some(WatchPathTarget::Session(session_id)));
+    }
     if let Some(target) = runtime_session_target_from_transcript(path) {
         let runtime_name = target.runtime_name.clone();
         let runtime_session_id = target.runtime_session_id.clone();
@@ -118,6 +121,19 @@ fn orchestration_session_id_from_path(path: &Path) -> Option<String> {
         }
         _ => None,
     })
+}
+
+fn observe_snapshot_session_id(path: &Path) -> Option<String> {
+    if path.file_name().and_then(|name| name.to_str()) != Some("snapshot.json") {
+        return None;
+    }
+    if !has_ancestor_names(path, 2, "observe", "agents") {
+        return None;
+    }
+    ancestor_name(path, 1)?
+        .strip_prefix("observe-")
+        .filter(|session_id| !session_id.is_empty())
+        .map(ToString::to_string)
 }
 
 pub(super) fn orchestration_context_root(path: &Path) -> Option<PathBuf> {

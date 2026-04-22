@@ -11,7 +11,9 @@ use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, SessionStatus, TaskSeverity, TaskSource};
 
 use super::scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
-use super::support::{create_work_items_for_issues, emit_watch_issues, map_severity};
+use super::support::{
+    create_work_items_for_issues, emit_watch_issues, map_severity, persist_observer_snapshot,
+};
 
 /// How many polling cycles between periodic sweeps.
 /// With default 3s poll interval, sweep runs every ~5 minutes.
@@ -130,6 +132,7 @@ fn watch_cycle(
         create_work_items_for_issues(&new_issues, session_id, &state, project_dir, actor_id)?;
         emit_watch_issues(&new_issues, json);
     }
+    persist_observer_snapshot(&state, project_dir, &new_issues)?;
 
     cycle.cycle_count += 1;
     if cycle.cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
@@ -161,16 +164,18 @@ fn run_periodic_sweep(
         .iter()
         .filter(|issue| !realtime_seen.contains(&issue.fingerprint))
         .collect();
+    let missed_issues: Vec<Issue> = missed.into_iter().cloned().collect();
 
-    if missed.is_empty() {
+    if missed_issues.is_empty() {
         return Ok(());
     }
+    persist_observer_snapshot(state, project_dir, &missed_issues)?;
 
     let Some(actor) = actor_id.filter(|value| !value.trim().is_empty()) else {
         return Ok(());
     };
 
-    for issue in &missed {
+    for issue in &missed_issues {
         *total_issues += 1;
 
         let title = format!("[{}] {}", issue.code, issue.summary);
@@ -205,6 +210,6 @@ fn run_periodic_sweep(
         let _ = service::create_task_with_source(session_id, &heuristic_spec, actor, project_dir);
     }
 
-    emit_watch_issues(&missed.into_iter().cloned().collect::<Vec<_>>(), json);
+    emit_watch_issues(&missed_issues, json);
     Ok(())
 }

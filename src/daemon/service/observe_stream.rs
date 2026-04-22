@@ -42,6 +42,7 @@ fn observe_session_from_daemon_db(
         .ok_or_else(|| session_not_found(session_id))?;
     let project_dir = effective_project_dir(&resolved).to_path_buf();
     let issues = session_observe::scan_all_agents(&resolved.state, session_id, &project_dir)?;
+    session_observe::persist_observer_snapshot(&resolved.state, &project_dir, &issues)?;
     apply_issue_tasks_to_db(db, &mut resolved, actor_id, &issues)?;
     db.sync_runtime_transcripts(&resolved)?;
     let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);

@@ -19,4 +19,4 @@ pub(super) use mutations::{execute_mute, execute_unmute};
 pub(super) use render::{render_json, render_pretty_json};
 pub(super) use scan::{execute_cycle, execute_resume};
 pub(super) use status::execute_status;
-pub(crate) use storage::{load_observer_state, save_observer_state};
+pub(crate) use storage::{is_observer_conflict, load_observer_state, save_observer_state};
