@@ -89,7 +89,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     app.typeKey(.escape, modifierFlags: [])
   }
 
-  func testNewSessionSheetUsesStackedEditableFieldsAndReadableSampleFolder() throws {
+  func testNewSessionSheetUsesStackedEditableFieldsAndReadableSeededFolder() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: [
@@ -132,7 +132,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     selectMenuOption(
       in: app,
       controlIdentifier: Accessibility.newSessionProjectPicker,
-      optionTitle: "Sample Project Folder"
+      optionTitle: "harness"
     )
 
     let titleField = editableField(in: app, identifier: Accessibility.newSessionTitle)
@@ -143,7 +143,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     let createButton = button(in: app, identifier: Accessibility.newSessionCreateButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) { createButton.exists && createButton.isEnabled },
-      "Create should enable once the sheet has a visible sample folder and title"
+      "Create should enable once the sheet has a visible seeded folder and title"
     )
   }
 
