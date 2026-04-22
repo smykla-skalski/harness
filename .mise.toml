@@ -1,6 +1,9 @@
 [tools]
 rust = "nightly"
 
+[env]
+HARNESS_APP_GROUP_ID = "Q498EB36N4.io.harnessmonitor"
+
 [tasks."check:stale"]
 description = "Fail fast if the dev environment has stale processes, /tmp bridge sockets, or non-approved DerivedData HarnessMonitor bundles"
 run = "./scripts/check-no-stale-state.sh"
