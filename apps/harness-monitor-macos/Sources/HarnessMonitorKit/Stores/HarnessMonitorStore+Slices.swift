@@ -374,14 +374,10 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class ContentToolbarSlice {
-    public var toolbarMetrics = HarnessMonitorStore.ToolbarMetricsState()
-    public var statusMessages: [HarnessMonitorStore.StatusMessageState] = []
     public var canNavigateBack = false
     public var canNavigateForward = false
     public var isRefreshing = false
     public var sleepPreventionEnabled = false
-    public var connectionState: ConnectionState = .idle
-    public var isBusy = false
 
     public init() {}
   }

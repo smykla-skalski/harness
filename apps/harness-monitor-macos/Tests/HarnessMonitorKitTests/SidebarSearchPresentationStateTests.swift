@@ -10,9 +10,9 @@ struct SidebarSearchPresentationStateTests {
   func requestDefersWhileStartupFocusParticipationIsDisabled() {
     var state = SidebarSearchPresentationState()
 
-    let shouldFocusNow = state.requestPresentation(canPresent: false)
+    let didPresent = state.requestPresentation(canPresent: false)
 
-    #expect(shouldFocusNow == false)
+    #expect(didPresent == false)
     #expect(state.isPresented == false)
     #expect(state.hasPendingFocusRequest == true)
   }
@@ -22,9 +22,9 @@ struct SidebarSearchPresentationStateTests {
     var state = SidebarSearchPresentationState()
     _ = state.requestPresentation(canPresent: false)
 
-    let shouldFocusNow = state.applyPendingPresentationIfNeeded(canPresent: true)
+    let didPresent = state.applyPendingPresentationIfNeeded(canPresent: true)
 
-    #expect(shouldFocusNow == true)
+    #expect(didPresent == true)
     #expect(state.isPresented == true)
     #expect(state.hasPendingFocusRequest == false)
   }
@@ -33,9 +33,9 @@ struct SidebarSearchPresentationStateTests {
   func requestPresentsImmediatelyWhenStartupFocusParticipationIsEnabled() {
     var state = SidebarSearchPresentationState()
 
-    let shouldFocusNow = state.requestPresentation(canPresent: true)
+    let didPresent = state.requestPresentation(canPresent: true)
 
-    #expect(shouldFocusNow == true)
+    #expect(didPresent == true)
     #expect(state.isPresented == true)
     #expect(state.hasPendingFocusRequest == false)
   }
@@ -47,8 +47,7 @@ struct SidebarSearchPresentationStateTests {
 
     let isVisible = SidebarFilterVisibilityPolicy.showsControls(
       for: controls,
-      isSearchPresented: true,
-      isSearchActive: false
+      isSearchPresented: true
     )
 
     #expect(isVisible == true)

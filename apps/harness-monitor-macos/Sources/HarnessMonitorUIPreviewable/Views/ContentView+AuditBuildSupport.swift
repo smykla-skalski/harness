@@ -2,48 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-enum ContentToolbarLayoutWidth {
-  static let windowWidthOverrideKey = "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH"
-  static let minimumWidth: CGFloat = 320
-  static let defaultWindowWidth: CGFloat = 1_640
-  static let defaultWidth: CGFloat = 1_344
-  static let defaultSidebarWidth: CGFloat = 260
-  static let splitViewChromeAllowance: CGFloat = 36
-  // The toolbar only changes meaningfully at coarse width buckets. Snapping
-  // more aggressively avoids feeding detail-column layout jitter back into the
-  // split-view shell during cockpit transitions.
-  static let measurementQuantum: CGFloat = 32
-
-  // Seed the initial toolbar width from the standard launch window and sidebar
-  // geometry so the first measured detail width usually lands in the same
-  // normalized bucket and avoids a startup write-back.
-  static func initialValue(
-    environment: [String: String] = ProcessInfo.processInfo.environment
-  ) -> CGFloat {
-    let windowWidth = resolvedWindowWidth(environment: environment)
-    let estimatedDetailWidth = windowWidth - defaultSidebarWidth - splitViewChromeAllowance
-    return normalized(estimatedDetailWidth)
-  }
-
-  static func normalized(_ width: CGFloat) -> CGFloat {
-    let clampedWidth = max(width, minimumWidth)
-    return (clampedWidth / measurementQuantum).rounded() * measurementQuantum
-  }
-
-  private static func resolvedWindowWidth(environment: [String: String]) -> CGFloat {
-    guard
-      let rawValue = environment[windowWidthOverrideKey]?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      let parsedValue = Double(rawValue),
-      parsedValue.isFinite
-    else {
-      return defaultWindowWidth
-    }
-
-    return max(CGFloat(parsedValue), minimumWidth)
-  }
-}
-
 extension ContentView {
   var auditBuildAccessibilityValue: String? {
     auditBuildState?.accessibilityValue
