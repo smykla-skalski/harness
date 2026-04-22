@@ -1,6 +1,17 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public func requestEndSelectedSessionConfirmation() {
+    requestEndSelectedSessionConfirmation(actor: "harness-app")
+  }
+
+  func requestEndSelectedSessionConfirmation(actor: String) {
+    let actionName = "End session"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return }
+    let actorID = controlPlaneActionActor(for: actor)
+    pendingConfirmation = .endSession(sessionID: action.sessionID, actorID: actorID)
+  }
+
   public func adoptExternalSession(
     bookmarkID: String,
     preview: SessionDiscoveryProbe.Preview
@@ -45,6 +56,32 @@ extension HarnessMonitorStore {
 
   public func dismissSheet() {
     presentedSheet = nil
+  }
+
+  public func cancelConfirmation() {
+    pendingConfirmation = nil
+  }
+
+  public func confirmPendingAction() async {
+    guard !isSessionReadOnly else {
+      pendingConfirmation = nil
+      reportUnavailableSelectedSessionAction(
+        "Confirm pending action",
+        message: readOnlySessionAccessMessage
+      )
+      return
+    }
+    guard let pendingConfirmation else {
+      return
+    }
+    self.pendingConfirmation = nil
+
+    switch pendingConfirmation {
+    case .endSession(_, let actorID):
+      await endSelectedSession(actor: actorID)
+    case .removeAgent(_, let agentID, let actorID):
+      await removeAgent(agentID: agentID, actor: actorID)
+    }
   }
 
   public func makeNewSessionViewModel() -> NewSessionViewModel? {

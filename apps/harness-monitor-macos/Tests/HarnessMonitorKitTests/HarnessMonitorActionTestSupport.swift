@@ -197,3 +197,32 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     }
   }
 }
+
+@MainActor
+func selectedActionStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
+  let store = await makeBootstrappedStore(client: client)
+  await store.selectSession(PreviewFixtures.summary.sessionId)
+  return store
+}
+
+func actorlessActionClient() -> RecordingHarnessClient {
+  HarnessMonitorStoreSelectionTestSupport.configuredClient(
+    summaries: [PreviewFixtures.emptyCockpitSummary],
+    detailsByID: [
+      PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail
+    ],
+    detail: PreviewFixtures.emptyCockpitDetail
+  )
+}
+
+@MainActor
+func actorlessActionStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
+  let store = await makeBootstrappedStore(client: client)
+  await store.selectSession(PreviewFixtures.emptyCockpitSummary.sessionId)
+  return store
+}
+
+let expectedLeaderlessActionMessage = """
+  Leader-only actions are unavailable until a real leader joins this session.
+  Observe, end session, and task controls remain available.
+  """

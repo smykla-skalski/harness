@@ -230,6 +230,7 @@
 		6AA840C014CA18008F69E3FC /* RecordingHarnessClient+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B86F5C4D60F01C244C360 /* RecordingHarnessClient+Config.swift */; };
 		6B4CB6E4BDF5FFF57F461725 /* HarnessMonitorAPIClient+AdoptSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4A06C0C15768C020865247 /* HarnessMonitorAPIClient+AdoptSession.swift */; };
 		6C3330B0F96C71B4CAD10498 /* HarnessMonitorGlassContrastUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF19853DB17E93AE8E38140 /* HarnessMonitorGlassContrastUITests.swift */; };
+		6C4D12833526E26269AD5E8C /* HarnessMonitorStore+TaskActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8D93F26E86795DBB2D315EF /* HarnessMonitorStore+TaskActions.swift */; };
 		6D4DD8F937244AC4B3AD9868 /* HarnessMonitorLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA25774CA10AEF98A95352D /* HarnessMonitorLogger.swift */; };
 		6DA28F558165BABD85E09F15 /* HarnessMonitorStoreSelectionFlowTests+Reconnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C94D7B4938800D6B21F5992 /* HarnessMonitorStoreSelectionFlowTests+Reconnect.swift */; };
 		6E375AD8C523B84D5049439F /* OpenTelemetryApi in Frameworks */ = {isa = PBXBuildFile; productRef = 49CA69D7EEE3B61A4C188CF5 /* OpenTelemetryApi */; };
@@ -1042,6 +1043,7 @@
 		B77376842276C969E1297DF7 /* NativeVoiceCaptureService+AudioProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeVoiceCaptureService+AudioProcessing.swift"; sourceTree = "<group>"; };
 		B7934C545AA6E661E1F3F669 /* AgentTuiWindowView+Terminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentTuiWindowView+Terminal.swift"; sourceTree = "<group>"; };
 		B8AAC05121D1DD29B798775C /* HarnessMonitorNotificationFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorNotificationFactory.swift; sourceTree = "<group>"; };
+		B8D93F26E86795DBB2D315EF /* HarnessMonitorStore+TaskActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+TaskActions.swift"; sourceTree = "<group>"; };
 		B918572AD5DE96BF8CE5B3A5 /* RecordingHarnessClient+Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+Timeline.swift"; sourceTree = "<group>"; };
 		B953E5559CD3D94C0E5EBA0C /* HarnessVoiceInputButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessVoiceInputButton.swift; sourceTree = "<group>"; };
 		BAF471732B53BBFB163405A4 /* HarnessMonitorThemeMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorThemeMode.swift; sourceTree = "<group>"; };
@@ -1751,6 +1753,7 @@
 				F1ABA036BC8E40D510DB2590 /* HarnessMonitorStore+StreamingPushFallback.swift */,
 				AFD3E34C3B9EB13B3431ECEA /* HarnessMonitorStore+StreamingSelectionSupport.swift */,
 				F173D296A77B8E16DB405D1A /* HarnessMonitorStore+StreamingSupport.swift */,
+				B8D93F26E86795DBB2D315EF /* HarnessMonitorStore+TaskActions.swift */,
 				8BE8A078B08FCD4E912E618E /* HarnessMonitorStore+TimelineLoadingGate.swift */,
 				25B18AE5685BBD43F78A8694 /* HarnessMonitorStore+UISync.swift */,
 				5DF1220415B83E40F5B793F3 /* HarnessMonitorStore+UserData.swift */,
@@ -2719,6 +2722,7 @@
 				D73A3BC6EF534991676437A0 /* HarnessMonitorStore+StreamingPushFallback.swift in Sources */,
 				AC552BE3183B6FC5A13A0466 /* HarnessMonitorStore+StreamingSelectionSupport.swift in Sources */,
 				9E6E22092C1C9919FD9D9213 /* HarnessMonitorStore+StreamingSupport.swift in Sources */,
+				6C4D12833526E26269AD5E8C /* HarnessMonitorStore+TaskActions.swift in Sources */,
 				50FEA0CE3229009C7CA9B8B5 /* HarnessMonitorStore+TimelineLoadingGate.swift in Sources */,
 				9215C3E4BC284AEFB8F5DFE1 /* HarnessMonitorStore+UISync.swift in Sources */,
 				EFC49CF8FE0C4BB5E37273B4 /* HarnessMonitorStore+UserData.swift in Sources */,
@@ -3121,7 +3125,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3143,7 +3147,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 29.0.9;
+				MARKETING_VERSION = 29.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -3166,7 +3170,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3195,7 +3199,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3292,7 +3296,7 @@
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3320,7 +3324,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 29.0.9;
+				MARKETING_VERSION = 29.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3393,7 +3397,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3634,7 +3638,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3713,7 +3717,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				COMPILER_INDEX_STORE_ENABLE = NO;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -3741,7 +3745,7 @@
 				HARNESS_MONITOR_BUILD_GIT_DIRTY = NO;
 				HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT = "local-dev";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 29.0.9;
+				MARKETING_VERSION = 29.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3807,7 +3811,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -3854,7 +3858,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 29.0.9;
+				CURRENT_PROJECT_VERSION = 29.1.0;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = Q498EB36N4;
 				DYLIB_COMPATIBILITY_VERSION = 1;
