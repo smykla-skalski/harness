@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::agent_tui::{
-    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiProcess, AgentTuiSnapshot,
-    AgentTuiStatus, deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
+    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
+    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};

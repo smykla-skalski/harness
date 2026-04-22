@@ -31,9 +31,14 @@ fn input_worker_replays_timed_sequences_in_order() {
     };
 
     let started = Instant::now();
-    worker.enqueue_sequence(&sequence).expect("queue sequence");
+    let queued_worker = worker.clone();
+    let sender = std::thread::spawn(move || queued_worker.enqueue_sequence(&sequence));
 
     wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("first"));
+    assert!(
+        !sender.is_finished(),
+        "sequence enqueue should not return before delayed replay finishes"
+    );
     assert!(
         !transcript_text(&process).contains("second"),
         "delayed step should not replay immediately"
@@ -45,11 +50,17 @@ fn input_worker_replays_timed_sequences_in_order() {
         "delayed step should still be pending midway through the idle window"
     );
 
-    wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("second"));
+    wait_until(WAIT_TIMEOUT, || {
+        transcript_text(&process).contains("second")
+    });
     assert!(
         started.elapsed() >= Duration::from_millis(120),
         "second step should not replay before its configured delay"
     );
+    sender
+        .join()
+        .expect("join queued sequence")
+        .expect("queue sequence");
 
     process.kill().expect("kill cat");
 }
@@ -76,7 +87,10 @@ fn input_worker_keeps_immediate_input_ordered_after_in_flight_sequence() {
         ],
     };
 
-    worker.enqueue_sequence(&sequence).expect("queue sequence");
+    let queued_worker = worker.clone();
+    let sequence_sender = std::thread::spawn(move || queued_worker.enqueue_sequence(&sequence));
+    wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("first"));
+
     let queued_worker = worker.clone();
     let sender = std::thread::spawn(move || {
         queued_worker.send_input(&AgentTuiInput::Text {
@@ -85,6 +99,10 @@ fn input_worker_keeps_immediate_input_ordered_after_in_flight_sequence() {
     });
 
     wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("third"));
+    sequence_sender
+        .join()
+        .expect("join queued sequence")
+        .expect("queue sequence");
     sender
         .join()
         .expect("join queued immediate input")
@@ -121,7 +139,8 @@ fn input_worker_aborts_pending_replay_after_stop_or_exit() {
         ],
     };
 
-    worker.enqueue_sequence(&sequence).expect("queue sequence");
+    let queued_worker = worker.clone();
+    let sender = std::thread::spawn(move || queued_worker.enqueue_sequence(&sequence));
     wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("first"));
 
     stop_flag.store(true, Ordering::Relaxed);
@@ -130,6 +149,11 @@ fn input_worker_aborts_pending_replay_after_stop_or_exit() {
 
     let transcript = transcript_text(&process);
     assert!(!transcript.contains("blocked"), "{transcript}");
+    let error = sender
+        .join()
+        .expect("join queued sequence")
+        .expect_err("stopped worker should fail timed replay");
+    assert!(error.to_string().contains("no longer active"));
     let error = worker
         .send_input(&AgentTuiInput::Text {
             text: "later\n".into(),
