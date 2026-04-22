@@ -209,6 +209,120 @@ fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
 }
 
 #[test]
+fn bridge_accepts_timed_input_sequences() {
+    let tmp = tempdir().expect("tempdir");
+    let host_home = ensure_host_home(tmp.path());
+    let project = tmp.path().join("project");
+    crate::integration::daemon_control::process::init_git_repo(&project);
+
+    let mut bridge = ManagedChild::spawn(
+        Command::new(harness_binary())
+            .args(["bridge", "start", "--capability", "agent-tui"])
+            .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+            .env("XDG_DATA_HOME", tmp.path())
+            .env("HARNESS_HOST_HOME", &host_home)
+            .env("HOME", &host_home)
+            .env_remove("HARNESS_APP_GROUP_ID")
+            .env_remove("HARNESS_SANDBOXED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .expect("spawn bridge");
+
+    let _state = wait_for_bridge_state(tmp.path());
+    temp_env::with_vars(
+        [
+            (
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 daemon root")),
+            ),
+            (
+                "HARNESS_HOST_HOME",
+                Some(host_home.to_str().expect("utf8 host home")),
+            ),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("HARNESS_SANDBOXED", None),
+        ],
+        || {
+            let client = BridgeClient::from_state_file().expect("bridge client");
+            let snapshot = client
+                .agent_tui_start(&AgentTuiStartSpec {
+                    session_id: "session-sequence".to_string(),
+                    agent_id: "agent-sequence".to_string(),
+                    tui_id: "agent-tui-sequence".to_string(),
+                    profile: AgentTuiLaunchProfile::from_argv(
+                        "codex",
+                        vec!["sh".to_string(), "-c".to_string(), "cat".to_string()],
+                    )
+                    .expect("launch profile"),
+                    project_dir: project.clone(),
+                    transcript_path: tmp.path().join("sequence-transcript.log"),
+                    size: AgentTuiSize { rows: 24, cols: 80 },
+                    prompt: None,
+                    effort: None,
+                })
+                .expect("start agent tui");
+
+            let queued = client
+                .agent_tui_input(
+                    &snapshot.tui_id,
+                    &AgentTuiInputRequest::from_sequence(AgentTuiInputSequence {
+                        steps: vec![
+                            AgentTuiInputSequenceStep {
+                                delay_before_ms: 0,
+                                input: AgentTuiInput::Text {
+                                    text: "first\n".to_string(),
+                                },
+                            },
+                            AgentTuiInputSequenceStep {
+                                delay_before_ms: 120,
+                                input: AgentTuiInput::Text {
+                                    text: "second\n".to_string(),
+                                },
+                            },
+                        ],
+                    })
+                    .expect("sequence request"),
+                )
+                .expect("queue sequence");
+            assert_eq!(queued.tui_id, snapshot.tui_id);
+
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let settled = loop {
+                let latest = client
+                    .agent_tui_get(&snapshot.tui_id)
+                    .expect("refresh snapshot");
+                if latest.screen.text.contains("second") {
+                    break latest;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "timed bridge input sequence never completed"
+                );
+                thread::sleep(Duration::from_millis(50));
+            };
+            assert!(settled.screen.text.contains("first"));
+            let first = settled.screen.text.find("first").expect("first text");
+            let second = settled.screen.text.find("second").expect("second text");
+            assert!(first < second, "{}", settled.screen.text);
+        },
+    );
+
+    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    assert!(
+        stop_output.status.success(),
+        "cleanup stop: {}",
+        output_text(&stop_output)
+    );
+    wait_for_bridge_exit(&mut bridge);
+}
+
+#[test]
 fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());

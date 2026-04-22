@@ -6,32 +6,25 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   func testAgentTuiWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
-
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-
     XCTAssertTrue(waitForElement(createRow, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(launchPane, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(state, timeout: Self.fastActionTimeout))
     XCTAssertTrue(state.label.contains("selection=create"))
   }
-
   func testStartingAgentTuiCreatesAndSelectsSessionRow() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "Inspect the cockpit session")
-
     let sessionRow = element(
       in: app,
       identifier: Accessibility.agentTuiTab("preview-agent-tui-1")
     )
     let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         sessionRow.exists
@@ -46,13 +39,10 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       }
     )
   }
-
   func testCommandNavigationRoutesBackAndForwardWithinActiveAgentTuiWindowHistory() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "exercise command navigation")
-
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let createTab = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let commandRoutingState = element(
@@ -61,7 +51,6 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
     let backButton = element(in: app, identifier: Accessibility.agentTuiNavigateBackButton)
     let forwardButton = element(in: app, identifier: Accessibility.agentTuiNavigateForwardButton)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=session:preview-agent-tui-1")
@@ -71,9 +60,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
           && forwardButton.exists
       }
     )
-
     tapButton(in: app, identifier: Accessibility.agentTuiCreateTab)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=create")
@@ -85,9 +72,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       },
       "Selecting the create tab should move the active Agents window into its create pane"
     )
-
     invokeHarnessMonitorMenuItem(in: app, title: "Back")
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=session:preview-agent-tui-1")
@@ -103,9 +88,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       forwardEnabled=\(forwardButton.isEnabled)
       """
     )
-
     invokeHarnessMonitorMenuItem(in: app, title: "Forward")
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=create")
@@ -115,14 +98,11 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       "Harness Monitor > Forward should navigate forward inside the active Agents window history"
     )
   }
-
   func testSidebarShowsAllSessionsWithoutOverflow() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-overflow"]
     )
-
     reopenAgentTuiWindow(in: app)
-
     for index in 1...6 {
       let sessionRow = element(
         in: app,
@@ -134,18 +114,13 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       )
     }
   }
-
   func testCreatePaneSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
-
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     XCTAssertTrue(waitForElement(createRow, timeout: Self.actionTimeout))
-
     let agentWindow = window(in: app, containing: createRow)
     XCTAssertTrue(agentWindow.exists)
-
     let toolbar = agentWindow.toolbars.firstMatch
     XCTAssertTrue(waitForElement(toolbar, timeout: Self.actionTimeout))
     XCTAssertGreaterThan(
@@ -153,13 +128,10 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       0,
       "Agents window should expose toolbar controls in native window chrome"
     )
-
     let leadingToolbarButton = toolbar.buttons.element(boundBy: 0)
     XCTAssertTrue(leadingToolbarButton.exists)
-
     let toolbarLeadingInset = leadingToolbarButton.frame.minX - agentWindow.frame.minX
     let rowTopInset = createRow.frame.minY - agentWindow.frame.minY
-
     XCTAssertLessThan(
       toolbarLeadingInset,
       176,
@@ -176,33 +148,25 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       "Agents sidebar content should stay visually close to the toolbar"
     )
   }
-
   func testWrapToggleSwitchesViewportMode() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "wrap test")
-
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("wrap=false")
       },
       "Session should start with wrap disabled"
     )
-
     app.typeKey("l", modifierFlags: .command)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("wrap=true")
       },
       "After Cmd+L, wrap should be enabled"
     )
-
     app.typeKey("l", modifierFlags: .command)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("wrap=false")
@@ -210,20 +174,15 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       "After Cmd+L again, wrap should be disabled"
     )
   }
-
   func testCommandReturnSendsAgentInputFromEditor() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "command return send")
-
     let inputField = editableField(in: app, identifier: Accessibility.agentTuiInputField)
     XCTAssertTrue(waitForElement(inputField, timeout: Self.actionTimeout))
-
     inputField.click()
     inputField.typeText("cmd return send")
     app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: .command)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         let value = inputField.value as? String
@@ -232,29 +191,67 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       "Cmd+Return should send the current input and clear the editor"
     )
   }
-
+  func testRapidKeyStripTapsShowPendingHintBeforeIdleFlush() throws {
+    let app = launchInCockpitPreview()
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "buffer key strip input")
+    tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
+    tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("arrow-down"))
+    let pendingHint = element(in: app, identifier: Accessibility.agentTuiKeyQueueHint)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        pendingHint.exists
+          && pendingHint.label.contains("↩")
+          && pendingHint.label.contains("↓")
+      },
+      "Rapid key-strip taps should show a pending queue hint before the idle flush runs"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !pendingHint.exists
+          && self.agentTuiViewportContainsText(in: app, text: "[Enter]")
+          && self.agentTuiViewportContainsText(in: app, text: "[Arrow Down]")
+      },
+      "After the idle window expires the queued keys should replay in order into the viewport"
+    )
+  }
+  func testSelectionChangeFlushesPendingKeySequenceImmediately() throws {
+    let app = launchInCockpitPreview()
+    openAgentTuiWindow(in: app)
+    startAgentTui(in: app, runtimeTitle: "Codex", prompt: "flush pending keys on selection change")
+    tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
+    let pendingHint = element(in: app, identifier: Accessibility.agentTuiKeyQueueHint)
+    XCTAssertTrue(waitForElement(pendingHint, timeout: Self.fastActionTimeout))
+    tapButton(in: app, identifier: Accessibility.agentTuiCreateTab)
+    let sessionRow = element(in: app, identifier: Accessibility.agentTuiTab("preview-agent-tui-1"))
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.actionTimeout))
+    tapViaCoordinate(in: app, element: sessionRow)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !pendingHint.exists && self.agentTuiViewportContainsText(in: app, text: "[Enter]")
+      },
+      """
+      Switching away from the session should flush the buffered key sequence immediately instead of
+      waiting for the idle timer.
+      """
+    )
+  }
   func testDraggingViewportDividerResizesLiveTerminal() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "resize with divider")
-
     let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
     let controls = element(in: app, identifier: Accessibility.agentTuiControls)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-
     XCTAssertTrue(waitForElement(viewport, timeout: Self.actionTimeout))
     XCTAssertTrue(waitForElement(controls, timeout: Self.actionTimeout))
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
-
     guard let initialSize = agentTuiSize(from: state.label) else {
       XCTFail("Expected the Agents state marker to expose the live size")
       return
     }
     let initialHeight = viewport.frame.height
-
     dragViewportDivider(in: app, viewport: viewport, controls: controls, verticalOffset: 120)
-
     let didResize = waitUntil(timeout: Self.actionTimeout) {
       guard let updatedSize = self.agentTuiSize(from: state.label) else {
         return false
@@ -262,7 +259,6 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       return viewport.frame.height >= initialHeight + 24
         && updatedSize.rows > initialSize.rows
     }
-
     let finalHeight = viewport.frame.height
     let finalState = state.label
     XCTAssertTrue(
@@ -276,17 +272,12 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       """
     )
   }
-
   func testStoppedSessionHidesLiveControlsButKeepsTranscriptAction() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "stop after start")
-
     tapButton(in: app, title: "Stop")
-
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("status=stopped")
@@ -313,41 +304,33 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       }
     )
   }
-
   func testTerminalSizeRemainsStableAfterStartAndSelection() throws {
     let app = launchInCockpitPreview()
-
     openAgentTuiWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Claude", prompt: "viewport size test")
-
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
-
     guard let initialSize = agentTuiSize(from: state.label) else {
       XCTFail("State marker should expose terminal size after start")
       return
     }
-
     XCTAssertNotEqual(
       initialSize.rows,
       30,
       "Terminal should use viewport-derived size, not daemon default 30 rows"
     )
-
     tapButton(in: app, identifier: Accessibility.agentTuiCreateTab)
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) {
         state.label.contains("selection=create")
       }
     )
-
     let sessionRow = element(
       in: app,
       identifier: Accessibility.agentTuiTab("preview-agent-tui-1")
     )
     XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
     sessionRow.click()
-
     let sizeStable = waitUntil(timeout: Self.actionTimeout) {
       guard let currentSize = self.agentTuiSize(from: state.label) else {
         return false
@@ -356,7 +339,6 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
         && currentSize.rows == initialSize.rows
         && currentSize.cols == initialSize.cols
     }
-
     let finalState = state.label
     XCTAssertTrue(
       sizeStable,

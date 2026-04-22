@@ -156,19 +156,20 @@ actor PreviewHarnessClientState {
     request: AgentTuiInputRequest
   ) -> AgentTuiSnapshot? {
     mutateAgentTui(tuiID: tuiID) { snapshot in
-      let updatedText: String =
-        switch request.input {
+      let updatedText = request.replayedInputs.reduce(snapshot.screen.text) { screenText, input in
+        switch input {
         case .text(let text), .paste(let text):
-          [snapshot.screen.text, text].filter { !$0.isEmpty }.joined(separator: "\n")
+          [screenText, text].filter { !$0.isEmpty }.joined(separator: "\n")
         case .key(let key):
-          [snapshot.screen.text, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
+          [screenText, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
         case .control(let key):
-          [snapshot.screen.text, "[Ctrl-\(String(key).uppercased())]"]
+          [screenText, "[Ctrl-\(String(key).uppercased())]"]
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
         case .rawBytesBase64:
-          [snapshot.screen.text, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
+          [screenText, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
         }
+      }
 
       return snapshot.replacing(
         screen: snapshot.screen.replacing(

@@ -1,7 +1,9 @@
 use std::io::Write;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
-use std::thread::{JoinHandle, sleep};
+use std::thread::{JoinHandle, sleep, spawn};
 use std::time::{Duration, Instant};
 
 use portable_pty::{Child, ExitStatus, MasterPty, native_pty_system};
@@ -11,6 +13,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::input::AgentTuiInput;
+use super::input_request::AgentTuiInputSequence;
 use super::model::{
     AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSnapshot, AgentTuiSpawnSpec, AgentTuiStatus,
 };
@@ -58,6 +61,210 @@ pub(crate) fn snapshot_from_process(
 pub(crate) struct AgentTuiAttachState {
     pub(crate) initial_bytes: Vec<u8>,
     pub(crate) broadcast_rx: broadcast::Receiver<Vec<u8>>,
+}
+
+enum QueuedAgentTuiInput {
+    Immediate {
+        input: AgentTuiInput,
+        completion: SyncSender<Result<(), CliError>>,
+    },
+    Sequence {
+        sequence: AgentTuiInputSequence,
+    },
+}
+
+enum QueuedAgentTuiInputPoll {
+    Input(QueuedAgentTuiInput),
+    Timeout,
+    Disconnected,
+}
+
+#[derive(Clone)]
+pub(crate) struct AgentTuiInputWorker {
+    sender: Sender<QueuedAgentTuiInput>,
+    stop_flag: Arc<AtomicBool>,
+    process: Arc<AgentTuiProcess>,
+}
+
+impl AgentTuiInputWorker {
+    pub(crate) fn spawn(process: Arc<AgentTuiProcess>, stop_flag: Arc<AtomicBool>) -> Self {
+        let (sender, receiver) = mpsc::channel();
+        let worker = Self {
+            sender,
+            stop_flag: Arc::clone(&stop_flag),
+            process: Arc::clone(&process),
+        };
+        spawn(move || {
+            Self::run(&receiver, &process, &stop_flag);
+        });
+        worker
+    }
+
+    /// Queue one immediate input and wait until it has been replayed.
+    ///
+    /// # Errors
+    /// Returns a session-not-active or transport error when the process has
+    /// already stopped, the queue is unavailable, or the replay fails.
+    pub(crate) fn send_input(&self, input: &AgentTuiInput) -> Result<(), CliError> {
+        self.ensure_accepting_input()?;
+        let (completion_tx, completion_rx) = mpsc::sync_channel(1);
+        self.sender
+            .send(QueuedAgentTuiInput::Immediate {
+                input: input.clone(),
+                completion: completion_tx,
+            })
+            .map_err(|_| {
+                CliError::from(CliErrorKind::session_not_active(
+                    "terminal agent input queue is no longer available",
+                ))
+            })?;
+        completion_rx.recv().map_err(|_| {
+            CliError::from(CliErrorKind::session_not_active(
+                "terminal agent input queue stopped before replay completed",
+            ))
+        })?
+    }
+
+    /// Queue one timed sequence for asynchronous replay.
+    ///
+    /// # Errors
+    /// Returns a session-not-active or transport error when the process has
+    /// already stopped or the queue is unavailable.
+    pub(crate) fn enqueue_sequence(
+        &self,
+        sequence: &AgentTuiInputSequence,
+    ) -> Result<(), CliError> {
+        self.ensure_accepting_input()?;
+        self.sender
+            .send(QueuedAgentTuiInput::Sequence {
+                sequence: sequence.clone(),
+            })
+            .map_err(|_| {
+                CliError::from(CliErrorKind::session_not_active(
+                    "terminal agent input queue is no longer available",
+                ))
+            })
+    }
+
+    fn ensure_accepting_input(&self) -> Result<(), CliError> {
+        if self.stop_flag.load(Ordering::Relaxed) || self.process.try_wait()?.is_some() {
+            return Err(CliErrorKind::session_not_active("terminal agent is no longer active").into());
+        }
+        Ok(())
+    }
+
+    fn run(
+        receiver: &mpsc::Receiver<QueuedAgentTuiInput>,
+        process: &Arc<AgentTuiProcess>,
+        stop_flag: &Arc<AtomicBool>,
+    ) {
+        loop {
+            if Self::transport_stopped(process, stop_flag).unwrap_or(true) {
+                return;
+            }
+            match Self::poll_next_input(receiver) {
+                QueuedAgentTuiInputPoll::Input(queued_input) => {
+                    Self::handle_queued_input(process, stop_flag, queued_input);
+                }
+                QueuedAgentTuiInputPoll::Timeout => {}
+                QueuedAgentTuiInputPoll::Disconnected => return,
+            }
+        }
+    }
+
+    fn poll_next_input(receiver: &mpsc::Receiver<QueuedAgentTuiInput>) -> QueuedAgentTuiInputPoll {
+        match receiver.recv_timeout(Duration::from_millis(20)) {
+            Ok(queued_input) => QueuedAgentTuiInputPoll::Input(queued_input),
+            Err(RecvTimeoutError::Timeout) => QueuedAgentTuiInputPoll::Timeout,
+            Err(RecvTimeoutError::Disconnected) => QueuedAgentTuiInputPoll::Disconnected,
+        }
+    }
+
+    fn handle_queued_input(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+        queued_input: QueuedAgentTuiInput,
+    ) {
+        match queued_input {
+            QueuedAgentTuiInput::Immediate { input, completion } => {
+                let _ = completion.send(Self::replay_input(process, stop_flag, &input));
+            }
+            QueuedAgentTuiInput::Sequence { sequence } => {
+                Self::warn_on_sequence_replay_failure(
+                    Self::replay_sequence(process, stop_flag, &sequence),
+                );
+            }
+        }
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn warn_on_sequence_replay_failure(result: Result<(), CliError>) {
+        if let Err(error) = result {
+            tracing::warn!(%error, "terminal agent timed input replay failed");
+        }
+    }
+
+    fn replay_sequence(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+        sequence: &AgentTuiInputSequence,
+    ) -> Result<(), CliError> {
+        for step in &sequence.steps {
+            Self::sleep_before_step(process, stop_flag, step.delay_before_ms)?;
+            Self::replay_input(process, stop_flag, &step.input)?;
+        }
+        Ok(())
+    }
+
+    fn sleep_before_step(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+        delay_before_ms: u64,
+    ) -> Result<(), CliError> {
+        let delay = Duration::from_millis(delay_before_ms);
+        if delay.is_zero() {
+            return Self::ensure_transport_active(process, stop_flag);
+        }
+        let deadline = Instant::now() + delay;
+        while Instant::now() < deadline {
+            Self::ensure_transport_active(process, stop_flag)?;
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            sleep(remaining.min(Duration::from_millis(10)));
+        }
+        Self::ensure_transport_active(process, stop_flag)
+    }
+
+    fn replay_input(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+        input: &AgentTuiInput,
+    ) -> Result<(), CliError> {
+        Self::ensure_transport_active(process, stop_flag)?;
+        process.send_input(input)
+    }
+
+    fn ensure_transport_active(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+    ) -> Result<(), CliError> {
+        if Self::transport_stopped(process, stop_flag)? {
+            return Err(CliErrorKind::session_not_active("terminal agent is no longer active").into());
+        }
+        Ok(())
+    }
+
+    fn transport_stopped(
+        process: &AgentTuiProcess,
+        stop_flag: &AtomicBool,
+    ) -> Result<bool, CliError> {
+        if stop_flag.load(Ordering::Relaxed) {
+            return Ok(true);
+        }
+        Ok(process.try_wait()?.is_some())
+    }
 }
 
 /// Live process handle for a terminal agent running inside a PTY.

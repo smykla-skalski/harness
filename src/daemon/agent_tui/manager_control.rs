@@ -4,14 +4,12 @@ use std::time::Duration;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::ordering::sort_agent_tui_snapshots;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::input_request::AgentTuiInputRequest;
 use super::manager::AgentTuiManagerHandle;
-use super::model::{
-    AgentTuiInputRequest, AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiSnapshot,
-    AgentTuiStatus,
-};
+use super::model::{AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiSnapshot, AgentTuiStatus};
 use super::process::{AgentTuiSnapshotContext, snapshot_from_process};
 use super::readiness::signal_readiness_ready;
 use super::support::lock_db;
@@ -81,6 +79,7 @@ impl AgentTuiManagerHandle {
         tui_id: &str,
         request: &AgentTuiInputRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
+        request.validate()?;
         if self.state.sandboxed {
             let snapshot = self.normalize_snapshot(
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
@@ -89,8 +88,21 @@ impl AgentTuiManagerHandle {
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
-        let process = self.active_process(tui_id)?;
-        process.send_input(&request.input)?;
+        let active = self.active_tui(tui_id)?;
+        let worker = active.input_worker.as_ref().ok_or_else(|| {
+            CliError::from(CliErrorKind::session_not_active(format!(
+                "terminal agent '{tui_id}' is not active"
+            )))
+        })?;
+        match (request.input(), request.sequence()) {
+            (Some(input), None) => worker.send_input(input)?,
+            (None, Some(sequence)) => worker.enqueue_sequence(sequence)?,
+            _ => {
+                return Err(CliError::from(CliErrorKind::workflow_parse(
+                    "terminal agent input request requires exactly one of 'input' or 'sequence'",
+                )));
+            }
+        }
         self.get(tui_id)
     }
 
@@ -108,28 +120,29 @@ impl AgentTuiManagerHandle {
             let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
             let _ = bridge.agent_tui_input(
                 tui_id,
-                &AgentTuiInputRequest {
-                    input: AgentTuiInput::Text {
-                        text: prompt.to_string(),
-                    },
-                },
+                &AgentTuiInputRequest::from_input(AgentTuiInput::Text {
+                    text: prompt.to_string(),
+                }),
             )?;
             let _ = bridge.agent_tui_input(
                 tui_id,
-                &AgentTuiInputRequest {
-                    input: AgentTuiInput::Key {
-                        key: AgentTuiKey::Enter,
-                    },
-                },
+                &AgentTuiInputRequest::from_input(AgentTuiInput::Key {
+                    key: AgentTuiKey::Enter,
+                }),
             )?;
             return Ok(true);
         }
 
-        let process = self.active_process(tui_id)?;
-        process.send_input(&AgentTuiInput::Text {
+        let active = self.active_tui(tui_id)?;
+        let worker = active.input_worker.ok_or_else(|| {
+            CliError::from(CliErrorKind::session_not_active(format!(
+                "terminal agent '{tui_id}' is not active"
+            )))
+        })?;
+        worker.send_input(&AgentTuiInput::Text {
             text: prompt.to_string(),
         })?;
-        process.send_input(&AgentTuiInput::Key {
+        worker.send_input(&AgentTuiInput::Key {
             key: AgentTuiKey::Enter,
         })?;
         Ok(true)

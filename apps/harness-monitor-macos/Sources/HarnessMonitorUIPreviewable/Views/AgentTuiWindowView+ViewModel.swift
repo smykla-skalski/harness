@@ -4,6 +4,153 @@ import Observation
 import SwiftUI
 
 extension AgentTuiWindowView {
+  protocol KeySequenceClock: AnyObject, Sendable {
+    @MainActor var now: ContinuousClock.Instant { get }
+    func sleep(until deadline: ContinuousClock.Instant) async throws
+  }
+
+  final class LiveKeySequenceClock: KeySequenceClock, @unchecked Sendable {
+    @MainActor var now: ContinuousClock.Instant { ContinuousClock.now }
+
+    func sleep(until deadline: ContinuousClock.Instant) async throws {
+      try await ContinuousClock().sleep(until: deadline)
+    }
+  }
+
+  @MainActor
+  @Observable
+  final class KeySequenceBuffer {
+    struct PendingStep: Equatable {
+      let delayBeforeMs: Int
+      let input: AgentTuiInput
+      let glyph: String
+    }
+
+    private let clock: any KeySequenceClock
+    private let idleDelay: Duration
+    private var pendingSteps: [PendingStep] = []
+    private var lastQueuedAt: ContinuousClock.Instant?
+    @ObservationIgnored private var flushTask: Task<Void, Never>?
+    @ObservationIgnored private var flushHandler:
+      (@MainActor (_ tuiID: String, _ request: AgentTuiInputRequest) async -> Void)?
+
+    var pendingHint: String?
+    var pendingTuiID: String?
+
+    init(
+      clock: any KeySequenceClock = LiveKeySequenceClock(),
+      idleDelay: Duration = .milliseconds(350)
+    ) {
+      self.clock = clock
+      self.idleDelay = idleDelay
+    }
+
+    deinit {
+      flushTask?.cancel()
+    }
+
+    var hasPendingInputs: Bool {
+      pendingTuiID != nil && !pendingSteps.isEmpty
+    }
+
+    func enqueue(
+      input: AgentTuiInput,
+      glyph: String,
+      tuiID: String,
+      onFlush: @escaping @MainActor (_ tuiID: String, _ request: AgentTuiInputRequest) async -> Void
+    ) {
+      if pendingTuiID != tuiID {
+        clearPendingState()
+      }
+      let now = clock.now
+      let delayBeforeMs =
+        if let lastQueuedAt, !pendingSteps.isEmpty {
+          Self.durationMilliseconds(lastQueuedAt.duration(to: now))
+        } else {
+          0
+        }
+      pendingSteps.append(
+        PendingStep(
+          delayBeforeMs: delayBeforeMs,
+          input: input,
+          glyph: glyph
+        )
+      )
+      pendingTuiID = tuiID
+      pendingHint = pendingSteps.map(\.glyph).joined()
+      lastQueuedAt = now
+      flushHandler = onFlush
+      scheduleIdleFlush()
+    }
+
+    func flush() async {
+      let flushHandler = flushHandler
+      guard let pending = takePendingRequest(), let flushHandler else {
+        return
+      }
+      await flushHandler(pending.tuiID, pending.request)
+    }
+
+    func drop() {
+      clearPendingState()
+    }
+
+    private func takePendingRequest() -> (tuiID: String, request: AgentTuiInputRequest)? {
+      guard
+        let tuiID = pendingTuiID,
+        !pendingSteps.isEmpty
+      else {
+        clearPendingState()
+        return nil
+      }
+      let steps = pendingSteps.map { step in
+        AgentTuiInputSequenceStep(
+          delayBeforeMs: step.delayBeforeMs,
+          input: step.input
+        )
+      }
+      clearPendingState()
+      guard
+        let request = try? AgentTuiInputRequest(
+          sequence: AgentTuiInputSequence(steps: steps)
+        )
+      else {
+        return nil
+      }
+      return (tuiID, request)
+    }
+
+    private func scheduleIdleFlush() {
+      flushTask?.cancel()
+      let deadline = clock.now.advanced(by: idleDelay)
+      flushTask = Task { @MainActor [weak self] in
+        guard let self else { return }
+        do {
+          try await clock.sleep(until: deadline)
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else { return }
+        await flush()
+      }
+    }
+
+    private func clearPendingState() {
+      flushTask?.cancel()
+      flushTask = nil
+      pendingSteps = []
+      pendingHint = nil
+      pendingTuiID = nil
+      lastQueuedAt = nil
+      flushHandler = nil
+    }
+
+    private static func durationMilliseconds(_ duration: Duration) -> Int {
+      max(0, Int(duration.components.seconds * 1_000))
+        + Int(duration.components.attoseconds / 1_000_000_000_000_000)
+    }
+  }
+
   enum Field: Hashable {
     case name
     case prompt
@@ -236,6 +383,7 @@ extension AgentTuiWindowView {
     var pendingViewportResizeTarget: AgentTuiSize?
     var viewportResizeTask: Task<Void, Never>?
     var expectedSize: AgentTuiSize?
+    var keySequenceBuffer = KeySequenceBuffer()
 
     init(
       selection: AgentTuiSheetSelection = .create

@@ -254,6 +254,9 @@ public struct AgentTuiWindowView: View {
     .onChange(of: viewModel.selection) { oldValue, newValue in
       if oldValue != newValue {
         cancelPendingViewportResize()
+        Task {
+          await flushPendingKeySequenceIfNeeded()
+        }
       }
       if viewModel.suppressHistoryRecording {
         viewModel.suppressHistoryRecording = false
@@ -277,6 +280,9 @@ public struct AgentTuiWindowView: View {
     }
     .onDisappear {
       cancelPendingViewportResize()
+      Task {
+        await flushPendingKeySequenceIfNeeded()
+      }
       navigationBridge.update(WindowNavigationState())
     }
     .accessibilityElement(children: .contain)

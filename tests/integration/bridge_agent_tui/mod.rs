@@ -5,6 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use harness::daemon::agent_tui::{
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
     AgentTuiLaunchProfile, AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot,
     AgentTuiStartRequest, AgentTuiStatus,
 };

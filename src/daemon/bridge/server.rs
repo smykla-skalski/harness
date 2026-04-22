@@ -223,8 +223,18 @@ impl BridgeServer {
             }
             "input" => {
                 let request: BridgeInputRequest = parse_bridge_payload(payload)?;
-                let process = self.active_tui(&request.tui_id)?.process;
-                process.send_input(&request.request.input)?;
+                request.request.validate()?;
+                let active = self.active_tui(&request.tui_id)?;
+                match (request.request.input(), request.request.sequence()) {
+                    (Some(input), None) => active.input_worker.send_input(input)?,
+                    (None, Some(sequence)) => active.input_worker.enqueue_sequence(sequence)?,
+                    _ => {
+                        return Err(CliErrorKind::workflow_parse(
+                            "terminal agent input request requires exactly one of 'input' or 'sequence'",
+                        )
+                        .into());
+                    }
+                }
                 let snapshot = self.get_agent_tui(&request.tui_id)?;
                 Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }

@@ -60,9 +60,7 @@ impl Execute for ManagedTerminalInputArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let snapshot = daemon_client()?.send_managed_terminal_input(
             &self.agent_id,
-            &AgentTuiInputRequest {
-                input: self.input()?,
-            },
+            &AgentTuiInputRequest::from_input(self.input()?),
         )?;
         print_json(&snapshot)?;
         Ok(0)

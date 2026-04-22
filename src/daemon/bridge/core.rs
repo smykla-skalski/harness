@@ -1,13 +1,15 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::Child;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::daemon::agent_tui::{
-    AgentTuiAttachState, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiSnapshotContext,
+    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiLaunchProfile, AgentTuiProcess,
+    AgentTuiSnapshotContext, AgentTuiStatus,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -63,6 +65,8 @@ impl BridgeSnapshotContext {
 #[derive(Clone)]
 pub(super) struct BridgeActiveTui {
     pub(super) process: Arc<AgentTuiProcess>,
+    pub(super) stop_flag: Arc<AtomicBool>,
+    pub(super) input_worker: AgentTuiInputWorker,
     pub(super) context: BridgeSnapshotContext,
     pub(super) created_at: String,
     pub(super) exit_info: Option<BridgeTuiExitInfo>,
@@ -70,7 +74,7 @@ pub(super) struct BridgeActiveTui {
 
 #[derive(Debug, Clone)]
 pub(super) struct BridgeTuiExitInfo {
-    pub(super) status: crate::daemon::agent_tui::AgentTuiStatus,
+    pub(super) status: AgentTuiStatus,
     pub(super) exit_code: Option<u32>,
     pub(super) signal: Option<String>,
 }

@@ -1,4 +1,5 @@
 mod backend;
+mod input_worker;
 mod live_refresh;
 mod manager;
 mod sandboxed;
@@ -127,21 +128,17 @@ fn manager_starts_registers_steers_and_stops_tui() {
         manager
             .input(
                 &snapshot.tui_id,
-                &AgentTuiInputRequest {
-                    input: AgentTuiInput::Text {
-                        text: "hello from manager".into(),
-                    },
-                },
+                &AgentTuiInputRequest::from_input(AgentTuiInput::Text {
+                    text: "hello from manager".into(),
+                }),
             )
             .expect("send text");
         manager
             .input(
                 &snapshot.tui_id,
-                &AgentTuiInputRequest {
-                    input: AgentTuiInput::Key {
-                        key: AgentTuiKey::Enter,
-                    },
-                },
+                &AgentTuiInputRequest::from_input(AgentTuiInput::Key {
+                    key: AgentTuiKey::Enter,
+                }),
             )
             .expect("send enter");
 

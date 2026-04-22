@@ -90,7 +90,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func sendAgentTuiInput(
     tuiID: String,
-    input: AgentTuiInput,
+    request: AgentTuiInputRequest,
     showSuccessFeedback: Bool = true
   ) async -> Bool {
     let actionName = showSuccessFeedback ? "Agents input sent" : nil
@@ -104,9 +104,22 @@ extension HarnessMonitorStore {
     return await mutateAgentTui(using: client, actionName: actionName) {
       try await client.sendAgentTuiInput(
         tuiID: tuiID,
-        request: AgentTuiInputRequest(input: input)
+        request: request
       )
     }
+  }
+
+  @discardableResult
+  public func sendAgentTuiInput(
+    tuiID: String,
+    input: AgentTuiInput,
+    showSuccessFeedback: Bool = true
+  ) async -> Bool {
+    await sendAgentTuiInput(
+      tuiID: tuiID,
+      request: AgentTuiInputRequest(input: input),
+      showSuccessFeedback: showSuccessFeedback
+    )
   }
 
   @discardableResult
@@ -168,7 +181,6 @@ extension HarnessMonitorStore {
       cancelAgentTuiActionRefresh()
     }
   }
-
   func resetSelectedAgentTuis() {
     clearHostBridgeIssue(for: "agent-tui")
     cancelAgentTuiActionRefresh()
@@ -178,7 +190,6 @@ extension HarnessMonitorStore {
     selectedAgentTuis = []
     selectedAgentTui = nil
   }
-
   func applyAgentTui(_ tui: AgentTuiSnapshot) {
     guard tui.sessionId == selectedSessionID else {
       return
@@ -191,7 +202,6 @@ extension HarnessMonitorStore {
       selectedAgentTui = tui
     }
   }
-
   func refreshAgentTuis(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
@@ -215,7 +225,6 @@ extension HarnessMonitorStore {
       return applyAgentTuiError(error, selectedSessionID: sessionID)
     }
   }
-
   func recoverSelectedAgentTuisAfterReconnect(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
@@ -249,7 +258,6 @@ extension HarnessMonitorStore {
       )
     }
   }
-
   func refreshAgentTui(
     using client: any HarnessMonitorClientProtocol,
     tuiID: String
@@ -265,7 +273,6 @@ extension HarnessMonitorStore {
       return applyAgentTuiError(error, selectedSessionID: selectedSessionID)
     }
   }
-
   private func mutateAgentTui(
     using client: any HarnessMonitorClientProtocol,
     actionName: String? = nil,
@@ -291,7 +298,6 @@ extension HarnessMonitorStore {
       return applyAgentTuiError(error, selectedSessionID: selectedSessionID)
     }
   }
-
   private func applyAgentTuiError(
     _ error: any Error,
     selectedSessionID: String?
@@ -308,7 +314,6 @@ extension HarnessMonitorStore {
     presentFailureFeedback(error.localizedDescription)
     return false
   }
-
   private func scheduleAgentTuiActionRefresh(
     using client: any HarnessMonitorClientProtocol,
     baseline: AgentTuiSnapshot
@@ -357,7 +362,6 @@ extension HarnessMonitorStore {
       }
     }
   }
-
   func cancelAgentTuiActionRefresh(for tuiID: String? = nil) {
     guard tuiID == nil || pendingAgentTuiActionRefresh?.tuiID == tuiID else {
       return
@@ -367,7 +371,6 @@ extension HarnessMonitorStore {
     agentTuiActionRefreshTask?.cancel()
     agentTuiActionRefreshTask = nil
   }
-
   private func refreshAgentTuiAfterAction(
     using client: any HarnessMonitorClientProtocol,
     baseline: AgentTuiSnapshot
@@ -392,7 +395,6 @@ extension HarnessMonitorStore {
       return true
     }
   }
-
   private func preferredAgentTui(from tuis: [AgentTuiSnapshot]) -> AgentTuiSnapshot? {
     if let selectedTuiID = selectedAgentTui?.tuiId,
       let selectedTui = tuis.first(where: { $0.tuiId == selectedTuiID })
@@ -401,7 +403,6 @@ extension HarnessMonitorStore {
     }
     return tuis.first(where: { $0.status.isActive }) ?? tuis.first
   }
-
   private func upsertingAgentTui(
     _ tui: AgentTuiSnapshot,
     into tuis: [AgentTuiSnapshot]
@@ -411,7 +412,6 @@ extension HarnessMonitorStore {
     return AgentTuiListResponse(tuis: updatedTuis)
       .canonicallySorted(roleByAgent: selectedSessionRoles()).tuis
   }
-
   private func selectedSessionRoles() -> [String: SessionRole] {
     Dictionary(
       uniqueKeysWithValues: (selectedSession?.agents ?? []).map { ($0.agentId, $0.role) }

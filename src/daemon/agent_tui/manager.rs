@@ -8,19 +8,24 @@ use tokio::sync::broadcast;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::StreamEvent;
 
-use super::process::AgentTuiProcess;
+use super::process::{AgentTuiInputWorker, AgentTuiProcess};
 
 #[derive(Clone)]
 pub(crate) struct ActiveAgentTui {
     pub(crate) process: Option<Arc<AgentTuiProcess>>,
     pub(crate) stop_flag: Arc<AtomicBool>,
+    pub(crate) input_worker: Option<AgentTuiInputWorker>,
 }
 
 impl ActiveAgentTui {
     pub(crate) fn new(process: Option<Arc<AgentTuiProcess>>) -> Self {
+        let stop_flag = Arc::new(AtomicBool::new(false));
         Self {
+            input_worker: process.as_ref().map(|process| {
+                AgentTuiInputWorker::spawn(Arc::clone(process), Arc::clone(&stop_flag))
+            }),
             process,
-            stop_flag: Arc::new(AtomicBool::new(false)),
+            stop_flag,
         }
     }
 

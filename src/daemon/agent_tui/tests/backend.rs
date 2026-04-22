@@ -1,5 +1,6 @@
 use crate::daemon::agent_tui::{
-    AgentTuiInput, AgentTuiKey, AgentTuiLaunchProfile, AgentTuiSize, TerminalScreenParser,
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
+    AgentTuiKey, AgentTuiLaunchProfile, AgentTuiSize, TerminalScreenParser,
 };
 
 use super::support::{
@@ -91,6 +92,94 @@ fn structured_input_maps_to_terminal_bytes() {
             .expect("control bytes"),
         b"\x03"
     );
+}
+
+#[test]
+fn input_request_accepts_legacy_single_input_payload() {
+    let request: AgentTuiInputRequest = serde_json::from_value(serde_json::json!({
+        "input": {
+            "type": "text",
+            "text": "hello"
+        }
+    }))
+    .expect("decode input request");
+
+    assert_eq!(
+        request.input(),
+        Some(&AgentTuiInput::Text {
+            text: "hello".into()
+        })
+    );
+    assert!(request.sequence().is_none());
+}
+
+#[test]
+fn input_request_accepts_timed_sequence_payload() {
+    let request: AgentTuiInputRequest = serde_json::from_value(serde_json::json!({
+        "sequence": {
+            "steps": [
+                {
+                    "delay_before_ms": 0,
+                    "input": {
+                        "type": "key",
+                        "key": "enter"
+                    }
+                },
+                {
+                    "delay_before_ms": 120,
+                    "input": {
+                        "type": "control",
+                        "key": "c"
+                    }
+                }
+            ]
+        }
+    }))
+    .expect("decode sequence request");
+
+    assert!(request.input().is_none());
+    assert_eq!(
+        request.sequence(),
+        Some(&AgentTuiInputSequence {
+            steps: vec![
+                AgentTuiInputSequenceStep {
+                    delay_before_ms: 0,
+                    input: AgentTuiInput::Key {
+                        key: AgentTuiKey::Enter,
+                    },
+                },
+                AgentTuiInputSequenceStep {
+                    delay_before_ms: 120,
+                    input: AgentTuiInput::Control { key: 'c' },
+                },
+            ],
+        })
+    );
+}
+
+#[test]
+fn input_request_rejects_empty_or_ambiguous_payloads() {
+    let empty = serde_json::from_value::<AgentTuiInputRequest>(serde_json::json!({}))
+        .expect_err("empty request should fail");
+    let ambiguous = serde_json::from_value::<AgentTuiInputRequest>(serde_json::json!({
+        "input": {
+            "type": "text",
+            "text": "hello"
+        },
+        "sequence": {
+            "steps": [{
+                "delay_before_ms": 0,
+                "input": {
+                    "type": "key",
+                    "key": "enter"
+                }
+            }]
+        }
+    }))
+    .expect_err("ambiguous request should fail");
+
+    assert!(empty.to_string().contains("exactly one"));
+    assert!(ambiguous.to_string().contains("exactly one"));
 }
 
 #[test]

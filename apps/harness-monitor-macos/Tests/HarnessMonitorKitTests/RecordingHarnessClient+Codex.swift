@@ -181,25 +181,27 @@ extension RecordingHarnessClient {
     request: AgentTuiInputRequest
   ) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.sendAgentTuiInput(tuiID: tuiID, input: request.input))
+    calls.append(.sendAgentTuiInput(tuiID: tuiID, request: request))
     guard let tui = configuredAgentTui(id: tuiID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
     if let updated = dequeueConfiguredAgentTuiInputResponse(id: tuiID) {
       return updated
     }
-    let updatedScreenText: String =
-      switch request.input {
+    let updatedScreenText = request.replayedInputs.reduce(tui.screen.text) { screenText, input in
+      switch input {
       case .text(let text), .paste(let text):
-        [tui.screen.text, text].filter { !$0.isEmpty }.joined(separator: "\n")
+        [screenText, text].filter { !$0.isEmpty }.joined(separator: "\n")
       case .key(let key):
-        [tui.screen.text, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
+        [screenText, "[\(key.title)]"].filter { !$0.isEmpty }.joined(separator: "\n")
       case .control(let key):
-        [tui.screen.text, "[Ctrl-\(String(key).uppercased())]"].filter { !$0.isEmpty }.joined(
-          separator: "\n")
+        [screenText, "[Ctrl-\(String(key).uppercased())]"]
+          .filter { !$0.isEmpty }
+          .joined(separator: "\n")
       case .rawBytesBase64:
-        [tui.screen.text, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
+        [screenText, "[raw bytes]"].filter { !$0.isEmpty }.joined(separator: "\n")
       }
+    }
     let updated = agentTuiFixture(
       tuiID: tui.tuiId,
       sessionID: tui.sessionId,
