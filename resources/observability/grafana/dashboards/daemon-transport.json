@@ -1,671 +1,1039 @@
 {
-  "annotations": {
-    "list": [
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "harness-daemon-transport"
+  },
+  "spec": {
+    "annotations": [
       {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "spec": {}
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true,
+          "legacyOptions": {
+            "type": "dashboard"
+          }
+        }
+      }
+    ],
+    "cursorSync": "Crosshair",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "id": 1,
+          "title": "Server Req / s",
+          "description": "Daemon server request throughput split from the /v1 HTTP API.",
+          "links": [
+            {
+              "title": "Open Investigation Cockpit",
+              "url": "/d/harness-investigation-cockpit",
+              "targetBlank": false
+            },
+            {
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m]))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "reqps",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 2,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 10,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Server p95",
+          "description": "Daemon server p95 latency from the millisecond HTTP histogram family.",
+          "links": [
+            {
+              "title": "Open Investigation Cockpit",
+              "url": "/d/harness-investigation-cockpit",
+              "targetBlank": false
+            },
+            {
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[5m])) > 0)) or on() vector(0))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "ms",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 100,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 300,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "Client Requests",
+          "description": "Cumulative daemon client requests visible in the current dashboard range. Hook-side traffic is sparse, so totals stay informative when req/s rounds to zero.",
+          "links": [
+            {
+              "title": "Open Investigation Cockpit",
+              "url": "/d/harness-investigation-cockpit",
+              "targetBlank": false
+            },
+            {
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "(sum(last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[$__range])) or on() vector(0))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 2,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 10,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Client p95 (cumulative)",
+          "description": "Cumulative daemon client p95 latency across the current dashboard range. This keeps latency visible even when the hook-side path only emits a handful of samples.",
+          "links": [
+            {
+              "title": "Open Investigation Cockpit",
+              "url": "/d/harness-investigation-cockpit",
+              "targetBlank": false
+            },
+            {
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((histogram_quantile(0.95, sum by (le) (last_over_time(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[$__range]))) and on() (sum(last_over_time(harness_daemon_client_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[$__range])) > 0)) or on() vector(0))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "ms",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 100,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 300,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Server Rate by Route and Status",
+          "description": "Server throughput by route and status code.",
+          "links": [
+            {
+              "title": "Open Metrics Drilldown",
+              "url": "/a/grafana-metricsdrilldown-app/drilldown",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (http_route, http_status_code) (rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[5m]))",
+                        "legendFormat": "{{http_route}} :: {{http_status_code}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "reqps",
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Client Requests by Route and Status",
+          "description": "Cumulative daemon client requests by route and status code within the current dashboard range.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "(sum by (http_route, http_status_code) (last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[$__range])) or on() vector(0))",
+                        "legendFormat": "{{http_route}} :: {{http_status_code}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "id": 7,
+          "title": "Transport Errors and Latency",
+          "description": "Transport error rates and p95 latency on one surface.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"5..\"}[5m])) or on() vector(0)) / clamp_min(sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001))",
+                        "legendFormat": "server 5xx %"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", error=\"true\"}[5m])) or on() vector(0)) / clamp_min(sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001))",
+                        "legendFormat": "client error %"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+                        "legendFormat": "server p95 ms"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
+                        "legendFormat": "client p95 ms"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "Daemon Logs",
+          "description": "Daemon logs filtered by severity level.",
+          "links": [
+            {
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "targetBlank": false
+            }
+          ],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "loki"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "{service_name=\"harness-daemon\"} | detected_level=~\"${level:regex}\" | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
+                        "queryType": "range"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": [
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 0,
+              "width": 6,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-1"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-2"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 0,
+              "width": 6,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 18,
+              "y": 0,
+              "width": 6,
+              "height": 4,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-4"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 4,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-5"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 4,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 12,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-7"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 12,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-8"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "links": [
+      {
+        "title": "Investigation Cockpit",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/d/harness-investigation-cockpit",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "Host Machine",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/d/harness-host-machine",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "Monitor Client",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/d/harness-monitor-client",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": true
+      },
+      {
+        "title": "Storage & SQLite",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/d/harness-sqlite-forensics",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": true
+      },
+      {
+        "title": "Service Flow",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/d/harness-service-map",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": true
+      },
+      {
+        "title": "Logs Drilldown",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/a/grafana-lokiexplore-app/explore",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
+      },
+      {
+        "title": "Traces Breakdown",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "",
+        "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": false
+      }
+    ],
+    "liveNow": false,
+    "preload": false,
+    "tags": [
+      "harness",
+      "observability",
+      "daemon"
+    ],
+    "timeSettings": {
+      "from": "now-15m",
+      "to": "now",
+      "autoRefresh": "10s",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "hideTimepicker": false,
+      "fiscalYearStartMonth": 0
+    },
+    "title": "Harness Daemon Transport",
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "http_route",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "label": "Route",
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "prometheus"
+            },
+            "spec": {
+              "__legacyStringValue": "label_values(harness_daemon_http_requests_total, http_route)"
+            }
+          },
+          "regex": "",
+          "sort": "alphabeticalAsc",
+          "definition": "label_values(harness_daemon_http_requests_total, http_route)",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "allowCustomValue": true
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "http_status_code",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "label": "Status",
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "prometheus"
+            },
+            "spec": {
+              "__legacyStringValue": "label_values(harness_daemon_http_requests_total, http_status_code)"
+            }
+          },
+          "regex": "",
+          "sort": "alphabeticalAsc",
+          "definition": "label_values(harness_daemon_http_requests_total, http_status_code)",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "allowCustomValue": true
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "level",
+          "query": "debug,info,warn,error",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "label": "Level",
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "allowCustomValue": true
+        }
       }
     ]
   },
-  "editable": true,
-  "graphTooltip": 1,
-  "links": [
-    {
-      "title": "Investigation Cockpit",
-      "type": "link",
-      "url": "/d/harness-investigation-cockpit",
-      "keepTime": true,
-      "includeVars": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Host Machine",
-      "type": "link",
-      "url": "/d/harness-host-machine",
-      "keepTime": true,
-      "includeVars": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Monitor Client",
-      "type": "link",
-      "url": "/d/harness-monitor-client",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Storage & SQLite",
-      "type": "link",
-      "url": "/d/harness-sqlite-forensics",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Service Flow",
-      "type": "link",
-      "url": "/d/harness-service-map",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Logs Drilldown",
-      "type": "link",
-      "url": "/a/grafana-lokiexplore-app/explore",
-      "keepTime": true,
-      "includeVars": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    },
-    {
-      "title": "Traces Breakdown",
-      "type": "link",
-      "url": "/a/grafana-exploretraces-app/explore?from=now-30m&to=now&timezone=browser&var-ds=tempo&var-primarySignal=nestedSetParent%3C0&var-filters=&var-metric=rate&var-groupBy=resource.service.name&var-spanListColumns=&var-latencyThreshold=&var-partialLatencyThreshold=&var-durationPercentiles=0.9&actionView=breakdown",
-      "keepTime": false,
-      "includeVars": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "icon": "external link",
-      "tags": []
-    }
-  ],
-  "panels": [
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Daemon server request throughput split from the /v1 HTTP API.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 2
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "links": [
-        {
-          "title": "Open Investigation Cockpit",
-          "url": "/d/harness-investigation-cockpit",
-          "keepTime": true,
-          "targetBlank": false
-        },
-        {
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore",
-          "keepTime": true,
-          "targetBlank": false
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m]))",
-          "refId": "A"
-        }
-      ],
-      "title": "Server Req / s",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Daemon server p95 latency from the millisecond HTTP histogram family.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 300
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
-      "id": 2,
-      "links": [
-        {
-          "title": "Open Investigation Cockpit",
-          "url": "/d/harness-investigation-cockpit",
-          "keepTime": true,
-          "targetBlank": false
-        },
-        {
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore",
-          "keepTime": true,
-          "targetBlank": false
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[5m])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Server p95",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cumulative daemon client requests visible in the current dashboard range. Hook-side traffic is sparse, so totals stay informative when req/s rounds to zero.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 2
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
-      "id": 3,
-      "links": [
-        {
-          "title": "Open Investigation Cockpit",
-          "url": "/d/harness-investigation-cockpit",
-          "keepTime": true,
-          "targetBlank": false
-        },
-        {
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore",
-          "keepTime": true,
-          "targetBlank": false
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "(sum(last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[$__range])) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Client Requests",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cumulative daemon client p95 latency across the current dashboard range. This keeps latency visible even when the hook-side path only emits a handful of samples.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 300
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "id": 4,
-      "links": [
-        {
-          "title": "Open Investigation Cockpit",
-          "url": "/d/harness-investigation-cockpit",
-          "keepTime": true,
-          "targetBlank": false
-        },
-        {
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore",
-          "keepTime": true,
-          "targetBlank": false
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((histogram_quantile(0.95, sum by (le) (last_over_time(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[$__range]))) and on() (sum(last_over_time(harness_daemon_client_duration_milliseconds_count{http_route=~\"${http_route:regex}\"}[$__range])) > 0)) or on() vector(0))",
-          "refId": "A"
-        }
-      ],
-      "title": "Client p95 (cumulative)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Server throughput by route and status code.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "id": 5,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Metrics Drilldown",
-          "url": "/a/grafana-metricsdrilldown-app/drilldown"
-        }
-      ],
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum by (http_route, http_status_code) (rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[5m]))",
-          "legendFormat": "{{http_route}} :: {{http_status_code}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Server Rate by Route and Status",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cumulative daemon client requests by route and status code within the current dashboard range.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "id": 6,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "(sum by (http_route, http_status_code) (last_over_time(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"${http_status_code:regex}\"}[$__range])) or on() vector(0))",
-          "legendFormat": "{{http_route}} :: {{http_status_code}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Client Requests by Route and Status",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Transport error rates and p95 latency on one surface.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "100 * ((sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\", http_status_code=~\"5..\"}[5m])) or on() vector(0)) / clamp_min(sum(rate(harness_daemon_http_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001))",
-          "legendFormat": "server 5xx %",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "100 * ((sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\", error=\"true\"}[5m])) or on() vector(0)) / clamp_min(sum(rate(harness_daemon_client_requests_total{http_route=~\"${http_route:regex}\"}[5m])), 0.001))",
-          "legendFormat": "client error %",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
-          "legendFormat": "server p95 ms",
-          "refId": "C"
-        },
-        {
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_daemon_client_duration_milliseconds_bucket{http_route=~\"${http_route:regex}\"}[5m])))",
-          "legendFormat": "client p95 ms",
-          "refId": "D"
-        }
-      ],
-      "title": "Transport Errors and Latency",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "description": "Daemon logs filtered by severity level.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "id": 8,
-      "links": [
-        {
-          "keepTime": true,
-          "targetBlank": false,
-          "title": "Open Logs Drilldown",
-          "url": "/a/grafana-lokiexplore-app/explore"
-        }
-      ],
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showLabels": false,
-        "showTime": false,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "{service_name=\"harness-daemon\"} | detected_level=~\"${level:regex}\" | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Daemon Logs",
-      "type": "logs"
-    }
-  ],
-  "refresh": "10s",
-  "schemaVersion": 39,
-  "style": "dark",
-  "tags": [
-    "harness",
-    "observability",
-    "daemon"
-  ],
-  "templating": {
-    "list": [
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(harness_daemon_http_requests_total, http_route)",
-        "includeAll": true,
-        "label": "Route",
-        "multi": true,
-        "name": "http_route",
-        "options": [],
-        "query": "label_values(harness_daemon_http_requests_total, http_route)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(harness_daemon_http_requests_total, http_status_code)",
-        "includeAll": true,
-        "label": "Status",
-        "multi": true,
-        "name": "http_status_code",
-        "options": [],
-        "query": "label_values(harness_daemon_http_requests_total, http_status_code)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "label": "Level",
-        "multi": true,
-        "name": "level",
-        "options": [],
-        "query": "debug,info,warn,error",
-        "type": "custom"
-      }
-    ]
-  },
-  "time": {
-    "from": "now-15m",
-    "to": "now"
-  },
-  "title": "Harness Daemon Transport",
-  "uid": "harness-daemon-transport",
-  "version": 1
+  "status": {}
 }

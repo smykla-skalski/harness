@@ -1,4 +1,64 @@
-use super::support::{load_dashboard, panel_by_title, panel_expr, panel_exprs};
+use std::fs;
+
+use super::support::{dashboard_json_paths, load_dashboard, panel_by_title, panel_expr, panel_exprs, repo_root};
+
+#[test]
+fn observability_dashboards_are_stable_v2_resources() {
+    let dashboards_root = repo_root().join("resources/observability/grafana/dashboards");
+
+    for path in dashboard_json_paths(&dashboards_root) {
+        let content = fs::read_to_string(&path).unwrap();
+        let dashboard: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let file_name = path.file_name().unwrap().to_string_lossy();
+
+        assert_eq!(
+            dashboard["apiVersion"].as_str(),
+            Some("dashboard.grafana.app/v2"),
+            "{file_name} should use the stable Grafana v2 dashboard resource format"
+        );
+        assert_eq!(
+            dashboard["kind"].as_str(),
+            Some("Dashboard"),
+            "{file_name} should declare a Dashboard resource"
+        );
+        assert!(
+            dashboard["metadata"]["name"]
+                .as_str()
+                .is_some_and(|name| !name.is_empty()),
+            "{file_name} should declare a stable metadata.name"
+        );
+        assert!(
+            dashboard["spec"]["elements"]
+                .as_object()
+                .is_some_and(|elements| !elements.is_empty()),
+            "{file_name} should keep concrete v2 dashboard elements"
+        );
+        assert!(
+            dashboard["spec"]["layout"]["kind"].as_str().is_some(),
+            "{file_name} should keep a concrete v2 layout kind"
+        );
+    }
+}
+
+#[test]
+fn observability_suite_does_not_reference_removed_monitor_view_performance_dashboard() {
+    let dashboards_root = repo_root().join("resources/observability/grafana/dashboards");
+    let removed_dashboard = dashboards_root.join("monitor-view-performance.json");
+    assert!(
+        !removed_dashboard.exists(),
+        "removed dashboard should stay absent at {}",
+        removed_dashboard.display()
+    );
+
+    for path in dashboard_json_paths(&dashboards_root) {
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(
+            !content.contains("harness-monitor-view-performance"),
+            "{} should not reference the removed Harness Monitor View Performance dashboard",
+            path.display()
+        );
+    }
+}
 
 #[test]
 fn monitor_dashboard_surfaces_resource_activity_gauges() {
