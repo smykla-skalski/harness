@@ -1,6 +1,9 @@
 import XCTest
 
 extension HarnessMonitorUITestCase {
+  private static var maxWindowSearchCount: Int { 4 }
+  private static var maxToolbarButtonSearchCount: Int { 12 }
+
   func previewSessionTrigger(in app: XCUIApplication) -> XCUIElement {
     sessionTrigger(in: app, identifier: HarnessMonitorUITestAccessibility.previewSessionRow)
   }
@@ -30,11 +33,29 @@ extension HarnessMonitorUITestCase {
   }
 
   func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
-    let windows = app.windows.allElementsBoundByIndex.filter(\.exists)
-    if let matchingWindow = windows.filter({ $0.frame.contains(element.frame) }).min(by: {
-      ($0.frame.width * $0.frame.height) < ($1.frame.width * $1.frame.height)
-    }) {
-      return matchingWindow
+    let primaryWindow = mainWindow(in: app)
+    if primaryWindow.exists, primaryWindow.frame.contains(element.frame) {
+      return primaryWindow
+    }
+
+    let windows = app.windows
+    let searchCount = min(windows.count, Self.maxWindowSearchCount)
+    var bestMatch: XCUIElement?
+    for index in 0..<searchCount {
+      let candidate = windows.element(boundBy: index)
+      guard candidate.exists, candidate.frame.contains(element.frame) else {
+        continue
+      }
+      guard let currentBest = bestMatch else {
+        bestMatch = candidate
+        continue
+      }
+      if candidate.frame.width * candidate.frame.height < currentBest.frame.width * currentBest.frame.height {
+        bestMatch = candidate
+      }
+    }
+    if let bestMatch {
+      return bestMatch
     }
     return mainWindow(in: app)
   }
@@ -76,15 +97,11 @@ extension HarnessMonitorUITestCase {
   }
 
   func descendantElement(in container: XCUIElement, identifier: String) -> XCUIElement {
-    let candidates = container.descendants(matching: .any)
+    let match = container.descendants(matching: .any)
       .matching(identifier: identifier)
-      .allElementsBoundByIndex
-
-    if let candidate = candidates.last(where: { candidate in
-      candidate.exists
-        && (!candidate.label.isEmpty || !candidate.frame.isEmpty)
-    }) {
-      return candidate
+      .firstMatch
+    if match.exists {
+      return match
     }
 
     return container.descendants(matching: .any)
@@ -101,19 +118,19 @@ extension HarnessMonitorUITestCase {
     ]
 
     for role in roles {
-      let mainWindowMatches = mainWindow(in: app)
+      let mainWindowMatch = mainWindow(in: app)
         .descendants(matching: role)
         .matching(identifier: identifier)
-        .allElementsBoundByIndex
-      if let preferredMainWindowMatch = preferredElement(from: mainWindowMatches) {
-        return preferredMainWindowMatch
+        .firstMatch
+      if mainWindowMatch.exists {
+        return mainWindowMatch
       }
 
-      let appMatches = app.descendants(matching: role)
+      let appMatch = app.descendants(matching: role)
         .matching(identifier: identifier)
-        .allElementsBoundByIndex
-      if let preferredAppMatch = preferredElement(from: appMatches) {
-        return preferredAppMatch
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
       }
     }
 
@@ -131,43 +148,25 @@ extension HarnessMonitorUITestCase {
     ]
 
     for role in roles {
-      let mainWindowMatches = mainWindow(in: app)
+      let mainWindowMatch = mainWindow(in: app)
         .descendants(matching: role)
         .matching(predicate)
-        .allElementsBoundByIndex
-      if let preferredMainWindowMatch = preferredElement(from: mainWindowMatches) {
-        return preferredMainWindowMatch
+        .firstMatch
+      if mainWindowMatch.exists {
+        return mainWindowMatch
       }
 
-      let appMatches = app.descendants(matching: role)
+      let appMatch = app.descendants(matching: role)
         .matching(predicate)
-        .allElementsBoundByIndex
-      if let preferredAppMatch = preferredElement(from: appMatches) {
-        return preferredAppMatch
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
       }
     }
 
     return app.descendants(matching: .any)
       .matching(predicate)
       .firstMatch
-  }
-
-  private func preferredElement(
-    from candidates: [XCUIElement]
-  ) -> XCUIElement? {
-    if let hittableCandidate = candidates.last(where: { candidate in
-      candidate.exists && !candidate.frame.isEmpty && candidate.isHittable
-    }) {
-      return hittableCandidate
-    }
-
-    if let visibleCandidate = candidates.last(where: { candidate in
-      candidate.exists && !candidate.frame.isEmpty
-    }) {
-      return visibleCandidate
-    }
-
-    return candidates.last(where: \.exists)
   }
 
   func sidebarSectionElement(
@@ -209,14 +208,11 @@ extension HarnessMonitorUITestCase {
   }
 
   func descendantFrameElement(in container: XCUIElement, identifier: String) -> XCUIElement {
-    let candidates = container.descendants(matching: .any)
+    let match = container.descendants(matching: .any)
       .matching(identifier: identifier)
-      .allElementsBoundByIndex
-
-    if let candidate = candidates.last(where: { candidate in
-      candidate.exists && !candidate.frame.isEmpty
-    }) {
-      return candidate
+      .firstMatch
+    if match.exists {
+      return match
     }
 
     return container.descendants(matching: .any)
@@ -296,7 +292,6 @@ extension HarnessMonitorUITestCase {
   }
 
   func sidebarToggleButton(in app: XCUIApplication) -> XCUIElement {
-    let toolbarButtons = mainWindow(in: app).toolbars.buttons.allElementsBoundByIndex
     let excludedIdentifiers: Set<String> = [
       HarnessMonitorUITestAccessibility.navigateBackButton,
       HarnessMonitorUITestAccessibility.navigateForwardButton,
@@ -305,9 +300,13 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.inspectorToggleButton,
       HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
     ]
-    if let button = toolbarButtons.first(where: { button in
-      !excludedIdentifiers.contains(button.identifier)
-    }) {
+    let toolbarButtons = mainWindow(in: app).toolbars.buttons
+    let searchCount = min(toolbarButtons.count, Self.maxToolbarButtonSearchCount)
+    for index in 0..<searchCount {
+      let button = toolbarButtons.element(boundBy: index)
+      guard button.exists, !excludedIdentifiers.contains(button.identifier) else {
+        continue
+      }
       return button
     }
 

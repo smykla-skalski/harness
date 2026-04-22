@@ -39,20 +39,27 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func disableAnimationsForUITesting() {
+    NSAnimationContext.beginGrouping()
     NSAnimationContext.current.duration = 0
+    NSAnimationContext.current.allowsImplicitAnimation = false
+    NSAnimationContext.endGrouping()
     NotificationCenter.default.addObserver(
       forName: NSWindow.didBecomeKeyNotification,
       object: nil,
       queue: .main
-    ) { notification in
+    ) { [weak self] notification in
       let window = notification.object as? NSWindow
       MainActor.assumeIsolated {
-        window?.animationBehavior = .none
+        self?.configureWindowForUITesting(window)
       }
     }
     for window in NSApplication.shared.windows {
-      window.animationBehavior = .none
+      configureWindowForUITesting(window)
     }
+  }
+
+  private func configureWindowForUITesting(_ window: NSWindow?) {
+    window?.animationBehavior = .none
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(
