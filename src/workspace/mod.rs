@@ -1,6 +1,5 @@
 pub mod adopter;
 pub mod compact;
-mod git;
 pub mod ids;
 pub mod layout;
 pub mod orphan_cleanup;
@@ -11,7 +10,7 @@ mod session;
 pub mod socket_paths;
 pub mod worktree;
 
-pub use git::{
+pub use crate::git::identity::{
     GitCheckoutIdentity, GitCheckoutKind, canonical_checkout_root, resolve_git_checkout_identity,
 };
 #[cfg(target_os = "macos")]
