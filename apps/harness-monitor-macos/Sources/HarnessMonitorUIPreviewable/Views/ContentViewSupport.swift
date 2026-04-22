@@ -29,7 +29,7 @@ public enum ContentInspectorInitialPresentation {
 
   public static func resolve(defaults: UserDefaults = .standard) -> Bool {
     guard defaults.object(forKey: storageKey) != nil else {
-      return true
+      return false
     }
     return defaults.bool(forKey: storageKey)
   }
@@ -38,7 +38,6 @@ public enum ContentInspectorInitialPresentation {
 public struct ContentInspectorVisibilityChange: Equatable {
   public let nextPresentation: Bool
   public let persistedPreference: Bool?
-  public let shouldSuppressLayoutGeometry: Bool
 }
 
 public enum ContentInspectorVisibilityPolicy {
@@ -49,22 +48,16 @@ public enum ContentInspectorVisibilityPolicy {
     source: ContentInspectorVisibilitySource
   ) -> ContentInspectorVisibilityChange? {
     let shouldPersistPreference: Bool
-    let shouldSuppressLayoutGeometry: Bool
 
     switch source {
     case .persistedPreference:
       shouldPersistPreference = false
-      shouldSuppressLayoutGeometry = currentPresentation != nextPresentation
     case .explicitUserPreference:
       shouldPersistPreference = currentPersistedPreference != nextPresentation
-      shouldSuppressLayoutGeometry =
-        currentPresentation != nextPresentation || shouldPersistPreference
     case .contextualAutoOpen:
       shouldPersistPreference = false
-      shouldSuppressLayoutGeometry = currentPresentation != nextPresentation
     case .framework:
       shouldPersistPreference = false
-      shouldSuppressLayoutGeometry = false
     }
 
     guard currentPresentation != nextPresentation || shouldPersistPreference else {
@@ -73,8 +66,7 @@ public enum ContentInspectorVisibilityPolicy {
 
     return ContentInspectorVisibilityChange(
       nextPresentation: nextPresentation,
-      persistedPreference: shouldPersistPreference ? nextPresentation : nil,
-      shouldSuppressLayoutGeometry: shouldSuppressLayoutGeometry
+      persistedPreference: shouldPersistPreference ? nextPresentation : nil
     )
   }
 }
@@ -138,12 +130,8 @@ public struct ContentDetailColumn: View {
   public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   public let showInspector: Bool
-  public let layoutSuppressionPhase: Int
   public let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
   public let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
-  @State private var toolbarLayoutState = ToolbarCenterpieceLayoutState()
-  @State private var isToolbarLayoutAnimating = false
-  @State private var toolbarLayoutSuppressionTask: Task<Void, Never>?
 
   public init(
     store: HarnessMonitorStore,
@@ -154,7 +142,6 @@ public struct ContentDetailColumn: View {
     contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     showInspector: Bool,
-    layoutSuppressionPhase: Int,
     setInspectorVisibility: @escaping (Bool, ContentInspectorVisibilitySource) -> Void,
     toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   ) {
@@ -166,7 +153,6 @@ public struct ContentDetailColumn: View {
     self.contentSessionDetail = contentSessionDetail
     self.dashboardUI = dashboardUI
     self.showInspector = showInspector
-    self.layoutSuppressionPhase = layoutSuppressionPhase
     self.setInspectorVisibility = setInspectorVisibility
     self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
   }
@@ -181,14 +167,6 @@ public struct ContentDetailColumn: View {
 
   private var contentToolbar: HarnessMonitorStore.ContentToolbarSlice {
     store.contentUI.toolbar
-  }
-
-  private var toolbarLayoutWidth: CGFloat {
-    toolbarLayoutState.toolbarLayoutWidth
-  }
-
-  private var toolbarCenterpieceDisplayMode: ToolbarCenterpieceDisplayMode {
-    toolbarLayoutState.displayMode
   }
 
   private var statusBackdropDetail: SessionDetail? {
@@ -208,11 +186,6 @@ public struct ContentDetailColumn: View {
         }
       }
     }
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      toolbarLayoutState.recordMeasurement(width, isSuppressed: isToolbarLayoutAnimating)
-    }
     .background(alignment: .topLeading) {
       if let detail = statusBackdropDetail {
         ContentStatusBackdrop(
@@ -222,12 +195,6 @@ public struct ContentDetailColumn: View {
       }
     }
     .toolbar {
-      ContentCenterpieceToolbarItems(
-        store: store,
-        toolbarUI: contentToolbar,
-        displayMode: toolbarCenterpieceDisplayMode,
-        availableDetailWidth: toolbarLayoutWidth
-      )
       ContentPrimaryToolbarItems(
         store: store,
         toolbarUI: contentToolbar,
@@ -237,9 +204,6 @@ public struct ContentDetailColumn: View {
     }
     .navigationTitle(navigationTitleText)
     .navigationSubtitle(navigationSubtitleText ?? "")
-    .onChange(of: layoutSuppressionPhase) { _, _ in
-      suppressToolbarLayoutGeometry()
-    }
     .onChange(of: selection.inspectorSelection) { _, newValue in
       if newValue != .none, !showInspector {
         setInspectorVisibility(true, .contextualAutoOpen)
@@ -275,19 +239,6 @@ public struct ContentDetailColumn: View {
         return .handled
       }
       return .ignored
-    }
-  }
-  private func suppressToolbarLayoutGeometry() {
-    toolbarLayoutSuppressionTask?.cancel()
-    isToolbarLayoutAnimating = true
-    toolbarLayoutSuppressionTask = Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(400))
-      guard !Task.isCancelled else {
-        return
-      }
-      toolbarLayoutState.flushPendingMeasurement()
-      isToolbarLayoutAnimating = false
-      toolbarLayoutSuppressionTask = nil
     }
   }
 }

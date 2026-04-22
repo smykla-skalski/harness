@@ -1,20 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension HarnessMonitorStore.ContentToolbarSlice {
-  fileprivate var toolbarCenterpieceModel: ToolbarCenterpieceModel {
-    ToolbarCenterpieceModel(
-      workspaceName: "Harness Monitor",
-      destinationName: "My Mac",
-      destinationSystemImage: "laptopcomputer"
-    )
-  }
-
-  fileprivate var toolbarStatusMessages: [ToolbarStatusMessage] {
-    statusMessages.map(ToolbarStatusMessage.init)
-  }
-}
-
 public struct ContentNavigationToolbarItems: ToolbarContent {
   public let store: HarnessMonitorStore
 
@@ -31,35 +17,6 @@ public struct ContentNavigationToolbarItems: ToolbarContent {
       store: store,
       canNavigateBack: toolbarUI.canNavigateBack,
       canNavigateForward: toolbarUI.canNavigateForward
-    )
-  }
-}
-
-public struct ContentCenterpieceToolbarItems: ToolbarContent {
-  public let store: HarnessMonitorStore
-  public let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  public let displayMode: ToolbarCenterpieceDisplayMode
-  public let availableDetailWidth: CGFloat
-
-  public init(
-    store: HarnessMonitorStore,
-    toolbarUI: HarnessMonitorStore.ContentToolbarSlice,
-    displayMode: ToolbarCenterpieceDisplayMode,
-    availableDetailWidth: CGFloat
-  ) {
-    self.store = store
-    self.toolbarUI = toolbarUI
-    self.displayMode = displayMode
-    self.availableDetailWidth = availableDetailWidth
-  }
-
-  public var body: some ToolbarContent {
-    ContentCenterpieceToolbar(
-      model: toolbarUI.toolbarCenterpieceModel,
-      displayMode: displayMode,
-      availableDetailWidth: availableDetailWidth,
-      statusMessages: toolbarUI.toolbarStatusMessages,
-      connectionState: toolbarUI.connectionState
     )
   }
 }

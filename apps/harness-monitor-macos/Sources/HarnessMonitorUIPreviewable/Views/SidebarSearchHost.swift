@@ -36,10 +36,7 @@ struct SidebarSearchHost: View {
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
 
-  @Environment(\.isSearching)
-  private var isSearching
   @State private var searchPresentationState = SidebarSearchPresentationState()
-  @FocusState private var isSidebarSearchFocused: Bool
 
   private var profilingAttributes: [String: String] {
     [
@@ -55,8 +52,7 @@ struct SidebarSearchHost: View {
   private var showsSearchAccessoryBar: Bool {
     SidebarFilterVisibilityPolicy.showsControls(
       for: controls,
-      isSearchPresented: searchPresentationState.isPresented,
-      isSearchActive: isSearching
+      isSearchPresented: searchPresentationState.isPresented
     )
   }
 
@@ -104,8 +100,7 @@ struct SidebarSearchHost: View {
         SidebarFilterStateMarker(
           controls: controls,
           searchResults: searchResults,
-          isSidebarSearchPresented: searchPresentationState.isPresented,
-          isSearchActive: isSearching
+          isSidebarSearchPresented: searchPresentationState.isPresented
         )
       }
       .searchable(
@@ -114,7 +109,6 @@ struct SidebarSearchHost: View {
         placement: .sidebar,
         prompt: Text("Search sessions, projects, leaders")
       )
-      .searchFocused($isSidebarSearchFocused)
       .focusedSceneValue(\.harnessSidebarSearchFocusAction) {
         requestSearchPresentation()
       }
@@ -128,17 +122,11 @@ struct SidebarSearchHost: View {
   }
 
   private func requestSearchPresentation() {
-    guard searchPresentationState.requestPresentation(canPresent: canPresentSearch) else {
-      return
-    }
-    isSidebarSearchFocused = true
+    _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
   }
 
   private func applyPendingSearchPresentationIfNeeded(canPresent: Bool) {
-    guard searchPresentationState.applyPendingPresentationIfNeeded(canPresent: canPresent) else {
-      return
-    }
-    isSidebarSearchFocused = true
+    _ = searchPresentationState.applyPendingPresentationIfNeeded(canPresent: canPresent)
   }
 
   private func submitSearch() {

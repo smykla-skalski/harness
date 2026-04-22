@@ -65,17 +65,6 @@ func renderLaunchDashboardProfiledViews() -> HarnessMonitorStore {
     width: 340,
     height: 900
   )
-  render(
-    ToolbarCenterpieceView(
-      model: .preview,
-      displayMode: .standard,
-      availableDetailWidth: 1_024,
-      statusMessages: [.init(text: "Ready")],
-      connectionState: .online
-    ),
-    width: 420,
-    height: 32
-  )
   render(ConnectionToolbarBadge(metrics: metrics), width: 140, height: 20)
   return store
 }

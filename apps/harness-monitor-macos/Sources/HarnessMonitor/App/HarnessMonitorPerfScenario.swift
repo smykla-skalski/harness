@@ -70,6 +70,13 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     if previewScenarioIsEmpty {
       values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = defaultPreviewScenario
     }
+    if self == .launchDashboard,
+      values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .isEmpty ?? true
+    {
+      values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"] = "0"
+    }
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
   }
 }

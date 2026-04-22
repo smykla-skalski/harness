@@ -78,7 +78,7 @@ struct Phase5ViewProfilingTests {
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
     _ = ViewBodySignposter.measure(
-      "ToolbarCenterpieceView",
+      "ToolbarAccessoryView",
       attributes: [
         "harness.view.display_mode": "standard",
         "harness.view.status_message_count": "1",
@@ -92,14 +92,14 @@ struct Phase5ViewProfilingTests {
     try await waitForTraceExport(timeout: .seconds(3)) {
       viewBodySpanAttributes(
         in: collector.traceCollector,
-        viewName: "ToolbarCenterpieceView"
+        viewName: "ToolbarAccessoryView"
       ) != nil
     }
 
     let attributes = try #require(
       viewBodySpanAttributes(
         in: collector.traceCollector,
-        viewName: "ToolbarCenterpieceView"
+        viewName: "ToolbarAccessoryView"
       )
     )
     #expect(attributes["harness.view.display_mode"] == "standard")
@@ -108,16 +108,16 @@ struct Phase5ViewProfilingTests {
 
   @Test("View signposter can target invalidation logging to selected views")
   func viewSignposterCanTargetInvalidationLoggingToSelectedViews() {
-    let environment = ["HARNESS_MONITOR_LOG_VIEW_UPDATES": "ContentView, ToolbarCenterpieceView"]
+    let environment = ["HARNESS_MONITOR_LOG_VIEW_UPDATES": "ContentView, SidebarView"]
 
     #expect(ViewBodySignposter.shouldLogChanges(for: "ContentView", environment: environment))
+    #expect(ViewBodySignposter.shouldLogChanges(for: "SidebarView", environment: environment))
     #expect(
-      ViewBodySignposter.shouldLogChanges(
-        for: "ToolbarCenterpieceView",
+      !ViewBodySignposter.shouldLogChanges(
+        for: "ToolbarAccessoryView",
         environment: environment
       )
     )
-    #expect(!ViewBodySignposter.shouldLogChanges(for: "SidebarView", environment: environment))
   }
 
   @Test("View signposter can enable invalidation logging for all views")
@@ -154,10 +154,6 @@ struct Phase5ViewProfilingTests {
         && viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView") != nil
         && viewBodySpanAttributes(
           in: collector.traceCollector,
-          viewName: "ToolbarCenterpieceView"
-        ) != nil
-        && viewBodySpanAttributes(
-          in: collector.traceCollector,
           viewName: "ConnectionToolbarBadge"
         ) != nil
     }
@@ -167,12 +163,6 @@ struct Phase5ViewProfilingTests {
     )
     let sidebarAttributes = try #require(
       viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView")
-    )
-    let toolbarAttributes = try #require(
-      viewBodySpanAttributes(
-        in: collector.traceCollector,
-        viewName: "ToolbarCenterpieceView"
-      )
     )
     let badgeAttributes = try #require(
       viewBodySpanAttributes(
@@ -192,7 +182,7 @@ struct Phase5ViewProfilingTests {
 
     #expect(contentAttributes["harness.view.surface"] == "dashboard")
     #expect(contentAttributes["harness.view.column_visibility"] == "all")
-    #expect(contentAttributes["harness.view.inspector_presented"] == "true")
+    #expect(contentAttributes["harness.view.inspector_presented"] == "false")
     #expect(contentAttributes["harness.view.search_presented"] == nil)
     #expect(contentAttributes["harness.view.connection_state"] == nil)
     #expect(contentAttributes["harness.view.status_message_count"] == nil)
@@ -200,9 +190,12 @@ struct Phase5ViewProfilingTests {
     #expect(sidebarAttributes["harness.view.search_presented"] == "false")
     #expect(hasActiveFilters == false)
     #expect(accessoryAttributes == nil)
-    #expect(toolbarAttributes["harness.view.display_mode"] == "standard")
-    #expect(toolbarAttributes["harness.view.connection_state"] == "online")
-    #expect(toolbarAttributes["harness.view.status_message_count"] == "1")
+    #expect(
+      viewBodySpanAttributes(
+        in: collector.traceCollector,
+        viewName: "ToolbarCenterpieceView"
+      ) == nil
+    )
     #expect(badgeAttributes["harness.view.transport"] == "webSocket")
   }
 

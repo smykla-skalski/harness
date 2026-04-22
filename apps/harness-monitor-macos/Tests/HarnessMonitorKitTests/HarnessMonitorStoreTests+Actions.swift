@@ -102,8 +102,8 @@ extension HarnessMonitorStoreTests {
     )
   }
 
-  @Test("Toolbar counts only session-backed projects and worktrees")
-  func toolbarCountsOnlySessionBackedProjectsAndWorktrees() async {
+  @Test("Sidebar summary counts only session-backed projects and worktrees")
+  func sidebarSummaryCountsOnlySessionBackedProjectsAndWorktrees() async {
     let store = await makeBootstrappedStore()
 
     guard let status = store.daemonStatus else {
@@ -123,9 +123,9 @@ extension HarnessMonitorStoreTests {
     store.applySessionIndexSnapshot(projects: projects, sessions: sessions)
 
     // Two distinct origin worktrees back the 3 sessions across the active projects.
-    #expect(store.contentUI.toolbar.toolbarMetrics.projectCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.worktreeCount == 2)
-    #expect(store.contentUI.toolbar.toolbarMetrics.sessionCount == 3)
+    #expect(store.sidebarUI.projectCount == 2)
+    #expect(store.sidebarUI.worktreeCount == 2)
+    #expect(store.sidebarUI.sessionCount == 3)
   }
 
   private func makeToolbarCountFixtures() -> (

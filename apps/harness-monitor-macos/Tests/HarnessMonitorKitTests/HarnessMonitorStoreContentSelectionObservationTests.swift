@@ -5,12 +5,12 @@ import Testing
 @MainActor
 @Suite("Harness Monitor content selection observation")
 struct HarnessMonitorContentSelectionTests {
-  @Test("Content toolbar metrics ignore bookmark and filter churn")
-  func contentToolbarMetricsIgnoreBookmarkAndFilterChurn() async {
+  @Test("Content toolbar global actions ignore bookmark and filter churn")
+  func contentToolbarGlobalActionsIgnoreBookmarkAndFilterChurn() async {
     let store = await makeBootstrappedStore()
 
     let bookmarkInvalidated = await didInvalidate(
-      { store.contentUI.toolbar.toolbarMetrics },
+      toolbarGlobalActionState(for: store),
       after: {
         store.bookmarkedSessionIds = ["bookmark-content"]
       }
@@ -18,7 +18,7 @@ struct HarnessMonitorContentSelectionTests {
     #expect(bookmarkInvalidated == false)
 
     let filterInvalidated = await didInvalidate(
-      { store.contentUI.toolbar.toolbarMetrics },
+      toolbarGlobalActionState(for: store),
       after: {
         store.searchText = "preview"
         store.flushPendingSearchRebuild()
@@ -35,7 +35,7 @@ struct HarnessMonitorContentSelectionTests {
     let didChange = await didInvalidate(
       {
         (
-          store.contentUI.toolbar.toolbarMetrics,
+          toolbarGlobalActionState(for: store)(),
           store.contentUI.shell.connectionState
         )
       },
@@ -142,17 +142,12 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
-  @Test("Content toolbar centerpiece ignores session selection churn")
-  func contentToolbarCenterpieceIgnoresSessionSelectionChurn() async {
+  @Test("Content toolbar global actions ignore session selection churn")
+  func contentToolbarGlobalActionsIgnoreSessionSelectionChurn() async {
     let store = await makeBootstrappedStore()
 
     let didChange = await didInvalidate(
-      {
-        (
-          store.contentUI.toolbar.toolbarMetrics,
-          store.contentUI.toolbar.statusMessages
-        )
-      },
+      toolbarGlobalActionState(for: store),
       after: {
         await store.selectSession(PreviewFixtures.summary.sessionId)
       }
@@ -294,5 +289,16 @@ struct HarnessMonitorContentSelectionTests {
       pendingLeaderTransfer: nil,
       metrics: PreviewFixtures.summary.metrics
     )
+  }
+
+  private func toolbarGlobalActionState(
+    for store: HarnessMonitorStore
+  ) -> () -> (Bool, Bool) {
+    {
+      (
+        store.contentUI.toolbar.isRefreshing,
+        store.contentUI.toolbar.sleepPreventionEnabled
+      )
+    }
   }
 }

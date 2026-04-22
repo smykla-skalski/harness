@@ -213,7 +213,6 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(store.contentUI.toolbar.connectionState == .online)
     #expect(store.contentUI.chrome.sessionDataAvailability == .live)
     #expect(client.readCallCount(.diagnostics) == 2)
     #expect(

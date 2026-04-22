@@ -6,30 +6,6 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
 
-  func testToolbarCenterpieceContentIsReadable() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
-    )
-
-    let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
-    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.actionTimeout))
-
-    let stats = luminanceStats(of: centerpiece)
-    let screenshot = XCTAttachment(screenshot: centerpiece.screenshot())
-    screenshot.name = "toolbar-centerpiece"
-    screenshot.lifetime = .keepAlways
-    add(screenshot)
-
-    XCTAssertGreaterThan(
-      stats.stddev,
-      0.04,
-      "Section content washed out: stddev=\(stats.stddev), "
-        + "min=\(stats.min), max=\(stats.max), "
-        + "mean=\(stats.mean), samples=\(stats.count)"
-    )
-  }
-
   func testInspectorEmptyStateIsReadable() throws {
     let app = launch(mode: "empty")
 
