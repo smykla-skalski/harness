@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 
 @testable import HarnessMonitorKit
 
@@ -105,5 +106,19 @@ struct HarnessMonitorStoreSheetTests {
     // bookmarkStore is available in DEBUG builds (temp dir fallback).
     // client is set by bootstrap. Both must be non-nil for a result.
     #expect(viewModel != nil)
+  }
+
+  @Test("handleImportedFolder returns inserted bookmark for New Session auto-selection")
+  func handleImportedFolderReturnsInsertedBookmark() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let folderURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+    let inserted = await store.handleImportedFolder(.success([folderURL]))
+
+    #expect(inserted?.displayName == folderURL.lastPathComponent)
+    #expect(inserted?.lastResolvedPath == folderURL.path)
+    #expect(inserted?.kind == .projectRoot)
   }
 }
