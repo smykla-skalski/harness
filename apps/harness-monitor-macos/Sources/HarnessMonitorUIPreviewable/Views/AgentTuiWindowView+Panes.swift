@@ -57,6 +57,22 @@ extension AgentTuiWindowView {
     }
   }
 
+  @ViewBuilder
+  func agentDetailForAgentID(_ agentID: String?) -> some View {
+    if let agentID,
+      let session = store.selectedSession,
+      let agent = session.agents.first(where: { $0.agentId == agentID })
+    {
+      Divider()
+        .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      AgentDetailSection(
+        store: store,
+        agent: agent,
+        activity: session.agentActivity.first(where: { $0.agentId == agentID })
+      )
+    }
+  }
+
   var unavailableSessionPane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("That agent entry is no longer available.")
@@ -82,6 +98,7 @@ extension AgentTuiWindowView {
           terminalError(error)
         }
         terminalOutcome(tui)
+        agentDetailForAgentID(tui.agentId)
       }
     }
     .frame(
@@ -154,6 +171,7 @@ extension AgentTuiWindowView {
       terminalInputControls(tui)
       terminalKeyControls(tui)
       terminalResizeControls()
+      agentDetailForAgentID(tui.agentId)
     }
   }
 
