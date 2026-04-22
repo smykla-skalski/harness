@@ -581,7 +581,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=\"harness-daemon\", level=~\"${level:regex}\"} | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
+          "expr": "{service_name=\"harness-daemon\"} | detected_level=~\"${level:regex}\" | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -656,7 +656,7 @@
         "multi": true,
         "name": "level",
         "options": [],
-        "query": "DEBUG,INFO,WARN,ERROR",
+        "query": "debug,info,warn,error",
         "type": "custom"
       }
     ]
