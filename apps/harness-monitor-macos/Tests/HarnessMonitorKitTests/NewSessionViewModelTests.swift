@@ -62,7 +62,7 @@ struct NewSessionViewModelTests {
       if case .startSession = call { return true }
       return false
     }
-    guard case .startSession(let projectDir, _, _) = startCall else {
+    guard case .startSession(let projectDir, _) = startCall else {
       Issue.record("Expected startSession call")
       return
     }
@@ -94,7 +94,7 @@ struct NewSessionViewModelTests {
       if case .startSession = call { return true }
       return false
     }
-    guard case .startSession(let projectDir, _, _) = startCall else {
+    guard case .startSession(let projectDir, _) = startCall else {
       Issue.record("Expected startSession call")
       return
     }
@@ -129,7 +129,7 @@ struct NewSessionViewModelTests {
       if case .startSession = call { return true }
       return false
     }
-    guard case .startSession(let projectDir, _, _) = startCall else {
+    guard case .startSession(let projectDir, _) = startCall else {
       Issue.record("Expected startSession call")
       return
     }

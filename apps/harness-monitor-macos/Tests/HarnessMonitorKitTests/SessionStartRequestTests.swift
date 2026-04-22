@@ -7,7 +7,6 @@ final class SessionStartRequestTests: XCTestCase {
     let req = SessionStartRequest(
       title: "t",
       context: "c",
-      runtime: "claude",
       sessionId: nil,
       projectDir: "B-abc",
       policyPreset: nil,
@@ -19,13 +18,13 @@ final class SessionStartRequestTests: XCTestCase {
     let json = String(data: data, encoding: .utf8) ?? ""
     XCTAssertTrue(json.contains("\"base_ref\":\"main\""))
     XCTAssertTrue(json.contains("\"project_dir\":\"B-abc\""))
+    XCTAssertFalse(json.contains("runtime"))
   }
 
   func testOmitsNilBaseRef() throws {
     let req = SessionStartRequest(
       title: "t",
       context: "c",
-      runtime: "claude",
       sessionId: nil,
       projectDir: "B-abc",
       policyPreset: nil,

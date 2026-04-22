@@ -361,8 +361,38 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.pendingConfirmation == nil)
   }
 
-  @Test("Actorless session actions report failure instead of silently returning")
-  func actorlessSessionActionsReportFailure() async {
+  @Test("Awaiting-leader task creation uses the control-plane actor")
+  func awaitingLeaderTaskCreationUsesControlPlaneActor() async {
+    let client = actorlessClient()
+    let store = await actorlessStore(client: client)
+
+    let created = await store.createTask(
+      title: "Seed control-plane task",
+      context: "Fresh sessions should accept task seeding before any leader joins.",
+      severity: .medium
+    )
+
+    #expect(created)
+    #expect(store.areSelectedSessionActionsAvailable)
+    #expect(store.selectedSessionActionUnavailableMessage == nil)
+    #expect(store.areSelectedLeaderActionsAvailable == false)
+    #expect(store.selectedLeaderActionUnavailableMessage == expectedLeaderlessActionMessage)
+    #expect(
+      client.recordedCalls()
+        == [
+          .createTask(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            title: "Seed control-plane task",
+            context: "Fresh sessions should accept task seeding before any leader joins.",
+            severity: .medium,
+            actor: "harness-app"
+          )
+        ]
+    )
+  }
+
+  @Test("Awaiting-leader leader-only actions report unavailability")
+  func awaitingLeaderLeaderOnlyActionsReportUnavailability() async {
     let client = actorlessClient()
     let store = await actorlessStore(client: client)
 
@@ -370,25 +400,17 @@ struct HarnessMonitorStoreActionTests {
 
     #expect(observed == false)
     #expect(client.recordedCalls().isEmpty)
-    #expect(store.currentFailureFeedbackMessage == expectedActorlessActionMessage)
-    #expect(store.areSelectedSessionActionsAvailable == false)
-    #expect(store.selectedSessionActionUnavailableMessage == expectedActorlessActionMessage)
-  }
-
-  @Test("Actorless end-session confirmation reports failure instead of silently returning")
-  func actorlessEndSessionConfirmationReportsFailure() async {
-    let client = actorlessClient()
-    let store = await actorlessStore(client: client)
+    #expect(store.currentFailureFeedbackMessage == expectedLeaderlessActionMessage)
 
     store.requestEndSelectedSessionConfirmation()
 
     #expect(store.pendingConfirmation == nil)
     #expect(client.recordedCalls().isEmpty)
-    #expect(store.currentFailureFeedbackMessage == expectedActorlessActionMessage)
+    #expect(store.currentFailureFeedbackMessage == expectedLeaderlessActionMessage)
   }
 
-  @Test("Default action actor falls back to the session leader")
-  func defaultActionActorFallsBackToSessionLeader() async {
+  @Test("Default task actions keep the control-plane actor")
+  func defaultTaskActionsKeepTheControlPlaneActor() async {
     let client = RecordingHarnessClient()
     let store = await selectedStore(client: client)
 
@@ -406,7 +428,7 @@ struct HarnessMonitorStoreActionTests {
             title: "Use the live leader",
             context: "Default actor resolution should not send harness-app.",
             severity: .medium,
-            actor: "leader-claude"
+            actor: "harness-app"
           )
         ]
     )
@@ -458,7 +480,10 @@ struct HarnessMonitorStoreActionTests {
     return store
   }
 
-  private var expectedActorlessActionMessage: String {
-    "No session actor is available yet. Wait for a leader or active agent to join, then try again."
+  private var expectedLeaderlessActionMessage: String {
+    """
+    Leader-only actions are unavailable until a real leader joins this session.
+    Task controls remain available.
+    """
   }
 }

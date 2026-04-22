@@ -52,7 +52,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case resizeAgentTui(tuiID: String, rows: Int, cols: Int)
     case stopAgentTui(tuiID: String)
     case adoptSession(bookmarkID: String?, sessionRoot: URL)
-    case startSession(projectDir: String, runtime: String, baseRef: String?)
+    case startSession(projectDir: String, baseRef: String?)
     case endSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
     case removeAgent(sessionID: String, agentID: String, actor: String)

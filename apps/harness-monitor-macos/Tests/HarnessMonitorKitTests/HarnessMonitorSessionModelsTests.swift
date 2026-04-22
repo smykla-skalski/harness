@@ -371,6 +371,50 @@ struct HarnessMonitorSessionModelsTests {
     #expect(SessionStatus(rawValue: "leaderless_degraded") != nil)
   }
 
+  @Test("SessionStatus accepts awaiting leader daemon wire value")
+  func sessionStatusAcceptsAwaitingLeaderWireValue() {
+    #expect(SessionStatus(rawValue: "awaiting_leader") == .awaitingLeader)
+  }
+
+  @Test("Session summary decoding accepts awaiting leader daemon payloads")
+  func sessionSummaryDecodingAcceptsAwaitingLeaderPayloads() throws {
+    let json = """
+      {
+        "project_id": "project-awaiting-1",
+        "project_name": "harness",
+        "project_dir": "/tmp/project",
+        "context_root": "/tmp/harness/sessions/harness",
+        "session_id": "await001",
+        "worktree_path": "/tmp/harness/sessions/harness/await001/workspace",
+        "shared_path": "/tmp/harness/sessions/harness/await001/memory",
+        "origin_path": "/tmp/project",
+        "branch_ref": "harness/await001",
+        "title": "Prepare work before a leader joins",
+        "context": "Prepare work before a leader joins",
+        "status": "awaiting_leader",
+        "created_at": "2026-04-22T10:03:45Z",
+        "updated_at": "2026-04-22T10:03:45Z",
+        "last_activity_at": null,
+        "leader_id": null,
+        "observe_id": null,
+        "pending_leader_transfer": null,
+        "metrics": {
+          "agent_count": 0,
+          "active_agent_count": 0,
+          "open_task_count": 1,
+          "in_progress_task_count": 0,
+          "blocked_task_count": 0,
+          "completed_task_count": 0
+        }
+      }
+      """
+
+    let summary = try decoder.decode(SessionSummary.self, from: Data(json.utf8))
+
+    #expect(summary.status == .awaitingLeader)
+    #expect(summary.leaderId == nil)
+  }
+
   @Test("Session summary decoding accepts leaderless degraded daemon payloads")
   func sessionSummaryDecodingAcceptsLeaderlessDegradedPayloads() throws {
     let json = """

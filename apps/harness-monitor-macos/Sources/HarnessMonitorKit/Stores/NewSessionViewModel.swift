@@ -128,7 +128,6 @@ public final class NewSessionViewModel {
     let request = SessionStartRequest(
       title: trimmedTitle,
       context: context,
-      runtime: "claude",
       sessionId: nil,
       projectDir: projectDir,
       policyPreset: nil,

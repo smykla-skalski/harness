@@ -22,7 +22,6 @@ struct NewSessionAPIClientTests {
     let request = SessionStartRequest(
       title: "test session",
       context: "unit test context",
-      runtime: "claude",
       sessionId: nil,
       projectDir: "bmk-abc",
       policyPreset: nil,
@@ -102,7 +101,7 @@ private final class StartSessionURLProtocol: URLProtocol, @unchecked Sendable {
           "branch_ref": "main",
           "title": "test session",
           "context": "unit test context",
-          "status": "active",
+          "status": "awaiting_leader",
           "created_at": "2026-04-20T12:00:00Z",
           "updated_at": "2026-04-20T12:00:00Z",
           "agents": {},

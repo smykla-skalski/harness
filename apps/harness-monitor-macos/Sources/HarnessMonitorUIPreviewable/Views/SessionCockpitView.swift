@@ -105,6 +105,7 @@ struct SessionCockpitView: View {
     SessionAgentListSection(
       store: store,
       sessionID: detail.session.sessionId,
+      sessionStatus: detail.session.status,
       agents: detail.agents,
       tasks: detail.tasks,
       isSessionReadOnly: isSessionReadOnly,

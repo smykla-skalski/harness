@@ -21,6 +21,13 @@ extension HarnessMonitorStore {
     "No session actor is available yet. Wait for a leader or active agent to join, then try again."
   }
 
+  private var noSelectedLeaderMessage: String {
+    """
+    Leader-only actions are unavailable until a real leader joins this session.
+    Task controls remain available.
+    """
+  }
+
   public var selectedSessionActionUnavailableMessage: String? {
     if isSessionReadOnly {
       return readOnlySessionAccessMessage
@@ -31,9 +38,6 @@ extension HarnessMonitorStore {
     if client == nil {
       return actionChannelUnavailableMessage
     }
-    if resolvedActionActor() == nil {
-      return noResolvedActionActorMessage
-    }
     return nil
   }
 
@@ -41,8 +45,37 @@ extension HarnessMonitorStore {
     selectedSessionActionUnavailableMessage == nil
   }
 
+  public var selectedLeaderActionUnavailableMessage: String? {
+    if let generalUnavailableMessage = selectedSessionActionUnavailableMessage {
+      return generalUnavailableMessage
+    }
+    guard selectedSessionHasRealLeader else {
+      return noSelectedLeaderMessage
+    }
+    if resolvedActionActor() == nil {
+      return noResolvedActionActorMessage
+    }
+    return nil
+  }
+
+  public var areSelectedLeaderActionsAvailable: Bool {
+    selectedLeaderActionUnavailableMessage == nil
+  }
+
+  public var selectedSessionActionBannerMessage: String? {
+    selectedLeaderActionUnavailableMessage ?? selectedSessionActionUnavailableMessage
+  }
+
   func guardSessionActionsAvailable(actionName: String = "Session action") -> Bool {
     guard let unavailableMessage = selectedSessionActionUnavailableMessage else {
+      return true
+    }
+    reportUnavailableSelectedSessionAction(actionName, message: unavailableMessage)
+    return false
+  }
+
+  func guardLeaderActionsAvailable(actionName: String = "Session action") -> Bool {
+    guard let unavailableMessage = selectedLeaderActionUnavailableMessage else {
       return true
     }
     reportUnavailableSelectedSessionAction(actionName, message: unavailableMessage)
@@ -104,6 +137,16 @@ extension HarnessMonitorStore {
     presentFailureFeedback(reason)
   }
 
+  private var selectedSessionHasRealLeader: Bool {
+    guard let detail = selectedSession else {
+      return false
+    }
+    guard let leaderID = detail.session.leaderId else {
+      return false
+    }
+    return detail.agents.contains { $0.agentId == leaderID }
+  }
+
   @discardableResult
   public func createTask(
     title: String,
@@ -113,7 +156,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Create task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.createTask(sessionID: action.sessionID).key,
@@ -141,7 +184,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Assign task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.assignTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -166,7 +209,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Drop task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.dropTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -194,7 +237,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Update task queue"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.updateTaskQueuePolicy(
@@ -222,7 +265,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Update task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.updateTaskStatus(sessionID: action.sessionID, taskID: taskID)
@@ -248,7 +291,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Save checkpoint"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    let actor = taskActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.checkpointTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -276,7 +319,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Change role"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.changeRole(sessionID: action.sessionID, agentID: agentID).key,
@@ -299,7 +342,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Remove agent"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.removeAgent(sessionID: action.sessionID, agentID: agentID).key,
@@ -323,7 +366,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Transfer leader"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.transferLeader(
@@ -349,7 +392,7 @@ extension HarnessMonitorStore {
   public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
     let actionName = "Observe session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.observeSession(sessionID: action.sessionID).key,
@@ -368,7 +411,7 @@ extension HarnessMonitorStore {
   public func endSelectedSession(actor: String = "harness-app") async -> Bool {
     let actionName = "End session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
+    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.endSession(sessionID: action.sessionID).key,
@@ -386,6 +429,7 @@ extension HarnessMonitorStore {
   public func requestEndSelectedSessionConfirmation() {
     let actionName = "End session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return }
+    guard guardLeaderActionsAvailable(actionName: actionName) else { return }
     guard let actorID = resolvedActionActorOrReport(actionName: actionName) else { return }
     pendingConfirmation = .endSession(sessionID: action.sessionID, actorID: actorID)
   }
@@ -393,6 +437,7 @@ extension HarnessMonitorStore {
   public func requestRemoveAgentConfirmation(agentID: String) {
     let actionName = "Remove agent"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return }
+    guard guardLeaderActionsAvailable(actionName: actionName) else { return }
     guard let actorID = resolvedActionActorOrReport(actionName: actionName) else { return }
     pendingConfirmation = .removeAgent(
       sessionID: action.sessionID,
@@ -445,6 +490,20 @@ extension HarnessMonitorStore {
       return actor
     }
     return resolvedActionActorOrReport(actionName: actionName)
+  }
+
+  func taskActionActor(for actor: String) -> String {
+    actor == "harness-app" ? "harness-app" : actor
+  }
+
+  func leaderActionActor(
+    for actor: String,
+    actionName: String = "Session action"
+  ) -> String? {
+    guard guardLeaderActionsAvailable(actionName: actionName) else {
+      return nil
+    }
+    return actionActor(for: actor, actionName: actionName)
   }
 
   private func resolvedActionActorOrReport(actionName: String) -> String? {

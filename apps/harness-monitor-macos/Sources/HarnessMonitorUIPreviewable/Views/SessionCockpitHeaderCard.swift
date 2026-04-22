@@ -23,12 +23,19 @@ struct SessionCockpitHeaderCard: View {
     )
   }
 
-  private var areSessionActionsAvailable: Bool {
-    store.areSelectedSessionActionsAvailable
+  private var areLeaderActionsAvailable: Bool {
+    store.areSelectedLeaderActionsAvailable
   }
 
   private var unavailableActionHelp: String {
-    store.selectedSessionActionUnavailableMessage ?? ""
+    store.selectedLeaderActionUnavailableMessage ?? ""
+  }
+
+  private var awaitingLeaderMessage: String? {
+    guard detail.session.status == .awaitingLeader else {
+      return nil
+    }
+    return "This session is waiting for its first leader. Seed tasks now, then join a leader to unlock live controls."
   }
 
   var body: some View {
@@ -71,6 +78,11 @@ struct SessionCockpitHeaderCard: View {
           .transition(.opacity)
       }
 
+      if let awaitingLeaderMessage {
+        awaitingLeaderSummary(awaitingLeaderMessage)
+          .transition(.opacity)
+      }
+
       if let pendingTransfer = detail.session.pendingLeaderTransfer {
         pendingTransferSummary(pendingTransfer)
           .transition(.opacity)
@@ -89,7 +101,7 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .prominent,
       tint: nil,
-      isExternallyDisabled: !areSessionActionsAvailable,
+      isExternallyDisabled: !areLeaderActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.observeSessionButton,
       help: unavailableActionHelp,
       action: { observeSelectedSession() }
@@ -103,10 +115,27 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .bordered,
       tint: .secondary,
-      isExternallyDisabled: !areSessionActionsAvailable,
+      isExternallyDisabled: !areLeaderActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.endSessionButton,
       help: unavailableActionHelp,
       action: { requestEndSessionConfirmation() }
+    )
+  }
+
+  private func awaitingLeaderSummary(_ message: String) -> some View {
+    Label {
+      Text(message)
+        .scaledFont(.system(.body, design: .rounded, weight: .medium))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    } icon: {
+      Image(systemName: "hourglass")
+        .foregroundStyle(HarnessMonitorTheme.accent)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.cardPadding)
+    .background(
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+        .fill(HarnessMonitorTheme.accent.opacity(0.08))
     )
   }
 

@@ -48,6 +48,8 @@ public enum HarnessMonitorTheme {
 
 func statusColor(for status: SessionStatus) -> Color {
   switch status {
+  case .awaitingLeader:
+    HarnessMonitorTheme.accent
   case .active:
     HarnessMonitorTheme.success
   case .paused:
