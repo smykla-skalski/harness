@@ -6,7 +6,8 @@ use super::{
     build_initial_state, build_leave_signal_record, clear_pending_leader_transfer,
     ensure_session_can_end, leave_signal_delivery_error, next_available_agent_id,
     plan_leader_transfer, refresh_session, require_active, require_active_target_agent,
-    require_permission, require_removable_agent, runtime, runtime_capabilities, touch_agent,
+    require_endable_session, require_permission, require_removable_agent, runtime,
+    runtime_capabilities, touch_agent,
 };
 
 // ---------------------------------------------------------------------------
@@ -200,7 +201,7 @@ pub(crate) fn prepare_end_session_leave_signals(
     actor_id: &str,
     now: &str,
 ) -> Result<Vec<LeaveSignalRecord>, CliError> {
-    require_active(state)?;
+    require_endable_session(state)?;
     require_permission(state, actor_id, SessionAction::EndSession)?;
     ensure_session_can_end(state)?;
 
@@ -295,7 +296,7 @@ pub(crate) fn apply_end_session(
     actor_id: &str,
     now: &str,
 ) -> Result<(), CliError> {
-    require_active(state)?;
+    require_endable_session(state)?;
     require_permission(state, actor_id, SessionAction::EndSession)?;
     ensure_session_can_end(state)?;
 

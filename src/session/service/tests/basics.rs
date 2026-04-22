@@ -362,6 +362,77 @@ fn end_session_requires_leader() {
 }
 
 #[test]
+fn control_plane_can_end_non_ended_sessions() {
+    with_temp_project(|project| {
+        let awaiting = start_session("awaiting end", "", project, Some("end-awaiting"))
+            .expect("start awaiting session");
+        end_session(&awaiting.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end awaiting leader session");
+        assert_eq!(
+            session_status(&awaiting.session_id, project)
+                .expect("awaiting status")
+                .status,
+            SessionStatus::Ended
+        );
+
+        let paused = start_active_session(
+            "paused end",
+            "",
+            project,
+            Some("claude"),
+            Some("end-paused"),
+        )
+        .expect("start paused session");
+        let paused_layout =
+            storage::layout_from_project_dir(project, &paused.session_id).expect("paused layout");
+        storage::update_state(&paused_layout, |state| {
+            state.status = SessionStatus::Paused;
+            Ok(())
+        })
+        .expect("pause session");
+        end_session(&paused.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end paused session");
+        assert_eq!(
+            session_status(&paused.session_id, project)
+                .expect("paused status")
+                .status,
+            SessionStatus::Ended
+        );
+
+        let degraded = start_active_session(
+            "degraded end",
+            "",
+            project,
+            Some("claude"),
+            Some("end-degraded"),
+        )
+        .expect("start degraded session");
+        let previous_leader = degraded.leader_id.clone().expect("leader");
+        let degraded_layout = storage::layout_from_project_dir(project, &degraded.session_id)
+            .expect("degraded layout");
+        storage::update_state(&degraded_layout, |state| {
+            state.status = SessionStatus::LeaderlessDegraded;
+            state.leader_id = None;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::Disconnected;
+            Ok(())
+        })
+        .expect("degrade session");
+        end_session(&degraded.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end leaderless degraded session");
+        assert_eq!(
+            session_status(&degraded.session_id, project)
+                .expect("degraded status")
+                .status,
+            SessionStatus::Ended
+        );
+    });
+}
+
+#[test]
 fn task_lifecycle() {
     with_temp_project(|project| {
         let state =

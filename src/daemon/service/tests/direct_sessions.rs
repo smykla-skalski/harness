@@ -1,4 +1,5 @@
 use super::*;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 #[test]
 fn create_task_db_direct_writes_to_sqlite() {
@@ -109,6 +110,57 @@ fn end_session_db_direct_marks_inactive() {
             db.load_signals(&state.session_id).expect("signals").len(),
             2
         );
+    });
+}
+
+#[test]
+fn end_session_db_direct_allows_leaderless_degraded_control_plane_actor() {
+    with_temp_project(|project| {
+        let (db, state) = setup_db_only_session(project);
+        let original_leader = state.leader_id.clone().expect("leader id");
+        let worker_id = join_db_codex_worker(&db, &state, project, "db-degraded-end-worker");
+        let project_id = db
+            .project_id_for_session(&state.session_id)
+            .expect("project lookup")
+            .expect("project id");
+        let mut degraded = db
+            .load_session_state(&state.session_id)
+            .expect("load state")
+            .expect("state present");
+        degraded.status = SessionStatus::LeaderlessDegraded;
+        degraded.leader_id = None;
+        degraded
+            .agents
+            .get_mut(&original_leader)
+            .expect("leader registration")
+            .status = AgentStatus::Disconnected;
+        db.save_session_state(&project_id, &degraded)
+            .expect("save degraded state");
+
+        let detail = end_session(
+            &state.session_id,
+            &SessionEndRequest {
+                actor: CONTROL_PLANE_ACTOR_ID.into(),
+            },
+            Some(&db),
+        )
+        .expect("end degraded session via db");
+
+        assert_eq!(detail.session.status, SessionStatus::Ended);
+        assert!(detail.session.leader_id.is_none());
+        assert_eq!(detail.session.metrics.active_agent_count, 0);
+        assert!(
+            detail
+                .signals
+                .iter()
+                .any(|signal| signal.agent_id == worker_id)
+        );
+
+        let db_state = db
+            .load_session_state(&state.session_id)
+            .expect("load ended state")
+            .expect("ended state");
+        assert_eq!(db_state.status, SessionStatus::Ended);
     });
 }
 
