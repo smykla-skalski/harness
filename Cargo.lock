@@ -1560,19 +1560,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
-name = "git2"
-version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b88256088d75a56f8ecfa070513a775dd9107f6530ef14919dac831af9cfe2b"
-dependencies = [
- "bitflags 2.11.0",
- "libc",
- "libgit2-sys",
- "log",
- "url",
-]
-
-[[package]]
 name = "gix"
 version = "0.81.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2534,7 +2521,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "29.0.6"
+version = "29.0.7"
 dependencies = [
  "assert_cmd",
  "async-stream",
@@ -2553,7 +2540,6 @@ dependencies = [
  "fs-err",
  "fs2",
  "futures-util",
- "git2",
  "gix",
  "gray_matter",
  "harness-testkit",
@@ -2568,6 +2554,7 @@ dependencies = [
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "pathdiff",
  "portable-pty",
  "predicates",
  "pyroscope",
@@ -2606,10 +2593,9 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "29.0.6"
+version = "29.0.7"
 dependencies = [
  "assert_cmd",
- "git2",
  "harness",
  "jsonschema",
  "serde_json",
@@ -3526,18 +3512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libgit2-sys"
-version = "0.18.3+1.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9b3acc4b91781bb0b3386669d325163746af5f6e4f73e6d2d630e09a35f3487"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "pkg-config",
-]
-
-[[package]]
 name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3574,18 +3548,6 @@ checksum = "3302702afa434ffa30847a83305f0a69d6abd74293b6554c18ec85c7ef30c980"
 dependencies = [
  "anyhow",
  "version_check",
-]
-
-[[package]]
-name = "libz-sys"
-version = "1.1.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc3a226e576f50782b3305c5ccf458698f92798987f551c6a02efe8276721e22"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
- "vcpkg",
 ]
 
 [[package]]
@@ -4126,6 +4088,12 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "pe-unwind-info"
