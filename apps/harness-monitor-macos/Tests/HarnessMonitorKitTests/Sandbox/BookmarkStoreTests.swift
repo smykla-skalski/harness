@@ -32,6 +32,21 @@ final class BookmarkStoreTests: XCTestCase {
     XCTAssertEqual(all.count, BookmarkStore.mruCap)
   }
 
+  func testAddReusesExistingRecordForSameCanonicalPath() async throws {
+    let dir = try makeTempDir()
+    let store = BookmarkStore(containerURL: dir)
+    let target = FileManager.default.temporaryDirectory
+
+    let first = try await store.add(url: target, kind: .projectRoot)
+    let second = try await store.add(url: target, kind: .projectRoot)
+    let all = await store.all()
+
+    XCTAssertEqual(all.count, 1)
+    XCTAssertEqual(second.id, first.id)
+    XCTAssertEqual(all.first?.id, first.id)
+    XCTAssertEqual(all.first?.lastResolvedPath, target.standardizedFileURL.resolvingSymlinksInPath().path)
+  }
+
   func testUnsupportedSchemaVersionThrows() async throws {
     let dir = try makeTempDir()
     let sandboxDir = dir.appendingPathComponent("sandbox", isDirectory: true)
@@ -120,7 +135,7 @@ final class BookmarkStoreTests: XCTestCase {
           "schemaVersion": 1,
           "bookmarks": [
             {
-              "id": "B-preseed",
+              "id": "B-dup",
               "kind": "project-root",
               "displayName": "dup1",
               "lastResolvedPath": "/tmp/a",
@@ -130,7 +145,7 @@ final class BookmarkStoreTests: XCTestCase {
               "staleCount": 0
             },
             {
-              "id": "B-preseed",
+              "id": "B-dup",
               "kind": "project-root",
               "displayName": "dup2",
               "lastResolvedPath": "/tmp/b",
@@ -147,6 +162,78 @@ final class BookmarkStoreTests: XCTestCase {
       let loaded = try await store.loadAndValidate()
       XCTAssertEqual(loaded.bookmarks.count, 1)
       XCTAssertEqual(loaded.bookmarks.first?.displayName, "dup1")
+    }
+
+    func testLoadDropsUITestSeedOutsideUITestStores() async throws {
+      let dir = try makeTempDir()
+      let sandboxDir = dir.appendingPathComponent("sandbox", isDirectory: true)
+      try FileManager.default.createDirectory(at: sandboxDir, withIntermediateDirectories: true)
+      let url = sandboxDir.appendingPathComponent("bookmarks.json")
+      let json = """
+        {
+          "schemaVersion": 1,
+          "bookmarks": [
+            {
+              "id": "B-preseed",
+              "kind": "project-root",
+              "displayName": "Sample Project Folder",
+              "lastResolvedPath": "/tmp/sample",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            },
+            {
+              "id": "B-real",
+              "kind": "project-root",
+              "displayName": "harness",
+              "lastResolvedPath": "/tmp/harness",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            }
+          ]
+        }
+        """
+      try Data(json.utf8).write(to: url)
+
+      let store = BookmarkStore(containerURL: dir)
+      let loaded = try await store.loadAndValidate()
+
+      XCTAssertEqual(loaded.bookmarks.count, 1)
+      XCTAssertEqual(loaded.bookmarks.first?.id, "B-real")
+    }
+
+    func testLoadKeepsUITestSeedInsideUITestStores() async throws {
+      let dir = try makeTempDir()
+      let sandboxDir = dir.appendingPathComponent("sandbox", isDirectory: true)
+      try FileManager.default.createDirectory(at: sandboxDir, withIntermediateDirectories: true)
+      let url = sandboxDir.appendingPathComponent("bookmarks.json")
+      let json = """
+        {
+          "schemaVersion": 1,
+          "bookmarks": [
+            {
+              "id": "B-preseed",
+              "kind": "project-root",
+              "displayName": "Sample Project Folder",
+              "lastResolvedPath": "/tmp/sample",
+              "bookmarkData": "AA==",
+              "createdAt": "2024-01-01T00:00:00Z",
+              "lastAccessedAt": "2024-01-01T00:00:00Z",
+              "staleCount": 0
+            }
+          ]
+        }
+        """
+      try Data(json.utf8).write(to: url)
+
+      let store = BookmarkStore(containerURL: dir, allowsUITestSeedRecords: true)
+      let loaded = try await store.loadAndValidate()
+
+      XCTAssertEqual(loaded.bookmarks.count, 1)
+      XCTAssertEqual(loaded.bookmarks.first?.id, "B-preseed")
     }
   #endif
 
