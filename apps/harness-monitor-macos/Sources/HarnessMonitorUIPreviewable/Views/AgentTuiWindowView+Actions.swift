@@ -178,6 +178,13 @@ extension AgentTuiWindowView {
       let success = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: payload)
       if success {
         viewModel.inputText = ""
+        if submitSendsEnter {
+          _ = await store.sendAgentTuiInput(
+            tuiID: tui.tuiId,
+            input: .key(.enter),
+            showSuccessFeedback: false
+          )
+        }
       }
       viewModel.isSubmitting = false
     }

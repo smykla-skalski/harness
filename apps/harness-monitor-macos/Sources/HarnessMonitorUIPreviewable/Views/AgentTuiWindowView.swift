@@ -18,6 +18,8 @@ public struct AgentTuiWindowView: View {
   let store: HarnessMonitorStore
   let navigationBridge: AgentTuiWindowNavigationBridge
   @State private var stateViewModel: ViewModel
+  @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
+  var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
   @Environment(\.fontScale)
   private var stateFontScale
   @FocusState private var stateFocusedField: Field?
@@ -43,6 +45,7 @@ public struct AgentTuiWindowView: View {
   ]
 
   var viewModel: ViewModel { stateViewModel }
+
   @MainActor var displayState: AgentTuiDisplayState {
     AgentTuiDisplayState(store: store)
   }
@@ -173,9 +176,9 @@ public struct AgentTuiWindowView: View {
     }
   }
 
-    let displayState = displayState
   public var body: some View {
     @Bindable var viewModel = viewModel
+    let displayState = displayState
     return NavigationSplitView {
       AgentTuiSidebar(
         selection: $viewModel.selection,
@@ -230,7 +233,6 @@ public struct AgentTuiWindowView: View {
     }
     .onChange(of: store.selectedCodexRuns) { _, _ in
       reconcileSheetState(afterRefresh: false)
-    }
     }
     .onChange(of: store.agentTuiUnavailable) { _, _ in
       reconcileSheetState(afterRefresh: false)

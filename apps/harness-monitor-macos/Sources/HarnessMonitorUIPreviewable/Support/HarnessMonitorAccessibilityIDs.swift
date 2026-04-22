@@ -174,6 +174,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentsViewport = agentTuiViewport
   public static let agentsInputField = agentTuiInputField
   public static let agentsInputModePicker = agentTuiInputModePicker
+  public static let agentsSubmitWithEnterToggle = agentTuiSubmitWithEnterToggle
   public static let agentsRefreshButton = agentTuiRefreshButton
   public static let agentsStartButton = agentTuiStartButton
   public static let agentsSendButton = agentTuiSendButton
@@ -204,6 +205,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiViewport = "harness.sheet.agent-tui.viewport"
   public static let agentTuiInputField = "harness.sheet.agent-tui.input"
   public static let agentTuiInputModePicker = "harness.sheet.agent-tui.input-mode"
+  public static let agentTuiSubmitWithEnterToggle = "harness.sheet.agent-tui.submit-with-enter"
   public static let agentTuiRefreshButton = "harness.sheet.agent-tui.refresh"
   public static let agentTuiStartButton = "harness.sheet.agent-tui.start"
   public static let agentTuiSendButton = "harness.sheet.agent-tui.send"

@@ -152,6 +152,26 @@ struct HarnessMonitorStoreAgentTuiTests {
     #expect(store.selectedAgentTui?.screen.text.contains("status") == true)
   }
 
+  @Test("Silent Agents input skips success feedback")
+  func silentAgentTuiInputSkipsSuccessFeedback() async {
+    let client = RecordingHarnessClient()
+    let tui = client.agentTuiFixture()
+    client.configureAgentTuis([tui], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedStore(client: client)
+
+    let sent = await store.sendAgentTuiInput(
+      tuiID: tui.tuiId,
+      input: .key(.enter),
+      showSuccessFeedback: false
+    )
+
+    #expect(sent)
+    #expect(
+      client.recordedCalls() == [.sendAgentTuiInput(tuiID: tui.tuiId, input: .key(.enter))]
+    )
+    #expect(store.currentSuccessFeedbackMessage == nil)
+  }
+
   @Test("Agents input chases a fresher snapshot after a stale action response")
   func agentTuiInputRefreshesAfterStaleActionResponse() async {
     let client = RecordingHarnessClient()

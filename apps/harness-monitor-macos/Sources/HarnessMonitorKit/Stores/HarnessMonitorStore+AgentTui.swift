@@ -90,13 +90,19 @@ extension HarnessMonitorStore {
   @discardableResult
   public func sendAgentTuiInput(
     tuiID: String,
-    input: AgentTuiInput
+    input: AgentTuiInput,
+    showSuccessFeedback: Bool = true
   ) async -> Bool {
-    let actionName = "Agents input sent"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    let actionName = showSuccessFeedback ? "Agents input sent" : nil
+    if let actionName {
+      guard prepareSelectedSessionAction(named: actionName) != nil else { return false }
+    } else {
+      guard areSelectedSessionActionsAvailable else { return false }
+    }
+    guard let client else { return false }
 
-    return await mutateAgentTui(using: action.client) {
-      try await action.client.sendAgentTuiInput(
+    return await mutateAgentTui(using: client, actionName: actionName) {
+      try await client.sendAgentTuiInput(
         tuiID: tuiID,
         request: AgentTuiInputRequest(input: input)
       )
