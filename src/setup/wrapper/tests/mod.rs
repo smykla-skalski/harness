@@ -25,8 +25,8 @@ fn wrapper_content_references_plugin_path() {
 }
 
 #[test]
-fn wrapper_content_references_git_rev_parse() {
-    assert!(WRAPPER.contains("git rev-parse --show-toplevel"));
+fn wrapper_content_walks_parent_directories() {
+    assert!(WRAPPER.contains("resolve_from_cwd"));
 }
 
 #[test]

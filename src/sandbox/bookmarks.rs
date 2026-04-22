@@ -148,7 +148,7 @@ mod base64_bytes_option {
 
     #[expect(
         clippy::ref_option,
-        reason = "serde with-module serialize callbacks receive &Option<T> for Option fields"
+        reason = "serde with-module serialize signature receives &T for T = Option<Vec<u8>>"
     )]
     pub fn serialize<S: Serializer>(bytes: &Option<Vec<u8>>, s: S) -> Result<S::Ok, S::Error> {
         match bytes {

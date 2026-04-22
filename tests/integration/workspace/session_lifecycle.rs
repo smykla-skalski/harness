@@ -1,6 +1,6 @@
 // Session workspace lifecycle: start -> list -> status -> delete.
 //
-// Verifies that the daemon creates a git worktree, memory directory, and
+// Verifies that the daemon creates a linked checkout, memory directory, and
 // state.json at the new `<sessions_root>/<project>/<sid>/` layout, and that
 // DELETE /v1/sessions/<id> tears all of that down cleanly.
 

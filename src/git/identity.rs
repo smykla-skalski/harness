@@ -153,9 +153,8 @@ pub fn canonical_checkout_root(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
-
     use fs_err as fs;
+    use git2::{IndexAddOption, Repository, Signature};
     use tempfile::tempdir;
 
     use super::{
@@ -163,32 +162,24 @@ mod tests {
         resolve_git_checkout_identity,
     };
 
-    fn git_null_device() -> &'static str {
-        if cfg!(windows) { "NUL" } else { "/dev/null" }
-    }
-
-    fn git(path: &std::path::Path, args: &[&str]) {
-        let status = Command::new("git")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", git_null_device())
-            .arg("-C")
-            .arg(path)
-            .arg("-c")
-            .arg("commit.gpgsign=false")
-            .args(args)
-            .status()
-            .expect("run git");
-        assert!(status.success(), "git {:?} failed", args);
-    }
-
     fn init_repo(root: &std::path::Path) {
         fs::create_dir_all(root).expect("create repo");
-        git(root, &["init"]);
-        git(root, &["config", "user.name", "Harness Tests"]);
-        git(root, &["config", "user.email", "harness@example.com"]);
+        let repo = Repository::init(root).expect("init repo");
         fs::write(root.join("README.md"), "hello\n").expect("write readme");
-        git(root, &["add", "README.md"]);
-        git(root, &["commit", "-m", "init"]);
+        let mut index = repo.index().expect("open index");
+        index
+            .add_all(
+                [std::path::Path::new("README.md")],
+                IndexAddOption::DEFAULT,
+                None,
+            )
+            .expect("stage readme");
+        index.write().expect("write index");
+        let tree_id = index.write_tree().expect("write tree");
+        let tree = repo.find_tree(tree_id).expect("find tree");
+        let signature = Signature::now("Harness Tests", "harness@example.com").expect("signature");
+        repo.commit(Some("HEAD"), &signature, &signature, "init", &tree, &[])
+            .expect("create init commit");
     }
 
     #[test]
@@ -216,16 +207,20 @@ mod tests {
         let worktree = worktrees_root.join("feature-branch");
         init_repo(&repo_root);
         fs::create_dir_all(&worktrees_root).expect("create worktrees root");
-        git(
-            &repo_root,
-            &[
-                "worktree",
-                "add",
-                worktree.to_str().expect("utf8"),
-                "-b",
-                "feature-branch",
-            ],
-        );
+        let repo = Repository::open(&repo_root).expect("open repo");
+        let head_commit = repo
+            .head()
+            .expect("repo head")
+            .peel_to_commit()
+            .expect("head commit");
+        let branch = repo
+            .branch("feature-branch", &head_commit, false)
+            .expect("create branch");
+        let reference = branch.into_reference();
+        let mut options = git2::WorktreeAddOptions::new();
+        options.reference(Some(&reference));
+        repo.worktree("feature-branch", &worktree, Some(&options))
+            .expect("create worktree");
 
         let identity = resolve_git_checkout_identity(&worktree).expect("identity");
         let expected_repo = repo_root.canonicalize().expect("canonicalize repo");

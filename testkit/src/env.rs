@@ -1,5 +1,6 @@
 use std::path::Path;
-use std::process::Command;
+
+use git2::{BranchType, IndexAddOption, Repository, Signature, build::CheckoutBuilder};
 
 /// Initialize an empty git repository at `path` with a single seed commit so
 /// downstream callers (notably the daemon's `WorktreeController`) have a
@@ -12,35 +13,10 @@ use std::process::Command;
 /// Panics on any git failure because tests rely on a deterministic repo state.
 pub fn init_git_repo_with_seed(path: &Path) {
     std::fs::create_dir_all(path).expect("create git repo dir");
-    let init = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(path)
-        .status()
-        .expect("git init");
-    assert!(init.success(), "git init failed at {}", path.display());
+    let repo = Repository::init(path).expect("init repo");
     std::fs::write(path.join("README.md"), b"seed\n").expect("seed README");
-    let add = Command::new("git")
-        .current_dir(path)
-        .args(["add", "README.md"])
-        .status()
-        .expect("git add");
-    assert!(add.success(), "git add failed at {}", path.display());
-    let commit = Command::new("git")
-        .current_dir(path)
-        .args([
-            "-c",
-            "user.email=test@example.com",
-            "-c",
-            "user.name=test",
-            "commit",
-            "-q",
-            "-m",
-            "seed",
-        ])
-        .status()
-        .expect("git commit");
-    assert!(commit.success(), "git commit failed at {}", path.display());
+    stage_path(&repo, Path::new("README.md"));
+    commit_head(&repo, "seed");
 }
 
 /// Initialize a git repository at `path` with a seed commit on the default
@@ -55,54 +31,86 @@ pub fn init_git_repo_with_seed(path: &Path) {
 /// Panics on any git failure.
 pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
     init_git_repo_with_seed(path);
-    // Capture the current (default) branch name so we can restore it after
-    // creating the extra branch. HOME may point at a temp dir during tests, so
-    // init.defaultBranch from the real global config is not available.
-    let default_branch = {
-        let out = Command::new("git")
-            .current_dir(path)
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .output()
-            .expect("git rev-parse HEAD");
-        String::from_utf8(out.stdout)
-            .expect("utf8 branch name")
-            .trim()
-            .to_owned()
-    };
-    let checkout = Command::new("git")
-        .current_dir(path)
-        .args(["checkout", "-q", "-b", branch_name])
-        .status()
-        .expect("git checkout -b");
-    assert!(checkout.success(), "git checkout -b failed");
+    let repo = Repository::open(path).expect("open repo");
+    let default_branch = current_branch_name(&repo);
+    let head_commit = repo
+        .head()
+        .expect("repo head")
+        .peel_to_commit()
+        .expect("head commit");
+    repo.branch(branch_name, &head_commit, false)
+        .expect("create branch");
+    checkout_branch(&repo, branch_name);
     std::fs::write(path.join("branch.txt"), branch_name.as_bytes()).expect("write branch.txt");
-    let add = Command::new("git")
-        .current_dir(path)
-        .args(["add", "branch.txt"])
-        .status()
-        .expect("git add branch.txt");
-    assert!(add.success(), "git add branch.txt failed");
-    let commit = Command::new("git")
-        .current_dir(path)
-        .args([
-            "-c",
-            "user.email=test@example.com",
-            "-c",
-            "user.name=test",
-            "commit",
-            "-q",
-            "-m",
-            branch_name,
-        ])
-        .status()
-        .expect("git commit branch");
-    assert!(commit.success(), "git commit branch failed");
-    let back = Command::new("git")
-        .current_dir(path)
-        .args(["checkout", "-q", &default_branch])
-        .status()
-        .expect("git checkout default branch");
-    assert!(back.success(), "git checkout default branch failed");
+    stage_path(&repo, Path::new("branch.txt"));
+    commit_head(&repo, branch_name);
+    checkout_branch(&repo, &default_branch);
+}
+
+pub fn git_head_sha(repo_path: &Path, reference: &str) -> String {
+    let repo = Repository::open(repo_path).expect("open repo");
+    repo.revparse_single(reference)
+        .expect("resolve reference")
+        .id()
+        .to_string()
+}
+
+pub fn git_branches_matching(repo_path: &Path, prefix: &str) -> Vec<String> {
+    let repo = Repository::open(repo_path).expect("open repo");
+    repo.branches(Some(BranchType::Local))
+        .expect("list branches")
+        .filter_map(|branch| {
+            let (branch, _) = branch.ok()?;
+            let name = branch.name().ok().flatten()?.to_string();
+            name.starts_with(prefix).then_some(name)
+        })
+        .collect()
+}
+
+fn stage_path(repo: &Repository, path: &Path) {
+    let mut index = repo.index().expect("open index");
+    index
+        .add_all([path], IndexAddOption::DEFAULT, None)
+        .expect("stage path");
+    index.write().expect("write index");
+}
+
+fn commit_head(repo: &Repository, message: &str) {
+    let mut index = repo.index().expect("open index");
+    let tree_id = index.write_tree().expect("write tree");
+    let tree = repo.find_tree(tree_id).expect("find tree");
+    let signature = Signature::now("test", "test@example.com").expect("signature");
+    let parents = repo
+        .head()
+        .ok()
+        .and_then(|head| head.peel_to_commit().ok())
+        .into_iter()
+        .collect::<Vec<_>>();
+    let parent_refs = parents.iter().collect::<Vec<_>>();
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        message,
+        &tree,
+        &parent_refs,
+    )
+    .expect("create commit");
+}
+
+fn current_branch_name(repo: &Repository) -> String {
+    repo.head()
+        .expect("repo head")
+        .shorthand()
+        .expect("branch shorthand")
+        .to_owned()
+}
+
+fn checkout_branch(repo: &Repository, branch_name: &str) {
+    repo.set_head(&format!("refs/heads/{branch_name}"))
+        .expect("set head");
+    repo.checkout_head(Some(CheckoutBuilder::new().force()))
+        .expect("checkout head");
 }
 
 /// Run a closure inside an isolated Harness filesystem scope.

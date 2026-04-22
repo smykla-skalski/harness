@@ -6,7 +6,7 @@ use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
 use harness::workspace::utc_now;
-use harness_testkit::with_isolated_harness_env;
+use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
 /// Seed two projects with sessions, agents, tasks, and a daemon manifest.
 fn seed_workspace(tmp: &std::path::Path) {
@@ -29,16 +29,8 @@ fn seed_workspace(tmp: &std::path::Path) {
 
     let project_a = tmp.join("project-a");
     let project_b = tmp.join("project-b");
-    fs_err::create_dir_all(&project_a).expect("create project a");
-    fs_err::create_dir_all(&project_b).expect("create project b");
-
     for project in [&project_a, &project_b] {
-        std::process::Command::new("git")
-            .arg("-C")
-            .arg(project)
-            .args(["init"])
-            .status()
-            .expect("git init");
+        init_git_repo_with_seed(project);
     }
 
     let state_a = session_service::start_session(

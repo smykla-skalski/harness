@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::git::GitRepository;
 
 /// Build information resolved from the repo.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,36 +41,21 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         return Ok(BuildInfo { version });
     }
 
-    let dirty_output = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=no"])
-        .current_dir(repo)
-        .output()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::command_failed(format!("git status: {error}")))
-        })?;
-
-    if !String::from_utf8_lossy(&dirty_output.stdout)
-        .trim()
-        .is_empty()
+    let repository = GitRepository::discover(repo)
+        .map_err(|error| CliError::from(CliErrorKind::command_failed(error.to_string())))?;
+    if repository
+        .is_dirty()
+        .map_err(|error| CliError::from(CliErrorKind::command_failed(error.to_string())))?
     {
         return Ok(BuildInfo {
             version: "0.0.0-preview.vlocal-build".into(),
         });
     }
 
-    let sha_output = Command::new("git")
-        .args(["rev-parse", "--short=10", "HEAD"])
-        .current_dir(repo)
-        .output()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::command_failed(format!(
-                "git rev-parse: {error}"
-            )))
-        })?;
-
-    let short_sha = String::from_utf8_lossy(&sha_output.stdout)
-        .trim()
-        .to_string();
+    let short_sha = repository
+        .short_head_sha(10)
+        .map_err(|error| CliError::from(CliErrorKind::command_failed(error.to_string())))?
+        .ok_or_else(|| CliError::from(CliErrorKind::command_failed("repository has no HEAD")))?;
 
     Ok(BuildInfo {
         version: format!("0.0.0-preview.v{short_sha}"),

@@ -1,8 +1,7 @@
 use std::path::Path;
-use std::process::Command;
 
 use fs_err as fs;
-use harness_testkit::with_isolated_harness_env;
+use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 use tempfile::tempdir;
 
 use super::contexts::{infer_checkout_identity, infer_ledger_cwd, repair_context_root};
@@ -22,14 +21,7 @@ fn write_text(path: &Path, contents: &str) {
 }
 
 fn init_git_repo(path: &Path) {
-    fs::create_dir_all(path).expect("create repo dir");
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(path)
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init should succeed");
+    init_git_repo_with_seed(path);
 }
 
 fn write_codex_transcript(context_root: &Path, runtime_session_id: &str) {

@@ -26,6 +26,22 @@ use registrations::{build_codex_config, process_agent_registrations};
 pub const WRAPPER: &str = r#"#!/bin/sh
 set -eu
 
+resolve_from_cwd() {
+  dir="$(pwd)"
+  while :; do
+    candidate="${dir}/.claude/plugins/suite/harness"
+    if [ -x "${candidate}" ]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+    parent="$(dirname "${dir}")"
+    if [ "${parent}" = "${dir}" ]; then
+      return 1
+    fi
+    dir="${parent}"
+  done
+}
+
 if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
   candidate="${CLAUDE_PROJECT_DIR}/.claude/plugins/suite/harness"
   if [ -x "${candidate}" ]; then
@@ -33,13 +49,8 @@ if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
   fi
 fi
 
-if command -v git >/dev/null 2>&1; then
-  if repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
-    candidate="${repo_root}/.claude/plugins/suite/harness"
-    if [ -x "${candidate}" ]; then
-      exec "${candidate}" "$@"
-    fi
-  fi
+if candidate="$(resolve_from_cwd)"; then
+  exec "${candidate}" "$@"
 fi
 
 echo "harness: unable to resolve .claude/plugins/suite/harness" >&2

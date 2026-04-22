@@ -1,6 +1,6 @@
 [package]
 name = "harness-testkit"
-version = "28.7.0"
+version = "28.6.7"
 edition = "2024"
 rust-version = "1.94"
 
@@ -12,6 +12,7 @@ serde_json = "1.0.149"
 serde_yml = "0.0.12"
 tempfile = "3.27.0"
 temp-env = "0.3.6"
+git2 = { version = "0.20.4", default-features = false }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

@@ -5,7 +5,7 @@ use crate::workspace::layout::{SessionLayout, sessions_root as workspace_session
 use crate::workspace::worktree::WorktreeController;
 
 /// Destroy the on-disk artifacts for a session: deregister the active-session
-/// marker and tear down its git worktree. Failures are logged and swallowed so
+/// marker and tear down its linked checkout. Failures are logged and swallowed so
 /// the caller's DB cleanup can always proceed.
 ///
 /// For externally-rooted sessions (`external_origin` is `Some`), the worktree

@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>28.7.0</string>
+	<string>28.6.7</string>
 	<key>CFBundleVersion</key>
-	<string>28.7.0</string>
+	<string>28.6.7</string>
 	<key>LSBackgroundOnly</key>
 	<true/>
 </dict>

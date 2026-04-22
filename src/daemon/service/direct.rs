@@ -7,7 +7,7 @@ use super::{
 use crate::errors::CliErrorKind;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
-/// Creates a per-session git worktree and records the state file under the
+/// Creates a per-session linked checkout and records the state file under the
 /// session root.
 ///
 /// # Errors
