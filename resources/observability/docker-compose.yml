@@ -95,7 +95,7 @@ services:
     ports:
       - "127.0.0.1:9560:9560"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9560/metrics"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9560/metrics')"]
       interval: 30s
       timeout: 10s
       retries: 3
