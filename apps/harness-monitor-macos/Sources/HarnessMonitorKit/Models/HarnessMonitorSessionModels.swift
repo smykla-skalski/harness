@@ -75,6 +75,7 @@ public struct ProjectSummary: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum SessionStatus: String, Codable, CaseIterable, Sendable {
+  case awaitingLeader = "awaiting_leader"
   case active
   case paused
   case leaderlessDegraded = "leaderless_degraded"
@@ -82,6 +83,8 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
+    case .awaitingLeader:
+      "Awaiting Leader"
     case .active:
       "Active"
     case .paused:

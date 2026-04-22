@@ -254,14 +254,14 @@ struct HarnessMonitorStoreTests {
     #expect(store.sessionDataAvailability == .live)
   }
 
-  @Test("Leaderless summaries do not render as plain active")
-  func leaderlessSummariesDoNotRenderAsPlainActive() {
+  @Test("Awaiting leader summaries use pre-leader presentation")
+  func awaitingLeaderSummariesUsePreLeaderPresentation() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let summary = makeSession(
       .init(
         sessionId: "sess-leaderless",
         context: "Leaderless review lane",
-        status: .active,
+        status: .awaitingLeader,
         leaderId: nil,
         observeId: nil,
         openTaskCount: 1,
@@ -273,8 +273,8 @@ struct HarnessMonitorStoreTests {
 
     let presentation = store.sessionSummaryPresentation(for: summary)
 
-    #expect(presentation.statusText == "Leaderless")
-    #expect(presentation.statusTone == .caution)
+    #expect(presentation.statusText == "Awaiting Leader")
+    #expect(presentation.statusTone == .info)
     #expect(presentation.agentStat.symbolName == "person.2")
     #expect(presentation.agentStat.valueText == "2")
     #expect(presentation.agentStat.helpText == "2 known")

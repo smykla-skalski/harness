@@ -235,7 +235,7 @@ struct InspectorRoleMutationConsole: View {
       agent: selectedAgent,
       leaderID: leaderID,
       role: $role,
-      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
+      areSessionActionsAvailable: store.areSelectedLeaderActionsAvailable,
       changeSelectedRole: submitChangeSelectedRole
     )
     .task(id: stateKey) {
@@ -299,7 +299,7 @@ struct InspectorLeaderTransferConsole: View {
       transferReason: $transferReason,
       transferLeaderButtonTitle: transferLeaderButtonTitle,
       actionActorID: actionActorID,
-      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
+      areSessionActionsAvailable: store.areSelectedLeaderActionsAvailable,
       submitTransferLeader: submitTransferLeader
     )
     .task(id: stateKey) {

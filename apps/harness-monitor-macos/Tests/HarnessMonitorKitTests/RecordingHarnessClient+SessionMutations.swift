@@ -33,7 +33,6 @@ extension RecordingHarnessClient {
     calls.append(
       .startSession(
         projectDir: request.projectDir,
-        runtime: request.runtime,
         baseRef: request.baseRef
       )
     )
