@@ -127,6 +127,24 @@ chmod 755 "$daemon_dir/harness"
             completed.stderr,
         )
 
+    def test_fails_when_daemon_user_selected_entitlement_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            entitlements_path = Path(tmp_dir) / "HarnessMonitorDaemon.entitlements"
+            write_entitlements(
+                entitlements_path,
+                {
+                    "com.apple.security.files.bookmarks.app-scope": True,
+                },
+            )
+
+            completed, _ = self.run_script(daemon_entitlements=entitlements_path)
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn(
+            "daemon missing user-selected.read-write",
+            completed.stderr,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
