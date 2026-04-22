@@ -26,14 +26,14 @@ extension AgentTuiWindowView {
   var createPaneDescription: String {
     switch viewModel.createMode {
     case .terminal:
-      if viewModel.displayState.hasAgentTuis {
+      if displayState.hasAgentTuis {
         "Open terminal-backed agents stay pinned in the sidebar so you can launch "
           + "another agent without losing the active viewport."
       } else {
         "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
       }
     case .codex:
-      if viewModel.displayState.hasCodexRuns {
+      if displayState.hasCodexRuns {
         "Codex threads stay pinned in the sidebar so you can continue active work without losing context."
       } else {
         "Start a Codex thread to investigate, patch, or route approvals from the same Agents window."
@@ -42,10 +42,10 @@ extension AgentTuiWindowView {
   }
 
   @ViewBuilder var createPaneBanners: some View {
-    if viewModel.createMode == .terminal && viewModel.displayState.agentTuiUnavailable {
+    if viewModel.createMode == .terminal && displayState.agentTuiUnavailable {
       Section { agentTuiUnavailableBanner }
     }
-    if viewModel.createMode == .codex && viewModel.displayState.codexUnavailable {
+    if viewModel.createMode == .codex && displayState.codexUnavailable {
       Section { codexUnavailableBanner }
     }
   }

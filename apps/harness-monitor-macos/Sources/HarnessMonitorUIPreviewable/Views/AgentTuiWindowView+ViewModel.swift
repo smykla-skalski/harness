@@ -199,7 +199,6 @@ extension AgentTuiWindowView {
   @MainActor
   @Observable
   final class ViewModel {
-    var displayState = AgentTuiDisplayState()
     var runtime: AgentTuiRuntime = .copilot
     var selectedRole: SessionRole = .worker
     var name = ""
@@ -239,10 +238,8 @@ extension AgentTuiWindowView {
     var expectedSize: AgentTuiSize?
 
     init(
-      displayState: AgentTuiDisplayState = AgentTuiDisplayState(),
       selection: AgentTuiSheetSelection = .create
     ) {
-      self.displayState = displayState
       self.selection = selection
     }
   }
