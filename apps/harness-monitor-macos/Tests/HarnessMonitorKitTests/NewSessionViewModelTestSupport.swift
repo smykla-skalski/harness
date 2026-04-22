@@ -190,7 +190,7 @@ final class SpyHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable 
     request _: LeaderTransferRequest
   ) async throws -> SessionDetail { throw error }
 
-  func startSession(request _: SessionStartRequest) async throws -> SessionSummary {
+  func startSession(request _: SessionStartRequest) async throws -> SessionStartResult {
     throw error
   }
 

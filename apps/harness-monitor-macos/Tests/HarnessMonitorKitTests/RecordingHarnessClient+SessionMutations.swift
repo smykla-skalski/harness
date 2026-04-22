@@ -28,7 +28,7 @@ extension RecordingHarnessClient {
     return adoptedSummary
   }
 
-  func startSession(request: SessionStartRequest) async throws -> SessionSummary {
+  func startSession(request: SessionStartRequest) async throws -> SessionStartResult {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .startSession(
@@ -37,30 +37,7 @@ extension RecordingHarnessClient {
         baseRef: request.baseRef
       )
     )
-    return SessionSummary(
-      projectId: detail.session.projectId,
-      projectName: detail.session.projectName,
-      projectDir: request.projectDir,
-      contextRoot: detail.session.contextRoot,
-      sessionId: request.sessionId ?? "sess-recording-new",
-      title: request.title,
-      context: request.context,
-      status: .active,
-      createdAt: "2026-04-20T12:00:00Z",
-      updatedAt: "2026-04-20T12:00:00Z",
-      lastActivityAt: nil,
-      leaderId: nil,
-      observeId: nil,
-      pendingLeaderTransfer: nil,
-      metrics: SessionMetrics(
-        agentCount: 0,
-        activeAgentCount: 0,
-        openTaskCount: 0,
-        inProgressTaskCount: 0,
-        blockedTaskCount: 0,
-        completedTaskCount: 0
-      )
-    )
+    return SessionStartResult(sessionId: request.sessionId ?? "sess-recording-new")
   }
 
   func changeRole(

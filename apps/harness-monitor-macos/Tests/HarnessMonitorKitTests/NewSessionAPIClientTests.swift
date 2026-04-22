@@ -5,8 +5,8 @@ import Testing
 
 @Suite("New session API client")
 struct NewSessionAPIClientTests {
-  @Test("startSession posts to /v1/sessions and decodes the state wrapper")
-  func startSessionPostsAndDecodesStateWrapper() async throws {
+  @Test("startSession posts to /v1/sessions and decodes daemon mutation state")
+  func startSessionPostsAndDecodesMutationState() async throws {
     StartSessionURLProtocol.reset()
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [StartSessionURLProtocol.self]
@@ -29,9 +29,9 @@ struct NewSessionAPIClientTests {
       baseRef: "main"
     )
 
-    let summary = try await client.startSession(request: request)
+    let result = try await client.startSession(request: request)
 
-    #expect(summary.sessionId == "sess-new-1")
+    #expect(result.sessionId == "sess-new-1")
     #expect(StartSessionURLProtocol.lastRequestPath == "/v1/sessions")
     #expect(StartSessionURLProtocol.lastRequestMethod == "POST")
   }
@@ -92,27 +92,27 @@ private final class StartSessionURLProtocol: URLProtocol, @unchecked Sendable {
       """
       {
         "state": {
-          "project_id": "project-6ccf8d0a",
-          "project_name": "harness",
-          "project_dir": "/Users/example/Projects/harness",
-          "context_root": "/Users/example/Library/Application Support/harness/sessions/harness",
+          "schema_version": 9,
+          "state_version": 0,
           "session_id": "sess-new-1",
-          "worktree_path": "",
-          "shared_path": "",
-          "origin_path": "",
+          "project_name": "harness",
+          "worktree_path": "/tmp/harness/workspace",
+          "shared_path": "/tmp/harness/memory",
+          "origin_path": "/Users/example/Projects/harness",
           "branch_ref": "main",
           "title": "test session",
           "context": "unit test context",
           "status": "active",
           "created_at": "2026-04-20T12:00:00Z",
           "updated_at": "2026-04-20T12:00:00Z",
-          "last_activity_at": null,
+          "agents": {},
+          "tasks": {},
           "leader_id": null,
           "observe_id": null,
-          "pending_leader_transfer": null,
           "metrics": {
             "agent_count": 0,
             "active_agent_count": 0,
+            "idle_agent_count": 0,
             "open_task_count": 0,
             "in_progress_task_count": 0,
             "blocked_task_count": 0,
