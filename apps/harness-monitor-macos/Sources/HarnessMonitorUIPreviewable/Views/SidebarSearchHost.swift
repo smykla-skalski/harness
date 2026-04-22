@@ -37,6 +37,7 @@ struct SidebarSearchHost: View {
   let setCheckoutCollapsed: (String, Bool) -> Void
 
   @State private var searchPresentationState = SidebarSearchPresentationState()
+  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
 
   private var profilingAttributes: [String: String] {
     [
@@ -108,8 +109,17 @@ struct SidebarSearchHost: View {
         placement: .sidebar,
         prompt: Text("Search sessions, projects, leaders")
       )
-      .focusedSceneValue(\.harnessSidebarSearchFocusAction) {
-        requestSearchPresentation()
+      .focusedSceneValue(
+        \.harnessSidebarSearchFocusAction,
+        HarnessSidebarSearchFocus(
+          isAvailable: canPresentSearch,
+          dispatcher: searchFocusDispatcher
+        )
+      )
+      .task {
+        searchFocusDispatcher.handler = {
+          _ = searchPresentationState.requestPresentation(canPresent: true)
+        }
       }
       .onChange(of: canPresentSearch, initial: true) { _, canPresent in
         applyPendingSearchPresentationIfNeeded(canPresent: canPresent)
@@ -118,10 +128,6 @@ struct SidebarSearchHost: View {
         submitSearch()
       }
     }
-  }
-
-  private func requestSearchPresentation() {
-    _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
   }
 
   private func applyPendingSearchPresentationIfNeeded(canPresent: Bool) {
