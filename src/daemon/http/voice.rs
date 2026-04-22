@@ -8,7 +8,7 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest,
+    VoiceTranscriptUpdateRequest, http_paths,
 };
 use crate::daemon::voice::{append_audio_chunk, append_transcript, finish_session, start_session};
 
@@ -18,22 +18,13 @@ use super::response::{extract_request_id, timed_json};
 
 pub(super) fn voice_routes() -> Router<DaemonHttpState> {
     Router::new()
+        .route(http_paths::SESSION_VOICE_START, post(post_voice_session))
+        .route(http_paths::VOICE_AUDIO_APPEND, post(post_voice_audio_chunk))
         .route(
-            "/v1/sessions/{session_id}/voice-sessions",
-            post(post_voice_session),
-        )
-        .route(
-            "/v1/voice-sessions/{voice_session_id}/audio",
-            post(post_voice_audio_chunk),
-        )
-        .route(
-            "/v1/voice-sessions/{voice_session_id}/transcript",
+            http_paths::VOICE_TRANSCRIPT_APPEND,
             post(post_voice_transcript),
         )
-        .route(
-            "/v1/voice-sessions/{voice_session_id}/finish",
-            post(post_voice_finish),
-        )
+        .route(http_paths::VOICE_FINISH, post(post_voice_finish))
 }
 
 async fn post_voice_session(
@@ -49,7 +40,7 @@ async fn post_voice_session(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/voice-sessions",
+        http_paths::SESSION_VOICE_START,
         &request_id,
         start,
         start_session(&session_id, &request),
@@ -69,7 +60,7 @@ async fn post_voice_audio_chunk(
     }
     timed_json(
         "POST",
-        "/v1/voice-sessions/{id}/audio",
+        http_paths::VOICE_AUDIO_APPEND,
         &request_id,
         start,
         append_audio_chunk(&voice_session_id, &request).await,
@@ -89,7 +80,7 @@ async fn post_voice_transcript(
     }
     timed_json(
         "POST",
-        "/v1/voice-sessions/{id}/transcript",
+        http_paths::VOICE_TRANSCRIPT_APPEND,
         &request_id,
         start,
         append_transcript(&voice_session_id, &request),
@@ -109,7 +100,7 @@ async fn post_voice_finish(
     }
     timed_json(
         "POST",
-        "/v1/voice-sessions/{id}/finish",
+        http_paths::VOICE_FINISH,
         &request_id,
         start,
         finish_session(&voice_session_id, &request),

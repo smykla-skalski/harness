@@ -8,7 +8,7 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -19,25 +19,16 @@ use super::response::{extract_request_id, timed_json};
 
 pub(super) fn task_routes() -> Router<DaemonHttpState> {
     Router::new()
-        .route("/v1/sessions/{session_id}/task", post(post_task_create))
+        .route(http_paths::SESSION_TASK_CREATE, post(post_task_create))
+        .route(http_paths::SESSION_TASK_ASSIGN, post(post_task_assign))
+        .route(http_paths::SESSION_TASK_DROP, post(post_task_drop))
         .route(
-            "/v1/sessions/{session_id}/tasks/{task_id}/assign",
-            post(post_task_assign),
-        )
-        .route(
-            "/v1/sessions/{session_id}/tasks/{task_id}/drop",
-            post(post_task_drop),
-        )
-        .route(
-            "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy",
+            http_paths::SESSION_TASK_QUEUE_POLICY,
             post(post_task_queue_policy),
         )
+        .route(http_paths::SESSION_TASK_UPDATE, post(post_task_update))
         .route(
-            "/v1/sessions/{session_id}/tasks/{task_id}/status",
-            post(post_task_update),
-        )
-        .route(
-            "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint",
+            http_paths::SESSION_TASK_CHECKPOINT,
             post(post_task_checkpoint),
         )
 }
@@ -57,7 +48,13 @@ pub(super) async fn post_task_create(
     if result.is_ok() {
         broadcast_task_snapshot(&state, &session_id).await;
     }
-    timed_json("POST", "/v1/sessions/{id}/task", &request_id, start, result)
+    timed_json(
+        "POST",
+        http_paths::SESSION_TASK_CREATE,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 pub(super) async fn post_task_assign(
@@ -77,7 +74,7 @@ pub(super) async fn post_task_assign(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/tasks/{id}/assign",
+        http_paths::SESSION_TASK_ASSIGN,
         &request_id,
         start,
         result,
@@ -101,7 +98,7 @@ pub(super) async fn post_task_drop(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/tasks/{id}/drop",
+        http_paths::SESSION_TASK_DROP,
         &request_id,
         start,
         result,
@@ -125,7 +122,7 @@ pub(super) async fn post_task_queue_policy(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/tasks/{id}/queue-policy",
+        http_paths::SESSION_TASK_QUEUE_POLICY,
         &request_id,
         start,
         result,
@@ -149,7 +146,7 @@ pub(super) async fn post_task_update(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/tasks/{id}/status",
+        http_paths::SESSION_TASK_UPDATE,
         &request_id,
         start,
         result,
@@ -173,7 +170,7 @@ pub(super) async fn post_task_checkpoint(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/tasks/{id}/checkpoint",
+        http_paths::SESSION_TASK_CHECKPOINT,
         &request_id,
         start,
         result,

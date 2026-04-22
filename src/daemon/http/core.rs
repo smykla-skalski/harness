@@ -11,7 +11,7 @@ use axum::extract::Query;
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{
     HostBridgeReconfigureRequest, ReadinessResponse, RuntimeSessionResolutionResponse,
-    SetLogLevelRequest,
+    SetLogLevelRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::daemon::websocket::ws_upgrade_handler;
@@ -23,22 +23,25 @@ use super::{DaemonHttpState, require_async_db};
 
 pub(super) fn core_routes() -> Router<DaemonHttpState> {
     Router::new()
-        .route("/v1/health", get(get_health))
-        .route("/v1/ready", get(get_ready))
-        .route("/v1/diagnostics", get(get_diagnostics))
-        .route("/v1/daemon/stop", post(post_stop_daemon))
-        .route("/v1/bridge/reconfigure", post(post_bridge_reconfigure))
+        .route(http_paths::HEALTH, get(get_health))
+        .route(http_paths::READY, get(get_ready))
+        .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
+        .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
         .route(
-            "/v1/daemon/log-level",
+            http_paths::BRIDGE_RECONFIGURE,
+            post(post_bridge_reconfigure),
+        )
+        .route(
+            http_paths::DAEMON_LOG_LEVEL,
             get(get_log_level).put(put_log_level),
         )
-        .route("/v1/projects", get(get_projects))
+        .route(http_paths::PROJECTS, get(get_projects))
         .route(
-            "/v1/runtime-sessions/resolve",
+            http_paths::RUNTIME_SESSION_RESOLVE,
             get(get_runtime_session_resolution),
         )
-        .route("/v1/ws", get(ws_upgrade_handler))
-        .route("/v1/stream", get(stream_global))
+        .route(http_paths::WS, get(ws_upgrade_handler))
+        .route(http_paths::STREAM, get(stream_global))
 }
 
 /// Query parameters for `GET /v1/runtime-sessions/resolve`.
@@ -61,7 +64,7 @@ pub(super) async fn get_health(
         Ok(async_db) => service::health_response_async(&state.manifest, Some(async_db)).await,
         Err(error) => Err(error),
     };
-    timed_json("GET", "/v1/health", &request_id, start, result)
+    timed_json("GET", http_paths::HEALTH, &request_id, start, result)
 }
 
 pub(super) async fn get_ready(
@@ -77,7 +80,7 @@ pub(super) async fn get_ready(
         ready: true,
         daemon_epoch: state.daemon_epoch.clone(),
     });
-    timed_json("GET", "/v1/ready", &request_id, start, result)
+    timed_json("GET", http_paths::READY, &request_id, start, result)
 }
 
 pub(super) async fn get_runtime_session_resolution(
@@ -102,7 +105,7 @@ pub(super) async fn get_runtime_session_resolution(
     };
     timed_json(
         "GET",
-        "/v1/runtime-sessions/resolve",
+        http_paths::RUNTIME_SESSION_RESOLVE,
         &request_id,
         start,
         result,
@@ -122,7 +125,7 @@ pub(super) async fn get_diagnostics(
         Ok(async_db) => service::diagnostics_report_async(Some(async_db)).await,
         Err(error) => Err(error),
     };
-    timed_json("GET", "/v1/diagnostics", &request_id, start, result)
+    timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
 }
 
 async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
@@ -133,7 +136,7 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
     }
     timed_json(
         "POST",
-        "/v1/daemon/stop",
+        http_paths::DAEMON_STOP,
         &request_id,
         start,
         service::request_shutdown(),
@@ -152,7 +155,7 @@ async fn post_bridge_reconfigure(
     }
     timed_json(
         "POST",
-        "/v1/bridge/reconfigure",
+        http_paths::BRIDGE_RECONFIGURE,
         &request_id,
         start,
         reconfigure_bridge(&request.enable, &request.disable, request.force),
@@ -167,7 +170,7 @@ async fn get_log_level(headers: HeaderMap, State(state): State<DaemonHttpState>)
     }
     timed_json(
         "GET",
-        "/v1/daemon/log-level",
+        http_paths::DAEMON_LOG_LEVEL,
         &request_id,
         start,
         service::get_log_level(),
@@ -186,7 +189,7 @@ async fn put_log_level(
     }
     timed_json(
         "PUT",
-        "/v1/daemon/log-level",
+        http_paths::DAEMON_LOG_LEVEL,
         &request_id,
         start,
         service::set_log_level(&request, &state.sender),
@@ -206,5 +209,5 @@ pub(super) async fn get_projects(
         Ok(async_db) => service::list_projects_async(Some(async_db)).await,
         Err(error) => Err(error),
     };
-    timed_json("GET", "/v1/projects", &request_id, start, result)
+    timed_json("GET", http_paths::PROJECTS, &request_id, start, result)
 }

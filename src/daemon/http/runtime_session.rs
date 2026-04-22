@@ -6,7 +6,7 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::protocol::{
-    AgentRuntimeSessionRegistrationRequest, AgentRuntimeSessionRegistrationResponse,
+    AgentRuntimeSessionRegistrationRequest, AgentRuntimeSessionRegistrationResponse, http_paths,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -49,7 +49,7 @@ pub(super) async fn post_runtime_session(
     }
     timed_json(
         "POST",
-        "/v1/sessions/{id}/runtime-session",
+        http_paths::SESSION_RUNTIME_SESSION,
         &request_id,
         start,
         result,

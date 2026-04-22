@@ -6,7 +6,7 @@ extension WebSocketTransport {
     request: TaskCreateRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "task.create", params: params)
+    let value = try await rpc(method: .taskCreate, params: params)
     return try decode(value)
   }
 
@@ -19,7 +19,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
-    let value = try await send(method: "task.assign", params: params)
+    let value = try await rpc(method: .taskAssign, params: params)
     return try decode(value)
   }
 
@@ -32,7 +32,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
-    let value = try await send(method: "task.drop", params: params)
+    let value = try await rpc(method: .taskDrop, params: params)
     return try decode(value)
   }
 
@@ -45,7 +45,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
-    let value = try await send(method: "task.queue_policy", params: params)
+    let value = try await rpc(method: .taskQueuePolicy, params: params)
     return try decode(value)
   }
 
@@ -58,7 +58,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
-    let value = try await send(method: "task.update", params: params)
+    let value = try await rpc(method: .taskUpdate, params: params)
     return try decode(value)
   }
 
@@ -71,7 +71,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
-    let value = try await send(method: "task.checkpoint", params: params)
+    let value = try await rpc(method: .taskCheckpoint, params: params)
     return try decode(value)
   }
 
@@ -84,7 +84,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "agent_id": .string(agentID)]
     )
-    let value = try await send(method: "agent.change_role", params: params)
+    let value = try await rpc(method: .agentChangeRole, params: params)
     return try decode(value)
   }
 
@@ -97,7 +97,7 @@ extension WebSocketTransport {
       request,
       extra: ["session_id": .string(sessionID), "agent_id": .string(agentID)]
     )
-    let value = try await send(method: "agent.remove", params: params)
+    let value = try await rpc(method: .agentRemove, params: params)
     return try decode(value)
   }
 
@@ -106,15 +106,31 @@ extension WebSocketTransport {
     request: LeaderTransferRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "leader.transfer", params: params)
+    let value = try await rpc(method: .leaderTransfer, params: params)
     return try decode(value)
   }
 
   public func startSession(request: SessionStartRequest) async throws -> SessionStartResult {
     let params = try encodeParams(request, extra: [:])
-    let value = try await send(method: "session.start", params: params)
+    let value = try await rpc(method: .sessionStart, params: params)
     let response: SessionStartMutationResponse = try decode(value)
     return response.result
+  }
+
+  public func adoptSession(
+    bookmarkID: String?,
+    sessionRoot: URL
+  ) async throws -> SessionSummary {
+    struct Response: Decodable { let state: SessionSummary }
+
+    let request = AdoptSessionRequest(
+      bookmarkID: bookmarkID,
+      sessionRoot: sessionRoot.path
+    )
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .sessionAdopt, params: params)
+    let response: Response = try decode(value)
+    return response.state
   }
 
   public func endSession(
@@ -122,7 +138,7 @@ extension WebSocketTransport {
     request: SessionEndRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "session.end", params: params)
+    let value = try await rpc(method: .sessionEnd, params: params)
     return try decode(value)
   }
 
@@ -131,7 +147,7 @@ extension WebSocketTransport {
     request: SignalSendRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "signal.send", params: params)
+    let value = try await rpc(method: .signalSend, params: params)
     return try decode(value)
   }
 
@@ -140,7 +156,7 @@ extension WebSocketTransport {
     request: SignalCancelRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "signal.cancel", params: params)
+    let value = try await rpc(method: .signalCancel, params: params)
     return try decode(value)
   }
 
@@ -149,7 +165,7 @@ extension WebSocketTransport {
     request: ObserveSessionRequest
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
-    let value = try await send(method: "session.observe", params: params)
+    let value = try await rpc(method: .sessionObserve, params: params)
     return try decode(value)
   }
 
@@ -167,16 +183,16 @@ extension WebSocketTransport {
   }
 
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
-    let value = try await send(
-      method: "session.managed_agents",
+    let value = try await rpc(
+      method: .sessionManagedAgents,
       params: .object(["session_id": .string(sessionID)])
     )
     return try decode(value)
   }
 
   public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
-    let value = try await send(
-      method: "managed_agent.detail",
+    let value = try await rpc(
+      method: .managedAgentDetail,
       params: .object(["agent_id": .string(agentID)])
     )
     return try decode(value)
@@ -186,43 +202,61 @@ extension WebSocketTransport {
     sessionID: String,
     request: AgentTuiStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.startManagedTerminalAgent(sessionID: sessionID, request: request)
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await rpc(method: .managedAgentStartTerminal, params: params)
+    return try decode(value)
   }
 
   public func startManagedCodexAgent(
     sessionID: String,
     request: CodexRunRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.startManagedCodexAgent(sessionID: sessionID, request: request)
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await rpc(method: .managedAgentStartCodex, params: params)
+    return try decode(value)
   }
 
   public func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.sendManagedAgentInput(agentID: agentID, request: request)
+    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let value = try await rpc(method: .managedAgentInput, params: params)
+    return try decode(value)
   }
 
   public func resizeManagedAgent(
     agentID: String,
     request: AgentTuiResizeRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.resizeManagedAgent(agentID: agentID, request: request)
+    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let value = try await rpc(method: .managedAgentResize, params: params)
+    return try decode(value)
   }
 
   public func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.stopManagedAgent(agentID: agentID)
+    let value = try await rpc(
+      method: .managedAgentStop,
+      params: .object(["agent_id": .string(agentID)])
+    )
+    return try decode(value)
   }
 
   public func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.steerManagedCodexAgent(agentID: agentID, request: request)
+    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let value = try await rpc(method: .managedAgentSteerCodex, params: params)
+    return try decode(value)
   }
 
   public func interruptManagedCodexAgent(agentID: String) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.interruptManagedCodexAgent(agentID: agentID)
+    let value = try await rpc(
+      method: .managedAgentInterruptCodex,
+      params: .object(["agent_id": .string(agentID)])
+    )
+    return try decode(value)
   }
 
   public func resolveManagedCodexApproval(
@@ -230,11 +264,15 @@ extension WebSocketTransport {
     approvalID: String,
     request: CodexApprovalDecisionRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await httpFallbackClient.resolveManagedCodexApproval(
-      agentID: agentID,
-      approvalID: approvalID,
-      request: request
+    let params = try encodeParams(
+      request,
+      extra: [
+        "agent_id": .string(agentID),
+        "approval_id": .string(approvalID),
+      ]
     )
+    let value = try await rpc(method: .managedAgentResolveCodexApproval, params: params)
+    return try decode(value)
   }
 
   public func startAgentTui(
@@ -299,13 +337,49 @@ extension WebSocketTransport {
   }
 
   public func logLevel() async throws -> LogLevelResponse {
-    let value = try await send(method: "daemon.log_level")
+    let value = try await rpc(method: .daemonLogLevel)
     return try decode(value)
   }
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
     let params = JSONValue.object(["level": .string(level)])
-    let value = try await send(method: "daemon.set_log_level", params: params)
+    let value = try await rpc(method: .daemonSetLogLevel, params: params)
+    return try decode(value)
+  }
+
+  public func startVoiceSession(
+    sessionID: String,
+    request: VoiceSessionStartRequest
+  ) async throws -> VoiceSessionStartResponse {
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await rpc(method: .voiceStartSession, params: params)
+    return try decode(value)
+  }
+
+  public func appendVoiceAudioChunk(
+    voiceSessionID: String,
+    request: VoiceAudioChunkRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    let params = try encodeParams(request, extra: ["voice_session_id": .string(voiceSessionID)])
+    let value = try await rpc(method: .voiceAppendAudio, params: params)
+    return try decode(value)
+  }
+
+  public func appendVoiceTranscript(
+    voiceSessionID: String,
+    request: VoiceTranscriptUpdateRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    let params = try encodeParams(request, extra: ["voice_session_id": .string(voiceSessionID)])
+    let value = try await rpc(method: .voiceAppendTranscript, params: params)
+    return try decode(value)
+  }
+
+  public func finishVoiceSession(
+    voiceSessionID: String,
+    request: VoiceSessionFinishRequest
+  ) async throws -> VoiceSessionMutationResponse {
+    let params = try encodeParams(request, extra: ["voice_session_id": .string(voiceSessionID)])
+    let value = try await rpc(method: .voiceFinishSession, params: params)
     return try decode(value)
   }
 }

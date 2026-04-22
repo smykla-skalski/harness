@@ -4,15 +4,15 @@ use std::sync::{Arc, Mutex};
 use serde_json::Value;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::http::{DaemonHttpState, error_status_and_body};
 use crate::daemon::protocol::{
-    SessionDetail, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest, WsRequest,
-    WsResponse, bind_control_plane_actor_value,
+    SessionDetail, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
+    WsErrorPayload, WsRequest, WsResponse, bind_control_plane_actor_value,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
 
-use super::frames::{error_response, ok_response};
+use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_id, extract_string_param};
 
 pub(crate) fn dispatch_query<T: serde::Serialize>(
@@ -35,8 +35,27 @@ pub(crate) fn dispatch_query_result<T: serde::Serialize>(
                 &format!("failed to serialize result: {error}"),
             ),
         },
-        Err(error) => error_response(request_id, error.code(), &error.message()),
+        Err(error) => {
+            error_response_with_payload(request_id, ws_error_payload_from_cli_error(&error))
+        }
     }
+}
+
+pub(crate) fn ws_error_payload_from_cli_error(error: &CliError) -> WsErrorPayload {
+    let (status, body) = error_status_and_body(error);
+    WsErrorPayload {
+        code: error.code().to_string(),
+        message: error.message(),
+        details: error
+            .details()
+            .map_or_else(Vec::new, |detail| vec![detail.to_string()]),
+        status_code: Some(status.as_u16()),
+        data: Some(body),
+    }
+}
+
+pub(crate) fn cli_error_response(request_id: &str, error: &CliError) -> WsResponse {
+    error_response_with_payload(request_id, ws_error_payload_from_cli_error(error))
 }
 
 pub(crate) fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -125,7 +144,7 @@ pub(crate) fn dispatch_mutation(
                 ),
             }
         }
-        Err(error) => error_response(&request.id, &error.code, &error.message),
+        Err(error) => error_response_with_payload(&request.id, error.into_ws_error_payload()),
     }
 }
 
@@ -159,7 +178,7 @@ where
             .await;
             dispatch_query_result(&request.id, Ok(detail))
         }
-        Err(error) => error_response(&request.id, &error.code, &error.message),
+        Err(error) => error_response_with_payload(&request.id, error.into_ws_error_payload()),
     }
 }
 
@@ -199,7 +218,7 @@ pub(crate) fn dispatch_mutation_with_task(
                 ),
             }
         }
-        Err(error) => error_response(&request.id, &error.code, &error.message),
+        Err(error) => error_response_with_payload(&request.id, error.into_ws_error_payload()),
     }
 }
 
@@ -241,7 +260,7 @@ where
             .await;
             dispatch_query_result(&request.id, Ok(detail))
         }
-        Err(error) => error_response(&request.id, &error.code, &error.message),
+        Err(error) => error_response_with_payload(&request.id, error.into_ws_error_payload()),
     }
 }
 
@@ -330,13 +349,18 @@ where
 pub(crate) struct MutationError {
     code: String,
     message: String,
+    status_code: Option<u16>,
+    data: Option<Value>,
 }
 
 impl From<CliError> for MutationError {
     fn from(error: CliError) -> Self {
+        let payload = ws_error_payload_from_cli_error(&error);
         Self {
-            code: error.code().to_string(),
-            message: error.message(),
+            code: payload.code,
+            message: payload.message,
+            status_code: payload.status_code,
+            data: payload.data,
         }
     }
 }
@@ -346,6 +370,20 @@ impl From<serde_json::Error> for MutationError {
         Self {
             code: "INVALID_PARAMS".into(),
             message: format!("failed to parse request params: {error}"),
+            status_code: None,
+            data: None,
+        }
+    }
+}
+
+impl MutationError {
+    fn into_ws_error_payload(self) -> WsErrorPayload {
+        WsErrorPayload {
+            code: self.code,
+            message: self.message,
+            details: vec![],
+            status_code: self.status_code,
+            data: self.data,
         }
     }
 }
@@ -378,6 +416,8 @@ mod tests {
             Err(MutationError {
                 code: "EXPECTED".into(),
                 message: "stop here".into(),
+                status_code: None,
+                data: None,
             })
         });
 
@@ -412,6 +452,8 @@ mod tests {
                 Err(MutationError {
                     code: "EXPECTED".into(),
                     message: "stop here".into(),
+                    status_code: None,
+                    data: None,
                 })
             },
         )
