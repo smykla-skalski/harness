@@ -3,10 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
-    SessionDetail, WsRequest, WsResponse, bind_control_plane_actor_value,
+    SessionDetail, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest, WsRequest,
+    WsResponse, bind_control_plane_actor_value,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -36,6 +37,62 @@ pub(crate) fn dispatch_query_result<T: serde::Serialize>(
         },
         Err(error) => error_response(request_id, error.code(), &error.message()),
     }
+}
+
+pub(crate) fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("invalid set_log_level params: {error}"),
+            );
+        }
+    };
+    dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
+}
+
+pub(crate) async fn dispatch_session_start(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let body: SessionStartRequest = match serde_json::from_value(request.params.clone()) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("failed to parse request params: {error}"),
+            );
+        }
+    };
+
+    let result = if let Some(async_db) = state.async_db.get() {
+        let result = service::start_session_direct_async(&body, async_db.as_ref())
+            .await
+            .map(|session_state| SessionMutationResponse {
+                state: session_state,
+            });
+        if result.is_ok() {
+            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
+        }
+        result
+    } else {
+        ensure_shared_db(&state.db).and_then(|db| {
+            let db_guard = db.lock().expect("db lock");
+            let response = service::start_session_direct(&body, Some(&db_guard))
+                .map(|session_state| SessionMutationResponse {
+                    state: session_state,
+                });
+            if response.is_ok() {
+                service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+            }
+            response
+        })
+    };
+
+    dispatch_query_result(&request.id, result)
 }
 
 pub(crate) fn dispatch_mutation(
