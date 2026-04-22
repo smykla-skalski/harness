@@ -120,6 +120,50 @@ struct CachedModelsTests {
     #expect(restored.status == SessionStatus.leaderlessDegraded)
   }
 
+  @Test("SessionSummary preserves awaiting leader status through CachedSession")
+  func sessionSummaryAwaitingLeaderRoundTrip() throws {
+    let metrics = SessionMetrics(
+      agentCount: 0,
+      activeAgentCount: 0,
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      completedTaskCount: 0
+    )
+
+    let original = SessionSummary(
+      projectId: "proj-awaiting",
+      projectName: "harness",
+      projectDir: "/tmp/harness",
+      contextRoot: "/data/harness",
+      sessionId: "sess-awaiting",
+      title: "awaiting leader session",
+      context: "Persisted pre-leader session",
+      status: .awaitingLeader,
+      createdAt: "2026-04-22T09:33:46Z",
+      updatedAt: "2026-04-22T10:14:49Z",
+      lastActivityAt: nil,
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: metrics
+    )
+
+    let cached = original.toCachedSession()
+    container.mainContext.insert(cached)
+    try container.mainContext.save()
+
+    let descriptor = FetchDescriptor<CachedSession>()
+    let fetched = try container.mainContext.fetch(descriptor)
+    let cachedSession = try #require(
+      fetched.first(where: { $0.sessionId == "sess-awaiting" })
+    )
+
+    let restored = cachedSession.toSessionSummary()
+    #expect(restored == original)
+    #expect(restored.status == .awaitingLeader)
+  }
+
   @Test("SessionSummary with pending transfer round-trips")
   func sessionSummaryWithTransferRoundTrip() throws {
     let transfer = PendingLeaderTransfer(

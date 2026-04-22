@@ -223,18 +223,35 @@ extension HarnessMonitorStore {
     for summary: SessionSummary
   ) -> SessionSummaryPresentation {
     let isEstimated = sessionCatalogIsEstimated
+    let isMalformedActiveLeaderless =
+      summary.status == .active
+      && summary.leaderId == nil
     let isLeaderless =
       summary.status == .leaderlessDegraded
-      || (summary.status == .active && summary.leaderId == nil)
+      || isMalformedActiveLeaderless
+    let usesKnownAgentPhrasing =
+      summary.status == .awaitingLeader
+      || isLeaderless
 
-    let statusText = isLeaderless ? "Leaderless" : summary.status.title
+    let statusText =
+      if summary.status == .awaitingLeader {
+        "Awaiting Leader"
+      } else if isLeaderless {
+        "Leaderless"
+      } else {
+        summary.status.title
+      }
     let statusTone: StatusMessageTone
     if isEstimated {
       statusTone = .secondary
+    } else if summary.status == .awaitingLeader {
+      statusTone = .info
     } else if isLeaderless {
       statusTone = .caution
     } else {
       switch summary.status {
+      case .awaitingLeader:
+        statusTone = .info
       case .active:
         statusTone = .success
       case .leaderlessDegraded:
@@ -248,7 +265,7 @@ extension HarnessMonitorStore {
 
     let usesLiveAgentPhrasing =
       !isEstimated
-      && !isLeaderless
+      && !usesKnownAgentPhrasing
       && summary.status == .active
     let agentStat: SessionSummaryPresentation.SidebarStatPresentation
     if usesLiveAgentPhrasing {

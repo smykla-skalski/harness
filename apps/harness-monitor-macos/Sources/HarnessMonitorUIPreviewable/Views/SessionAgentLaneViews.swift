@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionAgentListSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
+  let sessionStatus: SessionStatus
   let agents: [AgentRegistration]
   let tasks: [WorkItem]
   let isSessionReadOnly: Bool
@@ -16,7 +17,21 @@ struct SessionAgentListSection: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if agents.isEmpty {
-        SessionCockpitEmptyStateRow(section: .agents)
+        if sessionStatus == .awaitingLeader {
+          HStack(spacing: 0) {
+            Text("No agents yet. Join a leader to activate this session.")
+              .scaledFont(SessionCockpitEmptyStateRow.baseFont)
+              .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+          }
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel(Text("No agents yet. Join a leader to activate this session."))
+          .accessibilityIdentifier(
+            SessionCockpitEmptyStateRow.Section.agents.accessibilityIdentifier
+          )
+        } else {
+          SessionCockpitEmptyStateRow(section: .agents)
+        }
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(agents) { agent in
