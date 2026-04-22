@@ -134,6 +134,33 @@ public enum HarnessMonitorSchemaV6: VersionedSchema {
   }
 }
 
+/// V7 adds the supervisor surface: `Decision`, `SupervisorEvent`, `PolicyConfigRow`. The
+/// existing V6 entities are unchanged so the V6→V7 stage is lightweight. No destructive field
+/// changes; three additive rows with independent lifetimes.
+public enum HarnessMonitorSchemaV7: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(7, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -143,11 +170,12 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV4.self,
       HarnessMonitorSchemaV5.self,
       HarnessMonitorSchemaV6.self,
+      HarnessMonitorSchemaV7.self,
     ]
   }
 
   public static var stages: [MigrationStage] {
-    [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6]
+    [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7]
   }
 
   static let migrateV1toV2 = MigrationStage.lightweight(
@@ -185,6 +213,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV5.self,
     toVersion: HarnessMonitorSchemaV6.self
   )
+
+  // V7 is purely additive: three new entities (Decision, SupervisorEvent, PolicyConfigRow)
+  // with no relationship to the V6 set. Lightweight migration is the correct stage because
+  // nothing changes on existing rows and the new tables start empty.
+  static let migrateV6toV7 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV6.self,
+    toVersion: HarnessMonitorSchemaV7.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV6
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV7
