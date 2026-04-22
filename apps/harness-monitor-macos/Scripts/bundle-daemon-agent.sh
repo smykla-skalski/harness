@@ -9,6 +9,16 @@ if [ "${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE:-}" = "1" ]; then
   exit 0
 fi
 
+if [ "${ACTION:-}" = "test" ] \
+  && [ "${HARNESS_MONITOR_FORCE_DAEMON_AGENT_BUNDLE_DURING_TESTS:-0}" != "1" ]; then
+  exit 0
+fi
+
+if [ "${PRODUCT_BUNDLE_IDENTIFIER:-}" = "io.harnessmonitor.app.ui-testing" ] \
+  && [ "${HARNESS_MONITOR_FORCE_DAEMON_AGENT_BUNDLE_FOR_UI_TEST_HOST:-0}" != "1" ]; then
+  exit 0
+fi
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Shared helpers keep path selection testable without executing the bundle flow.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
