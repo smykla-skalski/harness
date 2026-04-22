@@ -3,7 +3,9 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
-DESTINATION="${XCODEBUILD_DESTINATION:-platform=macOS}"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
+source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
+DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
 

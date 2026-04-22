@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import plistlib
 import stat
 import subprocess
@@ -11,6 +12,13 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = APP_ROOT / "Scripts" / "run-quality-gates.sh"
+
+
+def expected_default_destination() -> str:
+    machine = platform.machine()
+    if machine in {"arm64", "x86_64"}:
+        return f"platform=macOS,arch={machine},name=My Mac"
+    return "platform=macOS,name=My Mac"
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -84,6 +92,7 @@ chmod 755 "$daemon_dir/harness"
         completed, runner_args = self.run_script()
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(expected_default_destination(), runner_args)
         self.assertIn("build-for-testing", runner_args)
         self.assertIn("CODE_SIGNING_ALLOWED=NO", runner_args)
 
