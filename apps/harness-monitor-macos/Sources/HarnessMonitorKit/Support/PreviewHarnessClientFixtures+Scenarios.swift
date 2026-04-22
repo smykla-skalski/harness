@@ -140,7 +140,7 @@ extension PreviewHarnessClient.Fixtures {
           "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn001/workspace",
         sharedPath:
           "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn001/memory",
-        originPath: "/Users/example/Projects/harness",
+        originPath: "/Users/example/Projects/harness/.claude/worktrees/session-title",
         branchRef: "harness/tbhrn001",
         title: "Toolbar count fix",
         context: "Primary regression session",
@@ -171,7 +171,7 @@ extension PreviewHarnessClient.Fixtures {
           "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn002/workspace",
         sharedPath:
           "/Users/example/Library/Application Support/harness/sessions/harness/tbhrn002/memory",
-        originPath: "/Users/example/Projects/harness",
+        originPath: "/Users/example/Projects/harness/.claude/worktrees/session-title",
         branchRef: "harness/tbhrn002",
         title: "Cache sweep validation",
         context: "Secondary regression session",
@@ -202,7 +202,7 @@ extension PreviewHarnessClient.Fixtures {
           "/Users/example/Library/Application Support/harness/sessions/kuma/tbkuma01/workspace",
         sharedPath:
           "/Users/example/Library/Application Support/harness/sessions/kuma/tbkuma01/memory",
-        originPath: "/Users/example/Projects/kuma",
+        originPath: "/Users/example/Projects/kuma/.claude/worktrees/fix-motb",
         branchRef: "harness/tbkuma01",
         title: "Kuma validation",
         context: "Cross-project summary row",
