@@ -34,6 +34,13 @@ rtk_supports_cargo_subcommand() {
   esac
 }
 
+cargo_bin_usable() {
+  local candidate="${1:-}"
+  [[ -n "$candidate" ]] || return 1
+  command -v "$candidate" >/dev/null 2>&1 || return 1
+  "$candidate" -V >/dev/null 2>&1
+}
+
 tmpdir_is_usable() {
   local candidate probe
   candidate="${1:-}"
@@ -202,8 +209,16 @@ if [[ "${1:-}" == "--print-env" ]]; then
   exit 0
 fi
 
-if [[ $# -gt 0 ]] && command -v rtk >/dev/null 2>&1 && rtk_supports_cargo_subcommand "$1"; then
+cargo_bin="cargo"
+if ! cargo_bin_usable "$cargo_bin" && [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
+  cargo_bin="${HOME}/.cargo/bin/cargo"
+fi
+
+if [[ "$cargo_bin" == "cargo" ]] \
+  && [[ $# -gt 0 ]] \
+  && command -v rtk >/dev/null 2>&1 \
+  && rtk_supports_cargo_subcommand "$1"; then
   exec rtk cargo "$@"
 fi
 
-exec cargo "$@"
+exec "$cargo_bin" "$@"
