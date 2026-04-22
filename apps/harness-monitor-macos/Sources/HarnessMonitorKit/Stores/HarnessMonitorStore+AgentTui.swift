@@ -47,8 +47,8 @@ extension HarnessMonitorStore {
     rows: Int,
     cols: Int
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client, let sessionID = selectedSessionID else { return false }
+    let actionName = "Agents started"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
     guard rows > 0, cols > 0 else {
       presentFailureFeedback("Terminal size must be greater than zero.")
       return false
@@ -63,12 +63,12 @@ extension HarnessMonitorStore {
       .filter { !$0.isEmpty }
 
     return await mutateAgentTui(
-      using: client,
-      actionName: "Agents started",
+      using: action.client,
+      actionName: actionName,
       selectUpdatedSnapshot: true
     ) {
-      try await client.startAgentTui(
-        sessionID: sessionID,
+      try await action.client.startAgentTui(
+        sessionID: action.sessionID,
         request: AgentTuiStartRequest(
           runtime: runtime.rawValue,
           role: role,
@@ -92,11 +92,11 @@ extension HarnessMonitorStore {
     tuiID: String,
     input: AgentTuiInput
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
+    let actionName = "Agents input sent"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
 
-    return await mutateAgentTui(using: client) {
-      try await client.sendAgentTuiInput(
+    return await mutateAgentTui(using: action.client) {
+      try await action.client.sendAgentTuiInput(
         tuiID: tuiID,
         request: AgentTuiInputRequest(input: input)
       )
@@ -110,13 +110,6 @@ extension HarnessMonitorStore {
     cols: Int,
     feedback: AgentTuiResizeFeedback = .visible
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
-    guard rows > 0, cols > 0 else {
-      presentFailureFeedback("Terminal size must be greater than zero.")
-      return false
-    }
-
     let actionName: String? =
       switch feedback {
       case .visible:
@@ -124,6 +117,16 @@ extension HarnessMonitorStore {
       case .silent:
         nil
       }
+    if let actionName {
+      guard prepareSelectedSessionAction(named: actionName) != nil else { return false }
+    } else {
+      guard areSelectedSessionActionsAvailable else { return false }
+    }
+    guard let client else { return false }
+    guard rows > 0, cols > 0 else {
+      presentFailureFeedback("Terminal size must be greater than zero.")
+      return false
+    }
 
     return await mutateAgentTui(using: client, actionName: actionName) {
       try await client.resizeAgentTui(
@@ -135,11 +138,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func stopAgentTui(tuiID: String) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
+    let actionName = "Agents stopped"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
 
-    return await mutateAgentTui(using: client, actionName: "Agents stopped") {
-      try await client.stopAgentTui(tuiID: tuiID)
+    return await mutateAgentTui(using: action.client, actionName: actionName) {
+      try await action.client.stopAgentTui(tuiID: tuiID)
     }
   }
 

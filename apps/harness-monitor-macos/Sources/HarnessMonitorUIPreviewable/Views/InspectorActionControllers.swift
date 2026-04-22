@@ -15,7 +15,7 @@ struct InspectorCreateTaskConsole: View {
       createTitle: $createTitle,
       createContext: $createContext,
       createSeverity: $createSeverity,
-      isSessionReadOnly: store.isSessionReadOnly,
+      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
       submitCreateTask: submitCreateTask
     )
   }
@@ -102,7 +102,7 @@ struct InspectorTaskMutationConsole: View {
       statusNote: $statusNote,
       checkpointSummary: $checkpointSummary,
       checkpointProgress: $checkpointProgress,
-      isSessionReadOnly: store.isSessionReadOnly,
+      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
       assignSelectedTask: submitAssignSelectedTask,
       updateQueuePolicy: submitUpdateQueuePolicy,
       updateSelectedTask: submitUpdateSelectedTask,
@@ -235,7 +235,7 @@ struct InspectorRoleMutationConsole: View {
       agent: selectedAgent,
       leaderID: leaderID,
       role: $role,
-      isSessionReadOnly: store.isSessionReadOnly,
+      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
       changeSelectedRole: submitChangeSelectedRole
     )
     .task(id: stateKey) {
@@ -299,7 +299,7 @@ struct InspectorLeaderTransferConsole: View {
       transferReason: $transferReason,
       transferLeaderButtonTitle: transferLeaderButtonTitle,
       actionActorID: actionActorID,
-      isSessionReadOnly: store.isSessionReadOnly,
+      areSessionActionsAvailable: store.areSelectedSessionActionsAvailable,
       submitTransferLeader: submitTransferLeader
     )
     .task(id: stateKey) {

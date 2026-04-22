@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct InspectorActionStatusBanner: View {
-  let isSessionReadOnly: Bool
+  let unavailableMessage: String?
   let actionActorOptions: [AgentRegistration]
   @Binding var actionActorID: String
 
@@ -31,11 +31,8 @@ struct InspectorActionStatusBanner: View {
   }
 
   private var statusMessage: String {
-    if isSessionReadOnly {
-      return """
-        The daemon is offline. Persisted session data remains visible, but daemon-backed
-        actions are read-only.
-        """
+    if let unavailableMessage {
+      return unavailableMessage
     }
     return """
       Task creation, reassignments, checkpoints, and leadership changes flow through
@@ -57,7 +54,7 @@ struct InspectorCreateTaskSection: View {
   @Binding var createTitle: String
   @Binding var createContext: String
   @Binding var createSeverity: TaskSeverity
-  let isSessionReadOnly: Bool
+  let areSessionActionsAvailable: Bool
   let submitCreateTask: @MainActor @Sendable () -> Void
   @FocusState private var focusedField: ActionField?
 
@@ -97,12 +94,12 @@ struct InspectorCreateTaskSection: View {
         tint: nil,
         isExternallyDisabled:
           createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-          || isSessionReadOnly,
+          || !areSessionActionsAvailable,
         accessibilityIdentifier: HarnessMonitorAccessibility.createTaskButton,
         action: { submitCreateTask() }
       )
     }
-    .disabled(isSessionReadOnly)
+    .disabled(!areSessionActionsAvailable)
   }
 }
 
@@ -119,7 +116,7 @@ struct InspectorTaskActionsSection: View {
   @Binding var statusNote: String
   @Binding var checkpointSummary: String
   @Binding var checkpointProgress: Double
-  let isSessionReadOnly: Bool
+  let areSessionActionsAvailable: Bool
   let assignSelectedTask: @MainActor @Sendable () -> Void
   let updateQueuePolicy: @MainActor @Sendable () -> Void
   let updateSelectedTask: @MainActor @Sendable () -> Void
@@ -168,7 +165,7 @@ struct InspectorTaskActionsSection: View {
           store: store,
           variant: .prominent,
           tint: nil,
-          isExternallyDisabled: isSessionReadOnly,
+          isExternallyDisabled: !areSessionActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.assignTaskButton,
           action: { assignSelectedTask() }
         )
@@ -178,7 +175,7 @@ struct InspectorTaskActionsSection: View {
           store: store,
           variant: .bordered,
           tint: .secondary,
-          isExternallyDisabled: isSessionReadOnly,
+          isExternallyDisabled: !areSessionActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskQueuePolicyButton,
           action: { updateQueuePolicy() }
         )
@@ -190,7 +187,7 @@ struct InspectorTaskActionsSection: View {
           store: store,
           variant: .bordered,
           tint: .secondary,
-          isExternallyDisabled: isSessionReadOnly,
+          isExternallyDisabled: !areSessionActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskStatusButton,
           action: { updateSelectedTask() }
         )
@@ -227,7 +224,7 @@ struct InspectorTaskActionsSection: View {
           store: store,
           variant: .prominent,
           tint: HarnessMonitorTheme.caution,
-          isExternallyDisabled: isSessionReadOnly,
+          isExternallyDisabled: !areSessionActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.checkpointTaskButton,
           action: { checkpointSelectedTask() }
         )
@@ -239,7 +236,7 @@ struct InspectorTaskActionsSection: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
     }
-    .disabled(isSessionReadOnly)
+    .disabled(!areSessionActionsAvailable)
   }
 }
 
@@ -249,7 +246,7 @@ struct InspectorRoleActionsSection: View {
   let agent: AgentRegistration
   let leaderID: String?
   @Binding var role: SessionRole
-  let isSessionReadOnly: Bool
+  let areSessionActionsAvailable: Bool
   let changeSelectedRole: @MainActor @Sendable () -> Void
 
   var body: some View {
@@ -277,7 +274,7 @@ struct InspectorRoleActionsSection: View {
           store: store,
           variant: .prominent,
           tint: nil,
-          isExternallyDisabled: isSessionReadOnly,
+          isExternallyDisabled: !areSessionActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.changeRoleButton,
           action: { changeSelectedRole() }
         )
@@ -288,13 +285,13 @@ struct InspectorRoleActionsSection: View {
         store: store,
         variant: .bordered,
         tint: .red,
-        isExternallyDisabled: agent.agentId == leaderID || isSessionReadOnly,
+        isExternallyDisabled: agent.agentId == leaderID || !areSessionActionsAvailable,
         accessibilityIdentifier: HarnessMonitorAccessibility.removeAgentButton,
         help: agent.agentId == leaderID ? "The session leader cannot be removed" : "",
         action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
       )
     }
-    .disabled(isSessionReadOnly)
+    .disabled(!areSessionActionsAvailable)
   }
 }
 
@@ -305,7 +302,7 @@ struct InspectorLeaderTransferSection: View {
   @Binding var transferReason: String
   let transferLeaderButtonTitle: String
   let actionActorID: String
-  let isSessionReadOnly: Bool
+  let areSessionActionsAvailable: Bool
   let submitTransferLeader: @MainActor @Sendable () -> Void
 
   private var isSingleAgent: Bool {
@@ -364,7 +361,7 @@ struct InspectorLeaderTransferSection: View {
         tint: HarnessMonitorTheme.caution,
         isExternallyDisabled:
           transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
-          || isSessionReadOnly,
+          || !areSessionActionsAvailable,
         help:
           transferLeaderID == detail.session.leaderId
           ? "Select a different agent to transfer leadership to" : "",
@@ -372,7 +369,7 @@ struct InspectorLeaderTransferSection: View {
       )
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferSection)
-    .disabled(isSingleAgent || isSessionReadOnly)
+    .disabled(isSingleAgent || !areSessionActionsAvailable)
     .opacity(isSingleAgent ? 0.4 : 1)
     .help(isSingleAgent ? "At least two agents are needed to transfer leadership" : "")
   }

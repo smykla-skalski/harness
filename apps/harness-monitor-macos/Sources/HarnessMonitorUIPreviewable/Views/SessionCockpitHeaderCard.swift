@@ -23,6 +23,14 @@ struct SessionCockpitHeaderCard: View {
     )
   }
 
+  private var areSessionActionsAvailable: Bool {
+    store.areSelectedSessionActionsAvailable
+  }
+
+  private var unavailableActionHelp: String {
+    store.selectedSessionActionUnavailableMessage ?? ""
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       HStack(alignment: .top) {
@@ -81,9 +89,9 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .prominent,
       tint: nil,
-      isExternallyDisabled: isSessionReadOnly,
+      isExternallyDisabled: !areSessionActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.observeSessionButton,
-      help: isSessionReadOnly ? "Unavailable while the daemon is offline." : "",
+      help: unavailableActionHelp,
       action: { observeSelectedSession() }
     )
   }
@@ -95,9 +103,9 @@ struct SessionCockpitHeaderCard: View {
       store: store,
       variant: .bordered,
       tint: .secondary,
-      isExternallyDisabled: isSessionReadOnly,
+      isExternallyDisabled: !areSessionActionsAvailable,
       accessibilityIdentifier: HarnessMonitorAccessibility.endSessionButton,
-      help: isSessionReadOnly ? "Unavailable while the daemon is offline." : "",
+      help: unavailableActionHelp,
       action: { requestEndSessionConfirmation() }
     )
   }

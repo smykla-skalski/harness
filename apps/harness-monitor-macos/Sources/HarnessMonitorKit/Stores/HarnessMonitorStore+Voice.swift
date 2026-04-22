@@ -19,13 +19,13 @@ extension HarnessMonitorStore {
     requiresConfirmation: Bool,
     actor: String = "harness-app"
   ) async -> VoiceSessionStartResponse? {
-    guard guardSessionActionsAvailable() else { return nil }
-    guard let client, let sessionID = selectedSessionID else { return nil }
-    guard let actor = actionActor(for: actor) else { return nil }
+    let actionName = "Start voice session"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return nil }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return nil }
 
     do {
-      return try await client.startVoiceSession(
-        sessionID: sessionID,
+      return try await action.client.startVoiceSession(
+        sessionID: action.sessionID,
         request: VoiceSessionStartRequest(
           actor: actor,
           localeIdentifier: localeIdentifier,
@@ -47,11 +47,12 @@ extension HarnessMonitorStore {
     chunk: VoiceAudioChunk,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard let client else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    let actionName = "Append voice audio"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
 
     do {
-      _ = try await client.appendVoiceAudioChunk(
+      _ = try await action.client.appendVoiceAudioChunk(
         voiceSessionID: voiceSessionID,
         request: VoiceAudioChunkRequest(actor: actor, chunk: chunk)
       )
@@ -68,11 +69,12 @@ extension HarnessMonitorStore {
     segment: VoiceTranscriptSegment,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard let client else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    let actionName = "Append voice transcript"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
 
     do {
-      _ = try await client.appendVoiceTranscript(
+      _ = try await action.client.appendVoiceTranscript(
         voiceSessionID: voiceSessionID,
         request: VoiceTranscriptUpdateRequest(actor: actor, segment: segment)
       )
@@ -90,11 +92,12 @@ extension HarnessMonitorStore {
     confirmedText: String?,
     actor: String = "harness-app"
   ) async -> Bool {
-    guard let client else { return false }
-    guard let actor = actionActor(for: actor) else { return false }
+    let actionName = "Finish voice session"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let actor = actionActor(for: actor, actionName: actionName) else { return false }
 
     do {
-      _ = try await client.finishVoiceSession(
+      _ = try await action.client.finishVoiceSession(
         voiceSessionID: voiceSessionID,
         request: VoiceSessionFinishRequest(
           actor: actor,

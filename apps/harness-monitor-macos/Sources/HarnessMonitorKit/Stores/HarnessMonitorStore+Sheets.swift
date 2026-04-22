@@ -37,8 +37,9 @@ extension HarnessMonitorStore {
   }
 
   public func presentSendSignalSheet(agentID: String) {
-    guard guardSessionActionsAvailable() else { return }
-    guard selectedSessionID != nil else { return }
+    let actionName = "Send signal"
+    guard prepareSelectedSessionAction(named: actionName) != nil else { return }
+    guard actionActor(for: "harness-app", actionName: actionName) != nil else { return }
     presentedSheet = .sendSignal(agentID: agentID)
   }
 

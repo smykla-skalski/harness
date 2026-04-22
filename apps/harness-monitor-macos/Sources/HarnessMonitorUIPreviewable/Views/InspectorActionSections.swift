@@ -13,7 +13,7 @@ public struct InspectorActionSections: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
-        isSessionReadOnly: context.isSessionReadOnly,
+        unavailableMessage: store.selectedSessionActionUnavailableMessage,
         actionActorOptions: context.actionActorOptions,
         actionActorID: Binding(
           get: { context.selectedActionActorID },
