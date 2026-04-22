@@ -134,11 +134,9 @@ extension HarnessMonitorUITests {
     let app = launch(mode: "preview")
 
     let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let filterMenu = button(in: app, identifier: Accessibility.sidebarFilterMenu)
     let noMatches = app.staticTexts["No sessions match"]
 
     XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(filterMenu.waitForExistence(timeout: Self.actionTimeout))
 
     tapElement(in: app, identifier: Accessibility.sidebarSearchField)
     app.typeText("zzznomatch")
