@@ -13,6 +13,22 @@ struct AgentDetailSectionTests {
     #expect(HarnessMonitorAccessibility.agentsWindowDetailCard == "harness.agents.detail-card")
   }
 
+  @Test("Section publishes external-addition accessibility identifiers")
+  func publishesExternalAdditionIdentifiers() {
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailPersona
+        == "harness.agents.detail.persona"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailAssignedTasks
+        == "harness.agents.detail.assigned-tasks"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailTimeline
+        == "harness.agents.detail.timeline"
+    )
+  }
+
   @Test("Section publishes role-action accessibility identifiers")
   func publishesRoleActionIdentifiers() {
     #expect(
