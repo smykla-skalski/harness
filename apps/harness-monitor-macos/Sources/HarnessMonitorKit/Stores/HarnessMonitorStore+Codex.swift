@@ -75,12 +75,9 @@ extension HarnessMonitorStore {
     effort: String? = nil,
     allowCustomModel: Bool = false
   ) async -> CodexRunSnapshot? {
-    guard guardSessionActionsAvailable() else { return nil }
-    guard let client, let sessionID = selectedSessionID else {
-      presentFailureFeedback("Select a session before starting a Codex thread.")
-      return nil
-    }
-    let resolvedActor = actionActor(for: actor)
+    let actionName = "Start Codex thread"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return nil }
+    guard let resolvedActor = actionActor(for: actor, actionName: actionName) else { return nil }
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
@@ -103,16 +100,16 @@ extension HarnessMonitorStore {
 
     do {
       let measuredRun = try await measureCodexRunStart(
-        using: client,
-        sessionID: sessionID,
+        using: action.client,
+        sessionID: action.sessionID,
         request: request
       )
       applyCodexRunStartSuccess(measuredRun.value)
       return measuredRun.value
     } catch let apiError as HarnessMonitorAPIError {
       switch await recoverCodexStartAfterTransientBridgeFailure(
-        using: client,
-        sessionID: sessionID,
+        using: action.client,
+        sessionID: action.sessionID,
         request: request,
         error: apiError
       ) {
@@ -136,8 +133,8 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func steerCodexRun(runID: String, prompt: String) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
+    let actionName = "Codex context sent"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
@@ -145,8 +142,8 @@ extension HarnessMonitorStore {
       return false
     }
 
-    return await mutateCodexRun(actionName: "Codex context sent") {
-      try await client.steerCodexRun(
+    return await mutateCodexRun(actionName: actionName) {
+      try await action.client.steerCodexRun(
         runID: runID,
         request: CodexSteerRequest(prompt: trimmedPrompt)
       )
@@ -155,10 +152,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func interruptCodexRun(runID: String) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
-    return await mutateCodexRun(actionName: "Codex run interrupted") {
-      try await client.interruptCodexRun(runID: runID)
+    let actionName = "Codex run interrupted"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    return await mutateCodexRun(actionName: actionName) {
+      try await action.client.interruptCodexRun(runID: runID)
     }
   }
 
@@ -168,10 +165,10 @@ extension HarnessMonitorStore {
     approvalID: String,
     decision: CodexApprovalDecision
   ) async -> Bool {
-    guard guardSessionActionsAvailable() else { return false }
-    guard let client else { return false }
-    return await mutateCodexRun(actionName: "Codex approval resolved") {
-      try await client.resolveCodexApproval(
+    let actionName = "Codex approval resolved"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    return await mutateCodexRun(actionName: actionName) {
+      try await action.client.resolveCodexApproval(
         runID: runID,
         approvalID: approvalID,
         request: CodexApprovalDecisionRequest(decision: decision)

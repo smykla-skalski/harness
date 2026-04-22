@@ -361,6 +361,32 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.pendingConfirmation == nil)
   }
 
+  @Test("Actorless session actions report failure instead of silently returning")
+  func actorlessSessionActionsReportFailure() async {
+    let client = actorlessClient()
+    let store = await actorlessStore(client: client)
+
+    let observed = await store.observeSelectedSession()
+
+    #expect(observed == false)
+    #expect(client.recordedCalls().isEmpty)
+    #expect(store.currentFailureFeedbackMessage == expectedActorlessActionMessage)
+    #expect(store.areSelectedSessionActionsAvailable == false)
+    #expect(store.selectedSessionActionUnavailableMessage == expectedActorlessActionMessage)
+  }
+
+  @Test("Actorless end-session confirmation reports failure instead of silently returning")
+  func actorlessEndSessionConfirmationReportsFailure() async {
+    let client = actorlessClient()
+    let store = await actorlessStore(client: client)
+
+    store.requestEndSelectedSessionConfirmation()
+
+    #expect(store.pendingConfirmation == nil)
+    #expect(client.recordedCalls().isEmpty)
+    #expect(store.currentFailureFeedbackMessage == expectedActorlessActionMessage)
+  }
+
   @Test("Default action actor falls back to the session leader")
   func defaultActionActorFallsBackToSessionLeader() async {
     let client = RecordingHarnessClient()
@@ -416,5 +442,23 @@ struct HarnessMonitorStoreActionTests {
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
     return store
+  }
+
+  private func actorlessClient() -> RecordingHarnessClient {
+    HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [PreviewFixtures.emptyCockpitSummary],
+      detailsByID: [PreviewFixtures.emptyCockpitSummary.sessionId: PreviewFixtures.emptyCockpitDetail],
+      detail: PreviewFixtures.emptyCockpitDetail
+    )
+  }
+
+  private func actorlessStore(client: RecordingHarnessClient) async -> HarnessMonitorStore {
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.emptyCockpitSummary.sessionId)
+    return store
+  }
+
+  private var expectedActorlessActionMessage: String {
+    "No session actor is available yet. Wait for a leader or active agent to join, then try again."
   }
 }
