@@ -180,6 +180,57 @@ struct AdaptiveGridLayoutMeasurementKeyTests {
   }
 }
 
+@Suite("Content window toolbar model")
+struct ContentWindowToolbarModelTests {
+  @Test("Inspector label follows presentation state")
+  func inspectorLabelFollowsPresentationState() {
+    let shown = ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canStartNewSession: false,
+      isRefreshing: false,
+      sleepPreventionEnabled: false,
+      showInspector: true
+    )
+    let hidden = ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canStartNewSession: false,
+      isRefreshing: false,
+      sleepPreventionEnabled: false,
+      showInspector: false
+    )
+
+    #expect(shown.inspectorToggleTitle == "Hide Inspector")
+    #expect(hidden.inspectorToggleTitle == "Show Inspector")
+  }
+
+  @Test("Sleep prevention presentation follows enabled state")
+  func sleepPreventionPresentationFollowsEnabledState() {
+    let enabled = ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canStartNewSession: false,
+      isRefreshing: false,
+      sleepPreventionEnabled: true,
+      showInspector: false
+    )
+    let disabled = ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canStartNewSession: false,
+      isRefreshing: false,
+      sleepPreventionEnabled: false,
+      showInspector: false
+    )
+
+    #expect(enabled.sleepPreventionTitle == "Sleep Prevention On")
+    #expect(enabled.sleepPreventionSystemImage == "moon.zzz.fill")
+    #expect(disabled.sleepPreventionTitle == "Prevent Sleep")
+    #expect(disabled.sleepPreventionSystemImage == "moon.zzz")
+  }
+}
+
 @Suite("Agents viewport auto-resize stabilization")
 struct AgentTuiViewportAutoResizeStabilizationTests {
   @Test("Minor viewport jitter preserves the current terminal size")

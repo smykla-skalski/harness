@@ -72,25 +72,24 @@ struct SidebarSearchHost: View {
 
   var body: some View {
     ViewBodySignposter.trace(Self.self, "SidebarView", attributes: profilingAttributes) {
-      SidebarSessionListColumn(
-        store: store,
-        controls: controls,
-        projection: projection,
-        searchResults: searchResults,
-        sidebarUI: sidebarUI,
-        showsSearchControls: showsSearchAccessoryBar,
-        dateTimeConfiguration: dateTimeConfiguration,
-        fontScale: fontScale,
-        collapsedCheckoutKeys: collapsedCheckoutKeys,
-        setCheckoutCollapsed: setCheckoutCollapsed
-      )
-      .listStyle(.sidebar)
-      .scrollEdgeEffectStyle(.soft, for: .top)
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
-      }
-      .toolbar {
-        SidebarToolbarNewSessionToolbarItem(store: store)
+      ZStack {
+        SidebarSessionListColumn(
+          store: store,
+          controls: controls,
+          projection: projection,
+          searchResults: searchResults,
+          sidebarUI: sidebarUI,
+          showsSearchControls: showsSearchAccessoryBar,
+          dateTimeConfiguration: dateTimeConfiguration,
+          fontScale: fontScale,
+          collapsedCheckoutKeys: collapsedCheckoutKeys,
+          setCheckoutCollapsed: setCheckoutCollapsed
+        )
+        .listStyle(.sidebar)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
+        }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)

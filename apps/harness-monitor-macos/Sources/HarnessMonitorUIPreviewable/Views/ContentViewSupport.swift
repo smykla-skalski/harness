@@ -165,8 +165,15 @@ public struct ContentDetailColumn: View {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
   }
 
-  private var contentToolbar: HarnessMonitorStore.ContentToolbarSlice {
-    store.contentUI.toolbar
+  private var contentToolbarModel: ContentWindowToolbarModel {
+    ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canStartNewSession: false,
+      isRefreshing: store.contentUI.toolbar.isRefreshing,
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
+      showInspector: showInspector
+    )
   }
 
   private var statusBackdropDetail: SessionDetail? {
@@ -197,8 +204,7 @@ public struct ContentDetailColumn: View {
     .toolbar {
       ContentPrimaryToolbarItems(
         store: store,
-        toolbarUI: contentToolbar,
-        showInspector: showInspector,
+        model: contentToolbarModel,
         setInspectorVisibility: setInspectorVisibility
       )
     }

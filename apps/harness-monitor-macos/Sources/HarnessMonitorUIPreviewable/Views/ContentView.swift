@@ -138,8 +138,22 @@ public struct ContentView<CornerContent: View>: View {
     )
   }
 
+  private var contentToolbarModel: ContentWindowToolbarModel {
+    ContentWindowToolbarModel(
+      canNavigateBack: store.contentUI.toolbar.canNavigateBack,
+      canNavigateForward: store.contentUI.toolbar.canNavigateForward,
+      canStartNewSession: store.connectionState == .online,
+      isRefreshing: store.contentUI.toolbar.isRefreshing,
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
+      showInspector: showInspector
+    )
+  }
+
   @ToolbarContentBuilder private var contentToolbarItems: some ToolbarContent {
-    ContentNavigationToolbarItems(store: store)
+    ContentWindowToolbarItems(
+      store: store,
+      model: contentToolbarModel
+    )
   }
 
   @ViewBuilder private var contentAccessibilityOverlay: some View {

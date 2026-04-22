@@ -43,17 +43,16 @@ struct SidebarView: View {
 }
 
 struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
-  let store: HarnessMonitorStore
+  let isEnabled: Bool
+  let presentNewSession: () -> Void
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {
-      Button {
-        store.presentedSheet = .newSession
-      } label: {
+      Button(action: presentNewSession) {
         Label("New Session", systemImage: "plus")
       }
       .help("Start a new session")
-      .disabled(store.connectionState != .online)
+      .disabled(!isEnabled)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarNewSessionButton)
     }
   }

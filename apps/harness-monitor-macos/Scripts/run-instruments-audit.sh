@@ -355,6 +355,21 @@ cleanup_host_processes() {
   done <<<"$pids"
 }
 
+purge_legacy_launch_hosts() {
+  [[ -d "$RUNS_ROOT" ]] || return
+
+  while IFS= read -r -d '' legacy_stage_dir; do
+    /bin/rm -rf "$legacy_stage_dir"
+  done < <(
+    find "$RUNS_ROOT" \
+      -mindepth 2 \
+      -maxdepth 2 \
+      -type d \
+      -name 'launch-host' \
+      -print0 2>/dev/null
+  )
+}
+
 strip_app_attrs() {
   local target_path="$1"
   if [[ -e "$target_path" ]]; then
@@ -367,6 +382,8 @@ stage_launch_host() {
   local stage_root="$STAGED_HOST_STAGE_ROOT"
   local staged_bundle_name="Harness Monitor UI Testing.app"
   local info_plist_path
+
+  purge_legacy_launch_hosts
 
   STAGED_HOST_APP_PATH="$stage_root/$staged_bundle_name"
   STAGED_HOST_BINARY_PATH="$STAGED_HOST_APP_PATH/Contents/MacOS/Harness Monitor UI Testing"
