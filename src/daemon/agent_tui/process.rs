@@ -70,6 +70,7 @@ enum QueuedAgentTuiInput {
     },
     Sequence {
         sequence: AgentTuiInputSequence,
+        completion: SyncSender<Result<(), CliError>>,
     },
 }
 
@@ -125,30 +126,39 @@ impl AgentTuiInputWorker {
         })?
     }
 
-    /// Queue one timed sequence for asynchronous replay.
+    /// Queue one timed sequence and wait until it finishes replaying.
     ///
     /// # Errors
     /// Returns a session-not-active or transport error when the process has
-    /// already stopped or the queue is unavailable.
+    /// already stopped, the queue is unavailable, or replay fails.
     pub(crate) fn enqueue_sequence(
         &self,
         sequence: &AgentTuiInputSequence,
     ) -> Result<(), CliError> {
         self.ensure_accepting_input()?;
+        let (completion_tx, completion_rx) = mpsc::sync_channel(1);
         self.sender
             .send(QueuedAgentTuiInput::Sequence {
                 sequence: sequence.clone(),
+                completion: completion_tx,
             })
             .map_err(|_| {
                 CliError::from(CliErrorKind::session_not_active(
                     "terminal agent input queue is no longer available",
                 ))
-            })
+            })?;
+        completion_rx.recv().map_err(|_| {
+            CliError::from(CliErrorKind::session_not_active(
+                "terminal agent input queue stopped before replay completed",
+            ))
+        })?
     }
 
     fn ensure_accepting_input(&self) -> Result<(), CliError> {
         if self.stop_flag.load(Ordering::Relaxed) || self.process.try_wait()?.is_some() {
-            return Err(CliErrorKind::session_not_active("terminal agent is no longer active").into());
+            return Err(
+                CliErrorKind::session_not_active("terminal agent is no longer active").into(),
+            );
         }
         Ok(())
     }
@@ -189,21 +199,12 @@ impl AgentTuiInputWorker {
             QueuedAgentTuiInput::Immediate { input, completion } => {
                 let _ = completion.send(Self::replay_input(process, stop_flag, &input));
             }
-            QueuedAgentTuiInput::Sequence { sequence } => {
-                Self::warn_on_sequence_replay_failure(
-                    Self::replay_sequence(process, stop_flag, &sequence),
-                );
+            QueuedAgentTuiInput::Sequence {
+                sequence,
+                completion,
+            } => {
+                let _ = completion.send(Self::replay_sequence(process, stop_flag, &sequence));
             }
-        }
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
-    fn warn_on_sequence_replay_failure(result: Result<(), CliError>) {
-        if let Err(error) = result {
-            tracing::warn!(%error, "terminal agent timed input replay failed");
         }
     }
 
@@ -251,7 +252,9 @@ impl AgentTuiInputWorker {
         stop_flag: &AtomicBool,
     ) -> Result<(), CliError> {
         if Self::transport_stopped(process, stop_flag)? {
-            return Err(CliErrorKind::session_not_active("terminal agent is no longer active").into());
+            return Err(
+                CliErrorKind::session_not_active("terminal agent is no longer active").into(),
+            );
         }
         Ok(())
     }

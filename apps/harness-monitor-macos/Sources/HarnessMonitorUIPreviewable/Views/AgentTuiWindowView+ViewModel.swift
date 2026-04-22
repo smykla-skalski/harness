@@ -20,6 +20,11 @@ extension AgentTuiWindowView {
   @MainActor
   @Observable
   final class KeySequenceBuffer {
+    enum EnqueueResult: Equatable {
+      case buffered
+      case sendImmediately(AgentTuiInputRequest)
+    }
+
     struct PendingStep: Equatable {
       let delayBeforeMs: Int
       let input: AgentTuiInput
@@ -29,6 +34,8 @@ extension AgentTuiWindowView {
     private let clock: any KeySequenceClock
     private let idleDelay: Duration
     private var pendingSteps: [PendingStep] = []
+    private var lastImmediateInputAt: ContinuousClock.Instant?
+    private var lastImmediateTuiID: String?
     private var lastQueuedAt: ContinuousClock.Instant?
     @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private var flushHandler:
@@ -53,19 +60,27 @@ extension AgentTuiWindowView {
       pendingTuiID != nil && !pendingSteps.isEmpty
     }
 
+    @discardableResult
     func enqueue(
       input: AgentTuiInput,
       glyph: String,
       tuiID: String,
       onFlush: @escaping @MainActor (_ tuiID: String, _ request: AgentTuiInputRequest) async -> Void
-    ) {
-      if pendingTuiID != tuiID {
-        clearPendingState()
+    ) -> EnqueueResult {
+      if let pendingTuiID, pendingTuiID != tuiID {
+        clearAllState()
       }
       let now = clock.now
+      if shouldSendImmediately(to: tuiID, now: now) {
+        lastImmediateInputAt = now
+        lastImmediateTuiID = tuiID
+        return .sendImmediately(AgentTuiInputRequest(input: input))
+      }
       let delayBeforeMs =
         if let lastQueuedAt, !pendingSteps.isEmpty {
           Self.durationMilliseconds(lastQueuedAt.duration(to: now))
+        } else if let lastImmediateInputAt, lastImmediateTuiID == tuiID {
+          Self.durationMilliseconds(lastImmediateInputAt.duration(to: now))
         } else {
           0
         }
@@ -81,6 +96,7 @@ extension AgentTuiWindowView {
       lastQueuedAt = now
       flushHandler = onFlush
       scheduleIdleFlush()
+      return .buffered
     }
 
     func flush() async {
@@ -92,7 +108,7 @@ extension AgentTuiWindowView {
     }
 
     func drop() {
-      clearPendingState()
+      clearAllState()
     }
 
     private func takePendingRequest() -> (tuiID: String, request: AgentTuiInputRequest)? {
@@ -100,21 +116,26 @@ extension AgentTuiWindowView {
         let tuiID = pendingTuiID,
         !pendingSteps.isEmpty
       else {
-        clearPendingState()
+        clearAllState()
         return nil
       }
-      let steps = pendingSteps.map { step in
-        AgentTuiInputSequenceStep(
-          delayBeforeMs: step.delayBeforeMs,
-          input: step.input
+      let request: AgentTuiInputRequest?
+      if pendingSteps.count == 1, let step = pendingSteps.first {
+        request = AgentTuiInputRequest(input: step.input)
+      } else {
+        let steps = pendingSteps.enumerated().map { index, step in
+          AgentTuiInputSequenceStep(
+            delayBeforeMs: index == 0 ? 0 : step.delayBeforeMs,
+            input: step.input
+          )
+        }
+        request = try? AgentTuiInputRequest(
+          sequence: AgentTuiInputSequence(steps: steps)
         )
       }
       clearPendingState()
-      guard
-        let request = try? AgentTuiInputRequest(
-          sequence: AgentTuiInputSequence(steps: steps)
-        )
-      else {
+      clearBurstState()
+      guard let request else {
         return nil
       }
       return (tuiID, request)
@@ -135,6 +156,19 @@ extension AgentTuiWindowView {
       }
     }
 
+    private func shouldSendImmediately(
+      to tuiID: String,
+      now: ContinuousClock.Instant
+    ) -> Bool {
+      guard pendingSteps.isEmpty else {
+        return false
+      }
+      guard let lastImmediateInputAt, lastImmediateTuiID == tuiID else {
+        return true
+      }
+      return now >= lastImmediateInputAt.advanced(by: idleDelay)
+    }
+
     private func clearPendingState() {
       flushTask?.cancel()
       flushTask = nil
@@ -143,6 +177,16 @@ extension AgentTuiWindowView {
       pendingTuiID = nil
       lastQueuedAt = nil
       flushHandler = nil
+    }
+
+    private func clearBurstState() {
+      lastImmediateInputAt = nil
+      lastImmediateTuiID = nil
+    }
+
+    private func clearAllState() {
+      clearPendingState()
+      clearBurstState()
     }
 
     private static func durationMilliseconds(_ duration: Duration) -> Int {

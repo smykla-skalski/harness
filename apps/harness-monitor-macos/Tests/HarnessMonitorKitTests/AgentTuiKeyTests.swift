@@ -18,24 +18,27 @@ struct AgentTuiKeyTests {
   }
 
   @MainActor
-  @Test("key sequence buffer resets idle timer and flushes one timed request")
-  func keySequenceBufferFlushesTimedRequestAfterIdleWindow() async throws {
+  @Test("key sequence buffer sends first tap immediately and buffers follow-up taps")
+  func keySequenceBufferSendsFirstTapImmediatelyAndBuffersFollowUps() async throws {
     let clock = TestKeySequenceClock()
     let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
-    buffer.enqueue(input: .key(.enter), glyph: "↩", tuiID: "tui-1") { tuiID, request in
+    let first = buffer.enqueue(input: .key(.enter), glyph: "↩", tuiID: "tui-1") { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
+    #expect(first == .sendImmediately(AgentTuiInputRequest(input: .key(.enter))))
+    #expect(buffer.pendingHint == nil)
 
     clock.advance(by: .milliseconds(200))
     await drainTasks()
     #expect(await recorder.snapshot().isEmpty)
 
-    buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-1") { tuiID, request in
+    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-1") { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
-    #expect(buffer.pendingHint == "↩⌃C")
+    #expect(second == .buffered)
+    #expect(buffer.pendingHint == "⌃C")
 
     clock.advance(by: .milliseconds(200))
     await drainTasks()
@@ -47,10 +50,8 @@ struct AgentTuiKeyTests {
     let flushed = await recorder.snapshot()
     #expect(flushed.count == 1)
     #expect(flushed.first?.tuiID == "tui-1")
-    #expect(
-      flushed.first?.request.sequence?.steps.map(\.delayBeforeMs)
-        == [0, 200]
-    )
+    #expect(flushed.first?.request.input == .control("c"))
+    #expect(flushed.first?.request.sequence == nil)
     #expect(buffer.pendingHint == nil)
     #expect(buffer.pendingTuiID == nil)
   }
@@ -62,16 +63,26 @@ struct AgentTuiKeyTests {
     let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
-    buffer.enqueue(input: .key(.tab), glyph: "⇥", tuiID: "tui-original") { tuiID, request in
+    let first = buffer.enqueue(input: .key(.tab), glyph: "⇥", tuiID: "tui-original") { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
+    #expect(first == .sendImmediately(AgentTuiInputRequest(input: .key(.tab))))
+
+    clock.advance(by: .milliseconds(120))
+    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-original") {
+      tuiID,
+      request in
+      await recorder.record(tuiID: tuiID, request: request)
+    }
+    #expect(second == .buffered)
 
     await buffer.flush()
 
     let flushed = await recorder.snapshot()
     #expect(flushed.count == 1)
     #expect(flushed.first?.tuiID == "tui-original")
-    #expect(flushed.first?.request.sequence?.steps.map(\.input) == [.key(.tab)])
+    #expect(flushed.first?.request.input == .control("c"))
+    #expect(flushed.first?.request.sequence == nil)
     #expect(buffer.pendingHint == nil)
   }
 
@@ -82,10 +93,21 @@ struct AgentTuiKeyTests {
     let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
-    buffer.enqueue(input: .key(.escape), glyph: "⎋", tuiID: "tui-drop") { tuiID, request in
+    let first = buffer.enqueue(input: .key(.escape), glyph: "⎋", tuiID: "tui-drop") {
+      tuiID,
+      request in
       await recorder.record(tuiID: tuiID, request: request)
     }
-    #expect(buffer.pendingHint == "⎋")
+    #expect(first == .sendImmediately(AgentTuiInputRequest(input: .key(.escape))))
+
+    clock.advance(by: .milliseconds(90))
+    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-drop") {
+      tuiID,
+      request in
+      await recorder.record(tuiID: tuiID, request: request)
+    }
+    #expect(second == .buffered)
+    #expect(buffer.pendingHint == "⌃C")
 
     buffer.drop()
     clock.advance(by: .seconds(1))

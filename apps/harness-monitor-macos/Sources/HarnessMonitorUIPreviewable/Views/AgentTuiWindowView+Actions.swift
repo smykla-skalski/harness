@@ -219,11 +219,9 @@ extension AgentTuiWindowView {
   func queueKeyInput(_ input: AgentTuiInput, glyph: String, to tuiID: String) {
     let store = store
     let viewModel = viewModel
-    viewModel.keySequenceBuffer.enqueue(
-      input: input,
-      glyph: glyph,
-      tuiID: tuiID
-    ) { [weak viewModel] targetTuiID, request in
+    let sendRequest: @MainActor (_ targetTuiID: String, _ request: AgentTuiInputRequest) async -> Void = {
+      [weak viewModel] targetTuiID,
+      request in
       guard let viewModel else { return }
       guard
         let targetTui = store.selectedAgentTuis.first(where: { $0.tuiId == targetTuiID }),
@@ -238,6 +236,19 @@ extension AgentTuiWindowView {
         request: request,
         showSuccessFeedback: false
       )
+    }
+    let result = viewModel.keySequenceBuffer.enqueue(
+      input: input,
+      glyph: glyph,
+      tuiID: tuiID
+    ) { targetTuiID, request in
+      await sendRequest(targetTuiID, request)
+    }
+    guard case .sendImmediately(let request) = result else {
+      return
+    }
+    Task {
+      await sendRequest(tuiID, request)
     }
   }
   func flushPendingKeySequenceIfNeeded() async {

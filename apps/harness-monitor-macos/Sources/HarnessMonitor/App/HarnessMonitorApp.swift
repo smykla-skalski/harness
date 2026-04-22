@@ -67,6 +67,7 @@ struct HarnessMonitorApp: App {
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+    .defaultLaunchBehavior(.presented)
     .commands {
       HarnessMonitorAppCommands(
         store: store,
