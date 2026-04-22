@@ -118,7 +118,7 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let data_root = tmp.path().join("harness");
-            let bookmarks_path = data_root.join("bookmarks.json");
+            let bookmarks_path = tmp.path().join("sandbox/bookmarks.json");
             let sessions_dir = data_root.join("sessions");
             let session_dir = sessions_dir.join("demo/abc12345");
             let origin = tmp.path().join("src/demo");

@@ -74,20 +74,38 @@ mod tests;
 #[cfg(target_os = "macos")]
 fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
     use super::bookmarks;
-    let store_path = harness_data_root().join("bookmarks.json");
-    let store = bookmarks::load(&store_path).map_err(|error| -> CliError {
-        CliErrorKind::workflow_io(format!("load bookmarks store: {error}")).into()
-    })?;
-    let Some(record) = bookmarks::find(&store, input) else {
-        return Ok(None);
-    };
-    let resolved =
-        super::resolver::resolve(&record.bookmark_data).map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+    for store_path in bookmark_store_paths() {
+        let store = bookmarks::load(&store_path).map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!(
+                "load bookmarks store '{}': {error}",
+                store_path.display()
+            ))
+            .into()
         })?;
-    let path = resolved.path().to_path_buf();
-    Ok(Some(ProjectInputScope {
-        path,
-        _bookmark: Some(resolved),
-    }))
+        let Some(record) = bookmarks::find(&store, input) else {
+            continue;
+        };
+        let resolved =
+            super::resolver::resolve(&record.bookmark_data).map_err(|error| -> CliError {
+                CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+            })?;
+        let path = resolved.path().to_path_buf();
+        return Ok(Some(ProjectInputScope {
+            path,
+            _bookmark: Some(resolved),
+        }));
+    }
+    Ok(None)
+}
+
+#[cfg(target_os = "macos")]
+fn bookmark_store_paths() -> [PathBuf; 2] {
+    let harness_root = harness_data_root();
+    let shared_root = harness_root
+        .parent()
+        .map_or_else(|| harness_root.clone(), Path::to_path_buf);
+    [
+        shared_root.join("sandbox").join("bookmarks.json"),
+        harness_root.join("bookmarks.json"),
+    ]
 }

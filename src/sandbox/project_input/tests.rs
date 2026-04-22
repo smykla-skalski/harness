@@ -28,7 +28,7 @@ fn errors_when_path_does_not_exist() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn resolves_bookmark_from_harness_data_root() {
+fn resolves_bookmark_from_shared_sandbox_store() {
     use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
 
     let tmp = TempDir::new().expect("tempdir");
@@ -37,6 +37,45 @@ fn resolves_bookmark_from_harness_data_root() {
             let project_dir = tmp.path().join("repo");
             std::fs::create_dir_all(&project_dir).expect("create project dir");
             let bookmark_id = "B-project-input";
+            let store_path = tmp.path().join("sandbox/bookmarks.json");
+            bookmarks::save(
+                &store_path,
+                &PersistedStore {
+                    schema_version: PersistedStore::CURRENT_SCHEMA_VERSION,
+                    bookmarks: vec![Record {
+                        id: bookmark_id.into(),
+                        kind: Kind::ProjectRoot,
+                        display_name: "repo".into(),
+                        last_resolved_path: project_dir.display().to_string(),
+                        bookmark_data: synthesize_bookmark(&project_dir),
+                        created_at: chrono::Utc::now(),
+                        last_accessed_at: chrono::Utc::now(),
+                        stale_count: 0,
+                    }],
+                },
+            )
+            .expect("save bookmarks");
+
+            let scope = resolve_project_input(bookmark_id).expect("resolve bookmark input");
+            assert_eq!(
+                scope.path().canonicalize().expect("canonicalize"),
+                project_dir.canonicalize().expect("canonicalize")
+            );
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn resolves_bookmark_from_legacy_harness_store_path() {
+    use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
+
+    let tmp = TempDir::new().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(tmp.path(), || {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let project_dir = tmp.path().join("repo");
+            std::fs::create_dir_all(&project_dir).expect("create project dir");
+            let bookmark_id = "B-project-input-legacy";
             let store_path = tmp.path().join("harness/bookmarks.json");
             bookmarks::save(
                 &store_path,
