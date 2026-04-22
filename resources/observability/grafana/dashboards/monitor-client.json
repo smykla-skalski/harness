@@ -52,6 +52,17 @@
       "tags": []
     },
     {
+      "title": "View Performance",
+      "type": "link",
+      "url": "/d/harness-monitor-view-performance",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": []
+    },
+    {
       "title": "Storage & SQLite",
       "type": "link",
       "url": "/d/harness-sqlite-forensics",
