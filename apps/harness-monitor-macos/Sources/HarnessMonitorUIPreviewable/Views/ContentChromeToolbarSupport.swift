@@ -3,8 +3,7 @@ import SwiftUI
 
 struct ContentNavigationToolbar: ToolbarContent {
   let store: HarnessMonitorStore
-  let canNavigateBack: Bool
-  let canNavigateForward: Bool
+  let model: ContentWindowToolbarModel
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
@@ -13,7 +12,7 @@ struct ContentNavigationToolbar: ToolbarContent {
       } label: {
         Label("Back", systemImage: "chevron.backward")
       }
-      .disabled(!canNavigateBack)
+      .disabled(!model.canNavigateBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.navigateBackButton)
 
@@ -22,7 +21,7 @@ struct ContentNavigationToolbar: ToolbarContent {
       } label: {
         Label("Forward", systemImage: "chevron.forward")
       }
-      .disabled(!canNavigateForward)
+      .disabled(!model.canNavigateForward)
       .help("Go forward")
       .accessibilityIdentifier(HarnessMonitorAccessibility.navigateForwardButton)
     }

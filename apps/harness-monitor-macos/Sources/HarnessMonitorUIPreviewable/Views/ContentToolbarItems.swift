@@ -1,46 +1,49 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct ContentNavigationToolbarItems: ToolbarContent {
-  public let store: HarnessMonitorStore
+struct ContentWindowToolbarModel: Equatable {
+  let canNavigateBack: Bool
+  let canNavigateForward: Bool
+  let canStartNewSession: Bool
+  let isRefreshing: Bool
+  let sleepPreventionEnabled: Bool
+  let showInspector: Bool
 
-  public init(store: HarnessMonitorStore) {
+  var sleepPreventionTitle: String {
+    sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep"
+  }
+
+  var sleepPreventionSystemImage: String {
+    sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+  }
+
+  var inspectorToggleTitle: String {
+    showInspector ? "Hide Inspector" : "Show Inspector"
+  }
+}
+
+struct ContentWindowToolbarItems: ToolbarContent {
+  let store: HarnessMonitorStore
+  let model: ContentWindowToolbarModel
+
+  init(store: HarnessMonitorStore, model: ContentWindowToolbarModel) {
     self.store = store
+    self.model = model
   }
 
-  private var toolbarUI: HarnessMonitorStore.ContentToolbarSlice {
-    store.contentUI.toolbar
-  }
-
-  public var body: some ToolbarContent {
-    ContentNavigationToolbar(
-      store: store,
-      canNavigateBack: toolbarUI.canNavigateBack,
-      canNavigateForward: toolbarUI.canNavigateForward
+  @ToolbarContentBuilder
+  var body: some ToolbarContent {
+    ContentNavigationToolbar(store: store, model: model)
+    SidebarToolbarNewSessionToolbarItem(
+      isEnabled: model.canStartNewSession,
+      presentNewSession: { store.presentedSheet = .newSession }
     )
   }
 }
 
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let showInspector: Bool
-  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
-
-  var body: some ToolbarContent {
-    InspectorToolbarActions(
-      store: store,
-      toolbarUI: toolbarUI,
-      showInspector: showInspector,
-      setInspectorVisibility: setInspectorVisibility
-    )
-  }
-}
-
-struct InspectorToolbarActions: ToolbarContent {
-  let store: HarnessMonitorStore
-  let toolbarUI: HarnessMonitorStore.ContentToolbarSlice
-  let showInspector: Bool
+  let model: ContentWindowToolbarModel
   let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
 
   var body: some ToolbarContent {
@@ -49,18 +52,18 @@ struct InspectorToolbarActions: ToolbarContent {
         store.sleepPreventionEnabled.toggle()
       } label: {
         Label(
-          toolbarUI.sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep",
-          systemImage: toolbarUI.sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+          model.sleepPreventionTitle,
+          systemImage: model.sleepPreventionSystemImage
         )
       }
-      .tint(toolbarUI.sleepPreventionEnabled ? .orange : nil)
+      .tint(model.sleepPreventionEnabled ? .orange : nil)
       .help(
-        toolbarUI.sleepPreventionEnabled
+        model.sleepPreventionEnabled
           ? "Click to allow system sleep"
           : "Prevent sleep while sessions are active"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-      RefreshToolbarButton(isRefreshing: toolbarUI.isRefreshing) {
+      RefreshToolbarButton(isRefreshing: model.isRefreshing) {
         Task { await store.refresh() }
       }
       .help("Refresh sessions")
@@ -68,16 +71,13 @@ struct InspectorToolbarActions: ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
       Button {
-        setInspectorVisibility(!showInspector, .explicitUserPreference)
+        setInspectorVisibility(!model.showInspector, .explicitUserPreference)
       } label: {
-        Label(
-          showInspector ? "Hide Inspector" : "Show Inspector",
-          systemImage: "sidebar.trailing"
-        )
+        Label(model.inspectorToggleTitle, systemImage: "sidebar.trailing")
       }
-      .accessibilityLabel(showInspector ? "Hide Inspector" : "Show Inspector")
+      .accessibilityLabel(model.inspectorToggleTitle)
       .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
-      .help(showInspector ? "Hide inspector" : "Show inspector")
+      .help(model.showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 }
