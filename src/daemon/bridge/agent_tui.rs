@@ -1,11 +1,12 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::agent_tui::{
-    AgentTuiAttachState, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
-    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
+    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiProcess, AgentTuiSnapshot,
+    AgentTuiStatus, deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};
@@ -51,6 +52,8 @@ impl BridgeServer {
         let deferred_runtime = spec.profile.runtime.clone();
         let deferred_tui_id = spec.tui_id.clone();
         let process = Arc::new(process);
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let input_worker = AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag));
         let context = BridgeSnapshotContext {
             session_id: spec.session_id,
             agent_id: spec.agent_id,
@@ -65,6 +68,8 @@ impl BridgeServer {
             spec.tui_id,
             BridgeActiveTui {
                 process,
+                stop_flag,
+                input_worker,
                 context,
                 created_at: snapshot.created_at.clone(),
                 exit_info: None,
@@ -137,6 +142,7 @@ impl BridgeServer {
                 "terminal agent '{tui_id}' is not active in host bridge"
             ))
         })?;
+        active.stop_flag.store(true, Ordering::Relaxed);
         active.process.kill()?;
         let _ = active.process.wait_timeout(Duration::from_millis(500))?;
         let mut snapshot = snapshot_from_process(
@@ -197,11 +203,12 @@ fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<St
 mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
     use std::time::Duration;
 
     use crate::daemon::agent_tui::{
-        AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSpawnSpec, AgentTuiStatus,
-        PortablePtyAgentTuiBackend,
+        AgentTuiBackend, AgentTuiInputWorker, AgentTuiLaunchProfile, AgentTuiSize,
+        AgentTuiSpawnSpec, AgentTuiStatus, PortablePtyAgentTuiBackend,
     };
     use crate::daemon::bridge::core::{BridgeActiveTui, BridgeSnapshotContext};
     use crate::daemon::bridge::server::BridgeServer;
@@ -232,10 +239,13 @@ mod tests {
             AgentTuiSize { rows: 5, cols: 40 },
         )
         .expect("spec");
-        let process = PortablePtyAgentTuiBackend.spawn(spec).expect("spawn");
+        let process = Arc::new(PortablePtyAgentTuiBackend.spawn(spec).expect("spawn"));
+        let stop_flag = Arc::new(AtomicBool::new(false));
         let transcript_path = tmp.join("transcript.raw");
         BridgeActiveTui {
-            process: Arc::new(process),
+            input_worker: AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag)),
+            process,
+            stop_flag,
             context: BridgeSnapshotContext {
                 session_id: "sess".into(),
                 agent_id: String::new(),

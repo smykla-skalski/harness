@@ -23,7 +23,6 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func terminalViewport(_ tui: AgentTuiSnapshot) -> some View {
     ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
       Text(tui.screen.text.isEmpty ? "No terminal output yet." : tui.screen.text)
@@ -46,7 +45,6 @@ extension AgentTuiWindowView {
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiViewport)
   }
-
   func terminalError(_ error: String) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Error")
@@ -79,7 +77,6 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func terminalInputControls(_ tui: AgentTuiSnapshot) -> some View {
     @Bindable var viewModel = viewModel
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -134,12 +131,22 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func terminalKeyControls(_ tui: AgentTuiSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Keys")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    @Bindable var keySequenceBuffer = viewModel.keySequenceBuffer
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        Text("Keys")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        if let pendingHint = keySequenceBuffer.pendingHint {
+          Text("Pending \(pendingHint)")
+            .lineLimit(1)
+            .scaledFont(.footnote.monospaced())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiKeyQueueHint)
+        }
+      }
       HarnessMonitorWrapLayout(
         spacing: HarnessMonitorTheme.itemSpacing,
         lineSpacing: HarnessMonitorTheme.itemSpacing
@@ -178,7 +185,6 @@ extension AgentTuiWindowView {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
-
   func terminalResizeControls() -> some View {
     @Bindable var viewModel = viewModel
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -219,7 +225,6 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func multilineEditor(
     placeholder: String,
     text: Binding<String>,
@@ -265,7 +270,6 @@ extension AgentTuiWindowView {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(accessibilityIdentifier)
   }
-
   var agentTuiUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(agentTuiBridgeTitle, systemImage: "exclamationmark.triangle")
@@ -294,23 +298,18 @@ extension AgentTuiWindowView {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRecoveryBanner)
   }
-
   var agentTuiBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
     store.hostBridgeCapabilityState(for: "agent-tui")
   }
-
   var agentTuiBridgeCommand: String {
     store.hostBridgeStartCommand(for: "agent-tui")
   }
-
   var hostBridge: HostBridgeManifest {
     store.daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
   }
-
   var agentTuiBridgeCapabilityPresent: Bool {
     hostBridge.capabilities["agent-tui"] != nil
   }
-
   var agentTuiBridgeTitle: String {
     switch agentTuiBridgeState {
     case .excluded:
@@ -321,7 +320,6 @@ extension AgentTuiWindowView {
       "Terminal agent host bridge ready"
     }
   }
-
   var agentTuiBridgeMessage: String {
     switch agentTuiBridgeState {
     case .excluded:
@@ -339,7 +337,6 @@ extension AgentTuiWindowView {
       ""
     }
   }
-
   var codexUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(codexBridgeTitle, systemImage: "exclamationmark.triangle")
@@ -368,19 +365,15 @@ extension AgentTuiWindowView {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexRecoveryBanner)
   }
-
   var codexBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
     store.hostBridgeCapabilityState(for: "codex")
   }
-
   var codexBridgeCommand: String {
     store.hostBridgeStartCommand(for: "codex")
   }
-
   var codexBridgeCapabilityPresent: Bool {
     hostBridge.capabilities["codex"] != nil
   }
-
   var codexBridgeTitle: String {
     switch codexBridgeState {
     case .excluded:
@@ -395,7 +388,6 @@ extension AgentTuiWindowView {
       "Codex host bridge ready"
     }
   }
-
   var codexBridgeMessage: String {
     switch codexBridgeState {
     case .excluded:

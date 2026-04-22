@@ -7,6 +7,7 @@ use std::time::Duration;
 
 mod effort;
 mod input;
+mod input_request;
 mod manager;
 mod manager_control;
 mod manager_lifecycle;
@@ -28,17 +29,22 @@ pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub use input::{AgentTuiInput, AgentTuiKey};
+pub use input_request::{
+    AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
+};
 pub use manager::AgentTuiManagerHandle;
 pub use model::{
-    AgentTuiBackend, AgentTuiInputRequest, AgentTuiLaunchProfile, AgentTuiListResponse,
-    AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot, AgentTuiSpawnSpec, AgentTuiStartRequest,
-    AgentTuiStatus, PortablePtyAgentTuiBackend,
+    AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiResizeRequest,
+    AgentTuiSize, AgentTuiSnapshot, AgentTuiSpawnSpec, AgentTuiStartRequest, AgentTuiStatus,
+    PortablePtyAgentTuiBackend,
 };
 pub use process::AgentTuiProcess;
 pub use screen::{TerminalScreenParser, TerminalScreenSnapshot};
 
 #[allow(unused_imports)]
 pub(crate) use manager::ActiveAgentTui;
+#[allow(unused_imports)]
+pub(crate) use process::AgentTuiInputWorker;
 #[allow(unused_imports)]
 pub(crate) use process::{AgentTuiAttachState, AgentTuiSnapshotContext, snapshot_from_process};
 #[allow(unused_imports)]

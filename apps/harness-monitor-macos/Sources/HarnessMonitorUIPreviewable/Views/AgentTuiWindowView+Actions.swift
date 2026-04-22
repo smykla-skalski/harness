@@ -24,14 +24,13 @@ extension AgentTuiWindowView {
     }
     return .create
   }
-
   func selectCreateTab() {
     viewModel.selection = .create
   }
-
   func refresh() {
     viewModel.isSubmitting = true
     Task {
+      await flushPendingKeySequenceIfNeeded()
       switch viewModel.selection {
       case .create:
         async let tuiRefresh = store.refreshSelectedAgentTuis()
@@ -56,7 +55,6 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-
   func startTui() {
     viewModel.isSubmitting = true
     Task {
@@ -128,7 +126,6 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-
   func steerCodexRun(_ run: CodexRunSnapshot) {
     viewModel.isSubmitting = true
     Task {
@@ -139,7 +136,6 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-
   func interruptCodexRun(_ run: CodexRunSnapshot) {
     viewModel.isSubmitting = true
     Task {
@@ -147,7 +143,6 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-
   func resolveCodexApproval(
     _ approval: CodexApprovalRequest,
     run: CodexRunSnapshot,
@@ -163,7 +158,6 @@ extension AgentTuiWindowView {
       viewModel.resolvingCodexApprovalID = nil
     }
   }
-
   func sendInput(to tui: AgentTuiSnapshot) {
     let payload: AgentTuiInput =
       switch viewModel.inputMode {
@@ -175,6 +169,7 @@ extension AgentTuiWindowView {
 
     viewModel.isSubmitting = true
     Task {
+      await flushPendingKeySequenceIfNeeded()
       let success = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: payload)
       if success {
         viewModel.inputText = ""
@@ -189,48 +184,66 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-
   func sendKey(_ key: AgentTuiKey, to tui: AgentTuiSnapshot) {
-    viewModel.isSubmitting = true
-    Task {
-      _ = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .key(key))
-      viewModel.isSubmitting = false
-    }
+    queueKeyInput(.key(key), glyph: key.glyph, to: tui.tuiId)
   }
-
   func sendControl(_ key: Character, to tui: AgentTuiSnapshot) {
-    viewModel.isSubmitting = true
-    Task {
-      _ = await store.sendAgentTuiInput(tuiID: tui.tuiId, input: .control(key))
-      viewModel.isSubmitting = false
-    }
+    queueKeyInput(.control(key), glyph: "⌃\(String(key).uppercased())", to: tui.tuiId)
   }
-
   func resizeTui(_ tui: AgentTuiSnapshot) {
     viewModel.isSubmitting = true
     cancelPendingViewportResize()
     let target = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
     viewModel.expectedSize = target
     Task {
+      await flushPendingKeySequenceIfNeeded()
       _ = await store.resizeAgentTui(tuiID: tui.tuiId, rows: target.rows, cols: target.cols)
       viewModel.isSubmitting = false
     }
   }
-
   func stopTui(_ tui: AgentTuiSnapshot) {
     viewModel.isSubmitting = true
     let tuiID = tui.tuiId
     let stopper = StoreBackedAgentTuiStopper(store: store)
     Task {
+      await flushPendingKeySequenceIfNeeded()
       await performGracefulStop(tuiID: tuiID, stopper: stopper)
       viewModel.isSubmitting = false
     }
   }
-
+  func queueKeyInput(_ input: AgentTuiInput, glyph: String, to tuiID: String) {
+    let store = store
+    let viewModel = viewModel
+    viewModel.keySequenceBuffer.enqueue(
+      input: input,
+      glyph: glyph,
+      tuiID: tuiID
+    ) { [weak viewModel] targetTuiID, request in
+      guard let viewModel else { return }
+      guard
+        let targetTui = store.selectedAgentTuis.first(where: { $0.tuiId == targetTuiID }),
+        targetTui.status.isActive
+      else {
+        return
+      }
+      viewModel.isSubmitting = true
+      defer { viewModel.isSubmitting = false }
+      _ = await store.sendAgentTuiInput(
+        tuiID: targetTui.tuiId,
+        request: request,
+        showSuccessFeedback: false
+      )
+    }
+  }
+  func flushPendingKeySequenceIfNeeded() async {
+    await viewModel.keySequenceBuffer.flush()
+  }
+  func dropPendingKeySequence() {
+    viewModel.keySequenceBuffer.drop()
+  }
   func revealTranscript(_ tui: AgentTuiSnapshot) {
     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: tui.transcriptPath)])
   }
-
   func updateViewportGeometry(_ viewportSize: CGSize, for tui: AgentTuiSnapshot) {
     guard viewModel.selection.terminalID == tui.tuiId, tui.status.isActive else {
       return
@@ -279,6 +292,7 @@ extension AgentTuiWindowView {
         return
       }
 
+      await flushPendingKeySequenceIfNeeded()
       let resized = await store.resizeAgentTui(
         tuiID: tuiID,
         rows: terminalSize.rows,
@@ -294,13 +308,11 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func cancelPendingViewportResize() {
     viewModel.viewportResizeTask?.cancel()
     viewModel.viewportResizeTask = nil
     viewModel.pendingViewportResizeTarget = nil
   }
-
   func enforceExpectedSize() {
     guard let expected = viewModel.expectedSize,
       let serverSize = selectedSessionTui?.size,
@@ -311,6 +323,7 @@ extension AgentTuiWindowView {
       return
     }
     Task {
+      await flushPendingKeySequenceIfNeeded()
       _ = await store.resizeAgentTui(
         tuiID: tuiID,
         rows: expected.rows,
@@ -319,7 +332,6 @@ extension AgentTuiWindowView {
       )
     }
   }
-
   func reconcileSheetState(afterRefresh: Bool) {
     let preferredSelection = Self.initialSelection(
       displayState: displayState,
@@ -348,7 +360,6 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
     guard viewModel.selection != nextSelection else {
       if nextSelection.terminalID != nil {
@@ -362,7 +373,6 @@ extension AgentTuiWindowView {
       enforceExpectedSize()
     }
   }
-
   func navigateHistoryBack() {
     guard !viewModel.navigationBackStack.isEmpty else { return }
     let destination = viewModel.navigationBackStack.removeLast()
@@ -371,7 +381,6 @@ extension AgentTuiWindowView {
     viewModel.selection = destination
     updateNavigationState()
   }
-
   func navigateHistoryForward() {
     guard !viewModel.navigationForwardStack.isEmpty else { return }
     let destination = viewModel.navigationForwardStack.removeLast()
@@ -380,7 +389,6 @@ extension AgentTuiWindowView {
     viewModel.selection = destination
     updateNavigationState()
   }
-
   func updateNavigationState() {
     let canGoBack = !viewModel.navigationBackStack.isEmpty
     let canGoForward = !viewModel.navigationForwardStack.isEmpty

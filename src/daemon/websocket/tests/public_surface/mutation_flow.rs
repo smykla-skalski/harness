@@ -262,6 +262,46 @@ fn websocket_managed_agent_input_errors_include_http_status_metadata() {
 }
 
 #[test]
+fn websocket_managed_agent_sequence_errors_include_http_status_metadata() {
+    let state = test_http_state_with_db();
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    runtime.block_on(async {
+        let request = WsRequest {
+            id: "req-managed-agent-sequence-missing".into(),
+            method: ws_methods::MANAGED_AGENT_INPUT.into(),
+            params: serde_json::json!({
+                "agent_id": "missing-agent",
+                "sequence": {
+                    "steps": [
+                        {
+                            "delay_before_ms": 0,
+                            "input": {
+                                "type": "text",
+                                "text": "hello"
+                            }
+                        }
+                    ]
+                }
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch(&request, &state, &connection).await;
+        let error = response.error.expect("error response");
+        assert_eq!(error.code, "KSRCLI090");
+        assert_eq!(error.status_code, Some(400));
+        assert!(
+            error
+                .data
+                .as_ref()
+                .and_then(|data| data["error"]["message"].as_str())
+                .is_some_and(|message| message.contains("managed agent 'missing-agent' not found"))
+        );
+    });
+}
+
+#[test]
 fn websocket_voice_mutations_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {

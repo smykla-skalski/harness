@@ -233,6 +233,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentTuiControls = "harness.sheet.agent-tui.controls"
   static let agentTuiInputField = "harness.sheet.agent-tui.input"
   static let agentTuiInputModePicker = "harness.sheet.agent-tui.input-mode"
+  static let agentTuiKeyQueueHint = "harness.sheet.agent-tui.key-queue"
   static let agentTuiSubmitWithEnterToggle = "harness.sheet.agent-tui.submit-with-enter"
   static let agentTuiRefreshButton = "harness.sheet.agent-tui.refresh"
   static let agentTuiStartButton = "harness.sheet.agent-tui.start"
@@ -319,6 +320,10 @@ enum HarnessMonitorUITestAccessibility {
 
   static func agentTuiTab(_ tuiID: String) -> String {
     "harness.sheet.agent-tui.tab.\(slug(tuiID))"
+  }
+
+  static func agentTuiKeyButton(_ key: String) -> String {
+    "harness.sheet.agent-tui.key.\(slug(key))"
   }
 
   static func segmentedOption(_ controlID: String, option: String) -> String {

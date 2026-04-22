@@ -350,12 +350,6 @@ fn apply_model_to_profile(
     Ok(())
 }
 
-/// Request body for sending keyboard-like input into an active terminal agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiInputRequest {
-    pub input: super::input::AgentTuiInput,
-}
-
 /// Request body for resizing an active terminal agent PTY.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiResizeRequest {
