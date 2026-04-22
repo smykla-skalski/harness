@@ -176,4 +176,17 @@ extension AgentTuiWindowUITests {
     }
     return (rows, cols)
   }
+
+  func agentTuiViewportContainsText(
+    in app: XCUIApplication,
+    text: String
+  ) -> Bool {
+    let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
+    if viewport.label.contains(text) {
+      return true
+    }
+    let predicate = NSPredicate(format: "label CONTAINS %@", text)
+    return viewport.staticTexts.matching(predicate).firstMatch.exists
+      || app.staticTexts.matching(predicate).firstMatch.exists
+  }
 }

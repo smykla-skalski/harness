@@ -48,7 +48,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       rows: Int,
       cols: Int
     )
-    case sendAgentTuiInput(tuiID: String, input: AgentTuiInput)
+    case sendAgentTuiInput(tuiID: String, request: AgentTuiInputRequest)
     case resizeAgentTui(tuiID: String, rows: Int, cols: Int)
     case stopAgentTui(tuiID: String)
     case adoptSession(bookmarkID: String?, sessionRoot: URL)

@@ -118,7 +118,7 @@ struct WebSocketProtocolParityTests {
     )
     _ = try await transport.sendManagedAgentInput(
       agentID: terminalSnapshot.tuiId,
-      request: AgentTuiInputRequest(input: .text("ls\n"))
+      request: try timedSequenceInputRequest()
     )
     _ = try await transport.resizeManagedAgent(
       agentID: terminalSnapshot.tuiId,
@@ -216,6 +216,17 @@ struct WebSocketProtocolParityTests {
     )
   }
 
+  private func timedSequenceInputRequest() throws -> AgentTuiInputRequest {
+    try AgentTuiInputRequest(
+      sequence: AgentTuiInputSequence(
+        steps: [
+          AgentTuiInputSequenceStep(delayBeforeMs: 0, input: .text("ls")),
+          AgentTuiInputSequenceStep(delayBeforeMs: 120, input: .key(.enter)),
+        ]
+      )
+    )
+  }
+
   private func assertExpectedParameters(
     calls: [RPCProbe.Call],
     terminalSnapshot: AgentTuiSnapshot,
@@ -227,6 +238,7 @@ struct WebSocketProtocolParityTests {
       objectValue(calls[2].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
     )
     #expect(objectValue(calls[3].params, key: "agent_id") == .string(terminalSnapshot.tuiId))
+    #expect(objectValue(calls[3].params, key: "sequence") != nil)
     #expect(objectValue(calls[7].params, key: "agent_id") == .string(codexSnapshot.runId))
     #expect(
       objectValue(calls[10].params, key: "session_id")
