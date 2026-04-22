@@ -20,7 +20,10 @@ pub fn init_git_repo_with_seed(path: &Path) {
     std::fs::write(path.join("README.md"), b"seed\n").expect("seed README");
 
     run_git(path, &["add", "README.md"]);
-    run_git(path, &["-c", "commit.gpgsign=false", "commit", "-m", "seed"]);
+    run_git(
+        path,
+        &["-c", "commit.gpgsign=false", "commit", "-m", "seed"],
+    );
 }
 
 /// Initialize a git repository at `path` with a seed commit on the default
@@ -44,7 +47,10 @@ pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
     std::fs::write(path.join("branch.txt"), branch_name.as_bytes()).expect("write branch.txt");
 
     run_git(path, &["add", "branch.txt"]);
-    run_git(path, &["-c", "commit.gpgsign=false", "commit", "-m", branch_name]);
+    run_git(
+        path,
+        &["-c", "commit.gpgsign=false", "commit", "-m", branch_name],
+    );
     run_git(path, &["checkout", &default_branch]);
 }
 
