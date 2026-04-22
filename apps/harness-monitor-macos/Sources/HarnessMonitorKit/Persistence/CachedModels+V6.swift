@@ -384,11 +384,14 @@ extension HarnessMonitorSchemaV6 {
   }
 }
 
-typealias CachedProject = HarnessMonitorCurrentSchema.CachedProject
-typealias CachedSession = HarnessMonitorCurrentSchema.CachedSession
-typealias CachedAgent = HarnessMonitorCurrentSchema.CachedAgent
-typealias CachedWorkItem = HarnessMonitorCurrentSchema.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorCurrentSchema.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorCurrentSchema.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorCurrentSchema.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorCurrentSchema.CachedAgentActivity
+// V7 adds supervisor entities without introducing new Cached* variants, so the canonical
+// Cached* models continue to live under HarnessMonitorSchemaV6. The typealiases below stay
+// pinned to V6 to keep store/model-conversion call sites stable across schema version bumps.
+typealias CachedProject = HarnessMonitorSchemaV6.CachedProject
+typealias CachedSession = HarnessMonitorSchemaV6.CachedSession
+typealias CachedAgent = HarnessMonitorSchemaV6.CachedAgent
+typealias CachedWorkItem = HarnessMonitorSchemaV6.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorSchemaV6.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorSchemaV6.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorSchemaV6.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorSchemaV6.CachedAgentActivity
