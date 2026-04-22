@@ -9,6 +9,8 @@ mod params;
 mod queries;
 mod relay;
 #[cfg(test)]
+mod session_start_tests;
+#[cfg(test)]
 mod signal_tests;
 #[cfg(test)]
 mod telemetry_tests;
