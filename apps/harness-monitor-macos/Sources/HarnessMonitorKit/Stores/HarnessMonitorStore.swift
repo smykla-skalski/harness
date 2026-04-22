@@ -315,7 +315,9 @@ public final class HarnessMonitorStore {
   private func bootstrapManagedDaemon() async {
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
-      registrationState = try await ensureManagedLaunchAgentReady()
+      registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {
+        try await ensureManagedLaunchAgentReady()
+      }
     } catch {
       await applyLaunchAgentOfflineState(reason: error.localizedDescription)
       return
@@ -337,8 +339,12 @@ public final class HarnessMonitorStore {
     }
 
     do {
-      let client = try await awaitManagedDaemonWarmUpWithRecovery()
-      await connect(using: client)
+      let client = try await withBootstrapTelemetryPhase(.managedDaemonWarmUp) {
+        try await awaitManagedDaemonWarmUpWithRecovery()
+      }
+      await withBootstrapTelemetryPhase(.managedInitialConnect) {
+        await connect(using: client)
+      }
     } catch {
       let recovered = await recoverManagedBootstrapFailure(from: error)
       guard !recovered else {
@@ -362,10 +368,14 @@ public final class HarnessMonitorStore {
       )
     }
     do {
-      let client = try await daemonController.awaitManifestWarmUp(
-        timeout: bootstrapWarmUpTimeout
-      )
-      await connect(using: client)
+      let client = try await withBootstrapTelemetryPhase(.externalDaemonWarmUp) {
+        try await daemonController.awaitManifestWarmUp(
+          timeout: bootstrapWarmUpTimeout
+        )
+      }
+      await withBootstrapTelemetryPhase(.externalInitialConnect) {
+        await connect(using: client)
+      }
     } catch {
       let message =
         (error as? DaemonControlError)?.errorDescription

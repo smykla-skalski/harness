@@ -21,6 +21,56 @@ struct HarnessMonitorStoreObservabilityLifecycleTests {
     await store.prepareForTermination()
     #expect(sampler.stopCallCount() == 1)
   }
+
+  @Test("Managed bootstrap records phase telemetry for launch agent warm-up and connect")
+  func managedBootstrapRecordsPhaseTelemetry() async throws {
+    let collector = try GRPCCollectorServer()
+    defer {
+      collector.shutdown()
+      HarnessMonitorTelemetry.shared.resetForTests()
+    }
+
+    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
+    defer { try? FileManager.default.removeItem(at: temporaryHome) }
+
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: RecordingHarnessClient())
+    )
+
+    await store.bootstrap()
+    HarnessMonitorTelemetry.shared.shutdown()
+
+    try await waitForTraceExport(timeout: .seconds(3)) {
+      collector.metricCollector.hasReceivedMetrics && collector.traceCollector.hasReceivedSpans
+    }
+
+    let points = collector.metricCollector.dataPointsForMetric(
+      "harness_monitor_bootstrap_phase_duration_ms"
+    )
+    #expect(
+      points.contains { dataPoint in
+        dataPoint.attributes["bootstrap.phase"] == "managed_launch_agent_ready"
+      }
+    )
+    #expect(
+      points.contains { dataPoint in
+        dataPoint.attributes["bootstrap.phase"] == "managed_daemon_warm_up"
+      }
+    )
+    #expect(
+      points.contains { dataPoint in
+        dataPoint.attributes["bootstrap.phase"] == "managed_initial_connect"
+      }
+    )
+
+    let spans = collector.traceCollector.exportedSpans
+    #expect(spans.contains { $0.name == "app.lifecycle.bootstrap.managed_launch_agent_ready" })
+    #expect(spans.contains { $0.name == "app.lifecycle.bootstrap.managed_daemon_warm_up" })
+    #expect(spans.contains { $0.name == "app.lifecycle.bootstrap.managed_initial_connect" })
+  }
 }
 
 private final class ResourceMetricsSamplerSpy: HarnessMonitorResourceSampling, @unchecked Sendable {
