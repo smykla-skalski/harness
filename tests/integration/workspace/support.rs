@@ -10,6 +10,9 @@ use harness::daemon::protocol::SessionMutationResponse;
 use harness::session::types::SessionState;
 use harness::workspace::layout::SessionLayout;
 use harness::workspace::{harness_data_root, layout::sessions_root};
+use harness_testkit::{
+    git_branches_matching as helper_git_branches_matching, git_head_sha as helper_git_head_sha,
+};
 use serde_json::{Value, json};
 use tokio::runtime::Runtime;
 
@@ -209,16 +212,7 @@ pub fn start_session_with_base_ref(
 }
 
 pub fn git_head_sha(repo: &Path, refname: &str) -> String {
-    let out = Command::new("git")
-        .current_dir(repo)
-        .args(["log", refname, "-1", "--format=%H"])
-        .output()
-        .expect("git log");
-    assert!(out.status.success(), "git log failed for {refname}");
-    String::from_utf8(out.stdout)
-        .expect("utf8")
-        .trim()
-        .to_owned()
+    helper_git_head_sha(repo, refname)
 }
 
 pub fn delete_session_via_http(home: &Path, xdg: &Path, session_id: &str) -> u16 {
@@ -241,21 +235,7 @@ pub fn delete_session_via_http(home: &Path, xdg: &Path, session_id: &str) -> u16
 }
 
 pub fn git_branches_matching(repo: &Path, prefix: &str) -> Vec<String> {
-    let output = Command::new("git")
-        .current_dir(repo)
-        .args(["branch", "--list", &format!("{prefix}*")])
-        .output()
-        .expect("git branch");
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|line| {
-            let trimmed = line.trim();
-            let trimmed = trimmed.trim_start_matches("* ");
-            let trimmed = trimmed.trim_start_matches("+ ");
-            trimmed.to_string()
-        })
-        .filter(|line| !line.is_empty())
-        .collect()
+    helper_git_branches_matching(repo, prefix)
 }
 
 pub fn layout_for_state(xdg: &std::path::Path, state: &SessionState) -> SessionLayout {
