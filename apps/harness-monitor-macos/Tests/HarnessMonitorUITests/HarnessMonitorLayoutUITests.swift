@@ -87,15 +87,13 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(workerCard.exists)
   }
 
-  func testEmptyCockpitExplainsWhySessionActionsAreDisabled() throws {
+  func testEmptyCockpitKeepsControlPlaneActionsAvailable() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "empty-cockpit"]
     )
     let observeButton = button(in: app, title: "Observe")
-    let actionConsoleMessage = app.staticTexts[
-      "No session actor is available yet. Wait for a leader or active agent to join, then try again."
-    ]
+    let endSessionButton = button(in: app, title: "End Session")
     let createTaskTitleField = editableField(
       in: app,
       identifier: Accessibility.createTaskTitleField
@@ -103,16 +101,19 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let createTaskButton = button(in: app, identifier: Accessibility.createTaskButton)
 
     XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(actionConsoleMessage, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(endSessionButton, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(createTaskTitleField, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(createTaskButton, timeout: Self.fastActionTimeout))
 
-    XCTAssertFalse(observeButton.isEnabled)
+    XCTAssertTrue(observeButton.isEnabled)
+    XCTAssertTrue(endSessionButton.isEnabled)
 
     tapElement(in: app, identifier: Accessibility.createTaskTitleField)
-    app.typeText("Actorless task should stay disabled")
+    app.typeText("Actorless task should enable")
 
-    XCTAssertFalse(createTaskButton.isEnabled)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) { createTaskButton.isEnabled }
+    )
   }
 
   func testInspectorCardsFillTheirColumn() throws {
