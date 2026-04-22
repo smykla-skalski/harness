@@ -1,7 +1,7 @@
 //! Session-creation preparation shared by sync + async daemon paths.
 //!
 //! Resolves the project bucket, generates the session id, creates the
-//! per-session git worktree, writes initial `state.json`, and registers
+//! per-session linked checkout, writes initial `state.json`, and registers
 //! the session as active. Rolls back on failure so callers see all-or-nothing
 //! semantics.
 

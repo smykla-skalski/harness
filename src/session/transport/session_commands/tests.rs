@@ -1,5 +1,4 @@
 use std::net::TcpListener;
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -12,7 +11,7 @@ use crate::daemon::client::test_support::{
 };
 use crate::session::service::build_new_session_with_policy;
 use crate::workspace::utc_now;
-use harness_testkit::with_isolated_harness_env;
+use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
 #[test]
 fn session_title_execute_updates_active_session_via_daemon_client() {
@@ -77,14 +76,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
         });
 
         let project = tmp.path().join("project");
-        std::fs::create_dir_all(&project).expect("create project");
-        let status = Command::new("git")
-            .arg("init")
-            .arg("-q")
-            .arg(&project)
-            .status()
-            .expect("git init");
-        assert!(status.success(), "git init should succeed");
+        init_git_repo_with_seed(&project);
 
         let exit = SessionTitleArgs {
             session_id: "sess-title-daemon".into(),

@@ -34,7 +34,7 @@ impl SessionLayout {
         self.project_dir().join(&self.session_id)
     }
 
-    /// `<session_root>/workspace` — the git worktree managed by the daemon.
+    /// `<session_root>/workspace` — the linked checkout managed by the daemon.
     #[must_use]
     pub fn workspace(&self) -> PathBuf {
         self.session_root().join("workspace")

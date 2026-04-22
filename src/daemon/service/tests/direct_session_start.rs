@@ -1,7 +1,6 @@
 use super::*;
 
 use std::net::TcpListener;
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -183,17 +182,7 @@ fn session_start_honors_custom_base_ref() {
             init_git_with_branches(&project, "experimental");
             let db = setup_db_with_project(&project);
 
-            let experimental_head = {
-                let out = Command::new("git")
-                    .current_dir(&project)
-                    .args(["log", "experimental", "-1", "--format=%H"])
-                    .output()
-                    .expect("git log experimental");
-                String::from_utf8(out.stdout)
-                    .expect("utf8")
-                    .trim()
-                    .to_owned()
-            };
+            let experimental_head = harness_testkit::git_head_sha(&project, "experimental");
 
             let state = start_session_direct(
                 &crate::daemon::protocol::SessionStartRequest {
@@ -209,17 +198,7 @@ fn session_start_honors_custom_base_ref() {
             )
             .expect("start session with custom base_ref");
 
-            let worktree_head = {
-                let out = Command::new("git")
-                    .current_dir(&project)
-                    .args(["log", &state.branch_ref, "-1", "--format=%H"])
-                    .output()
-                    .expect("git log worktree branch");
-                String::from_utf8(out.stdout)
-                    .expect("utf8")
-                    .trim()
-                    .to_owned()
-            };
+            let worktree_head = harness_testkit::git_head_sha(&project, &state.branch_ref);
 
             assert_eq!(
                 worktree_head, experimental_head,

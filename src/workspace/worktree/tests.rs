@@ -1,115 +1,93 @@
-use std::process::Command;
+use std::path::Path;
 
+use git2::{IndexAddOption, Repository, Signature, build::RepoBuilder};
+use harness_testkit::{git_branches_matching, git_head_sha, init_git_repo_with_seed};
 use tempfile::TempDir;
 
 use super::*;
 use crate::workspace::layout::SessionLayout;
 
 fn init_origin_repo(tmp: &std::path::Path) {
-    Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .arg(tmp)
-        .output()
-        .unwrap();
-    std::fs::write(tmp.join("README"), b"seed").unwrap();
-    Command::new("git")
-        .current_dir(tmp)
-        .args(["add", "."])
-        .output()
-        .unwrap();
-    Command::new("git")
-        .current_dir(tmp)
-        .args([
-            "-c",
-            "user.email=a@b",
-            "-c",
-            "user.name=a",
-            "commit",
-            "-q",
-            "-m",
-            "seed",
-        ])
-        .output()
-        .unwrap();
-}
-
-fn git_output(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
-    Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .unwrap()
-}
-
-fn git_sha(dir: &std::path::Path, reference: &str) -> String {
-    let output = git_output(dir, &["rev-parse", reference]);
-    assert!(
-        output.status.success(),
-        "git rev-parse failed for {reference}"
-    );
-    String::from_utf8_lossy(&output.stdout).trim().to_string()
+    init_git_repo_with_seed(tmp);
 }
 
 fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str) {
+    let repo = Repository::open(dir).expect("open repo");
     std::fs::write(dir.join(path), contents).unwrap();
-    git_output(dir, &["add", path]);
-    let commit = git_output(
-        dir,
-        &[
-            "-c",
-            "user.email=a@b",
-            "-c",
-            "user.name=a",
-            "commit",
-            "-q",
-            "-m",
-            message,
-        ],
-    );
-    assert!(commit.status.success(), "git commit failed: {message}");
+    stage_path(&repo, Path::new(path));
+    commit_head(&repo, message);
 }
 
 fn init_checkout_with_upstream_remote() -> TempDir {
     let upstream = TempDir::new().unwrap();
-    let init_remote = Command::new("git")
-        .args(["init", "--bare", "-q"])
-        .arg(upstream.path())
-        .output()
-        .unwrap();
-    assert!(init_remote.status.success(), "init bare remote");
+    Repository::init_bare(upstream.path()).expect("init bare remote");
 
     let seed = TempDir::new().unwrap();
     init_origin_repo(seed.path());
-    let add_remote = Command::new("git")
-        .current_dir(seed.path())
-        .args(["remote", "add", "upstream"])
-        .arg(upstream.path())
-        .output()
-        .unwrap();
-    assert!(add_remote.status.success(), "add upstream remote");
-    let push = Command::new("git")
-        .current_dir(seed.path())
-        .args(["push", "-u", "upstream", "HEAD:refs/heads/main"])
-        .output()
-        .unwrap();
-    assert!(push.status.success(), "push seed to upstream");
-    let set_head = Command::new("git")
-        .current_dir(upstream.path())
-        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
-        .output()
-        .unwrap();
-    assert!(set_head.status.success(), "set upstream HEAD");
+    let seed_repo = Repository::open(seed.path()).expect("open seed repo");
+    let default_branch = current_branch_name(&seed_repo);
+    let mut remote = seed_repo
+        .remote(
+            "upstream",
+            upstream.path().to_str().expect("upstream path utf8"),
+        )
+        .expect("add upstream remote");
+    let refspec = format!("refs/heads/{default_branch}:refs/heads/main");
+    remote.push(&[refspec.as_str()], None).expect("push seed");
+    Repository::open_bare(upstream.path())
+        .expect("open bare upstream")
+        .set_head("refs/heads/main")
+        .expect("set upstream HEAD");
 
     let checkout = TempDir::new().unwrap();
-    let clone = Command::new("git")
-        .args(["clone", "--origin", "upstream"])
-        .arg(upstream.path())
-        .arg(checkout.path())
-        .output()
-        .unwrap();
-    assert!(clone.status.success(), "clone checkout from upstream");
+    let mut builder = RepoBuilder::new();
+    builder.remote_create(|repo, _name, url| repo.remote("upstream", url));
+    builder
+        .clone(
+            upstream.path().to_str().expect("upstream path utf8"),
+            checkout.path(),
+        )
+        .expect("clone checkout from upstream");
     checkout
+}
+
+fn stage_path(repo: &Repository, path: &Path) {
+    let mut index = repo.index().expect("open index");
+    index
+        .add_all([path], IndexAddOption::DEFAULT, None)
+        .expect("stage path");
+    index.write().expect("write index");
+}
+
+fn commit_head(repo: &Repository, message: &str) {
+    let mut index = repo.index().expect("open index");
+    let tree_id = index.write_tree().expect("write tree");
+    let tree = repo.find_tree(tree_id).expect("find tree");
+    let signature = Signature::now("test", "test@example.com").expect("signature");
+    let parents = repo
+        .head()
+        .ok()
+        .and_then(|head| head.peel_to_commit().ok())
+        .into_iter()
+        .collect::<Vec<_>>();
+    let parent_refs = parents.iter().collect::<Vec<_>>();
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        message,
+        &tree,
+        &parent_refs,
+    )
+    .expect("create commit");
+}
+
+fn current_branch_name(repo: &Repository) -> String {
+    repo.head()
+        .expect("repo head")
+        .shorthand()
+        .expect("branch shorthand")
+        .to_owned()
 }
 
 #[test]
@@ -124,7 +102,7 @@ fn creates_worktree_and_branch() {
     };
     std::fs::create_dir_all(layout.project_dir()).unwrap();
     WorktreeController::create(origin.path(), &layout, None).expect("create");
-    assert!(layout.workspace().join("README").exists());
+    assert!(layout.workspace().join("README.md").exists());
     assert!(layout.memory().exists());
 }
 
@@ -142,17 +120,7 @@ fn destroy_removes_worktree_and_branch() {
     WorktreeController::create(origin.path(), &layout, None).unwrap();
     WorktreeController::destroy(origin.path(), &layout).expect("destroy");
     assert!(!layout.workspace().exists());
-    let branches = Command::new("git")
-        .current_dir(origin.path())
-        .args(["branch", "--list", "harness/*"])
-        .output()
-        .unwrap();
-    assert!(
-        std::str::from_utf8(&branches.stdout)
-            .unwrap()
-            .trim()
-            .is_empty()
-    );
+    assert!(git_branches_matching(origin.path(), "harness/").is_empty());
 }
 
 /// Verify that when a post-add filesystem step fails, `create` rolls back
@@ -184,16 +152,8 @@ fn rollback_on_memory_create_failure() {
         "workspace should have been removed by rollback"
     );
 
-    let branches = Command::new("git")
-        .current_dir(origin.path())
-        .args(["branch", "--list", "harness/*"])
-        .output()
-        .unwrap();
     assert!(
-        std::str::from_utf8(&branches.stdout)
-            .unwrap()
-            .trim()
-            .is_empty(),
+        git_branches_matching(origin.path(), "harness/").is_empty(),
         "harness branch should have been deleted by rollback"
     );
 }
@@ -201,7 +161,7 @@ fn rollback_on_memory_create_failure() {
 #[test]
 fn resolve_base_ref_prefers_tracking_remote_head_over_local_head() {
     let checkout = init_checkout_with_upstream_remote();
-    let remote_tip = git_sha(checkout.path(), "upstream/main");
+    let remote_tip = git_head_sha(checkout.path(), "upstream/main");
 
     commit_file(
         checkout.path(),
@@ -209,12 +169,13 @@ fn resolve_base_ref_prefers_tracking_remote_head_over_local_head() {
         b"local-only",
         "local-only diverges from upstream/main",
     );
-    let local_tip = git_sha(checkout.path(), "HEAD");
+    let local_tip = git_head_sha(checkout.path(), "HEAD");
     assert_ne!(
         local_tip, remote_tip,
         "test setup must diverge from upstream"
     );
 
-    let resolved = resolve_base_ref(checkout.path()).expect("resolve base ref");
+    let repository = crate::git::GitRepository::discover(checkout.path()).expect("discover repo");
+    let resolved = resolve_base_ref(&repository).expect("resolve base ref");
     assert_eq!(resolved, "upstream/main");
 }
