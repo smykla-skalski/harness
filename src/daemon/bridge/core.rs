@@ -65,6 +65,14 @@ pub(super) struct BridgeActiveTui {
     pub(super) process: Arc<AgentTuiProcess>,
     pub(super) context: BridgeSnapshotContext,
     pub(super) created_at: String,
+    pub(super) exit_info: Option<BridgeTuiExitInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct BridgeTuiExitInfo {
+    pub(super) status: crate::daemon::agent_tui::AgentTuiStatus,
+    pub(super) exit_code: Option<u32>,
+    pub(super) signal: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -10,7 +10,9 @@ use crate::daemon::agent_tui::{
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};
 
-use super::core::{BridgeActiveTui, BridgeAgentTuiMetadata, BridgeSnapshotContext};
+use super::core::{
+    BridgeActiveTui, BridgeAgentTuiMetadata, BridgeSnapshotContext, BridgeTuiExitInfo,
+};
 use super::helpers::stringify_metadata_map;
 use super::server::BridgeServer;
 use super::types::{AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, BridgeCapability};
@@ -65,6 +67,7 @@ impl BridgeServer {
                 process,
                 context,
                 created_at: snapshot.created_at.clone(),
+                exit_info: None,
             },
         );
         self.update_agent_tui_metadata()?;
@@ -89,23 +92,43 @@ impl BridgeServer {
     }
 
     pub(super) fn get_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        let exit_info = self.resolve_tui_exit_state(tui_id)?;
         let active = self.active_tui(tui_id)?;
-        let mut status = AgentTuiStatus::Running;
-        let mut exit_code = None;
-        let mut signal = None;
-        if let Some(exit_status) = active.process.try_wait()? {
-            status = AgentTuiStatus::Exited;
-            exit_code = Some(exit_status.exit_code());
-            signal = exit_status.signal().map(ToString::to_string);
-            let _ = self.active_tuis()?.remove(tui_id);
-            self.update_agent_tui_metadata()?;
-        }
+        let (status, exit_code, signal) = exit_info
+            .map_or((AgentTuiStatus::Running, None, None), |info| {
+                (info.status, info.exit_code, info.signal)
+            });
         let mut snapshot =
             snapshot_from_process(&active.context.borrowed(), &active.process, status)?;
         snapshot.created_at = active.created_at;
         snapshot.exit_code = exit_code;
         snapshot.signal = signal;
         Ok(snapshot)
+    }
+
+    /// Return the cached exit info for `tui_id`, detecting fresh exits via
+    /// `try_wait` when needed. The entry stays in `active_tuis` so repeat
+    /// queries remain idempotent until `stop_agent_tui` removes it.
+    fn resolve_tui_exit_state(&self, tui_id: &str) -> Result<Option<BridgeTuiExitInfo>, CliError> {
+        let mut active_tuis = self.active_tuis()?;
+        let entry = active_tuis.get_mut(tui_id).ok_or_else(|| {
+            CliErrorKind::session_not_active(format!(
+                "terminal agent '{tui_id}' is not active in host bridge"
+            ))
+        })?;
+        if let Some(info) = &entry.exit_info {
+            return Ok(Some(info.clone()));
+        }
+        let Some(exit_status) = entry.process.try_wait()? else {
+            return Ok(None);
+        };
+        let info = BridgeTuiExitInfo {
+            status: AgentTuiStatus::Exited,
+            exit_code: Some(exit_status.exit_code()),
+            signal: exit_status.signal().map(ToString::to_string),
+        };
+        entry.exit_info = Some(info.clone());
+        Ok(Some(info))
     }
 
     pub(super) fn stop_agent_tui(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
@@ -172,7 +195,96 @@ fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<St
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use crate::daemon::agent_tui::{
+        AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSpawnSpec, AgentTuiStatus,
+        PortablePtyAgentTuiBackend,
+    };
+    use crate::daemon::bridge::core::{BridgeActiveTui, BridgeSnapshotContext};
+    use crate::daemon::bridge::server::BridgeServer;
+    use crate::daemon::bridge::types::PersistedBridgeConfig;
+    use crate::daemon::state::HostBridgeCapabilityManifest;
+
     use super::bridge_deferred_auto_join;
+
+    fn make_test_server(tmp: &std::path::Path) -> Arc<BridgeServer> {
+        Arc::new(BridgeServer::new(
+            "test-token".to_string(),
+            tmp.join("bridge.sock"),
+            PersistedBridgeConfig::default(),
+            BTreeMap::<String, HostBridgeCapabilityManifest>::new(),
+        ))
+    }
+
+    fn spawn_quick_exit_tui(tmp: &std::path::Path, tui_id: &str) -> BridgeActiveTui {
+        let profile = AgentTuiLaunchProfile::from_argv(
+            "codex",
+            vec!["sh".to_string(), "-c".to_string(), "exit 0".to_string()],
+        )
+        .expect("profile");
+        let spec = AgentTuiSpawnSpec::new(
+            profile.clone(),
+            tmp.to_path_buf(),
+            BTreeMap::new(),
+            AgentTuiSize { rows: 5, cols: 40 },
+        )
+        .expect("spec");
+        let process = PortablePtyAgentTuiBackend.spawn(spec).expect("spawn");
+        let transcript_path = tmp.join("transcript.raw");
+        BridgeActiveTui {
+            process: Arc::new(process),
+            context: BridgeSnapshotContext {
+                session_id: "sess".into(),
+                agent_id: String::new(),
+                tui_id: tui_id.into(),
+                profile,
+                project_dir: tmp.to_path_buf(),
+                transcript_path,
+            },
+            created_at: "2026-04-22T09:00:00Z".into(),
+            exit_info: None,
+        }
+    }
+
+    #[test]
+    fn get_agent_tui_is_idempotent_after_child_exit() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let server = make_test_server(tmp.path());
+        let tui_id = "bridge-tui-exit".to_string();
+        let active = spawn_quick_exit_tui(tmp.path(), &tui_id);
+        server
+            .active_tuis
+            .lock()
+            .expect("active lock")
+            .insert(tui_id.clone(), active);
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let mut first_exited = None;
+        while std::time::Instant::now() < deadline {
+            match server.get_agent_tui(&tui_id) {
+                Ok(snapshot) if snapshot.status == AgentTuiStatus::Exited => {
+                    first_exited = Some(snapshot);
+                    break;
+                }
+                Ok(_) => std::thread::sleep(Duration::from_millis(25)),
+                Err(error) => panic!("unexpected get failure: {error}"),
+            }
+        }
+        let first = first_exited.expect("tui should transition to Exited within timeout");
+        assert_eq!(first.status, AgentTuiStatus::Exited);
+
+        // Repeated get after exit must stay idempotent: return the same Exited
+        // snapshot instead of surfacing a "not active" error.
+        let second = server
+            .get_agent_tui(&tui_id)
+            .expect("idempotent get after exit");
+        assert_eq!(second.status, AgentTuiStatus::Exited);
+        assert_eq!(second.exit_code, first.exit_code);
+        assert_eq!(second.tui_id, tui_id);
+    }
 
     #[test]
     fn deferred_auto_join_skips_cli_prompt_runtimes() {
