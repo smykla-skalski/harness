@@ -11,4 +11,5 @@ public enum HarnessMonitorLogger {
   public static let lifecycle = Logger(subsystem: "io.harnessmonitor", category: "lifecycle")
   public static let sleep = Logger(subsystem: "io.harnessmonitor", category: "sleep")
   public static let thumbnail = Logger(subsystem: "io.harnessmonitor", category: "thumbnail")
+  public static let supervisor = Logger(subsystem: "io.harnessmonitor", category: "supervisor")
 }
