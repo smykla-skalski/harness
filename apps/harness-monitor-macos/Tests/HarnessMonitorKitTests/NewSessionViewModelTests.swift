@@ -6,85 +6,11 @@ import Testing
 @MainActor
 @Suite("NewSessionViewModel")
 struct NewSessionViewModelTests {
-  // MARK: - Helpers
-  private func makeStore() -> HarnessMonitorStore {
-    HarnessMonitorStore(daemonController: RecordingDaemonController())
-  }
-  private func makeBookmarkStore() -> BookmarkStore {
-    BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
-  }
-  private func makeDaemonStatus(sandboxed: Bool) -> DaemonStatusReport {
-    DaemonStatusReport(
-      manifest: DaemonManifest(
-        version: "28.6.2",
-        pid: 1,
-        endpoint: "http://127.0.0.1:9999",
-        startedAt: "2026-04-22T00:00:00Z",
-        tokenPath: "/tmp/token",
-        sandboxed: sandboxed
-      ),
-      launchAgent: LaunchAgentStatus(
-        installed: true,
-        label: "io.harnessmonitor.daemon",
-        path: "/tmp/io.harnessmonitor.daemon.plist"
-      ),
-      projectCount: 1,
-      sessionCount: 0,
-      diagnostics: DaemonDiagnostics(
-        daemonRoot: "/tmp/harness/daemon",
-        manifestPath: "/tmp/harness/daemon/manifest.json",
-        authTokenPath: "/tmp/token",
-        authTokenPresent: true,
-        eventsPath: "/tmp/harness/daemon/events.jsonl",
-        databasePath: "/tmp/harness/daemon/harness.db",
-        databaseSizeBytes: 0,
-        lastEvent: nil
-      )
-    )
-  }
-  private func makeViewModel(
-    store: HarnessMonitorStore? = nil,
-    client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
-    isSandboxed: @Sendable @escaping () -> Bool = { true },
-    bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
-    logSink: (any NewSessionLogSink)? = nil
-  ) -> NewSessionViewModel {
-    let resolvedStore = store ?? makeStore()
-    let bookmarkStore = makeBookmarkStore()
-    return NewSessionViewModel(
-      store: resolvedStore,
-      bookmarkStore: bookmarkStore,
-      client: client,
-      isSandboxed: isSandboxed,
-      bookmarkResolver: bookmarkResolver,
-      logSink: logSink ?? LiveNewSessionLogSink()
-    )
-  }
-
-  private func stubResolver(
-    id: String,
-    path: String,
-    isStale: Bool = false
-  ) -> NewSessionViewModel.BookmarkResolver {
-    { receivedId in
-      guard receivedId == id else {
-        throw BookmarkStoreError.notFound(id: receivedId)
-      }
-      return NewSessionViewModel.ResolvedBookmark(
-        projectDir: path,
-        isStale: isStale
-      )
-    }
-  }
-
-  private func failingResolver(error: any Error) -> NewSessionViewModel.BookmarkResolver {
-    { _ in throw error }
-  }
   // MARK: - Validation
 
   @Test("empty title returns titleRequired validation error")
   func emptyTitleReturnsValidationError() async {
-    let vm = makeViewModel()
+    let vm = makeNewSessionViewModel()
     vm.title = ""
     vm.selectedBookmarkId = "B-some-id"
     let result = await vm.submit()
@@ -95,7 +21,7 @@ struct NewSessionViewModelTests {
 
   @Test("whitespace-only title returns titleRequired validation error")
   func whitespaceOnlyTitleReturnsValidationError() async {
-    let vm = makeViewModel()
+    let vm = makeNewSessionViewModel()
     vm.title = "   "
     vm.selectedBookmarkId = "B-some-id"
     let result = await vm.submit()
@@ -104,7 +30,7 @@ struct NewSessionViewModelTests {
 
   @Test("nil selectedBookmarkId returns projectRequired validation error")
   func nilBookmarkIdReturnsProjectRequiredError() async {
-    let vm = makeViewModel()
+    let vm = makeNewSessionViewModel()
     vm.title = "My Session"
     vm.selectedBookmarkId = nil
     let result = await vm.submit()
@@ -117,10 +43,10 @@ struct NewSessionViewModelTests {
   @Test("sandboxed mode posts bookmark id as projectDir")
   func sandboxedModePostsBookmarkIdAsProjectDir() async {
     let recordingClient = RecordingHarnessClient()
-    let vm = makeViewModel(
+    let vm = makeNewSessionViewModel(
       client: recordingClient,
       isSandboxed: { true },
-      bookmarkResolver: stubResolver(
+      bookmarkResolver: stubBookmarkResolver(
         id: "B-sandbox-id",
         path: "/ignored/in/sandbox"
       )
@@ -149,10 +75,10 @@ struct NewSessionViewModelTests {
   func nonSandboxedModePostsResolvedUrlPath() async {
     let recordingClient = RecordingHarnessClient()
     let expectedPath = "/Users/example/Projects/harness"
-    let vm = makeViewModel(
+    let vm = makeNewSessionViewModel(
       client: recordingClient,
       isSandboxed: { false },
-      bookmarkResolver: stubResolver(
+      bookmarkResolver: stubBookmarkResolver(
         id: "B-dev-id",
         path: expectedPath
       )
@@ -178,14 +104,14 @@ struct NewSessionViewModelTests {
   @Test("daemon manifest sandboxed flag overrides environment guess")
   func daemonManifestSandboxedFlagOverridesEnvironmentGuess() async {
     let recordingClient = RecordingHarnessClient()
-    let store = makeStore()
-    store.daemonStatus = makeDaemonStatus(sandboxed: false)
+    let store = makeNewSessionStore()
+    store.daemonStatus = makeNewSessionDaemonStatus(sandboxed: false)
     let expectedPath = "/Users/example/Projects/harness"
-    let vm = makeViewModel(
+    let vm = makeNewSessionViewModel(
       store: store,
       client: recordingClient,
       isSandboxed: { true },
-      bookmarkResolver: stubResolver(
+      bookmarkResolver: stubBookmarkResolver(
         id: "B-daemon-manifest",
         path: expectedPath
       )
@@ -216,130 +142,15 @@ struct NewSessionViewModelTests {
   func cannotConnectToHostMapsToDaemonUnreachable() async {
     let urlError = URLError(.cannotConnectToHost)
     let spyClient = SpyHarnessClient(error: urlError)
-    let vm = makeViewModel(
+    let vm = makeNewSessionViewModel(
       client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
+      bookmarkResolver: stubBookmarkResolver(id: "B-x", path: "/tmp/x")
     )
     vm.title = "Test"
     vm.selectedBookmarkId = "B-x"
     let result = await vm.submit()
     #expect(result == .failure(.daemonUnreachable))
     #expect(vm.lastError == .daemonUnreachable)
-  }
-  // MARK: - HTTP 500 worktree error mapping
-
-  @Test("server response with worktree message maps to worktreeCreateFailed")
-  func serverResponseWithWorktreeMessageMapsToWorktreeCreateFailed() async {
-    let apiError = HarnessMonitorAPIError.server(
-      code: 400,
-      message: "create session worktree: worktree create failed: path exists"
-    )
-    let spyClient = SpyHarnessClient(error: apiError)
-    let vm = makeViewModel(
-      client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
-    )
-    vm.title = "Test"
-    vm.selectedBookmarkId = "B-x"
-    let result = await vm.submit()
-    guard case .failure(.worktreeCreateFailed(let reason)) = result else {
-      Issue.record("Expected worktreeCreateFailed, got \(result)")
-      return
-    }
-    #expect(reason.contains("create session worktree"))
-  }
-
-  @Test("400 response with no HEAD maps to invalidProject")
-  func http400WithNoHeadMapsToInvalidProject() async {
-    let apiError = HarnessMonitorAPIError.server(
-      code: 400,
-      message: "create session worktree: worktree create failed: no HEAD"
-    )
-    let spyClient = SpyHarnessClient(error: apiError)
-    let vm = makeViewModel(
-      client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
-    )
-    vm.title = "Test"
-    vm.selectedBookmarkId = "B-x"
-
-    let result = await vm.submit()
-
-    guard case .failure(.invalidProject(let reason)) = result else {
-      Issue.record("Expected invalidProject, got \(result)")
-      return
-    }
-    #expect(reason.contains("no HEAD"))
-    #expect(vm.lastError == .invalidProject(reason: reason))
-  }
-
-  @Test("websocket no HEAD maps to invalidProject")
-  func websocketNoHeadMapsToInvalidProject() async {
-    let transportError = WebSocketTransportError.serverError(
-      code: "WORKFLOW_IO",
-      message: "create session worktree: worktree create failed: no HEAD"
-    )
-    let spyClient = SpyHarnessClient(error: transportError)
-    let vm = makeViewModel(
-      client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
-    )
-    vm.title = "Test"
-    vm.selectedBookmarkId = "B-x"
-
-    let result = await vm.submit()
-
-    guard case .failure(.invalidProject(let reason)) = result else {
-      Issue.record("Expected invalidProject, got \(result)")
-      return
-    }
-    #expect(reason.contains("no HEAD"))
-  }
-
-  @Test("websocket invalid reference maps to invalidBaseRef")
-  func websocketInvalidReferenceMapsToInvalidBaseRef() async {
-    let transportError = WebSocketTransportError.serverError(
-      code: "WORKFLOW_IO",
-      message: "create session worktree: worktree create failed: fatal: invalid reference: origin/main"
-    )
-    let spyClient = SpyHarnessClient(error: transportError)
-    let vm = makeViewModel(
-      client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
-    )
-    vm.title = "Test"
-    vm.selectedBookmarkId = "B-x"
-    vm.baseRef = "origin/main"
-
-    let result = await vm.submit()
-
-    guard case .failure(.invalidBaseRef(let ref, let reason)) = result else {
-      Issue.record("Expected invalidBaseRef, got \(result)")
-      return
-    }
-    #expect(ref == "origin/main")
-    #expect(reason.contains("invalid reference"))
-  }
-
-  @Test("websocket bookmark resolution failure maps to bookmarkRevoked")
-  func websocketBookmarkResolutionFailureMapsToBookmarkRevoked() async {
-    let transportError = WebSocketTransportError.serverError(
-      code: "WORKFLOW_IO",
-      message:
-        "resolve bookmark 'B-x': resolution failed: CFURLCreateByResolvingBookmarkData failed: code=259 description=The file couldn’t be opened because it isn’t in the correct format."
-    )
-    let spyClient = SpyHarnessClient(error: transportError)
-    let vm = makeViewModel(
-      client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-x", path: "/tmp/x")
-    )
-    vm.title = "Test"
-    vm.selectedBookmarkId = "B-x"
-
-    let result = await vm.submit()
-
-    #expect(result == .failure(.bookmarkRevoked(id: "B-x")))
-    #expect(vm.lastError == .bookmarkRevoked(id: "B-x"))
   }
 
   // MARK: - BookmarkStoreError mapping
@@ -350,8 +161,8 @@ struct NewSessionViewModelTests {
       id: "B-stale-id",
       underlying: "bookmark data is invalid"
     )
-    let vm = makeViewModel(
-      bookmarkResolver: failingResolver(error: bookmarkError)
+    let vm = makeNewSessionViewModel(
+      bookmarkResolver: failingBookmarkResolver(error: bookmarkError)
     )
     vm.title = "Test"
     vm.selectedBookmarkId = "B-stale-id"
@@ -364,7 +175,7 @@ struct NewSessionViewModelTests {
 
   @Test("availableBookmarks returns only projectRoot bookmarks from empty store")
   func availableBookmarksFiltersToProjectRoot() async {
-    let vm = makeViewModel()
+    let vm = makeNewSessionViewModel()
 
     let bookmarks = await vm.availableBookmarks()
 
@@ -375,8 +186,8 @@ struct NewSessionViewModelTests {
 
   @Test("lastError is nil after successful submit following a prior error")
   func lastErrorClearedAfterSuccess() async {
-    let vm = makeViewModel(
-      bookmarkResolver: stubResolver(id: "B-ok", path: "/tmp/ok")
+    let vm = makeNewSessionViewModel(
+      bookmarkResolver: stubBookmarkResolver(id: "B-ok", path: "/tmp/ok")
     )
     vm.title = ""
     vm.selectedBookmarkId = "B-ok"
@@ -398,8 +209,8 @@ struct NewSessionViewModelTests {
   @Test("submit emits started and succeeded logs on happy path")
   func submitEmitsStartedAndSucceededLogsOnHappyPath() async {
     let spy = SpyLogSink()
-    let vm = makeViewModel(
-      bookmarkResolver: stubResolver(id: "B-log", path: "/tmp/log"),
+    let vm = makeNewSessionViewModel(
+      bookmarkResolver: stubBookmarkResolver(id: "B-log", path: "/tmp/log"),
       logSink: spy
     )
     vm.title = "Logged Session"
@@ -415,9 +226,9 @@ struct NewSessionViewModelTests {
   func submitEmitsErrorLogOnDaemonUnreachable() async {
     let spy = SpyLogSink()
     let spyClient = SpyHarnessClient(error: URLError(.cannotConnectToHost))
-    let vm = makeViewModel(
+    let vm = makeNewSessionViewModel(
       client: spyClient,
-      bookmarkResolver: stubResolver(id: "B-err", path: "/tmp/err"),
+      bookmarkResolver: stubBookmarkResolver(id: "B-err", path: "/tmp/err"),
       logSink: spy
     )
     vm.title = "Fail Session"

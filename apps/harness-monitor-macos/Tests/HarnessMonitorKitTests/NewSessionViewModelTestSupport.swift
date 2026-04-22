@@ -2,6 +2,83 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
+@MainActor
+func makeNewSessionStore() -> HarnessMonitorStore {
+  HarnessMonitorStore(daemonController: RecordingDaemonController())
+}
+
+func makeNewSessionBookmarkStore() -> BookmarkStore {
+  BookmarkStore(containerURL: FileManager.default.temporaryDirectory)
+}
+
+func makeNewSessionDaemonStatus(sandboxed: Bool) -> DaemonStatusReport {
+  DaemonStatusReport(
+    manifest: DaemonManifest(
+      version: "28.6.2",
+      pid: 1,
+      endpoint: "http://127.0.0.1:9999",
+      startedAt: "2026-04-22T00:00:00Z",
+      tokenPath: "/tmp/token",
+      sandboxed: sandboxed
+    ),
+    launchAgent: LaunchAgentStatus(
+      installed: true,
+      label: "io.harnessmonitor.daemon",
+      path: "/tmp/io.harnessmonitor.daemon.plist"
+    ),
+    projectCount: 1,
+    sessionCount: 0,
+    diagnostics: DaemonDiagnostics(
+      daemonRoot: "/tmp/harness/daemon",
+      manifestPath: "/tmp/harness/daemon/manifest.json",
+      authTokenPath: "/tmp/token",
+      authTokenPresent: true,
+      eventsPath: "/tmp/harness/daemon/events.jsonl",
+      databasePath: "/tmp/harness/daemon/harness.db",
+      databaseSizeBytes: 0,
+      lastEvent: nil
+    )
+  )
+}
+
+@MainActor
+func makeNewSessionViewModel(
+  store: HarnessMonitorStore? = nil,
+  client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
+  isSandboxed: @Sendable @escaping () -> Bool = { true },
+  bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
+  logSink: (any NewSessionLogSink)? = nil
+) -> NewSessionViewModel {
+  NewSessionViewModel(
+    store: store ?? makeNewSessionStore(),
+    bookmarkStore: makeNewSessionBookmarkStore(),
+    client: client,
+    isSandboxed: isSandboxed,
+    bookmarkResolver: bookmarkResolver,
+    logSink: logSink ?? LiveNewSessionLogSink()
+  )
+}
+
+func stubBookmarkResolver(
+  id: String,
+  path: String,
+  isStale: Bool = false
+) -> NewSessionViewModel.BookmarkResolver {
+  { receivedID in
+    guard receivedID == id else {
+      throw BookmarkStoreError.notFound(id: receivedID)
+    }
+    return NewSessionViewModel.ResolvedBookmark(
+      projectDir: path,
+      isStale: isStale
+    )
+  }
+}
+
+func failingBookmarkResolver(error: any Error) -> NewSessionViewModel.BookmarkResolver {
+  { _ in throw error }
+}
+
 final class SpyLogSink: NewSessionLogSink, @unchecked Sendable {
   private let lock = NSLock()
   private(set) var infoMessages: [String] = []
@@ -48,13 +125,17 @@ final class SpyHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable 
   func timeline(sessionID _: String) async throws -> [TimelineEntry] { throw error }
 
   nonisolated func globalStream() -> DaemonPushEventStream {
-    let err = error
-    return AsyncThrowingStream { $0.finish(throwing: err) }
+    let currentError = error
+    return AsyncThrowingStream { continuation in
+      continuation.finish(throwing: currentError)
+    }
   }
 
   nonisolated func sessionStream(sessionID _: String) -> DaemonPushEventStream {
-    let err = error
-    return AsyncThrowingStream { $0.finish(throwing: err) }
+    let currentError = error
+    return AsyncThrowingStream { continuation in
+      continuation.finish(throwing: currentError)
+    }
   }
 
   func createTask(
