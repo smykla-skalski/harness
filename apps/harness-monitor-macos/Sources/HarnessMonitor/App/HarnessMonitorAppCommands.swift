@@ -13,7 +13,7 @@ struct HarnessMonitorAppCommands: Commands {
   @Environment(\.openWindow)
   private var openWindow
   @FocusedValue(\.harnessSidebarSearchFocusAction)
-  private var sidebarSearchFocusAction
+  private var sidebarSearchFocus
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
@@ -98,10 +98,10 @@ struct HarnessMonitorAppCommands: Commands {
     }
     CommandMenu("Harness Monitor") {
       Button("Find in Sessions") {
-        sidebarSearchFocusAction?()
+        sidebarSearchFocus?.invoke()
       }
       .keyboardShortcut("f", modifiers: .command)
-      .disabled(sidebarSearchFocusAction == nil)
+      .disabled(sidebarSearchFocus?.isAvailable != true)
 
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command, .shift])
