@@ -50,8 +50,8 @@ fn removed_agent_loses_mutation_permissions() {
 #[test]
 fn assign_role_rejects_leader_changes() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("roles")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("roles"))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "roles",
@@ -86,8 +86,8 @@ fn assign_role_rejects_leader_changes() {
 #[test]
 fn assign_task_requires_active_assignee() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("assign")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("assign"))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "assign",
@@ -233,8 +233,8 @@ fn leader_cannot_assign_task_to_observer() {
 #[test]
 fn transfer_leader_requires_active_target() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("transfer")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("transfer"))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "transfer",

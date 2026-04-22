@@ -151,7 +151,6 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             "late gemini runtime session id",
             "",
             project,
-            Some("claude"),
             Some("sess-gemini-late"),
         )
         .expect("start session");

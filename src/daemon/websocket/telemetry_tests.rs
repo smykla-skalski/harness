@@ -180,9 +180,7 @@ fn find_exported_span<'a>(spans: &'a [SpanData], name: &str) -> &'a SpanData {
 }
 
 fn exported_span<'a>(spans: &'a [SpanData], name: &str) -> Option<&'a SpanData> {
-    spans
-        .iter()
-        .find(|span| span.name.as_ref() == name)
+    spans.iter().find(|span| span.name.as_ref() == name)
 }
 
 fn span_string_attribute(span: &SpanData, key: &str) -> Option<String> {

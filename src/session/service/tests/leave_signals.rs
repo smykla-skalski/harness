@@ -3,8 +3,8 @@ use super::*;
 #[test]
 fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("end-leave")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("end-leave"))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("end-leave-worker"))], || {
             join_session(
@@ -129,8 +129,9 @@ fn remove_agent_sends_abort_leave_signal_to_removed_agent() {
 #[test]
 fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("end-leave-fail"))
-            .expect("start");
+        let state =
+            start_active_session("test", "", project, Some("claude"), Some("end-leave-fail"))
+                .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
             "end-leave-fail",

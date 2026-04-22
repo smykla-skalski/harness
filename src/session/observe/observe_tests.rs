@@ -5,14 +5,14 @@ use crate::session::types::{SessionRole, TaskSeverity};
 use super::once::execute_session_observe;
 use super::scan::scan_all_agents;
 use super::support::create_work_items_for_issues;
-use super::test_support::{infrastructure_issue, with_temp_project, write_agent_log};
+use super::test_support::{
+    infrastructure_issue, start_active_session, with_temp_project, write_agent_log,
+};
 
 #[test]
 fn observe_scans_logs_via_runtime_session_id() {
     with_temp_project(|project| {
-        let state =
-            service::start_session("observe test", "", project, Some("claude"), Some("sess-1"))
-                .expect("start session");
+        let state = start_active_session(project, "sess-1", "observe test");
 
         temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
             let joined = service::join_session(
@@ -53,14 +53,7 @@ fn observe_scans_logs_via_runtime_session_id() {
 #[test]
 fn observe_scans_logs_via_legacy_session_fallback() {
     with_temp_project(|project| {
-        let state = service::start_session(
-            "observe test",
-            "",
-            project,
-            Some("claude"),
-            Some("sess-legacy"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "sess-legacy", "observe test");
 
         let joined = service::join_session(
             &state.session_id,
@@ -116,8 +109,7 @@ fn observe_scans_logs_via_legacy_session_fallback() {
 #[test]
 fn observe_without_actor_stays_read_only() {
     with_temp_project(|project| {
-        service::start_session("observe test", "", project, Some("claude"), Some("sess-2"))
-            .expect("start session");
+        start_active_session(project, "sess-2", "observe test");
         write_agent_log(
             project,
             HookAgent::Claude,
@@ -141,9 +133,7 @@ fn observe_without_actor_stays_read_only() {
 #[test]
 fn observe_keeps_distinct_issue_ids_when_titles_match() {
     with_temp_project(|project| {
-        let state =
-            service::start_session("observe test", "", project, Some("claude"), Some("sess-3"))
-                .expect("start session");
+        let state = start_active_session(project, "sess-3", "observe test");
         let leader_id = state.leader_id.clone().expect("leader id");
         let issues = vec![
             infrastructure_issue("fingerprint-a"),
@@ -166,9 +156,7 @@ fn observe_keeps_distinct_issue_ids_when_titles_match() {
 #[test]
 fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
     with_temp_project(|project| {
-        let state =
-            service::start_session("observe test", "", project, Some("claude"), Some("sess-4"))
-                .expect("start session");
+        let state = start_active_session(project, "sess-4", "observe test");
         let leader_id = state.leader_id.clone().expect("leader id");
         let issue = infrastructure_issue("fingerprint-a");
 

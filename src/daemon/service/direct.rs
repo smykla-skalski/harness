@@ -29,7 +29,6 @@ pub fn start_session_direct(
             &request.context,
             &request.title,
             Path::new(&request.project_dir),
-            None,
             request.session_id.as_deref(),
             request.policy_preset.as_deref(),
         );

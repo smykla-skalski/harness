@@ -1,9 +1,8 @@
 use super::{
     AgentRegistration, BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject,
-    SessionLogEntry, SessionState, TaskCheckpoint, WorkItem, daemon_timeline,
-    db_error, extract_transition_kind, i64_from_u64, normalize_change_scope,
-    session_status_db_label, stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry,
-    utc_now,
+    SessionLogEntry, SessionState, TaskCheckpoint, WorkItem, daemon_timeline, db_error,
+    extract_transition_kind, i64_from_u64, normalize_change_scope, session_status_db_label,
+    stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry, utc_now,
 };
 use crate::session::service::canonicalize_active_session_without_leader;
 

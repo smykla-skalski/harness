@@ -29,7 +29,7 @@ pub(super) fn start_active_session(
     _runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    let state = start_session(context, title, project, None, session_id)?;
+    let state = start_session(context, title, project, session_id)?;
     join_test_leader(&state.session_id, project)
 }
 
@@ -41,8 +41,7 @@ pub(super) fn start_active_session_with_policy(
     session_id: Option<&str>,
     policy_preset: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    let state =
-        start_session_with_policy(context, title, project, None, session_id, policy_preset)?;
+    let state = start_session_with_policy(context, title, project, session_id, policy_preset)?;
     join_test_leader(&state.session_id, project)
 }
 

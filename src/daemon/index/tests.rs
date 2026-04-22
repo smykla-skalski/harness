@@ -70,16 +70,26 @@ fn index_round_trip_smoke_covers_public_surface() {
         let project_dir = tmp.path().join("project-alpha");
         init_git_repo(&project_dir);
 
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            session_service::start_session(
+        let active = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
+            let state = session_service::start_session(
                 "Mission control",
                 "Keep daemon index queries healthy",
                 &project_dir,
-                Some("claude"),
                 Some("shared-session"),
             )
             .expect("start session");
+            session_service::join_session(
+                &state.session_id,
+                SessionRole::Leader,
+                "claude",
+                &[],
+                None,
+                &project_dir,
+                None,
+            )
+            .expect("join leader")
         });
+        let leader_id = active.leader_id.clone().expect("leader id");
 
         temp_env::with_vars(
             [
@@ -106,7 +116,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             .expect("joined state exists")
             .agents
             .keys()
-            .find(|agent_id| agent_id.as_str() != "claude-leader")
+            .find(|agent_id| agent_id.as_str() != leader_id)
             .cloned()
             .expect("worker agent id");
         let task = session_service::create_task(
@@ -114,7 +124,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             "Split daemon index",
             Some("exercise public index helpers"),
             crate::session::types::TaskSeverity::High,
-            "claude-leader",
+            &leader_id,
             &project_dir,
         )
         .expect("create task");
@@ -122,7 +132,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             "shared-session",
             &task.task_id,
             &worker_agent_id,
-            "claude-leader",
+            &leader_id,
             &project_dir,
         )
         .expect("assign task");
@@ -448,27 +458,22 @@ fn resolve_session_id_scopes_to_project_bucket_under_new_layout() {
         harness_testkit::init_git_repo_with_seed(&project_dir);
 
         let session_id = "alphasid";
+        temp_env::with_var("CODEX_SESSION_ID", Some("runtime-leader-codex"), || {
+            let state =
+                session_service::start_session("ctx", "title", &project_dir, Some(session_id))
+                    .expect("start session");
+            session_service::join_session(
+                &state.session_id,
+                SessionRole::Leader,
+                "codex",
+                &[],
+                None,
+                &project_dir,
+                None,
+            )
+            .expect("join leader");
+        });
         let project = discovered_project_for_checkout(&project_dir);
-        let layout = crate::session::storage::layout_from_project_dir(&project_dir, session_id)
-            .expect("build layout");
-        fs::create_dir_all(layout.session_root()).expect("session root");
-        let now = "2026-04-20T00:00:00Z";
-        let mut state =
-            session_service::build_new_session("title", "ctx", session_id, "claude", None, now);
-        state
-            .agents
-            .values_mut()
-            .next()
-            .expect("leader agent")
-            .agent_session_id = Some("runtime-leader-codex".into());
-        state
-            .agents
-            .values_mut()
-            .next()
-            .expect("leader agent")
-            .runtime = "codex".into();
-        crate::session::storage::create_state(&layout, &state).expect("write state");
-        crate::session::storage::register_active(&layout).expect("register active");
 
         let resolved =
             resolve_session_id_for_runtime_session(&project, "codex", "runtime-leader-codex")

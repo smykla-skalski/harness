@@ -70,9 +70,11 @@ fn daemon_serve_startup_groups_db_spans_under_startup_root() {
     let spans = exporter.finished_spans();
     let startup_span = find_exported_span(&spans, "daemon.lifecycle.startup");
     assert!(
-        startup_span.events.events.iter().any(|event| {
-            event.name == "initializing daemon database schema"
-        }),
+        startup_span
+            .events
+            .events
+            .iter()
+            .any(|event| { event.name == "initializing daemon database schema" }),
         "startup span should capture sync DB initialization"
     );
     assert!(

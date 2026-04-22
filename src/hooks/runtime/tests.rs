@@ -10,7 +10,7 @@ use crate::hooks::protocol::context::{
     AgentContext, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
 use crate::session::storage as session_storage;
-use crate::session::types::{SessionRole, SessionTransition};
+use crate::session::types::{SessionRole, SessionState, SessionTransition};
 
 fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempdir().expect("tempdir");
@@ -23,17 +23,25 @@ fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     });
 }
 
+fn start_active_session(project: &Path, session_id: &str, context: &str) -> SessionState {
+    let state = session_service::start_session(context, "", project, Some(session_id))
+        .expect("start session");
+    session_service::join_session(
+        &state.session_id,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        Some("leader"),
+        project,
+        None,
+    )
+    .expect("join leader")
+}
+
 #[test]
 fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
-            "signal hook test",
-            "",
-            project,
-            Some("claude"),
-            Some("hook-sess"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "hook-sess", "signal hook test");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
             session_service::join_session(
@@ -105,14 +113,7 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
 #[test]
 fn collect_signal_context_marks_expired_signal_without_injecting_context() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
-            "expired signal hook test",
-            "",
-            project,
-            Some("claude"),
-            Some("hook-expired-sess"),
-        )
-        .expect("start session");
+        let state = start_active_session(project, "hook-expired-sess", "expired signal hook test");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars(
             [("CODEX_SESSION_ID", Some("expired-worker-session"))],

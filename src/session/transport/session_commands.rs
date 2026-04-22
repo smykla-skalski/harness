@@ -37,7 +37,6 @@ impl Execute for SessionStartArgs {
             &self.context,
             &self.title,
             project.as_ref(),
-            None,
             self.session_id.as_deref(),
             self.policy_preset.as_deref(),
         )?;
