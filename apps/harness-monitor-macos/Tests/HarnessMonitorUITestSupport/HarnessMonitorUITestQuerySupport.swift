@@ -101,19 +101,19 @@ extension HarnessMonitorUITestCase {
     ]
 
     for role in roles {
-      let mainWindowMatch = mainWindow(in: app)
+      let mainWindowMatches = mainWindow(in: app)
         .descendants(matching: role)
         .matching(identifier: identifier)
-        .firstMatch
-      if mainWindowMatch.exists {
-        return mainWindowMatch
+        .allElementsBoundByIndex
+      if let preferredMainWindowMatch = preferredElement(from: mainWindowMatches) {
+        return preferredMainWindowMatch
       }
 
-      let appMatch = app.descendants(matching: role)
+      let appMatches = app.descendants(matching: role)
         .matching(identifier: identifier)
-        .firstMatch
-      if appMatch.exists {
-        return appMatch
+        .allElementsBoundByIndex
+      if let preferredAppMatch = preferredElement(from: appMatches) {
+        return preferredAppMatch
       }
     }
 
@@ -125,30 +125,49 @@ extension HarnessMonitorUITestCase {
 
     let roles: [XCUIElement.ElementType] = [
       .button,
+      .menuButton,
       .radioButton,
       .cell,
     ]
 
     for role in roles {
-      let mainWindowMatch = mainWindow(in: app)
+      let mainWindowMatches = mainWindow(in: app)
         .descendants(matching: role)
         .matching(predicate)
-        .firstMatch
-      if mainWindowMatch.exists {
-        return mainWindowMatch
+        .allElementsBoundByIndex
+      if let preferredMainWindowMatch = preferredElement(from: mainWindowMatches) {
+        return preferredMainWindowMatch
       }
 
-      let appMatch = app.descendants(matching: role)
+      let appMatches = app.descendants(matching: role)
         .matching(predicate)
-        .firstMatch
-      if appMatch.exists {
-        return appMatch
+        .allElementsBoundByIndex
+      if let preferredAppMatch = preferredElement(from: appMatches) {
+        return preferredAppMatch
       }
     }
 
     return app.descendants(matching: .any)
       .matching(predicate)
       .firstMatch
+  }
+
+  private func preferredElement(
+    from candidates: [XCUIElement]
+  ) -> XCUIElement? {
+    if let hittableCandidate = candidates.last(where: { candidate in
+      candidate.exists && !candidate.frame.isEmpty && candidate.isHittable
+    }) {
+      return hittableCandidate
+    }
+
+    if let visibleCandidate = candidates.last(where: { candidate in
+      candidate.exists && !candidate.frame.isEmpty
+    }) {
+      return visibleCandidate
+    }
+
+    return candidates.last(where: \.exists)
   }
 
   func sidebarSectionElement(
@@ -285,7 +304,6 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.sleepPreventionButton,
       HarnessMonitorUITestAccessibility.inspectorToggleButton,
       HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
-      HarnessMonitorUITestAccessibility.sidebarFilterMenu,
     ]
     if let button = toolbarButtons.first(where: { button in
       !excludedIdentifiers.contains(button.identifier)
@@ -294,5 +312,59 @@ extension HarnessMonitorUITestCase {
     }
 
     return toolbarButton(in: app, index: 0)
+  }
+
+  func sidebarFilterControl(in app: XCUIApplication) -> XCUIElement {
+    let identifiedControl = element(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.sidebarStatusPicker
+    )
+    if identifiedControl.exists, !identifiedControl.frame.isEmpty {
+      return identifiedControl
+    }
+
+    let titledControl = button(in: app, title: "Status")
+    return titledControl.exists ? titledControl : identifiedControl
+  }
+
+  func sidebarFilterControlDiagnostics(in app: XCUIApplication) -> String {
+    let roles: [XCUIElement.ElementType] = [
+      .button,
+      .menuButton,
+      .popUpButton,
+      .radioButton,
+      .cell,
+      .any,
+    ]
+    var lines: [String] = []
+
+    for role in roles {
+      let identifierMatches = mainWindow(in: app)
+        .descendants(matching: role)
+        .matching(identifier: HarnessMonitorUITestAccessibility.sidebarStatusPicker)
+        .allElementsBoundByIndex
+      for (index, element) in identifierMatches.enumerated() {
+        lines.append(
+          "identifier role=\(role.rawValue) index=\(index) exists=\(element.exists) "
+            + "hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label)"
+        )
+      }
+
+      let titleMatches = mainWindow(in: app)
+        .descendants(matching: role)
+        .matching(NSPredicate(format: "label == %@", "Status"))
+        .allElementsBoundByIndex
+      for (index, element) in titleMatches.enumerated() {
+        lines.append(
+          "title role=\(role.rawValue) index=\(index) exists=\(element.exists) "
+            + "hittable=\(element.isHittable) frame=\(element.frame) identifier=\(element.identifier)"
+        )
+      }
+    }
+
+    if lines.isEmpty {
+      return "no sidebar filter accessibility candidates"
+    }
+    return lines.joined(separator: "\n")
   }
 }

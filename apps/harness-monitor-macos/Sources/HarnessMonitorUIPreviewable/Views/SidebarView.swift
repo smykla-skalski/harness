@@ -7,6 +7,9 @@ struct SidebarView: View {
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let isSidebarSearchPresented: Bool
+  @Environment(\.isSearching)
+  private var isSearching
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -24,6 +27,13 @@ struct SidebarView: View {
     ]
   }
 
+  private var showsSearchAccessoryBar: Bool {
+    SidebarFilterVisibilityPolicy.showsControls(
+      for: controls,
+      isSearchActive: isSearching
+    )
+  }
+
   var body: some View {
     ViewBodySignposter.trace(Self.self, "SidebarView", attributes: profilingAttributes) {
       SidebarSessionListColumn(
@@ -32,6 +42,7 @@ struct SidebarView: View {
         projection: projection,
         searchResults: searchResults,
         sidebarUI: sidebarUI,
+        showsSearchControls: showsSearchAccessoryBar,
         dateTimeConfiguration: dateTimeConfiguration,
         fontScale: fontScale,
         collapsedCheckoutKeys: collapsedCheckoutKeys,
@@ -39,12 +50,6 @@ struct SidebarView: View {
       )
       .listStyle(.sidebar)
       .scrollEdgeEffectStyle(.soft, for: .top)
-      .safeAreaInset(edge: .top, spacing: 0) {
-        SidebarSearchAccessoryBar(
-          store: store,
-          controls: controls
-        )
-      }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
       }
@@ -58,7 +63,9 @@ struct SidebarView: View {
       .overlay {
         SidebarFilterStateMarker(
           controls: controls,
-          searchResults: searchResults
+          searchResults: searchResults,
+          isSidebarSearchPresented: isSidebarSearchPresented,
+          isSearchActive: isSearching
         )
       }
     }
@@ -96,6 +103,8 @@ private struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
 private struct SidebarFilterStateMarker: View {
   let controls: HarnessMonitorStore.SessionControlsSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
+  let isSidebarSearchPresented: Bool
+  let isSearchActive: Bool
 
   private var sidebarFilterStateValue: String {
     [
@@ -108,12 +117,30 @@ private struct SidebarFilterStateMarker: View {
     ].joined(separator: ", ")
   }
 
+  private var sidebarSearchStateValue: String {
+    let isVisible = SidebarFilterVisibilityPolicy.showsControls(
+      for: controls,
+      isSearchActive: isSearchActive
+    )
+    return [
+      "presented=\(isSidebarSearchPresented)",
+      "active=\(isSearchActive)",
+      "visible=\(isVisible)",
+    ].joined(separator: ", ")
+  }
+
   var body: some View {
     if HarnessMonitorUITestEnvironment.searchMarkersEnabled {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.sidebarFilterState,
-        text: sidebarFilterStateValue
-      )
+      Group {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.sidebarFilterState,
+          text: sidebarFilterStateValue
+        )
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.sidebarSearchState,
+          text: sidebarSearchStateValue
+        )
+      }
     }
   }
 }
@@ -124,6 +151,7 @@ private struct SidebarSessionListColumn: View {
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let showsSearchControls: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
@@ -171,6 +199,12 @@ private struct SidebarSessionListColumn: View {
 
   var body: some View {
     List(selection: sidebarSelection) {
+      if showsSearchControls {
+        SidebarSearchControlsSection(
+          store: store,
+          controls: controls
+        )
+      }
       SidebarSessionListContent(
         store: store,
         renderState: renderState,
@@ -180,10 +214,30 @@ private struct SidebarSessionListColumn: View {
         setCheckoutCollapsed: setCheckoutCollapsed
       )
     }
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.sidebarSessionListState,
       label: renderState.groupedStateAccessibilityLabel
     )
+  }
+}
+
+@MainActor
+enum SidebarFilterVisibilityPolicy {
+  static func hasActiveFilters(
+    in controls: HarnessMonitorStore.SessionControlsSlice
+  ) -> Bool {
+    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || controls.sessionFilter != .all
+      || controls.sessionFocusFilter != .all
+      || controls.sessionSortOrder != .recentActivity
+  }
+
+  static func showsControls(
+    for controls: HarnessMonitorStore.SessionControlsSlice,
+    isSearchActive: Bool
+  ) -> Bool {
+    isSearchActive || hasActiveFilters(in: controls)
   }
 }
 

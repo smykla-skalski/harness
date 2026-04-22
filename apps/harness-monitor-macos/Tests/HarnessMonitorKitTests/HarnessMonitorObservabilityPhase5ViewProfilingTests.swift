@@ -154,10 +154,6 @@ struct Phase5ViewProfilingTests {
         && viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView") != nil
         && viewBodySpanAttributes(
           in: collector.traceCollector,
-          viewName: "SidebarSearchAccessoryBar"
-        ) != nil
-        && viewBodySpanAttributes(
-          in: collector.traceCollector,
           viewName: "ToolbarCenterpieceView"
         ) != nil
         && viewBodySpanAttributes(
@@ -171,12 +167,6 @@ struct Phase5ViewProfilingTests {
     )
     let sidebarAttributes = try #require(
       viewBodySpanAttributes(in: collector.traceCollector, viewName: "SidebarView")
-    )
-    let accessoryAttributes = try #require(
-      viewBodySpanAttributes(
-        in: collector.traceCollector,
-        viewName: "SidebarSearchAccessoryBar"
-      )
     )
     let toolbarAttributes = try #require(
       viewBodySpanAttributes(
@@ -195,15 +185,20 @@ struct Phase5ViewProfilingTests {
       || store.sessionFilter != .all
       || store.sessionFocusFilter != .all
       || store.sessionSortOrder != .recentActivity
+    let accessoryAttributes = viewBodySpanAttributes(
+      in: collector.traceCollector,
+      viewName: "SidebarSearchControlsSection"
+    )
 
     #expect(contentAttributes["harness.view.surface"] == "dashboard")
+    #expect(contentAttributes["harness.view.column_visibility"] == "all")
+    #expect(contentAttributes["harness.view.inspector_presented"] == "true")
+    #expect(contentAttributes["harness.view.search_presented"] == "false")
     #expect(contentAttributes["harness.view.connection_state"] == nil)
     #expect(contentAttributes["harness.view.status_message_count"] == nil)
-    #expect(sidebarAttributes["harness.view.session_filter"] == "active")
-    #expect(
-      accessoryAttributes["harness.view.has_active_filters"]
-        == (hasActiveFilters ? "true" : "false")
-    )
+    #expect(sidebarAttributes["harness.view.session_filter"] == "all")
+    #expect(hasActiveFilters == false)
+    #expect(accessoryAttributes == nil)
     #expect(toolbarAttributes["harness.view.display_mode"] == "standard")
     #expect(toolbarAttributes["harness.view.connection_state"] == "online")
     #expect(toolbarAttributes["harness.view.status_message_count"] == "1")
