@@ -51,10 +51,9 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
 
     let request = with_bridge_env(tmp.path(), &host_home, || {
         let state = service::start_session_with_policy(
-            "bridge recovery",
             "",
+            "bridge recovery",
             &project,
-            Some("claude"),
             Some("bridge-recovery"),
             Some("swarm-default"),
         )

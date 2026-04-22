@@ -155,8 +155,7 @@ fn seed_workspace(tmp: &std::path::Path) {
     }
 
     let state_a =
-        session_service::start_session("perf-test", "", &project_a, Some("claude"), Some("s1"))
-            .expect("start s1");
+        session_service::start_session("", "perf-test", &project_a, Some("s1")).expect("start s1");
     session_service::join_session(
         "s1",
         SessionRole::Worker,
@@ -168,9 +167,8 @@ fn seed_workspace(tmp: &std::path::Path) {
     )
     .expect("join s1");
 
-    let state_b =
-        session_service::start_session("perf-test-2", "", &project_b, Some("claude"), Some("s2"))
-            .expect("start s2");
+    let state_b = session_service::start_session("", "perf-test-2", &project_b, Some("s2"))
+        .expect("start s2");
 
     let sessions = [
         ("s1", project_a.as_path(), &state_a),
@@ -272,7 +270,7 @@ fn daemon_status_report_within_budget() {
         state::ensure_daemon_dirs().expect("dirs");
         let project = tmp.path().join("project");
         init_git_repo_with_seed(&project);
-        session_service::start_session("status-perf", "", &project, Some("claude"), Some("sp1"))
+        session_service::start_session("", "status-perf", &project, Some("sp1"))
             .expect("start session");
     });
 
