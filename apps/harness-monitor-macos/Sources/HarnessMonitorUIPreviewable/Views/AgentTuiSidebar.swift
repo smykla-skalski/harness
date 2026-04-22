@@ -7,6 +7,7 @@ struct AgentTuiSidebar: View {
   let sessionTitlesByID: [String: String]
   let codexRuns: [CodexRunSnapshot]
   let codexTitlesByID: [String: String]
+  let externalAgents: [AgentRegistration]
   let refresh: () -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -45,6 +46,29 @@ struct AgentTuiSidebar: View {
         .padding(.vertical, rowPadding)
         .tag(AgentTuiSheetSelection.create)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
+
+      if !externalAgents.isEmpty {
+        Section("External Agents") {
+          ForEach(externalAgents) { agent in
+            HStack(spacing: HarnessMonitorTheme.spacingSM) {
+              Image(systemName: "person.crop.circle")
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(agent.name)
+                  .scaledFont(.body)
+                Text("\(agent.runtime) • \(agent.role.title)")
+                  .scaledFont(.caption)
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              }
+            }
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.agent(agent.agentId))
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
+            )
+          }
+        }
+      }
 
       if !activeTuis.isEmpty {
         Section("Interactive") {
