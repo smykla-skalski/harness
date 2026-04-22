@@ -27,9 +27,7 @@ private struct ToolbarBaselineSeparatorSuppressor: NSViewRepresentable {
     _TitlebarSeparatorSuppressorView()
   }
 
-  func updateNSView(_ nsView: _TitlebarSeparatorSuppressorView, context: Context) {
-    nsView.window?.titlebarSeparatorStyle = .none
-  }
+  func updateNSView(_ nsView: _TitlebarSeparatorSuppressorView, context: Context) {}
 }
 
 extension View {
