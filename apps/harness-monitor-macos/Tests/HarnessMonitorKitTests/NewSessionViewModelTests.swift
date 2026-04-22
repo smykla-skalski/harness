@@ -136,6 +136,79 @@ struct NewSessionViewModelTests {
     #expect(projectDir == expectedPath)
   }
 
+  @Test("submit selects newly created awaiting-leader session in the store")
+  func submitSelectsNewAwaitingLeaderSessionInStore() async {
+    let recordingClient = RecordingHarnessClient()
+    recordingClient.configureSessions(summaries: [], detailsByID: [:])
+    let store = await makeBootstrappedStore(client: recordingClient)
+
+    let startedSummary = SessionSummary(
+      projectId: PreviewFixtures.emptyCockpitSummary.projectId,
+      projectName: PreviewFixtures.emptyCockpitSummary.projectName,
+      projectDir: PreviewFixtures.emptyCockpitSummary.projectDir,
+      contextRoot: PreviewFixtures.emptyCockpitSummary.contextRoot,
+      sessionId: "sess-recording-new",
+      worktreePath: PreviewFixtures.emptyCockpitSummary.worktreePath,
+      sharedPath: PreviewFixtures.emptyCockpitSummary.sharedPath,
+      originPath: PreviewFixtures.emptyCockpitSummary.originPath,
+      branchRef: "harness/sess-recording-new",
+      title: "Created Session",
+      context: "new session cockpit",
+      status: .awaitingLeader,
+      createdAt: "2026-04-22T00:00:00Z",
+      updatedAt: "2026-04-22T00:00:00Z",
+      lastActivityAt: nil,
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 0,
+        activeAgentCount: 0,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+    let startedDetail = PreviewFixtures.sessionDetail(
+      session: startedSummary,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    recordingClient.configureSessions(
+      summaries: [startedSummary],
+      detailsByID: [startedSummary.sessionId: startedDetail]
+    )
+
+    let vm = makeNewSessionViewModel(
+      store: store,
+      client: recordingClient,
+      isSandboxed: { true },
+      bookmarkResolver: stubBookmarkResolver(
+        id: "B-select",
+        path: "/tmp/select"
+      )
+    )
+    vm.title = startedSummary.title
+    vm.selectedBookmarkId = "B-select"
+
+    #expect(store.selectedSessionID == nil)
+
+    let result = await vm.submit()
+
+    guard case .success(let startedSession) = result else {
+      Issue.record("Expected success, got \(result)")
+      return
+    }
+    #expect(startedSession.sessionId == startedSummary.sessionId)
+    #expect(store.selectedSessionID == startedSummary.sessionId)
+    #expect(store.selectedSession?.session.sessionId == startedSummary.sessionId)
+    #expect(store.selectedSession?.session.status == .awaitingLeader)
+  }
+
   // MARK: - URLError mapping
 
   @Test("URLError.cannotConnectToHost maps to daemonUnreachable")
