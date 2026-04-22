@@ -6,7 +6,7 @@ use super::*;
 #[test]
 fn resolve_roundtrip_from_synthesized_bookmark() {
     let tmp = tempfile::tempdir().unwrap();
-    let bytes = synthesize_bookmark(tmp.path());
+    let bytes = synthesize_bookmark(tmp.path(), true);
     let resolved = resolve(&bytes).expect("resolve must succeed");
     // On macOS /var is a symlink to /private/var; canonicalize both sides so
     // the comparison is stable regardless of which representation is used.
@@ -14,6 +14,20 @@ fn resolve_roundtrip_from_synthesized_bookmark() {
     let got = resolved.path().canonicalize().unwrap();
     assert_eq!(got, expected);
     assert!(!resolved.is_stale());
+}
+
+#[test]
+fn plain_bookmark_can_bootstrap_security_scoped_bookmark() {
+    let tmp = tempfile::tempdir().unwrap();
+    let plain = synthesize_bookmark(tmp.path(), false);
+    let resolved = resolve_without_security_scope(&plain).expect("plain resolve must succeed");
+    let helper_bookmark =
+        create_security_scoped_bookmark(resolved.path()).expect("helper bookmark create");
+    let helper_resolved = resolve(&helper_bookmark).expect("helper bookmark resolve");
+    assert_eq!(
+        helper_resolved.path().canonicalize().unwrap(),
+        tmp.path().canonicalize().unwrap()
+    );
 }
 
 #[test]
@@ -33,7 +47,7 @@ fn is_sandboxed_reads_env() {
 ///
 /// The test binary is unsandboxed so the bookmark lacks real extension rights,
 /// but the CFURL round-trip is sufficient to verify `resolve`.
-fn synthesize_bookmark(path: &std::path::Path) -> Vec<u8> {
+fn synthesize_bookmark(path: &std::path::Path, with_security_scope: bool) -> Vec<u8> {
     use core_foundation::base::TCFType;
     use core_foundation::data::CFData;
     use core_foundation::url::{
@@ -47,7 +61,11 @@ fn synthesize_bookmark(path: &std::path::Path) -> Vec<u8> {
         CFURLCreateBookmarkData(
             std::ptr::null(),
             cf_url.as_concrete_TypeRef(),
-            kCFURLBookmarkCreationWithSecurityScope,
+            if with_security_scope {
+                kCFURLBookmarkCreationWithSecurityScope
+            } else {
+                0
+            },
             std::ptr::null(),
             std::ptr::null(),
             &mut err,
