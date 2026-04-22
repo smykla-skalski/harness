@@ -8,6 +8,15 @@ struct AgentDetailSection: View {
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
+  @State private var selectedRole: SessionRole = .worker
+
+  private var sessionID: String { store.selectedSessionID ?? "" }
+  private var leaderID: String? { store.selectedSession?.session.leaderId }
+  private var isLeader: Bool { agent.agentId == leaderID }
+  private var roleActionsAvailable: Bool { store.areSelectedLeaderActionsAvailable }
+  private var roleStateKey: String {
+    "\(agent.agentId)|\(agent.role.rawValue)|\(leaderID ?? "-")"
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -84,6 +93,48 @@ struct AgentDetailSection: View {
           }
         }
       }
+      InspectorSection(title: "Role Actions") {
+        if isLeader {
+          Text("Transfer leadership before changing the leader's role.")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        } else {
+          Picker("Role", selection: $selectedRole) {
+            ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+              Text(role.title).tag(role)
+            }
+          }
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailRolePicker)
+          HarnessInlineActionButton(
+            title: "Change Role",
+            actionID: .changeRole(sessionID: sessionID, agentID: agent.agentId),
+            store: store,
+            variant: .prominent,
+            tint: nil,
+            isExternallyDisabled: !roleActionsAvailable,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentsWindowDetailRoleChange,
+            action: {
+              Task { await changeRole() }
+            }
+          )
+        }
+        HarnessInlineActionButton(
+          title: "Remove Agent",
+          actionID: .removeAgent(sessionID: sessionID, agentID: agent.agentId),
+          store: store,
+          variant: .bordered,
+          tint: .red,
+          isExternallyDisabled: isLeader || !roleActionsAvailable,
+          accessibilityIdentifier: HarnessMonitorAccessibility.agentsWindowDetailRoleRemove,
+          help: isLeader ? "The session leader cannot be removed" : "",
+          action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
+        )
+      }
+      .disabled(!roleActionsAvailable)
+      .task(id: roleStateKey) {
+        selectedRole = agent.role
+      }
       InspectorSection(title: "Send Signal") {
         TextField("Command", text: $signalCommand)
           .harnessNativeFormControl()
@@ -133,5 +184,10 @@ struct AgentDetailSection: View {
       value: agent.agentId
     )
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsWindowDetailCard).frame")
+  }
+
+  private func changeRole() async {
+    _ = await store.changeRole(agentID: agent.agentId, role: selectedRole)
+    selectedRole = agent.role
   }
 }

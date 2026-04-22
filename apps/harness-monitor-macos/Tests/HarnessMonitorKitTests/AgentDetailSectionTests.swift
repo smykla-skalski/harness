@@ -13,6 +13,22 @@ struct AgentDetailSectionTests {
     #expect(HarnessMonitorAccessibility.agentsWindowDetailCard == "harness.agents.detail-card")
   }
 
+  @Test("Section publishes role-action accessibility identifiers")
+  func publishesRoleActionIdentifiers() {
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailRolePicker
+        == "harness.agents.detail.role-picker"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailRoleChange
+        == "harness.agents.detail.role-change"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentsWindowDetailRoleRemove
+        == "harness.agents.detail.role-remove"
+    )
+  }
+
   @Test("Section accepts an agent + activity and conforms to View")
   func constructsForAgent() {
     let agent = AgentRegistration(
