@@ -193,6 +193,7 @@ public struct AgentTuiWindowView: View {
         sessionTitlesByID: displayState.sessionTitlesByID,
         codexRuns: displayState.sortedCodexRuns,
         codexTitlesByID: displayState.codexTitlesByID,
+        externalAgents: displayState.externalAgents,
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
