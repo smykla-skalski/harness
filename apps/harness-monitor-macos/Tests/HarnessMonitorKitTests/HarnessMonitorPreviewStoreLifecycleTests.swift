@@ -109,6 +109,17 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
   }
 
+  @Test("Preview store factory seeds dashboard landing with default filter state")
+  func previewStoreFactorySeedsDashboardLandingState() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLanding)
+
+    #expect(store.connectionState == .online)
+    #expect(store.sessionFilter == .all)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.timeline.isEmpty)
+  }
+
   @Test("Preview bootstrap auto-selects the declared ready session")
   func previewBootstrapAutoSelectsDeclaredReadySession() async {
     let store = HarnessMonitorStore(

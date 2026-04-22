@@ -53,7 +53,7 @@ extension HarnessMonitorPreviewStoreFactory {
       metrics: metrics,
       selection: PreviewSelectionState(
         bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
-        sessionFilter: .active,
+        sessionFilter: .all,
         selectedSessionID: nil,
         selectedDetail: nil,
         timeline: []

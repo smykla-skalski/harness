@@ -98,12 +98,10 @@ struct SidebarSessionListContent: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
       } else if let firstGroup = renderState.projectionGroups.first {
         projectSection(for: firstGroup)
           .accessibilityElement(children: .contain)
           .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarSessionList)
-          .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
 
         ForEach(Array(renderState.projectionGroups.dropFirst())) { group in
           projectSection(for: group)

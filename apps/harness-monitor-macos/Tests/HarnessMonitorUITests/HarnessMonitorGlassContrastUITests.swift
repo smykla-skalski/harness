@@ -76,25 +76,32 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testSidebarStatusSegmentBackgroundIsVisible() throws {
-    let app = launch(mode: "preview")
+  func testSidebarStatusPickerBackgroundIsVisible() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
 
-    let chip = button(in: app, title: "Ended")
+    activateSidebarSearch(in: app)
+    let statusPicker = element(
+      in: app,
+      identifier: Accessibility.sidebarStatusPicker
+    )
     let filtersCard = element(
       in: app,
       identifier: Accessibility.sidebarFiltersCard
     )
     XCTAssertTrue(
-      chip.waitForExistence(timeout: Self.actionTimeout),
-      "Ended status segment must exist"
+      statusPicker.waitForExistence(timeout: Self.actionTimeout),
+      "Status picker must exist"
     )
     XCTAssertTrue(filtersCard.exists, "Filters card must exist")
 
-    let pickerEdge = edgeLuminance(of: chip, region: .top)
+    let pickerEdge = edgeLuminance(of: statusPicker, region: .top)
     let cardBg = edgeLuminance(of: filtersCard, region: .top)
 
-    let pickerShot = XCTAttachment(screenshot: chip.screenshot())
-    pickerShot.name = "status-segment-ended"
+    let pickerShot = XCTAttachment(screenshot: statusPicker.screenshot())
+    pickerShot.name = "status-picker"
     pickerShot.lifetime = .keepAlways
     add(pickerShot)
 
@@ -106,57 +113,56 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     let delta = abs(pickerEdge - cardBg)
     print("SELECT_CONTRAST pickerEdge=\(pickerEdge) cardBg=\(cardBg) delta=\(delta)")
 
-    // A bordered button with a visible fill should differ from
-    // the surrounding area by at least 0.06 luminance. Under
-    // sidebar vibrancy the delta was ~0.08 but both values were
-    // very dark (~0.13 and ~0.21) making the fill imperceptible.
-    // Outside vibrancy both values are bright and the delta
-    // represents a real visible button background.
-    //
-    // Additionally, the chip edge must be above 0.2 - if both
-    // the chip and card are very dark, the button fill is still
-    // invisible regardless of delta.
-    // In dark mode, bordered buttons have subtle fills. The key
-    // metric is whether the chip area differs from the card at all.
-    // Under full vibrancy the delta was ~0.08 at very low luminance
-    // (both near 0.13-0.21). Outside vibrancy the delta should be
-    // at least 0.03 with the chip edge above 0.12.
+    // Native menu pickers in a sidebar use subtler chrome than the old
+    // segmented control. The important contract is that the picker stays
+    // visibly brighter than a washed-out vibrancy surface and still reads
+    // as distinct from the surrounding filter card.
+    XCTAssertGreaterThan(
+      pickerEdge,
+      0.2,
+      "Status picker should remain bright enough to read as an interactive control: "
+        + "pickerEdge=\(pickerEdge)."
+    )
     XCTAssertGreaterThan(
       delta,
-      0.03,
-      "Status segmented control has no visible contrast against sidebar: "
+      0.025,
+      "Status picker has no visible contrast against sidebar: "
         + "pickerEdge=\(pickerEdge), cardBg=\(cardBg), delta=\(delta)."
     )
   }
 
   func testSidebarSecondarySegmentsShareConsistentBackground() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
 
-    let sortSegment = button(
+    activateSidebarSearch(in: app)
+    let sortPicker = element(
       in: app,
-      identifier: Accessibility.sidebarSortSegment("name")
+      identifier: Accessibility.sidebarSortPicker
     )
-    let focusSegment = button(in: app, identifier: Accessibility.blockedChip)
+    let focusPicker = element(in: app, identifier: Accessibility.sidebarFocusPicker)
 
     XCTAssertTrue(
-      sortSegment.waitForExistence(timeout: Self.actionTimeout),
-      "Name sort segment must exist"
+      sortPicker.waitForExistence(timeout: Self.actionTimeout),
+      "Sort picker must exist"
     )
     XCTAssertTrue(
-      focusSegment.waitForExistence(timeout: Self.actionTimeout),
-      "Blocked focus segment must exist"
+      focusPicker.waitForExistence(timeout: Self.actionTimeout),
+      "Focus picker must exist"
     )
 
-    let sortColor = averageColor(of: sortSegment)
-    let focusColor = averageColor(of: focusSegment)
+    let sortColor = averageColor(of: sortPicker)
+    let focusColor = averageColor(of: focusPicker)
 
-    let sortShot = XCTAttachment(screenshot: sortSegment.screenshot())
-    sortShot.name = "sort-segment-name"
+    let sortShot = XCTAttachment(screenshot: sortPicker.screenshot())
+    sortShot.name = "sort-picker"
     sortShot.lifetime = .keepAlways
     add(sortShot)
 
-    let focusShot = XCTAttachment(screenshot: focusSegment.screenshot())
-    focusShot.name = "focus-segment-blocked"
+    let focusShot = XCTAttachment(screenshot: focusPicker.screenshot())
+    focusShot.name = "focus-picker"
     focusShot.lifetime = .keepAlways
     add(focusShot)
 
@@ -174,10 +180,22 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(
       maxDelta,
       0.06,
-      "Sidebar secondary segmented controls do not share a consistent background tone: "
+      "Sidebar filter pickers do not share a consistent background tone: "
         + "sort=(\(sortColor.red),\(sortColor.green),\(sortColor.blue)), "
         + "focus=(\(focusColor.red),\(focusColor.green),\(focusColor.blue)), "
         + "maxChannelDelta=\(maxDelta)."
+    )
+  }
+
+  private func activateSidebarSearch(in app: XCUIApplication) {
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
+    let filtersCard = element(in: app, identifier: Accessibility.sidebarFiltersCard)
+
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
+    tapElement(in: app, identifier: Accessibility.sidebarSearchField)
+    XCTAssertTrue(
+      filtersCard.waitForExistence(timeout: Self.actionTimeout),
+      "Sidebar filters should appear once the native search field becomes active"
     )
   }
 
