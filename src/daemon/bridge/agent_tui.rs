@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::agent_tui::{
     AgentTuiAttachState, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
     deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
@@ -44,7 +45,7 @@ impl BridgeServer {
             spec.prompt.clone(),
             spec.effort.as_deref(),
         )?;
-        let deferred_prompt = spec.prompt.clone();
+        let deferred_prompt = bridge_deferred_auto_join(&spec.profile.runtime, spec.prompt.clone());
         let deferred_runtime = spec.profile.runtime.clone();
         let deferred_tui_id = spec.tui_id.clone();
         let process = Arc::new(process);
@@ -68,19 +69,17 @@ impl BridgeServer {
         );
         self.update_agent_tui_metadata()?;
 
-        // Send prompt in background so the bridge response returns immediately.
-        {
+        // Send PTY-delivered prompts in background so the bridge response
+        // returns immediately. CLI-injected runtimes already received the
+        // prompt in argv and must not be sent the same join command again.
+        if let Some(prompt) = deferred_prompt {
             let process = Arc::clone(&self.active_tui(&deferred_tui_id)?.process);
-            let prompt = deferred_prompt
-                .as_deref()
-                .filter(|p| !p.is_empty())
-                .map(ToString::to_string);
             thread::spawn(move || {
                 deliver_deferred_prompts(
                     &process,
                     &deferred_runtime,
                     &deferred_tui_id,
-                    prompt.as_deref().unwrap_or(""),
+                    &prompt,
                     None,
                 );
             });
@@ -157,5 +156,46 @@ impl BridgeServer {
     ) -> Result<(Arc<AgentTuiProcess>, AgentTuiAttachState), CliError> {
         let active = self.active_tui(tui_id)?;
         Ok((Arc::clone(&active.process), active.process.attach_state()?))
+    }
+}
+
+fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<String> {
+    let delivery = runtime_for_name(runtime).map_or(
+        InitialPromptDelivery::PtySend,
+        AgentRuntime::initial_prompt_delivery,
+    );
+    match delivery {
+        InitialPromptDelivery::PtySend => prompt.filter(|value| !value.is_empty()),
+        InitialPromptDelivery::CliPositional | InitialPromptDelivery::CliFlag(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bridge_deferred_auto_join;
+
+    #[test]
+    fn deferred_auto_join_skips_cli_prompt_runtimes() {
+        assert_eq!(
+            bridge_deferred_auto_join("claude", Some("join".into())),
+            None
+        );
+        assert_eq!(
+            bridge_deferred_auto_join("gemini", Some("join".into())),
+            None
+        );
+        assert_eq!(bridge_deferred_auto_join("vibe", Some("join".into())), None);
+    }
+
+    #[test]
+    fn deferred_auto_join_keeps_pty_runtimes() {
+        assert_eq!(
+            bridge_deferred_auto_join("codex", Some("join".into())),
+            Some("join".into())
+        );
+        assert_eq!(
+            bridge_deferred_auto_join("copilot", Some("join".into())),
+            Some("join".into())
+        );
     }
 }
