@@ -13,6 +13,7 @@ use crate::daemon::protocol::{
     SessionJoinRequest, SessionStartRequest, TaskAssignRequest, TaskCheckpointRequest,
     TaskCreateRequest,
 };
+use crate::daemon::service::join_session_direct_async;
 use crate::daemon::state::DaemonManifest;
 use crate::session::types::SessionRole;
 use harness_testkit::with_isolated_harness_env;
@@ -84,13 +85,13 @@ pub(super) async fn start_async_http_session(
     project_dir: &std::path::Path,
     session_id: &str,
 ) -> serde_json::Value {
+    let join_state = state.clone();
     let response = post_session_start(
         auth_headers(),
         State(state),
         Json(SessionStartRequest {
             title: format!("{session_id} title"),
             context: format!("{session_id} context"),
-            runtime: "claude".into(),
             session_id: Some(session_id.to_string()),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: None,
@@ -100,6 +101,22 @@ pub(super) async fn start_async_http_session(
     .await;
     let (status, body) = response_json(response).await;
     assert_eq!(status, StatusCode::OK);
+    let async_db = join_state.async_db.get().expect("async db");
+    join_session_direct_async(
+        session_id,
+        &SessionJoinRequest {
+            runtime: "claude".into(),
+            role: SessionRole::Leader,
+            fallback_role: None,
+            capabilities: vec![],
+            name: Some("leader".into()),
+            project_dir: project_dir.to_string_lossy().into_owned(),
+            persona: None,
+        },
+        async_db.as_ref(),
+    )
+    .await
+    .expect("join leader");
     body
 }
 

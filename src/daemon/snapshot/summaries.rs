@@ -14,7 +14,7 @@ fn increment_session_counts(
 ) {
     let entry = counts.entry(key).or_insert((0, 0));
     entry.1 += 1;
-    if status == SessionStatus::Active {
+    if status.is_default_visible() {
         entry.0 += 1;
     }
 }

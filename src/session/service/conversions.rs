@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::{
     BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
-    SessionState, SessionStatus, protocol, runtime_session_matches_agent,
+    SessionState, protocol, runtime_session_matches_agent,
 };
 use crate::daemon::client::RuntimeSessionLookup;
 use crate::session::types::SessionPolicy;
@@ -104,7 +104,7 @@ fn resolve_runtime_session_via_legacy_fanout(
     let summaries = client.list_sessions()?;
     let mut matches = Vec::new();
     for summary in &summaries {
-        if summary.status != SessionStatus::Active {
+        if !summary.status.is_joinable() {
             continue;
         }
         let Ok(detail) = client.get_session_detail(&summary.session_id) else {
@@ -135,7 +135,7 @@ fn resolve_runtime_session_via_legacy_fanout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::types::SessionMetrics;
+    use crate::session::types::{SessionMetrics, SessionStatus};
 
     fn summary_fixture() -> protocol::SessionSummary {
         protocol::SessionSummary {

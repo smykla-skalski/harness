@@ -87,10 +87,42 @@ pub struct SessionState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionStatus {
+    AwaitingLeader,
     Active,
     Paused,
     LeaderlessDegraded,
     Ended,
+}
+
+impl SessionStatus {
+    #[must_use]
+    pub const fn is_default_visible(self) -> bool {
+        !matches!(self, Self::Ended)
+    }
+
+    #[must_use]
+    pub const fn is_joinable(self) -> bool {
+        matches!(
+            self,
+            Self::AwaitingLeader | Self::Active | Self::LeaderlessDegraded
+        )
+    }
+
+    #[must_use]
+    pub const fn allows_task_creation(self) -> bool {
+        matches!(
+            self,
+            Self::AwaitingLeader | Self::Active | Self::LeaderlessDegraded
+        )
+    }
+
+    #[must_use]
+    pub const fn is_liveness_eligible(self) -> bool {
+        matches!(
+            self,
+            Self::AwaitingLeader | Self::Active | Self::LeaderlessDegraded
+        )
+    }
 }
 
 /// Lightweight rollup metrics for session summaries.

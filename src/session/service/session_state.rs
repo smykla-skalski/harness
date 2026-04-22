@@ -27,16 +27,16 @@ pub(crate) fn build_new_session(
     context: &str,
     title: &str,
     session_id: &str,
-    runtime_name: &str,
-    agent_session_id: Option<&str>,
+    _runtime_name: &str,
+    _agent_session_id: Option<&str>,
     now: &str,
 ) -> SessionState {
     build_new_session_with_policy(
         context,
         title,
         session_id,
-        runtime_name,
-        agent_session_id,
+        _runtime_name,
+        _agent_session_id,
         now,
         None,
     )
@@ -46,20 +46,12 @@ pub(crate) fn build_new_session_with_policy(
     context: &str,
     title: &str,
     session_id: &str,
-    runtime_name: &str,
-    agent_session_id: Option<&str>,
+    _runtime_name: &str,
+    _agent_session_id: Option<&str>,
     now: &str,
     policy_preset: Option<&str>,
 ) -> SessionState {
-    build_initial_state(
-        context,
-        title,
-        session_id,
-        runtime_name,
-        agent_session_id,
-        now,
-        policy_preset,
-    )
+    build_initial_state(context, title, session_id, now, policy_preset)
 }
 
 /// Find an existing agent whose capabilities include the same
@@ -108,10 +100,10 @@ pub(crate) fn apply_join_session(
 ) -> Result<String, CliError> {
     if !matches!(
         state.status,
-        SessionStatus::Active | SessionStatus::LeaderlessDegraded
+        SessionStatus::AwaitingLeader | SessionStatus::Active | SessionStatus::LeaderlessDegraded
     ) {
         return Err(CliErrorKind::session_agent_conflict(format!(
-            "session '{}' is {:?}; joins require an active or leaderless degraded session",
+            "session '{}' is {:?}; joins require an awaiting_leader, active, or leaderless degraded session",
             state.session_id, state.status
         ))
         .into());

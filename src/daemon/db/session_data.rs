@@ -182,7 +182,7 @@ impl DaemonDb {
     /// created directly in `SQLite` without touching files.
     ///
     /// Delegates to [`sync_session`] (which is an upsert) and then
-    /// explicitly ensures the active flag is set.
+    /// explicitly ensures the default-visible flag is set.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
@@ -192,8 +192,8 @@ impl DaemonDb {
         state: &SessionState,
     ) -> Result<(), CliError> {
         self.sync_session(project_id, state)?;
-        // sync_session sets is_active based on status, but be explicit
-        // for clarity: a newly created session is always active.
+        // sync_session sets is_active based on visibility, but be explicit
+        // for clarity: a newly created session is always default-visible.
         self.conn
             .execute(
                 "UPDATE sessions SET is_active = 1 WHERE session_id = ?1",

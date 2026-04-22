@@ -1,6 +1,6 @@
 use crate::agents::runtime::{runtime_for_name, signal::pending_dir};
 use crate::daemon::db::ExpiredPendingSignalIndexRecord;
-use crate::session::types::{SessionState, SessionStatus};
+use crate::session::types::SessionState;
 
 use super::{
     AckResult, CliError, Path, PathBuf, ResolvedSession, SessionTransition, SignalAck,
@@ -10,7 +10,7 @@ use super::{
 };
 
 pub(crate) fn liveness_project_dir_for_resolved(resolved: &ResolvedSession) -> Option<PathBuf> {
-    if resolved.state.status != SessionStatus::Active || !session_has_live_agents(&resolved.state) {
+    if !resolved.state.status.is_liveness_eligible() || !session_has_live_agents(&resolved.state) {
         return None;
     }
     // Keep the liveness path active even after the file-backed state disappears.

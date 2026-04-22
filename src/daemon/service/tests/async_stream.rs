@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn global_stream_initial_events_async_include_current_session_index() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon async stream initial index payload",
             "",
             project,
@@ -48,7 +48,7 @@ fn global_stream_initial_events_async_include_current_session_index() {
 #[test]
 fn session_stream_initial_events_async_include_current_session_snapshot() {
     with_temp_project(|project| {
-        let state = session_service::start_session(
+        let state = start_active_file_session(
             "daemon async stream initial session payload",
             "",
             project,

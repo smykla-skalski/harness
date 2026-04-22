@@ -4,8 +4,8 @@ use super::*;
 fn list_sessions_returns_all_when_requested() {
     with_temp_project(|project| {
         let first =
-            start_session("goal1", "", project, Some("claude"), Some("ls1")).expect("start one");
-        start_session("goal2", "", project, Some("codex"), Some("ls2")).expect("start two");
+            start_active_session("goal1", "", project, Some("claude"), Some("ls1")).expect("start one");
+        start_active_session("goal2", "", project, Some("codex"), Some("ls2")).expect("start two");
         end_session("ls1", first.leader_id.as_deref().expect("leader"), project).expect("end");
 
         let active_only = list_sessions(project, false).expect("active list");
@@ -18,7 +18,7 @@ fn list_sessions_returns_all_when_requested() {
 #[test]
 fn checkpoint_record_updates_task_summary_and_log() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s5")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("s5")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let task = create_task(
             "s5",
@@ -62,7 +62,7 @@ fn checkpoint_record_updates_task_summary_and_log() {
 #[test]
 fn send_signal_lists_pending_signal_for_target_agent() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("claude"), Some("s6")).expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some("s6")).expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session("s6", SessionRole::Worker, "codex", &[], None, project, None)
             .expect("join");
@@ -95,7 +95,7 @@ fn send_signal_lists_pending_signal_for_target_agent() {
 #[test]
 fn list_signals_filters_shared_runtime_session_history() {
     with_temp_project(|project| {
-        let session_one = start_session("test", "", project, Some("claude"), Some("s6-alpha"))
+        let session_one = start_active_session("test", "", project, Some("claude"), Some("s6-alpha"))
             .expect("start alpha");
         let leader_one = session_one.leader_id.expect("alpha leader id");
         let joined_one = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
@@ -117,7 +117,7 @@ fn list_signals_filters_shared_runtime_session_history() {
             .expect("alpha worker id")
             .clone();
 
-        let session_two = start_session("test", "", project, Some("claude"), Some("s6-beta"))
+        let session_two = start_active_session("test", "", project, Some("claude"), Some("s6-beta"))
             .expect("start beta");
         let leader_two = session_two.leader_id.expect("beta leader id");
         let joined_two = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
@@ -175,7 +175,7 @@ fn list_signals_filters_shared_runtime_session_history() {
 #[test]
 fn send_signal_denies_worker_actor() {
     with_temp_project(|project| {
-        start_session("test", "", project, Some("claude"), Some("s7")).expect("start");
+        start_active_session("test", "", project, Some("claude"), Some("s7")).expect("start");
         let joined = join_session("s7", SessionRole::Worker, "codex", &[], None, project, None)
             .expect("join");
         let worker_id = joined

@@ -57,8 +57,8 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
                     "daemon forwarded context",
                     "daemon forwarded title",
                     "daemon-forwarded-session",
-                    "claude",
-                    Some("leader-session"),
+                    "leaderless",
+                    None,
                     &utc_now(),
                     Some("swarm-default"),
                 );
@@ -77,7 +77,6 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
             &crate::daemon::protocol::SessionStartRequest {
                 title: "direct daemon fallback".into(),
                 context: "daemon client fallback".into(),
-                runtime: "claude".into(),
                 session_id: Some("daemon-client-start".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: Some("swarm-default".into()),
@@ -110,7 +109,6 @@ fn start_session_direct_creates_worktree() {
             &crate::daemon::protocol::SessionStartRequest {
                 title: "worktree start".into(),
                 context: "wires the worktree controller".into(),
-                runtime: "claude".into(),
                 session_id: None,
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: None,
@@ -153,7 +151,6 @@ fn start_session_direct_rejects_unknown_policy_preset() {
             &crate::daemon::protocol::SessionStartRequest {
                 title: "unknown preset".into(),
                 context: "should be rejected".into(),
-                runtime: "claude".into(),
                 session_id: Some("unknown-policy-preset".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: Some("swarm-future".into()),
@@ -188,7 +185,6 @@ fn session_start_honors_custom_base_ref() {
                 &crate::daemon::protocol::SessionStartRequest {
                     title: "base_ref test".into(),
                     context: "honors custom base ref".into(),
-                    runtime: "claude".into(),
                     session_id: None,
                     project_dir: project.to_string_lossy().into_owned(),
                     policy_preset: None,

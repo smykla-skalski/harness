@@ -119,14 +119,33 @@ pub(super) struct SessionReadFixture {
     pub(super) worker_log: PathBuf,
 }
 
+pub(super) fn start_active_file_session(
+    context: &str,
+    title: &str,
+    project: &Path,
+    _runtime_name: Option<&str>,
+    session_id: Option<&str>,
+) -> Result<crate::session::types::SessionState, CliError> {
+    let state = session_service::start_session(context, title, project, None, session_id)?;
+    session_service::join_session(
+        &state.session_id,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        Some("leader"),
+        project,
+        None,
+    )
+}
+
 pub(super) fn setup_session_with_worker_logs(
     project: &Path,
     title: &str,
     session_id: &str,
 ) -> SessionReadFixture {
     let state =
-        session_service::start_session(title, "", project, Some("claude"), Some(session_id))
-            .expect("start session");
+        start_active_file_session(title, "", project, Some("claude"), Some(session_id))
+            .expect("start active session");
     let worker_session_id = format!("{session_id}-worker");
     temp_env::with_var("CODEX_SESSION_ID", Some(worker_session_id.as_str()), || {
         session_service::join_session(
@@ -283,6 +302,7 @@ pub(super) fn setup_db_only_session(
     crate::daemon::db::DaemonDb,
     crate::session::types::SessionState,
 ) {
+    use crate::daemon::protocol::SessionJoinRequest;
     use crate::session::service::build_new_session;
 
     let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
@@ -300,6 +320,20 @@ pub(super) fn setup_db_only_session(
     );
     db.sync_session(&project_record.project_id, &state)
         .expect("sync session");
+    let state = join_session_direct(
+        &state.session_id,
+        &SessionJoinRequest {
+            runtime: "claude".into(),
+            role: SessionRole::Leader,
+            fallback_role: None,
+            capabilities: vec![],
+            name: Some("leader".into()),
+            project_dir: project.to_string_lossy().into(),
+            persona: None,
+        },
+        Some(&db),
+    )
+    .expect("join db-only leader");
     (db, state)
 }
 
@@ -345,11 +379,10 @@ pub(super) fn start_direct_session(
 ) -> crate::session::types::SessionState {
     use crate::daemon::protocol::SessionStartRequest;
 
-    start_session_direct(
+    let state = start_session_direct(
         &SessionStartRequest {
             title: title.into(),
             context: context.into(),
-            runtime: "claude".into(),
             session_id: Some(session_id.into()),
             project_dir: project.to_string_lossy().into(),
             policy_preset: policy_preset.map(ToString::to_string),
@@ -357,7 +390,63 @@ pub(super) fn start_direct_session(
         },
         Some(db),
     )
-    .expect("start direct session")
+    .expect("start direct session");
+
+    join_session_direct(
+        &state.session_id,
+        &crate::daemon::protocol::SessionJoinRequest {
+            runtime: "claude".into(),
+            role: SessionRole::Leader,
+            fallback_role: None,
+            capabilities: vec![],
+            name: Some("leader".into()),
+            project_dir: project.to_string_lossy().into(),
+            persona: None,
+        },
+        Some(db),
+    )
+    .expect("join direct leader")
+}
+
+pub(super) async fn start_direct_session_async(
+    async_db: &crate::daemon::db::AsyncDaemonDb,
+    project: &Path,
+    session_id: &str,
+    title: &str,
+    context: &str,
+    policy_preset: Option<&str>,
+) -> crate::session::types::SessionState {
+    use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+
+    let state = start_session_direct_async(
+        &SessionStartRequest {
+            title: title.into(),
+            context: context.into(),
+            session_id: Some(session_id.into()),
+            project_dir: project.to_string_lossy().into(),
+            policy_preset: policy_preset.map(ToString::to_string),
+            base_ref: None,
+        },
+        async_db,
+    )
+    .await
+    .expect("start direct async session");
+
+    join_session_direct_async(
+        &state.session_id,
+        &SessionJoinRequest {
+            runtime: "claude".into(),
+            role: SessionRole::Leader,
+            fallback_role: None,
+            capabilities: vec![],
+            name: Some("leader".into()),
+            project_dir: project.to_string_lossy().into(),
+            persona: None,
+        },
+        async_db,
+    )
+    .await
+    .expect("join direct async leader")
 }
 
 pub(super) fn join_direct_codex(

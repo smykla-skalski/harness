@@ -4,8 +4,6 @@ use std::time::Instant;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::errors::CliError;
-use crate::session::types::SessionStatus;
-
 use super::super::{
     SESSION_LIVENESS_REFRESH_CACHE, SESSION_LIVENESS_REFRESH_TTL,
     liveness_project_dir_for_resolved, refresh_resolved_session_from_files_if_newer,
@@ -22,9 +20,7 @@ pub(super) fn reconcile_active_session_liveness_for_reads(
     let session_ids: BTreeSet<_> = db
         .list_session_summaries()?
         .into_iter()
-        .filter(|state| {
-            state.status == SessionStatus::Active && state.metrics.active_agent_count > 0
-        })
+        .filter(|state| state.status.is_liveness_eligible() && state.metrics.agent_count > 0)
         .map(|state| state.session_id)
         .collect();
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
@@ -48,9 +44,7 @@ pub(super) async fn reconcile_active_session_liveness_for_reads_async(
         .list_session_summaries()
         .await?
         .into_iter()
-        .filter(|state| {
-            state.status == SessionStatus::Active && state.metrics.active_agent_count > 0
-        })
+        .filter(|state| state.status.is_liveness_eligible() && state.metrics.agent_count > 0)
         .map(|state| state.session_id)
         .collect();
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());

@@ -43,20 +43,15 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
-            let state = start_session_direct_async(
-                &crate::daemon::protocol::SessionStartRequest {
-                    title: "async leave session".into(),
-                    context: "async leave".into(),
-                    runtime: "claude".into(),
-                    session_id: Some("daemon-async-leave".into()),
-                    project_dir: project.to_string_lossy().into(),
-                    policy_preset: None,
-                    base_ref: None,
-                },
+            let state = start_direct_session_async(
                 &async_db,
+                project,
+                "daemon-async-leave",
+                "async leave session",
+                "async leave",
+                None,
             )
-            .await
-            .expect("start session");
+            .await;
             let leader_id = state.leader_id.clone().expect("leader id");
 
             let detail = leave_session_async(

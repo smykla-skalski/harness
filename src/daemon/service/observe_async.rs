@@ -5,8 +5,6 @@ use tokio::time::sleep;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
-use crate::session::types::SessionStatus;
-
 use super::{
     CliError, Duration, ObserveSessionRequest, Path, PathBuf, SessionDetail,
     apply_heuristic_gap_tasks_to_async_db, apply_issue_tasks_to_async_db, effective_project_dir,
@@ -86,7 +84,7 @@ async fn watch_cycle_async(
     async_db: &AsyncDaemonDb,
     cycle: &mut ObserveWatchState,
 ) -> Result<bool, CliError> {
-    let Some(mut resolved) = resolve_active_session(async_db, session_id).await? else {
+    let Some(mut resolved) = resolve_observable_session(async_db, session_id).await? else {
         return Ok(false);
     };
     let liveness_changed =
@@ -102,7 +100,7 @@ async fn watch_cycle_async(
     Ok(true)
 }
 
-async fn resolve_active_session(
+async fn resolve_observable_session(
     async_db: &AsyncDaemonDb,
     session_id: &str,
 ) -> Result<Option<ResolvedSession>, CliError> {
@@ -110,7 +108,7 @@ async fn resolve_active_session(
         .resolve_session(session_id)
         .await?
         .ok_or_else(|| session_not_found(session_id))?;
-    if resolved.state.status == SessionStatus::Active {
+    if resolved.state.status.is_liveness_eligible() {
         Ok(Some(resolved))
     } else {
         Ok(None)
