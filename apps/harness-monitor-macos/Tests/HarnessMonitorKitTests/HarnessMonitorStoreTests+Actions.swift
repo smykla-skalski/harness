@@ -86,8 +86,8 @@ extension HarnessMonitorStoreTests {
     #expect(store.isBusy == false)
   }
 
-  @Test("Request end confirmation uses the resolved actor")
-  func requestEndConfirmationUsesResolvedActor() async {
+  @Test("Request end confirmation uses the control-plane actor")
+  func requestEndConfirmationUsesControlPlaneActor() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
@@ -97,7 +97,7 @@ extension HarnessMonitorStoreTests {
       store.pendingConfirmation
         == .endSession(
           sessionID: PreviewFixtures.summary.sessionId,
-          actorID: PreviewFixtures.agents[0].agentId
+          actorID: "harness-app"
         )
     )
   }

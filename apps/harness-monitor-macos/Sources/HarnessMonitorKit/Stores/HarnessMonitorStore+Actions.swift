@@ -24,7 +24,7 @@ extension HarnessMonitorStore {
   private var noSelectedLeaderMessage: String {
     """
     Leader-only actions are unavailable until a real leader joins this session.
-    Task controls remain available.
+    Observe, end session, and task controls remain available.
     """
   }
 
@@ -156,7 +156,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Create task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.createTask(sessionID: action.sessionID).key,
@@ -184,7 +184,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Assign task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.assignTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -209,7 +209,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Drop task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.dropTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -237,7 +237,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Update task queue"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.updateTaskQueuePolicy(
@@ -265,7 +265,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Update task"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.updateTaskStatus(sessionID: action.sessionID, taskID: taskID)
@@ -291,7 +291,7 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let actionName = "Save checkpoint"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    let actor = taskActionActor(for: actor)
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.checkpointTask(sessionID: action.sessionID, taskID: taskID).key,
@@ -392,7 +392,7 @@ extension HarnessMonitorStore {
   public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
     let actionName = "Observe session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.observeSession(sessionID: action.sessionID).key,
@@ -411,7 +411,7 @@ extension HarnessMonitorStore {
   public func endSelectedSession(actor: String = "harness-app") async -> Bool {
     let actionName = "End session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
+    let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
       actionID: InspectorActionID.endSession(sessionID: action.sessionID).key,
@@ -427,10 +427,13 @@ extension HarnessMonitorStore {
   }
 
   public func requestEndSelectedSessionConfirmation() {
+    requestEndSelectedSessionConfirmation(actor: "harness-app")
+  }
+
+  func requestEndSelectedSessionConfirmation(actor: String) {
     let actionName = "End session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return }
-    guard guardLeaderActionsAvailable(actionName: actionName) else { return }
-    guard let actorID = resolvedActionActorOrReport(actionName: actionName) else { return }
+    let actorID = controlPlaneActionActor(for: actor)
     pendingConfirmation = .endSession(sessionID: action.sessionID, actorID: actorID)
   }
 
@@ -492,7 +495,7 @@ extension HarnessMonitorStore {
     return resolvedActionActorOrReport(actionName: actionName)
   }
 
-  func taskActionActor(for actor: String) -> String {
+  func controlPlaneActionActor(for actor: String) -> String {
     actor == "harness-app" ? "harness-app" : actor
   }
 

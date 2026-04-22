@@ -391,22 +391,44 @@ struct HarnessMonitorStoreActionTests {
     )
   }
 
-  @Test("Awaiting-leader leader-only actions report unavailability")
-  func awaitingLeaderLeaderOnlyActionsReportUnavailability() async {
+  @Test("Awaiting-leader control-plane session actions stay available")
+  func awaitingLeaderControlPlaneSessionActionsStayAvailable() async {
     let client = actorlessClient()
     let store = await actorlessStore(client: client)
 
     let observed = await store.observeSelectedSession()
 
-    #expect(observed == false)
-    #expect(client.recordedCalls().isEmpty)
-    #expect(store.currentFailureFeedbackMessage == expectedLeaderlessActionMessage)
+    #expect(observed)
+    #expect(store.currentSuccessFeedbackMessage == "Observe session")
 
     store.requestEndSelectedSessionConfirmation()
 
+    #expect(
+      store.pendingConfirmation
+        == .endSession(
+          sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+          actorID: "harness-app"
+        )
+    )
+
+    await store.confirmPendingAction()
+
     #expect(store.pendingConfirmation == nil)
-    #expect(client.recordedCalls().isEmpty)
-    #expect(store.currentFailureFeedbackMessage == expectedLeaderlessActionMessage)
+    #expect(
+      client.recordedCalls()
+        == [
+          .observeSession(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            actor: "harness-app"
+          ),
+          .endSession(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            actor: "harness-app"
+          ),
+        ]
+    )
+    #expect(store.selectedSession?.session.status == .ended)
+    #expect(store.currentSuccessFeedbackMessage == "End session")
   }
 
   @Test("Default task actions keep the control-plane actor")
@@ -483,7 +505,7 @@ struct HarnessMonitorStoreActionTests {
   private var expectedLeaderlessActionMessage: String {
     """
     Leader-only actions are unavailable until a real leader joins this session.
-    Task controls remain available.
+    Observe, end session, and task controls remain available.
     """
   }
 }
