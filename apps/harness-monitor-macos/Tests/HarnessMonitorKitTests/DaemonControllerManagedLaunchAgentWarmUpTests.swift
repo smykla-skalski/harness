@@ -11,15 +11,16 @@ private let managedLaunchAgentHelperPathFixture =
 @Suite("Daemon controller managed launch-agent warm-up")
 struct DaemonControllerManagedLaunchAgentWarmUpTests {
   @Test(
-    "awaitManifestWarmUp refreshes the managed launch agent before probing when the bundled helper changed"
+    "awaitManifestWarmUp refreshes the managed launch agent after stale-manifest evidence when the bundled helper changed"
   )
-  func awaitManifestWarmUpRefreshesManagedLaunchAgentBeforeProbingWhenBundledHelperChanged()
+  func awaitManifestWarmUpRefreshesManagedLaunchAgentAfterStaleManifestWhenHelperChanged()
     async throws
   {
     try await withTempDaemonFixture(pid: 999_999) { environment in
       let client = PreviewHarnessClient()
       let manifestRewritePID = UInt32(getpid())
       let liveEndpoint = "http://127.0.0.1:65533"
+      let staleEndpoint = "http://127.0.0.1:65534"
       try writeManagedLaunchAgentBundleStampFixture(
         ManagedLaunchAgentBundleStampFixture(
           helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
@@ -67,7 +68,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       #expect(bootstrappedClient as AnyObject === client as AnyObject)
       #expect(manager.unregisterCallCount == 1)
       #expect(manager.registerCallCount == 1)
-      #expect(await probedEndpoints.values() == [liveEndpoint])
+      #expect(await probedEndpoints.values() == [staleEndpoint, liveEndpoint])
     }
   }
 
@@ -141,9 +142,9 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
   }
 
   @Test(
-    "awaitManifestWarmUp refreshes the managed launch agent before trusting a live manifest from a replaced helper"
+    "awaitManifestWarmUp trusts a live compatible daemon before applying a deferred helper refresh"
   )
-  func awaitManifestWarmUpRefreshesManagedLaunchAgentBeforeTrustingMismatchedLiveHelperIdentity()
+  func awaitManifestWarmUpDefersRefreshForCompatibleLiveHelperMismatch()
     async throws
   {
     let currentStamp = ManagedLaunchAgentBundleStampFixture(
@@ -212,6 +213,9 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
 
         #expect(bootstrappedClient as AnyObject === client as AnyObject)
+        #expect(manager.unregisterCallCount == 0)
+        #expect(manager.registerCallCount == 0)
+        #expect(await controller.performDeferredManagedLaunchAgentRefreshIfNeeded() == true)
         #expect(manager.unregisterCallCount == 1)
         #expect(manager.registerCallCount == 1)
         #expect(await probedEndpoints.values() == [liveEndpoint])

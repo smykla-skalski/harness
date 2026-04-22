@@ -133,6 +133,10 @@ actor FailingDaemonController: DaemonControlling {
     return PreviewHarnessClient()
   }
 
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    false
+  }
+
   func stopDaemon() async throws -> String {
     if let actionError {
       throw actionError
