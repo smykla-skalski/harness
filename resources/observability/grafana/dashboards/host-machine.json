@@ -238,7 +238,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "node_load1 / clamp_min(count(count by (cpu) (node_cpu_seconds_total{mode=\"idle\"})), 1)",
+          "expr": "node_load1 / scalar(clamp_min(count(count by (cpu) (node_cpu_seconds_total{mode=\"idle\"})), 1))",
           "refId": "A"
         }
       ],
@@ -499,62 +499,6 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "WiFi quality and channel contention from darwin-exporter and wdutil when available.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "darwin_wifi_rssi_dbm{interface=~\"${wifi_interface:regex}\"}",
-          "legendFormat": "RSSI {{interface}}",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "darwin_wifi_snr_db{interface=~\"${wifi_interface:regex}\"}",
-          "legendFormat": "SNR {{interface}}",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "darwin_wifi_tx_rate_mbps{interface=~\"${wifi_interface:regex}\"}",
-          "legendFormat": "TX rate {{interface}}",
-          "refId": "C"
-        },
-        {
-          "editorMode": "code",
-          "expr": "darwin_wdutil_wifi_cca_percent{interface=~\"${wifi_interface:regex}\"} or vector(0)",
-          "legendFormat": "CCA {{interface}}",
-          "refId": "D"
-        }
-      ],
-      "title": "WiFi Quality",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
       "description": "Battery health and temperature signals alongside CPU thermals.",
       "fieldConfig": {
         "defaults": {
@@ -567,7 +511,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 12
       },
       "id": 8,
@@ -624,8 +568,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 20
+        "x": 12,
+        "y": 12
       },
       "id": 9,
       "options": {
@@ -643,51 +587,6 @@
         }
       ],
       "title": "Thermal Pressure States",
-      "type": "state-timeline"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Power and connectivity state changes for the workstation.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 20
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "node_power_supply_charging",
-          "legendFormat": "charging",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "darwin_wifi_connected{interface=~\"${wifi_interface:regex}\"}",
-          "legendFormat": "wifi connected {{interface}}",
-          "refId": "B"
-        }
-      ],
-      "title": "Power and WiFi State",
       "type": "state-timeline"
     },
     {
@@ -940,7 +839,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 28
       },
       "id": 17,
       "options": {
@@ -987,8 +886,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 60
+        "x": 12,
+        "y": 52
       },
       "id": 18,
       "options": {
@@ -1073,31 +972,6 @@
         "name": "mountpoint",
         "options": [],
         "query": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".+",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(darwin_wifi_info, interface)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "WiFi Interface",
-        "multi": true,
-        "name": "wifi_interface",
-        "options": [],
-        "query": "label_values(darwin_wifi_info, interface)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
