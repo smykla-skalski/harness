@@ -37,25 +37,6 @@ public actor PolicyRegistry {
   }
 }
 
-public enum HarnessMonitorSupervisorRuleCatalog {
-  public static func makeRules() -> [any PolicyRule] {
-    [
-      CodexApprovalRule(),
-      DaemonDisconnectRule(),
-      FailedNudgeLoopRule(),
-      IdleSessionRule(),
-      ObserverIssueRule(),
-      PolicyGapRule(),
-      StuckAgentRule(),
-      UnassignedTaskRule(),
-    ]
-  }
-
-  public static func makeObservers() -> [any PolicyObserver] {
-    [LoggingPolicyObserver()]
-  }
-}
-
 extension PolicyRegistry {
   public func registerDefaults() async {
     for rule in HarnessMonitorSupervisorRuleCatalog.makeRules() {

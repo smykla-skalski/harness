@@ -262,10 +262,6 @@ private struct NoOpSupervisorAPIClient: SupervisorAPIClient {
   }
 }
 
-private struct NoOpSupervisorAuditWriter: SupervisorAuditWriter {
-  func append(_ record: SupervisorAuditRecord) async {}
-}
-
 extension PolicyAction {
   fileprivate var auditTickID: String {
     switch self {
