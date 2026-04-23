@@ -15,6 +15,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
 MANIFEST="$PROJECT_DIR/Previews.json"
 OUT_DIR="$PROJECT_DIR/tmp/previews"
 TIMEOUT="${PREVIEW_TIMEOUT_SECONDS:-120}"
@@ -30,6 +31,34 @@ require() {
 
 require xcode-cli
 require jq
+
+normalize_entry_file() {
+  local candidate="$1"
+  local app_prefix="apps/harness-monitor-macos/"
+
+  if [[ "$candidate" == /* ]]; then
+    if [[ "$candidate" == "$PROJECT_DIR/"* ]]; then
+      printf '%s\n' "${candidate#$PROJECT_DIR/}"
+      return 0
+    fi
+    if [[ "$candidate" == "$REPO_ROOT/$app_prefix"* ]]; then
+      printf '%s\n' "${candidate#"$REPO_ROOT/$app_prefix"}"
+      return 0
+    fi
+  else
+    if [[ -f "$PROJECT_DIR/$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    if [[ "$candidate" == "$app_prefix"* && -f "$REPO_ROOT/$candidate" ]]; then
+      printf '%s\n' "${candidate#$app_prefix}"
+      return 0
+    fi
+  fi
+
+  echo "error: preview file '$candidate' must be app-relative, repo-root-relative, or absolute within this repo" >&2
+  exit 1
+}
 
 entry_id=""
 entry_file=""
@@ -70,12 +99,14 @@ if [[ -n "$entry_id" ]]; then
   entry_file=$(printf '%s' "$entry_json" | jq -r '.file')
   entry_index=$(printf '%s' "$entry_json" | jq -r '.index // 0')
 elif [[ -n "$entry_file" ]]; then
-  entry_id="$(basename "$entry_file" .swift)@${entry_index:-0}"
   entry_index="${entry_index:-0}"
 else
   echo "error: must pass --id <EntryID> or --file <path>" >&2
   exit 2
 fi
+
+entry_file="$(normalize_entry_file "$entry_file")"
+entry_id="${entry_id:-$(basename "$entry_file" .swift)@${entry_index:-0}}"
 
 mkdir -p "$OUT_DIR"
 png_path="$OUT_DIR/$entry_id.png"
