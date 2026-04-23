@@ -13,6 +13,10 @@ extension HarnessMonitorAccessibility {
   public static let decisionsLiveTick = "harness.decisions.live-tick"
   public static let decisionInspector = "harness.decisions.inspector"
   public static let decisionInspectorMetadata = "harness.decisions.inspector.metadata"
+  public static let decisionInspectorToggle = "harness.decisions.inspector.toggle"
+  public static let decisionBulkActions = "harness.decisions.bulk-actions"
+  public static let decisionBulkSnoozeCritical = "harness.decisions.bulk-actions.snooze-critical"
+  public static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
 
   public static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
