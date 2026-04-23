@@ -246,7 +246,7 @@ public actor SupervisorService {
       recordFiredActions(forRuleID: entry.ruleID, actions: entry.actions, firedAt: firedAt)
       for action in entry.actions {
         if shouldSuppress(action, at: clock.now()) {
-          HarnessMonitorLogger.supervisor.info(
+          HarnessMonitorLogger.supervisor.trace(
             "supervisor.action.suppressed key=\(action.actionKey, privacy: .public)"
           )
           continue

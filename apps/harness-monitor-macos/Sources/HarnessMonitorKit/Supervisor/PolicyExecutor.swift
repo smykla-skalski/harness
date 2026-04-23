@@ -189,10 +189,10 @@ public actor PolicyExecutor {
       )
 
     case .logEvent(let payload):
-      HarnessMonitorLogger.supervisor.info("logEvent: \(payload.message, privacy: .public)")
+      HarnessMonitorLogger.supervisor.trace("logEvent: \(payload.message, privacy: .public)")
 
     case .suggestConfigChange(let payload):
-      HarnessMonitorLogger.supervisor.info(
+      HarnessMonitorLogger.supervisor.trace(
         """
         suggestConfigChange ruleID=\(payload.ruleID, privacy: .public) \
         rationale=\(payload.rationale, privacy: .public)
