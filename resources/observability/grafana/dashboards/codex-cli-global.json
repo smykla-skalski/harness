@@ -2,7 +2,7 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "codex-cli-global"
+    "name": "codex-global"
   },
   "spec": {
     "annotations": [
@@ -1101,7 +1101,7 @@
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
-    "title": "Codex CLI Global",
+    "title": "Codex Global",
     "variables": [
       {
         "kind": "QueryVariable",
