@@ -1,6 +1,6 @@
 ---
 name: swiftui-performance-macos
-description: SwiftUI and Harness Monitor performance rules. Covers no DateFormatter/JSONEncoder/NumberFormatter allocation in view body, cached @MainActor formatters, no .repeatForever on always-visible views, no persisted state in .inspector/.searchable on first frame, no mirror-state loops for store-backed selection, no geometry feedback loops during animation, OSSignposter contract (io.harnessmonitor/perf/<scenario>), perf test env vars (HARNESS_MONITOR_KEEP_ANIMATIONS), and isolated worktree requirements for Scripts/run-instruments-audit.sh. Invoke when writing or reviewing performance-sensitive SwiftUI code, animations, formatters, startup flow, persisted layout state, XCTest perf tests, or running Instruments audits in apps/harness-monitor-macos.
+description: SwiftUI and Harness Monitor performance rules. Covers no DateFormatter/JSONEncoder/NumberFormatter allocation in view body, cached @MainActor formatters, no .repeatForever on always-visible views, no persisted state in .inspector/.searchable on first frame, no mirror-state loops for store-backed selection, no geometry feedback loops during animation, OSSignposter contract (io.harnessmonitor/perf/<scenario>), perf test env vars (HARNESS_MONITOR_KEEP_ANIMATIONS), and isolated worktree requirements for `mise run monitor:macos:audit`. Invoke when writing or reviewing performance-sensitive SwiftUI code, animations, formatters, startup flow, persisted layout state, XCTest perf tests, or running Instruments audits in apps/harness-monitor-macos.
 ---
 
 # SwiftUI performance rules for Harness Monitor
@@ -262,14 +262,14 @@ Instrumentation/audit runs must not execute from a dirty shared worktree. They b
 For every audit run that is intended to prove a performance fix, prefer the dedicated wrapper:
 
 ```bash
-apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh \
+mise run monitor:macos:audit:from-ref -- \
   --ref <sha-or-ref> \
   --label <name> \
   ...
 ```
 
 It creates the temporary worktree, runs `mise trust`, delegates to
-`Scripts/run-instruments-audit.sh`, verifies `manifest.json` provenance, and
+`mise run monitor:macos:audit`, verifies `manifest.json` provenance, and
 removes the worktree on exit.
 
 If you need to reason about that behavior or change it, the required contract is:
@@ -291,7 +291,7 @@ If you need to reason about that behavior or change it, the required contract is
    so the worktree uses the expected repo tool configuration. Do not continue
    after creating the worktree until `mise trust` has completed cleanly.
 
-3. Run `apps/harness-monitor-macos/Scripts/run-instruments-audit.sh` from inside that worktree. Compare against the baseline path from the main repo only when needed; do not run the audit from the main worktree just to access the baseline.
+3. Run `mise run monitor:macos:audit -- ...` from inside that worktree. Compare against the baseline path from the main repo only when needed; do not run the audit from the main worktree just to access the baseline.
 
 4. Verify the generated `manifest.json` before trusting the numbers. The embedded commit, dirty flag, workspace fingerprint, host binary hash, and staged host bundle ID must match the worktree/ref being measured.
 
@@ -319,8 +319,7 @@ The Python scripts under `apps/harness-monitor-macos/Scripts/` parse Instruments
 When modifying the extractor or comparator, run the parser regression tests:
 
 ```
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'
+mise run monitor:macos:test:scripts
 ```
 
 Test fixtures in `Scripts/tests/fixtures/` are minimal XML samples. Update them when adding new schema parsers.
