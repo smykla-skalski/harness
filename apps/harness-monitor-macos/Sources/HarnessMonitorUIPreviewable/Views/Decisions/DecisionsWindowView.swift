@@ -81,6 +81,40 @@ public struct DecisionsWindowView: View {
     return runtime.decisions.first
   }
 
+  private var openDecisionCount: Int { runtime.decisions.count }
+
+  private var criticalDecisionCount: Int {
+    runtime.decisions.reduce(into: 0) { count, decision in
+      if decision.severityRaw == DecisionSeverity.critical.rawValue {
+        count += 1
+      }
+    }
+  }
+
+  private var infoDecisionIDs: [String] {
+    runtime.decisions
+      .filter { $0.severityRaw == DecisionSeverity.info.rawValue }
+      .map(\.id)
+  }
+
+  private var criticalDecisionIDs: [String] {
+    runtime.decisions
+      .filter { $0.severityRaw == DecisionSeverity.critical.rawValue }
+      .map(\.id)
+  }
+
+  private var navigationSubtitle: String {
+    let openLabel = "\(openDecisionCount) open"
+    guard criticalDecisionCount > 0 else {
+      return openLabel
+    }
+    return "\(openLabel) · \(criticalDecisionCount) critical"
+  }
+
+  private var inspectorToggleLabel: String {
+    inspectorVisible ? "Hide Inspector" : "Show Inspector"
+  }
+
   @ViewBuilder private var detailColumn: some View {
     if let selectedDecision {
       DecisionDetailView(
@@ -109,6 +143,9 @@ public struct DecisionsWindowView: View {
         }
     }
     .navigationSplitViewStyle(.balanced)
+    .navigationTitle("Decisions")
+    .navigationSubtitle(navigationSubtitle)
+    .toolbar { windowToolbar }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsWindow)
     .task {
@@ -125,6 +162,60 @@ public struct DecisionsWindowView: View {
     }
     .onChange(of: selection) { _, newValue in
       store?.supervisorSelectedDecisionID = newValue
+    }
+  }
+
+  @ToolbarContentBuilder private var windowToolbar: some ToolbarContent {
+    ToolbarItemGroup(placement: .primaryAction) {
+      bulkActionsMenu
+      inspectorToggleButton
+    }
+  }
+
+  private var bulkActionsMenu: some View {
+    Menu {
+      Button("Snooze all critical for 1h") {
+        Task { await snoozeAllCritical() }
+      }
+      .disabled(criticalDecisionIDs.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkSnoozeCritical)
+
+      Button("Dismiss all info") {
+        Task { await dismissAllInfo() }
+      }
+      .disabled(infoDecisionIDs.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissInfo)
+    } label: {
+      Label("Bulk actions", systemImage: "ellipsis.circle")
+    }
+    .menuIndicator(.hidden)
+    .help("Bulk actions")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkActions)
+  }
+
+  private var inspectorToggleButton: some View {
+    Button {
+      inspectorVisible.toggle()
+    } label: {
+      Label(inspectorToggleLabel, systemImage: "sidebar.right")
+    }
+    .keyboardShortcut("i", modifiers: [.command, .option])
+    .help(inspectorToggleLabel)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionInspectorToggle)
+  }
+
+  private func snoozeAllCritical() async {
+    let handler = actionHandler
+    let oneHour: TimeInterval = 60 * 60
+    for id in criticalDecisionIDs {
+      await handler.snooze(decisionID: id, duration: oneHour)
+    }
+  }
+
+  private func dismissAllInfo() async {
+    let handler = actionHandler
+    for id in infoDecisionIDs {
+      await handler.dismiss(decisionID: id)
     }
   }
 
