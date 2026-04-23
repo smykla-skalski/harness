@@ -334,6 +334,8 @@ private func crowdedAuditEvents() -> [SupervisorEvent] {
 
 #Preview("Decisions Window — crowded") {
   @Previewable @State var selection: String? = "dec-5"
+  @Previewable @State var detailTab: DecisionDetailTab = .context
+  @Previewable @State var inspectorVisible: Bool = true
   let decisions = crowdedDecisions()
   let auditEvents = crowdedAuditEvents()
   let liveTick = DecisionLiveTickSnapshot(
@@ -344,6 +346,9 @@ private func crowdedAuditEvents() -> [SupervisorEvent] {
     quarantinedRuleIDs: ["runaway-agent", "test-crash", "secret-exposed"]
   )
   let selected = decisions.first(where: { $0.id == selection }) ?? decisions[0]
+  let criticalCount = decisions.filter { $0.severityRaw == DecisionSeverity.critical.rawValue }
+    .count
+  let subtitle = "\(decisions.count) open · \(criticalCount) critical"
 
   NavigationSplitView {
     DecisionsSidebar(decisions: decisions, selection: $selection)
@@ -351,13 +356,25 @@ private func crowdedAuditEvents() -> [SupervisorEvent] {
   } detail: {
     DecisionDetailView(
       decision: selected,
-      auditEvents: auditEvents
+      auditEvents: auditEvents,
+      selectedTab: $detailTab
     )
-    .inspector(isPresented: .constant(true)) {
+    .inspector(isPresented: $inspectorVisible) {
       DecisionInspector(decision: selected, liveTick: liveTick)
         .inspectorColumnWidth(min: 260, ideal: 320, max: 420)
     }
   }
   .navigationSplitViewStyle(.balanced)
-  .frame(width: 1_200, height: 820)
+  .navigationTitle("Decisions")
+  .navigationSubtitle(subtitle)
+  .toolbar {
+    ToolbarItem(placement: .primaryAction) {
+      Button {
+        inspectorVisible.toggle()
+      } label: {
+        Label("Toggle Inspector", systemImage: "sidebar.right")
+      }
+    }
+  }
+  .frame(width: 1_280, height: 840)
 }
