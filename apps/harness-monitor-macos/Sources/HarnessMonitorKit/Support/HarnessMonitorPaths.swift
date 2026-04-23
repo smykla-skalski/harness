@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
 
 public struct HarnessMonitorEnvironment: Equatable, Sendable {
   public let values: [String: String]
@@ -12,7 +17,38 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
     self.homeDirectory = homeDirectory
   }
 
-  public static let current = Self()
+  public static var current: Self {
+    Self(
+      values: currentProcessValues(),
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+  }
+
+  private static func currentProcessValues() -> [String: String] {
+    var values = ProcessInfo.processInfo.environment
+    for key in liveEnvironmentOverrideKeys {
+      if let value = currentCEnvironmentValue(for: key) {
+        values[key] = value
+      } else {
+        values.removeValue(forKey: key)
+      }
+    }
+    return values
+  }
+
+  private static func currentCEnvironmentValue(for key: String) -> String? {
+    key.withCString { namePointer in
+      guard let valuePointer = getenv(namePointer) else { return nil }
+      return String(cString: valuePointer)
+    }
+  }
+
+  private static let liveEnvironmentOverrideKeys = [
+    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey,
+    HarnessMonitorAppGroup.environmentKey,
+    "HARNESS_MONITOR_EXTERNAL_DAEMON",
+    "XDG_DATA_HOME",
+  ]
 }
 
 public enum HarnessMonitorAppGroup {
