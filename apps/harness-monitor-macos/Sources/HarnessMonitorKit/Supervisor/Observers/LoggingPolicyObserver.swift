@@ -12,7 +12,9 @@ public struct OSLogSupervisorLogSink: SupervisorLogSink {
   public func record(event: String, fields: [String: String]) {
     let renderedFields =
       fields
-      .sorted { lhs, rhs in lhs.key < rhs.key }
+      .sorted { lhs, rhs in
+        lhs.key < rhs.key
+      }
       .map { key, value in "\(key)=\(value)" }
       .joined(separator: " ")
 
