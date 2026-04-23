@@ -1,14 +1,14 @@
 import Foundation
 
 actor PreviewHarnessClientState {
-  fileprivate static let mutationTimestamp = "2026-03-28T14:20:30Z"
+  static let mutationTimestamp = "2026-03-28T14:20:30Z"
 
   private var sessionSummaries: [SessionSummary]
   private var detailsBySessionID: [String: SessionDetail]
   private var coreDetailsBySessionID: [String: SessionDetail]
   private var timelinesBySessionID: [String: [TimelineEntry]]
   private var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
-  private var codexRunsBySessionID: [String: [CodexRunSnapshot]]
+  var codexRunsBySessionID: [String: [CodexRunSnapshot]]
   private var nextAgentTuiSequence: Int
   private var nextCodexRunSequence: Int
   private let fallbackDetail: SessionDetail?

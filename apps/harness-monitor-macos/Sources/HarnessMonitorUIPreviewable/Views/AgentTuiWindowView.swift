@@ -79,6 +79,13 @@ public struct AgentTuiWindowView: View {
     return displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
   }
 
+  var selectedCodexApprovalItems: [CodexApprovalItem] {
+    guard let selectedCodexRun else {
+      return []
+    }
+    return Self.codexApprovalItems(for: selectedCodexRun, decisions: store.supervisorOpenDecisions)
+  }
+
   var trimmedInput: String {
     viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
   }
@@ -160,7 +167,7 @@ public struct AgentTuiWindowView: View {
         "selection=terminal:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
     case .codex(let runID):
       let status = selectedCodexRun?.status.rawValue ?? "missing"
-      let approvalCount = selectedCodexRun?.pendingApprovals.count ?? 0
+      let approvalCount = selectedCodexApprovalItems.count
       return "selection=codex:\(runID),status=\(status),approvals=\(approvalCount)"
     case .agent(let agentID):
       let agentStatus =

@@ -132,8 +132,9 @@ extension AgentTuiWindowView {
             label: error
           )
       }
-      if !run.pendingApprovals.isEmpty {
-        codexApprovalsSection(run)
+      let approvalItems = codexApprovalItems(for: run)
+      if !approvalItems.isEmpty {
+        codexApprovalsSection(approvalItems, run: run)
       }
       if run.status.isActive {
         codexContextSection(run)
@@ -207,30 +208,26 @@ extension AgentTuiWindowView {
     }
   }
 
-  func codexApprovalsSection(_ run: CodexRunSnapshot) -> some View {
+  func codexApprovalsSection(_ items: [CodexApprovalItem], run: CodexRunSnapshot) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       Text("Approvals")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      ForEach(run.pendingApprovals) { approval in
+      ForEach(items) { item in
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          Text(approval.title)
+          Text(item.title)
             .scaledFont(.headline)
-          Text(approval.detail)
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .textSelection(.enabled)
+          if !item.detail.isEmpty {
+            Text(item.detail)
+              .scaledFont(.subheadline)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .textSelection(.enabled)
+          }
           HStack {
-            codexApprovalButton("Approve", approval: approval, run: run, decision: .accept)
-            codexApprovalButton(
-              "Allow Session",
-              approval: approval,
-              run: run,
-              decision: .acceptForSession
-            )
-            codexApprovalButton("Decline", approval: approval, run: run, decision: .decline)
+            ForEach(item.actions) { action in
+              codexApprovalButton(action.title, item: item, run: run, actionID: action.id)
+            }
             Spacer()
-            codexApprovalButton("Cancel", approval: approval, run: run, decision: .cancel)
           }
         }
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
@@ -240,20 +237,24 @@ extension AgentTuiWindowView {
 
   func codexApprovalButton(
     _ title: String,
-    approval: CodexApprovalRequest,
+    item: CodexApprovalItem,
     run: CodexRunSnapshot,
-    decision: CodexApprovalDecision
+    actionID: String
   ) -> some View {
     Button(title) {
-      resolveCodexApproval(approval, run: run, decision: decision)
+      resolveCodexApproval(item, run: run, actionID: actionID)
     }
     .disabled(viewModel.resolvingCodexApprovalID != nil || viewModel.isSubmitting)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.codexApprovalButton(
-        approval.approvalId,
-        decision: decision.rawValue
+        item.approvalID,
+        decision: actionID
       )
     )
+  }
+
+  func codexApprovalItems(for run: CodexRunSnapshot) -> [CodexApprovalItem] {
+    Self.codexApprovalItems(for: run, decisions: store.supervisorOpenDecisions)
   }
 
   func codexContextSection(_ run: CodexRunSnapshot) -> some View {

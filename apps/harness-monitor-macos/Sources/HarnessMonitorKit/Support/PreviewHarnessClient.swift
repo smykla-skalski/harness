@@ -163,6 +163,24 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     }
   }
 
+  public func resolveCodexApproval(
+    runID: String,
+    approvalID: String,
+    request: CodexApprovalDecisionRequest
+  ) async throws -> CodexRunSnapshot {
+    try await performActionDelay()
+    guard
+      let run = await state.resolveCodexApproval(
+        runID: runID,
+        approvalID: approvalID,
+        decision: request.decision
+      )
+    else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable.")
+    }
+    return run
+  }
+
   public func createTask(
     sessionID _: String,
     request _: TaskCreateRequest
