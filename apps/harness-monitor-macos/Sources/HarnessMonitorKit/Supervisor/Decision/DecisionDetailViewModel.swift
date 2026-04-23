@@ -203,7 +203,7 @@ private struct ContextBlob: Decodable {
     var sections: [DecisionDetailViewModel.ContextSection] = []
     if let snapshotExcerpt, !snapshotExcerpt.isEmpty {
       sections.append(
-        .init(title: "Snapshot excerpt", lines: [snapshotExcerpt])
+        .init(title: "Snapshot", lines: [snapshotExcerpt])
       )
     }
     if let relatedTimeline, !relatedTimeline.isEmpty {

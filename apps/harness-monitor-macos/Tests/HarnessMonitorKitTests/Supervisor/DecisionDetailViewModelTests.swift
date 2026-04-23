@@ -70,7 +70,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     let titles = viewModel.contextSections.map(\.title)
     XCTAssertEqual(
       titles,
-      ["Snapshot excerpt", "Related timeline", "Observer issues", "Recent supervisor actions"]
+      ["Snapshot", "Related timeline", "Observer issues", "Recent supervisor actions"]
     )
     XCTAssertEqual(viewModel.contextSections[0].lines, ["agent=agent-1 idle=720s"])
     XCTAssertEqual(viewModel.contextSections[1].lines.count, 2)
@@ -85,7 +85,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     )
 
     XCTAssertEqual(viewModel.contextSections.count, 1)
-    XCTAssertEqual(viewModel.contextSections.first?.title, "Snapshot excerpt")
+    XCTAssertEqual(viewModel.contextSections.first?.title, "Snapshot")
   }
 
   func test_malformedContextJSONYieldsRawFallback() {

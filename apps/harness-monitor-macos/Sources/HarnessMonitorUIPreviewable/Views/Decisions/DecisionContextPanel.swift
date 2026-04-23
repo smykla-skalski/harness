@@ -66,7 +66,7 @@ private struct ContextSectionCard: View {
 #Preview("Decision Context — populated") {
   DecisionContextPanel(
     sections: [
-      .init(title: "Snapshot excerpt", lines: ["agent=agent-7 idle=720s owner=leader"]),
+      .init(title: "Snapshot", lines: ["agent=agent-7 idle=720s owner=leader"]),
       .init(
         title: "Related timeline",
         lines: ["signal.sent: 12:01", "reminder.sent: 12:04", "reply.missing: 12:12"]
