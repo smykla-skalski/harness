@@ -9,6 +9,7 @@ public actor PreviewDaemonController: DaemonControlling {
     case pagedTimeline
     case signalRegression
     case singleAgent
+    case supervisorStuckAgent
     case empty
   }
 
@@ -41,6 +42,8 @@ public actor PreviewDaemonController: DaemonControlling {
         PreviewHarnessClient.Fixtures.signalRegression
       case .singleAgent:
         PreviewHarnessClient.Fixtures.singleAgent
+      case .supervisorStuckAgent:
+        PreviewHarnessClient.Fixtures.supervisorStuckAgent
       case .empty:
         PreviewHarnessClient.Fixtures.empty
       }

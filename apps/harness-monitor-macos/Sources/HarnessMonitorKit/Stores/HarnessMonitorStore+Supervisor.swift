@@ -41,6 +41,10 @@ private enum SupervisorBindingsKey {
   nonisolated(unsafe) static var key: UInt8 = 0
 }
 
+private enum SupervisorStartTaskKey {
+  nonisolated(unsafe) static var key: UInt8 = 0
+}
+
 extension HarnessMonitorStore {
   fileprivate var _stack: SupervisorStack? {
     get {
@@ -70,6 +74,20 @@ extension HarnessMonitorStore {
       .OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
     return created
+  }
+
+  fileprivate var _supervisorStartTask: Task<Void, Never>? {
+    get {
+      objc_getAssociatedObject(self, &SupervisorStartTaskKey.key) as? Task<Void, Never>
+    }
+    set {
+      objc_setAssociatedObject(
+        self,
+        &SupervisorStartTaskKey.key,
+        newValue,
+        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+      )
+    }
   }
 
   public var supervisorDecisionStore: DecisionStore? {
@@ -104,6 +122,29 @@ extension HarnessMonitorStore {
   }
 
   public func startSupervisor() async {
+    guard _stack == nil else {
+      HarnessMonitorLogger.supervisor.info("supervisor.start skipped — already running")
+      return
+    }
+
+    if let startTask = _supervisorStartTask {
+      await startTask.value
+      return
+    }
+
+    let startTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      await self.performSupervisorStartup()
+    }
+    _supervisorStartTask = startTask
+    await startTask.value
+  }
+
+  private func performSupervisorStartup() async {
+    defer { _supervisorStartTask = nil }
+
     guard _stack == nil else {
       HarnessMonitorLogger.supervisor.info("supervisor.start skipped — already running")
       return
@@ -267,6 +308,9 @@ extension HarnessMonitorStore {
   }
 
   public func runSupervisorTickForTesting() async {
+    if _stack == nil {
+      await startSupervisor()
+    }
     guard let stack = _stack else {
       return
     }
@@ -327,86 +371,4 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func seedSupervisorDecisionsIfNeeded(_ decisionStore: DecisionStore) async throws {
-    let environmentKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
-    guard
-      let rawValue = ProcessInfo.processInfo.environment[environmentKey]?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      !rawValue.isEmpty
-    else {
-      return
-    }
-
-    let payload = try JSONDecoder().decode(
-      SupervisorDecisionSeedPayload.self,
-      from: Data(rawValue.utf8)
-    )
-    for seededDecision in payload.decisions {
-      guard let severity = DecisionSeverity(rawValue: seededDecision.severity) else {
-        continue
-      }
-      try await decisionStore.insert(
-        DecisionDraft(
-          id: seededDecision.id,
-          severity: severity,
-          ruleID: seededDecision.ruleID,
-          sessionID: seededDecision.sessionID,
-          agentID: seededDecision.agentID,
-          taskID: seededDecision.taskID,
-          summary: seededDecision.summary,
-          contextJSON: seededDecision.contextJSON ?? "{}",
-          suggestedActionsJSON: seededDecision.suggestedActionsJSON ?? "[]"
-        )
-      )
-    }
-  }
-
-  private static func loadPolicyOverrides(
-    from modelContext: ModelContext?
-  ) -> [PolicyConfigOverride] {
-    guard let modelContext else {
-      return []
-    }
-
-    do {
-      let descriptor = FetchDescriptor<PolicyConfigRow>(
-        sortBy: [SortDescriptor(\.ruleID)]
-      )
-      return try modelContext.fetch(descriptor).map { row in
-        PolicyConfigOverride(
-          ruleID: row.ruleID,
-          enabled: row.enabled,
-          defaultBehavior: RuleDefaultBehavior(rawValue: row.defaultBehaviorRaw) ?? .cautious,
-          parameters: decodeParameters(from: row.parametersJSON)
-        )
-      }
-    } catch {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.policy_config_load_failed error=\(String(describing: error), privacy: .public)"
-      )
-      return []
-    }
-  }
-
-  private static func decodeParameters(from json: String) -> [String: String] {
-    guard
-      let data = json.data(using: .utf8),
-      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else {
-      return [:]
-    }
-
-    var parameters: [String: String] = [:]
-    for (key, value) in object {
-      switch value {
-      case let string as String:
-        parameters[key] = string
-      case let number as NSNumber:
-        parameters[key] = number.stringValue
-      default:
-        continue
-      }
-    }
-    return parameters
-  }
 }

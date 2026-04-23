@@ -1,6 +1,115 @@
 import Foundation
 
 extension PreviewHarnessClient.Fixtures {
+  public static let supervisorStuckAgent: Self = {
+    let now = Date()
+    let staleActivity = now.addingTimeInterval(-300)
+    let createdAt = now.addingTimeInterval(-3600)
+    let project = ProjectSummary(
+      projectId: "project-ui-tests",
+      name: "Harness UI Tests",
+      projectDir: "/tmp/harness-ui-tests",
+      contextRoot: "/tmp/harness-ui-tests/context",
+      activeSessionCount: 1,
+      totalSessionCount: 1
+    )
+    let summary = SessionSummary(
+      projectId: project.projectId,
+      projectName: project.name,
+      contextRoot: project.contextRoot,
+      sessionId: "session-ui-stuck",
+      title: "Supervisor Stuck Agent",
+      context: "Supervisor toolbar badge regression fixture",
+      status: .active,
+      createdAt: iso8601String(createdAt),
+      updatedAt: iso8601String(now),
+      lastActivityAt: iso8601String(now),
+      leaderId: "agent-ui-leader",
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 1,
+        activeAgentCount: 1,
+        openTaskCount: 1,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+    let agent = AgentRegistration(
+      agentId: "agent-ui-stuck",
+      name: "Stuck Worker",
+      runtime: "codex",
+      role: .worker,
+      capabilities: [],
+      joinedAt: iso8601String(createdAt),
+      updatedAt: iso8601String(now),
+      status: .active,
+      agentSessionId: nil,
+      lastActivityAt: iso8601String(staleActivity),
+      currentTaskId: "task-ui-stuck",
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "codex",
+        supportsNativeTranscript: true,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 1,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+    let task = WorkItem(
+      taskId: "task-ui-stuck",
+      title: "Unblock the stalled worker",
+      context: "Seeded UI-test task for the stuck-agent rule",
+      severity: .medium,
+      status: .inProgress,
+      assignedTo: agent.agentId,
+      createdAt: iso8601String(createdAt),
+      updatedAt: iso8601String(now),
+      createdBy: "ui-tests",
+      notes: [],
+      suggestedFix: nil,
+      source: .manual,
+      blockedReason: nil,
+      completedAt: nil,
+      checkpointSummary: nil
+    )
+    let detail = SessionDetail(
+      session: summary,
+      agents: [agent],
+      tasks: [task],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    return Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: iso8601String(createdAt),
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: [project],
+      sessions: [summary],
+      detail: detail,
+      timeline: [],
+      readySessionID: summary.sessionId,
+      detailsBySessionID: [summary.sessionId: detail],
+      coreDetailsBySessionID: [:],
+      timelinesBySessionID: [summary.sessionId: []]
+    )
+  }()
+
+  private static func iso8601String(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
+  }
+
   public static let overflow: Self = {
     let sessions = PreviewFixtures.overflowSessions
     let detailsBySessionID = Dictionary(
