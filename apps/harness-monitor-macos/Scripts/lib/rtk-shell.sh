@@ -1,7 +1,12 @@
 #!/bin/bash
 
 run_xcodebuild_command() {
-  xcodebuild "$@"
+  local xcodebuild_bin="${XCODEBUILD_BIN:-/usr/bin/xcodebuild}"
+  if [[ ! -x "$xcodebuild_bin" ]]; then
+    echo "xcodebuild binary is not executable: $xcodebuild_bin" >&2
+    return 127
+  fi
+  "$xcodebuild_bin" "$@"
 }
 
 print_log_tail_compact() {
