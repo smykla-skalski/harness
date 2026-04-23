@@ -885,8 +885,8 @@
                   "custom": {
                     "drawStyle": "bars",
                     "lineWidth": 0,
-                    "fillOpacity": 80,
-                    "gradientMode": "opacity",
+                    "fillOpacity": 100,
+                    "gradientMode": "none",
                     "barAlignment": 0,
                     "barWidthFactor": 0.8,
                     "barMaxWidth": 50,
@@ -1136,8 +1136,8 @@
                   "custom": {
                     "drawStyle": "bars",
                     "lineWidth": 0,
-                    "fillOpacity": 80,
-                    "gradientMode": "opacity",
+                    "fillOpacity": 100,
+                    "gradientMode": "none",
                     "barAlignment": 0,
                     "barWidthFactor": 0.8,
                     "barMaxWidth": 50,
@@ -3813,7 +3813,7 @@
               },
               "options": {
                 "orientation": "horizontal",
-                "displayMode": "gradient",
+                "displayMode": "basic",
                 "valueMode": "color",
                 "showUnfilled": true,
                 "minVizWidth": 0,
