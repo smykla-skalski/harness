@@ -1,35 +1,9 @@
 import Foundation
 import OpenTelemetryApi
-import os
+import SwiftData
 
-/// Clock abstraction the supervisor tick loop uses. Real code plugs in `WallClock` (the default
-/// when `clock: Any?` is nil); tests plug in `TestClock` to advance virtual time deterministically.
-public protocol SupervisorClock: Sendable {
-  func now() -> Date
-  func sleep(for duration: Duration) async throws
-}
-
-/// Wall-clock implementation backed by `Task.sleep(for:)`. Used when the caller passes `nil`
-/// for the clock parameter (i.e. production wiring from `HarnessMonitorStore+Supervisor`).
-public struct WallClock: SupervisorClock {
-  public init() {}
-  public func now() -> Date { Date() }
-  public func sleep(for duration: Duration) async throws {
-    try await Task.sleep(for: duration)
-  }
-}
-
-/// Actor owning the Monitor supervisor tick loop. Each tick builds a `SessionsSnapshot`, fans
-/// rules out to a `TaskGroup`, dispatches emitted actions through `PolicyExecutor`, and notifies
-/// registered observers. Per-rule failures are isolated and counted inside a sliding 10-tick
-/// window; a rule that fails 5+ times in that window is quarantined — subsequent ticks skip it
-/// and the supervisor queues a critical `Decision` so the user sees the quarantine.
 public actor SupervisorService {
-  /// Quarantine threshold: a rule that fails at least this many times inside the recent window
-  /// is quarantined.
   private static let quarantineErrorThreshold = 5
-
-  /// Sliding window size (in ticks) used when evaluating the quarantine threshold.
   private static let quarantineWindowTicks = 10
 
   private let store: HarnessMonitorStore?
@@ -38,18 +12,20 @@ public actor SupervisorService {
   private let clock: any SupervisorClock
   private let interval: TimeInterval
 
-  /// The task running the tick loop. Cancelling and awaiting it drains the in-flight tick.
   private var tickTask: Task<Void, Never>?
   private var running = false
   private var autoActionsSuppressed = false
   private var quietHoursWindow: SupervisorQuietHoursWindow?
 
-  /// Per-rule error flags for the last N ticks. Each ring entry is keyed by rule id; `true`
-  /// means the rule errored during that tick. Oldest entries are dropped as the window slides.
   private var ruleFailureWindow: [[String: Bool]] = []
   private var quarantined: Set<String> = []
   private var injectedFailures: Set<String> = []
   private var dispatchedQuarantineDecisions: Set<String> = []
+  private var ruleLastFiredAt: [String: Date] = [:]
+  private var ruleRecentActionKeys: [String: Set<String>] = [:]
+  private var tickLatencySamplesMs: [Double] = []
+  private var lastSnapshotID: String?
+  private var lastObserverCount = 0
 
   public init(
     store: HarnessMonitorStore?,
@@ -81,20 +57,13 @@ public actor SupervisorService {
     guard running else { return }
     running = false
     tickTask?.cancel()
-    // Awaiting the tick-loop task drains any in-flight tick before returning.
     _ = await tickTask?.value
     tickTask = nil
     HarnessMonitorLogger.supervisor.info("supervisor.stop")
   }
 
-  /// Runs a single tick inline. Exposed for the UI-test debug hook (`forceSupervisorTick`) and
-  /// for deterministic test driving via `runOneTick()`.
-  public func runOneTick() async {
-    await tickBody()
-  }
+  public func runOneTick() async { await tickBody() }
 
-  /// Suppress automatic actions for the duration of the supplied operation. Useful while a user
-  /// is actively resolving a decision so the supervisor doesn't fire additional nudges.
   public func suppressAutoActions<Result>(
     during operation: @Sendable () async throws -> Result
   ) async rethrows -> Result {
@@ -103,40 +72,27 @@ public actor SupervisorService {
     return try await operation()
   }
 
-  /// Persisted quiet-hours preferences are wired through the store and applied on every tick,
-  /// so the supervisor can suppress side effects without requiring the preferences UI to stay
-  /// open.
   public func setQuietHoursWindow(_ window: SupervisorQuietHoursWindow?) {
     quietHoursWindow = window
   }
 
-  // MARK: - Test hooks
+  public func awaitCurrentTick() async { await Task.yield() }
 
-  /// Wait for the current tick (if any) to finish. No-op when the loop is idle.
-  /// For deterministic test driving, prefer calling `runOneTick()` directly.
-  public func awaitCurrentTick() async {
-    // Yield to the cooperative scheduler so any pending tick work in flight gets a scheduling
-    // opportunity. Tests that use runOneTick() directly do not need this method.
-    await Task.yield()
+  public func quarantinedRuleIDs() -> Set<String> { quarantined }
+
+  public func isAutoActionSuppressed(at date: Date) -> Bool { suppressionActive(at: date) }
+
+  public func liveTickSnapshot() -> DecisionLiveTickSnapshot {
+    DecisionLiveTickSnapshot(
+      lastSnapshotID: lastSnapshotID,
+      tickLatencyP50Ms: percentile(0.5),
+      tickLatencyP95Ms: percentile(0.95),
+      activeObserverCount: lastObserverCount,
+      quarantinedRuleIDs: quarantined.sorted()
+    )
   }
 
-  /// Set of rules the supervisor has quarantined in the current run.
-  public func quarantinedRuleIDs() -> Set<String> {
-    quarantined
-  }
-
-  public func isAutoActionSuppressed(at date: Date) -> Bool {
-    suppressionActive(at: date)
-  }
-
-  /// Arm the supervisor to treat evaluate calls for `ruleID` as failures. Used only by the
-  /// supervisor test suite to exercise the quarantine path without altering the frozen
-  /// `PolicyRule` protocol. Injection persists across ticks until the rule is quarantined.
-  public func injectFailure(forRuleID ruleID: String) {
-    injectedFailures.insert(ruleID)
-  }
-
-  // MARK: - Tick loop
+  public func injectFailure(forRuleID ruleID: String) { injectedFailures.insert(ruleID) }
 
   private func runLoop() async {
     while running && !Task.isCancelled {
@@ -151,6 +107,7 @@ public actor SupervisorService {
   }
 
   private func tickBody() async {
+    let tickStartedAt = Date()
     let tracer = SupervisorTelemetry.tracer()
     let span = tracer.spanBuilder(spanName: SupervisorTelemetry.tickSpanName).startSpan()
     defer { span.end() }
@@ -163,6 +120,8 @@ public actor SupervisorService {
 
     let rules = await registry.allRules
     let observers = await registry.observerList
+    lastSnapshotID = snapshot.id
+    lastObserverCount = observers.count
     for observer in observers {
       await observer.willTick(snapshot)
     }
@@ -175,7 +134,13 @@ public actor SupervisorService {
     )
     advanceFailureWindow(with: results.failedRuleIDs)
     applyNewQuarantines(for: results.failedRuleIDs)
-    await dispatchActions(results.actionsByRule, observers: observers)
+    await dispatchActions(
+      results.actionsByRule,
+      tickID: snapshot.id,
+      firedAt: now,
+      observers: observers
+    )
+    recordTickLatency(startedAt: tickStartedAt)
   }
 
   private struct TickResults {
@@ -189,19 +154,21 @@ public actor SupervisorService {
     now: Date,
     observers: [any PolicyObserver]
   ) async -> TickResults {
-    let context = PolicyContext(
-      now: now,
-      lastFiredAt: nil,
-      recentActionKeys: [],
-      parameters: PolicyParameterValues(raw: [:]),
-      history: PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
-    )
+    let history = await historyWindow()
     let quarantinedSnapshot = quarantined
     let armedSnapshot = injectedFailures
 
     return await withTaskGroup(of: RuleEvaluation.self) { group in
       for rule in rules where !quarantinedSnapshot.contains(rule.id) {
+        guard await registry.isEnabled(ruleID: rule.id) else {
+          continue
+        }
         let armed = armedSnapshot.contains(rule.id)
+        let context = await makeContext(
+          forRuleID: rule.id,
+          now: now,
+          history: history
+        )
         group.addTask { [context] in
           await Self.runRule(rule, snapshot: snapshot, context: context, armed: armed)
         }
@@ -271,9 +238,12 @@ public actor SupervisorService {
 
   private func dispatchActions(
     _ actionsByRule: [(ruleID: String, actions: [PolicyAction])],
+    tickID: String,
+    firedAt: Date,
     observers: [any PolicyObserver]
   ) async {
     for entry in actionsByRule {
+      recordFiredActions(forRuleID: entry.ruleID, actions: entry.actions, firedAt: firedAt)
       for action in entry.actions {
         if shouldSuppress(action, at: clock.now()) {
           HarnessMonitorLogger.supervisor.info(
@@ -281,14 +251,12 @@ public actor SupervisorService {
           )
           continue
         }
-        await dispatch(action, observers: observers)
+        await dispatch(action, tickID: tickID, observers: observers)
       }
     }
-    // Emit a quarantine decision for every newly quarantined rule so the user gets a visible
-    // signal when the supervisor gives up on a rule.
     for ruleID in quarantined where wasQuarantinedThisTick(ruleID) {
       let decision = Self.makeQuarantineDecision(for: ruleID)
-      await dispatch(.queueDecision(decision), observers: observers)
+      await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
       dispatchedQuarantineDecisions.insert(ruleID)
     }
   }
@@ -299,9 +267,10 @@ public actor SupervisorService {
 
   private func dispatch(
     _ action: PolicyAction,
+    tickID: String,
     observers: [any PolicyObserver]
   ) async {
-    let outcome = await executor.execute(action)
+    let outcome = await executor.execute(action, tickID: tickID)
     for observer in observers {
       await observer.didExecute(action: action, outcome: outcome)
     }
@@ -344,15 +313,105 @@ public actor SupervisorService {
     }
     return quietHoursWindow?.contains(now) == true
   }
-}
 
-extension PolicyAction {
-  fileprivate var isAutomaticSideEffect: Bool {
-    switch self {
-    case .nudgeAgent, .assignTask, .dropTask, .notifyOnly:
-      true
-    case .queueDecision, .logEvent, .suggestConfigChange:
-      false
+  private func makeContext(
+    forRuleID ruleID: String,
+    now: Date,
+    history: PolicyHistoryWindow
+  ) async -> PolicyContext {
+    PolicyContext(
+      now: now,
+      lastFiredAt: ruleLastFiredAt[ruleID],
+      recentActionKeys: ruleRecentActionKeys[ruleID] ?? [],
+      parameters: await registry.parameters(forRule: ruleID),
+      history: history
+    )
+  }
+
+  private func recordFiredActions(
+    forRuleID ruleID: String,
+    actions: [PolicyAction],
+    firedAt: Date
+  ) {
+    ruleRecentActionKeys[ruleID] = Set(actions.map(\.actionKey))
+    guard !actions.isEmpty else {
+      return
     }
+    ruleLastFiredAt[ruleID] = firedAt
+  }
+
+  private func historyWindow() async -> PolicyHistoryWindow {
+    guard let store else {
+      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
+    }
+    return await MainActor.run {
+      Self.historyWindow(from: store.modelContext)
+    }
+  }
+
+  @MainActor
+  private static func historyWindow(from context: ModelContext?) -> PolicyHistoryWindow {
+    guard let context else {
+      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
+    }
+
+    do {
+      var eventDescriptor = FetchDescriptor<SupervisorEvent>(
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      eventDescriptor.fetchLimit = 64
+      let recentEvents = try context.fetch(eventDescriptor).map {
+        SupervisorEventSummary(
+          id: $0.id,
+          kind: $0.kind,
+          ruleID: $0.ruleID,
+          createdAt: $0.createdAt
+        )
+      }
+
+      var decisionDescriptor = FetchDescriptor<Decision>(
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      decisionDescriptor.fetchLimit = 64
+      let decisions = try context.fetch(decisionDescriptor)
+      let recentDecisions: [DecisionSummary] = decisions.compactMap { decision in
+        guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
+          return nil
+        }
+        return DecisionSummary(
+          id: decision.id,
+          ruleID: decision.ruleID,
+          severity: severity,
+          createdAt: decision.createdAt
+        )
+      }
+
+      return PolicyHistoryWindow(
+        recentEvents: recentEvents,
+        recentDecisions: recentDecisions
+      )
+    } catch {
+      HarnessMonitorLogger.supervisor.warning(
+        "supervisor.history_load_failed error=\(String(describing: error), privacy: .public)"
+      )
+      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
+    }
+  }
+
+  private func recordTickLatency(startedAt: Date) {
+    tickLatencySamplesMs.append(Date().timeIntervalSince(startedAt) * 1_000)
+    if tickLatencySamplesMs.count > 32 {
+      tickLatencySamplesMs.removeFirst(tickLatencySamplesMs.count - 32)
+    }
+  }
+
+  private func percentile(_ value: Double) -> Double {
+    guard !tickLatencySamplesMs.isEmpty else {
+      return 0
+    }
+    let sorted = tickLatencySamplesMs.sorted()
+    let lastIndex = sorted.count - 1
+    let index = Int((Double(lastIndex) * value).rounded(.down))
+    return sorted[max(0, min(lastIndex, index))]
   }
 }

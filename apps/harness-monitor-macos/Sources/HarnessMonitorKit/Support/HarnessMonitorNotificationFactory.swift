@@ -90,7 +90,7 @@ enum HarnessMonitorNotificationRequestFactory {
   static func makeSupervisorRequest(
     severity: DecisionSeverity,
     summary: String,
-    decisionID: UUID
+    decisionID: String
   ) async throws -> UNNotificationRequest {
     let preferences = SupervisorNotificationPreferences.load()
     let content = UNMutableNotificationContent()
@@ -103,11 +103,10 @@ enum HarnessMonitorNotificationRequestFactory {
     content.relevanceScore = severity.supervisorRelevanceScore
     content.sound = preferences.requestSound(for: severity)
     content.userInfo = [
-      HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID.uuidString,
+      HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID,
       HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,
     ]
-    let identifier =
-      "\(HarnessMonitorSupervisorNotificationID.requestPrefix)\(decisionID.uuidString)"
+    let identifier = "\(HarnessMonitorSupervisorNotificationID.requestPrefix)\(decisionID)"
     return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
   }
 

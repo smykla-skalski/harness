@@ -86,11 +86,12 @@ struct HarnessMonitorWindowRootView: View {
   }
   private func routeDecisionWindowRequest(for tick: Int) {
     guard tick != handledDecisionRequestTick,
-      notifications.decisionRequestedID != nil
+      let decisionID = notifications.decisionRequestedID
     else {
       return
     }
     handledDecisionRequestTick = tick
+    store.supervisorSelectedDecisionID = decisionID
     openWindow(id: HarnessMonitorWindowID.decisions)
   }
 }

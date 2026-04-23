@@ -65,11 +65,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(
     _ sender: NSApplication
   ) -> Bool {
-    // Monitor supervisor loop runs in the background via NSBackgroundActivityScheduler, so
-    // the app must stay alive after the last window closes. Phase 2 worker 6 owns the
-    // scheduler lifecycle; Phase 1 just reverts the quit-on-close policy documented in
-    // memory `project_quit_on_close.md`.
-    false
+    let storedValue =
+      UserDefaults.standard.object(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      ) as? Bool
+    let runInBackground = storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
+    _ = sender
+    return !runInBackground
   }
 
   func applicationDidResignActive(_ notification: Notification) {

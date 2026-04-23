@@ -22,7 +22,7 @@ public final class SupervisorLifecycle: @unchecked Sendable {
   /// synchronously without waiting for the real scheduler.
   ///
   /// Set before calling `startBackgroundActivity`.
-  public var onTick: (() -> Void)?
+  public var onTick: (@Sendable () async -> Void)?
 
   private var scheduler: NSBackgroundActivityScheduler?
   private let interval: TimeInterval
@@ -77,8 +77,10 @@ public final class SupervisorLifecycle: @unchecked Sendable {
         return
       }
       HarnessMonitorLogger.supervisor.debug("supervisor.lifecycle.background_tick fired")
-      self.onTick?()
-      completion(.finished)
+      Task {
+        await self.onTick?()
+        completion(.finished)
+      }
     }
 
     scheduler = activity
@@ -104,8 +106,8 @@ public final class SupervisorLifecycle: @unchecked Sendable {
   // MARK: - Test hook
 
   /// Immediately invokes `onTick` inline, bypassing the scheduler. Only for tests.
-  public func forceTick() {
-    onTick?()
+  public func forceTick() async {
+    await onTick?()
   }
 
   private var normalizedTolerance: TimeInterval {

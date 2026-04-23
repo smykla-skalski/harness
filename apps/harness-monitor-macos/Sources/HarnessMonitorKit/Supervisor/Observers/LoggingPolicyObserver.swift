@@ -153,7 +153,7 @@ extension PolicyOutcome {
       [
         "actionKey": actionKey,
         "outcome": "failed",
-        "error": error,
+        "error": redactSupervisorErrorMessage(error),
       ]
     case .quarantined(let ruleID, let reason):
       [

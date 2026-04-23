@@ -27,6 +27,28 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "name": "Deployments",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "loki"
+            },
+            "spec": {
+              "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
+              "refId": "DEPLOY",
+              "maxLines": 100
+            }
+          }
+        }
       }
     ],
     "cursorSync": "Crosshair",
@@ -1223,16 +1245,16 @@
       }
     },
     "layout": {
-      "kind": "GridLayout",
+      "kind": "AutoGridLayout",
       "spec": {
+        "maxColumnCount": 4,
+        "columnWidthMode": "standard",
+        "rowHeightMode": "standard",
+        "fillScreen": false,
         "items": [
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-1"
@@ -1240,12 +1262,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 6,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-2"
@@ -1253,12 +1271,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-3"
@@ -1266,12 +1280,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 18,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-4"
@@ -1279,12 +1289,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 4,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-5"
@@ -1292,12 +1298,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 4,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-6"
@@ -1305,12 +1307,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 12,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-8"
@@ -1318,12 +1316,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 12,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-9"
@@ -1331,12 +1325,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 28,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-11"
@@ -1344,12 +1334,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 28,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-17"
@@ -1357,12 +1343,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 36,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-12"
@@ -1370,12 +1352,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 36,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-13"
@@ -1383,12 +1361,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 44,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-14"
@@ -1396,12 +1370,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 44,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-15"
@@ -1409,12 +1379,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 52,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-16"
@@ -1422,12 +1388,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 52,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-18"
@@ -1559,18 +1521,6 @@
       "from": "now-15m",
       "to": "now",
       "autoRefresh": "10s",
-      "autoRefreshIntervals": [
-        "5s",
-        "10s",
-        "30s",
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h",
-        "2h",
-        "1d"
-      ],
       "quickRanges": [
         {
           "display": "Last 15 minutes",
@@ -1623,7 +1573,7 @@
               "name": "prometheus"
             },
             "spec": {
-              "__legacyStringValue": "label_values(node_disk_read_bytes_total, device)"
+              "expr": "label_values(node_disk_read_bytes_total, device)"
             }
           },
           "regex": "",
@@ -1656,7 +1606,7 @@
               "name": "prometheus"
             },
             "spec": {
-              "__legacyStringValue": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)"
+              "expr": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)"
             }
           },
           "regex": "",
@@ -1689,7 +1639,7 @@
               "name": "prometheus"
             },
             "spec": {
-              "__legacyStringValue": "label_values(process_cpu_utilization_ratio, process_executable_name)"
+              "expr": "label_values(process_cpu_utilization_ratio, process_executable_name)"
             }
           },
           "regex": "",

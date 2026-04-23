@@ -53,7 +53,9 @@ struct HarnessMonitorApp: App {
       }()
     self.notificationController = notificationController
     perfScenario = configuration.perfScenario
-    _store = State(initialValue: configuration.store)
+    let store = configuration.store
+    store.bindSupervisorNotifications(notificationController)
+    _store = State(initialValue: store)
     _agentTuiNavigationBridge = State(initialValue: AgentTuiWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
@@ -118,7 +120,7 @@ struct HarnessMonitorApp: App {
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
 
     Window("Decisions", id: HarnessMonitorWindowID.decisions) {
-      DecisionsWindowView()
+      DecisionsWindowView(store: store)
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
     }
     .windowStyle(.titleBar)
