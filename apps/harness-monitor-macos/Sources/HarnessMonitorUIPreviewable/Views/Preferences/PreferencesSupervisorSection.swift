@@ -53,7 +53,7 @@ public struct PreferencesSupervisorSection: View {
         Group {
           switch selectedPane {
           case .rules:
-            PreferencesSupervisorRulesPane()
+            PreferencesSupervisorRulesPane(store: store)
           case .notifications:
             PreferencesSupervisorNotificationsPane(notifications: notifications)
           case .background:
