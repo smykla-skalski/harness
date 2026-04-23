@@ -1,9 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Key identifying which Supervisor preferences pane is currently selected. Phase 2 workers
-/// 22 and 23 own their respective subviews and wire them via this enum switch. Phase 1 ships
-/// the switch so later workers only touch their own subview files.
+/// Key identifying which Supervisor preferences pane is currently selected.
 public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
   case rules
   case notifications
@@ -20,9 +18,9 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
   }
 }
 
-/// Root Supervisor section in the Preferences window. Phase 1 renders a segmented control that
-/// switches between three empty pane stubs; Phase 2 worker 22 replaces the `.rules` pane body
-/// and worker 23 replaces `.notifications` + `.background`.
+/// Root Supervisor section in the Preferences window. Renders a native scope bar pinned to the
+/// top safe area and delegates to the selected pane. Each pane owns its own `Form` and
+/// `preferencesDetailFormStyle()` so the sidebar can continue to supply the detail column title.
 public struct PreferencesSupervisorSection: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -37,41 +35,52 @@ public struct PreferencesSupervisorSection: View {
   }
 
   public var body: some View {
-    NavigationStack {
-      VStack(alignment: .leading, spacing: 16) {
-        Picker("Pane", selection: $selectedPane) {
-          ForEach(SupervisorPaneKey.allCases) { pane in
-            Text(pane.title).tag(pane)
+    Group {
+      switch selectedPane {
+      case .rules:
+        PreferencesSupervisorRulesPane(store: store)
+      case .notifications:
+        PreferencesSupervisorNotificationsPane(notifications: notifications)
+      case .background:
+        PreferencesSupervisorBackgroundPane(
+          onRunInBackgroundChange: { enabled in
+            store.setSupervisorRunInBackgroundEnabled(enabled)
+          },
+          onQuietHoursChange: { window, _ in
+            store.setSupervisorQuietHoursWindow(window)
           }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.preferencesSupervisorPane("pane-picker")
         )
-
-        Group {
-          switch selectedPane {
-          case .rules:
-            PreferencesSupervisorRulesPane(store: store)
-          case .notifications:
-            PreferencesSupervisorNotificationsPane(notifications: notifications)
-          case .background:
-            PreferencesSupervisorBackgroundPane(
-              onRunInBackgroundChange: { enabled in
-                store.setSupervisorRunInBackgroundEnabled(enabled)
-              },
-              onQuietHoursChange: { window, _ in
-                store.setSupervisorQuietHoursWindow(window)
-              }
-            )
-          }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
-      .padding()
-      .navigationTitle("Supervisor")
     }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      SupervisorScopeBar(selection: $selectedPane)
+    }
+  }
+}
+
+private struct SupervisorScopeBar: View {
+  @Binding var selection: SupervisorPaneKey
+
+  var body: some View {
+    HStack {
+      Spacer(minLength: 0)
+      Picker("Pane", selection: $selection) {
+        ForEach(SupervisorPaneKey.allCases) { pane in
+          Text(pane.title).tag(pane)
+        }
+      }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .controlSize(.large)
+      .frame(maxWidth: 380)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.preferencesSupervisorPane("pane-picker")
+      )
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+    .padding(.top, HarnessMonitorTheme.spacingMD)
+    .padding(.bottom, HarnessMonitorTheme.spacingSM)
   }
 }
 
