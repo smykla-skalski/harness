@@ -321,14 +321,12 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "prometheus",
+                      "group": "loki",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "count(sum by (conversation_id) (rate({service_name=\"codex\"}[2m])))",
+                        "queryType": "instant"
                       }
                     },
                     "refId": "A",
@@ -340,10 +338,10 @@
               "transformations": []
             }
           },
-          "description": "Codex session starts over the selected time range.",
+          "description": "Codex sessions active in the last 2 minutes (distinct conversation IDs with recent log activity).",
           "id": 204,
           "links": [],
-          "title": "Codex Session Starts",
+          "title": "Active Codex Sessions",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -362,11 +360,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 10
+                        "value": 5
                       },
                       {
                         "color": "red",
-                        "value": 50
+                        "value": 15
                       }
                     ]
                   },
@@ -376,7 +374,7 @@
               },
               "options": {
                 "colorMode": "value",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
@@ -386,7 +384,8 @@
                   "fields": "",
                   "values": false
                 },
-                "textMode": "value"
+                "textMode": "value",
+                "noValue": "0"
               }
             },
             "version": ""
