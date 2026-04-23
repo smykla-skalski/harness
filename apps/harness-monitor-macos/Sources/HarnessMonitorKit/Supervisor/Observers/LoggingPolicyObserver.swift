@@ -78,50 +78,55 @@ public final class LoggingPolicyObserver: PolicyObserver {
 
 extension PolicyAction {
   fileprivate var logFields: [String: String] {
+    var fields = baseLogFields
+    if let snapshotID {
+      fields["snapshotID"] = snapshotID
+    }
+    if let snapshotHash {
+      fields["snapshotHash"] = snapshotHash
+    }
+    return fields
+  }
+
+  private var baseLogFields: [String: String] {
     switch self {
     case .nudgeAgent(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "snapshotID": payload.snapshotID,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID]
     case .assignTask(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "snapshotID": payload.snapshotID,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID]
     case .dropTask(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "snapshotID": payload.snapshotID,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID]
     case .queueDecision(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "decisionID": payload.id,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID, "decisionID": payload.id]
     case .notifyOnly(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "snapshotID": payload.snapshotID,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID]
     case .logEvent(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "snapshotID": payload.snapshotID,
-        "logID": payload.id,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID, "logID": payload.id]
     case .suggestConfigChange(let payload):
-      [
-        "actionKey": actionKey,
-        "ruleID": payload.ruleID,
-        "suggestionID": payload.id,
-      ]
+      ["actionKey": actionKey, "ruleID": payload.ruleID, "suggestionID": payload.id]
+    }
+  }
+
+  private var snapshotID: String? {
+    switch self {
+    case .nudgeAgent(let payload): payload.snapshotID
+    case .assignTask(let payload): payload.snapshotID
+    case .dropTask(let payload): payload.snapshotID
+    case .notifyOnly(let payload): payload.snapshotID
+    case .logEvent(let payload): payload.snapshotID
+    case .queueDecision, .suggestConfigChange:
+      nil
+    }
+  }
+
+  private var snapshotHash: String? {
+    switch self {
+    case .nudgeAgent(let payload): payload.snapshotHash
+    case .assignTask(let payload): payload.snapshotHash
+    case .dropTask(let payload): payload.snapshotHash
+    case .notifyOnly(let payload): payload.snapshotHash
+    case .queueDecision, .logEvent, .suggestConfigChange:
+      nil
     }
   }
 }

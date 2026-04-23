@@ -103,6 +103,33 @@ final class PolicyGapRuleTests: XCTestCase {
     XCTAssertTrue(secondPass.isEmpty)
   }
 
+  func test_unknownCodeIsIdempotentAcrossEquivalentSnapshots() async {
+    let rule = PolicyGapRule()
+    let unknownCode = "repeating_unknown_code"
+    let first = makeSnapshot(
+      id: "snapshot-1",
+      hash: "stable-hash",
+      issueCodes: [unknownCode]
+    )
+    let second = makeSnapshot(
+      id: "snapshot-2",
+      hash: "stable-hash",
+      issueCodes: [unknownCode]
+    )
+
+    let firstPass = await rule.evaluate(snapshot: first, context: .empty)
+    let context = PolicyContext(
+      now: Date.fixed,
+      lastFiredAt: nil,
+      recentActionKeys: Set(firstPass.map(\.actionKey)),
+      parameters: PolicyParameterValues(raw: [:]),
+      history: PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
+    )
+
+    let secondPass = await rule.evaluate(snapshot: second, context: context)
+    XCTAssertTrue(secondPass.isEmpty)
+  }
+
   func test_ruleMetadataIsStable() {
     let rule = PolicyGapRule()
     let logActionKey = PolicyAction.logEvent(
@@ -134,7 +161,11 @@ final class PolicyGapRuleTests: XCTestCase {
     XCTAssertEqual(rule.defaultBehavior(for: decisionActionKey), .cautious)
   }
 
-  private func makeSnapshot(issueCodes: [String]) -> SessionsSnapshot {
+  private func makeSnapshot(
+    id: String = "snapshot-1",
+    hash: String = "test-hash",
+    issueCodes: [String]
+  ) -> SessionsSnapshot {
     let issues = issueCodes.enumerated().map { index, code in
       ObserverIssueSnapshot(
         id: "issue-\(index)",
@@ -156,9 +187,9 @@ final class PolicyGapRuleTests: XCTestCase {
     )
 
     return SessionsSnapshot(
-      id: "snapshot-1",
+      id: id,
       createdAt: Date.fixed,
-      hash: "test-hash",
+      hash: hash,
       sessions: [session],
       connection: ConnectionSnapshot(kind: "connected", lastMessageAt: nil, reconnectAttempt: 0)
     )
