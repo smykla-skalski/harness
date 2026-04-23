@@ -1146,7 +1146,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude-code\"}[5m]))",
+                        "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude\"}[5m]))",
                         "legendFormat": "{{service}}"
                       }
                     },
@@ -1210,7 +1210,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(12, sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude-code\"}[5m])))",
+                        "expr": "topk(12, sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude\"}[5m])))",
                         "legendFormat": "{{service}} :: {{span_name}}"
                       }
                     },
@@ -4146,7 +4146,7 @@
     ],
     "tags": [
       "ai-agents",
-      "claude-code",
+      "claude",
       "codex",
       "global",
       "observability"
