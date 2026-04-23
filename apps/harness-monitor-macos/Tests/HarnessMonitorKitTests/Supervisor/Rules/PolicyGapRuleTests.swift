@@ -105,11 +105,33 @@ final class PolicyGapRuleTests: XCTestCase {
 
   func test_ruleMetadataIsStable() {
     let rule = PolicyGapRule()
+    let logActionKey = PolicyAction.logEvent(
+      .init(
+        id: "log-1",
+        ruleID: rule.id,
+        snapshotID: "snapshot-1",
+        message: "Unknown classifier code detected"
+      )
+    ).actionKey
+    let decisionActionKey = PolicyAction.queueDecision(
+      .init(
+        id: "decision-1",
+        severity: .info,
+        ruleID: rule.id,
+        sessionID: nil,
+        agentID: nil,
+        taskID: nil,
+        summary: "Teach supervisor about unknown classifier code",
+        contextJSON: "{}",
+        suggestedActionsJSON: "[]"
+      )
+    ).actionKey
 
     XCTAssertEqual(rule.id, "policy-gap")
     XCTAssertEqual(rule.name, "Policy Gap")
     XCTAssertEqual(rule.version, 1)
-    XCTAssertEqual(rule.defaultBehavior(for: "anything"), .aggressive)
+    XCTAssertEqual(rule.defaultBehavior(for: logActionKey), .aggressive)
+    XCTAssertEqual(rule.defaultBehavior(for: decisionActionKey), .cautious)
   }
 
   private func makeSnapshot(issueCodes: [String]) -> SessionsSnapshot {

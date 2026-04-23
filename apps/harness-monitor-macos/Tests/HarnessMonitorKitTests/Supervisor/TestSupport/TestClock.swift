@@ -7,11 +7,14 @@ import Foundation
 /// `sleep(for:)` is registered still satisfy the pending sleep immediately, avoiding the race
 /// where the tick loop hasn't yet called `sleep` when the test advances time.
 final class TestClock: @unchecked Sendable, SupervisorClock {
+  private typealias Sleeper = (
+    deadline: TimeInterval, continuation: CheckedContinuation<Void, Error>
+  )
+
   private let lock = NSLock()
   private var nowValue: Date
   private var budget: TimeInterval = 0
-  private var sleepers:
-    [(deadline: TimeInterval, continuation: CheckedContinuation<Void, Error>)] = []
+  private var sleepers: [Sleeper] = []
 
   init(now: Date = .fixed) {
     self.nowValue = now
