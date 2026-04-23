@@ -3,15 +3,35 @@ import Foundation
 @testable import HarnessMonitorKit
 
 /// In-memory audit writer used by Monitor supervisor tests that need to assert
-/// `actionDispatched` / `actionExecuted` ordering without a SwiftData round-trip. Phase 1 ships
-/// the scaffold only; Phase 2 worker 4 fills the protocol conformance in the same commit as the
-/// `PolicyExecutor` body so the audit surface lands together.
-final class InMemoryAuditWriter: @unchecked Sendable {
+/// `actionDispatched` / `actionExecuted` / `actionFailed` ordering without a
+/// SwiftData round-trip. Each `append` records a `RecordedEvent` in the order
+/// the `PolicyExecutor` wrote it, preserving sequence for audit-trail tests.
+actor InMemoryAuditWriter: SupervisorAuditWriter {
   struct RecordedEvent: Equatable, Sendable {
+    let id: String
+    let tickID: String
     let kind: String
     let ruleID: String?
+    let severity: DecisionSeverity?
     let payloadJSON: String
+    let createdAt: Date
   }
 
-  private(set) var events: [RecordedEvent] = []
+  private var events: [RecordedEvent] = []
+
+  func append(_ record: SupervisorAuditRecord) async {
+    events.append(
+      RecordedEvent(
+        id: record.id,
+        tickID: record.tickID,
+        kind: record.kind,
+        ruleID: record.ruleID,
+        severity: record.severity,
+        payloadJSON: record.payloadJSON,
+        createdAt: record.createdAt
+      )
+    )
+  }
+
+  func snapshot() -> [RecordedEvent] { events }
 }
