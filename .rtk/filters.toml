@@ -12,6 +12,7 @@
 # - version:* -> harness-mise-version
 # - check:scripts -> harness-mise-check-scripts
 # - cargo:env -> harness-mise-cargo-env
+# - cargo:local -> harness-mise-cargo-local
 # - check / test / install / mcp:test -> harness-mise-rust
 # - monitor:macos:* / preview:* -> monitor-specific filters below
 # - observability:* -> harness-mise-observability
@@ -187,6 +188,63 @@ expected = "CARGO_TARGET_DIR=/Users/x/harness/target/dev/local\nCARGO_BUILD_JOBS
 name = "empty returns on_empty"
 input = ""
 expected = "cargo:env: ok"
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — cargo:local passthrough wrapper
+# ---------------------------------------------------------------------------
+[filters.harness-mise-cargo-local]
+description = "Compact cargo:local output — keep env dumps plus rust diagnostics"
+match_command = "^(cargo-local\\.sh|mise(\\s+run)?\\s+cargo:local)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^[A-Z_]+=",
+  "^error(\\[[A-Z0-9]+\\])?:",
+  "^warning: ",
+  "^note: ",
+  "^help: ",
+  "^\\s*--> /.*:\\d+:\\d+",
+  "^\\s*= (note|help):",
+  "^running \\d+ tests?$",
+  "^test [^ ]+ \\.\\.\\. FAILED$",
+  "^failures:$",
+  "^---- .* ----$",
+  "^thread '.*' panicked at ",
+  "^test result: (ok|FAILED)\\.",
+  "^error: test failed,",
+  "^error: could not compile ",
+  "^failed to prepare writable TMPDIR at ",
+]
+max_lines = 120
+on_empty = "cargo:local: ok"
+
+[[tests.harness-mise-cargo-local]]
+name = "keeps env dump"
+input = """
+CARGO_TARGET_DIR=/Users/x/harness/target/dev/local
+CARGO_BUILD_JOBS=4
+SESSION_MODE=local
+TMPDIR=/var/folders/tmp/
+"""
+expected = "CARGO_TARGET_DIR=/Users/x/harness/target/dev/local\nCARGO_BUILD_JOBS=4\nSESSION_MODE=local\nTMPDIR=/var/folders/tmp/"
+
+[[tests.harness-mise-cargo-local]]
+name = "keeps rust failure context"
+input = """
+running 1 test
+test cli::tests::fails_fast ... FAILED
+failures:
+---- cli::tests::fails_fast stdout ----
+thread 'cli::tests::fails_fast' panicked at src/cli.rs:42:9:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+error: test failed, to rerun pass `--lib`
+"""
+expected = "running 1 test\ntest cli::tests::fails_fast ... FAILED\nfailures:\n---- cli::tests::fails_fast stdout ----\nthread 'cli::tests::fails_fast' panicked at src/cli.rs:42:9:\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out\nerror: test failed, to rerun pass `--lib`"
+
+[[tests.harness-mise-cargo-local]]
+name = "empty returns on_empty"
+input = ""
+expected = "cargo:local: ok"
 
 # ---------------------------------------------------------------------------
 # Root mise tasks — rust / cargo composite lanes
@@ -761,7 +819,7 @@ expected = "preview-smoke: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-observability]
 description = "Compact observability mise tasks — keep readiness failures, service URLs, and smoke verdicts"
-match_command = "^mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture)(\\s|$)"
+match_command = "^(observability\\.sh\\s+(start|stop|restart|status|logs|open|reset|wipe|smoke|--restore-smoke-stack-fixture)|mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture))(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
