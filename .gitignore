@@ -46,3 +46,4 @@ apps/harness-monitor-macos/xcode-derived/
 apps/harness-monitor-macos/xcode-derived*
 apps/harness-monitor-macos/*.xcodeproj/xcuserdata/
 apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
+apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
