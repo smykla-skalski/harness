@@ -78,7 +78,10 @@ public struct DecisionDetailView: View {
   private func populatedBody(_ viewModel: DecisionDetailViewModel) -> some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        headerCard(viewModel)
+        DecisionDetailHero(
+          viewModel: viewModel,
+          dateTimeConfiguration: dateTimeConfiguration
+        )
         suggestedActions(viewModel)
         detailTabs(viewModel)
         liveTickSection
@@ -101,47 +104,6 @@ public struct DecisionDetailView: View {
         .multilineTextAlignment(.center)
     }
     .padding()
-  }
-
-  private func headerCard(_ viewModel: DecisionDetailViewModel) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        severityBadge(for: viewModel.severity)
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text(viewModel.decision.summary)
-            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-          Text(viewModel.decision.ruleID)
-            .scaledFont(.caption.monospaced())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-          Text(viewModel.formattedAge(reference: .now))
-            .scaledFont(.caption.bold())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Text(formatTimestamp(viewModel.decision.createdAt, configuration: dateTimeConfiguration))
-            .scaledFont(.caption.monospacedDigit())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-      }
-      if !viewModel.deeplinks.isEmpty {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          ForEach(viewModel.deeplinks, id: \.stableKey) { deeplink in
-            deeplinkBadge(deeplink)
-          }
-        }
-      }
-    }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.05))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
-    }
   }
 
   private func suggestedActions(_ viewModel: DecisionDetailViewModel) -> some View {
@@ -222,27 +184,6 @@ public struct DecisionDetailView: View {
         }
       }
     )
-  }
-
-  private func severityBadge(for severity: DecisionSeverity) -> some View {
-    Text(severity.title)
-      .scaledFont(.caption.bold())
-      .foregroundStyle(severity.tint)
-      .harnessPillPadding()
-      .harnessControlPill(tint: severity.tint)
-  }
-
-  private func deeplinkBadge(_ deeplink: DecisionDetailViewModel.Deeplink) -> some View {
-    Label {
-      Text(deeplink.id)
-        .scaledFont(.caption.monospaced())
-    } icon: {
-      Image(systemName: deeplink.kind.symbolName)
-        .scaledFont(.caption.bold())
-    }
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .harnessPillPadding()
-    .harnessControlPill(tint: HarnessMonitorTheme.ink.opacity(0.6))
   }
 
   private func tint(for action: SuggestedAction, severity: DecisionSeverity) -> Color? {
@@ -328,46 +269,5 @@ private struct DecisionSnoozeSheet: View {
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(minWidth: 320)
-  }
-}
-
-extension DecisionSeverity {
-  fileprivate var tint: Color {
-    switch self {
-    case .info:
-      HarnessMonitorTheme.accent
-    case .warn:
-      HarnessMonitorTheme.caution
-    case .needsUser:
-      HarnessMonitorTheme.warmAccent
-    case .critical:
-      HarnessMonitorTheme.danger
-    }
-  }
-
-  fileprivate var title: String {
-    switch self {
-    case .info:
-      "Info"
-    case .warn:
-      "Warning"
-    case .needsUser:
-      "Needs User"
-    case .critical:
-      "Critical"
-    }
-  }
-}
-
-extension DecisionDetailViewModel.Deeplink.Kind {
-  fileprivate var symbolName: String {
-    switch self {
-    case .session:
-      "square.stack.3d.up"
-    case .agent:
-      "person.crop.circle"
-    case .task:
-      "checklist"
-    }
   }
 }
