@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-@MainActor
 /// Decisions detail column with header, suggested actions, context, audit trail, and live tick.
+@MainActor
 public struct DecisionDetailView: View {
   private enum DetailTab: String, CaseIterable, Identifiable {
     case context
@@ -249,62 +249,6 @@ public struct DecisionDetailView: View {
   }
 }
 
-#Preview("Decision Detail — empty") {
-  DecisionDetailView()
-    .frame(width: 600, height: 480)
-}
-
-#Preview("Decision Detail — populated") {
-  let decision = Decision(
-    id: "decision-preview",
-    severity: .needsUser,
-    ruleID: "stuck-agent",
-    sessionID: "sess-1",
-    agentID: "agent-7",
-    taskID: "task-3",
-    summary: "Agent has not acknowledged a critical signal."
-  ,
-    contextJSON:
-      "{\"snapshotExcerpt\":\"agent=agent-7 idle=720s\",\"relatedTimeline\":[\"signal.sent: 12:01\",\"reminder.sent: 12:05\"],\"observerIssues\":[\"observer_idle_gap\"],\"recentActions\":[\"nudge.sent\"]}",
-    suggestedActionsJSON:
-      "[{\"id\":\"accept\",\"title\":\"Accept\",\"kind\":\"custom\",\"payloadJSON\":\"{}\"},{\"id\":\"snooze-1h\",\"title\":\"Snooze 1h\",\"kind\":\"snooze\",\"payloadJSON\":\"{\\\"duration\\\":3600}\"},{\"id\":\"dismiss\",\"title\":\"Dismiss\",\"kind\":\"dismiss\",\"payloadJSON\":\"{}\"}]"
-  )
-  decision.createdAt = Date().addingTimeInterval(-600)
-
-  let first = SupervisorEvent(
-    id: "evt-1",
-    tickID: "tick-1",
-    kind: "observe",
-    ruleID: "stuck-agent",
-    severity: nil,
-    payloadJSON: "{\"summary\":\"rule observed idle gap\"}"
-  )
-  first.createdAt = Date().addingTimeInterval(-590)
-  let second = SupervisorEvent(
-    id: "evt-2",
-    tickID: "tick-2",
-    kind: "dispatch",
-    ruleID: "stuck-agent",
-    severity: .needsUser,
-    payloadJSON:
-      "{\"target\":{\"sessionID\":\"sess-1\",\"agentID\":\"agent-7\",\"taskID\":\"task-3\"},\"action\":\"queueDecision\"}"
-  )
-  second.createdAt = Date().addingTimeInterval(-560)
-
-  return DecisionDetailView(
-    decision: decision,
-    auditEvents: [first, second],
-    liveTick: DecisionLiveTickSnapshot(
-      lastSnapshotID: "snap-42",
-      tickLatencyP50Ms: 118,
-      tickLatencyP95Ms: 286,
-      activeObserverCount: 3,
-      quarantinedRuleIDs: ["stuck-agent"]
-    )
-  )
-  .frame(width: 700, height: 640)
-}
-
 private struct DecisionSnoozeSheet: View {
   enum SnoozeOption: String, CaseIterable, Identifiable {
     case fifteenMinutes
@@ -376,8 +320,8 @@ private struct DecisionSnoozeSheet: View {
   }
 }
 
-private extension DecisionSeverity {
-  var tint: Color {
+extension DecisionSeverity {
+  fileprivate var tint: Color {
     switch self {
     case .info:
       HarnessMonitorTheme.accent
@@ -390,7 +334,7 @@ private extension DecisionSeverity {
     }
   }
 
-  var title: String {
+  fileprivate var title: String {
     switch self {
     case .info:
       "Info"
@@ -404,8 +348,8 @@ private extension DecisionSeverity {
   }
 }
 
-private extension DecisionDetailViewModel.Deeplink.Kind {
-  var symbolName: String {
+extension DecisionDetailViewModel.Deeplink.Kind {
+  fileprivate var symbolName: String {
     switch self {
     case .session:
       "square.stack.3d.up"
