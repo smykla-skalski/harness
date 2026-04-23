@@ -7,6 +7,11 @@
 # Scripts are matched by basename (so `rtk Scripts/run-quality-gates.sh` activates
 # the `harness-monitor-run-quality-gates` filter).
 #
+# Task filters intentionally accept all three CLI shapes:
+# - `mise run <task>`
+# - `mise <task>`
+# - env-prefixed variants like `env KEY=value mise run <task>` or `KEY=value mise <task>`
+#
 # Task-family coverage:
 # - check:stale / clean:stale -> harness-mise-stale-state
 # - version:* -> harness-mise-version
@@ -25,7 +30,7 @@ schema_version = 1
 # ---------------------------------------------------------------------------
 [filters.harness-mise-stale-state]
 description = "Compact stale-state mise tasks — keep actionable failures and cleanup actions"
-match_command = "^mise(\\s+run)?\\s+(check:stale|clean:stale)(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+(check:stale|clean:stale)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -73,7 +78,7 @@ expected = "stale-state: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-version]
 description = "Compact version mise tasks — keep semver output and sync mismatches"
-match_command = "^mise(\\s+run)?\\s+version:(show|set|sync|sync:monitor|check)(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+version:(show|set|sync|sync:monitor|check)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -114,7 +119,7 @@ expected = "version: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-check-scripts]
 description = "Compact check:scripts output — keep shellcheck and python diagnostics"
-match_command = "^mise(\\s+run)?\\s+check:scripts(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+check:scripts(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -163,7 +168,7 @@ expected = "check:scripts: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-cargo-env]
 description = "Compact cargo:env output — keep resolved environment only"
-match_command = "^mise(\\s+run)?\\s+cargo:env(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+cargo:env(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -194,7 +199,7 @@ expected = "cargo:env: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-cargo-local]
 description = "Compact cargo:local output — keep env dumps plus rust diagnostics"
-match_command = "^(cargo-local\\.sh|mise(\\s+run)?\\s+cargo:local)(\\s|$)"
+match_command = "^(cargo-local\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+cargo:local)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -251,7 +256,7 @@ expected = "cargo:local: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-rust]
 description = "Compact root rust mise lanes — keep diagnostics, failed tests, install results"
-match_command = "^mise(\\s+run)?\\s+(test(?::(unit|integration|slow))?|check(?::agent-assets)?|lint:fix|install|mcp:test)(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+(test(?::(unit|integration|slow))?|check(?::agent-assets)?|lint:fix|install|mcp:test)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -315,7 +320,7 @@ expected = "rust mise lane: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-quality-gates]
 description = "Compact Harness Monitor quality-gates output (SwiftLint + Swift Format + xcodebuild)"
-match_command = "^(run-quality-gates\\.sh|mise(\\s+run)?\\s+monitor:macos:lint)(\\s|$)"
+match_command = "^(run-quality-gates\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:lint)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -399,7 +404,7 @@ expected = "run-quality-gates: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-xcodebuild]
 description = "Aggressive xcodebuild filter for HarnessMonitor scheme — keep only diagnostics and verdict"
-match_command = "^(xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor.*|xcodebuild-with-lock\\.sh(\\s|$)|mise(\\s+run)?\\s+(monitor:macos:(xcodebuild|build)|mcp:build:monitor)(\\s|$))"
+match_command = "^(xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor.*|xcodebuild-with-lock\\.sh(\\s|$)|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+(monitor:macos:(xcodebuild|build)|mcp:build:monitor)(\\s|$))"
 strip_ansi = true
 keep_lines_matching = [
   # Diagnostics (any path:line:col: error/warning/note:)
@@ -478,7 +483,7 @@ expected = "xcodebuild (HarnessMonitor): ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-generate-project]
 description = "Compact XcodeGen output — keep warnings, errors, created-at path"
-match_command = "^(generate-project\\.sh|mise(\\s+run)?\\s+monitor:macos:generate)(\\s|$)"
+match_command = "^(generate-project\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:generate)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -525,7 +530,7 @@ expected = "generate-project: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-swift]
 description = "Compact test-swift.sh output — keep verdicts, diagnostics, and failures"
-match_command = "^(test-swift\\.sh|mise(\\s+run)?\\s+monitor:macos:test)(\\s|$)"
+match_command = "^(test-swift\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:test)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -580,7 +585,7 @@ expected = "test-swift: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-scripts]
 description = "Compact monitor:test:scripts output — keep unittest failures and final verdict"
-match_command = "^mise(\\s+run)?\\s+monitor:macos:test:scripts(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:test:scripts(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -630,7 +635,7 @@ expected = "monitor:test:scripts: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-agents-e2e]
 description = "Compact explicit Agents e2e output — keep build/test verdicts and preserved-state hints"
-match_command = "^(test-agents-e2e\\.sh|mise(\\s+run)?\\s+monitor:macos:test:agents-e2e)(\\s|$)"
+match_command = "^(test-agents-e2e\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:test:agents-e2e)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -688,7 +693,7 @@ expected = "test-agents-e2e: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-instruments-audit]
 description = "Compact xctrace audit output — keep metric totals and threshold verdicts"
-match_command = "^(run-instruments-audit\\.sh|mise(\\s+run)?\\s+monitor:macos:audit(:from-ref)?)(\\s|$)"
+match_command = "^(run-instruments-audit\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+monitor:macos:audit(:from-ref)?)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -731,7 +736,7 @@ expected = "run-instruments-audit: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-preview-render]
 description = "Compact preview-render.sh output — keep retry hints, failures, and rendered path"
-match_command = "^(preview-render\\.sh|mise(\\s+run)?\\s+preview:render)(\\s|$)"
+match_command = "^(preview-render\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+preview:render)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -772,7 +777,7 @@ expected = "preview-render: ok"
 
 [filters.harness-monitor-preview-smoke]
 description = "Compact preview-smoke.sh output — keep per-entry progress and final summary"
-match_command = "^(preview-smoke\\.sh|mise(\\s+run)?\\s+preview:smoke)(\\s|$)"
+match_command = "^(preview-smoke\\.sh|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+preview:smoke)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -819,7 +824,7 @@ expected = "preview-smoke: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-observability]
 description = "Compact observability mise tasks — keep readiness failures, service URLs, and smoke verdicts"
-match_command = "^(observability\\.sh\\s+(start|stop|restart|status|logs|open|reset|wipe|smoke|--restore-smoke-stack-fixture)|mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture))(\\s|$)"
+match_command = "^(observability\\.sh\\s+(start|stop|restart|status|logs|open|reset|wipe|smoke|--restore-smoke-stack-fixture)|(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture))(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -878,7 +883,7 @@ expected = "observability: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-host-metrics]
 description = "Compact host-metrics mise tasks — keep service actions, status, metrics, and failures"
-match_command = "^mise(\\s+run)?\\s+host-metrics:(install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter)(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+host-metrics:(install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -936,7 +941,7 @@ expected = "host-metrics: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-mcp]
 description = "Compact MCP mise tasks — keep doctor verdicts, registration actions, socket readiness, and nested build failures"
-match_command = "^mise(\\s+run)?\\s+mcp:(build:input-helper|install|socket-path|serve|smoke|doctor|register-claude|wait-socket|launch:monitor|launch:dev|dev)(\\s|$)"
+match_command = "^(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?mise(\\s+run)?\\s+mcp:(build:input-helper|install|socket-path|serve|smoke|doctor|register-claude|wait-socket|launch:monitor|launch:dev|dev)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
