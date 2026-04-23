@@ -26,17 +26,6 @@ sanitize_segment() {
   printf '%s' "$1" | tr -cs '[:alnum:]._-' '-'
 }
 
-rtk_supports_cargo_subcommand() {
-  case "${1:-}" in
-    build|check|clippy|fmt|install|nextest|test)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 cargo_bin_usable() {
   local candidate="${1:-}"
   [[ -n "$candidate" ]] || return 1
@@ -215,13 +204,6 @@ fi
 cargo_bin="cargo"
 if ! cargo_bin_usable "$cargo_bin" && [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
   cargo_bin="${HOME}/.cargo/bin/cargo"
-fi
-
-if [[ "$cargo_bin" == "cargo" ]] \
-  && [[ $# -gt 0 ]] \
-  && command -v rtk >/dev/null 2>&1 \
-  && rtk_supports_cargo_subcommand "$1"; then
-  exec rtk cargo "$@"
 fi
 
 exec "$cargo_bin" "$@"
