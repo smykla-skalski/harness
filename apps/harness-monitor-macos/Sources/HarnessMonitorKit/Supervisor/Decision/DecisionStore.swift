@@ -91,7 +91,7 @@ public actor DecisionStore {
     yield(.init(kind: .inserted, decisionID: draft.id))
   }
 
-  public nonisolated func openDecisions() async throws -> [Decision] {
+  nonisolated public func openDecisions() async throws -> [Decision] {
     let context = ModelContext(container)
     let now = Date()
     let descriptor = FetchDescriptor<Decision>(
@@ -101,7 +101,7 @@ public actor DecisionStore {
     return rows.filter { isOpen($0, now: now) }
   }
 
-  public nonisolated func decision(id: String) async throws -> Decision? {
+  nonisolated public func decision(id: String) async throws -> Decision? {
     let context = ModelContext(container)
     return try fetchDecision(id: id, context: context)
   }
@@ -163,7 +163,7 @@ public actor DecisionStore {
 
   // MARK: - Private
 
-  private nonisolated func fetchDecision(id: String, context: ModelContext) throws -> Decision? {
+  nonisolated private func fetchDecision(id: String, context: ModelContext) throws -> Decision? {
     var descriptor = FetchDescriptor<Decision>(
       predicate: #Predicate<Decision> { $0.id == id }
     )
@@ -171,7 +171,7 @@ public actor DecisionStore {
     return try context.fetch(descriptor).first
   }
 
-  private nonisolated func isOpen(_ decision: Decision, now: Date) -> Bool {
+  nonisolated private func isOpen(_ decision: Decision, now: Date) -> Bool {
     guard decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed else {
       return false
     }
@@ -184,7 +184,13 @@ public actor DecisionStore {
 
   private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {
     let data = try JSONEncoder().encode(outcome)
-    return String(decoding: data, as: UTF8.self)
+    guard let string = String(bytes: data, encoding: .utf8) else {
+      throw EncodingError.invalidValue(
+        outcome,
+        .init(codingPath: [], debugDescription: "DecisionOutcome JSON was not valid UTF-8")
+      )
+    }
+    return string
   }
 
   private func yield(_ event: DecisionEvent) {

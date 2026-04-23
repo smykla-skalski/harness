@@ -171,12 +171,12 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
     detail: SessionDetail,
     summary: SessionSummary,
     now: Date
-  ) -> SessionSnapshot {
+  ) -> Self {
     let agents = detail.agents.map { AgentSnapshot.from(registration: $0, now: now) }
     let tasks = detail.tasks.map(TaskSnapshot.from(workItem:))
     let observerIssues =
       detail.observer?.openIssues?.map(ObserverIssueSnapshot.from(summary:)) ?? []
-    return SessionSnapshot(
+    return Self(
       id: summary.sessionId,
       title: summary.title,
       agents: agents,
@@ -190,8 +190,8 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
   /// Builds a summary-only snapshot for sessions the store knows about but has not hydrated yet.
   /// Rules that need agent/task detail must select the session first; this shape still lets the
   /// tick loop reason about session counts and titles.
-  fileprivate static func from(summary: SessionSummary) -> SessionSnapshot {
-    SessionSnapshot(
+  fileprivate static func from(summary: SessionSummary) -> Self {
+    Self(
       id: summary.sessionId,
       title: summary.title,
       agents: [],
@@ -228,10 +228,10 @@ public struct AgentSnapshot: Sendable, Hashable, Codable {
   }
 
   @MainActor
-  fileprivate static func from(registration: AgentRegistration, now: Date) -> AgentSnapshot {
+  fileprivate static func from(registration: AgentRegistration, now: Date) -> Self {
     let lastActivityAt = registration.lastActivityAt.flatMap(SessionsSnapshotDateParser.parse)
     let idleSeconds = lastActivityAt.map { max(0, Int(now.timeIntervalSince($0).rounded())) }
-    return AgentSnapshot(
+    return Self(
       id: registration.agentId,
       runtime: registration.runtime,
       statusRaw: registration.status.rawValue,
@@ -264,10 +264,10 @@ public struct TaskSnapshot: Sendable, Hashable, Codable {
   }
 
   @MainActor
-  fileprivate static func from(workItem: WorkItem) -> TaskSnapshot {
+  fileprivate static func from(workItem: WorkItem) -> Self {
     let createdAt =
       SessionsSnapshotDateParser.parse(workItem.createdAt) ?? Date(timeIntervalSince1970: 0)
-    return TaskSnapshot(
+    return Self(
       id: workItem.taskId,
       statusRaw: workItem.status.rawValue,
       assignedAgentID: workItem.assignedTo,
@@ -298,8 +298,8 @@ public struct ObserverIssueSnapshot: Sendable, Hashable, Codable {
     self.count = count
   }
 
-  fileprivate static func from(summary: ObserverIssueSummary) -> ObserverIssueSnapshot {
-    ObserverIssueSnapshot(
+  fileprivate static func from(summary: ObserverIssueSummary) -> Self {
+    Self(
       id: summary.issueId,
       severityRaw: summary.severity,
       code: summary.code,
@@ -342,7 +342,7 @@ public struct ConnectionSnapshot: Sendable, Hashable, Codable {
     self.reconnectAttempt = reconnectAttempt
   }
 
-  fileprivate static func from(_ state: HarnessMonitorStore.ConnectionState) -> ConnectionSnapshot {
+  fileprivate static func from(_ state: HarnessMonitorStore.ConnectionState) -> Self {
     let kind: String
     switch state {
     case .idle:
@@ -354,7 +354,7 @@ public struct ConnectionSnapshot: Sendable, Hashable, Codable {
     case .offline:
       kind = "offline"
     }
-    return ConnectionSnapshot(kind: kind, lastMessageAt: nil, reconnectAttempt: 0)
+    return Self(kind: kind, lastMessageAt: nil, reconnectAttempt: 0)
   }
 }
 
