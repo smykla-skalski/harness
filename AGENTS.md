@@ -104,11 +104,11 @@ Canonical version source for harness:
 
 Automatic sync workflow:
 
-- bump the canonical version with `./scripts/version.sh set <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
+- bump the canonical version with `mise run version:set -- <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
 - `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
-- `apps/harness-monitor-macos/Scripts/generate-project.sh` regenerates the project, then resyncs the monitor version metadata from the root package version so XcodeGen cannot reintroduce stale build numbers
+- `mise run monitor:macos:generate` regenerates the project, then resyncs the monitor version metadata from the root package version so XcodeGen cannot reintroduce stale build numbers
 
-Derived surfaces maintained by `scripts/version.sh`:
+Derived surfaces maintained by the `mise run version:*` sync workflow:
 
 - `testkit/Cargo.toml`
 - `Cargo.lock` package entries for `harness` and `harness-testkit`
