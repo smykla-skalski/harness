@@ -22,6 +22,15 @@ extension AgentTuiWindowView {
   func selectCreateTab() {
     viewModel.selection = .create
   }
+
+  func refreshDisplayState() {
+    let displayState = AgentTuiDisplayState(store: store)
+    guard viewModel.displayState != displayState else {
+      return
+    }
+    viewModel.displayState = displayState
+  }
+
   func refresh() {
     viewModel.isSubmitting = true
     Task {
@@ -102,6 +111,8 @@ extension AgentTuiWindowView {
           focusedField = .input
         }
       case .codex:
+        viewModel.codexStartAttemptCount += 1
+        viewModel.codexStartResult = "started"
         let catalog = viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
         let pickerValue = viewModel.selectedCodexModel ?? catalog?.default ?? ""
         let customValue = viewModel.customCodexModel ?? ""
@@ -118,9 +129,12 @@ extension AgentTuiWindowView {
           allowCustomModel: resolved.allowCustom
         )
         if let startedRun {
+          viewModel.codexStartResult = "run"
           viewModel.codexPrompt = ""
           viewModel.codexContext = ""
           viewModel.selection = .codex(startedRun.runId)
+        } else {
+          viewModel.codexStartResult = "nil"
         }
       }
       viewModel.isSubmitting = false

@@ -24,13 +24,13 @@ extension AgentTuiWindowView {
     }
   }
   func terminalViewport(_ tui: AgentTuiSnapshot) -> some View {
-    ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
-      Text(tui.screen.text.isEmpty ? "No terminal output yet." : tui.screen.text)
-        .scaledFont(.system(.body, design: .monospaced))
-        .textSelection(.enabled)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(HarnessMonitorTheme.spacingMD)
+    let visibleRows = tui.screen.visibleRows()
+    return ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
+      AgentTuiTerminalOutputView(visibleRows: visibleRows)
     }
+    .scaledFont(.system(.body, design: .monospaced))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.spacingMD)
     .frame(
       maxWidth: .infinity,
       minHeight: TerminalViewportSizing.minimumViewportHeight,
@@ -252,6 +252,7 @@ extension AgentTuiWindowView {
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
         .focused(focusedFieldBinding, equals: field)
+        .accessibilityIdentifier(accessibilityIdentifier)
         .background {
           if let onCommandReturn {
             CommandReturnKeyMonitor(

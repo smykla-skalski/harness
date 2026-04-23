@@ -221,6 +221,7 @@ struct Phase5ViewProfilingTests {
         detail: PreviewFixtures.detail,
         timeline: PreviewFixtures.timeline,
         timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+        tuiStatusByAgent: [:],
         isSessionStatusStale: false,
         isSessionReadOnly: false,
         isTimelineLoading: false,

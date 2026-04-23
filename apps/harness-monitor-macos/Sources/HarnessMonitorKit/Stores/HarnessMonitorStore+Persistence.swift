@@ -124,6 +124,10 @@ extension HarnessMonitorStore {
           self.pendingCacheWriteTask = nil
         }
       }
+      try? await Task.sleep(for: .milliseconds(250))
+      guard !Task.isCancelled, self.pendingCacheWriteTaskToken == taskToken else {
+        return
+      }
       let result = await work(cacheService)
       await self.applyPersistedCacheWriteResult(result)
     }

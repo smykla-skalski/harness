@@ -19,6 +19,22 @@ struct AgentTuiRuntimeTests {
     #expect(AgentTuiRuntime.allCases.contains(.vibe))
   }
 
+  @Test("Terminal screen exposes stable capped row identities")
+  func terminalScreenRowsAreCappedWithStableIdentities() {
+    let snapshot = AgentTuiScreenSnapshot(
+      rows: 24,
+      cols: 80,
+      cursorRow: 1,
+      cursorCol: 1,
+      text: (1...5).map { "line-\($0)" }.joined(separator: "\n")
+    )
+
+    let rows = snapshot.visibleRows(maxRows: 3)
+
+    #expect(rows.map(\.id) == [2, 3, 4])
+    #expect(rows.map(\.text) == ["line-3", "line-4", "line-5"])
+  }
+
   @Test("Canonical Agents ordering keeps leader first regardless of updatedAt drift")
   func canonicalOrderingPrioritizesLeaderOverWorkerRefresh() {
     let leader = AgentTuiSnapshot(

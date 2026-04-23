@@ -10,12 +10,19 @@ public actor BackgroundThumbnailCache {
 
   let cacheDirectory: URL
   let maxPixelSize: Int
+  let maxFullImagePixelSize: Int
   let thumbnailMemoryLimit: Int
   let fullImageMemoryLimit: Int
+  let thumbnailMemoryByteLimit: Int
+  let fullImageMemoryByteLimit: Int
   var thumbnailMemoryCache: [String: CGImage] = [:]
   var fullImageMemoryCache: [String: CGImage] = [:]
+  var thumbnailMemoryCacheByteCost = 0
+  var fullImageMemoryCacheByteCost = 0
   private var thumbnailAccessOrder: [String] = []
   private var fullImageAccessOrder: [String] = []
+  private var thumbnailTasks: [String: Task<CGImage?, Never>] = [:]
+  private var fullImageTasks: [String: Task<CGImage?, Never>] = [:]
 
   static let allowedPathPrefixes = ["/System/Library/", "/Library/"]
   static let allowedExtensions: Set<String> = ["heic", "jpg", "jpeg", "png", "tiff"]
@@ -24,13 +31,19 @@ public actor BackgroundThumbnailCache {
   public init(
     cacheDirectory: URL = HarnessMonitorPaths.thumbnailCacheRoot(),
     maxPixelSize: Int = 512,
+    maxFullImagePixelSize: Int = 2_560,
     thumbnailMemoryLimit: Int = 24,
-    fullImageMemoryLimit: Int = 1
+    fullImageMemoryLimit: Int = 1,
+    thumbnailMemoryByteLimit: Int = 48 * 1024 * 1024,
+    fullImageMemoryByteLimit: Int = 32 * 1024 * 1024
   ) {
     self.cacheDirectory = cacheDirectory
     self.maxPixelSize = maxPixelSize
+    self.maxFullImagePixelSize = maxFullImagePixelSize
     self.thumbnailMemoryLimit = max(0, thumbnailMemoryLimit)
     self.fullImageMemoryLimit = max(0, fullImageMemoryLimit)
+    self.thumbnailMemoryByteLimit = max(0, thumbnailMemoryByteLimit)
+    self.fullImageMemoryByteLimit = max(0, fullImageMemoryByteLimit)
   }
 
   // MARK: - Public
@@ -42,9 +55,16 @@ public actor BackgroundThumbnailCache {
       return cached
     }
 
-    let generated = await Task.detached(priority: Task.currentPriority) { [self] in
+    if let task = thumbnailTasks[key] {
+      return await task.value
+    }
+
+    let task = Task.detached(priority: Task.currentPriority) { [self] in
       generateThumbnail(key: key, selection: selection)
-    }.value
+    }
+    thumbnailTasks[key] = task
+    let generated = await task.value
+    thumbnailTasks[key] = nil
 
     if let generated {
       cacheMemoryImage(generated, for: key, kind: .thumbnail)
@@ -59,9 +79,16 @@ public actor BackgroundThumbnailCache {
       return cached
     }
 
-    let generated = await Task.detached(priority: Task.currentPriority) { [self] in
+    if let task = fullImageTasks[key] {
+      return await task.value
+    }
+
+    let task = Task.detached(priority: Task.currentPriority) { [self] in
       generateFullImage(selection: selection)
-    }.value
+    }
+    fullImageTasks[key] = task
+    let generated = await task.value
+    fullImageTasks[key] = nil
 
     if let generated {
       cacheMemoryImage(generated, for: key, kind: .fullImage)
@@ -134,7 +161,10 @@ public actor BackgroundThumbnailCache {
     guard let nsImage = HarnessMonitorUIAssets.bundle.image(forResource: image.assetName) else {
       return nil
     }
-    return nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+      return nil
+    }
+    return opaqueRGBImage(from: cgImage, maxPixelSize: maxFullImagePixelSize)
   }
 
   nonisolated private func generateSystemThumbnail(
@@ -151,7 +181,8 @@ public actor BackgroundThumbnailCache {
       return diskImage
     }
 
-    guard let thumbnail = downsampleFile(at: wallpaper.imagePath) else {
+    guard let thumbnail = downsampleFile(at: wallpaper.imagePath, maximumPixelSize: maxPixelSize)
+    else {
       log.warning("Failed to generate thumbnail: \(wallpaper.imagePath)")
       return nil
     }
@@ -167,22 +198,7 @@ public actor BackgroundThumbnailCache {
       return nil
     }
 
-    let url = URL(fileURLWithPath: wallpaper.imagePath)
-    let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
-
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary)
-    else {
-      return nil
-    }
-
-    guard CGImageSourceGetStatus(source) == .statusComplete,
-      CGImageSourceGetCount(source) > 0
-    else {
-      return nil
-    }
-
-    let imageOptions: [CFString: Any] = [kCGImageSourceShouldCacheImmediately: true]
-    return CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary)
+    return downsampleFile(at: wallpaper.imagePath, maximumPixelSize: maxFullImagePixelSize)
   }
 
   // MARK: - Security validation
@@ -223,7 +239,7 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Thumbnail generation
 
-  nonisolated private func downsampleFile(at path: String) -> CGImage? {
+  nonisolated private func downsampleFile(at path: String, maximumPixelSize: Int) -> CGImage? {
     let url = URL(fileURLWithPath: path)
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
@@ -239,14 +255,18 @@ public actor BackgroundThumbnailCache {
       return nil
     }
 
-    guard let thumbnailMaxPixelSize = thumbnailMaxPixelSize(for: source) else {
+    guard
+      let sourceMaxPixelSize = thumbnailMaxPixelSize(for: source),
+      maximumPixelSize > 0
+    else {
       log.warning("Invalid image dimensions: \(path)")
       return nil
     }
+    let targetMaxPixelSize = min(sourceMaxPixelSize, maximumPixelSize)
 
     let thumbnailOptions: [CFString: Any] = [
       kCGImageSourceCreateThumbnailFromImageAlways: true,
-      kCGImageSourceThumbnailMaxPixelSize: thumbnailMaxPixelSize,
+      kCGImageSourceThumbnailMaxPixelSize: targetMaxPixelSize,
       kCGImageSourceCreateThumbnailWithTransform: true,
       kCGImageSourceShouldCacheImmediately: true,
     ]
@@ -290,26 +310,62 @@ public actor BackgroundThumbnailCache {
   }
 
   func cacheMemoryImage(_ image: CGImage, for key: String, kind: MemoryCacheKind) {
-    let limit: Int
+    let countLimit: Int
+    let byteLimit: Int
     switch kind {
     case .thumbnail:
-      limit = thumbnailMemoryLimit
+      countLimit = thumbnailMemoryLimit
+      byteLimit = thumbnailMemoryByteLimit
     case .fullImage:
-      limit = fullImageMemoryLimit
+      countLimit = fullImageMemoryLimit
+      byteLimit = fullImageMemoryByteLimit
     }
 
-    guard limit > 0 else {
+    guard countLimit > 0, byteLimit > 0 else {
+      removeMemoryImage(for: key, kind: kind)
+      return
+    }
+    let imageCost = memoryCost(of: image)
+    guard imageCost <= byteLimit else {
+      removeMemoryImage(for: key, kind: kind)
       return
     }
 
     switch kind {
     case .thumbnail:
+      if let existing = thumbnailMemoryCache[key] {
+        thumbnailMemoryCacheByteCost -= memoryCost(of: existing)
+      }
       thumbnailMemoryCache[key] = image
+      thumbnailMemoryCacheByteCost += imageCost
     case .fullImage:
+      if let existing = fullImageMemoryCache[key] {
+        fullImageMemoryCacheByteCost -= memoryCost(of: existing)
+      }
       fullImageMemoryCache[key] = image
+      fullImageMemoryCacheByteCost += imageCost
     }
     recordMemoryAccess(for: key, kind: kind)
-    evictMemoryCacheIfNeeded(kind: kind, limit: limit)
+    evictMemoryCacheIfNeeded(kind: kind, countLimit: countLimit, byteLimit: byteLimit)
+  }
+
+  private func memoryCost(of image: CGImage) -> Int {
+    image.bytesPerRow * image.height
+  }
+
+  private func removeMemoryImage(for key: String, kind: MemoryCacheKind) {
+    switch kind {
+    case .thumbnail:
+      if let removed = thumbnailMemoryCache.removeValue(forKey: key) {
+        thumbnailMemoryCacheByteCost -= memoryCost(of: removed)
+      }
+      thumbnailAccessOrder.removeAll { $0 == key }
+    case .fullImage:
+      if let removed = fullImageMemoryCache.removeValue(forKey: key) {
+        fullImageMemoryCacheByteCost -= memoryCost(of: removed)
+      }
+      fullImageAccessOrder.removeAll { $0 == key }
+    }
   }
 
   private func recordMemoryAccess(for key: String, kind: MemoryCacheKind) {
@@ -323,17 +379,29 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  private func evictMemoryCacheIfNeeded(kind: MemoryCacheKind, limit: Int) {
+  private func evictMemoryCacheIfNeeded(
+    kind: MemoryCacheKind,
+    countLimit: Int,
+    byteLimit: Int
+  ) {
     switch kind {
     case .thumbnail:
-      while thumbnailMemoryCache.count > limit, let evictedKey = thumbnailAccessOrder.first {
+      while thumbnailMemoryCache.count > countLimit || thumbnailMemoryCacheByteCost > byteLimit,
+        let evictedKey = thumbnailAccessOrder.first
+      {
         thumbnailAccessOrder.removeFirst()
-        thumbnailMemoryCache.removeValue(forKey: evictedKey)
+        if let removed = thumbnailMemoryCache.removeValue(forKey: evictedKey) {
+          thumbnailMemoryCacheByteCost -= memoryCost(of: removed)
+        }
       }
     case .fullImage:
-      while fullImageMemoryCache.count > limit, let evictedKey = fullImageAccessOrder.first {
+      while fullImageMemoryCache.count > countLimit || fullImageMemoryCacheByteCost > byteLimit,
+        let evictedKey = fullImageAccessOrder.first
+      {
         fullImageAccessOrder.removeFirst()
-        fullImageMemoryCache.removeValue(forKey: evictedKey)
+        if let removed = fullImageMemoryCache.removeValue(forKey: evictedKey) {
+          fullImageMemoryCacheByteCost -= memoryCost(of: removed)
+        }
       }
     }
   }

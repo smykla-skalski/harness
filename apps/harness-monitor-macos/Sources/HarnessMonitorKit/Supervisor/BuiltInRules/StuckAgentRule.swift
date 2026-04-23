@@ -4,6 +4,12 @@ import Foundation
 /// trigger on `agent.idleSeconds > stuckThreshold` while the agent owns an in-progress task,
 /// aggressively nudge up to N times, then queue a decision.
 public struct StuckAgentRule: PolicyRule {
+  private static let payloadEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
   public let id = "stuck-agent"
   public let name = "Stuck Agent"
   public let version = 1
@@ -252,10 +258,8 @@ public struct StuckAgentRule: PolicyRule {
   }
 
   private func encode<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
     guard
-      let data = try? encoder.encode(value),
+      let data = try? Self.payloadEncoder.encode(value),
       let string = String(data: data, encoding: .utf8)
     else {
       return "{}"

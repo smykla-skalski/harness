@@ -6,6 +6,7 @@ struct SessionContentState {
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
+  let tuiStatusByAgent: [String: AgentTuiStatus]
   let isSessionStatusStale: Bool
   let isSessionReadOnly: Bool
   let isSelectionLoading: Bool
@@ -43,6 +44,7 @@ struct SessionContentContainer: View {
           detail: cockpitDetail,
           timeline: state.timeline,
           timelineWindow: state.timelineWindow,
+          tuiStatusByAgent: state.tuiStatusByAgent,
           isSessionStatusStale: state.isSessionStatusStale,
           isSessionReadOnly: state.isSessionReadOnly,
           isTimelineLoading: state.isTimelineLoading,
@@ -93,6 +95,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: nil,
       timeline: [],
       timelineWindow: nil,
+      tuiStatusByAgent: [:],
       isSessionStatusStale: false,
       isSessionReadOnly: false,
       isSelectionLoading: false,
@@ -114,6 +117,7 @@ private struct SessionCockpitLoadingSurface: View {
       summary: store.selectedSessionSummary,
       timeline: store.timeline,
       timelineWindow: store.timelineWindow,
+      tuiStatusByAgent: [:],
       isSessionStatusStale: false,
       isSessionReadOnly: false,
       isSelectionLoading: false,

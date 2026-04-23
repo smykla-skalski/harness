@@ -160,7 +160,8 @@ extension HarnessMonitorStore {
       selectedSession: SessionDetail?,
       selectedSessionSummary: SessionSummary?,
       inspectorSelection: HarnessMonitorStore.InspectorSelection,
-      isPersistenceAvailable: Bool
+      isPersistenceAvailable: Bool,
+      lookupIndex: HarnessMonitorStore.InspectorLookupIndex? = nil
     ) {
       guard let selectedSession else {
         if let selectedSessionSummary {
@@ -171,7 +172,8 @@ extension HarnessMonitorStore {
         return
       }
 
-      self = InspectorLookupIndex(detail: selectedSession).primaryContent(
+      let index = lookupIndex ?? InspectorLookupIndex(detail: selectedSession)
+      self = index.primaryContent(
         for: inspectorSelection,
         isPersistenceAvailable: isPersistenceAvailable
       )
@@ -187,6 +189,19 @@ extension HarnessMonitorStore {
     public let selectedActionActorID: String
     public let isSessionReadOnly: Bool
     public let isSessionActionInFlight: Bool
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+      lhs.detail.session.sessionId == rhs.detail.session.sessionId
+        && lhs.detail.session.updatedAt == rhs.detail.session.updatedAt
+        && lhs.selectedTask == rhs.selectedTask
+        && lhs.selectedObserver == rhs.selectedObserver
+        && lhs.isPersistenceAvailable == rhs.isPersistenceAvailable
+        && lhs.actionActorOptions.map(\.agentId) == rhs.actionActorOptions.map(\.agentId)
+        && lhs.actionActorOptions.map(\.status) == rhs.actionActorOptions.map(\.status)
+        && lhs.selectedActionActorID == rhs.selectedActionActorID
+        && lhs.isSessionReadOnly == rhs.isSessionReadOnly
+        && lhs.isSessionActionInFlight == rhs.isSessionActionInFlight
+    }
 
     public init(
       detail: SessionDetail,
@@ -214,14 +229,16 @@ extension HarnessMonitorStore {
       isPersistenceAvailable: Bool,
       selectedActionActorID: String,
       isSessionReadOnly: Bool,
-      isSessionActionInFlight: Bool
+      isSessionActionInFlight: Bool,
+      lookupIndex: HarnessMonitorStore.InspectorLookupIndex? = nil
     ) {
       guard let detail else {
         return nil
       }
 
+      let index = lookupIndex ?? InspectorLookupIndex(detail: detail)
       guard
-        let actionContext = InspectorLookupIndex(detail: detail).actionContext(
+        let actionContext = index.actionContext(
           inspectorSelection: inspectorSelection,
           isPersistenceAvailable: isPersistenceAvailable,
           selectedActionActorID: selectedActionActorID,

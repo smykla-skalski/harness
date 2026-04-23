@@ -26,7 +26,7 @@ extension HarnessMonitorAgentsE2ETests {
 
   func assertCodexRunBecomesActive(
     state: XCUIElement,
-    harness: LiveHarness
+    harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
     XCTAssertTrue(
       waitUntil(timeout: Self.liveActionTimeout) {
@@ -58,7 +58,7 @@ extension HarnessMonitorAgentsE2ETests {
   func assertSteeredCodexRunCompletes(
     in app: XCUIApplication,
     state: XCUIElement,
-    harness: LiveHarness
+    harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
     let steeredFinalMessage = element(in: app, identifier: Accessibility.agentsCodexFinalMessage)
     XCTAssertTrue(
@@ -114,7 +114,7 @@ extension HarnessMonitorAgentsE2ETests {
   func assertApprovalCodexRunCompletes(
     in app: XCUIApplication,
     state: XCUIElement,
-    harness: LiveHarness
+    harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
     var sawApproval = false
     let approvalFinalMessage = element(in: app, identifier: Accessibility.agentsCodexFinalMessage)

@@ -392,6 +392,8 @@ extension AgentTuiWindowView {
     var codexPrompt = ""
     var codexMode: CodexRunMode = .report
     var codexContext = ""
+    var codexStartAttemptCount = 0
+    var codexStartResult = "idle"
     var resolvingCodexApprovalID: String?
     var navigationBackStack: [AgentTuiSheetSelection] = []
     var navigationForwardStack: [AgentTuiSheetSelection] = []
@@ -401,10 +403,13 @@ extension AgentTuiWindowView {
     var viewportResizeTask: Task<Void, Never>?
     var expectedSize: AgentTuiSize?
     var keySequenceBuffer = KeySequenceBuffer()
+    var displayState: AgentTuiDisplayState
     init(
-      selection: AgentTuiSheetSelection = .create
+      selection: AgentTuiSheetSelection = .create,
+      displayState: AgentTuiDisplayState = AgentTuiDisplayState()
     ) {
       self.selection = selection
+      self.displayState = displayState
     }
   }
 }

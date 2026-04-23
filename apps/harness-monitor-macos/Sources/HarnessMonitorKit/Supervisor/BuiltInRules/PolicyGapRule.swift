@@ -5,6 +5,12 @@ import Foundation
 /// aggressive default logs the event, cautious path queues an informational decision so the
 /// user can teach a new pattern. Phase 2 also seeds the `KnownClassifierCodes` constant.
 public struct PolicyGapRule: PolicyRule {
+  private static let payloadEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
   public let id = "policy-gap"
   public let name = "Policy Gap"
   public let version = 1
@@ -159,10 +165,8 @@ public struct PolicyGapRule: PolicyRule {
   }
 
   private func encode<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
     guard
-      let data = try? encoder.encode(value),
+      let data = try? Self.payloadEncoder.encode(value),
       let string = String(data: data, encoding: .utf8)
     else {
       return "{}"

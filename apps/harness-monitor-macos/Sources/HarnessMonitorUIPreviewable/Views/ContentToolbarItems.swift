@@ -8,7 +8,6 @@ struct ContentWindowToolbarModel: Equatable {
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
   let showInspector: Bool
-  let supervisorDecisionRefreshTick: Int
 
   var sleepPreventionTitle: String {
     sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep"
@@ -71,7 +70,6 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
       SupervisorToolbarItem(slice: store.supervisorToolbarSlice)
-        .id("supervisor-toolbar-\(model.supervisorDecisionRefreshTick)")
     }
     ToolbarItem(placement: .primaryAction) {
       Button {

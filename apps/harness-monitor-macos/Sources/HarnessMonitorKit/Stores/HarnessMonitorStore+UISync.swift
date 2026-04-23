@@ -236,6 +236,7 @@ extension HarnessMonitorStore {
         selectedSessionDetail: selection.matchedSelectedSession,
         timeline: selection.timeline,
         timelineWindow: selection.timelineWindow,
+        tuiStatusByAgent: tuiStatusByAgent(for: selection.matchedSelectedSession),
         isTimelineLoading: selection.isTimelineLoading,
         retainPresentedDetailWhenSelectionClears: selection
           .retainPresentedDetailWhenSelectionClears
@@ -253,6 +254,35 @@ extension HarnessMonitorStore {
         isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true
       )
     )
+  }
+
+  private func tuiStatusByAgent(for detail: SessionDetail?) -> [String: AgentTuiStatus] {
+    guard let detail else {
+      return [:]
+    }
+
+    var snapshotStatus: [String: AgentTuiStatus] = [:]
+    snapshotStatus.reserveCapacity(selectedAgentTuis.count)
+    for tui in selectedAgentTuis {
+      if let existing = snapshotStatus[tui.agentId] {
+        if tui.status.isActive && !existing.isActive {
+          snapshotStatus[tui.agentId] = tui.status
+        }
+      } else {
+        snapshotStatus[tui.agentId] = tui.status
+      }
+    }
+
+    var result: [String: AgentTuiStatus] = [:]
+    result.reserveCapacity(detail.agents.count)
+    for agent in detail.agents {
+      if let status = snapshotStatus[agent.agentId] {
+        result[agent.agentId] = status
+      } else if agent.capabilities.contains("agent-tui") {
+        result[agent.agentId] = agent.status == .active ? .running : .exited
+      }
+    }
+    return result
   }
 
   private func syncSidebarUI() {
@@ -275,25 +305,30 @@ extension HarnessMonitorStore {
     let selectedSessionSummary = sessionIndex.sessionSummary(
       for: selection.selectedSessionID
     )
+    let selectedSession = selection.matchedSelectedSession
+    let selectedActionActorID = resolvedActionActor() ?? ""
+    let lookupIndex = selectedSession.map { InspectorLookupIndex(detail: $0) }
     let resolvedPrimaryContent = InspectorPrimaryContentState(
-      selectedSession: selection.matchedSelectedSession,
+      selectedSession: selectedSession,
       selectedSessionSummary: selectedSessionSummary,
       inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: isPersistenceAvailable
+      isPersistenceAvailable: isPersistenceAvailable,
+      lookupIndex: lookupIndex
     )
 
     let resolvedActionContext = InspectorActionContext(
-      detail: selection.matchedSelectedSession,
+      detail: selectedSession,
       inspectorSelection: selection.inspectorSelection,
       isPersistenceAvailable: isPersistenceAvailable,
-      selectedActionActorID: resolvedActionActor() ?? "",
+      selectedActionActorID: selectedActionActorID,
       isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight
+      isSessionActionInFlight: isSessionActionInFlight,
+      lookupIndex: lookupIndex
     )
     inspectorUI.apply(
       InspectorUIState(
         isPersistenceAvailable: isPersistenceAvailable,
-        selectedActionActorID: resolvedActionActor() ?? "",
+        selectedActionActorID: selectedActionActorID,
         isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
         primaryContent: resolvedPrimaryContent,

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 
@@ -51,6 +52,26 @@ struct BackgroundThumbnailCacheTests {
     #expect(Set(await cache.thumbnailMemoryCache.keys) == Set([firstKey, secondKey]))
     #expect(Set(await cache.fullImageMemoryCache.keys) == Set([secondFullKey]))
     #expect(await cache.fullImageMemoryCache[firstFullKey] == nil)
+  }
+
+  @Test("Memory cache evicts images by byte budget before count budget")
+  func memoryCacheEvictsImagesByByteBudgetBeforeCountBudget() async {
+    let cache = BackgroundThumbnailCache(
+      cacheDirectory: makeTemporaryThumbnailCacheDirectory(),
+      maxPixelSize: 64,
+      thumbnailMemoryLimit: 10,
+      fullImageMemoryLimit: 10,
+      thumbnailMemoryByteLimit: 512,
+      fullImageMemoryByteLimit: 512
+    )
+    let firstImage = makeTestImage(width: 12, height: 12)
+    let secondImage = makeTestImage(width: 12, height: 12)
+
+    await cache.cacheMemoryImage(firstImage, for: "first", kind: .thumbnail)
+    await cache.cacheMemoryImage(secondImage, for: "second", kind: .thumbnail)
+
+    #expect(Set(await cache.thumbnailMemoryCache.keys) == Set(["second"]))
+    #expect(await cache.thumbnailMemoryCacheByteCost <= 512)
   }
 
   @Test(
@@ -132,4 +153,27 @@ private func makeTemporaryThumbnailCacheDirectory() -> URL {
     .appendingPathComponent(UUID().uuidString, isDirectory: true)
   try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
   return directory
+}
+
+private func makeTestImage(width: Int, height: Int) -> CGImage {
+  let colorSpace = CGColorSpaceCreateDeviceRGB()
+  guard
+    let context = CGContext(
+      data: nil,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: width * 4,
+      space: colorSpace,
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )
+  else {
+    fatalError("failed to create test CGContext")
+  }
+  context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.3, alpha: 1.0))
+  context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+  guard let image = context.makeImage() else {
+    fatalError("failed to create test CGImage")
+  }
+  return image
 }

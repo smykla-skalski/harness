@@ -125,6 +125,26 @@ public struct AgentTuiScreenSnapshot: Codable, Equatable, Sendable {
   public let cursorRow: Int
   public let cursorCol: Int
   public let text: String
+
+  public static let defaultVisibleRowLimit = 400
+
+  public struct VisibleRow: Equatable, Identifiable, Sendable {
+    public let id: Int
+    public let text: String
+  }
+
+  public func visibleRows(maxRows: Int = defaultVisibleRowLimit) -> [VisibleRow] {
+    let limit = Swift.max(0, maxRows)
+    guard !text.isEmpty, limit > 0 else {
+      return []
+    }
+
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+    let startIndex = Swift.max(0, lines.count - limit)
+    return lines[startIndex...].enumerated().map { offset, line in
+      VisibleRow(id: startIndex + offset, text: String(line))
+    }
+  }
 }
 
 public struct AgentTuiListResponse: Codable, Equatable, Sendable {

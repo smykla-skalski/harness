@@ -62,6 +62,43 @@ extension AgentTuiWindowUITests {
     )
   }
 
+  func testTerminalModelPickerSupportsNativePopupFallback() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.agentsModelPicker,
+      optionTitle: "Custom..."
+    )
+
+    let customField = element(in: app, identifier: Accessibility.agentsCustomModelField)
+    XCTAssertTrue(
+      waitForElement(customField, timeout: Self.uiTimeout),
+      "Terminal model picker should support the native popup fallback path"
+    )
+  }
+
+  func testCodexModelPickerSupportsNativePopupFallback() throws {
+    let app = launchInCockpitPreview()
+
+    openAgentTuiWindow(in: app)
+    tapButton(in: app, title: "Codex")
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.agentsCodexModelPicker,
+      optionTitle: "Custom..."
+    )
+
+    let customField = element(in: app, identifier: Accessibility.agentsCodexCustomModelField)
+    XCTAssertTrue(
+      waitForElement(customField, timeout: Self.uiTimeout),
+      "Codex model picker should support the native popup fallback path"
+    )
+  }
+
   func testEffortPickerHidesForModelWithoutReasoningSupport() throws {
     let app = launchInCockpitPreview()
 

@@ -53,6 +53,31 @@ struct HarnessMonitorStoreCodexTests {
     #expect(startedRun?.mode == .workspaceWrite)
   }
 
+  @Test("Start Codex run keeps the control-plane actor when no session actor is resolved")
+  func startCodexRunKeepsControlPlaneActorWithoutResolvedSessionActor() async {
+    let client = actorlessActionClient()
+    let store = await actorlessActionStore(client: client)
+
+    let startedRun = await store.startCodexRunSnapshot(
+      prompt: "Investigate the failing suite.",
+      mode: .workspaceWrite
+    )
+
+    #expect(startedRun?.runId == store.selectedCodexRun?.runId)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startCodexRun(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            prompt: "Investigate the failing suite.",
+            mode: .workspaceWrite,
+            actor: "harness-app",
+            resumeThreadID: nil
+          )
+        ]
+    )
+  }
+
   @Test("Starting another Codex run reselects the newly started run")
   func startingAnotherCodexRunReselectsNewRun() async {
     let client = RecordingHarnessClient()

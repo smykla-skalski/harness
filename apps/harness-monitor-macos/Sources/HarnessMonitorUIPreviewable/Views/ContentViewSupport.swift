@@ -172,8 +172,7 @@ public struct ContentDetailColumn: View {
       canStartNewSession: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector,
-      supervisorDecisionRefreshTick: store.supervisorDecisionRefreshTick
+      showInspector: showInspector
     )
   }
 
@@ -227,6 +226,7 @@ public struct ContentDetailColumn: View {
         summary: contentSession.selectedSessionSummary,
         timeline: contentSessionDetail.presentedTimeline,
         timelineWindow: contentSessionDetail.presentedTimelineWindow,
+        tuiStatusByAgent: contentSessionDetail.tuiStatusByAgent,
         isSessionStatusStale: contentChrome.sessionDataAvailability != .live,
         isSessionReadOnly: contentSession.isSessionReadOnly,
         isSelectionLoading: contentSession.isSelectionLoading,
