@@ -39,9 +39,6 @@
             "kind": "DataQuery",
             "group": "loki",
             "version": "v0",
-            "datasource": {
-              "name": "loki"
-            },
             "spec": {
               "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
               "refId": "DEPLOY",
@@ -72,9 +69,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_spanmetrics_duration_milliseconds_bucket{service_name=\"harness-hook\"}[5m]))) and on() (sum(rate(harness_spanmetrics_calls_total{service_name=\"harness-hook\"}[5m])) > 0)) or on() vector(0))"
@@ -156,9 +150,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_spanmetrics_calls_total[5m]))",
@@ -176,9 +167,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))",
@@ -196,9 +184,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))",
@@ -255,9 +240,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (status) (system_processes_count{status=~\"running|sleeping|blocked|zombies\"})",
@@ -323,9 +305,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(8, sum by (process_executable_name) (process_cpu_utilization_ratio))",
@@ -392,9 +371,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(8, sum by (process_executable_name) (process_memory_usage_bytes))",
@@ -461,9 +437,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(8, histogram_quantile(0.95, sum by (le, http_route) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))))",
@@ -481,9 +454,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(8, histogram_quantile(0.95, sum by (le, url_path) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))))",
@@ -541,9 +511,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_http_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_http_duration_milliseconds_count[5m])) > 0)) or on() vector(0))"
@@ -625,9 +592,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_http_request_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_http_request_duration_ms_count[5m])) > 0)) or on() vector(0))"
@@ -709,9 +673,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max(darwin_thermal_pressure{state=~\"fair|serious|critical\"}) or on() vector(0)"
@@ -789,9 +750,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(system_processes_count{status=\"running\"}) or on() vector(0)"
@@ -873,9 +831,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(system_processes_count{status=\"zombies\"}) or on() vector(0)"
@@ -957,9 +912,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(1, sum by (process_executable_name) (process_cpu_utilization_ratio))",
@@ -1042,9 +994,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(1, sum by (process_executable_name) (process_memory_usage_bytes))",
@@ -1127,9 +1076,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100",
@@ -1147,9 +1093,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((node_memory_active_bytes + node_memory_wired_bytes + node_memory_compressed_bytes) / clamp_min(node_memory_total_bytes, 1)) * 100",
@@ -1167,9 +1110,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "clamp_max(sum(rate(node_disk_read_time_seconds_total[5m]) + rate(node_disk_write_time_seconds_total[5m])), 1) * 100",
@@ -1226,9 +1166,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=\"harness-cli\"}[5m])) or on() vector(0)"
@@ -1310,9 +1247,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_http_requests_total[5m])) or on() vector(0)"
@@ -1394,9 +1328,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "(sum(clamp_min((last_over_time(harness_monitor_user_interactions_total[5m]) - last_over_time(harness_monitor_user_interactions_total[5m] offset 5m)) or last_over_time(harness_monitor_user_interactions_total[5m]), 0)) or on() vector(0))"
@@ -1478,9 +1409,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "(sum(clamp_min((last_over_time(harness_monitor_api_errors_total[5m]) - last_over_time(harness_monitor_api_errors_total[5m] offset 5m)) or last_over_time(harness_monitor_api_errors_total[5m]), 0)) or on() vector(0))"
@@ -1562,9 +1490,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(harness_monitor_active_tasks) or on() vector(0)"
@@ -1646,9 +1571,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((((sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)) / clamp_min(sum(clamp_min((last_over_time(harness_monitor_cache_hits_total[5m]) - last_over_time(harness_monitor_cache_hits_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_hits_total[5m]), 0)) + sum(clamp_min((last_over_time(harness_monitor_cache_misses_total[5m]) - last_over_time(harness_monitor_cache_misses_total[5m] offset 5m)) or last_over_time(harness_monitor_cache_misses_total[5m]), 0)), 0.000001)) * 100) or on() vector(0)))"
@@ -1730,9 +1652,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=~\"harness-cli|harness-hook\"}[5m]))",
@@ -1750,9 +1669,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_http_requests_total[5m]))",
@@ -1770,9 +1686,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_http_requests_total[5m]))",
@@ -1790,9 +1703,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_websocket_connects_total[5m]))",
@@ -1850,9 +1760,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_http_requests_total{http_status_code=~\"5..\"}[5m])) * 60",
@@ -1870,9 +1777,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_api_errors_total[5m])) * 60",
@@ -1890,9 +1794,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_timeout_errors_total[5m])) * 60",
@@ -1910,9 +1811,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_decoding_errors_total[5m])) * 60",
@@ -2421,50 +2319,7 @@
       "fiscalYearStartMonth": 0
     },
     "title": "Harness Investigation Cockpit",
-    "variables": [
-      {
-        "kind": "DatasourceVariable",
-        "spec": {
-          "name": "datasource",
-          "label": "Prometheus",
-          "pluginId": "prometheus",
-          "current": {
-            "text": "Prometheus",
-            "value": "prometheus"
-          },
-          "hide": "dontHide",
-          "includeAll": false,
-          "multi": false,
-          "options": [],
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "skipUrlSync": false,
-          "defaultOptionEnabled": true,
-          "allowCustomValue": false
-        }
-      },
-      {
-        "kind": "DatasourceVariable",
-        "spec": {
-          "name": "loki_ds",
-          "label": "Loki",
-          "pluginId": "loki",
-          "current": {
-            "text": "Loki",
-            "value": "loki"
-          },
-          "hide": "dontHide",
-          "includeAll": false,
-          "multi": false,
-          "options": [],
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "skipUrlSync": false,
-          "defaultOptionEnabled": true,
-          "allowCustomValue": false
-        }
-      }
-    ]
+    "variables": []
   },
   "status": {}
 }

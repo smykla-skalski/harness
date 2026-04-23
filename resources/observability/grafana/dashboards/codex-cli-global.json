@@ -39,9 +39,6 @@
             "kind": "DataQuery",
             "group": "loki",
             "version": "v0",
-            "datasource": {
-              "name": "loki"
-            },
             "spec": {
               "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
               "refId": "DEPLOY",
@@ -72,9 +69,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
@@ -156,9 +150,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__range])) or on() vector(0)"
@@ -240,9 +231,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)"
@@ -324,9 +312,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__range])) or on() vector(0)), 1))"
@@ -410,9 +395,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(codex_tool_call_duration_ms_milliseconds_bucket{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m]))) and on() (sum(rate(codex_tool_call_duration_ms_milliseconds_count{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m])) > 0)) or on() vector(0))"
@@ -494,9 +476,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (tool) (increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
@@ -558,9 +537,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (token_type) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=~\"input|output|reasoning_output|cached_input\"}[$__rate_interval]))",
@@ -622,9 +598,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (tool, success) (increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
@@ -686,9 +659,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_name=~\"${span_name:regex}\"}[5m])) or on() vector(0)"
@@ -770,9 +740,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(12, sum by (span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_name=~\"${span_name:regex}\"}[5m])))",
@@ -841,12 +808,9 @@
                       "kind": "DataQuery",
                       "group": "loki",
                       "version": "v0",
-                      "datasource": {
-                        "name": "loki"
-                      },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "{service_name=~\"${service_name:regex}\",deployment_environment=~\"${deployment_environment:regex}\",detected_level=~\"${level:regex}\"} | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
+                        "expr": "{service_name=~\"${service_name:regex}\",service_name!=\"\"} | env=~\"${deployment_environment:regex}\" | detected_level=~\"${level:regex}\" | keep event_timestamp,event_name,model,tool,success,trace_id | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
                         "queryType": "range"
                       }
                     },
@@ -1130,9 +1094,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total, deployment_environment)"
             }
@@ -1163,9 +1124,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)"
             }
@@ -1176,7 +1134,7 @@
           "options": [],
           "multi": true,
           "includeAll": true,
-          "allValue": ".*",
+          "allValue": "codex|codex_cli_rs|codex_exec",
           "allowCustomValue": true
         }
       },
@@ -1196,9 +1154,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)"
             }
@@ -1229,9 +1184,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\"}, auth_mode)"
             }
@@ -1262,9 +1214,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)"
             }
@@ -1295,9 +1244,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}, tool)"
             }
@@ -1328,9 +1274,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\"}, span_name)"
             }

@@ -39,9 +39,6 @@
             "kind": "DataQuery",
             "group": "loki",
             "version": "v0",
-            "datasource": {
-              "name": "loki"
-            },
             "spec": {
               "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
               "refId": "DEPLOY",
@@ -72,9 +69,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=\"harness-cli\", span_name=~\"${span_name:regex}\"}[5m]))"
@@ -156,9 +150,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_spanmetrics_calls_total{service_name=\"harness-hook\", span_name=~\"${span_name:regex}\"}[5m]))"
@@ -240,9 +231,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_hook_duration_milliseconds_bucket{hook_name=~\"${hook_name:regex}\"}[5m]))) and on() (sum(rate(harness_hook_duration_milliseconds_count{hook_name=~\"${hook_name:regex}\"}[5m])) > 0)) or on() vector(0))"
@@ -324,9 +312,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.99, sum by (le) (rate(harness_hook_duration_milliseconds_bucket{hook_name=~\"${hook_name:regex}\"}[5m]))) and on() (sum(rate(harness_hook_duration_milliseconds_count{hook_name=~\"${hook_name:regex}\"}[5m])) > 0)) or on() vector(0))"
@@ -408,9 +393,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (service_name, span_name) (rate(harness_spanmetrics_calls_total{service_name=~\"${service_name:regex}\", span_name=~\"${span_name:regex}\"}[5m]))",
@@ -468,9 +450,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "histogram_quantile(0.95, sum by (le, service_name, span_name) (rate(harness_spanmetrics_duration_milliseconds_bucket{service_name=~\"${service_name:regex}\", span_name=~\"${span_name:regex}\"}[5m])))",
@@ -528,9 +507,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "histogram_quantile(0.50, sum by (le) (rate(harness_hook_duration_milliseconds_bucket{hook_name=~\"${hook_name:regex}\"}[5m])))",
@@ -548,9 +524,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "histogram_quantile(0.95, sum by (le) (rate(harness_hook_duration_milliseconds_bucket{hook_name=~\"${hook_name:regex}\"}[5m])))",
@@ -568,9 +541,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "histogram_quantile(0.99, sum by (le) (rate(harness_hook_duration_milliseconds_bucket{hook_name=~\"${hook_name:regex}\"}[5m])))",
@@ -628,9 +598,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (hook_name, hook_outcome) (rate(harness_hook_outcomes_total{hook_name=~\"${hook_name:regex}\"}[5m]))",
@@ -688,9 +655,6 @@
                       "kind": "DataQuery",
                       "group": "loki",
                       "version": "v0",
-                      "datasource": {
-                        "name": "loki"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "{service_name=~\"${service_name:regex}\", level=~\"${level:regex}\"} | line_format \"{{ __timestamp__ | date \\\"15:04:05\\\" }} {{ __line__ }}\"",
@@ -939,9 +903,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(harness_spanmetrics_calls_total, service_name)"
             }
@@ -972,9 +933,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(harness_hook_outcomes_total, hook_name)"
             }
@@ -1005,9 +963,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(harness_spanmetrics_calls_total, span_name)"
             }

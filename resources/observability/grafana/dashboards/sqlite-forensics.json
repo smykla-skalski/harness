@@ -39,9 +39,6 @@
             "kind": "DataQuery",
             "group": "loki",
             "version": "v0",
-            "datasource": {
-              "name": "loki"
-            },
             "spec": {
               "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
               "refId": "DEPLOY",
@@ -72,9 +69,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_db_operations_total[5m])) or on() vector(0)"
@@ -136,9 +130,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (db_operation_name) (rate(harness_daemon_db_errors_total[5m]))",
@@ -156,9 +147,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_db_busy_total[5m]))",
@@ -176,9 +164,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (pool_state) (harness_daemon_db_pool_connections)",
@@ -236,9 +221,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (db_operation_name) (rate(harness_monitor_sqlite_operations_total[5m]))",
@@ -256,9 +238,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (db_operation_name) (rate(harness_monitor_sqlite_errors_total[5m]))",
@@ -316,9 +295,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (database, query, status) (rate(queries_total{job=\"sqlite-exporter\"}[5m]))",
@@ -376,9 +352,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (entity) (harness_sqlite_table_rows{database=\"daemon_db\"})",
@@ -396,9 +369,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (db_entity) (harness_daemon_db_health_count)",
@@ -456,9 +426,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (entity, status) (harness_sqlite_status_rows{database=\"daemon_db\"})",
@@ -516,9 +483,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (entity) (harness_sqlite_table_rows{database=\"monitor_cache\"})",
@@ -536,9 +500,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (db_entity) (harness_monitor_sqlite_record_count) or label_replace(max by (entity) (harness_sqlite_table_rows{database=\"monitor_cache\"}), \"db_entity\", \"$1\", \"entity\", \"(.*)\")",
@@ -596,9 +557,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max by (entity, status) (harness_sqlite_status_rows{database=\"monitor_cache\"})",
@@ -815,9 +773,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_daemon_db_operation_duration_milliseconds_bucket[5m]))) and on() (sum(rate(harness_daemon_db_operation_duration_milliseconds_count[5m])) > 0)) or on() vector(0))"
@@ -1038,9 +993,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_daemon_db_busy_total[5m])) or on() vector(0)"
@@ -1102,9 +1054,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max(harness_daemon_db_file_size_bytes) or on() vector(0)"
@@ -1166,9 +1115,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(harness_monitor_sqlite_operations_total[5m])) or on() vector(0)"
@@ -1230,9 +1176,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "((histogram_quantile(0.95, sum by (le) (rate(harness_monitor_sqlite_operation_duration_ms_bucket[5m]))) and on() (sum(rate(harness_monitor_sqlite_operation_duration_ms_count[5m])) > 0)) or on() vector(0))"
@@ -1294,9 +1237,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "max(harness_monitor_sqlite_file_size_bytes) or on() vector(0)"
@@ -1358,9 +1298,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(database_errors{job=\"sqlite-exporter\"}[5m])) or on() vector(0)"
@@ -1422,9 +1359,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (db_operation_name) (rate(harness_daemon_db_operations_total[5m]))",
@@ -1811,50 +1745,7 @@
       "fiscalYearStartMonth": 0
     },
     "title": "Harness Storage & SQLite",
-    "variables": [
-      {
-        "kind": "DatasourceVariable",
-        "spec": {
-          "name": "datasource",
-          "label": "Prometheus",
-          "pluginId": "prometheus",
-          "current": {
-            "text": "Prometheus",
-            "value": "prometheus"
-          },
-          "hide": "dontHide",
-          "includeAll": false,
-          "multi": false,
-          "options": [],
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "skipUrlSync": false,
-          "defaultOptionEnabled": true,
-          "allowCustomValue": false
-        }
-      },
-      {
-        "kind": "DatasourceVariable",
-        "spec": {
-          "name": "loki_ds",
-          "label": "Loki",
-          "pluginId": "loki",
-          "current": {
-            "text": "Loki",
-            "value": "loki"
-          },
-          "hide": "dontHide",
-          "includeAll": false,
-          "multi": false,
-          "options": [],
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "skipUrlSync": false,
-          "defaultOptionEnabled": true,
-          "allowCustomValue": false
-        }
-      }
-    ]
+    "variables": []
   },
   "status": {}
 }
