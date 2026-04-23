@@ -7,7 +7,8 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 PROJECT_PATH="$APP_ROOT/HarnessMonitor.xcodeproj"
-XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$APP_ROOT/Scripts/xcodebuild-with-lock.sh}"
+CANONICAL_XCODEBUILD_RUNNER="$APP_ROOT/Scripts/xcodebuild-with-lock.sh"
+XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
@@ -59,6 +60,11 @@ AUDIT_DAEMON_CARGO_TARGET_DIR=""
 AUDIT_BUILD_ARCH=""
 DESTINATION=""
 RETAINED_RUN_SIZE_BUDGET_KIB=10240
+
+if [[ "$XCODEBUILD_RUNNER" != "$CANONICAL_XCODEBUILD_RUNNER" ]]; then
+  echo "XCODEBUILD_RUNNER override is unsupported; use $CANONICAL_XCODEBUILD_RUNNER" >&2
+  exit 1
+fi
 
 if [[ ! -x "$XCODEBUILD_RUNNER" ]]; then
   echo "xcodebuild runner is not executable: $XCODEBUILD_RUNNER" >&2
