@@ -90,12 +90,14 @@ extension HarnessMonitorStore {
       updatedAt: SessionsFixtureBuilder.isoString(secondsBeforeFixed: idleSeconds)
     )
     let idleAgent = SessionsFixtureBuilder.agent(
-      agentId: "agent-idle",
-      name: "Idle Worker",
-      runtime: "claude",
-      role: .worker,
-      lastActivityAt: SessionsFixtureBuilder.isoString(secondsBeforeFixed: idleSeconds),
-      currentTaskId: nil
+      .init(
+        id: "agent-idle",
+        name: "Idle Worker",
+        runtime: "claude",
+        role: .worker,
+        currentTaskId: nil
+      ),
+      lastActivityAt: SessionsFixtureBuilder.isoString(secondsBeforeFixed: idleSeconds)
     )
     let detail = SessionDetail(
       session: summary,
@@ -115,6 +117,14 @@ extension HarnessMonitorStore {
 /// Helpers that assemble plain value types for the seeds above. Kept private to the TestSupport
 /// module so production callers cannot accidentally depend on them.
 private enum SessionsFixtureBuilder {
+  struct AgentSeed {
+    let id: String
+    let name: String
+    let runtime: String
+    let role: SessionRole
+    let currentTaskId: String?
+  }
+
   static func isoString(secondsBeforeFixed seconds: Int) -> String {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
@@ -160,46 +170,46 @@ private enum SessionsFixtureBuilder {
   static func defaultAgents(lastActivityAt: String) -> [AgentRegistration] {
     [
       agent(
-        agentId: "leader-fixture",
-        name: "Leader",
-        runtime: "claude",
-        role: .leader,
-        lastActivityAt: lastActivityAt,
-        currentTaskId: "task-fixture"
+        .init(
+          id: "leader-fixture",
+          name: "Leader",
+          runtime: "claude",
+          role: .leader,
+          currentTaskId: "task-fixture"
+        ),
+        lastActivityAt: lastActivityAt
       ),
       agent(
-        agentId: "worker-fixture",
-        name: "Worker",
-        runtime: "codex",
-        role: .worker,
-        lastActivityAt: lastActivityAt,
-        currentTaskId: nil,
+        .init(
+          id: "worker-fixture",
+          name: "Worker",
+          runtime: "codex",
+          role: .worker,
+          currentTaskId: nil
+        ),
+        lastActivityAt: lastActivityAt
       ),
     ]
   }
 
   static func agent(
-    agentId: String,
-    name: String,
-    runtime: String,
-    role: SessionRole,
-    lastActivityAt: String,
-    currentTaskId: String?
+    _ seed: AgentSeed,
+    lastActivityAt: String
   ) -> AgentRegistration {
     AgentRegistration(
-      agentId: agentId,
-      name: name,
-      runtime: runtime,
-      role: role,
+      agentId: seed.id,
+      name: seed.name,
+      runtime: seed.runtime,
+      role: seed.role,
       capabilities: [],
       joinedAt: isoString(secondsBeforeFixed: 3600),
       updatedAt: lastActivityAt,
       status: .active,
       agentSessionId: nil,
       lastActivityAt: lastActivityAt,
-      currentTaskId: currentTaskId,
+      currentTaskId: seed.currentTaskId,
       runtimeCapabilities: RuntimeCapabilities(
-        runtime: runtime,
+        runtime: seed.runtime,
         supportsNativeTranscript: true,
         supportsSignalDelivery: true,
         supportsContextInjection: true,
