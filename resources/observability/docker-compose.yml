@@ -52,6 +52,8 @@ services:
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
       - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
+      - --enable-feature=otlp-deltatocumulative,exemplar-storage,native-histograms
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro

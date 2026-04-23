@@ -18,7 +18,6 @@ ALLOY_PROCESS_CONFIG_SOURCE="$ROOT/resources/observability/alloy/host-processes.
 ALLOY_PROCESS_CONFIG="/opt/homebrew/etc/alloy/harness-host-processes.otel.yaml"
 ALLOY_PROCESS_LABEL="io.harness.alloy-host-processes"
 ALLOY_PROCESS_PLIST="$HOME/Library/LaunchAgents/${ALLOY_PROCESS_LABEL}.plist"
-ALLOY_PROCESS_PORT="10103"
 ALLOY_PROCESS_HEALTH_URL="http://127.0.0.1:10104"
 ALLOY_PROCESS_LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/harness/observability"
 ALLOY_PROCESS_LOG="$ALLOY_PROCESS_LOG_DIR/alloy-host-processes.log"
@@ -99,7 +98,7 @@ install_alloy_process_exporter() {
   write_alloy_process_plist
   load_alloy_process_exporter
 
-  printf 'alloy host-process exporter installed and listening on port %s\n' "$ALLOY_PROCESS_PORT"
+  printf 'alloy host-process exporter installed; pushing OTLP metrics to %s/api/v1/otlp\n' "$PROMETHEUS_URL"
 }
 
 disable_brew_alloy_service() {
@@ -167,7 +166,7 @@ install_alloy() {
 write_alloy_config() {
   mkdir -p "$(dirname "$ALLOY_CONFIG")"
   cat >"$ALLOY_CONFIG" <<'EOF'
-// macOS system metrics via unix exporter
+// macOS system metrics via unix exporter, bridged into OTel and shipped via OTLP
 prometheus.exporter.unix "macos" {
   enable_collectors = [
     "cpu",
@@ -183,13 +182,23 @@ prometheus.exporter.unix "macos" {
 
 prometheus.scrape "macos" {
   targets    = prometheus.exporter.unix.macos.targets
-  forward_to = [prometheus.remote_write.local.receiver]
+  forward_to = [otelcol.receiver.prometheus.macos.receiver]
   scrape_interval = "10s"
 }
 
-prometheus.remote_write "local" {
-  endpoint {
-    url = "http://127.0.0.1:9090/api/v1/write"
+otelcol.receiver.prometheus "macos" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.prom.input]
+  }
+}
+
+otelcol.exporter.otlphttp "prom" {
+  client {
+    endpoint = "http://127.0.0.1:9090/api/v1/otlp"
+    tls {
+      insecure             = true
+      insecure_skip_verify = true
+    }
   }
 }
 EOF
@@ -379,7 +388,7 @@ show_status() {
       printf 'status: loaded but not running\n'
     fi
     printf 'config: %s\n' "$ALLOY_PROCESS_CONFIG"
-    printf 'metrics: http://127.0.0.1:%s/metrics\n' "$ALLOY_PROCESS_PORT"
+    printf 'push: %s/api/v1/otlp (OTLP http)\n' "$PROMETHEUS_URL"
     printf 'health: %s\n' "$ALLOY_PROCESS_HEALTH_URL"
     printf 'logs: %s\n' "$ALLOY_PROCESS_LOG"
   else
