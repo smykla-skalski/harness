@@ -136,6 +136,7 @@
 		35F025A53298CFBB24332F36 /* HarnessMonitorFailureTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14AF847B83E27E7A729BEB54 /* HarnessMonitorFailureTestSupport.swift */; };
 		35FDAD360BAE27CC7D7980B0 /* DecisionSeverity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978CC5CFDBFACC8368C6009D /* DecisionSeverity.swift */; };
 		36E56FB9D4067A5921E765BE /* HarnessMonitorKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 09069D489D24200773820893 /* HarnessMonitorKit.framework */; };
+		36F49808FF69D2D3641202E6 /* Fixtures+UnassignedTaskRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175C9912D64176FD84E7E9DC /* Fixtures+UnassignedTaskRule.swift */; };
 		373BC845BCCAC5DF1AA11935 /* DaemonStatusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F28705995FE71A55D4249D3 /* DaemonStatusModels.swift */; };
 		384730DBA27F98448F60AB0B /* PreferencesMCPSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1476C4B49BA8B957DEC2A9A7 /* PreferencesMCPSection.swift */; };
 		388721DB1811AB303C3617BF /* CodexApprovalRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DB064C2A2C92C3B12FF479 /* CodexApprovalRuleTests.swift */; };
@@ -387,6 +388,7 @@
 		9E6E22092C1C9919FD9D9213 /* HarnessMonitorStore+StreamingSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F173D296A77B8E16DB405D1A /* HarnessMonitorStore+StreamingSupport.swift */; };
 		9E719BC24462749E897212C2 /* CopyableCommandBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE1DA525C38667067DD3088 /* CopyableCommandBox.swift */; };
 		9E7B66787ACB93806B3215AD /* DecisionLiveTickSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF51FD134E126932FABBE90 /* DecisionLiveTickSnapshot.swift */; };
+		9E8FF6A69ADBA4AC20778702 /* UnassignedTaskRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913AD098285706256A2920CC /* UnassignedTaskRuleTests.swift */; };
 		9E96124F35F799DF15F91C91 /* HarnessMonitorAgentsE2ETests+CodexFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C8FFD034E99156533192272 /* HarnessMonitorAgentsE2ETests+CodexFlow.swift */; };
 		9EF8FB4E7DB3A21F04C4D839 /* AgentTuiSidebarExternalSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6DD475FD03FE667F1DD7CA /* AgentTuiSidebarExternalSectionTests.swift */; };
 		9EFF49D697E3ADE66E4074D7 /* ConnectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE8F5073488F979732F46AB /* ConnectionModels.swift */; };
@@ -847,6 +849,7 @@
 		168A1B895AB6F4106959B03B /* SupervisorAuditExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorAuditExporter.swift; sourceTree = "<group>"; };
 		16F165071CD93E197E96CB99 /* SessionsBoardRecentSessionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardRecentSessionsSection.swift; sourceTree = "<group>"; };
 		1748D555E7510B3712685011 /* PreviewHarnessClientState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHarnessClientState.swift; sourceTree = "<group>"; };
+		175C9912D64176FD84E7E9DC /* Fixtures+UnassignedTaskRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Fixtures+UnassignedTaskRule.swift"; sourceTree = "<group>"; };
 		175FAD824596FA7FBF38D4C2 /* HarnessMonitorStoreUpdateStreamTests+TimelineFallback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStoreUpdateStreamTests+TimelineFallback.swift"; sourceTree = "<group>"; };
 		17BD77350FBDC1B328C902A6 /* HarnessMonitorObservabilityTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorObservabilityTestSupport.swift; sourceTree = "<group>"; };
 		17C3A3AB3E72C7CD816CA5FF /* InspectorObserverViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorObserverViews.swift; sourceTree = "<group>"; };
@@ -1121,6 +1124,7 @@
 		8ECB7F667C719A10D7786C5E /* HarnessMonitorStore+StreamControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+StreamControl.swift"; sourceTree = "<group>"; };
 		8EE5FD02C3984ECB9419D3A1 /* HarnessMonitorStoreCodexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreCodexTests.swift; sourceTree = "<group>"; };
 		8F992BE47CA7A3EEC9B3C629 /* PreferencesSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesSidebar.swift; sourceTree = "<group>"; };
+		913AD098285706256A2920CC /* UnassignedTaskRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnassignedTaskRuleTests.swift; sourceTree = "<group>"; };
 		924B4EEC757DC679F3C66568 /* PresentedSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentedSheetTests.swift; sourceTree = "<group>"; };
 		9277EB39AF2DF97F3A7C1529 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		93097EB15F24C61DB8411A15 /* BookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStoreTests.swift; sourceTree = "<group>"; };
@@ -1700,6 +1704,8 @@
 				FA553C2CD9D32B02B6896DFB /* FakeAPIClient.swift */,
 				F6DA62180F1E1E9625B34B99 /* Fixtures.swift */,
 				EAB8B8971E711F6E024368CF /* Fixtures+DecisionStore.swift */,
+				0E686CA8E43568705EF3FB58 /* Fixtures+SessionsSnapshot.swift */,
+				175C9912D64176FD84E7E9DC /* Fixtures+UnassignedTaskRule.swift */,
 				D9029636E0F39998C91C026C /* InMemoryAuditWriter.swift */,
 				7C221C2C682C220A6D8FC149 /* TestClock.swift */,
 			);
@@ -1943,6 +1949,7 @@
 				82D268D544020D318C3C4FC7 /* IdleSessionRuleTests.swift */,
 				CB9B53F7E3FFDFF0F72DE1AE /* ObserverIssueRuleTests.swift */,
 				6E6979139B3910236F17E0BC /* PolicyGapRuleTests.swift */,
+				913AD098285706256A2920CC /* UnassignedTaskRuleTests.swift */,
 			);
 			path = Rules;
 			sourceTree = "<group>";
@@ -2905,6 +2912,8 @@
 				6ECE3895200F25888CE360C8 /* FakeAPIClient.swift in Sources */,
 				FBCCE8DB4FC9654E86A098CE /* FakeCollectors.swift in Sources */,
 				CF71ED2D1933E84BDD1B5432 /* Fixtures+DecisionStore.swift in Sources */,
+				D8946D5189A915C40025186F /* Fixtures+SessionsSnapshot.swift in Sources */,
+				36F49808FF69D2D3641202E6 /* Fixtures+UnassignedTaskRule.swift in Sources */,
 				A289C3FE172EFD58F3A03EAB /* Fixtures.swift in Sources */,
 				F011DB162B830CE048552482 /* GracefulAgentTuiStopTests.swift in Sources */,
 				5E4753F6502FAA1A8FE7B334 /* HarnessMonitorActionTestSupport.swift in Sources */,
@@ -3047,6 +3056,7 @@
 				A7FC9D529C83A9BEFBB62AD1 /* TestClock.swift in Sources */,
 				5D6E0AD523D51EFD80A48396 /* ToastSliceTests.swift in Sources */,
 				3E80F198D8DD08DF6038BBCF /* URLSecurityScopeTests.swift in Sources */,
+				9E8FF6A69ADBA4AC20778702 /* UnassignedTaskRuleTests.swift in Sources */,
 				129C109326E4780F52376062 /* WebSocketProtocolParityTests.swift in Sources */,
 				BB31BEA9ECB346EC0DCDB06D /* WebSocketProtocolTests.swift in Sources */,
 				071C3BF89EA1E26856283164 /* WebSocketStreamTests.swift in Sources */,
