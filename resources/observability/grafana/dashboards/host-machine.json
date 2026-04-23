@@ -39,9 +39,6 @@
             "kind": "DataQuery",
             "group": "loki",
             "version": "v0",
-            "datasource": {
-              "name": "loki"
-            },
             "spec": {
               "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
               "refId": "DEPLOY",
@@ -72,9 +69,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))"
@@ -156,9 +150,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (device) (rate(node_network_receive_bytes_total{device!~\"lo0|utun.*|awdl0|llw0\"}[5m]))",
@@ -176,9 +167,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (device) (rate(node_network_transmit_bytes_total{device!~\"lo0|utun.*|awdl0|llw0\"}[5m]))",
@@ -236,9 +224,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (status) (system_processes_count)",
@@ -296,9 +281,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, sum by (process_executable_name) (process_cpu_utilization_ratio{state=~\"system|user\",process_executable_name=~\"$process_name\"}))",
@@ -365,9 +347,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, sum by (process_executable_name) (process_memory_usage_bytes{process_executable_name=~\"$process_name\"}))",
@@ -434,9 +413,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, sum by (process_executable_name) (process_memory_virtual_bytes{process_executable_name=~\"$process_name\"}))",
@@ -503,9 +479,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, sum by (process_executable_name) (process_threads{process_executable_name=~\"$process_name\"}))",
@@ -572,9 +545,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, sum by (process_executable_name) (process_open_file_descriptors{process_executable_name=~\"$process_name\"}))",
@@ -641,9 +611,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "topk(10, max by (process_executable_name) (process_uptime_seconds{process_executable_name=~\"$process_name\"}))",
@@ -710,9 +677,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "node_load1 / scalar(clamp_min(count(count by (cpu) (node_cpu_seconds_total{mode=\"idle\"})), 1))"
@@ -794,9 +758,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "(node_memory_active_bytes + node_memory_wired_bytes + node_memory_compressed_bytes) / clamp_min(node_memory_total_bytes, 1)"
@@ -878,9 +839,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(node_memory_swapped_in_bytes_total[5m]) + rate(node_memory_swapped_out_bytes_total[5m]))"
@@ -962,9 +920,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "clamp_max(rate(node_disk_read_time_seconds_total{device=~\"${disk_device:regex}\"}[5m]) + rate(node_disk_write_time_seconds_total{device=~\"${disk_device:regex}\"}[5m]), 1)",
@@ -1022,9 +977,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "(1 - node_filesystem_avail_bytes{mountpoint=~\"${mountpoint:regex}\",fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"} / node_filesystem_size_bytes{mountpoint=~\"${mountpoint:regex}\",fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}) * 100",
@@ -1082,9 +1034,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "node_power_supply_current_capacity / 100",
@@ -1102,9 +1051,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "darwin_battery_health_percent / 100",
@@ -1122,9 +1068,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "darwin_cpu_temperature_celsius",
@@ -1142,9 +1085,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "darwin_battery_temperature_celsius",
@@ -1201,9 +1141,6 @@
                       "kind": "DataQuery",
                       "group": "prometheus",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
                         "expr": "darwin_thermal_pressure",
@@ -1569,9 +1506,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(node_disk_read_bytes_total, device)"
             }
@@ -1602,9 +1536,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(node_filesystem_size_bytes{fstype!~\"autofs|procfs|devfs|fdescfs|tmpfs\"}, mountpoint)"
             }
@@ -1635,9 +1566,6 @@
             "kind": "DataQuery",
             "group": "prometheus",
             "version": "v0",
-            "datasource": {
-              "name": "prometheus"
-            },
             "spec": {
               "expr": "label_values(process_cpu_utilization_ratio, process_executable_name)"
             }

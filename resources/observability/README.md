@@ -93,6 +93,10 @@ The local stack now provisions a repo-managed forensic suite into the `Harness O
 
 Use Tempo Explore's Service Graph for the authoritative topology view and use the suite dashboards for metric correlation, ranked offenders, and log or trace pivots.
 
+Native OTLP logs in Loki keep most OpenTelemetry log attributes as structured metadata, not indexed stream labels.
+For Codex logs specifically, the environment field currently arrives as `env`, and level arrives as `detected_level`, so dashboard log queries must use pipeline metadata filters such as `| env=~"..."`
+and `| detected_level=~"..."` instead of stream selectors like `{deployment_environment=...}`.
+
 ### Submodule
 
 darwin-exporter source lives in `vendor/darwin-exporter` as a git submodule pointing to [timansky/darwin-exporter](https://github.com/timansky/darwin-exporter). To update:

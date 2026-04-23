@@ -79,7 +79,7 @@ otelcol.processor.transform "normalize_service_name" {
       otelcol.processor.batch.metrics.input,
     ]
     traces = [
-      otelcol.processor.batch.traces.input,
+      otelcol.processor.filter.drop_noisy_codex_spans_for_tempo.input,
       otelcol.connector.spanmetrics.harness.input,
     ]
   }
@@ -189,5 +189,25 @@ otelcol.exporter.otlphttp "loki" {
       insecure             = true
       insecure_skip_verify = true
     }
+  }
+}
+
+otelcol.processor.filter "drop_noisy_codex_spans_for_tempo" {
+  error_mode = "ignore"
+
+  // Tempo storage is dominated by a pair of very chatty internal Codex spans.
+  // Drop them only on the Tempo branch; spanmetrics still receives the full
+  // normalized stream so dashboards keep their broader activity picture.
+  trace_conditions {
+    context = "span"
+    conditions = [
+      `span.attributes["service.name"] == "codex" and IsMatch(span.name, "^(handle_responses|receiving)$")`,
+    ]
+  }
+
+  output {
+    traces = [
+      otelcol.processor.batch.traces.input,
+    ]
   }
 }
