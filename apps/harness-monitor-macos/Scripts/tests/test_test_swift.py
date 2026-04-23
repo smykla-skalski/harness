@@ -22,16 +22,27 @@ class TestSwiftScriptTests(unittest.TestCase):
         self,
         *,
         only_testing: str | None = None,
-    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+        override_runner: bool = False,
+    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
+            app_root = temp_root / "HarnessMonitor"
+            scripts_root = app_root / "Scripts"
+            scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
-            generate_project = temp_root / "generate-project.sh"
-            fake_runner = temp_root / "xcodebuild-runner.sh"
+            generate_project = scripts_root / "generate-project.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
+            rtk_calls = temp_root / "rtk-calls.log"
 
             write_executable(generate_project, "#!/bin/bash\nset -euo pipefail\n")
+            write_executable(
+                fake_log,
+                "#!/bin/bash\nset -euo pipefail\n",
+            )
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            fake_runner = fake_bin / "xcodebuild"
             write_executable(
                 fake_runner,
                 f"""#!/bin/bash
@@ -45,21 +56,34 @@ fi
 """,
             )
             write_executable(fake_log, "#!/bin/bash\nset -euo pipefail\n")
+            write_executable(
+                fake_bin / "rtk",
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "{rtk_calls}"
+exit 1
+""",
+            )
 
             env = os.environ.copy()
             env.update(
                 {
                     "GENERATE_PROJECT_SCRIPT": str(generate_project),
+                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
                     "SWIFT_BIN": "/usr/bin/true",
                     "SWIFTLINT_BIN": "/usr/bin/true",
-                    "XCODEBUILD_RUNNER": str(fake_runner),
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "LOG_BIN": str(fake_log),
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "TMPDIR": str(temp_root),
                 }
             )
             if only_testing is not None:
                 env["XCODE_ONLY_TESTING"] = only_testing
+            if override_runner:
+                env["XCODEBUILD_RUNNER"] = str(temp_root / "override-runner.sh")
 
             completed = subprocess.run(
                 ["bash", str(SCRIPT_PATH)],
@@ -71,10 +95,11 @@ fi
             calls = []
             if runner_calls.exists():
                 calls = [line.split() for line in runner_calls.read_text().splitlines() if line]
-            return completed, calls
+            rtk_log = rtk_calls.read_text() if rtk_calls.exists() else ""
+            return completed, calls, rtk_log
 
     def test_passes_only_testing_selector_to_test_without_building_invocation(self) -> None:
-        completed, calls = self.run_script(
+        completed, calls, rtk_log = self.run_script(
             only_testing="HarnessMonitorKitTests/PolicyGapRuleTests"
         )
 
@@ -86,9 +111,10 @@ fi
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests",
             calls[1],
         )
+        self.assertEqual(rtk_log, "")
 
     def test_splits_comma_separated_only_testing_selectors(self) -> None:
-        completed, calls = self.run_script(
+        completed, calls, rtk_log = self.run_script(
             only_testing=(
                 "HarnessMonitorKitTests/PolicyGapRuleTests,"
                 "HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow"
@@ -106,6 +132,15 @@ fi
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
             calls[1],
         )
+        self.assertEqual(rtk_log, "")
+
+    def test_rejects_xcodebuild_runner_override(self) -> None:
+        completed, calls, rtk_log = self.run_script(override_runner=True)
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("XCODEBUILD_RUNNER override is unsupported", completed.stderr)
+        self.assertEqual(calls, [])
+        self.assertEqual(rtk_log, "")
 
 
 if __name__ == "__main__":

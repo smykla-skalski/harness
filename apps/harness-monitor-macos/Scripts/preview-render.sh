@@ -38,7 +38,7 @@ normalize_entry_file() {
 
   if [[ "$candidate" == /* ]]; then
     if [[ "$candidate" == "$PROJECT_DIR/"* ]]; then
-      printf '%s\n' "${candidate#$PROJECT_DIR/}"
+      printf '%s\n' "${candidate#"$PROJECT_DIR"/}"
       return 0
     fi
     if [[ "$candidate" == "$REPO_ROOT/$app_prefix"* ]]; then
@@ -51,7 +51,7 @@ normalize_entry_file() {
       return 0
     fi
     if [[ "$candidate" == "$app_prefix"* && -f "$REPO_ROOT/$candidate" ]]; then
-      printf '%s\n' "${candidate#$app_prefix}"
+      printf '%s\n' "${candidate#"$app_prefix"}"
       return 0
     fi
   fi

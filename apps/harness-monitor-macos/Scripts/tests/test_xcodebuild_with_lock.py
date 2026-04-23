@@ -66,12 +66,13 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
             log = tool_log.read_text() if tool_log.exists() else ""
             return completed, log
 
-    def test_prefers_rtk_for_normal_build_invocations(self) -> None:
+    def test_uses_direct_xcodebuild_for_normal_build_invocations(self) -> None:
         completed, log = self.run_script("-scheme", "HarnessMonitor", "build")
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("RTK=xcodebuild", log)
+        self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-scheme HarnessMonitor build", log)
+        self.assertNotIn("RTK=", log)
 
     def test_skips_rtk_for_json_output(self) -> None:
         completed, log = self.run_script("-list", "-json")
