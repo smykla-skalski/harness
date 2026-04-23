@@ -18,7 +18,7 @@ public struct OSLogSupervisorLogSink: SupervisorLogSink {
       .map { key, value in "\(key)=\(value)" }
       .joined(separator: " ")
 
-    HarnessMonitorLogger.supervisor.info(
+    HarnessMonitorLogger.supervisor.trace(
       "\(event, privacy: .public) \(renderedFields, privacy: .public)"
     )
   }
