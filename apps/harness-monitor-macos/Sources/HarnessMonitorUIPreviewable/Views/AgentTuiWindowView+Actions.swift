@@ -143,21 +143,6 @@ extension AgentTuiWindowView {
       viewModel.isSubmitting = false
     }
   }
-  func resolveCodexApproval(
-    _ approval: CodexApprovalRequest,
-    run: CodexRunSnapshot,
-    decision: CodexApprovalDecision
-  ) {
-    viewModel.resolvingCodexApprovalID = approval.approvalId
-    Task {
-      _ = await store.resolveCodexApproval(
-        runID: run.runId,
-        approvalID: approval.approvalId,
-        decision: decision
-      )
-      viewModel.resolvingCodexApprovalID = nil
-    }
-  }
   func sendInput(to tui: AgentTuiSnapshot) {
     let payload: AgentTuiInput =
       switch viewModel.inputMode {

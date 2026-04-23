@@ -3,28 +3,23 @@ import SwiftData
 
 extension HarnessMonitorPreviewStoreFactory {
   static func configuration(for scenario: Scenario) -> PreviewStoreConfiguration {
-    switch scenario {
-    case .dashboardLanding:
-      return dashboardLandingConfiguration()
-    case .dashboardLoaded:
-      return dashboardConfiguration()
-    case .cockpitLoaded:
-      return cockpitConfiguration()
-    case .emptyCockpit:
-      return emptyCockpitConfiguration()
-    case .toolbarCountRegression:
-      return toolbarCountRegressionConfiguration()
-    case .agentTuiOverflow:
-      return agentTuiOverflowConfiguration()
-    case .taskDropCockpit:
-      return taskDropConfiguration()
-    case .offlineCached:
-      return offlineCachedConfiguration()
-    case .sidebarOverflow:
-      return overflowConfiguration()
-    case .empty:
+    let builders: [Scenario: () -> PreviewStoreConfiguration] = [
+      .dashboardLanding: dashboardLandingConfiguration,
+      .dashboardLoaded: dashboardConfiguration,
+      .cockpitLoaded: cockpitConfiguration,
+      .emptyCockpit: emptyCockpitConfiguration,
+      .toolbarCountRegression: toolbarCountRegressionConfiguration,
+      .codexApprovalUnification: codexApprovalUnificationConfiguration,
+      .agentTuiOverflow: agentTuiOverflowConfiguration,
+      .taskDropCockpit: taskDropConfiguration,
+      .offlineCached: offlineCachedConfiguration,
+      .sidebarOverflow: overflowConfiguration,
+      .empty: emptyConfiguration,
+    ]
+    guard let builder = builders[scenario] else {
       return emptyConfiguration()
     }
+    return builder()
   }
 
   static func dashboardConfiguration() -> PreviewStoreConfiguration {
@@ -118,6 +113,23 @@ extension HarnessMonitorPreviewStoreFactory {
       isShowingCachedData: false,
       persistedSessionCount: 0,
       lastPersistedSnapshotAt: nil
+    )
+  }
+
+  static func codexApprovalUnificationConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.codexApprovalUnification
+    let metrics = makeConnectionMetrics(latencyMs: 18, messagesPerSecond: 4.2)
+    return liveConfiguration(
+      mode: .populated,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.summary.sessionId,
+        selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
     )
   }
 
