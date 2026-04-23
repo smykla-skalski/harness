@@ -54,6 +54,40 @@ final class PreferencesSupervisorNotificationsViewModelTests: XCTestCase {
     XCTAssertFalse(preferences.allowsAnyDelivery(for: .info))
   }
 
+  func test_setAllowedFalseClearsAllChannelsForSeverity() {
+    let userDefaults = makeUserDefaults()
+    let viewModel = PreferencesSupervisorNotificationsViewModel(userDefaults: userDefaults)
+    XCTAssertTrue(viewModel.allowsAny(for: .critical))
+
+    viewModel.setAllowed(false, for: .critical)
+
+    XCTAssertFalse(viewModel.allowsAny(for: .critical))
+    for channel in SupervisorNotificationChannel.allCases {
+      XCTAssertFalse(viewModel.isEnabled(channel, for: .critical))
+    }
+    let reloaded = PreferencesSupervisorNotificationsViewModel(userDefaults: userDefaults)
+    XCTAssertFalse(reloaded.allowsAny(for: .critical))
+    XCTAssertTrue(reloaded.allowsAny(for: .warn))
+  }
+
+  func test_setAllowedTrueRestoresSeverityDefaults() {
+    let userDefaults = makeUserDefaults()
+    let viewModel = PreferencesSupervisorNotificationsViewModel(userDefaults: userDefaults)
+    viewModel.setAllowed(false, for: .needsUser)
+    XCTAssertFalse(viewModel.allowsAny(for: .needsUser))
+
+    viewModel.setAllowed(true, for: .needsUser)
+
+    let defaults = SupervisorNotificationPreferences.defaultChannels(for: .needsUser)
+    for channel in SupervisorNotificationChannel.allCases {
+      XCTAssertEqual(
+        viewModel.isEnabled(channel, for: .needsUser),
+        defaults.contains(channel),
+        "mismatch for \(channel)"
+      )
+    }
+  }
+
   private func makeUserDefaults() -> UserDefaults {
     let suiteName = "PreferencesSupervisorNotificationsViewModelTests.\(UUID().uuidString)"
     let userDefaults = UserDefaults(suiteName: suiteName)!
