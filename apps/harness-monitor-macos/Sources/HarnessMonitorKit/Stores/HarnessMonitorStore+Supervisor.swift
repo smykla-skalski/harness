@@ -123,7 +123,7 @@ extension HarnessMonitorStore {
 
   public func startSupervisor() async {
     guard _stack == nil else {
-      HarnessMonitorLogger.supervisor.info("supervisor.start skipped — already running")
+      HarnessMonitorLogger.supervisorInfo("supervisor.start skipped — already running")
       return
     }
 
@@ -146,11 +146,11 @@ extension HarnessMonitorStore {
     defer { _supervisorStartTask = nil }
 
     guard _stack == nil else {
-      HarnessMonitorLogger.supervisor.info("supervisor.start skipped — already running")
+      HarnessMonitorLogger.supervisorInfo("supervisor.start skipped — already running")
       return
     }
 
-    HarnessMonitorLogger.supervisor.info("supervisor.start")
+    HarnessMonitorLogger.supervisorInfo("supervisor.start")
 
     let decisionStore: DecisionStore
     if let container = modelContext?.container {
@@ -159,8 +159,8 @@ extension HarnessMonitorStore {
       do {
         decisionStore = try DecisionStore.makeInMemory()
       } catch {
-        HarnessMonitorLogger.supervisor.error(
-          "supervisor.start failed to create DecisionStore: \(error.localizedDescription, privacy: .public)"
+        HarnessMonitorLogger.supervisorError(
+          "supervisor.start failed to create DecisionStore: \(error.localizedDescription)"
         )
         return
       }
@@ -207,8 +207,8 @@ extension HarnessMonitorStore {
     do {
       try await seedSupervisorDecisionsIfNeeded(decisionStore)
     } catch {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.seed_decisions_failed error=\(String(describing: error), privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.seed_decisions_failed error=\(String(describing: error))"
       )
     }
 
@@ -240,12 +240,12 @@ extension HarnessMonitorStore {
     lifecycle.startBackgroundActivity()
     auditRetention?.startBackgroundCompaction()
 
-    HarnessMonitorLogger.supervisor.info("supervisor.started")
+    HarnessMonitorLogger.supervisorInfo("supervisor.started")
   }
 
   public func stopSupervisor() async {
     guard let stack = _stack else {
-      HarnessMonitorLogger.supervisor.info("supervisor.stop skipped — not running")
+      HarnessMonitorLogger.supervisorInfo("supervisor.stop skipped — not running")
       return
     }
     _stack = nil
@@ -259,7 +259,7 @@ extension HarnessMonitorStore {
     supervisorSelectedDecisionID = nil
     supervisorDecisionRefreshTick &+= 1
 
-    HarnessMonitorLogger.supervisor.info("supervisor.stopped")
+    HarnessMonitorLogger.supervisorInfo("supervisor.stopped")
   }
 
   public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {

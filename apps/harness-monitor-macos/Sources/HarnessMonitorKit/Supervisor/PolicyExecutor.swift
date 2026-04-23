@@ -109,8 +109,8 @@ public actor PolicyExecutor {
       return .executed(actionKey: key)
     } catch {
       let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
-      HarnessMonitorLogger.supervisor.warning(
-        "action failed key=\(key, privacy: .public) error=\(sanitizedError, privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "action failed key=\(key) error=\(sanitizedError)"
       )
       let failedRecord = auditRecord(
         id: UUID().uuidString,
@@ -189,13 +189,13 @@ public actor PolicyExecutor {
       )
 
     case .logEvent(let payload):
-      HarnessMonitorLogger.supervisor.trace("logEvent: \(payload.message, privacy: .public)")
+      HarnessMonitorLogger.supervisorTrace("logEvent: \(payload.message)")
 
     case .suggestConfigChange(let payload):
-      HarnessMonitorLogger.supervisor.trace(
+      HarnessMonitorLogger.supervisorTrace(
         """
-        suggestConfigChange ruleID=\(payload.ruleID, privacy: .public) \
-        rationale=\(payload.rationale, privacy: .public)
+        suggestConfigChange ruleID=\(payload.ruleID) \
+        rationale=\(payload.rationale)
         """
       )
     }

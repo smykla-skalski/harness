@@ -20,10 +20,10 @@
       do {
         try applySupervisorUITestScenario(scenario)
       } catch {
-        HarnessMonitorLogger.supervisor.warning(
+        HarnessMonitorLogger.supervisorWarning(
           """
-          supervisor.ui_test_seed_failed scenario=\(scenario.rawValue, privacy: .public) \
-          error=\(String(describing: error), privacy: .public)
+          supervisor.ui_test_seed_failed scenario=\(scenario.rawValue) \
+          error=\(String(describing: error))
           """
         )
       }

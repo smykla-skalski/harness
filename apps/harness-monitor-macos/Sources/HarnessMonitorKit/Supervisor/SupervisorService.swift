@@ -44,8 +44,8 @@ public actor SupervisorService {
   public func start() async {
     guard !running else { return }
     running = true
-    HarnessMonitorLogger.supervisor.info(
-      "supervisor.start interval=\(self.interval, privacy: .public)"
+    HarnessMonitorLogger.supervisorInfo(
+      "supervisor.start interval=\(self.interval)"
     )
     tickTask = Task { [weak self] in
       guard let self else { return }
@@ -59,7 +59,7 @@ public actor SupervisorService {
     tickTask?.cancel()
     _ = await tickTask?.value
     tickTask = nil
-    HarnessMonitorLogger.supervisor.info("supervisor.stop")
+    HarnessMonitorLogger.supervisorInfo("supervisor.stop")
   }
 
   public func runOneTick() async { await tickBody() }
@@ -114,8 +114,8 @@ public actor SupervisorService {
 
     let now = clock.now()
     let snapshot = await buildSnapshot(now: now)
-    HarnessMonitorLogger.supervisor.debug(
-      "supervisor.tick snapshot=\(snapshot.id, privacy: .public)"
+    HarnessMonitorLogger.supervisorDebug(
+      "supervisor.tick snapshot=\(snapshot.id)"
     )
 
     let rules = await registry.allRules
@@ -203,8 +203,8 @@ public actor SupervisorService {
     armed: Bool
   ) async -> RuleEvaluation {
     if armed {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.rule.failed rule=\(rule.id, privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.rule.failed rule=\(rule.id)"
       )
       return RuleEvaluation(ruleID: rule.id, rule: rule, actions: [], failed: true)
     }
@@ -229,8 +229,8 @@ public actor SupervisorService {
       }
       if count >= Self.quarantineErrorThreshold {
         quarantined.insert(ruleID)
-        HarnessMonitorLogger.supervisor.error(
-          "supervisor.rule.quarantined rule=\(ruleID, privacy: .public) count=\(count, privacy: .public)"
+        HarnessMonitorLogger.supervisorError(
+          "supervisor.rule.quarantined rule=\(ruleID) count=\(count)"
         )
       }
     }
@@ -246,8 +246,8 @@ public actor SupervisorService {
       recordFiredActions(forRuleID: entry.ruleID, actions: entry.actions, firedAt: firedAt)
       for action in entry.actions {
         if shouldSuppress(action, at: clock.now()) {
-          HarnessMonitorLogger.supervisor.trace(
-            "supervisor.action.suppressed key=\(action.actionKey, privacy: .public)"
+          HarnessMonitorLogger.supervisorTrace(
+            "supervisor.action.suppressed key=\(action.actionKey)"
           )
           continue
         }
@@ -391,8 +391,8 @@ public actor SupervisorService {
         recentDecisions: recentDecisions
       )
     } catch {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.history_load_failed error=\(String(describing: error), privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.history_load_failed error=\(String(describing: error))"
       )
       return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
     }
