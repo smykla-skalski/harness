@@ -6,6 +6,7 @@ struct SessionCockpitView: View {
   let detail: SessionDetail
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
+  let tuiStatusByAgent: [String: AgentTuiStatus]
   let isSessionStatusStale: Bool
   let isSessionReadOnly: Bool
   let isTimelineLoading: Bool
@@ -16,31 +17,6 @@ struct SessionCockpitView: View {
   private func openAgent(_ agentID: String) {
     store.requestAgentsWindowSelection(.agent(agentID))
     openWindow(id: HarnessMonitorWindowID.agents)
-  }
-
-  private var tuiStatusByAgent: [String: AgentTuiStatus] {
-    var snapshotStatus: [String: AgentTuiStatus] = [:]
-    snapshotStatus.reserveCapacity(store.selectedAgentTuis.count)
-    for tui in store.selectedAgentTuis {
-      if let existing = snapshotStatus[tui.agentId] {
-        if tui.status.isActive && !existing.isActive {
-          snapshotStatus[tui.agentId] = tui.status
-        }
-      } else {
-        snapshotStatus[tui.agentId] = tui.status
-      }
-    }
-
-    var result: [String: AgentTuiStatus] = [:]
-    result.reserveCapacity(detail.agents.count)
-    for agent in detail.agents {
-      if let status = snapshotStatus[agent.agentId] {
-        result[agent.agentId] = status
-      } else if agent.capabilities.contains("agent-tui") {
-        result[agent.agentId] = agent.status == .active ? .running : .exited
-      }
-    }
-    return result
   }
 
   var body: some View {
@@ -125,6 +101,7 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+    tuiStatusByAgent: [:],
     isSessionStatusStale: false,
     isSessionReadOnly: false,
     isTimelineLoading: false,
@@ -138,6 +115,7 @@ struct SessionCockpitView: View {
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
     timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+    tuiStatusByAgent: [:],
     isSessionStatusStale: false,
     isSessionReadOnly: false,
     isTimelineLoading: false,

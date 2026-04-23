@@ -145,6 +145,7 @@ extension AgentTuiWindowView {
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsModelPicker).frame")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsModelPicker)
 
       if modelBinding.wrappedValue == RuntimeCustomModel.tag {
@@ -337,6 +338,7 @@ extension AgentTuiWindowView {
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsCodexModelPicker).frame")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexModelPicker)
 
       if modelBinding.wrappedValue == RuntimeCustomModel.tag {

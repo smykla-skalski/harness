@@ -5,6 +5,13 @@ import Foundation
 /// actions whose `payloadJSON` encodes the `WebSocketProtocol.managedAgentResolveCodexApproval`
 /// request body (accept / acceptForSession / decline / cancel).
 public struct CodexApprovalRule: PolicyRule {
+  private static let payloadEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+  }()
+
   public let id = "codex-approval"
   public let name = "Codex Approval"
   public let version = 1
@@ -67,11 +74,8 @@ public struct CodexApprovalRule: PolicyRule {
   }
 
   private func encode<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    encoder.dateEncodingStrategy = .iso8601
     guard
-      let data = try? encoder.encode(value),
+      let data = try? Self.payloadEncoder.encode(value),
       let string = String(data: data, encoding: .utf8)
     else {
       return "{}"

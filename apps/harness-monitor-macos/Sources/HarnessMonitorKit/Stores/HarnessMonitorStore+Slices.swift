@@ -322,6 +322,7 @@ extension HarnessMonitorStore {
     public var selectedSessionDetail: SessionDetail?
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
+    public var tuiStatusByAgent: [String: AgentTuiStatus] = [:]
     public var isTimelineLoading = false
     public var retainPresentedDetailWhenSelectionClears = false
   }

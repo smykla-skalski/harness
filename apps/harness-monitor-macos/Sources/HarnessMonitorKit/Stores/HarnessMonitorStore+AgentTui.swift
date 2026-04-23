@@ -168,15 +168,16 @@ extension HarnessMonitorStore {
   public func selectAgentTui(tuiID: String?) {
     let previousTuiID = selectedAgentTui?.tuiId
     guard let tuiID else {
-      selectedAgentTui = preferredAgentTui(from: selectedAgentTuis)
+      assignSelectedAgentTui(preferredAgentTui(from: selectedAgentTuis))
       if selectedAgentTui?.tuiId != previousTuiID {
         cancelAgentTuiActionRefresh()
       }
       return
     }
-    selectedAgentTui =
+    assignSelectedAgentTui(
       selectedAgentTuis.first(where: { $0.tuiId == tuiID })
-      ?? preferredAgentTui(from: selectedAgentTuis)
+        ?? preferredAgentTui(from: selectedAgentTuis)
+    )
     if selectedAgentTui?.tuiId != previousTuiID {
       cancelAgentTuiActionRefresh()
     }
@@ -187,8 +188,7 @@ extension HarnessMonitorStore {
     guard !selectedAgentTuis.isEmpty || selectedAgentTui != nil else {
       return
     }
-    selectedAgentTuis = []
-    selectedAgentTui = nil
+    assignAgentTuis([], selected: nil)
   }
   func applyAgentTui(_ tui: AgentTuiSnapshot) {
     guard tui.sessionId == selectedSessionID else {
@@ -197,10 +197,10 @@ extension HarnessMonitorStore {
 
     clearHostBridgeIssue(for: "agent-tui")
     let tuis = upsertingAgentTui(tui, into: selectedAgentTuis)
-    selectedAgentTuis = tuis
-    if selectedAgentTui?.tuiId == tui.tuiId || selectedAgentTui == nil {
-      selectedAgentTui = tui
-    }
+    let preferred =
+      selectedAgentTui?.tuiId == tui.tuiId || selectedAgentTui == nil
+      ? tui : preferredAgentTui(from: tuis)
+    assignAgentTuis(tuis, selected: preferred)
   }
   func refreshAgentTuis(
     using client: any HarnessMonitorClientProtocol,
@@ -218,8 +218,7 @@ extension HarnessMonitorStore {
       cancelAgentTuiActionRefresh()
       let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles())
         .tuis
-      selectedAgentTuis = sortedTuis
-      selectedAgentTui = preferredAgentTui(from: sortedTuis)
+      assignAgentTuis(sortedTuis, selected: preferredAgentTui(from: sortedTuis))
       return true
     } catch {
       return applyAgentTuiError(error, selectedSessionID: sessionID)
@@ -240,8 +239,7 @@ extension HarnessMonitorStore {
       clearHostBridgeIssue(for: "agent-tui")
       let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles())
         .tuis
-      selectedAgentTuis = sortedTuis
-      selectedAgentTui = preferredAgentTui(from: sortedTuis)
+      assignAgentTuis(sortedTuis, selected: preferredAgentTui(from: sortedTuis))
     } catch {
       guard selectedSessionID == sessionID else {
         return
@@ -402,19 +400,5 @@ extension HarnessMonitorStore {
       return selectedTui
     }
     return tuis.first(where: { $0.status.isActive }) ?? tuis.first
-  }
-  private func upsertingAgentTui(
-    _ tui: AgentTuiSnapshot,
-    into tuis: [AgentTuiSnapshot]
-  ) -> [AgentTuiSnapshot] {
-    var updatedTuis = tuis.filter { $0.tuiId != tui.tuiId }
-    updatedTuis.append(tui)
-    return AgentTuiListResponse(tuis: updatedTuis)
-      .canonicallySorted(roleByAgent: selectedSessionRoles()).tuis
-  }
-  private func selectedSessionRoles() -> [String: SessionRole] {
-    Dictionary(
-      uniqueKeysWithValues: (selectedSession?.agents ?? []).map { ($0.agentId, $0.role) }
-    )
   }
 }

@@ -190,8 +190,7 @@ struct ContentWindowToolbarModelTests {
       canStartNewSession: false,
       isRefreshing: false,
       sleepPreventionEnabled: false,
-      showInspector: true,
-      supervisorDecisionRefreshTick: 0
+      showInspector: true
     )
     let hidden = ContentWindowToolbarModel(
       canNavigateBack: false,
@@ -199,8 +198,7 @@ struct ContentWindowToolbarModelTests {
       canStartNewSession: false,
       isRefreshing: false,
       sleepPreventionEnabled: false,
-      showInspector: false,
-      supervisorDecisionRefreshTick: 0
+      showInspector: false
     )
 
     #expect(shown.inspectorToggleTitle == "Hide Inspector")
@@ -215,8 +213,7 @@ struct ContentWindowToolbarModelTests {
       canStartNewSession: false,
       isRefreshing: false,
       sleepPreventionEnabled: true,
-      showInspector: false,
-      supervisorDecisionRefreshTick: 0
+      showInspector: false
     )
     let disabled = ContentWindowToolbarModel(
       canNavigateBack: false,
@@ -224,8 +221,7 @@ struct ContentWindowToolbarModelTests {
       canStartNewSession: false,
       isRefreshing: false,
       sleepPreventionEnabled: false,
-      showInspector: false,
-      supervisorDecisionRefreshTick: 0
+      showInspector: false
     )
 
     #expect(enabled.sleepPreventionTitle == "Sleep Prevention On")

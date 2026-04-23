@@ -112,7 +112,7 @@ private struct PreferencesConnectionUptimeValue: View {
   let connectedSince: Date?
 
   var body: some View {
-    TimelineView(.periodic(from: .now, by: 1)) { context in
+    TimelineView(.periodic(from: .now, by: 15)) { context in
       Text(formatConnectionUptime(since: connectedSince, now: context.date))
     }
   }

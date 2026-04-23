@@ -179,13 +179,7 @@ struct SessionCockpitTimelineSection: View {
   }
 
   @ViewBuilder private var placeholderAwareTimelineRows: some View {
-    if shouldAnimatePlaceholders {
-      TimelineView(.periodic(from: .now, by: 1 / 12)) { context in
-        timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.phase(at: context.date))
-      }
-    } else {
-      timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase)
-    }
+    timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase)
   }
 
   private func timelineRows(shimmerPhase: CGFloat) -> some View {
