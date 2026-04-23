@@ -1690,7 +1690,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "(1000 * (((histogram_quantile(0.95, sum by (le) (last_over_time(github_copilot_tool_call_duration_seconds_bucket[$__range])))) and on() (sum(last_over_time(github_copilot_tool_call_duration_seconds_count[$__range])) > 0)) or on() vector(0)))"
                       }
                     },
                     "refId": "A",
@@ -1702,10 +1702,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot trace span volume over the selected range.",
+          "description": "p95 Copilot tool-call latency from the Copilot duration histogram family.",
           "id": 219,
           "links": [],
-          "title": "Copilot Trace Spans",
+          "title": "Copilot Tool p95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -1724,15 +1724,15 @@
                       },
                       {
                         "color": "orange",
-                        "value": 10
+                        "value": 250
                       },
                       {
                         "color": "red",
-                        "value": 100
+                        "value": 1000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "ms"
                 },
                 "overrides": []
               },
@@ -5395,97 +5395,6 @@
                       "spec": {
                         "x": 0,
                         "y": 8,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-9"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 12,
-                        "y": 8,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-10"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 0,
-                        "y": 16,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-11"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 12,
-                        "y": 16,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-12"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 0,
-                        "y": 24,
-                        "width": 24,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-13"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 0,
-                        "y": 32,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-14"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 12,
-                        "y": 32,
-                        "width": 12,
-                        "height": 8,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "cockpit-panel-15"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 0,
-                        "y": 40,
                         "width": 6,
                         "height": 4,
                         "element": {
@@ -5498,7 +5407,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 6,
-                        "y": 40,
+                        "y": 8,
                         "width": 6,
                         "height": 4,
                         "element": {
@@ -5511,7 +5420,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 40,
+                        "y": 8,
                         "width": 6,
                         "height": 4,
                         "element": {
@@ -5524,12 +5433,103 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 18,
-                        "y": 40,
+                        "y": 8,
                         "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "cockpit-panel-19"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 12,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-9"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 12,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-10"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 20,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-11"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 20,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-12"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 28,
+                        "width": 24,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-13"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 36,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-14"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 36,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-15"
                         }
                       }
                     }
