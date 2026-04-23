@@ -121,6 +121,12 @@
       "description": "Session surface container",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/ContentSessionSurface.swift",
       "index": 0
+    },
+    {
+      "id": "DecisionsWindowCrowded",
+      "description": "Decisions window with sidebar, detail, and inspector populated",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsWindowCrowdedPreview.swift",
+      "index": 0
     }
   ]
 }
