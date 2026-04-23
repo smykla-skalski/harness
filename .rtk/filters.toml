@@ -364,7 +364,10 @@ keep_lines_matching = [
   "^❌ ",
   "^💥 ",
 ]
-max_lines = 120
+truncate_lines_at = 240
+head_lines = 20
+tail_lines = 20
+max_lines = 50
 on_empty = "run-quality-gates: ok"
 
 [[tests.harness-monitor-run-quality-gates]]
@@ -409,6 +412,56 @@ swift-compile-context: source: /Users/x/Sources/RulesPane.swift
 expected = "error: emit-module command failed with exit code 1\nswift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog\nswift-compile-context: source: /Users/x/Sources/RulesPane.swift\n** BUILD FAILED **"
 
 [[tests.harness-monitor-run-quality-gates]]
+name = "hard caps noisy matching diagnostics"
+input = """
+warning: noisy diagnostic 01
+warning: noisy diagnostic 02
+warning: noisy diagnostic 03
+warning: noisy diagnostic 04
+warning: noisy diagnostic 05
+warning: noisy diagnostic 06
+warning: noisy diagnostic 07
+warning: noisy diagnostic 08
+warning: noisy diagnostic 09
+warning: noisy diagnostic 10
+warning: noisy diagnostic 11
+warning: noisy diagnostic 12
+warning: noisy diagnostic 13
+warning: noisy diagnostic 14
+warning: noisy diagnostic 15
+warning: noisy diagnostic 16
+warning: noisy diagnostic 17
+warning: noisy diagnostic 18
+warning: noisy diagnostic 19
+warning: noisy diagnostic 20
+warning: noisy diagnostic 21
+warning: noisy diagnostic 22
+warning: noisy diagnostic 23
+warning: noisy diagnostic 24
+warning: noisy diagnostic 25
+warning: noisy diagnostic 26
+warning: noisy diagnostic 27
+warning: noisy diagnostic 28
+warning: noisy diagnostic 29
+warning: noisy diagnostic 30
+warning: noisy diagnostic 31
+warning: noisy diagnostic 32
+warning: noisy diagnostic 33
+warning: noisy diagnostic 34
+warning: noisy diagnostic 35
+warning: noisy diagnostic 36
+warning: noisy diagnostic 37
+warning: noisy diagnostic 38
+warning: noisy diagnostic 39
+warning: noisy diagnostic 40
+warning: noisy diagnostic 41
+warning: noisy diagnostic 42
+warning: noisy diagnostic 43
+** BUILD FAILED **
+"""
+expected = "warning: noisy diagnostic 01\nwarning: noisy diagnostic 02\nwarning: noisy diagnostic 03\nwarning: noisy diagnostic 04\nwarning: noisy diagnostic 05\nwarning: noisy diagnostic 06\nwarning: noisy diagnostic 07\nwarning: noisy diagnostic 08\nwarning: noisy diagnostic 09\nwarning: noisy diagnostic 10\nwarning: noisy diagnostic 11\nwarning: noisy diagnostic 12\nwarning: noisy diagnostic 13\nwarning: noisy diagnostic 14\nwarning: noisy diagnostic 15\nwarning: noisy diagnostic 16\nwarning: noisy diagnostic 17\nwarning: noisy diagnostic 18\nwarning: noisy diagnostic 19\nwarning: noisy diagnostic 20\n... (4 lines omitted)\nwarning: noisy diagnostic 25\nwarning: noisy diagnostic 26\nwarning: noisy diagnostic 27\nwarning: noisy diagnostic 28\nwarning: noisy diagnostic 29\nwarning: noisy diagnostic 30\nwarning: noisy diagnostic 31\nwarning: noisy diagnostic 32\nwarning: noisy diagnostic 33\nwarning: noisy diagnostic 34\nwarning: noisy diagnostic 35\nwarning: noisy diagnostic 36\nwarning: noisy diagnostic 37\nwarning: noisy diagnostic 38\nwarning: noisy diagnostic 39\nwarning: noisy diagnostic 40\nwarning: noisy diagnostic 41\nwarning: noisy diagnostic 42\nwarning: noisy diagnostic 43\n** BUILD FAILED **"
+
+[[tests.harness-monitor-run-quality-gates]]
 name = "empty input returns on_empty"
 input = ""
 expected = "run-quality-gates: ok"
@@ -445,7 +498,10 @@ keep_lines_matching = [
   "^Code Sign error:",
   "^swift-compile-context:",
 ]
-max_lines = 150
+truncate_lines_at = 240
+head_lines = 20
+tail_lines = 20
+max_lines = 50
 on_empty = "xcodebuild (HarnessMonitor): ok"
 
 [[tests.harness-monitor-xcodebuild]]
@@ -593,7 +649,10 @@ keep_lines_matching = [
   "^✅ ",
   "^❌ ",
 ]
-max_lines = 120
+truncate_lines_at = 240
+head_lines = 20
+tail_lines = 20
+max_lines = 50
 on_empty = "test-swift: ok"
 
 [[tests.harness-monitor-test-swift]]
@@ -718,7 +777,10 @@ keep_lines_matching = [
   "^error: ",
   "^warning: ",
 ]
-max_lines = 120
+truncate_lines_at = 240
+head_lines = 20
+tail_lines = 20
+max_lines = 50
 on_empty = "test-agents-e2e: ok"
 
 [[tests.harness-monitor-test-agents-e2e]]
