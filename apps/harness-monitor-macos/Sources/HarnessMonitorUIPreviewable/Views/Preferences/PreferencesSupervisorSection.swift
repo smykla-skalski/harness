@@ -18,20 +18,21 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
   }
 }
 
-/// Root Supervisor section in the Preferences window. Renders a native scope bar pinned to the
-/// top safe area and delegates to the selected pane. Each pane owns its own `Form` and
-/// `preferencesDetailFormStyle()` so the sidebar can continue to supply the detail column title.
+/// Root Supervisor section in the Preferences window. The pane switcher lives in the window
+/// toolbar, while each pane owns its own `Form` and `preferencesDetailFormStyle()`.
 public struct PreferencesSupervisorSection: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
-  @State private var selectedPane: SupervisorPaneKey = .rules
+  @Binding var selectedPane: SupervisorPaneKey
 
   public init(
     store: HarnessMonitorStore,
-    notifications: HarnessMonitorUserNotificationController
+    notifications: HarnessMonitorUserNotificationController,
+    selectedPane: Binding<SupervisorPaneKey>
   ) {
     self.store = store
     self.notifications = notifications
+    _selectedPane = selectedPane
   }
 
   public var body: some View {
@@ -52,42 +53,46 @@ public struct PreferencesSupervisorSection: View {
         )
       }
     }
-    .safeAreaInset(edge: .top, spacing: 0) {
-      SupervisorScopeBar(selection: $selectedPane)
-    }
   }
 }
 
-private struct SupervisorScopeBar: View {
+private enum SupervisorPaneToolbarMetrics {
+  static let width: CGFloat = 380
+}
+
+struct SupervisorPreferencesToolbarPicker: View {
   @Binding var selection: SupervisorPaneKey
 
   var body: some View {
-    HStack {
-      Spacer(minLength: 0)
-      Picker("Pane", selection: $selection) {
-        ForEach(SupervisorPaneKey.allCases) { pane in
-          Text(pane.title).tag(pane)
-        }
+    Picker("Pane", selection: $selection) {
+      ForEach(SupervisorPaneKey.allCases) { pane in
+        Text(pane.title)
+          .tag(pane)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.preferencesSupervisorPane("pane-picker"),
+              option: pane.title
+            )
+          )
       }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .controlSize(.large)
-      .frame(maxWidth: 380)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesSupervisorPane("pane-picker")
-      )
-      Spacer(minLength: 0)
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-    .padding(.top, HarnessMonitorTheme.spacingMD)
-    .padding(.bottom, HarnessMonitorTheme.spacingSM)
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .controlSize(.large)
+    .frame(width: SupervisorPaneToolbarMetrics.width)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.preferencesSupervisorPane("pane-picker")
+    )
   }
 }
 
 #Preview("Preferences Supervisor Section — empty") {
+  @Previewable @State var selectedPane: SupervisorPaneKey = .rules
+
   PreferencesSupervisorSection(
     store: PreferencesPreviewSupport.makeStore(),
-    notifications: HarnessMonitorUserNotificationController.preview()
+    notifications: HarnessMonitorUserNotificationController.preview(),
+    selectedPane: $selectedPane
   )
   .frame(width: 640, height: 480)
 }

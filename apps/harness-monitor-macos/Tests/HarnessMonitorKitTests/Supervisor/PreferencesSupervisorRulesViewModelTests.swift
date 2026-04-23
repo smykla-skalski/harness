@@ -135,4 +135,32 @@ final class PreferencesSupervisorRulesViewModelTests: XCTestCase {
       "600"
     )
   }
+
+  func test_isRuleAtBuiltInDefaultsReflectsPerRuleEdits() {
+    let viewModel = PreferencesSupervisorRulesViewModel()
+
+    XCTAssertTrue(viewModel.isRuleAtBuiltInDefaults("idle-session"))
+
+    viewModel.setRuleParameterValue("900", for: "sessionIdleThreshold", ruleID: "idle-session")
+
+    XCTAssertFalse(viewModel.isRuleAtBuiltInDefaults("idle-session"))
+
+    viewModel.resetRule(ruleID: "idle-session")
+
+    XCTAssertTrue(viewModel.isRuleAtBuiltInDefaults("idle-session"))
+  }
+
+  func test_isRuleAtBuiltInDefaultsTreatsEquivalentPersistedStateAsDefault() {
+    let row = PolicyConfigRow(
+      ruleID: "codex-approval",
+      enabled: true,
+      defaultBehavior: RuleDefaultBehavior.cautious.rawValue,
+      parametersJSON: #"{}"#
+    )
+    let viewModel = PreferencesSupervisorRulesViewModel()
+
+    viewModel.applyRows([row])
+
+    XCTAssertTrue(viewModel.isRuleAtBuiltInDefaults("codex-approval"))
+  }
 }
