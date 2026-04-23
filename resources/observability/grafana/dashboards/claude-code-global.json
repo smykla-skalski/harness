@@ -76,6 +76,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "noValue": "0",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -893,7 +894,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))",
+                        "expr": "(100 * ((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))) or on() vector(0)",
                         "legendFormat": "Claude accept %"
                       }
                     },
@@ -913,7 +914,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__rate_interval])) / clamp_min(sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval])), 1)))",
+                        "expr": "(100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__rate_interval])) / clamp_min(sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval])), 1)))) or on() vector(0)",
                         "legendFormat": "Codex success %"
                       }
                     },
@@ -3402,186 +3403,201 @@
             "spec": {
               "title": "Cockpit",
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "GridLayout",
                 "spec": {
-                  "rows": [
+                  "items": [
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Summary KPIs",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "columnWidthMode": "custom",
-                            "columnWidth": 220,
-                            "fillScreen": true,
-                            "maxColumnCount": 4,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-1"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-2"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-3"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-4"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-5"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-6"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-7"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-8"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 0,
+                        "y": 0,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-1"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Cross-Agent Trends",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "columnWidthMode": "custom",
-                            "columnWidth": 420,
-                            "fillScreen": true,
-                            "maxColumnCount": 2,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-9"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-10"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-11"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-12"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 6,
+                        "y": 0,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-2"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Service Correlation",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "columnWidthMode": "custom",
-                            "columnWidth": 420,
-                            "fillScreen": true,
-                            "maxColumnCount": 2,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-14"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cockpit-panel-15"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 12,
+                        "y": 0,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-3"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 0,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-4"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 4,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-5"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 6,
+                        "y": 4,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-6"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 4,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-7"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 4,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-8"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 8,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-9"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 8,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-10"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 16,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-11"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 16,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-12"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 24,
+                        "width": 24,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-13"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 32,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-14"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 32,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-15"
                         }
                       }
                     }
