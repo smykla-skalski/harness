@@ -295,6 +295,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.preferences.section.\(key)"
   }
 
+  static func preferencesSupervisorPane(_ key: String) -> String {
+    "harness.preferences.supervisor.\(slug(key))"
+  }
+
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
     "harness.session.timeline.pagination.page.\(pageNumber)"
   }

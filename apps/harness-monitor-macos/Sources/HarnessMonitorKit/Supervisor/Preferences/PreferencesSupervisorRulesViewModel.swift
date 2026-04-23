@@ -134,6 +134,16 @@ public final class PreferencesSupervisorRulesViewModel {
     syncSelectedRuleState(ruleID: ruleID)
   }
 
+  public func isRuleAtBuiltInDefaults(_ ruleID: String) -> Bool {
+    guard
+      let rule = rules.first(where: { $0.id == ruleID }),
+      let state = editorStates[ruleID]
+    else {
+      return true
+    }
+    return state == Self.builtInEditorState(for: rule)
+  }
+
   public func makePolicyConfigRow(forRuleID ruleID: String) throws -> PolicyConfigRow {
     guard
       let rule = rules.first(where: { $0.id == ruleID }),
@@ -279,7 +289,7 @@ private struct RuleOverrideState {
   let parameters: [String: String]
 }
 
-private struct RuleEditorState {
+private struct RuleEditorState: Equatable {
   var enabled: Bool
   var defaultBehavior: RuleDefaultBehavior
   var parameterValues: [String: String]

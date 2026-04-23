@@ -137,4 +137,69 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSupervisorPaneTabsLiveInTrailingToolbarChrome() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    selectPreferencesSection(
+      in: app,
+      identifier: Accessibility.preferencesSectionButton("supervisor"),
+      expectedTitle: "Supervisor"
+    )
+
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let settingsWindow = window(in: app, containing: preferencesPanel)
+    XCTAssertTrue(settingsWindow.exists)
+
+    let settingsToolbar = settingsWindow.toolbars.firstMatch
+    XCTAssertTrue(settingsToolbar.waitForExistence(timeout: Self.actionTimeout))
+
+    let panePicker = segmentedControl(
+      in: app,
+      identifier: Accessibility.preferencesSupervisorPane("pane-picker")
+    )
+    XCTAssertTrue(panePicker.waitForExistence(timeout: Self.actionTimeout))
+
+    let notificationsOption = button(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.preferencesSupervisorPane("pane-picker"),
+        option: "Notifications"
+      )
+    )
+    XCTAssertTrue(notificationsOption.waitForExistence(timeout: Self.actionTimeout))
+
+    let toolbarBottom = settingsToolbar.frame.maxY
+    let toolbarTrailingInset = settingsWindow.frame.maxX - panePicker.frame.maxX
+
+    XCTAssertLessThanOrEqual(
+      panePicker.frame.maxY,
+      toolbarBottom + 4,
+      "Supervisor pane tabs should live inside the native toolbar chrome"
+    )
+    XCTAssertGreaterThan(
+      panePicker.frame.minX,
+      settingsWindow.frame.midX,
+      "Supervisor pane tabs should stay anchored on the trailing half of the toolbar"
+    )
+    XCTAssertLessThan(
+      toolbarTrailingInset,
+      140,
+      "Supervisor pane tabs should stay close to the trailing window chrome"
+    )
+
+    notificationsOption.tap()
+
+    let notificationsPane = element(
+      in: app,
+      identifier: Accessibility.preferencesSupervisorPane("notifications")
+    )
+    XCTAssertTrue(
+      notificationsPane.waitForExistence(timeout: Self.actionTimeout),
+      "Toolbar tabs should keep switching Supervisor panes"
+    )
+  }
+
 }

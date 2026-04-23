@@ -5,6 +5,8 @@ import SwiftUI
 public struct PreferencesSupervisorRulesPane: View {
   let store: HarnessMonitorStore
 
+  private static let statusDisplayDuration: Duration = .seconds(2)
+
   @State private var viewModel = PreferencesSupervisorRulesViewModel()
   @State private var persistedRowsByRuleID: [String: PolicyConfigRow] = [:]
   @State private var statusMessages: [String: String] = [:]
@@ -81,7 +83,7 @@ public struct PreferencesSupervisorRulesPane: View {
       }
       try modelContext.save()
       reloadRows()
-      statusMessages[rule.id] = "Saved rule override."
+      showTransientStatus("Saved rule override", for: rule.id)
       errorMessages[rule.id] = nil
       Task { await store.refreshSupervisorPolicyOverrides() }
     } catch {
@@ -104,9 +106,25 @@ public struct PreferencesSupervisorRulesPane: View {
     }
     viewModel.resetRule(ruleID: rule.id)
     reloadRows()
-    statusMessages[rule.id] = "Reset to built-in defaults."
+    showTransientStatus("Reset to built-in defaults", for: rule.id)
     errorMessages[rule.id] = nil
     Task { await store.refreshSupervisorPolicyOverrides() }
+  }
+
+  private func showTransientStatus(_ message: String, for ruleID: String) {
+    withAnimation(.easeOut(duration: 0.15)) {
+      statusMessages[ruleID] = message
+    }
+    Task {
+      try? await Task.sleep(for: Self.statusDisplayDuration)
+      await MainActor.run {
+        if statusMessages[ruleID] == message {
+          withAnimation(.easeOut(duration: 0.15)) {
+            statusMessages[ruleID] = nil
+          }
+        }
+      }
+    }
   }
 }
 
@@ -131,6 +149,7 @@ private struct SupervisorRuleSection: View {
         )
       )
       .harnessNativeFormControl()
+      .scaledFont(.subheadline)
 
       Picker(
         "Default behavior",
@@ -147,12 +166,9 @@ private struct SupervisorRuleSection: View {
       }
       .pickerStyle(.segmented)
       .harnessNativeFormControl()
+      .scaledFont(.subheadline)
 
-      if rule.parameters.fields.isEmpty {
-        LabeledContent("Parameters") {
-          Text("None").foregroundStyle(.secondary)
-        }
-      } else {
+      if !rule.parameters.fields.isEmpty {
         ForEach(rule.parameters.fields, id: \.key) { field in
           SupervisorRuleParameterRow(
             ruleID: rule.id,
@@ -163,15 +179,22 @@ private struct SupervisorRuleSection: View {
         }
       }
     } header: {
-      SupervisorRuleSectionHeader(rule: rule, onReset: onReset)
+      SupervisorRuleSectionHeader(
+        rule: rule,
+        status: status,
+        canReset: !viewModel.isRuleAtBuiltInDefaults(rule.id),
+        onReset: onReset
+      )
     } footer: {
-      SupervisorRuleSectionFooter(rule: rule, status: status, error: error)
+      SupervisorRuleSectionFooter(rule: rule, error: error)
     }
   }
 }
 
 private struct SupervisorRuleSectionHeader: View {
   let rule: PreferencesSupervisorRuleDescriptor
+  let status: String?
+  let canReset: Bool
   let onReset: () -> Void
 
   var body: some View {
@@ -180,29 +203,38 @@ private struct SupervisorRuleSectionHeader: View {
         .scaledFont(.headline)
         .accessibilityAddTraits(.isHeader)
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
-      Button("Reset to defaults", role: .destructive, action: onReset)
+      if let status {
+        Text(status)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.accent)
+          .transition(.opacity)
+      }
+      Button("Reset", action: onReset)
+        .disabled(!canReset)
+        .controlSize(.small)
+        .scaledFont(.subheadline)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.preferencesActionButton(
             "Supervisor Rules Reset \(rule.id)"
           )
         )
     }
+    .animation(.easeOut(duration: 0.15), value: status)
   }
 }
 
 private struct SupervisorRuleSectionFooter: View {
   let rule: PreferencesSupervisorRuleDescriptor
-  let status: String?
   let error: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline) {
-        Text(rule.id)
+        Text(verbatim: rule.id)
           .scaledFont(.caption.monospaced())
           .foregroundStyle(.secondary)
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        Text(metadataText)
+        Text(verbatim: Self.formatSemver(rule.version))
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
       }
@@ -210,19 +242,8 @@ private struct SupervisorRuleSectionFooter: View {
         Text(error)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.danger)
-      } else if let status {
-        Text(status)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.accent)
       }
     }
-  }
-
-  private var metadataText: String {
-    let fieldCount = rule.parameters.fields.count
-    let plural = fieldCount == 1 ? "parameter" : "parameters"
-    let version = Self.formatSemver(rule.version)
-    return "\(fieldCount) \(plural) · \(version)"
   }
 
   static func formatSemver(_ version: Int) -> String {
@@ -257,6 +278,7 @@ private struct SupervisorRuleParameterRow: View {
     LabeledContent(field.label) {
       Toggle("", isOn: booleanBinding)
         .labelsHidden()
+        .scaledFont(.subheadline)
     }
     .harnessNativeFormControl()
     .help("Default: \(field.default)")
@@ -264,15 +286,29 @@ private struct SupervisorRuleParameterRow: View {
 
   private func numericRow(helpSuffix: String) -> some View {
     LabeledContent(field.label) {
-      TextField("", value: intBinding, format: .number)
-        .textFieldStyle(.roundedBorder)
-        .labelsHidden()
-        .multilineTextAlignment(.trailing)
-        .monospacedDigit()
-        .frame(minWidth: 140)
-        .onSubmit(onCommit)
+      HStack(spacing: 0) {
+        TextField("", value: editableIntBinding, format: .number)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .scaledFont(.subheadline)
+          .labelsHidden()
+          .multilineTextAlignment(.trailing)
+          .monospacedDigit()
+          .frame(width: 72)
+          .onSubmit(onCommit)
+        Stepper {
+          EmptyView()
+        } onIncrement: {
+          adjustNumericValue(by: 1)
+        } onDecrement: {
+          adjustNumericValue(by: -1)
+        }
+          .labelsHidden()
+          .controlSize(.small)
+      }
     }
     .harnessNativeFormControl()
+    .scaledFont(.subheadline)
     .help("\(helpSuffix)Default: \(field.default)")
   }
 
@@ -280,6 +316,8 @@ private struct SupervisorRuleParameterRow: View {
     LabeledContent(field.label) {
       TextField("", text: textBinding)
         .textFieldStyle(.roundedBorder)
+        .controlSize(.small)
+        .scaledFont(.subheadline)
         .labelsHidden()
         .frame(minWidth: 140)
         .onSubmit(onCommit)
@@ -290,14 +328,19 @@ private struct SupervisorRuleParameterRow: View {
 
   private func enumerationRow(allowedValues: [String]) -> some View {
     LabeledContent(field.label) {
-      Picker("", selection: enumerationBinding(allowedValues: allowedValues)) {
-        ForEach(allowedValues, id: \.self) { value in
-          Text(Self.enumerationDisplayName(value)).tag(value)
+      HStack(spacing: 0) {
+        Spacer(minLength: 0)
+        Picker("", selection: enumerationBinding(allowedValues: allowedValues)) {
+          ForEach(allowedValues, id: \.self) { value in
+            Text(Self.enumerationDisplayName(value)).tag(value)
+          }
         }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .scaledFont(.subheadline)
+        .frame(width: 140, alignment: .trailing)
       }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .frame(minWidth: 140)
     }
     .harnessNativeFormControl()
     .help("Default: \(Self.enumerationDisplayName(field.default))")
@@ -310,7 +353,7 @@ private struct SupervisorRuleParameterRow: View {
     )
   }
 
-  private var intBinding: Binding<Int> {
+  private var editableIntBinding: Binding<Int> {
     Binding(
       get: {
         Int(viewModel.ruleParameterValue(for: field.key, ruleID: ruleID))
@@ -318,7 +361,6 @@ private struct SupervisorRuleParameterRow: View {
       },
       set: { value in
         viewModel.setRuleParameterValue(String(value), for: field.key, ruleID: ruleID)
-        onCommit()
       }
     )
   }
@@ -346,6 +388,31 @@ private struct SupervisorRuleParameterRow: View {
         onCommit()
       }
     )
+  }
+
+  private func adjustNumericValue(by delta: Int) {
+    let currentValue = editableIntBinding.wrappedValue
+    let nextValue: Int
+
+    if delta >= 0 {
+      let (candidate, overflowed) = currentValue.addingReportingOverflow(delta)
+      nextValue = overflowed ? Int.max : candidate
+    } else {
+      let magnitude = delta.magnitude
+      let (candidate, overflowed) = currentValue.subtractingReportingOverflow(Int(magnitude))
+      nextValue = overflowed ? Int.min : candidate
+    }
+
+    let clampedValue: Int
+    switch field.kind {
+    case .duration:
+      clampedValue = max(0, nextValue)
+    case .integer, .boolean, .string:
+      clampedValue = nextValue
+    }
+
+    editableIntBinding.wrappedValue = clampedValue
+    onCommit()
   }
 
   private static func boolValue(from value: String) -> Bool {
