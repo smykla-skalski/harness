@@ -10,10 +10,12 @@ public struct OSLogSupervisorLogSink: SupervisorLogSink {
   public init() {}
 
   public func record(event: String, fields: [String: String]) {
-    let renderedFields = fields
+    let renderedFields =
+      fields
       .sorted { lhs, rhs in lhs.key < rhs.key }
       .map { key, value in "\(key)=\(value)" }
       .joined(separator: " ")
+
     HarnessMonitorLogger.supervisor.info(
       "\(event, privacy: .public) \(renderedFields, privacy: .public)"
     )
@@ -72,8 +74,8 @@ public final class LoggingPolicyObserver: PolicyObserver {
   }
 }
 
-private extension PolicyAction {
-  var logFields: [String: String] {
+extension PolicyAction {
+  fileprivate var logFields: [String: String] {
     switch self {
     case .nudgeAgent(let payload):
       [
@@ -122,8 +124,8 @@ private extension PolicyAction {
   }
 }
 
-private extension PolicyOutcome {
-  var logFields: [String: String] {
+extension PolicyOutcome {
+  fileprivate var logFields: [String: String] {
     switch self {
     case .dispatched(let actionKey):
       [

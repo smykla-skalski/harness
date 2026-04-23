@@ -23,7 +23,7 @@ public struct DecisionLiveTickSnapshot: Sendable, Hashable {
     self.quarantinedRuleIDs = quarantinedRuleIDs
   }
 
-  public static let placeholder = DecisionLiveTickSnapshot(
+  public static let placeholder = Self(
     lastSnapshotID: nil,
     tickLatencyP50Ms: 0,
     tickLatencyP95Ms: 0,

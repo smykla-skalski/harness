@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-@MainActor
 /// Audit-trail tab rendered inside the Decisions detail column.
+@MainActor
 public struct DecisionAuditTrailTab: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
