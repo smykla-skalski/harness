@@ -116,7 +116,16 @@ public struct DecisionsSidebar: View {
   private let decisions: [Decision]
 
   @State private var query: String = ""
-  @State private var selectedSeverities: Set<DecisionSeverity> = []
+
+  @AppStorage("harness.decisions.sidebar.filterExpanded")
+  private var filterExpanded: Bool = true
+
+  @AppStorage("harness.decisions.sidebar.severitiesCSV")
+  private var severitiesCSV: String = ""
+
+  @AppStorage("harness.decisions.sidebar.searchScope")
+  private var searchScopeRaw: String = DecisionsSidebarSearchScope.summary.rawValue
+
   @Environment(\.fontScale)
   private var fontScale
 
@@ -128,10 +137,35 @@ public struct DecisionsSidebar: View {
     _selectedDecisionID = selection
   }
 
+  private var selectedSeverities: Set<DecisionSeverity> {
+    Set(
+      severitiesCSV
+        .split(separator: ",")
+        .compactMap { DecisionSeverity(rawValue: String($0)) }
+    )
+  }
+
+  private var searchScope: DecisionsSidebarSearchScope {
+    DecisionsSidebarSearchScope(rawValue: searchScopeRaw) ?? .summary
+  }
+
+  private func setSelectedSeverities(_ newValue: Set<DecisionSeverity>) {
+    severitiesCSV = newValue.map(\.rawValue).sorted().joined(separator: ",")
+  }
+
   private var groups: [DecisionsSidebarViewModel.SessionGroup] {
-    DecisionsSidebarViewModel.grouped(
-      decisions: decisions,
-      query: query,
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    let scope = searchScope
+    let scoped: [Decision]
+    if trimmed.isEmpty {
+      scoped = decisions
+    } else {
+      scoped = decisions.filter { scope.matches($0, trimmedQuery: trimmed) }
+    }
+    let summaryQuery = scope == .summary ? trimmed : ""
+    return DecisionsSidebarViewModel.grouped(
+      decisions: scoped,
+      query: summaryQuery,
       severities: selectedSeverities
     )
   }
@@ -148,42 +182,132 @@ public struct DecisionsSidebar: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TextField("Search decisions", text: $query)
-        .textFieldStyle(.roundedBorder)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
-      severityChipRow
+      searchRow
+      if filterExpanded {
+        severityChipRow
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
     }
     .padding(HarnessMonitorTheme.spacingMD)
+    .animation(.snappy(duration: 0.18), value: filterExpanded)
+  }
+
+  private var searchRow: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      TextField(searchScope.label, text: $query)
+        .textFieldStyle(.roundedBorder)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
+      scopeMenu
+      filterToggleButton
+    }
+  }
+
+  private var filterToggleButton: some View {
+    let systemName: String
+    if filterExpanded {
+      systemName = "line.3.horizontal.decrease.circle.fill"
+    } else {
+      systemName = "line.3.horizontal.decrease.circle"
+    }
+    return Button {
+      filterExpanded.toggle()
+    } label: {
+      Image(systemName: systemName)
+        .imageScale(.large)
+        .foregroundStyle(
+          filterExpanded ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk
+        )
+    }
+    .buttonStyle(.borderless)
+    .accessibilityLabel(filterExpanded ? "Hide filters" : "Show filters")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarFilterToggle)
+  }
+
+  private var scopeMenu: some View {
+    Menu {
+      Picker("Search scope", selection: $searchScopeRaw) {
+        ForEach(DecisionsSidebarSearchScope.allCases) { scope in
+          Label(scope.label, systemImage: scope.systemImage)
+            .tag(scope.rawValue)
+        }
+      }
+    } label: {
+      Image(systemName: searchScope.systemImage)
+        .imageScale(.medium)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .accessibilityLabel("Search scope — \(searchScope.label)")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearchScopeMenu)
   }
 
   private var severityChipRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      allChip
       ForEach(DecisionSeverity.sidebarOrdering, id: \.self) { severity in
         severityChip(severity)
       }
     }
   }
 
+  private var allChip: some View {
+    let isActive = selectedSeverities.isEmpty
+    return Button {
+      setSelectedSeverities([])
+    } label: {
+      Text("All")
+        .scaledFont(.caption.bold())
+        .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+        .background(
+          Capsule().fill(isActive ? HarnessMonitorTheme.accent : Color.clear)
+        )
+        .overlay(
+          Capsule().strokeBorder(
+            HarnessMonitorTheme.accent.opacity(isActive ? 0 : 0.35),
+            lineWidth: 1
+          )
+        )
+        .foregroundStyle(
+          isActive ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.secondaryInk
+        )
+        .contentShape(Capsule())
+    }
+    .harnessFilterChipButtonStyle(isSelected: isActive)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarAllChip)
+    .accessibilityValue(isActive ? "selected" : "not selected")
+  }
+
   private func severityChip(_ severity: DecisionSeverity) -> some View {
     let isActive = selectedSeverities.contains(severity)
     return Button {
-      if selectedSeverities.contains(severity) {
-        selectedSeverities.remove(severity)
+      var next = selectedSeverities
+      if next.contains(severity) {
+        next.remove(severity)
       } else {
-        selectedSeverities.insert(severity)
+        next.insert(severity)
       }
+      setSelectedSeverities(next)
     } label: {
       Text(severity.chipLabel)
         .scaledFont(.caption)
+        .lineLimit(1)
         .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
         .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
         .background(
           Capsule().fill(isActive ? severity.chipColor : Color.clear)
         )
         .overlay(
-          Capsule().stroke(severity.chipColor.opacity(isActive ? 0 : 0.6), lineWidth: 1)
+          Capsule().strokeBorder(
+            severity.chipColor.opacity(isActive ? 0 : 0.35),
+            lineWidth: 1
+          )
         )
-        .foregroundStyle(isActive ? HarnessMonitorTheme.onContrast : severity.chipColor)
+        .foregroundStyle(
+          isActive ? HarnessMonitorTheme.onContrast : severity.chipColor.opacity(0.85)
+        )
         .contentShape(Capsule())
     }
     .harnessFilterChipButtonStyle(isSelected: isActive)
@@ -264,105 +388,13 @@ public struct DecisionsSidebar: View {
   }
 }
 
-private struct DecisionRow: View {
-  let decision: Decision
-  let isSelected: Bool
-  let fontScale: CGFloat
-  let select: () -> Void
-
-  private var severity: DecisionSeverity {
-    DecisionSeverity(rawValue: decision.severityRaw) ?? .info
-  }
-
-  var body: some View {
-    Button(action: select) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        Circle()
-          .fill(severity.chipColor)
-          .frame(width: 8, height: 8)
-          .padding(.top, 6)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(decision.summary)
-            .scaledFont(.body)
-            .lineLimit(2)
-            .multilineTextAlignment(.leading)
-          Text(severity.chipLabel)
-            .scaledFont(.caption)
-            .foregroundStyle(severity.chipColor)
-        }
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM * fontScale)
-      .background(
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.16) : Color.clear)
-      )
-      .contentShape(
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-      )
-    }
-    .harnessDismissButtonStyle()
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
-    .accessibilityValue(isSelected ? "selected" : "not selected")
-  }
-}
-
 extension HarnessMonitorAccessibility {
   public static let decisionsSidebarSearch = "harness.decisions.sidebar.search"
+  public static let decisionsSidebarSearchScopeMenu = "harness.decisions.sidebar.search.scope"
+  public static let decisionsSidebarFilterToggle = "harness.decisions.sidebar.filter.toggle"
+  public static let decisionsSidebarAllChip = "harness.decisions.sidebar.chip.all"
 
   public static func decisionsSidebarSeverityChip(_ raw: String) -> String {
     "harness.decisions.sidebar.chip.\(slug(raw))"
   }
-}
-
-@MainActor
-private enum DecisionsSidebarPreviewFixtures {
-  static let decisions: [Decision] = [
-    makeDecision(
-      id: "preview-critical",
-      severity: .critical,
-      summary: "Leader session has stalled for 18 minutes",
-      sessionID: "session-leader"
-    ),
-    makeDecision(
-      id: "preview-needs-user",
-      severity: .needsUser,
-      summary: "Codex approval is waiting for operator input",
-      sessionID: "session-leader"
-    ),
-    makeDecision(
-      id: "preview-warn",
-      severity: .warn,
-      summary: "Observer issue needs classifier teaching",
-      sessionID: "session-worker"
-    ),
-  ]
-
-  private static func makeDecision(
-    id: String,
-    severity: DecisionSeverity,
-    summary: String,
-    sessionID: String
-  ) -> Decision {
-    Decision(
-      id: id,
-      severity: severity,
-      ruleID: "preview-rule-\(id)",
-      sessionID: sessionID,
-      agentID: nil,
-      taskID: nil,
-      summary: summary,
-      contextJSON: "{}",
-      suggestedActionsJSON: "[]"
-    )
-  }
-}
-
-#Preview("Decisions Sidebar — seeded") {
-  DecisionsSidebar(
-    decisions: DecisionsSidebarPreviewFixtures.decisions,
-    selection: .constant(DecisionsSidebarPreviewFixtures.decisions.first?.id)
-  )
-  .frame(width: 320, height: 520)
 }
