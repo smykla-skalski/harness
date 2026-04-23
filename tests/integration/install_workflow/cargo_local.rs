@@ -150,7 +150,7 @@ fn install_script_prefers_explicit_cargo_target_dir_when_present() {
 }
 
 #[test]
-fn cargo_local_script_prefers_rtk_for_supported_subcommands() {
+fn cargo_local_script_uses_cargo_for_supported_subcommands() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fake_bin = tmp.path().join("fake-bin");
@@ -184,7 +184,7 @@ fn cargo_local_script_prefers_rtk_for_supported_subcommands() {
     );
 
     let log = std::fs::read_to_string(&log_path).expect("read fake script log");
-    assert_eq!(log.trim(), "RTK=cargo test --lib");
+    assert_eq!(log.trim(), "CARGO=test --lib");
 }
 
 #[test]
@@ -229,7 +229,7 @@ fn cargo_local_script_keeps_run_subcommand_raw_when_rtk_is_available() {
 }
 
 #[test]
-fn cargo_local_script_prefers_rtk_for_fmt_subcommand() {
+fn cargo_local_script_uses_cargo_for_fmt_subcommand() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fake_bin = tmp.path().join("fake-bin");
@@ -262,5 +262,5 @@ fn cargo_local_script_prefers_rtk_for_fmt_subcommand() {
     );
 
     let log = std::fs::read_to_string(&log_path).expect("read fake script log");
-    assert_eq!(log.trim(), "RTK=cargo fmt");
+    assert_eq!(log.trim(), "CARGO=fmt");
 }

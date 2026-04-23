@@ -56,14 +56,6 @@ load_stack_env_defaults
 
 compose() {
   prepare_sqlite_exporter_env
-  if [ $# -gt 0 ] && command -v rtk >/dev/null 2>&1; then
-    case "$1" in
-      logs|ps|up)
-        rtk docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
-        return
-        ;;
-    esac
-  fi
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
