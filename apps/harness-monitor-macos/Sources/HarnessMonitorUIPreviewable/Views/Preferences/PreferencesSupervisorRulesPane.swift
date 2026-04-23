@@ -226,7 +226,7 @@ private struct SupervisorRuleSectionFooter: View {
   }
 
   static func formatSemver(_ version: Int) -> String {
-    "v\(version).0.0"
+    "v\(version)"
   }
 }
 
