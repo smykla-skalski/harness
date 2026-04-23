@@ -2,6 +2,8 @@ import Foundation
 
 extension HarnessMonitorAccessibility {
   public static let supervisorBadge = "harness.supervisor.badge"
+  public static let supervisorBadgeState = "harness.supervisor.badge.state"
+  public static let supervisorForceTick = "harness.supervisor.force-tick"
   public static let decisionsWindow = "harness.decisions.window"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"

@@ -33,6 +33,13 @@ public struct ContentView<CornerContent: View>: View {
     ].joined(separator: ", ")
   }
 
+  private var supervisorBadgeAccessibilityValue: String {
+    let slice = store.supervisorToolbarSlice
+    let severity = slice.maxSeverity?.rawValue ?? "none"
+    return
+      "count=\(slice.count) severity=\(severity) tint=\(supervisorBadgeTint(for: slice.maxSeverity))"
+  }
+
   private var profilingAttributes: [String: String] {
     [
       "harness.view.surface":
@@ -145,7 +152,8 @@ public struct ContentView<CornerContent: View>: View {
       canStartNewSession: store.connectionState == .online,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector
+      showInspector: showInspector,
+      supervisorDecisionRefreshTick: store.supervisorDecisionRefreshTick
     )
   }
 
@@ -161,9 +169,21 @@ public struct ContentView<CornerContent: View>: View {
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       appChromeAccessibilityValue: appChromeAccessibilityValue,
+      supervisorBadgeAccessibilityValue: supervisorBadgeAccessibilityValue,
       toolbarBackgroundMarker: contentToolbarBackgroundMarker,
       auditBuildAccessibilityValue: auditBuildAccessibilityValue
     )
+  }
+
+  private func supervisorBadgeTint(for severity: DecisionSeverity?) -> String {
+    switch severity {
+    case .none, .info:
+      return "secondary"
+    case .warn, .needsUser:
+      return "orange"
+    case .critical:
+      return "red"
+    }
   }
 
   @ViewBuilder private var contentBackground: some View {

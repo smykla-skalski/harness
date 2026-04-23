@@ -243,6 +243,30 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_seededStuckAgentScenarioQueuesDecisionOnForcedTick() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    store.seedSupervisorScenarioForTesting(named: "stuck-agent")
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    await store.runSupervisorTickForTesting()
+    try await Task.sleep(for: .milliseconds(100))
+
+    let context = try XCTUnwrap(store.modelContext)
+    let decisions = try context.fetch(FetchDescriptor<Decision>())
+    let seededDecision = try XCTUnwrap(
+      decisions.first(
+        where: {
+          $0.id == "stuck-agent:session-ui-stuck:agent-ui-stuck:task-ui-stuck"
+        }
+      )
+    )
+    XCTAssertEqual(seededDecision.severityRaw, DecisionSeverity.needsUser.rawValue)
+    XCTAssertEqual(store.supervisorToolbarSlice.count, 1)
+    XCTAssertEqual(store.supervisorToolbarSlice.maxSeverity, .needsUser)
+  }
+
+  @MainActor
   func test_startSupervisorWithPersistenceSchedulesAuditRetention() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
     await store.startSupervisor()

@@ -69,6 +69,7 @@ struct HarnessMonitorWindowRootView: View {
       )
     )
     .modifier(HarnessMonitorUITestAnimationModifier())
+    .modifier(SupervisorUITestForceTickModifier(store: store))
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
         return
