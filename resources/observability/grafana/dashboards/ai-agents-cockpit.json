@@ -1365,8 +1365,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
-                        "legendFormat": "gemini :: {{pretty_model}}"
+                        "expr": "sum by (span_name) (increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__rate_interval]))",
+                        "legendFormat": "gemini :: {{span_name}}"
                       }
                     },
                     "refId": "D",
@@ -4720,10 +4720,10 @@
               "transformations": []
             }
           },
-          "description": "Gemini chat span activity grouped by normalized model name.",
+          "description": "Gemini span activity grouped by real span name. Current spanmetrics do not expose per-model labels for Gemini.",
           "id": 405,
           "links": [],
-          "title": "Model Activity",
+          "title": "Span Activity",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
