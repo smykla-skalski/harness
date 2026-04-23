@@ -28,6 +28,46 @@ public actor PolicyRegistry {
     )
   }
 
+  public func clearOverrides() {
+    overrides.removeAll()
+  }
+
+  public func currentOverrides() -> [PolicyConfigOverride] {
+    Array(overrides.values)
+  }
+}
+
+public enum HarnessMonitorSupervisorRuleCatalog {
+  public static func makeRules() -> [any PolicyRule] {
+    [
+      CodexApprovalRule(),
+      DaemonDisconnectRule(),
+      FailedNudgeLoopRule(),
+      IdleSessionRule(),
+      ObserverIssueRule(),
+      PolicyGapRule(),
+      StuckAgentRule(),
+      UnassignedTaskRule(),
+    ]
+  }
+
+  public static func makeObservers() -> [any PolicyObserver] {
+    [LoggingPolicyObserver()]
+  }
+}
+
+extension PolicyRegistry {
+  public func registerDefaults() async {
+    for rule in HarnessMonitorSupervisorRuleCatalog.makeRules() {
+      register(rule)
+    }
+    for observer in HarnessMonitorSupervisorRuleCatalog.makeObservers() {
+      registerObserver(observer)
+    }
+  }
+}
+
+extension PolicyRegistry {
   public func parameters(forRule ruleID: String) -> PolicyParameterValues {
     PolicyParameterValues(raw: overrides[ruleID]?.parameters ?? [:])
   }

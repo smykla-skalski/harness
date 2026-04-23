@@ -32,8 +32,15 @@ public final class SupervisorToolbarSlice {
   }
 
   public func start(decisions: DecisionStore) {
-    _ = ingest(events: decisions.events) {
-      (try? await decisions.openCountBySeverity()) ?? [:]
+    stop()
+    ingestTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      self.apply(counts: (try? await decisions.openCountBySeverity()) ?? [:])
+      for await _ in decisions.events {
+        self.apply(counts: (try? await decisions.openCountBySeverity()) ?? [:])
+      }
     }
   }
 
@@ -42,6 +49,10 @@ public final class SupervisorToolbarSlice {
     ingestTask = nil
     count = 0
     maxSeverity = nil
+  }
+
+  public func refresh(counts: [DecisionSeverity: Int]) {
+    apply(counts: counts)
   }
 
   private func apply(counts: [DecisionSeverity: Int]) {

@@ -10,7 +10,7 @@ import XCTest
 @MainActor
 final class NotificationRoutingTests: XCTestCase {
   func test_supervisorRequest_carriesSeverityInterruptionAndDecisionID() async throws {
-    let decisionID = UUID()
+    let decisionID = "codex-approval:sess-7:appr-42"
     let request = try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
       severity: .needsUser,
       summary: "Stuck agent needs attention",
@@ -25,7 +25,7 @@ final class NotificationRoutingTests: XCTestCase {
     XCTAssertEqual(request.content.threadIdentifier, "io.harnessmonitor.supervisor")
     let decodedID =
       request.content.userInfo[HarnessMonitorSupervisorNotificationID.decisionIDKey] as? String
-    XCTAssertEqual(decodedID, decisionID.uuidString)
+    XCTAssertEqual(decodedID, decisionID)
   }
 
   func test_supervisorSeverityMapping_coversAllSeverities() async throws {
@@ -40,7 +40,7 @@ final class NotificationRoutingTests: XCTestCase {
       let request = try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
         severity: severity,
         summary: "summary",
-        decisionID: UUID()
+        decisionID: "decision-\(severity.rawValue)"
       )
       XCTAssertEqual(request.content.interruptionLevel, expectedInterruption, "\(severity)")
       identifiers.insert(request.content.categoryIdentifier)
@@ -68,7 +68,7 @@ final class NotificationRoutingTests: XCTestCase {
 
   func test_tapOpenAction_publishesDecisionRequestedID() async throws {
     let controller = makeController()
-    let decisionID = UUID()
+    let decisionID = "codex-approval:sess-7:appr-open"
     let request = try await makeSupervisorRequest(
       decisionID: decisionID,
       severity: .needsUser
@@ -85,7 +85,7 @@ final class NotificationRoutingTests: XCTestCase {
 
   func test_tapDefaultAction_publishesDecisionRequestedID() async throws {
     let controller = makeController()
-    let decisionID = UUID()
+    let decisionID = "policy-gap-decision:daemon-outage"
     let request = try await makeSupervisorRequest(
       decisionID: decisionID,
       severity: .warn
@@ -101,7 +101,7 @@ final class NotificationRoutingTests: XCTestCase {
 
   func test_tapOpenAction_repeatedSameDecisionIncrementsTickOncePerTap() async throws {
     let controller = makeController()
-    let decisionID = UUID()
+    let decisionID = "codex-approval:sess-7:appr-repeat"
     let request = try await makeSupervisorRequest(
       decisionID: decisionID,
       severity: .info
@@ -122,7 +122,7 @@ final class NotificationRoutingTests: XCTestCase {
 
   func test_tapAcknowledgeAction_doesNotOpenDecisionsWindow() async throws {
     let controller = makeController()
-    let decisionID = UUID()
+    let decisionID = "codex-approval:sess-7:appr-ack"
     let request = try await makeSupervisorRequest(
       decisionID: decisionID,
       severity: .warn
@@ -146,7 +146,7 @@ final class NotificationRoutingTests: XCTestCase {
       await recorder.record(id: id, outcome: outcome)
     }
 
-    let decisionID = UUID()
+    let decisionID = "codex-approval:sess-7:appr-dismiss"
     let request = try await makeSupervisorRequest(
       decisionID: decisionID,
       severity: .warn
@@ -164,7 +164,7 @@ final class NotificationRoutingTests: XCTestCase {
     }
     let entries = await recorder.entries
     XCTAssertEqual(entries.count, 1)
-    XCTAssertEqual(entries.first?.id, decisionID.uuidString)
+    XCTAssertEqual(entries.first?.id, decisionID)
     XCTAssertEqual(
       entries.first?.outcome.chosenActionID,
       HarnessMonitorNotificationActionID.acknowledge
@@ -172,7 +172,7 @@ final class NotificationRoutingTests: XCTestCase {
   }
 
   private func makeSupervisorRequest(
-    decisionID: UUID,
+    decisionID: String,
     severity: DecisionSeverity
   ) async throws -> UNNotificationRequest {
     try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(

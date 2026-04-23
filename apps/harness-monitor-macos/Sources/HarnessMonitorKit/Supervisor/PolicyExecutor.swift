@@ -11,7 +11,8 @@ public protocol SupervisorAPIClient: Sendable {
   func postNotification(
     ruleID: String,
     severity: DecisionSeverity,
-    summary: String
+    summary: String,
+    decisionID: String?
   ) async
 }
 
@@ -79,7 +80,7 @@ public actor PolicyExecutor {
   ///
   /// Ordering invariant: `actionDispatched` is written before the action fires.
   /// `actionExecuted` or `actionFailed` is written after the action completes.
-  public func execute(_ action: PolicyAction) async -> PolicyOutcome {
+  public func execute(_ action: PolicyAction, tickID: String? = nil) async -> PolicyOutcome {
     let key = action.actionKey
     pruneExpiredKeys()
 
@@ -90,7 +91,8 @@ public actor PolicyExecutor {
     let dispatchRecord = auditRecord(
       id: UUID().uuidString,
       kind: "actionDispatched",
-      action: action
+      action: action,
+      tickID: tickID ?? action.auditTickID
     )
     await audit.append(dispatchRecord)
     recentKeys[key] = Date()
@@ -100,21 +102,24 @@ public actor PolicyExecutor {
       let executedRecord = auditRecord(
         id: UUID().uuidString,
         kind: "actionExecuted",
-        action: action
+        action: action,
+        tickID: tickID ?? action.auditTickID
       )
       await audit.append(executedRecord)
       return .executed(actionKey: key)
     } catch {
+      let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
       HarnessMonitorLogger.supervisor.warning(
-        "action failed key=\(key, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+        "action failed key=\(key, privacy: .public) error=\(sanitizedError, privacy: .public)"
       )
       let failedRecord = auditRecord(
         id: UUID().uuidString,
         kind: "actionFailed",
-        action: action
+        action: action,
+        tickID: tickID ?? action.auditTickID
       )
       await audit.append(failedRecord)
-      return .failed(actionKey: key, error: error.localizedDescription)
+      return .failed(actionKey: key, error: sanitizedError)
     }
   }
 
@@ -128,11 +133,12 @@ public actor PolicyExecutor {
   private func auditRecord(
     id: String,
     kind: String,
-    action: PolicyAction
+    action: PolicyAction,
+    tickID: String
   ) -> SupervisorAuditRecord {
     SupervisorAuditRecord(
       id: id,
-      tickID: "executor",
+      tickID: tickID,
       kind: kind,
       ruleID: ruleID(for: action),
       severity: severity(for: action),
@@ -152,6 +158,7 @@ public actor PolicyExecutor {
       try await api.dropTask(taskID: payload.taskID, reason: payload.reason)
 
     case .queueDecision(let payload):
+      let exists = try await decisions.decision(id: payload.id) != nil
       let draft = DecisionDraft(
         id: payload.id,
         severity: payload.severity,
@@ -163,13 +170,22 @@ public actor PolicyExecutor {
         contextJSON: payload.contextJSON,
         suggestedActionsJSON: payload.suggestedActionsJSON
       )
-      try await decisions.insert(draft)
+      if !exists {
+        try await decisions.insert(draft)
+        await api.postNotification(
+          ruleID: payload.ruleID,
+          severity: payload.severity,
+          summary: payload.summary,
+          decisionID: payload.id
+        )
+      }
 
     case .notifyOnly(let payload):
       await api.postNotification(
         ruleID: payload.ruleID,
         severity: payload.severity,
-        summary: payload.summary
+        summary: payload.summary,
+        decisionID: nil
       )
 
     case .logEvent(let payload):
@@ -236,9 +252,55 @@ private struct NoOpSupervisorAPIClient: SupervisorAPIClient {
   func nudgeAgent(agentID: String, input: String) async throws {}
   func assignTask(taskID: String, agentID: String) async throws {}
   func dropTask(taskID: String, reason: String) async throws {}
-  func postNotification(ruleID: String, severity: DecisionSeverity, summary: String) async {}
+  func postNotification(
+    ruleID: String,
+    severity: DecisionSeverity,
+    summary: String,
+    decisionID: String?
+  ) async {
+    _ = (ruleID, severity, summary, decisionID)
+  }
 }
 
 private struct NoOpSupervisorAuditWriter: SupervisorAuditWriter {
   func append(_ record: SupervisorAuditRecord) async {}
+}
+
+extension PolicyAction {
+  fileprivate var auditTickID: String {
+    switch self {
+    case .nudgeAgent(let payload):
+      payload.snapshotID
+    case .assignTask(let payload):
+      payload.snapshotID
+    case .dropTask(let payload):
+      payload.snapshotID
+    case .queueDecision(let payload):
+      payload.id
+    case .notifyOnly(let payload):
+      payload.snapshotID
+    case .logEvent(let payload):
+      payload.snapshotID
+    case .suggestConfigChange(let payload):
+      payload.id
+    }
+  }
+}
+
+func redactSupervisorErrorMessage(_ message: String) -> String {
+  guard !message.isEmpty else {
+    return message
+  }
+
+  let pattern = #"(?i)\b(token|secret|password|authorization|api[_-]?key)=([^\s,;]+)"#
+  guard let regex = try? NSRegularExpression(pattern: pattern) else {
+    return message
+  }
+  let range = NSRange(message.startIndex..<message.endIndex, in: message)
+  return regex.stringByReplacingMatches(
+    in: message,
+    options: [],
+    range: range,
+    withTemplate: "$1=[redacted]"
+  )
 }

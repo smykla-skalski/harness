@@ -8,14 +8,12 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 /// opens a secondary window marked with the `decisionsWindow` identifier, and that a
 /// pre-loaded decision (when a seeding mechanism is available) renders a `decisionRow`.
 ///
-/// The brief specifies seeding via `HARNESS_MONITOR_UI_TEST=1` and a supervisor
-/// decision-seed env var. Until Phase 2 wires those two pieces (a decision-seed hook
-/// and sidebar row rendering), the seeded-row assertion is guarded by a check that
-/// skips the test if the host build has not yet exposed the seed surface.
+/// The brief specifies seeding via `HARNESS_MONITOR_UI_TESTS=1` and a supervisor
+/// decision-seed env var. The host must load the seeded row into the Decisions window.
 @MainActor
 final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
-  private static let singularUITestKey = "HARNESS_MONITOR_UI_TEST"
+  private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let seededDecisionID = "ui-test-seed-decision-1"
 
   /// Clicking the toolbar bell opens the Decisions window. This assertion holds on the
@@ -25,7 +23,7 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
   func testClickingSupervisorBadgeOpensDecisionsWindow() throws {
     let app = launch(
       mode: "preview",
-      additionalEnvironment: [Self.singularUITestKey: "1"]
+      additionalEnvironment: [Self.uiTestsKey: "1"]
     )
 
     let badge = app.buttons
@@ -55,28 +53,14 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
   }
 
   /// With a seeded decision the sidebar must render a row carrying the `decisionRow`
-  /// accessibility identifier. Gated on the seed env var being supported by the host
-  /// app; skipped when the seeding surface does not yet exist so the earlier Phase 2
-  /// workers do not block this test while landing.
+  /// accessibility identifier.
   func testSeededDecisionRowAppearsAfterOpeningWindow() throws {
     let seededPayload = makeSeededDecisionsPayload()
     let environment: [String: String] = [
-      Self.singularUITestKey: "1",
+      Self.uiTestsKey: "1",
       Self.decisionSeedEnvKey: seededPayload,
     ]
     let app = launch(mode: "preview", additionalEnvironment: environment)
-
-    try XCTSkipUnless(
-      appSupportsDecisionSeedHook(app: app),
-      """
-      Skipping seeded-row assertion: host app does not yet read \
-      \(Self.decisionSeedEnvKey). Phase 2 workers 2, 18, 19 must add:
-        1. DecisionStore insertion from the env var (seeding hook),
-        2. SupervisorToolbarSlice subscription so count/tint update,
-        3. DecisionsSidebar rendering of seeded rows with \
-           HarnessMonitorAccessibility.decisionRow(_:).
-      """
-    )
 
     let badge = app.buttons
       .matching(identifier: Accessibility.supervisorBadge)
@@ -106,7 +90,7 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
   private func makeSeededDecisionsPayload() -> String {
     let decision: [String: Any] = [
       "id": Self.seededDecisionID,
-      "severity": "warning",
+      "severity": "warn",
       "ruleID": "stuck-agent",
       "summary": "UI test seeded decision",
     ]
@@ -118,19 +102,5 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
       return "{\"decisions\":[]}"
     }
     return serialized
-  }
-
-  private func appSupportsDecisionSeedHook(app: XCUIApplication) -> Bool {
-    let badge = app.buttons
-      .matching(identifier: Accessibility.supervisorBadge)
-      .firstMatch
-    guard waitForElement(badge, timeout: Self.actionTimeout) else {
-      return false
-    }
-    let rawValue = badge.value as? String ?? ""
-    if rawValue.contains("count=") && !rawValue.contains("count=0") {
-      return true
-    }
-    return !(badge.label.isEmpty) && badge.label.contains(String(1))
   }
 }

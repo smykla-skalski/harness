@@ -47,7 +47,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   /// The value is rewritten on every `Open` tap - even when the new id equals the previous one -
   /// so observers see each tap as a fresh event (the scene view reads the value once per change
   /// of `@Bindable`/`@Observable` tracking).
-  public private(set) var decisionRequestedID: UUID?
+  public private(set) var decisionRequestedID: String?
 
   /// Bumped on every supervisor decision tap that publishes `decisionRequestedID`. Observers
   /// key off this counter to distinguish consecutive taps that resolve to the same decision id.
@@ -118,7 +118,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   public func deliverSupervisorDecision(
     severity: DecisionSeverity,
     summary: String,
-    decisionID: UUID
+    decisionID: String
   ) async {
     await performNotificationOperation {
       let preferences = SupervisorNotificationPreferences.load()
@@ -134,7 +134,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
           decisionID: decisionID
         )
         try await centerBox.base.add(request)
-        lastResult = "Scheduled supervisor decision \(decisionID.uuidString)."
+        lastResult = "Scheduled supervisor decision \(decisionID)."
         await refreshStatus()
       } catch {
         lastResult = "Scheduling supervisor decision failed: \(error.localizedDescription)"
@@ -252,14 +252,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     )
   }
 
-  nonisolated private static func decisionID(from userInfo: [AnyHashable: Any]) -> UUID? {
-    guard let raw = userInfo[HarnessMonitorSupervisorNotificationID.decisionIDKey] as? String else {
-      return nil
-    }
-    return UUID(uuidString: raw)
+  nonisolated private static func decisionID(from userInfo: [AnyHashable: Any]) -> String? {
+    userInfo[HarnessMonitorSupervisorNotificationID.decisionIDKey] as? String
   }
 
-  private func routeSupervisorAction(actionIdentifier: String, decisionID: UUID?) {
+  private func routeSupervisorAction(actionIdentifier: String, decisionID: String?) {
     guard let decisionID else {
       return
     }
@@ -279,12 +276,12 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     }
   }
 
-  private func publishDecisionRequest(decisionID: UUID) {
+  private func publishDecisionRequest(decisionID: String) {
     decisionRequestedID = decisionID
     decisionRequestTick &+= 1
   }
 
-  private func dismissDecision(decisionID: UUID) {
+  private func dismissDecision(decisionID: String) {
     guard let handler = resolveHandler else {
       return
     }
@@ -292,16 +289,15 @@ public final class HarnessMonitorUserNotificationController: NSObject,
       chosenActionID: HarnessMonitorNotificationActionID.acknowledge,
       note: "Acknowledged from notification"
     )
-    let id = decisionID.uuidString
     Task { @Sendable in
-      await handler(id, outcome)
+      await handler(decisionID, outcome)
     }
   }
 
   private func handleNotificationResponse(
     snapshot: HarnessMonitorNotificationResponseSnapshot,
     actionIdentifier: String,
-    decisionID: UUID?
+    decisionID: String?
   ) {
     lastResponse = snapshot
     lastResult = "Handled notification action \(snapshot.actionIdentifier)."

@@ -27,9 +27,31 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "name": "Deployments",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "loki"
+            },
+            "spec": {
+              "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
+              "refId": "DEPLOY",
+              "maxLines": 100
+            }
+          }
+        }
       }
     ],
-    "cursorSync": "Crosshair",
+    "cursorSync": "Tooltip",
     "editable": true,
     "elements": {
       "panel-1": {
@@ -38,13 +60,7 @@
           "id": 1,
           "title": "Hook p95",
           "description": "Short-window hook latency across the local hook service.",
-          "links": [
-            {
-              "title": "Open Runtime & Hooks",
-              "url": "/d/harness-runtime-execution",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -128,13 +144,7 @@
           "id": 10,
           "title": "Harness Stress Correlation",
           "description": "Correlate Harness request rate and HTTP latency before drilling into runtime surfaces.",
-          "links": [
-            {
-              "title": "Open Runtime & Hooks",
-              "url": "/d/harness-runtime-execution",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -233,13 +243,7 @@
           "id": 11,
           "title": "Process State Pressure",
           "description": "Process state mix over time to spot stalls, buildup, or zombie churn.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -307,13 +311,7 @@
           "id": 12,
           "title": "Top Tracked Process CPU",
           "description": "Top tracked executables by CPU over the investigation window.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -382,13 +380,7 @@
           "id": 13,
           "title": "Top Tracked Process RSS",
           "description": "Top tracked executables by resident memory over the investigation window.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -457,18 +449,7 @@
           "id": 14,
           "title": "Top Slow Routes",
           "description": "Rank the slowest daemon and monitor routes in the current investigation window.",
-          "links": [
-            {
-              "title": "Open Daemon Transport",
-              "url": "/d/harness-daemon-transport",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -548,13 +529,7 @@
           "id": 2,
           "title": "Daemon HTTP p95",
           "description": "Daemon HTTP p95 over the active investigation window.",
-          "links": [
-            {
-              "title": "Open Daemon Transport",
-              "url": "/d/harness-daemon-transport",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -638,13 +613,7 @@
           "id": 3,
           "title": "Monitor HTTP p95",
           "description": "Monitor HTTP p95 over the active investigation window.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -728,13 +697,7 @@
           "id": 4,
           "title": "Thermal Pressure Active",
           "description": "Signals whether any non-nominal thermal pressure is active on the host.",
-          "links": [
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -814,13 +777,7 @@
           "id": 5,
           "title": "Running Processes",
           "description": "Current running process count for the workstation.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -904,13 +861,7 @@
           "id": 6,
           "title": "Zombie Processes",
           "description": "Current zombie process count for the workstation.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -994,13 +945,7 @@
           "id": 7,
           "title": "Top CPU Process",
           "description": "Tracked executable currently consuming the most CPU.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1085,13 +1030,7 @@
           "id": 8,
           "title": "Top RSS Process",
           "description": "Tracked executable currently consuming the most resident memory.",
-          "links": [
-            {
-              "title": "Open Host Processes",
-              "url": "/d/harness-host-processes",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1176,13 +1115,7 @@
           "id": 9,
           "title": "Host Stress Correlation",
           "description": "Correlate host CPU, memory, and disk pressure before drilling into the host board.",
-          "links": [
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1281,13 +1214,7 @@
           "id": 15,
           "title": "CLI Span Rate",
           "description": "Current Harness CLI span throughput across the active investigation window.",
-          "links": [
-            {
-              "title": "Open Runtime & Hooks",
-              "url": "/d/harness-runtime-execution",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1371,13 +1298,7 @@
           "id": 16,
           "title": "Daemon Req / s",
           "description": "Current daemon HTTP request throughput across all routes.",
-          "links": [
-            {
-              "title": "Open Daemon Transport",
-              "url": "/d/harness-daemon-transport",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1461,13 +1382,7 @@
           "id": 17,
           "title": "User Interactions / 5m",
           "description": "Recent user interaction volume from the monitor UI.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1551,13 +1466,7 @@
           "id": 18,
           "title": "API Errors / 5m",
           "description": "Recent monitor API error count over the last five minutes.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1641,13 +1550,7 @@
           "id": 19,
           "title": "Active Tasks",
           "description": "Current active monitor task count.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1731,13 +1634,7 @@
           "id": 20,
           "title": "Cache Miss %",
           "description": "Monitor cache miss ratio over the last five minutes.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1821,13 +1718,7 @@
           "id": 21,
           "title": "Request Pressure by Surface",
           "description": "Compare runtime, daemon, monitor, and WebSocket traffic at glance.",
-          "links": [
-            {
-              "title": "Open Service Flow",
-              "url": "/d/harness-service-map",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1947,13 +1838,7 @@
           "id": 22,
           "title": "Reliability Signals",
           "description": "Track transport and client-facing errors before drilling into specialist dashboards.",
-          "links": [
-            {
-              "title": "Open Monitor Client",
-              "url": "/d/harness-monitor-client",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2494,7 +2379,7 @@
       }
     ],
     "liveNow": false,
-    "preload": false,
+    "preload": true,
     "tags": [
       "harness",
       "observability",
@@ -2505,18 +2390,6 @@
       "from": "now-15m",
       "to": "now",
       "autoRefresh": "10s",
-      "autoRefreshIntervals": [
-        "5s",
-        "10s",
-        "30s",
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h",
-        "2h",
-        "1d"
-      ],
       "quickRanges": [
         {
           "display": "Last 15 minutes",
@@ -2548,7 +2421,50 @@
       "fiscalYearStartMonth": 0
     },
     "title": "Harness Investigation Cockpit",
-    "variables": []
+    "variables": [
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "datasource",
+          "label": "Prometheus",
+          "pluginId": "prometheus",
+          "current": {
+            "text": "Prometheus",
+            "value": "prometheus"
+          },
+          "hide": "dontHide",
+          "includeAll": false,
+          "multi": false,
+          "options": [],
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "defaultOptionEnabled": true,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "loki_ds",
+          "label": "Loki",
+          "pluginId": "loki",
+          "current": {
+            "text": "Loki",
+            "value": "loki"
+          },
+          "hide": "dontHide",
+          "includeAll": false,
+          "multi": false,
+          "options": [],
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "defaultOptionEnabled": true,
+          "allowCustomValue": false
+        }
+      }
+    ]
   },
   "status": {}
 }

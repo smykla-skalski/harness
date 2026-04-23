@@ -70,8 +70,66 @@ final class SupervisorAuditRetentionTests: XCTestCase {
     XCTAssertTrue(try fetchEventIDs(container).isEmpty)
   }
 
+  func test_forceCompactionUsesDefaultRetentionWindow() async throws {
+    let container = try makeContainer()
+    let now = Date.fixed
+    try insertEvent(
+      id: "stale-event",
+      createdAt: now.addingTimeInterval(-SupervisorAuditRetention.defaultRetention - 1),
+      into: container
+    )
+
+    let retention1 = SupervisorAuditRetention(container: container, clock: { now })
+    let result = try await retention1.forceCompaction()
+
+    XCTAssertEqual(result.deletedEvents, 1)
+    XCTAssertEqual(result.deletedDecisions, 0)
+    XCTAssertTrue(try fetchEventIDs(container).isEmpty)
+  }
+
   func test_defaultRetentionIsFourteenDays() {
     XCTAssertEqual(SupervisorAuditRetention.defaultRetention, 14 * 24 * 60 * 60)
+  }
+
+  func test_startBackgroundCompactionRespectsDisabledPreference() throws {
+    let container = try makeContainer()
+    let retention1 = SupervisorAuditRetention(container: container)
+    UserDefaults.standard.set(false, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
+
+    retention1.startBackgroundCompaction()
+
+    XCTAssertFalse(retention1.isBackgroundActivityScheduled)
+  }
+
+  func test_startBackgroundCompactionSchedulesWhenPreferenceEnabled() throws {
+    let container = try makeContainer()
+    let retention1 = SupervisorAuditRetention(container: container)
+    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      retention1.stopBackgroundCompaction()
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
+
+    retention1.startBackgroundCompaction()
+
+    XCTAssertTrue(retention1.isBackgroundActivityScheduled)
+  }
+
+  func test_stopBackgroundCompactionIsIdempotent() throws {
+    let container = try makeContainer()
+    let retention1 = SupervisorAuditRetention(container: container)
+
+    retention1.stopBackgroundCompaction()
+    retention1.stopBackgroundCompaction()
+
+    XCTAssertFalse(retention1.isBackgroundActivityScheduled)
   }
 
   func test_schedulerIdentifierIsDistinctFromMainSupervisor() {

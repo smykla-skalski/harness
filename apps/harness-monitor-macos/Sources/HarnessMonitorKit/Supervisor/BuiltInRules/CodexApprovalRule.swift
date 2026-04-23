@@ -34,7 +34,7 @@ public struct CodexApprovalRule: PolicyRule {
     snapshotID: String,
     context: PolicyContext
   ) -> PolicyAction? {
-    let decisionID = "codex-approval:\(approval.id)"
+    let decisionID = "codex-approval:\(sessionID):\(approval.id)"
     let payload = PolicyAction.DecisionPayload(
       id: decisionID,
       severity: .needsUser,
@@ -84,16 +84,12 @@ private struct ContextPayload: Encodable {
   let snapshotID: String
   let approvalID: String
   let agentID: String
-  let title: String
-  let detail: String
   let receivedAt: Date
 
   init(snapshotID: String, approval: CodexApprovalSnapshot) {
     self.snapshotID = snapshotID
     approvalID = approval.id
     agentID = approval.agentID
-    title = approval.title
-    detail = approval.detail
     receivedAt = approval.receivedAt
   }
 }

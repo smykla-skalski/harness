@@ -27,6 +27,7 @@ otelcol.processor.transform "normalize_service_name" {
     context = "resource"
     statements = [
       `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_cli_rs"`,
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
@@ -38,6 +39,7 @@ otelcol.processor.transform "normalize_service_name" {
     context = "span"
     statements = [
       `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_cli_rs"`,
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
@@ -49,6 +51,7 @@ otelcol.processor.transform "normalize_service_name" {
     context = "resource"
     statements = [
       `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_cli_rs"`,
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
@@ -60,6 +63,7 @@ otelcol.processor.transform "normalize_service_name" {
     context = "resource"
     statements = [
       `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_cli_rs"`,
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,

@@ -27,6 +27,28 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "name": "Deployments",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "loki"
+            },
+            "spec": {
+              "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
+              "refId": "DEPLOY",
+              "maxLines": 100
+            }
+          }
+        }
       }
     ],
     "cursorSync": "Crosshair",
@@ -536,18 +558,7 @@
           "id": 16,
           "title": "Top CPU Now",
           "description": "Current CPU utilization ranking for tracked executables.",
-          "links": [
-            {
-              "title": "Open Metrics Drilldown",
-              "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -614,18 +625,7 @@
           "id": 17,
           "title": "Top RSS Now",
           "description": "Current resident memory ranking for tracked executables.",
-          "links": [
-            {
-              "title": "Open Metrics Drilldown",
-              "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -692,18 +692,7 @@
           "id": 18,
           "title": "Top Threads Now",
           "description": "Current thread-count ranking for tracked executables.",
-          "links": [
-            {
-              "title": "Open Metrics Drilldown",
-              "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -770,18 +759,7 @@
           "id": 19,
           "title": "Top Open FDs Now",
           "description": "Current open-file-descriptor ranking for tracked executables.",
-          "links": [
-            {
-              "title": "Open Metrics Drilldown",
-              "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -932,18 +910,7 @@
           "id": 20,
           "title": "Process State Share",
           "description": "Current process-state distribution as a proportional snapshot.",
-          "links": [
-            {
-              "title": "Open Host Machine",
-              "url": "/d/harness-host-machine",
-              "targetBlank": false
-            },
-            {
-              "title": "Open Metrics Drilldown",
-              "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1602,16 +1569,16 @@
       }
     },
     "layout": {
-      "kind": "GridLayout",
+      "kind": "AutoGridLayout",
       "spec": {
+        "maxColumnCount": 4,
+        "columnWidthMode": "standard",
+        "rowHeightMode": "standard",
+        "fillScreen": false,
         "items": [
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-1"
@@ -1619,12 +1586,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 6,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-2"
@@ -1632,12 +1595,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-3"
@@ -1645,12 +1604,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 18,
-              "y": 0,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-4"
@@ -1658,12 +1613,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 4,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-5"
@@ -1671,12 +1622,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 6,
-              "y": 4,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-6"
@@ -1684,12 +1631,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 4,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-7"
@@ -1697,12 +1640,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 18,
-              "y": 4,
-              "width": 6,
-              "height": 4,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-8"
@@ -1710,12 +1649,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 8,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-20"
@@ -1723,12 +1658,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 8,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-9"
@@ -1736,12 +1667,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 16,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-10"
@@ -1749,12 +1676,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 16,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-11"
@@ -1762,12 +1685,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 24,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-12"
@@ -1775,12 +1694,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 24,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-13"
@@ -1788,12 +1703,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 32,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-14"
@@ -1801,12 +1712,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 32,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-15"
@@ -1814,12 +1721,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 40,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-16"
@@ -1827,12 +1730,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 40,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-17"
@@ -1840,12 +1739,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 48,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-18"
@@ -1853,12 +1748,8 @@
             }
           },
           {
-            "kind": "GridLayoutItem",
+            "kind": "AutoGridLayoutItem",
             "spec": {
-              "x": 12,
-              "y": 48,
-              "width": 12,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-19"
@@ -1931,18 +1822,6 @@
       "from": "now-15m",
       "to": "now",
       "autoRefresh": "10s",
-      "autoRefreshIntervals": [
-        "5s",
-        "10s",
-        "30s",
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h",
-        "2h",
-        "1d"
-      ],
       "quickRanges": [
         {
           "display": "Last 15 minutes",
@@ -1995,7 +1874,7 @@
               "name": "prometheus"
             },
             "spec": {
-              "__legacyStringValue": "label_values(process_cpu_utilization_ratio, process_executable_name)"
+              "expr": "label_values(process_cpu_utilization_ratio, process_executable_name)"
             }
           },
           "regex": "",
