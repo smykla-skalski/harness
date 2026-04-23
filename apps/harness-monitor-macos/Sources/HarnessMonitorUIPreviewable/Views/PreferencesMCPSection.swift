@@ -35,13 +35,9 @@ public struct PreferencesMCPSection: View {
       } header: {
         Text("Accessibility Registry")
       } footer: {
-        HarnessMonitorMarkdownText(
-          "When enabled, Harness Monitor binds a Unix-domain socket inside the "
-            + "app-group container so the `harness mcp serve` MCP server can "
-            + "enumerate windows and elements, click UI, and type text. "
-            + "Clients still need Accessibility permission in System Settings.",
-          font: .footnote
-        )
+        Text(footerAttributed)
+          .scaledFont(.footnote)
+          .foregroundStyle(.secondary)
       }
     }
     .preferencesDetailFormStyle()
@@ -51,6 +47,25 @@ public struct PreferencesMCPSection: View {
     let envVar = HarnessMonitorMCPPreferencesDefaults.forceEnableEnvVar
     return "\(envVar) is set in this DEBUG build; the host is forced on "
       + "regardless of the toggle."
+  }
+
+  private var footerAttributed: AttributedString {
+    var string = AttributedString(
+      "When enabled, Harness Monitor binds a Unix-domain socket inside the "
+        + "app-group container so the "
+    )
+    var code = AttributedString("harness mcp serve")
+    code.font = .footnote.monospaced()
+    code.backgroundColor = HarnessMonitorTheme.accent.opacity(0.12)
+    code.foregroundColor = HarnessMonitorTheme.ink
+    string.append(code)
+    string.append(
+      AttributedString(
+        " MCP server can enumerate windows and elements, click UI, and type "
+          + "text. Clients still need Accessibility permission in System Settings."
+      )
+    )
+    return string
   }
 
   @ViewBuilder private var socketPathRow: some View {
