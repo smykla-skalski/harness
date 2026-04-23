@@ -24,9 +24,17 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable {
 /// switches between three empty pane stubs; Phase 2 worker 22 replaces the `.rules` pane body
 /// and worker 23 replaces `.notifications` + `.background`.
 public struct PreferencesSupervisorSection: View {
+  let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
   @State private var selectedPane: SupervisorPaneKey = .rules
 
-  public init() {}
+  public init(
+    store: HarnessMonitorStore,
+    notifications: HarnessMonitorUserNotificationController
+  ) {
+    self.store = store
+    self.notifications = notifications
+  }
 
   public var body: some View {
     NavigationStack {
@@ -47,9 +55,16 @@ public struct PreferencesSupervisorSection: View {
           case .rules:
             PreferencesSupervisorRulesPane()
           case .notifications:
-            PreferencesSupervisorNotificationsPane()
+            PreferencesSupervisorNotificationsPane(notifications: notifications)
           case .background:
-            PreferencesSupervisorBackgroundPane()
+            PreferencesSupervisorBackgroundPane(
+              onRunInBackgroundChange: { enabled in
+                store.setSupervisorRunInBackgroundEnabled(enabled)
+              },
+              onQuietHoursChange: { window, _ in
+                store.setSupervisorQuietHoursWindow(window)
+              }
+            )
           }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -61,6 +76,9 @@ public struct PreferencesSupervisorSection: View {
 }
 
 #Preview("Preferences Supervisor Section — empty") {
-  PreferencesSupervisorSection()
-    .frame(width: 640, height: 480)
+  PreferencesSupervisorSection(
+    store: PreferencesPreviewSupport.makeStore(),
+    notifications: HarnessMonitorUserNotificationController.preview()
+  )
+  .frame(width: 640, height: 480)
 }

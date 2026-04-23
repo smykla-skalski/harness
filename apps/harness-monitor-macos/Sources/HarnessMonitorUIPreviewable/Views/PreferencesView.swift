@@ -57,7 +57,7 @@ public struct PreferencesView: View {
         case .authorizedFolders:
           AuthorizedFoldersSection(store: store)
         case .supervisor:
-          PreferencesSupervisorSection()
+          PreferencesSupervisorSection(store: store, notifications: notifications)
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:

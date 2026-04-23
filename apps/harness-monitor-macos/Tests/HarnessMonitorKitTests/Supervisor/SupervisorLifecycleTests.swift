@@ -241,4 +241,36 @@ final class SupervisorLifecycleTests: XCTestCase {
       "Bootstrap should start the supervisor so decision inserts become visible"
     )
   }
+
+  @MainActor
+  func test_setSupervisorRunInBackgroundEnabledStopsAndStartsScheduler() async {
+    let store = HarnessMonitorStore.fixture()
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+
+    store.setSupervisorRunInBackgroundEnabled(false)
+    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
+
+    store.setSupervisorRunInBackgroundEnabled(true)
+    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+  }
+
+  @MainActor
+  func test_setSupervisorQuietHoursWindowUpdatesRuntimeSuppression() async {
+    let store = HarnessMonitorStore.fixture()
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    await store.applySupervisorQuietHoursWindowForTesting(
+      SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0)
+    )
+    let isSuppressed = await store.isSupervisorAutoActionSuppressedForTesting(at: .fixed)
+    XCTAssertTrue(isSuppressed)
+
+    await store.applySupervisorQuietHoursWindowForTesting(nil)
+    let isCleared = await store.isSupervisorAutoActionSuppressedForTesting(at: .fixed)
+    XCTAssertFalse(isCleared)
+  }
 }
