@@ -102,8 +102,8 @@ public struct SessionsSnapshot: Sendable, Hashable {
       } else if let cached = cachedByID[summary.sessionId] {
         detailSource = (cached.detail, cached.timeline)
       } else {
-        HarnessMonitorLogger.supervisor.debug(
-          "supervisor.snapshot skipping unhydrated session \(summary.sessionId, privacy: .public)"
+        HarnessMonitorLogger.supervisorDebug(
+          "supervisor.snapshot skipping unhydrated session \(summary.sessionId)"
         )
         return nil
       }

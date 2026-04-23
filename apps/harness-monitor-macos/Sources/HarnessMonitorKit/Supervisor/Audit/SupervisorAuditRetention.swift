@@ -66,7 +66,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     stopBackgroundCompaction()
 
     guard runInBackgroundEnabled else {
-      HarnessMonitorLogger.supervisor.info(
+      HarnessMonitorLogger.supervisorInfo(
         "supervisor.audit_retention.background_skipped reason=preference_disabled"
       )
       return
@@ -82,22 +82,22 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
         completion(.deferred)
         return
       }
-      HarnessMonitorLogger.supervisor.debug("supervisor.audit_retention.background_tick fired")
+      HarnessMonitorLogger.supervisorDebug("supervisor.audit_retention.background_tick fired")
       Task {
         do {
           let result = try await self.forceCompaction()
-          HarnessMonitorLogger.supervisor.info(
+          HarnessMonitorLogger.supervisorInfo(
             """
-            supervisor.audit_retention.compacted deleted_events=\(result.deletedEvents, privacy: .public) \
-            deleted_decisions=\(result.deletedDecisions, privacy: .public)
+            supervisor.audit_retention.compacted deleted_events=\(result.deletedEvents) \
+            deleted_decisions=\(result.deletedDecisions)
             """
           )
           completion(.finished)
         } catch {
-          HarnessMonitorLogger.supervisor.warning(
+          HarnessMonitorLogger.supervisorWarning(
             """
             supervisor.audit_retention.compaction_failed \
-            error=\(String(describing: error), privacy: .public)
+            error=\(String(describing: error))
             """
           )
           completion(.deferred)
@@ -108,8 +108,8 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     scheduler = activity
     isBackgroundActivityScheduled = true
     let intervalValue = interval
-    HarnessMonitorLogger.supervisor.info(
-      "supervisor.audit_retention.background_started interval=\(intervalValue, privacy: .public)"
+    HarnessMonitorLogger.supervisorInfo(
+      "supervisor.audit_retention.background_started interval=\(intervalValue)"
     )
   }
 
@@ -121,7 +121,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     activity.invalidate()
     scheduler = nil
     isBackgroundActivityScheduled = false
-    HarnessMonitorLogger.supervisor.info("supervisor.audit_retention.background_stopped")
+    HarnessMonitorLogger.supervisorInfo("supervisor.audit_retention.background_stopped")
   }
 
   public func forceCompaction() async throws -> CompactionResult {
