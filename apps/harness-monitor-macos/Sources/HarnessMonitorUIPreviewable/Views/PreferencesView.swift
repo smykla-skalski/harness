@@ -6,6 +6,7 @@ public struct PreferencesView: View {
   let notifications: HarnessMonitorUserNotificationController
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: PreferencesSection
+  @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
 
   public init(
     store: HarnessMonitorStore,
@@ -57,7 +58,11 @@ public struct PreferencesView: View {
         case .authorizedFolders:
           AuthorizedFoldersSection(store: store)
         case .supervisor:
-          PreferencesSupervisorSection(store: store, notifications: notifications)
+          PreferencesSupervisorSection(
+            store: store,
+            notifications: notifications,
+            selectedPane: $selectedSupervisorPane
+          )
         case .database:
           PreferencesDatabaseSection(store: store)
         case .diagnostics:
@@ -72,6 +77,9 @@ public struct PreferencesView: View {
       markedAs: HarnessMonitorAccessibility.preferencesToolbarSeparatorSuppressed
     )
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+    .toolbar {
+      preferencesToolbarItems
+    }
     .containerBackground(.windowBackground, for: .window)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesRoot)
@@ -82,6 +90,15 @@ public struct PreferencesView: View {
       )
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.preferencesPanel)
+  }
+
+  @ToolbarContentBuilder private var preferencesToolbarItems: some ToolbarContent {
+    if selectedSection == .supervisor {
+      ToolbarItem(placement: .primaryAction) {
+        SupervisorPreferencesToolbarPicker(selection: $selectedSupervisorPane)
+      }
+      .sharedBackgroundVisibility(.hidden)
+    }
   }
 }
 
