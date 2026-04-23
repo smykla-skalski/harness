@@ -10,7 +10,15 @@ private final class DecisionsWindowRuntime {
   var liveTick: DecisionLiveTickSnapshot = .placeholder
 
   func reload(from store: HarnessMonitorStore?) async {
-    guard let store, let decisionStore = store.supervisorDecisionStore else {
+    guard let store else {
+      decisions = []
+      auditEvents = []
+      liveTick = .placeholder
+      return
+    }
+
+    let decisionStore = await resolveDecisionStore(from: store)
+    guard let decisionStore else {
       decisions = []
       auditEvents = []
       liveTick = .placeholder
@@ -20,6 +28,15 @@ private final class DecisionsWindowRuntime {
     decisions = (try? await decisionStore.openDecisions()) ?? []
     auditEvents = Self.loadAuditEvents(from: store.modelContext)
     liveTick = await store.supervisorLiveTickSnapshot()
+  }
+
+  private func resolveDecisionStore(from store: HarnessMonitorStore) async -> DecisionStore? {
+    if let decisionStore = store.supervisorDecisionStore {
+      return decisionStore
+    }
+
+    await store.startSupervisor()
+    return store.supervisorDecisionStore
   }
 
   private static func loadAuditEvents(from modelContext: ModelContext?) -> [SupervisorEvent] {
