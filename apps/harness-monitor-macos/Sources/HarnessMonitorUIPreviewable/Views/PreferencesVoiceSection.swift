@@ -145,7 +145,7 @@ private struct PreferencesVoiceTranscriptionSection: View {
     } footer: {
       Text(
         "Harness Monitor tries the selected locale first, then falls back to the current macOS locale "
-          + "and English (US) when Speech can map the language."
+          + "and English (US) when Speech can map the language"
       )
     }
   }
@@ -177,7 +177,7 @@ private struct PreferencesVoiceProcessingSection: View {
     } footer: {
       Text(
         "If every sink is turned off, Harness Monitor still keeps the local daemon enabled "
-          + "so the recording session remains routable."
+          + "so the recording session remains routable"
       )
     }
   }
@@ -212,7 +212,7 @@ private struct PreferencesVoiceRemoteProcessorSection: View {
       Text("Remote Processor")
     } footer: {
       Text(
-        "This v1 configuration stores a single shared HTTPS endpoint without custom headers or auth tokens."
+        "This v1 configuration stores a single shared HTTPS endpoint without custom headers or auth tokens"
       )
     }
   }
@@ -273,7 +273,7 @@ private struct PreferencesVoiceAdvancedSection: View {
       Text("Advanced")
     } footer: {
       Text(
-        "Pending limits cap how many events stay buffered locally before the daemon voice session is ready."
+        "Pending limits cap how many events stay buffered locally before the daemon voice session is ready"
       )
     }
   }
