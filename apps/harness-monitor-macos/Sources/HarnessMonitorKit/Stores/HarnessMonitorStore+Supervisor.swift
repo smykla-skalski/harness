@@ -87,6 +87,7 @@ extension HarnessMonitorStore {
 
     let registry = PolicyRegistry()
     await buildDefaultRegistry(registry)
+    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
 
     let apiClient = StoreAPIClient(store: self)
     let auditWriter = NoOpSupervisorAuditWriter()
@@ -169,6 +170,13 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func refreshSupervisorPolicyOverrides() async {
+    guard let registry = _stack?.registry else {
+      return
+    }
+    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+  }
+
   // MARK: - Test hooks
 
   /// Runs one supervisor tick inline. Only for tests — production code uses the tick loop.
@@ -210,18 +218,12 @@ extension HarnessMonitorStore {
   // MARK: - Private helpers
 
   private func buildDefaultRegistry(_ registry: PolicyRegistry) async {
-    // Built-in rules registered in ID-alphabetical order for deterministic evaluation order.
-    await registry.register(CodexApprovalRule())
-    await registry.register(DaemonDisconnectRule())
-    await registry.register(FailedNudgeLoopRule())
-    await registry.register(IdleSessionRule())
-    await registry.register(ObserverIssueRule())
-    await registry.register(PolicyGapRule())
-    await registry.register(StuckAgentRule())
-    await registry.register(UnassignedTaskRule())
-
-    let loggingObserver = LoggingPolicyObserver()
-    await registry.registerObserver(loggingObserver)
+    for rule in HarnessMonitorSupervisorRuleCatalog.makeRules() {
+      await registry.register(rule)
+    }
+    for observer in HarnessMonitorSupervisorRuleCatalog.makeObservers() {
+      await registry.registerObserver(observer)
+    }
   }
 
   private func applySupervisorQuietHoursWindow(
@@ -229,6 +231,55 @@ extension HarnessMonitorStore {
     service: SupervisorService
   ) async {
     await service.setQuietHoursWindow(window)
+  }
+
+  private static func loadPolicyOverrides(
+    from modelContext: ModelContext?
+  ) -> [PolicyConfigOverride] {
+    guard let modelContext else {
+      return []
+    }
+
+    do {
+      let descriptor = FetchDescriptor<PolicyConfigRow>(
+        sortBy: [SortDescriptor(\.ruleID)]
+      )
+      return try modelContext.fetch(descriptor).map { row in
+        PolicyConfigOverride(
+          ruleID: row.ruleID,
+          enabled: row.enabled,
+          defaultBehavior: RuleDefaultBehavior(rawValue: row.defaultBehaviorRaw) ?? .cautious,
+          parameters: Self.decodeParameters(from: row.parametersJSON)
+        )
+      }
+    } catch {
+      HarnessMonitorLogger.supervisor.warning(
+        "supervisor.policy_config_load_failed error=\(String(describing: error), privacy: .public)"
+      )
+      return []
+    }
+  }
+
+  private static func decodeParameters(from json: String) -> [String: String] {
+    guard
+      let data = json.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return [:]
+    }
+
+    var parameters: [String: String] = [:]
+    for (key, value) in object {
+      switch value {
+      case let string as String:
+        parameters[key] = string
+      case let number as NSNumber:
+        parameters[key] = number.stringValue
+      default:
+        continue
+      }
+    }
+    return parameters
   }
 }
 

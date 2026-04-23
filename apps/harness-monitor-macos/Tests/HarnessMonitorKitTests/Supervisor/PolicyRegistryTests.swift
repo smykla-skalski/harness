@@ -63,6 +63,28 @@ final class PolicyRegistryTests: XCTestCase {
     XCTAssertEqual(behavior, .cautious)
   }
 
+  func test_applyOverridesWithEmptyListClearsExistingOverride() async {
+    let registry = PolicyRegistry()
+    await registry.register(StubRule(id: "stub"))
+    await registry.applyOverrides([
+      PolicyConfigOverride(
+        ruleID: "stub",
+        enabled: false,
+        defaultBehavior: .aggressive,
+        parameters: ["threshold": "180"]
+      )
+    ])
+
+    await registry.applyOverrides([])
+
+    let params = await registry.parameters(forRule: "stub")
+    XCTAssertEqual(params.int("threshold", default: 42), 42)
+    let enabled = await registry.isEnabled(ruleID: "stub")
+    XCTAssertTrue(enabled)
+    let behavior = await registry.defaultBehavior(forRule: "stub")
+    XCTAssertEqual(behavior, .cautious)
+  }
+
   func test_isEnabledDefaultsToTrueWhenNoOverride() async {
     let registry = PolicyRegistry()
     await registry.register(StubRule(id: "stub"))

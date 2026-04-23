@@ -23,9 +23,9 @@ public actor PolicyRegistry {
   }
 
   public func applyOverrides(_ overrides: [PolicyConfigOverride]) {
-    for override in overrides {
-      self.overrides[override.ruleID] = override
-    }
+    self.overrides = Dictionary(
+      uniqueKeysWithValues: overrides.map { ($0.ruleID, $0) }
+    )
   }
 
   public func parameters(forRule ruleID: String) -> PolicyParameterValues {
@@ -48,5 +48,24 @@ public actor PolicyRegistry {
 
   public func registerObserver(_ observer: any PolicyObserver) {
     observers.append(observer)
+  }
+}
+
+public enum HarnessMonitorSupervisorRuleCatalog {
+  public static func makeRules() -> [any PolicyRule] {
+    [
+      CodexApprovalRule(),
+      DaemonDisconnectRule(),
+      FailedNudgeLoopRule(),
+      IdleSessionRule(),
+      ObserverIssueRule(),
+      PolicyGapRule(),
+      StuckAgentRule(),
+      UnassignedTaskRule(),
+    ]
+  }
+
+  public static func makeObservers() -> [any PolicyObserver] {
+    [LoggingPolicyObserver()]
   }
 }
