@@ -195,4 +195,47 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.sidebarUI.selectedSessionID == nil)
     #expect(store.contentUI.session.selectedSessionSummary == nil)
   }
+
+  @Test("Bootstrap snapshot retry loop exits promptly when the bootstrap task is cancelled")
+  func bootstrapRetryLoopStopsWhenCancelled() async {
+    let client = RecordingHarnessClient()
+    let persistentErrors: [any Error] = (0..<256).map { _ in
+      HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
+    }
+    client.configureDiagnosticsErrors(persistentErrors)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .seconds(5)
+    store.initialConnectRefreshRetryInterval = .seconds(1)
+
+    let bootstrapTask = Task { @MainActor in
+      await store.bootstrap()
+    }
+
+    try? await Task.sleep(for: .milliseconds(20))
+    bootstrapTask.cancel()
+
+    #expect(await taskCompletes(bootstrapTask, timeout: .milliseconds(200)))
+  }
+}
+
+private func taskCompletes(
+  _ task: Task<Void, Never>,
+  timeout: Duration
+) async -> Bool {
+  await withTaskGroup(of: Bool.self) { group in
+    group.addTask {
+      await task.value
+      return true
+    }
+    group.addTask {
+      try? await Task.sleep(for: timeout)
+      return false
+    }
+
+    let completed = await group.next() ?? false
+    group.cancelAll()
+    return completed
+  }
 }

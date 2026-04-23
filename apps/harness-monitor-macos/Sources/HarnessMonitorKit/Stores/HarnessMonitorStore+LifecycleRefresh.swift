@@ -159,7 +159,11 @@ extension HarnessMonitorStore {
             "Daemon health is live, but the startup snapshot is still warming up "
             + "(retry \(attempt)): \(errorDescription)"
         )
-        try? await Task.sleep(for: initialConnectRefreshRetryInterval)
+        do {
+          try await Task.sleep(for: initialConnectRefreshRetryInterval)
+        } catch is CancellationError {
+          throw CancellationError()
+        }
       }
     }
   }
