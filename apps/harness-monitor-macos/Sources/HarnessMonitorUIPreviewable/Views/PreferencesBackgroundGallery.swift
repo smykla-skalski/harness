@@ -202,6 +202,8 @@ struct PreferencesBackgroundGallery: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackgroundGallery)
         .task(id: galleryPrefetchSignature) {
+          try? await Task.sleep(for: .milliseconds(180))
+          guard !Task.isCancelled else { return }
           await BackgroundThumbnailCache.shared.prefetch(galleryPrefetchSelections)
         }
       }

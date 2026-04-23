@@ -37,7 +37,12 @@ public struct AgentTuiWindowView: View {
       selectedTerminalID: store.selectedAgentTui?.tuiId,
       selectedCodexRunID: store.selectedCodexRun?.runId
     )
-    _stateViewModel = State(wrappedValue: ViewModel(selection: initialSelection))
+    _stateViewModel = State(
+      wrappedValue: ViewModel(
+        selection: initialSelection,
+        displayState: initialDisplayState
+      )
+    )
   }
 
   let commonKeys: [AgentTuiKey] = [
@@ -47,7 +52,7 @@ public struct AgentTuiWindowView: View {
   var viewModel: ViewModel { stateViewModel }
 
   @MainActor var displayState: AgentTuiDisplayState {
-    AgentTuiDisplayState(store: store)
+    viewModel.displayState
   }
 
   var fontScale: CGFloat { stateFontScale }
@@ -151,29 +156,78 @@ public struct AgentTuiWindowView: View {
     selectedSessionTui?.status.isActive == true
   }
 
-  var currentStateMarker: String {
+  @MainActor var currentStateMarker: String {
+    let selectedSessionLabel = "session=\(store.selectedSessionID ?? "none")"
+    let readOnlyLabel = "readOnly=\(store.isSessionReadOnly)"
+    let codexStartLabel =
+      "codexStart=\(viewModel.codexStartAttemptCount):\(viewModel.codexStartResult)"
+    let toastLabel: String = {
+      guard let feedback = store.toast.activeFeedback.first else {
+        return "toast=none"
+      }
+      let severity =
+        switch feedback.severity {
+        case .success:
+          "success"
+        case .failure:
+          "failure"
+        }
+      let message = feedback.message.replacingOccurrences(of: ",", with: ";")
+      return "toast=\(severity):\(message)"
+    }()
     switch viewModel.selection {
     case .create:
-      return "selection=create"
+      return [
+        "selection=create",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(
+        separator: ","
+      )
     case .terminal(let sessionID):
       let status = selectedSessionTui?.status.rawValue ?? "missing"
-      let sizeLabel =
-        if let selectedSessionTui {
-          "size=\(selectedSessionTui.size.rows)x\(selectedSessionTui.size.cols)"
-        } else {
-          "size=missing"
+      let sizeLabel: String = {
+        guard let selectedSessionTui else {
+          return "size=missing"
         }
-      return
-        "selection=terminal:\(sessionID),status=\(status),wrap=\(viewModel.wrapLines),\(sizeLabel)"
+        return "size=\(selectedSessionTui.size.rows)x\(selectedSessionTui.size.cols)"
+      }()
+      return [
+        "selection=terminal:\(sessionID)",
+        "status=\(status)",
+        "wrap=\(viewModel.wrapLines)",
+        sizeLabel,
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
     case .codex(let runID):
       let status = selectedCodexRun?.status.rawValue ?? "missing"
       let approvalCount = selectedCodexApprovalItems.count
-      return "selection=codex:\(runID),status=\(status),approvals=\(approvalCount)"
+      return [
+        "selection=codex:\(runID)",
+        "status=\(status)",
+        "approvals=\(approvalCount)",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
     case .agent(let agentID):
       let agentStatus =
         store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.status.rawValue
         ?? "missing"
-      return "selection=agent:\(agentID),status=\(agentStatus)"
+      return [
+        "selection=agent:\(agentID)",
+        "status=\(agentStatus)",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
     }
   }
 
@@ -241,6 +295,7 @@ public struct AgentTuiWindowView: View {
       if viewModel.availableRuntimeModels != loadedRuntimeModels {
         viewModel.availableRuntimeModels = loadedRuntimeModels
       }
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: true)
       consumePendingAgentsWindowSelection()
     }
@@ -248,15 +303,23 @@ public struct AgentTuiWindowView: View {
       consumePendingAgentsWindowSelection()
     }
     .onChange(of: store.selectedAgentTuis) { _, _ in
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.selectedCodexRuns) { _, _ in
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.agentTuiUnavailable) { _, _ in
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.codexUnavailable) { _, _ in
+      refreshDisplayState()
+      reconcileSheetState(afterRefresh: false)
+    }
+    .onChange(of: store.selectedSession) { _, _ in
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
     }
     .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in

@@ -12,6 +12,8 @@ import Synchronization
 /// Mutations fan out through `events` (an `AsyncStream<DecisionEvent>`) so downstream consumers
 /// (toolbar slice, notification controller) can react without repolling SwiftData.
 public actor DecisionStore {
+  private static let outcomeEncoder = JSONEncoder()
+
   public struct DecisionEvent: Sendable, Hashable {
     public enum Kind: String, Sendable {
       case inserted
@@ -192,7 +194,7 @@ public actor DecisionStore {
   }
 
   private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {
-    let data = try JSONEncoder().encode(outcome)
+    let data = try Self.outcomeEncoder.encode(outcome)
     guard let string = String(bytes: data, encoding: .utf8) else {
       throw EncodingError.invalidValue(
         outcome,

@@ -152,8 +152,7 @@ public struct ContentView<CornerContent: View>: View {
       canStartNewSession: store.connectionState == .online,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector,
-      supervisorDecisionRefreshTick: store.supervisorDecisionRefreshTick
+      showInspector: showInspector
     )
   }
 

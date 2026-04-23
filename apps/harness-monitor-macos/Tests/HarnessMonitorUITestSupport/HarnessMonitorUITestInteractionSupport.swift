@@ -238,13 +238,10 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
-    let window = window(in: app, containing: element)
-    guard window.waitForExistence(timeout: 0.2) else {
+    _ = app
+    guard element.exists || element.waitForExistence(timeout: 0.2) else {
       return nil
     }
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let dx = element.frame.midX - window.frame.minX
-    let dy = element.frame.midY - window.frame.minY
-    return origin.withOffset(CGVector(dx: dx, dy: dy))
+    return element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
   }
 }

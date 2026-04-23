@@ -15,6 +15,55 @@ private struct SessionDetailIdentity: Equatable {
   }
 }
 
+private struct TimelineIdentity: Equatable {
+  struct Entry: Equatable {
+    let entryID: String
+    let recordedAt: String
+    let kind: String
+    let agentID: String?
+    let taskID: String?
+    let summary: String
+  }
+
+  let entries: [Entry]
+
+  init(_ timeline: [TimelineEntry]) {
+    entries = timeline.map {
+      Entry(
+        entryID: $0.entryId,
+        recordedAt: $0.recordedAt,
+        kind: $0.kind,
+        agentID: $0.agentId,
+        taskID: $0.taskId,
+        summary: $0.summary
+      )
+    }
+  }
+}
+
+private struct TimelineWindowIdentity: Equatable {
+  let revision: Int64
+  let totalCount: Int
+  let windowStart: Int
+  let windowEnd: Int
+  let hasOlder: Bool
+  let hasNewer: Bool
+  let unchanged: Bool
+
+  init?(_ window: TimelineWindowResponse?) {
+    guard let window else {
+      return nil
+    }
+    revision = window.revision
+    totalCount = window.totalCount
+    windowStart = window.windowStart
+    windowEnd = window.windowEnd
+    hasOlder = window.hasOlder
+    hasNewer = window.hasNewer
+    unchanged = window.unchanged
+  }
+}
+
 extension HarnessMonitorStore {
   @MainActor
   @Observable
@@ -56,6 +105,7 @@ extension HarnessMonitorStore {
     public var selectedSessionDetail: SessionDetail?
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
+    public var tuiStatusByAgent: [String: AgentTuiStatus] = [:]
     public var isTimelineLoading = false
     public var presentedSessionDetail: SessionDetail?
     public var presentedTimeline: [TimelineEntry] = []
@@ -64,7 +114,14 @@ extension HarnessMonitorStore {
     private var retainedTimeline: [TimelineEntry] = []
     private var retainedTimelineWindow: TimelineWindowResponse?
     private var selectedSessionDetailIdentity: SessionDetailIdentity?
+    private var selectedTimelineIdentity = TimelineIdentity([])
+    private var selectedTimelineWindowIdentity: TimelineWindowIdentity?
     private var retainedSessionDetailIdentity: SessionDetailIdentity?
+    private var retainedTimelineIdentity = TimelineIdentity([])
+    private var retainedTimelineWindowIdentity: TimelineWindowIdentity?
+    private var presentedSessionDetailIdentity: SessionDetailIdentity?
+    private var presentedTimelineIdentity = TimelineIdentity([])
+    private var presentedTimelineWindowIdentity: TimelineWindowIdentity?
 
     public init() {}
 
@@ -111,8 +168,10 @@ extension HarnessMonitorStore {
       _ state: ContentSessionDetailState,
       identity nextSelectedIdentity: SessionDetailIdentity?
     ) -> Bool {
-      let didUpdateSelectedTimeline = timeline != state.timeline
-      let didUpdateSelectedDetail = selectedSessionDetail != state.selectedSessionDetail
+      let nextTimelineIdentity = TimelineIdentity(state.timeline)
+      let nextTimelineWindowIdentity = TimelineWindowIdentity(state.timelineWindow)
+      let didUpdateSelectedTimeline = selectedTimelineIdentity != nextTimelineIdentity
+      let didUpdateSelectedDetail = selectedSessionDetailIdentity != nextSelectedIdentity
 
       if didUpdateSelectedDetail {
         selectedSessionDetail = state.selectedSessionDetail
@@ -122,9 +181,14 @@ extension HarnessMonitorStore {
       }
       if didUpdateSelectedTimeline {
         timeline = state.timeline
+        selectedTimelineIdentity = nextTimelineIdentity
       }
-      if timelineWindow != state.timelineWindow {
+      if selectedTimelineWindowIdentity != nextTimelineWindowIdentity {
         timelineWindow = state.timelineWindow
+        selectedTimelineWindowIdentity = nextTimelineWindowIdentity
+      }
+      if tuiStatusByAgent != state.tuiStatusByAgent {
+        tuiStatusByAgent = state.tuiStatusByAgent
       }
       if isTimelineLoading != state.isTimelineLoading {
         isTimelineLoading = state.isTimelineLoading
@@ -138,8 +202,7 @@ extension HarnessMonitorStore {
       didUpdateSelectedTimeline: Bool
     ) {
       let didUpdateRetainedIdentity = retainedSessionDetailIdentity != nextSelectedIdentity
-      let didUpdateRetainedDetail = retainedSessionDetail != detail
-      if didUpdateRetainedDetail {
+      if didUpdateRetainedIdentity {
         retainedSessionDetail = detail
       }
       if didUpdateRetainedIdentity {
@@ -147,9 +210,11 @@ extension HarnessMonitorStore {
       }
       if didUpdateRetainedIdentity || didUpdateSelectedTimeline {
         retainedTimeline = timeline
+        retainedTimelineIdentity = selectedTimelineIdentity
       }
-      if retainedTimelineWindow != timelineWindow {
+      if retainedTimelineWindowIdentity != selectedTimelineWindowIdentity {
         retainedTimelineWindow = timelineWindow
+        retainedTimelineWindowIdentity = selectedTimelineWindowIdentity
       }
     }
 
@@ -158,11 +223,13 @@ extension HarnessMonitorStore {
         retainedSessionDetail = nil
         retainedSessionDetailIdentity = nil
       }
-      if !retainedTimeline.isEmpty {
+      if retainedTimelineIdentity != TimelineIdentity([]) {
         retainedTimeline = []
+        retainedTimelineIdentity = TimelineIdentity([])
       }
-      if retainedTimelineWindow != nil {
+      if retainedTimelineWindowIdentity != nil {
         retainedTimelineWindow = nil
+        retainedTimelineWindowIdentity = nil
       }
     }
 
@@ -171,9 +238,21 @@ extension HarnessMonitorStore {
       timeline: [TimelineEntry],
       timelineWindow: TimelineWindowResponse?
     ) {
-      if presentedSessionDetail != sessionDetail { presentedSessionDetail = sessionDetail }
-      if presentedTimeline != timeline { presentedTimeline = timeline }
-      if presentedTimelineWindow != timelineWindow { presentedTimelineWindow = timelineWindow }
+      let nextDetailIdentity = SessionDetailIdentity(sessionDetail)
+      let nextTimelineIdentity = TimelineIdentity(timeline)
+      let nextTimelineWindowIdentity = TimelineWindowIdentity(timelineWindow)
+      if presentedSessionDetailIdentity != nextDetailIdentity {
+        presentedSessionDetail = sessionDetail
+        presentedSessionDetailIdentity = nextDetailIdentity
+      }
+      if presentedTimelineIdentity != nextTimelineIdentity {
+        presentedTimeline = timeline
+        presentedTimelineIdentity = nextTimelineIdentity
+      }
+      if presentedTimelineWindowIdentity != nextTimelineWindowIdentity {
+        presentedTimelineWindow = timelineWindow
+        presentedTimelineWindowIdentity = nextTimelineWindowIdentity
+      }
     }
   }
 

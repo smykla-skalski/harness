@@ -4,12 +4,6 @@ extension HarnessMonitorStore {
   static let agentTuiActionRefreshDelay = Duration.milliseconds(250)
   static let agentTuiActionRefreshAttempts = 4
 
-  private enum CodexStartRecoveryOutcome {
-    case notAttempted
-    case succeeded(CodexRunSnapshot)
-    case failed
-  }
-
   @discardableResult
   public func setHostBridgeCapability(
     _ capability: String,
@@ -77,7 +71,7 @@ extension HarnessMonitorStore {
   ) async -> CodexRunSnapshot? {
     let actionName = "Start Codex thread"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return nil }
-    guard let resolvedActor = actionActor(for: actor, actionName: actionName) else { return nil }
+    let resolvedActor = codexStartActionActor(for: actor)
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedPrompt.isEmpty else {
@@ -183,18 +177,18 @@ extension HarnessMonitorStore {
     if let sessionID = selectedSessionID {
       codexRunsBySessionID[sessionID] = []
     }
-    selectedCodexRuns = []
-    selectedCodexRun = nil
+    assignCodexRuns([], selected: nil)
   }
 
   public func selectCodexRun(runID: String?) {
     guard let runID else {
-      selectedCodexRun = preferredCodexRun(from: selectedCodexRuns)
+      assignSelectedCodexRun(preferredCodexRun(from: selectedCodexRuns))
       return
     }
-    selectedCodexRun =
+    assignSelectedCodexRun(
       selectedCodexRuns.first(where: { $0.runId == runID })
-      ?? preferredCodexRun(from: selectedCodexRuns)
+        ?? preferredCodexRun(from: selectedCodexRuns)
+    )
   }
 
   func applyCodexRun(_ run: CodexRunSnapshot, selectingRun: Bool = false) {
@@ -207,10 +201,13 @@ extension HarnessMonitorStore {
     }
 
     let runs = upsertingCodexRun(run, into: selectedCodexRuns)
-    selectedCodexRuns = runs
-    if selectingRun || selectedCodexRun?.runId == run.runId || selectedCodexRun == nil {
-      selectedCodexRun = run
-    }
+    let selected =
+      if selectingRun || selectedCodexRun?.runId == run.runId || selectedCodexRun == nil {
+        run
+      } else {
+        selectedCodexRun
+      }
+    assignCodexRuns(runs, selected: selected)
   }
 
   func applyCodexApprovalRequested(_ payload: CodexApprovalRequestedPayload) {
@@ -230,8 +227,10 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return true
       }
-      selectedCodexRuns = measuredRuns.value.runs
-      selectedCodexRun = preferredCodexRun(from: measuredRuns.value.runs)
+      assignCodexRuns(
+        measuredRuns.value.runs,
+        selected: preferredCodexRun(from: measuredRuns.value.runs)
+      )
       return true
     } catch {
       guard selectedSessionID == sessionID else {
@@ -255,8 +254,10 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return
       }
-      selectedCodexRuns = measuredRuns.value.runs
-      selectedCodexRun = preferredCodexRun(from: measuredRuns.value.runs)
+      assignCodexRuns(
+        measuredRuns.value.runs,
+        selected: preferredCodexRun(from: measuredRuns.value.runs)
+      )
     } catch {
       guard selectedSessionID == sessionID else {
         return
@@ -331,7 +332,7 @@ extension HarnessMonitorStore {
     return updatedRuns
   }
 
-  private func measureCodexRunStart(
+  func measureCodexRunStart(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String,
     request: CodexRunRequest
@@ -344,76 +345,11 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func applyCodexRunStartSuccess(_ run: CodexRunSnapshot) {
-    recordRequestSuccess()
-    clearHostBridgeIssue(for: "codex")
-    applyCodexRun(run, selectingRun: true)
-    presentSuccessFeedback("Codex run started")
+  private func codexStartActionActor(for actor: String) -> String {
+    guard actor == "harness-app" else {
+      return actor
+    }
+    return resolvedActionActor() ?? "harness-app"
   }
 
-  private func recoverCodexStartAfterTransientBridgeFailure(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String,
-    request: CodexRunRequest,
-    error: HarnessMonitorAPIError
-  ) async -> CodexStartRecoveryOutcome {
-    guard case .server(let code, _) = error, code == 503 else {
-      return .notAttempted
-    }
-    guard daemonStatus?.manifest?.sandboxed == true else {
-      return .notAttempted
-    }
-
-    await refreshDaemonStatus()
-    reconcileHostBridgeIssueFromManifest(for: "codex")
-
-    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
-    guard hostBridge.running, hostBridge.capabilities["codex"]?.healthy == true else {
-      markHostBridgeIssue(for: "codex", statusCode: code)
-      return .notAttempted
-    }
-
-    do {
-      let measuredRun = try await measureCodexRunStart(
-        using: client,
-        sessionID: sessionID,
-        request: request
-      )
-      applyCodexRunStartSuccess(measuredRun.value)
-      return .succeeded(measuredRun.value)
-    } catch let retryError as HarnessMonitorAPIError {
-      if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
-        markHostBridgeIssue(for: "codex", statusCode: retryCode)
-      }
-      presentFailureFeedback(retryError.localizedDescription)
-      return .failed
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return .failed
-    }
-  }
-
-  private func reconcileHostBridgeIssueFromManifest(for capability: String) {
-    guard !forcedHostBridgeCapabilities.contains(capability) else {
-      return
-    }
-    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
-    guard daemonStatus?.manifest?.sandboxed == true else {
-      clearHostBridgeIssue(for: capability)
-      return
-    }
-    guard hostBridge.running else {
-      hostBridgeCapabilityIssues[capability] = .unavailable
-      return
-    }
-    guard let capabilityState = hostBridge.capabilities[capability] else {
-      hostBridgeCapabilityIssues[capability] = .excluded
-      return
-    }
-    if capabilityState.healthy {
-      clearHostBridgeIssue(for: capability)
-    } else {
-      hostBridgeCapabilityIssues[capability] = .unavailable
-    }
-  }
 }

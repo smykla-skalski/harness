@@ -22,19 +22,31 @@ extension HarnessMonitorAgentsE2ETests {
 
   func selectFastModelForTerminal(in app: XCUIApplication, runtime: String) {
     guard let displayName = Self.e2eFastModelDisplayName[runtime] else { return }
-    selectSegment(
+    revealAction(
+      in: app,
+      containerIdentifier: Accessibility.agentTuiLaunchPane,
+      identifier: Accessibility.agentsModelPicker,
+      title: "Model"
+    )
+    selectMenuOption(
       in: app,
       controlIdentifier: Accessibility.agentsModelPicker,
-      title: displayName
+      optionTitle: displayName
     )
   }
 
   func selectFastModelForCodex(in app: XCUIApplication) {
     guard let displayName = Self.e2eFastModelDisplayName["codex"] else { return }
-    selectSegment(
+    revealAction(
+      in: app,
+      containerIdentifier: Accessibility.agentTuiLaunchPane,
+      identifier: Accessibility.agentsCodexModelPicker,
+      title: "Model"
+    )
+    selectMenuOption(
       in: app,
       controlIdentifier: Accessibility.agentsCodexModelPicker,
-      title: displayName
+      optionTitle: displayName
     )
   }
 

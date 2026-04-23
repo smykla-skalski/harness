@@ -56,8 +56,14 @@ public final class SupervisorToolbarSlice {
   }
 
   private func apply(counts: [DecisionSeverity: Int]) {
-    count = counts.values.reduce(0, +)
-    maxSeverity = Self.maxSeverity(in: counts)
+    let nextCount = counts.values.reduce(0, +)
+    let nextMaxSeverity = Self.maxSeverity(in: counts)
+    if count != nextCount {
+      count = nextCount
+    }
+    if maxSeverity != nextMaxSeverity {
+      maxSeverity = nextMaxSeverity
+    }
   }
 
   private static func maxSeverity(in counts: [DecisionSeverity: Int]) -> DecisionSeverity? {
