@@ -91,6 +91,7 @@ exit 1
                     ),
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                 }
             )

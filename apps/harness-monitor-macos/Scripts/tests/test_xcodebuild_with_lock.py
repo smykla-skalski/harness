@@ -11,6 +11,7 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = APP_ROOT / "Scripts" / "xcodebuild-with-lock.sh"
+RTK_SHELL_PATH = APP_ROOT / "Scripts" / "lib" / "rtk-shell.sh"
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -47,6 +48,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                 }
             )
@@ -74,6 +76,13 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-scheme HarnessMonitor build", log)
         self.assertNotIn("RTK=", log)
+
+    def test_runner_uses_absolute_xcodebuild_by_default(self) -> None:
+        rtk_shell = RTK_SHELL_PATH.read_text()
+
+        self.assertIn("XCODEBUILD_BIN:-/usr/bin/xcodebuild", rtk_shell)
+        self.assertIn('"$xcodebuild_bin" "$@"', rtk_shell)
+        self.assertNotIn("\n  xcodebuild \"$@\"", rtk_shell)
 
     def test_skips_rtk_for_json_output(self) -> None:
         completed, log = self.run_script("-list", "-json")
@@ -155,6 +164,7 @@ printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
                 }
@@ -213,6 +223,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                 }
             )
@@ -295,6 +306,7 @@ exit 65
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                 }
             )

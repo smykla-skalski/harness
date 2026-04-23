@@ -77,6 +77,7 @@ exit 1
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_runner),
                     "TMPDIR": str(temp_root),
                 }
             )
