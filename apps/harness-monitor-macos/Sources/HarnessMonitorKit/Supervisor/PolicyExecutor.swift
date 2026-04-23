@@ -177,27 +177,30 @@ public actor PolicyExecutor {
 
     case .suggestConfigChange(let payload):
       HarnessMonitorLogger.supervisor.info(
-        "suggestConfigChange ruleID=\(payload.ruleID, privacy: .public) rationale=\(payload.rationale, privacy: .public)"
+        """
+        suggestConfigChange ruleID=\(payload.ruleID, privacy: .public) \
+        rationale=\(payload.rationale, privacy: .public)
+        """
       )
     }
   }
 
   private func ruleID(for action: PolicyAction) -> String? {
     switch action {
-    case .nudgeAgent(let p): p.ruleID
-    case .assignTask(let p): p.ruleID
-    case .dropTask(let p): p.ruleID
-    case .queueDecision(let p): p.ruleID
-    case .notifyOnly(let p): p.ruleID
-    case .logEvent(let p): p.ruleID
-    case .suggestConfigChange(let p): p.ruleID
+    case .nudgeAgent(let payload): payload.ruleID
+    case .assignTask(let payload): payload.ruleID
+    case .dropTask(let payload): payload.ruleID
+    case .queueDecision(let payload): payload.ruleID
+    case .notifyOnly(let payload): payload.ruleID
+    case .logEvent(let payload): payload.ruleID
+    case .suggestConfigChange(let payload): payload.ruleID
     }
   }
 
   private func severity(for action: PolicyAction) -> DecisionSeverity? {
     switch action {
-    case .queueDecision(let p): p.severity
-    case .notifyOnly(let p): p.severity
+    case .queueDecision(let payload): payload.severity
+    case .notifyOnly(let payload): payload.severity
     default: nil
     }
   }
