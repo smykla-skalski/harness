@@ -54,19 +54,20 @@ public enum DecisionsSidebarViewModel {
   }
 
   /// Groups decisions by `sessionID`, filters by case-insensitive `query` substring over
-  /// summary and by minimum severity, then sorts each group's rows by severity descending
-  /// (stable by `createdAt` then `id`). Sessions sort by earliest `createdAt` ascending so the
-  /// long-lived ones stay at the top; ties fall back to `sessionID` alphabetically. The
-  /// session-less bucket (where `sessionID == nil`) sorts last.
+  /// summary and by an explicit severity set, then sorts each group's rows by severity
+  /// descending (stable by `createdAt` then `id`). An empty `severities` set means "show all
+  /// severities"; any non-empty set keeps only decisions whose severity is a member. Sessions
+  /// sort by earliest `createdAt` ascending so the long-lived ones stay at the top; ties fall
+  /// back to `sessionID` alphabetically. The session-less bucket (`sessionID == nil`) sorts last.
   public static func grouped(
     decisions: [Decision],
     query: String,
-    minSeverity: DecisionSeverity
+    severities: Set<DecisionSeverity>
   ) -> [SessionGroup] {
     let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
     let filtered = decisions.filter { decision in
       guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else { return false }
-      guard severity.sortKey >= minSeverity.sortKey else { return false }
+      if !severities.isEmpty, !severities.contains(severity) { return false }
       if trimmedQuery.isEmpty { return true }
       return decision.summary.range(of: trimmedQuery, options: .caseInsensitive) != nil
     }
@@ -115,7 +116,7 @@ public struct DecisionsSidebar: View {
   private let decisions: [Decision]
 
   @State private var query: String = ""
-  @State private var minSeverity: DecisionSeverity = .info
+  @State private var selectedSeverities: Set<DecisionSeverity> = []
   @Environment(\.fontScale)
   private var fontScale
 
@@ -131,7 +132,7 @@ public struct DecisionsSidebar: View {
     DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: query,
-      minSeverity: minSeverity
+      severities: selectedSeverities
     )
   }
 
@@ -164,9 +165,13 @@ public struct DecisionsSidebar: View {
   }
 
   private func severityChip(_ severity: DecisionSeverity) -> some View {
-    let isActive = minSeverity == severity
+    let isActive = selectedSeverities.contains(severity)
     return Button {
-      minSeverity = severity
+      if selectedSeverities.contains(severity) {
+        selectedSeverities.remove(severity)
+      } else {
+        selectedSeverities.insert(severity)
+      }
     } label: {
       Text(severity.chipLabel)
         .scaledFont(.caption)
