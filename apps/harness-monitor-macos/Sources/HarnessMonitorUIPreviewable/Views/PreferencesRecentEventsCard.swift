@@ -9,7 +9,7 @@ struct PreferencesRecentEventsSection: View {
   var body: some View {
     Section("Recent Events") {
       if events.isEmpty {
-        Text("No daemon events available yet.")
+        Text("No daemon events available yet")
           .foregroundStyle(.secondary)
       } else {
         ForEach(events) { event in
