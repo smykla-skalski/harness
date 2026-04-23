@@ -54,6 +54,15 @@ normalize_shared_schemes_after_xcodebuild() {
     "$ROOT/Scripts/generate-project.sh" >/dev/null
 }
 
+create_temp_log_path() {
+  local temp_root log_stem log_path
+  temp_root="${TMPDIR:-/tmp}"
+  log_stem="$(mktemp "${temp_root%/}/harness-xcodebuild.XXXXXX")"
+  log_path="${log_stem}.log"
+  /bin/mv "$log_stem" "$log_path"
+  printf '%s\n' "$log_path"
+}
+
 acquire_lock() {
   local started_at now owner_pid
   /bin/mkdir -p "$derive_data_path"
@@ -79,7 +88,7 @@ acquire_lock() {
 
 run_once() {
   local log_path status
-  log_path="$(mktemp "${TMPDIR:-/tmp}/harness-xcodebuild.XXXXXX.log")"
+  log_path="$(create_temp_log_path)"
   set +e
   run_xcodebuild_command "${args[@]}" 2>&1 | tee "$log_path"
   status="${PIPESTATUS[0]}"
