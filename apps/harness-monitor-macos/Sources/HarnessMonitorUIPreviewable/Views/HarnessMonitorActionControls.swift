@@ -62,6 +62,7 @@ public struct HarnessMonitorAsyncActionButton: View {
   public let title: String
   public let tint: Color?
   public let variant: Variant
+  public let role: ButtonRole?
   public let isLoading: Bool
   public let accessibilityIdentifier: String
   public let fillsWidth: Bool
@@ -74,6 +75,7 @@ public struct HarnessMonitorAsyncActionButton: View {
     title: String,
     tint: Color? = nil,
     variant: Variant,
+    role: ButtonRole? = nil,
     isLoading: Bool,
     accessibilityIdentifier: String,
     fillsWidth: Bool = false,
@@ -82,6 +84,7 @@ public struct HarnessMonitorAsyncActionButton: View {
     self.title = title
     self.tint = tint
     self.variant = variant
+    self.role = role
     self.isLoading = isLoading
     self.accessibilityIdentifier = accessibilityIdentifier
     self.fillsWidth = fillsWidth
@@ -98,7 +101,7 @@ public struct HarnessMonitorAsyncActionButton: View {
 
   public var body: some View {
     ZStack {
-      Button {
+      Button(role: role) {
         if isLoading {
           cancelAction()
         } else {

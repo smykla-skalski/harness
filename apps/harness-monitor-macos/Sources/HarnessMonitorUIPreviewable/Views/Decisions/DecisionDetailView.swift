@@ -119,19 +119,37 @@ public struct DecisionDetailView: View {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             ForEach(viewModel.suggestedActions) { action in
-              HarnessMonitorAsyncActionButton(
-                title: action.title,
-                tint: tint(for: action, severity: viewModel.severity),
-                variant: viewModel.isPrimary(action) ? .prominent : .bordered,
-                isLoading: false,
-                accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id)
-              ) {
-                await viewModel.invoke(action: action)
-              }
+              actionButton(for: action, viewModel: viewModel)
             }
           }
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private func actionButton(
+    for action: SuggestedAction,
+    viewModel: DecisionDetailViewModel
+  ) -> some View {
+    let isPrimary = viewModel.isPrimary(action)
+    let role: ButtonRole? = action.kind == .dismiss ? .destructive : nil
+    let button = HarnessMonitorAsyncActionButton(
+      title: action.title,
+      tint: tint(for: action, severity: viewModel.severity),
+      variant: isPrimary ? .prominent : .bordered,
+      role: role,
+      isLoading: false,
+      accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id)
+    ) {
+      await viewModel.invoke(action: action)
+    }
+    if isPrimary {
+      button.keyboardShortcut(.defaultAction)
+    } else if action.kind == .dismiss {
+      button.keyboardShortcut(".", modifiers: [.command])
+    } else {
+      button
     }
   }
 
