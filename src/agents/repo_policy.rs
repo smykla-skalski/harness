@@ -1,16 +1,18 @@
 use std::path::Path;
 
+mod wrapped;
+
 use crate::hooks::adapters::{HookAgent, RenderedHookResponse, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
 use crate::hooks::protocol::result::NormalizedHookResult;
-use crate::kernel::command_intent::{
-    ParsedCommand, is_env_assignment, is_shell_control_op, normalized_binary_name,
-};
+use crate::kernel::command_intent::{ParsedCommand, is_shell_control_op, normalized_binary_name};
+use wrapped::{split_env_prefix, wrapped_command, wrapped_command_suggestions};
 
 const SESSION_START_CONTEXT: &str = concat!(
     "Repo policy:\n",
     "- Discover supported workflows with `mise tasks ls`.\n",
     "- Run repo-supported logic only through `mise run <task>` or `mise run <task> -- <args>`.\n",
+    "- Run `mise` commands directly. Do not wrap them in `bash -lc`, `zsh -lc`, `rtk env`, `env`, or similar shells/wrappers.\n",
     "- Canonical task families here are `check`, `test`, `check:scripts`, `cargo:local`, \
      `setup:*`, `version:*`, `monitor:macos:*`, `observability:*`, `host-metrics:*`, \
      `mcp:*`, `preview:*`, `check:stale`, and `clean:stale`.\n",
@@ -115,9 +117,7 @@ fn manual_command_denial_reason(command_text: &str) -> Option<String> {
 fn suggested_tasks(words: &[String]) -> Vec<SuggestedTask> {
     let mut suggestions = Vec::new();
     for segment in command_segments(words) {
-        if let Some(suggestion) = suggestion_for_segment(segment) {
-            suggestions.push(suggestion);
-        }
+        suggestions.extend(suggestions_for_segment(segment, &[]));
     }
     suggestions
 }
@@ -139,24 +139,28 @@ fn command_segments(words: &[String]) -> Vec<&[String]> {
     segments
 }
 
-fn suggestion_for_segment(segment: &[String]) -> Option<SuggestedTask> {
+fn suggestions_for_segment(
+    segment: &[String],
+    inherited_env_prefix: &[String],
+) -> Vec<SuggestedTask> {
     if segment.is_empty() {
-        return None;
+        return Vec::new();
     }
 
-    let env_prefix_len = segment
-        .iter()
-        .take_while(|word| is_env_assignment(word))
-        .count();
-    let env_prefix = &segment[..env_prefix_len];
-    let words = &segment[env_prefix_len..];
+    let (env_prefix, words) = split_env_prefix(segment, inherited_env_prefix);
     if words.is_empty() {
-        return None;
+        return Vec::new();
+    }
+
+    if let Some((wrapper_env, nested_command)) = wrapped_command(words) {
+        let mut merged_env = env_prefix;
+        merged_env.extend(wrapper_env);
+        return wrapped_command_suggestions(&nested_command, &merged_env);
     }
 
     let head = normalized_binary_name(&words[0]);
     if head == "mise" {
-        return None;
+        return Vec::new();
     }
 
     let (script_index, args_start) = if is_shell_interpreter(&head) && words.len() >= 2 {
@@ -164,33 +168,39 @@ fn suggestion_for_segment(segment: &[String]) -> Option<SuggestedTask> {
     } else {
         (0, 1)
     };
-    let script_basename = file_name(&words[script_index])?;
+    let Some(script_basename) = file_name(&words[script_index]) else {
+        return Vec::new();
+    };
 
-    match script_basename {
-        "check-no-stale-state.sh" => exact_task(env_prefix, "check:stale"),
-        "clean-stale-state.sh" => exact_task(env_prefix, "clean:stale"),
-        "check-scripts.sh" => exact_task(env_prefix, "check:scripts"),
-        "cargo-local.sh" => passthrough_task(env_prefix, "cargo:local", &words[args_start..]),
-        "generate-project.sh" => exact_task(env_prefix, "monitor:macos:generate"),
-        "xcodebuild-with-lock.sh" => {
-            passthrough_task(env_prefix, "monitor:macos:xcodebuild", &words[args_start..])
-        }
-        "run-quality-gates.sh" => exact_task(env_prefix, "monitor:macos:lint"),
-        "test-swift.sh" => exact_task(env_prefix, "monitor:macos:test"),
-        "test-agents-e2e.sh" => exact_task(env_prefix, "monitor:macos:test:agents-e2e"),
+    match match script_basename {
+        "check-no-stale-state.sh" => exact_task(&env_prefix, "check:stale"),
+        "clean-stale-state.sh" => exact_task(&env_prefix, "clean:stale"),
+        "check-scripts.sh" => exact_task(&env_prefix, "check:scripts"),
+        "cargo-local.sh" => passthrough_task(&env_prefix, "cargo:local", &words[args_start..]),
+        "generate-project.sh" => exact_task(&env_prefix, "monitor:macos:generate"),
+        "xcodebuild-with-lock.sh" => passthrough_task(
+            &env_prefix,
+            "monitor:macos:xcodebuild",
+            &words[args_start..],
+        ),
+        "run-quality-gates.sh" => exact_task(&env_prefix, "monitor:macos:lint"),
+        "test-swift.sh" => exact_task(&env_prefix, "monitor:macos:test"),
+        "test-agents-e2e.sh" => exact_task(&env_prefix, "monitor:macos:test:agents-e2e"),
         "run-instruments-audit.sh" => {
-            passthrough_task(env_prefix, "monitor:macos:audit", &words[args_start..])
+            passthrough_task(&env_prefix, "monitor:macos:audit", &words[args_start..])
         }
         "run-instruments-audit-from-ref.sh" => passthrough_task(
-            env_prefix,
+            &env_prefix,
             "monitor:macos:audit:from-ref",
             &words[args_start..],
         ),
-        "preview-render.sh" => passthrough_task(env_prefix, "preview:render", &words[args_start..]),
-        "preview-smoke.sh" => exact_task(env_prefix, "preview:smoke"),
-        "version.sh" => version_task(env_prefix, &words[args_start..]),
+        "preview-render.sh" => {
+            passthrough_task(&env_prefix, "preview:render", &words[args_start..])
+        }
+        "preview-smoke.sh" => exact_task(&env_prefix, "preview:smoke"),
+        "version.sh" => version_task(&env_prefix, &words[args_start..]),
         "observability.sh" => subcommand_task(
-            env_prefix,
+            &env_prefix,
             "observability",
             &words[args_start..],
             Some((
@@ -199,20 +209,23 @@ fn suggestion_for_segment(segment: &[String]) -> Option<SuggestedTask> {
             )),
         ),
         "host-metrics.sh" => {
-            subcommand_task(env_prefix, "host-metrics", &words[args_start..], None)
+            subcommand_task(&env_prefix, "host-metrics", &words[args_start..], None)
         }
-        "mcp-socket-path.sh" => exact_task(env_prefix, "mcp:socket-path"),
-        "mcp-smoke.sh" => passthrough_task(env_prefix, "mcp:smoke", &words[args_start..]),
-        "mcp-doctor.sh" => exact_task(env_prefix, "mcp:doctor"),
+        "mcp-socket-path.sh" => exact_task(&env_prefix, "mcp:socket-path"),
+        "mcp-smoke.sh" => passthrough_task(&env_prefix, "mcp:smoke", &words[args_start..]),
+        "mcp-doctor.sh" => exact_task(&env_prefix, "mcp:doctor"),
         "mcp-register-claude.sh" => {
-            passthrough_task(env_prefix, "mcp:register-claude", &words[args_start..])
+            passthrough_task(&env_prefix, "mcp:register-claude", &words[args_start..])
         }
         "mcp-wait-socket.sh" => {
-            passthrough_task(env_prefix, "mcp:wait-socket", &words[args_start..])
+            passthrough_task(&env_prefix, "mcp:wait-socket", &words[args_start..])
         }
-        "mcp-launch-monitor.sh" => exact_task(env_prefix, "mcp:launch:monitor"),
-        "mcp-launch-dev.sh" => exact_task(env_prefix, "mcp:launch:dev"),
-        _ => command_head_task(env_prefix, words, &head),
+        "mcp-launch-monitor.sh" => exact_task(&env_prefix, "mcp:launch:monitor"),
+        "mcp-launch-dev.sh" => exact_task(&env_prefix, "mcp:launch:dev"),
+        _ => command_head_task(&env_prefix, words, &head),
+    } {
+        Some(suggestion) => vec![suggestion],
+        None => Vec::new(),
     }
 }
 
@@ -354,7 +367,7 @@ fn same_script(left: &str, right: &str, expected_basename: &str) -> bool {
 }
 
 fn is_shell_interpreter(head: &str) -> bool {
-    matches!(head, "bash" | "sh" | "zsh")
+    matches!(head, "bash" | "fish" | "sh" | "zsh")
 }
 
 fn file_name(path: &str) -> Option<&str> {
