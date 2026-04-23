@@ -9,6 +9,9 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+# This wrapper is the canonical xcodebuild entrypoint for repo scripts. Keep the invocation on
+# the real tool binary so rtk filters cannot recurse back into this same wrapper.
+export RTK_DISABLED=1
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 
