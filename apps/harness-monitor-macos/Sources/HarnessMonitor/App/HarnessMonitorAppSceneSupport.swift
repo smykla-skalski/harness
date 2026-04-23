@@ -2,7 +2,6 @@ import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
-
 struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
@@ -21,16 +20,14 @@ struct HarnessMonitorWindowRootView: View {
   @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
   private var cornerAnimationEnabled = false
   @State private var handledSettingsOpenRequestID = 0
+  @State private var handledDecisionRequestTick = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
-
   private var backdropMode: HarnessMonitorBackdropMode {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
   }
-
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
-
   var body: some View {
     ContentView(
       store: store,
@@ -80,9 +77,23 @@ struct HarnessMonitorWindowRootView: View {
       preferencesSelectedSection = .notifications
       openWindow(id: HarnessMonitorWindowID.preferences)
     }
+    .task(id: notifications.decisionRequestTick) {
+      routeDecisionWindowRequest(for: notifications.decisionRequestTick)
+    }
+    .onChange(of: notifications.decisionRequestTick) { _, tick in
+      routeDecisionWindowRequest(for: tick)
+    }
+  }
+  private func routeDecisionWindowRequest(for tick: Int) {
+    guard tick != handledDecisionRequestTick,
+      notifications.decisionRequestedID != nil
+    else {
+      return
+    }
+    handledDecisionRequestTick = tick
+    openWindow(id: HarnessMonitorWindowID.decisions)
   }
 }
-
 private enum HarnessMonitorPerfScenarioStatus: String {
   case idle
   case bootstrapping
@@ -98,7 +109,6 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   private var openWindow
   @State private var hasRunPerfScenario = false
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
-
   private var perfScenarioStateText: String? {
     guard shouldPublishPerfScenarioState,
       let perfScenario
@@ -107,11 +117,9 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     }
     return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
   }
-
   private var shouldPublishPerfScenarioState: Bool {
     HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
   }
-
   func body(content: Content) -> some View {
     content
       .overlay {
@@ -126,7 +134,6 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
         await runPerfScenarioIfNeeded()
       }
   }
-
   private func runPerfScenarioIfNeeded() async {
     delegate.bind(store: store)
     guard let perfScenario else {
@@ -148,7 +155,6 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       publishPerfScenarioStatus(.completed)
       return
     }
-
     publishPerfScenarioStatus(.bootstrapping)
     await store.bootstrapIfNeeded()
     publishPerfScenarioStatus(.running)
@@ -159,7 +165,6 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     )
     publishPerfScenarioStatus(.completed)
   }
-
   private func publishPerfScenarioStatus(_ status: HarnessMonitorPerfScenarioStatus) {
     guard shouldPublishPerfScenarioState else {
       return
