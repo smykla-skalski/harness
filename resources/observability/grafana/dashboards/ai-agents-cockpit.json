@@ -777,16 +777,36 @@
                     "refId": "B",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__rate_interval])) or on() vector(0)",
+                        "legendFormat": "copilot"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude session starts and Codex thread starts shown together for direct workload comparison.",
+          "description": "Claude sessions, Codex thread starts, and Copilot agent runs shown together for direct workload comparison.",
           "id": 209,
           "links": [],
-          "title": "Sessions and Threads by Agent",
+          "title": "Sessions, Threads, and Runs by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -867,7 +887,7 @@
               "transformations": []
             }
           },
-          "description": "Tokens produced per bucket by agent runtime. Stacked bars reveal both total throughput and share; gaps are honest (no samples).",
+          "description": "Claude and Codex token usage aligned on the same chart.",
           "id": 210,
           "links": [],
           "title": "Tokens by Agent",
@@ -878,103 +898,20 @@
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic-by-name"
+                    "mode": "palette-classic"
                   },
-                  "unit": "short",
-                  "decimals": 0,
-                  "custom": {
-                    "drawStyle": "bars",
-                    "lineWidth": 0,
-                    "fillOpacity": 100,
-                    "gradientMode": "none",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.8,
-                    "barMaxWidth": 50,
-                    "spanNulls": false,
-                    "insertNulls": false,
-                    "showPoints": "never",
-                    "stacking": {
-                      "mode": "normal",
-                      "group": "A"
-                    },
-                    "axisPlacement": "auto",
-                    "axisLabel": "tokens",
-                    "axisSoftMin": 0,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "hideFrom": {
-                      "tooltip": false,
-                      "viz": false,
-                      "legend": false
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "transparent",
-                        "value": 0
-                      }
-                    ]
-                  }
+                  "unit": "short"
                 },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "claude"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "green"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "codex"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "orange"
-                        }
-                      }
-                    ]
-                  }
-                ]
+                "overrides": []
               },
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "calcs": [
-                    "sum",
-                    "mean",
-                    "max",
-                    "lastNotNull"
-                  ],
-                  "sortBy": "Total",
-                  "sortDesc": true
+                  "placement": "bottom"
                 },
                 "tooltip": {
                   "mode": "multi",
-                  "sort": "desc",
-                  "hideZeros": true,
-                  "maxHeight": 600
+                  "sort": "desc"
                 }
               }
             },
@@ -1085,8 +1022,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "{{model}}"
+                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
+                        "legendFormat": "claude :: {{pretty_model}}"
                       }
                     },
                     "refId": "A",
@@ -1105,11 +1042,31 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]))",
-                        "legendFormat": "{{model}}"
+                        "expr": "sum by (pretty_model) (label_replace(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"model\", \"(.*)\"))",
+                        "legendFormat": "codex :: {{pretty_model}}"
                       }
                     },
                     "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "legendFormat": "copilot :: {{pretty_model}}"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -1118,7 +1075,7 @@
               "transformations": []
             }
           },
-          "description": "Token usage split by model across both agent runtimes. Stacked bars compare model mix per bucket over the selected range.",
+          "description": "Claude and Codex token volume plus Copilot chat activity, grouped by normalized model name.",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -1129,163 +1086,20 @@
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic-by-name"
+                    "mode": "palette-classic"
                   },
-                  "unit": "short",
-                  "decimals": 0,
-                  "custom": {
-                    "drawStyle": "bars",
-                    "lineWidth": 0,
-                    "fillOpacity": 100,
-                    "gradientMode": "none",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.8,
-                    "barMaxWidth": 50,
-                    "spanNulls": false,
-                    "insertNulls": false,
-                    "showPoints": "never",
-                    "stacking": {
-                      "mode": "normal",
-                      "group": "A"
-                    },
-                    "axisPlacement": "auto",
-                    "axisLabel": "tokens",
-                    "axisSoftMin": 0,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "hideFrom": {
-                      "tooltip": false,
-                      "viz": false,
-                      "legend": false
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "transparent",
-                        "value": 0
-                      }
-                    ]
-                  }
+                  "unit": "short"
                 },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-opus.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "purple"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-sonnet.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "blue"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-haiku.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "semi-dark-blue"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^gpt-5.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "orange"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^gpt-4.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "dark-orange"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^o1.*|^o3.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "yellow"
-                        }
-                      }
-                    ]
-                  }
-                ]
+                "overrides": []
               },
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "calcs": [
-                    "sum",
-                    "mean",
-                    "max",
-                    "lastNotNull"
-                  ],
-                  "sortBy": "Total",
-                  "sortDesc": true
+                  "placement": "bottom"
                 },
                 "tooltip": {
                   "mode": "multi",
-                  "sort": "desc",
-                  "hideZeros": true,
-                  "maxHeight": 600
+                  "sort": "desc"
                 }
               }
             },
@@ -1313,7 +1127,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) or on() vector(0)",
-                        "legendFormat": "claude decisions"
+                        "legendFormat": "claude"
                       }
                     },
                     "refId": "A",
@@ -1333,10 +1147,30 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "codex tool calls"
+                        "legendFormat": "codex"
                       }
                     },
                     "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__rate_interval])) or on() vector(0)",
+                        "legendFormat": "copilot"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -1345,7 +1179,7 @@
               "transformations": []
             }
           },
-          "description": "Claude decisions observed and Codex tool calls on the same chart.",
+          "description": "Claude decisions, Codex tool calls, and Copilot tool calls on the same chart.",
           "id": 213,
           "links": [],
           "title": "Tooling Activity by Agent",
@@ -1396,7 +1230,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[5m])) or on() vector(0)",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[$__range])) or on() vector(0)",
                         "legendFormat": "claude"
                       }
                     },
@@ -1416,11 +1250,31 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[5m])) or on() vector(0)",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[$__range])) or on() vector(0)",
                         "legendFormat": "codex"
                       }
                     },
                     "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)",
+                        "legendFormat": "copilot"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -1429,10 +1283,10 @@
               "transformations": []
             }
           },
-          "description": "Tempo spanmetrics rate normalized to the two agent families only: claude and codex.",
+          "description": "Tempo span totals over the selected range, normalized to Claude, Codex, and Copilot.",
           "id": 214,
           "links": [],
-          "title": "Trace Span Rate by Agent",
+          "title": "Trace Volume by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1442,7 +1296,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "ops"
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -1480,7 +1334,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(rate(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[5m]), \"pretty_span\", \"$1\", \"span_name\", \"claude_code\\\\.(.*)\")))",
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"claude_code\\\\.(.*)\")))",
                         "legendFormat": "claude :: {{pretty_span}}"
                       }
                     },
@@ -1500,11 +1354,31 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(rate(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[5m]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
                         "legendFormat": "codex :: {{pretty_span}}"
                       }
                     },
                     "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
+                        "legendFormat": "copilot :: {{pretty_span}}"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -1513,7 +1387,7 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume trace spans with agent names normalized to claude and codex.",
+          "description": "Highest-volume trace spans over the selected range for Claude, Codex, and Copilot.",
           "id": 215,
           "links": [],
           "title": "Top Trace Spans by Agent",
@@ -1526,7 +1400,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "ops"
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -1539,6 +1413,1681 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-16": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed GitHub Copilot agent invocations over the selected range.",
+          "id": 216,
+          "links": [],
+          "title": "Copilot Agent Runs",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-17": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed GitHub Copilot turns over the selected range.",
+          "id": 217,
+          "links": [],
+          "title": "Copilot Agent Turns",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-18": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed GitHub Copilot tool calls over the selected range.",
+          "id": 218,
+          "links": [],
+          "title": "Copilot Tool Calls",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-19": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot trace span volume over the selected range.",
+          "id": 219,
+          "links": [],
+          "title": "Copilot Trace Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot agent invocations over selected time range.",
+          "id": 301,
+          "links": [],
+          "title": "Agent Runs",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot turns over selected time range.",
+          "id": 302,
+          "links": [],
+          "title": "Agent Turns",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot tool calls over selected time range.",
+          "id": 303,
+          "links": [],
+          "title": "Tool Calls",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)), 1))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Average turns per Copilot agent run over selected time range.",
+          "id": 304,
+          "links": [],
+          "title": "Avg Turns / Run",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 2,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 3
+                      },
+                      {
+                        "color": "red",
+                        "value": 8
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((sum(last_over_time(github_copilot_tool_call_duration_seconds_sum[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(github_copilot_tool_call_duration_seconds_count[$__range])) or on() vector(0)), 1))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Average Copilot tool latency over selected time range.",
+          "id": 305,
+          "links": [],
+          "title": "Avg Tool Duration",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 2,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot trace span volume over selected time range.",
+          "id": 306,
+          "links": [],
+          "title": "Trace Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (service_name) (last_over_time(github_copilot_agent_turn_count_count[$__rate_interval]))",
+                        "legendFormat": "{{service_name}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot agent runs split by service identity.",
+          "id": 307,
+          "links": [],
+          "title": "Agent Runs by Service",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (service_name, gen_ai_tool_name, success) (last_over_time(github_copilot_tool_call_count_total[$__rate_interval]))",
+                        "legendFormat": "{{service_name}} :: {{gen_ai_tool_name}} :: success={{success}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Copilot tool calls split by service, tool, and success.",
+          "id": 308,
+          "links": [],
+          "title": "Tool Calls by Service",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(10, sum by (service, span_name) (increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])))",
+                        "legendFormat": "{{service}} :: {{span_name}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Highest-volume Copilot trace spans over the selected range.",
+          "id": 309,
+          "links": [],
+          "title": "Top Trace Spans",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-token-command": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)",
+                        "legendFormat": "claude total",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)",
+                        "legendFormat": "codex total",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "(sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))",
+                        "legendFormat": "total tokens",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
+                        "legendFormat": "claude share",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
+                        "legendFormat": "codex share",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "E",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Canvas summary of Claude and Codex token totals for the selected range. Keep Tokens by Agent for the live trend line.",
+          "id": 216,
+          "links": [],
+          "title": "Token Command Center",
+          "vizConfig": {
+            "group": "canvas",
+            "kind": "VizConfig",
+            "spec": {
+              "options": {
+                "inlineEditing": false,
+                "showAdvancedTypes": false,
+                "root": {
+                  "type": "frame",
+                  "name": "Token Command Center",
+                  "background": {
+                    "color": {
+                      "fixed": "#fffef9"
+                    }
+                  },
+                  "border": {
+                    "color": {
+                      "fixed": "transparent"
+                    }
+                  },
+                  "elements": [
+                    {
+                      "name": "Title",
+                      "type": "text",
+                      "placement": {
+                        "top": 24,
+                        "left": 32,
+                        "width": 420,
+                        "height": 40
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Token Command Center",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 34,
+                        "color": {
+                          "fixed": "#111827"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Subtitle",
+                      "type": "text",
+                      "placement": {
+                        "top": 70,
+                        "left": 34,
+                        "width": 560,
+                        "height": 22
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Range totals for Claude and Codex. Keep Tokens by Agent for the live trend line.",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 15,
+                        "color": {
+                          "fixed": "#6b7280"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Total Label",
+                      "type": "text",
+                      "placement": {
+                        "top": 118,
+                        "left": 34,
+                        "width": 260,
+                        "height": 18
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "All tokens",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 14,
+                        "color": {
+                          "fixed": "#6b7280"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Total Metric",
+                      "type": "metric-value",
+                      "placement": {
+                        "top": 140,
+                        "left": 32,
+                        "width": 430,
+                        "height": 118
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 76,
+                        "color": {
+                          "fixed": "#0f172a"
+                        },
+                        "text": {
+                          "field": "total tokens",
+                          "fixed": "",
+                          "mode": "field"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "#f6f0df"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "#e5d7ab"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Claude Label",
+                      "type": "text",
+                      "placement": {
+                        "top": 102,
+                        "left": 640,
+                        "width": 220,
+                        "height": 18
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Claude total",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 14,
+                        "color": {
+                          "fixed": "#166534"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Claude Metric",
+                      "type": "metric-value",
+                      "placement": {
+                        "top": 124,
+                        "left": 640,
+                        "width": 240,
+                        "height": 84
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 48,
+                        "color": {
+                          "fixed": "#166534"
+                        },
+                        "text": {
+                          "field": "claude total",
+                          "fixed": "",
+                          "mode": "field"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "#eff9f0"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "#b9e3c0"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Codex Label",
+                      "type": "text",
+                      "placement": {
+                        "top": 102,
+                        "left": 918,
+                        "width": 220,
+                        "height": 18
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Codex total",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 14,
+                        "color": {
+                          "fixed": "#9a3412"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Codex Metric",
+                      "type": "metric-value",
+                      "placement": {
+                        "top": 124,
+                        "left": 918,
+                        "width": 240,
+                        "height": 84
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 48,
+                        "color": {
+                          "fixed": "#9a3412"
+                        },
+                        "text": {
+                          "field": "codex total",
+                          "fixed": "",
+                          "mode": "field"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "#fff5eb"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "#f3d2a5"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Claude Share Label",
+                      "type": "text",
+                      "placement": {
+                        "top": 226,
+                        "left": 640,
+                        "width": 220,
+                        "height": 18
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Claude share",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 13,
+                        "color": {
+                          "fixed": "#166534"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Claude Share Metric",
+                      "type": "metric-value",
+                      "placement": {
+                        "top": 248,
+                        "left": 640,
+                        "width": 240,
+                        "height": 46
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 28,
+                        "color": {
+                          "fixed": "#166534"
+                        },
+                        "text": {
+                          "field": "claude share",
+                          "fixed": "",
+                          "mode": "field"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "#f6fbf6"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "#d7eddb"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Codex Share Label",
+                      "type": "text",
+                      "placement": {
+                        "top": 226,
+                        "left": 918,
+                        "width": 220,
+                        "height": 18
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "text": {
+                          "fixed": "Codex share",
+                          "mode": "fixed"
+                        },
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 13,
+                        "color": {
+                          "fixed": "#9a3412"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "transparent"
+                        }
+                      }
+                    },
+                    {
+                      "name": "Codex Share Metric",
+                      "type": "metric-value",
+                      "placement": {
+                        "top": 248,
+                        "left": 918,
+                        "width": 240,
+                        "height": 46
+                      },
+                      "constraint": {
+                        "horizontal": "scale",
+                        "vertical": "scale"
+                      },
+                      "config": {
+                        "align": "left",
+                        "valign": "middle",
+                        "size": 28,
+                        "color": {
+                          "fixed": "#9a3412"
+                        },
+                        "text": {
+                          "field": "codex share",
+                          "fixed": "",
+                          "mode": "field"
+                        }
+                      },
+                      "background": {
+                        "color": {
+                          "fixed": "#fff8f2"
+                        }
+                      },
+                      "border": {
+                        "color": {
+                          "fixed": "#f8e2c7"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "mappings": [],
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "claude share"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "codex share"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      }
+                    ]
+                  }
+                ]
               }
             },
             "version": ""
@@ -2032,12 +3581,52 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "{{model}}"
+                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
+                        "legendFormat": "claude :: {{pretty_model}}"
                       },
                       "version": "v0"
                     },
                     "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"model\", \"(.*)\"))",
+                        "legendFormat": "codex :: {{pretty_model}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "legendFormat": "copilot :: {{pretty_model}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "C"
                   }
                 }
               ],
@@ -2045,10 +3634,10 @@
               "transformations": []
             }
           },
-          "description": "Token growth broken down by Claude model.",
+          "description": "Claude and Codex token volume plus Copilot chat activity, grouped by normalized model name.",
           "id": 16,
           "links": [],
-          "title": "Token Usage by Model",
+          "title": "Model Activity by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -2812,8 +4401,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "{{model}}"
+                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
+                        "legendFormat": "claude :: {{pretty_model}}"
                       },
                       "version": "v0"
                     },
@@ -2825,7 +4414,7 @@
               "transformations": []
             }
           },
-          "description": "Spend trend broken down by Claude model.",
+          "description": "Claude spend trend grouped by normalized model name.",
           "id": 9,
           "links": [],
           "title": "Cost by Model",
@@ -3683,364 +5272,6 @@
             "version": ""
           }
         }
-      },
-      "cockpit-panel-tokens-agent-total": {
-        "kind": "Panel",
-        "spec": {
-          "id": 260,
-          "title": "Tokens by Agent (range total)",
-          "description": "Aggregate token volume per agent over the selected time range.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range]))",
-                        "legendFormat": "claude",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range]))",
-                        "legendFormat": "codex",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "vizConfig": {
-            "group": "bargauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic-by-name"
-                  },
-                  "unit": "short",
-                  "decimals": 0,
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "yellow",
-                        "value": 1000000
-                      },
-                      {
-                        "color": "orange",
-                        "value": 5000000
-                      },
-                      {
-                        "color": "red",
-                        "value": 20000000
-                      }
-                    ]
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "claude"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "green"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "codex"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "orange"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "orientation": "horizontal",
-                "displayMode": "basic",
-                "valueMode": "color",
-                "showUnfilled": true,
-                "minVizWidth": 0,
-                "minVizHeight": 18,
-                "maxVizHeight": 300,
-                "namePlacement": "left",
-                "reduceOptions": {
-                  "calcs": [
-                    "sum"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "sizing": "auto",
-                "legend": {
-                  "showLegend": false
-                }
-              }
-            },
-            "version": ""
-          }
-        }
-      },
-      "cockpit-panel-model-share": {
-        "kind": "Panel",
-        "spec": {
-          "id": 262,
-          "title": "Model Share (range)",
-          "description": "Share of token volume per model across selected time range.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range]))",
-                        "legendFormat": "{{model}}",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum by (model) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range]))",
-                        "legendFormat": "{{model}}",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "vizConfig": {
-            "group": "piechart",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic-by-name"
-                  },
-                  "unit": "short",
-                  "decimals": 0,
-                  "custom": {
-                    "hideFrom": {
-                      "tooltip": false,
-                      "viz": false,
-                      "legend": false
-                    }
-                  },
-                  "mappings": []
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-opus.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "purple"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-sonnet.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "blue"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude-haiku.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "semi-dark-blue"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^gpt-5.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "orange"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^gpt-4.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "dark-orange"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^o1.*|^o3.*"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "yellow"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "reduceOptions": {
-                  "calcs": [
-                    "sum"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "pieType": "donut",
-                "tooltip": {
-                  "mode": "single",
-                  "sort": "desc",
-                  "hideZeros": true
-                },
-                "legend": {
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true,
-                  "values": [
-                    "value",
-                    "percent"
-                  ]
-                },
-                "displayLabels": [
-                  "percent"
-                ]
-              }
-            },
-            "version": ""
-          }
-        }
       }
     },
     "layout": {
@@ -4255,11 +5486,24 @@
                       "spec": {
                         "x": 0,
                         "y": 40,
-                        "width": 12,
-                        "height": 8,
+                        "width": 6,
+                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-tokens-agent-total"
+                          "name": "cockpit-panel-16"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 6,
+                        "y": 40,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-17"
                         }
                       }
                     },
@@ -4268,11 +5512,24 @@
                       "spec": {
                         "x": 12,
                         "y": 40,
-                        "width": 12,
-                        "height": 8,
+                        "width": 6,
+                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-model-share"
+                          "name": "cockpit-panel-18"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 40,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-19"
                         }
                       }
                     }
@@ -4736,6 +5993,155 @@
                         "layout": {
                           "kind": "AutoGridLayout",
                           "spec": {
+                            "columnWidth": 220,
+                            "columnWidthMode": "custom",
+                            "fillScreen": true,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-1"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-2"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-3"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-4"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-5"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-6"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 4,
+                            "rowHeightMode": "short"
+                          }
+                        },
+                        "title": "Summary KPIs"
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-7"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-8"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 2,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Service Activity"
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "copilot-panel-9"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 1,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Tracing"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Copilot Overview"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
                             "columnWidthMode": "standard",
                             "fillScreen": false,
                             "items": [
@@ -4822,6 +6228,7 @@
     "tags": [
       "ai-agents",
       "claude",
+      "copilot",
       "codex",
       "global",
       "observability"
