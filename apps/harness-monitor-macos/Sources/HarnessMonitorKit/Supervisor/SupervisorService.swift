@@ -67,7 +67,9 @@ public actor SupervisorService {
   public func start() async {
     guard !running else { return }
     running = true
-    HarnessMonitorLogger.supervisor.info("supervisor.start interval=\(self.interval, privacy: .public)")
+    HarnessMonitorLogger.supervisor.info(
+      "supervisor.start interval=\(self.interval, privacy: .public)"
+    )
     tickTask = Task { [weak self] in
       guard let self else { return }
       await self.runLoop()
