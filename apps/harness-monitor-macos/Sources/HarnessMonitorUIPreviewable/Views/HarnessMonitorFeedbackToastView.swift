@@ -65,7 +65,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .harnessFloatingControlGlass(
+    .harnessFeedbackToastGlass(
       cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
       tint: tintColor
     )

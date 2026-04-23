@@ -291,3 +291,69 @@ extension View {
     modifier(HarnessMonitorToastDismissGlassModifier())
   }
 }
+
+// MARK: - Feedback toast surface glass (severity-tinted)
+
+private struct HarnessMonitorFeedbackToastGlassModifier: ViewModifier {
+  let cornerRadius: CGFloat
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.72 : 0.6
+    }
+    return colorSchemeContrast == .increased ? 0.55 : 0.42
+  }
+
+  private var fallbackStrokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.85 : 0.65
+  }
+
+  private var fallbackStrokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  private var glassTintOpacity: Double {
+    colorSchemeContrast == .increased ? 0.62 : 0.48
+  }
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    if reduceTransparency {
+      content
+        .background {
+          shape.fill(tint.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          shape.strokeBorder(tint.opacity(fallbackStrokeOpacity), lineWidth: fallbackStrokeWidth)
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(tint.opacity(glassTintOpacity)),
+          in: .rect(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .overlay {
+          shape.strokeBorder(tint.opacity(0.45), lineWidth: 1)
+        }
+    }
+  }
+}
+
+extension View {
+  func harnessFeedbackToastGlass(
+    cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusLG,
+    tint: Color
+  ) -> some View {
+    modifier(
+      HarnessMonitorFeedbackToastGlassModifier(
+        cornerRadius: cornerRadius,
+        tint: tint
+      )
+    )
+  }
+}
