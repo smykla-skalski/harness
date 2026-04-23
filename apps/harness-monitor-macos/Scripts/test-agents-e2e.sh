@@ -2,11 +2,14 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
-REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
-DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
+DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
@@ -29,7 +32,20 @@ CODEX_SESSION_ID="sess-agents-e2e-codex-${RUN_ID}"
 DAEMON_LOG="$LOG_ROOT/daemon.log"
 BRIDGE_LOG="$LOG_ROOT/bridge.log"
 APPROVAL_FILE="$CODEX_WORKSPACE/approved.txt"
-HARNESS_BINARY="$REPO_ROOT/target/debug/harness"
+resolve_harness_binary_path() {
+  local cargo_target_dir
+  cargo_target_dir="$(
+    "$CHECKOUT_ROOT/scripts/cargo-local.sh" --print-env \
+      | awk -F= '/^CARGO_TARGET_DIR=/{print $2}'
+  )"
+  if [[ -z "$cargo_target_dir" ]]; then
+    echo "failed to resolve CARGO_TARGET_DIR via scripts/cargo-local.sh --print-env" >&2
+    exit 1
+  fi
+  printf '%s/debug/harness\n' "$cargo_target_dir"
+}
+
+HARNESS_BINARY="${HARNESS_MONITOR_E2E_HARNESS_BINARY:-$(resolve_harness_binary_path)}"
 KEEP_STATE_ROOT="${HARNESS_MONITOR_E2E_KEEP_STATE_ROOT:-0}"
 CODEX_PORT_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_PORT:-}"
 
@@ -311,7 +327,7 @@ PY
 seed_observability_config
 
 "$ROOT/Scripts/generate-project.sh"
-"$REPO_ROOT/scripts/cargo-local.sh" build --bin harness
+"$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
   -project "$ROOT/HarnessMonitor.xcodeproj"

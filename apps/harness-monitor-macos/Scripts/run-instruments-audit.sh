@@ -3,9 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
+CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 PROJECT_PATH="$APP_ROOT/HarnessMonitor.xcodeproj"
-DERIVED_DATA_PATH="$REPO_ROOT/xcode-derived"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$APP_ROOT/Scripts/xcodebuild-with-lock.sh}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
@@ -119,15 +120,6 @@ contains() {
   return 1
 }
 
-resolve_common_repo_root() {
-  local common_git_dir
-  common_git_dir="$(git -C "$REPO_ROOT" rev-parse --git-common-dir)"
-  if [[ "$common_git_dir" != /* ]]; then
-    common_git_dir="$REPO_ROOT/$common_git_dir"
-  fi
-  CDPATH='' cd -- "$common_git_dir/.." && pwd
-}
-
 resolve_existing_path() {
   local candidate="$1"
   local resolved=""
@@ -142,8 +134,8 @@ resolve_existing_path() {
     resolved="$(CDPATH='' cd -- "$(dirname -- "$candidate")" && pwd)/$(basename -- "$candidate")"
   elif [[ -e "$COMMON_REPO_ROOT/$candidate" ]]; then
     resolved="$COMMON_REPO_ROOT/$candidate"
-  elif [[ -e "$REPO_ROOT/$candidate" ]]; then
-    resolved="$REPO_ROOT/$candidate"
+  elif [[ -e "$CHECKOUT_ROOT/$candidate" ]]; then
+    resolved="$CHECKOUT_ROOT/$candidate"
   else
     return 1
   fi
@@ -189,7 +181,7 @@ duration_for() {
   esac
 }
 
-COMMON_REPO_ROOT="$(resolve_common_repo_root)"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 RUNS_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/runs"
 STAGED_HOST_STAGE_ROOT="$COMMON_REPO_ROOT/tmp/perf/harness-monitor-instruments/staged-host"
 AUDIT_LOCK_DIR="$RUNS_ROOT/.audit.lock"

@@ -3,7 +3,10 @@ set -euo pipefail
 unalias -a 2>/dev/null || true
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
-lease_dir="$ROOT/target/.cargo-local/leases"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+lease_dir="$COMMON_REPO_ROOT/target/.cargo-local/leases"
 lease_path=""
 active_build_count=1
 
@@ -169,7 +172,7 @@ if [[ -n "$session_id" ]]; then
 fi
 
 if ! tmpdir_is_usable "${TMPDIR:-}"; then
-  tmpdir_fallback="$ROOT/target/.cargo-local/tmp/$target_segment"
+  tmpdir_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$target_segment"
   mkdir -p "$tmpdir_fallback"
   if ! tmpdir_is_usable "$tmpdir_fallback"; then
     printf 'failed to prepare writable TMPDIR at %s\n' "$tmpdir_fallback" >&2
@@ -178,7 +181,7 @@ if ! tmpdir_is_usable "${TMPDIR:-}"; then
   export TMPDIR="$tmpdir_fallback/"
 fi
 
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$ROOT/target/dev/$target_segment}}"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 
 if [[ -z "${RUSTC_WRAPPER:-}" ]] && command -v sccache >/dev/null 2>&1; then

@@ -15,6 +15,7 @@ Validation expectations (run from repo root):
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
+  Repo scripts and `apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh` resolve those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout.
 - For local macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'`. Xcode sees both `My Mac` and `Any Mac`, prints `Using the first of multiple matching destinations`, and silently picks one. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64` destinations. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless you intentionally need a stricter `id=...` selector.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
@@ -42,7 +43,7 @@ Targeted run (single scenario):
 ```bash
 xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' \
   -scheme 'HarnessMonitor' -destination "platform=macOS,arch=$(uname -m),name=My Mac" \
-  -derivedDataPath xcode-derived \
+  -derivedDataPath "$(git rev-parse --path-format=absolute --git-common-dir | sed 's#/\\.git$##')/xcode-derived" \
   test -only-testing:HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate
 ```
 

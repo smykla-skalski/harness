@@ -1,5 +1,9 @@
 #!/bin/bash
 
+COMMON_REPO_ROOT_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../../scripts/lib" && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$COMMON_REPO_ROOT_LIB_DIR/common-repo-root.sh"
+
 resolve_repo_root() {
   local candidate="${PROJECT_DIR:-}"
   while [ -n "$candidate" ] && [ "$candidate" != "/" ]; do
@@ -15,7 +19,9 @@ resolve_repo_root() {
 
 default_cargo_target_dir() {
   local resolved_repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
-  printf '%s/target/harness-monitor-xcode-daemon\n' "$resolved_repo_root"
+  local common_repo_root
+  common_repo_root="$(resolve_common_repo_root "$resolved_repo_root")"
+  printf '%s/target/harness-monitor-xcode-daemon\n' "$common_repo_root"
 }
 
 resolve_cargo_target_dir() {

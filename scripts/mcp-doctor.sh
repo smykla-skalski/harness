@@ -4,6 +4,11 @@
 # any critical check fails so this can drive CI or pre-flight scripts.
 set -uo pipefail
 
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+
 pass="\033[32mPASS\033[0m"
 fail="\033[31mFAIL\033[0m"
 warn="\033[33mWARN\033[0m"
@@ -73,7 +78,7 @@ fi
 # 3. Monitor.app build
 
 section "Harness Monitor.app"
-app_path="xcode-derived/Build/Products/Debug/Harness Monitor.app"
+app_path="$COMMON_REPO_ROOT/xcode-derived/Build/Products/Debug/Harness Monitor.app"
 if [[ -d "$app_path" ]]; then
   ok "Debug build present" "$app_path"
 else

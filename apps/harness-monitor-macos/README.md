@@ -30,10 +30,12 @@ apps/harness-monitor-macos/Scripts/test-swift.sh
 When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `xcode-derived` build database:
 
 ```bash
-apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived build CODE_SIGNING_ALLOWED=NO
+apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug build CODE_SIGNING_ALLOWED=NO
 ```
 
-`monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against `xcode-derived`.
+The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one DerivedData tree instead of bloating each checkout.
+
+`monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against the shared `xcode-derived`.
 
 `monitor:macos:test` runs the same quality gates first, then executes:
 

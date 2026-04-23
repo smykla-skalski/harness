@@ -21,10 +21,12 @@ The repo `mise` tasks route Rust compilation through [`scripts/cargo-local.sh`](
 - Plain `cargo` invocations also pick up local compiler caching through [`.cargo/config.toml`](.cargo/config.toml), which dispatches to [`scripts/rustc-cache-wrapper.sh`](scripts/rustc-cache-wrapper.sh) and falls back cleanly when `sccache` is unavailable.
 - Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
 - Concurrent wrapper invocations automatically reduce their default job budgets based on the number of active local Rust builds, so a second or third agent does not assume it owns the whole machine.
-- Agent sessions get isolated target directories under `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use `target/dev/local`.
+- Agent sessions get isolated target directories under the shared git-common-root `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use the shared `target/dev/local`, so extra worktrees reuse the same artifacts instead of cloning a new `target/` tree per checkout.
 - Full release installs still sign and install the binary locally, but now respect `CARGO_TARGET_DIR` so the build and install steps stay aligned.
 
 Without `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Install `sccache` if you want multi-agent sessions to reuse most compile work instead of rebuilding the same crates in parallel.
+
+Linked git worktrees share the same wrapper-managed `target/`, `xcode-derived/`, and `xcode-derived-instruments/` roots under the repository common dir. Repo scripts and `mise` tasks resolve those shared paths automatically, so routine worktree use does not spray duplicate build trees across each checkout.
 
 Inspect the current wrapper settings with:
 

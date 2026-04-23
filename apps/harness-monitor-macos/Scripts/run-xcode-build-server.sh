@@ -1,6 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+BUILD_ROOT="${XCODE_BUILD_SERVER_BUILD_ROOT:-$COMMON_REPO_ROOT/xcode-derived}"
+SERVER_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/harness-xcode-build-server.XXXXXX")"
+
+cleanup() {
+  rm -rf "$SERVER_TMP_DIR"
+}
+
+trap cleanup EXIT
+
 if [ -n "${XCODE_BUILD_SERVER_BIN:-}" ]; then
   if [ ! -x "$XCODE_BUILD_SERVER_BIN" ]; then
     echo "XCODE_BUILD_SERVER_BIN must point to an executable xcode-build-server binary" >&2
@@ -15,4 +30,12 @@ if [ -z "$XCODE_BUILD_SERVER_BIN" ]; then
   exit 1
 fi
 
-exec "$XCODE_BUILD_SERVER_BIN" "$@"
+(
+  cd "$SERVER_TMP_DIR"
+  "$XCODE_BUILD_SERVER_BIN" config \
+    -project "$APP_ROOT/HarnessMonitor.xcodeproj" \
+    -scheme "HarnessMonitor" \
+    --build_root "$BUILD_ROOT" \
+    --skip-validate-bin >/dev/null
+  "$XCODE_BUILD_SERVER_BIN" serve "$@"
+)
