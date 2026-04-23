@@ -334,13 +334,13 @@ release_products_are_current() {
 cleanup_host_processes() {
   local pids
   pids="$(
-    ps -Ao pid=,command= \
+    ps -Ao pid=,command= 2>/dev/null \
       | awk '
         /Harness Monitor UI Testing[.]app\/Contents\/MacOS\/Harness Monitor UI Testing/ { print $1; next }
         /target\/debug\/harness daemon serve/ { print $1; next }
         /target\/debug\/harness bridge start/ { print $1; next }
         /[\/]mock-codex([[:space:]]|$)/ { print $1; next }
-      '
+      ' || true
   )"
   if [[ -z "$pids" ]]; then
     return
@@ -539,35 +539,6 @@ acquire_audit_lock() {
   local run_dir="$4"
 
   mkdir -p "$RUNS_ROOT"
-  local active_audit_processes active_pid active_ppid active_command
-  active_audit_processes="$(
-    ps -Ao pid=,ppid=,command= \
-      | awk '
-        /run-instruments-audit[.]sh/ {
-          pid = $1
-          ppid = $2
-          $1 = ""
-          $2 = ""
-          sub(/^  */, "")
-          printf "%s\t%s\t%s\n", pid, ppid, $0
-        }
-      '
-  )"
-  while IFS=$'\t' read -r active_pid active_ppid active_command; do
-    if [[ -z "$active_pid" ]]; then
-      continue
-    fi
-    if [[ "$active_command" == *"harness hook --agent codex suite:run audit-turn"* ]]; then
-      continue
-    fi
-    if [[ "$active_pid" != "$$" && "$active_pid" != "$PPID" && "$active_ppid" != "$$" ]]; then
-      printf 'Another audit script process is already active (pid=%s command=%s). Wait for it to finish before starting %s.\n' \
-        "$active_pid" \
-        "$active_command" \
-        "$run_id" >&2
-      exit 1
-    fi
-  done <<<"$active_audit_processes"
 
   if mkdir "$AUDIT_LOCK_DIR" 2>/dev/null; then
     write_lock_info "$run_id" "$run_label" "$started_at_utc" "$run_dir"
@@ -591,6 +562,134 @@ acquire_audit_lock() {
   rm -rf "$AUDIT_LOCK_DIR"
   mkdir "$AUDIT_LOCK_DIR"
   write_lock_info "$run_id" "$run_label" "$started_at_utc" "$run_dir"
+}
+
+enforce_instruments_metric_budgets() {
+  local summary_path="$1"
+
+  python3 - "$summary_path" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+summary = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+
+SWIFTUI_BUDGETS: dict[str, dict[str, float]] = {
+    "launch-dashboard": {
+        "total_updates": 25_000,
+        "body_updates": 2_500,
+        "max_update_group_ms": 50,
+        "hitches": 0,
+        "potential_hangs": 0,
+    },
+    "select-session-cockpit": {
+        "total_updates": 35_000,
+        "body_updates": 3_500,
+        "max_update_group_ms": 50,
+        "hitches": 0,
+        "potential_hangs": 0,
+    },
+    "refresh-and-search": {
+        "total_updates": 30_000,
+        "body_updates": 3_000,
+        "max_update_group_ms": 50,
+        "hitches": 0,
+        "potential_hangs": 0,
+    },
+    "timeline-burst": {
+        "total_updates": 30_000,
+        "body_updates": 3_000,
+        "max_update_group_ms": 50,
+        "hitches": 0,
+        "potential_hangs": 0,
+    },
+}
+DEFAULT_SWIFTUI_BUDGET = {
+    "total_updates": 35_000,
+    "body_updates": 3_500,
+    "max_update_group_ms": 50,
+    "hitches": 0,
+    "potential_hangs": 0,
+}
+ALLOCATIONS_BUDGETS: dict[str, dict[str, float]] = {
+    "settings-background-cycle": {"heap_total_bytes": 350 * 1024 * 1024},
+    "settings-backdrop-cycle": {"heap_total_bytes": 350 * 1024 * 1024},
+    "offline-cached-open": {"heap_total_bytes": 300 * 1024 * 1024},
+}
+
+
+def metric(metrics: dict[str, Any], *path: str) -> float:
+    value: Any = metrics
+    for key in path:
+        if not isinstance(value, dict):
+            return 0
+        value = value.get(key, 0)
+    if isinstance(value, int | float):
+        return float(value)
+    return 0
+
+
+def assert_swiftui_budget(capture: dict[str, Any]) -> list[str]:
+    scenario = capture["scenario"]
+    metrics = capture.get("metrics", {})
+    budget = SWIFTUI_BUDGETS.get(scenario, DEFAULT_SWIFTUI_BUDGET)
+    failures: list[str] = []
+
+    checks = {
+        "total_updates": metric(metrics, "swiftui_updates", "total_count"),
+        "body_updates": metric(metrics, "swiftui_updates", "body_update_count"),
+        "max_update_group_ms": metric(metrics, "swiftui_update_groups", "duration_ns_max")
+        / 1_000_000,
+        "hitches": metric(metrics, "hitches", "count"),
+        "potential_hangs": metric(metrics, "potential_hangs", "count"),
+    }
+    for name, value in checks.items():
+        limit = budget[name]
+        if value > limit:
+            failures.append(
+                f"{scenario} SwiftUI {name} exceeded budget: {value:g} > {limit:g}"
+            )
+    return failures
+
+
+def assert_allocations_budget(capture: dict[str, Any]) -> list[str]:
+    scenario = capture["scenario"]
+    budget = ALLOCATIONS_BUDGETS.get(scenario)
+    if budget is None:
+        return []
+
+    summary_rows = (
+        capture.get("metrics", {})
+        .get("allocations", {})
+        .get("summary_rows", {})
+    )
+    heap = summary_rows.get("All Heap Allocations", {})
+    total_bytes = float(heap.get("total_bytes", 0) or 0)
+    limit = budget["heap_total_bytes"]
+    if total_bytes > limit:
+        return [
+            f"{scenario} Allocations heap_total_bytes exceeded budget: "
+            f"{total_bytes:g} > {limit:g}"
+        ]
+    return []
+
+
+failures: list[str] = []
+for capture in summary.get("captures", []):
+    if capture.get("template") == "SwiftUI":
+        failures.extend(assert_swiftui_budget(capture))
+    elif capture.get("template") == "Allocations":
+        failures.extend(assert_allocations_budget(capture))
+
+if failures:
+    print("Instruments metric budgets failed:", file=sys.stderr)
+    for failure in failures:
+        print(f"- {failure}", file=sys.stderr)
+    raise SystemExit(1)
+PY
 }
 
 plist_value() {
@@ -676,9 +775,13 @@ include_paths = [
     root / "HarnessMonitorUITestHost.entitlements",
     root / "HarnessMonitorDaemon.entitlements",
     root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
+    root / "Resources",
+    root / "Scripts" / "bundle-daemon-agent.sh",
+    root / "Scripts" / "run-instruments-audit.sh",
     root / "Sources" / "HarnessMonitor",
     root / "Sources" / "HarnessMonitorKit",
-    root / "Sources" / "HarnessMonitorUI",
+    root / "Sources" / "HarnessMonitorUIPreviewable",
+    root / "Sources" / "HarnessMonitorUITestHost",
 ]
 digest = hashlib.sha256()
 
@@ -1252,6 +1355,7 @@ Path(manifest_path).write_text(json.dumps(manifest, indent=2, sort_keys=True), e
 PY
 
 python3 "$SCRIPT_DIR/extract-instruments-metrics.py" --run-dir "$run_dir"
+enforce_instruments_metric_budgets "$run_dir/summary.json"
 
 if [[ -n "$compare_to" ]]; then
   python3 "$SCRIPT_DIR/compare-instruments-runs.py" \
