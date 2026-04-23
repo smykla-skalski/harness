@@ -358,13 +358,17 @@ private struct PreferencesVoiceStatusValue: View {
   let text: String
 
   init(_ text: String) {
-    self.text = text
+    var trimmed = text
+    while trimmed.hasSuffix(".") {
+      trimmed.removeLast()
+    }
+    self.text = trimmed
   }
 
   var body: some View {
     Text(text)
+      .lineLimit(1)
+      .truncationMode(.tail)
       .multilineTextAlignment(.trailing)
-      .fixedSize(horizontal: false, vertical: true)
-      .frame(maxWidth: 280, alignment: .trailing)
   }
 }
