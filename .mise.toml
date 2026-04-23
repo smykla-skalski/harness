@@ -77,7 +77,7 @@ description = "Run the strict Swift format and build-tool-plugin quality gates f
 run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
 [tasks."monitor:macos:test"]
-description = "Generate, lint, and test the Harness Monitor macOS app"
+description = "Generate, lint, and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
 [tasks."monitor:macos:test:agents-e2e"]
