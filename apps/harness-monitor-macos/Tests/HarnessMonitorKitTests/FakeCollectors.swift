@@ -304,17 +304,17 @@ private func extractDataPoints(
   switch metric.data {
   case .sum(let sum):
     for dp in sum.dataPoints {
-      let pairs = dp.attributes.map { ($0.key, $0.value.stringValue) }
+      let pairs = dp.attributes.map { ($0.key, attributeStringValue($0.value)) }
       points.append(MetricDataPoint(attributes: Dictionary(uniqueKeysWithValues: pairs)))
     }
   case .gauge(let gauge):
     for dp in gauge.dataPoints {
-      let pairs = dp.attributes.map { ($0.key, $0.value.stringValue) }
+      let pairs = dp.attributes.map { ($0.key, attributeStringValue($0.value)) }
       points.append(MetricDataPoint(attributes: Dictionary(uniqueKeysWithValues: pairs)))
     }
   case .histogram(let histogram):
     for dp in histogram.dataPoints {
-      let pairs = dp.attributes.map { ($0.key, $0.value.stringValue) }
+      let pairs = dp.attributes.map { ($0.key, attributeStringValue($0.value)) }
       points.append(MetricDataPoint(attributes: Dictionary(uniqueKeysWithValues: pairs)))
     }
   case .exponentialHistogram, .summary, .none:
@@ -322,4 +322,29 @@ private func extractDataPoints(
   }
 
   return points
+}
+
+private func attributeStringValue(
+  _ value: Opentelemetry_Proto_Common_V1_AnyValue
+) -> String {
+  switch value.value {
+  case .stringValue(let string):
+    string
+  case .boolValue(let bool):
+    bool ? "true" : "false"
+  case .intValue(let int):
+    String(int)
+  case .doubleValue(let double):
+    String(double)
+  case .arrayValue(let array):
+    array.values.map(attributeStringValue).joined(separator: ",")
+  case .kvlistValue(let list):
+    list.values
+      .map { "\($0.key)=\(attributeStringValue($0.value))" }
+      .joined(separator: ",")
+  case .bytesValue(let bytes):
+    bytes.map { String(format: "%02x", $0) }.joined()
+  case .none:
+    ""
+  }
 }

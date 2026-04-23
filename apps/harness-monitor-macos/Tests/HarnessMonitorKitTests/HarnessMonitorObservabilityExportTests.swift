@@ -251,51 +251,10 @@ struct HarnessMonitorObservabilityGRPCExportTests {
 
     try await waitForTraceExport(timeout: .seconds(5)) {
       let spans = collector.traceCollector.exportedSpans
-      let hasBootstrapSpan = spans.contains {
-        $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
-      }
-      let hasMonitorClientSpan = spans.contains {
-        $0.serviceName == "harness-monitor" && $0.name == "daemon.websocket.rpc"
-      }
-      let hasDaemonSessionsSpan = spans.contains {
-        $0.serviceName == "harness-daemon" && $0.name == "sessions"
-      }
-      let hasDaemonDbSpan = spans.contains {
-        $0.serviceName == "harness-daemon" && $0.name == "daemon.db.async.list_session_summaries"
-      }
-      return hasBootstrapSpan && hasMonitorClientSpan && hasDaemonSessionsSpan && hasDaemonDbSpan
+      return hasBootstrapTransportTrace(spans)
     }
 
-    let spans = collector.traceCollector.exportedSpans
-    let bootstrapSpan = try #require(
-      spans.last {
-        $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
-      }
-    )
-    let monitorClientSpans = spans.filter {
-      $0.serviceName == "harness-monitor"
-        && $0.name == "daemon.websocket.rpc"
-        && $0.traceID == bootstrapSpan.traceID
-        && $0.parentSpanID == bootstrapSpan.spanID
-    }
-    let daemonSpan = try #require(
-      spans.last {
-        $0.serviceName == "harness-daemon"
-          && $0.name == "sessions"
-          && $0.traceID == bootstrapSpan.traceID
-      }
-    )
-    let dbSpan = try #require(
-      spans.last {
-        $0.serviceName == "harness-daemon"
-          && $0.name == "daemon.db.async.list_session_summaries"
-          && $0.traceID == bootstrapSpan.traceID
-      }
-    )
-
-    #expect(monitorClientSpans.isEmpty == false)
-    #expect(monitorClientSpans.contains { $0.spanID == daemonSpan.parentSpanID })
-    #expect(dbSpan.parentSpanID == daemonSpan.spanID)
+    try assertBootstrapTransportTrace(collector.traceCollector.exportedSpans)
   }
 
   @Test("gRPC export preserves pre-collector root spans until the loopback collector is reachable")
@@ -370,6 +329,12 @@ struct HarnessMonitorObservabilityGRPCExportTests {
         HarnessMonitorTelemetry.shared.state.deferredExportActivation == nil
       }
     )
+    let activationSpan = HarnessMonitorTelemetry.shared.startSpan(
+      name: "app.lifecycle.deferred_bootstrap_activated",
+      kind: .internal
+    )
+    activationSpan.end()
+    HarnessMonitorTelemetry.shared.forceFlush()
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForAllSignalExports(
@@ -387,4 +352,60 @@ struct HarnessMonitorObservabilityGRPCExportTests {
       }
     )
   }
+}
+
+private func hasBootstrapTransportTrace(_ spans: [CollectedTraceSpan]) -> Bool {
+  let hasBootstrapSpan = spans.contains {
+    $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
+  }
+  let hasMonitorClientSpan = spans.contains {
+    $0.serviceName == "harness-monitor" && $0.name == "daemon.websocket.rpc"
+  }
+  let hasDaemonSessionsSpan = spans.contains {
+    $0.serviceName == "harness-daemon" && $0.name == "sessions"
+  }
+  let hasDaemonDbSpan = spans.contains {
+    $0.serviceName == "harness-daemon" && $0.name == "daemon.db.async.list_session_summaries"
+  }
+  return hasBootstrapSpan && hasMonitorClientSpan && hasDaemonSessionsSpan && hasDaemonDbSpan
+}
+
+private func assertBootstrapTransportTrace(_ spans: [CollectedTraceSpan]) throws {
+  let bootstrapSpan = try #require(
+    spans.last {
+      $0.serviceName == "harness-monitor" && $0.name == "app.lifecycle.bootstrap"
+    }
+  )
+  let initialConnectSpan = try #require(
+    spans.last {
+      $0.serviceName == "harness-monitor"
+        && $0.name == "app.lifecycle.bootstrap.managed_initial_connect"
+        && $0.traceID == bootstrapSpan.traceID
+    }
+  )
+  let monitorClientSpans = spans.filter {
+    $0.serviceName == "harness-monitor"
+      && $0.name == "daemon.websocket.rpc"
+      && $0.traceID == bootstrapSpan.traceID
+  }
+  let daemonSpan = try #require(
+    spans.last {
+      $0.serviceName == "harness-daemon"
+        && $0.name == "sessions"
+        && $0.traceID == bootstrapSpan.traceID
+    }
+  )
+  let dbSpan = try #require(
+    spans.last {
+      $0.serviceName == "harness-daemon"
+        && $0.name == "daemon.db.async.list_session_summaries"
+        && $0.traceID == bootstrapSpan.traceID
+    }
+  )
+
+  #expect(initialConnectSpan.parentSpanID == bootstrapSpan.spanID)
+  #expect(monitorClientSpans.isEmpty == false)
+  #expect(monitorClientSpans.contains { $0.parentSpanID == initialConnectSpan.spanID })
+  #expect(monitorClientSpans.contains { $0.spanID == daemonSpan.parentSpanID })
+  #expect(dbSpan.parentSpanID == daemonSpan.spanID)
 }
