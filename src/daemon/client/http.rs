@@ -1,11 +1,11 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tracing::field::{Empty, display};
 use uuid::Uuid;
 
-use super::{DaemonClient, MUTATION_TIMEOUT};
+use super::{DaemonClient, MUTATION_TIMEOUT, SESSION_START_TIMEOUT};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_client_metrics};
@@ -85,13 +85,21 @@ impl DaemonClient {
                 .bearer_auth(&self.token)
                 .header("x-request-id", &request_id)
                 .json(body)
-                .timeout(MUTATION_TIMEOUT);
+                .timeout(mutation_timeout_for_path(path));
             for (header, value) in &propagation_headers {
                 request = request.header(header, value);
             }
             request.send().await
         });
         process_response(response, "POST", path, &request_id, &start)
+    }
+}
+
+pub(super) fn mutation_timeout_for_path(path: &str) -> Duration {
+    if path == "/v1/sessions" {
+        SESSION_START_TIMEOUT
+    } else {
+        MUTATION_TIMEOUT
     }
 }
 
