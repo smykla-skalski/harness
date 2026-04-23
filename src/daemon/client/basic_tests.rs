@@ -16,7 +16,7 @@ use super::DaemonClient;
 use super::connection::{
     daemon_client_allowed_in_current_context, try_build_client, wait_for_authenticated_api,
 };
-use super::http::parse_error_response;
+use super::http::{mutation_timeout_for_path, parse_error_response};
 use super::test_support::{read_http_request, write_http_response};
 
 #[test]
@@ -219,6 +219,18 @@ fn wait_for_authenticated_api_retries_ready_probe_until_it_succeeds() {
     let observed = paths.lock().expect("paths lock").clone();
     assert_eq!(observed, vec!["/v1/ready", "/v1/ready"]);
     server.join().expect("server");
+}
+
+#[test]
+fn mutation_timeout_uses_longer_deadline_for_session_start() {
+    assert_eq!(
+        mutation_timeout_for_path("/v1/sessions"),
+        Duration::from_secs(30)
+    );
+    assert_eq!(
+        mutation_timeout_for_path("/v1/sessions/sess-123/task"),
+        Duration::from_secs(5)
+    );
 }
 
 #[test]

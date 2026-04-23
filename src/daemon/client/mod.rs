@@ -39,3 +39,4 @@ const HEALTH_TIMEOUT: Duration = Duration::from_millis(500);
 const API_READY_TIMEOUT: Duration = Duration::from_secs(2);
 const API_READY_INTERVAL: Duration = Duration::from_millis(100);
 const MUTATION_TIMEOUT: Duration = Duration::from_secs(5);
+const SESSION_START_TIMEOUT: Duration = Duration::from_secs(30);
