@@ -4,7 +4,9 @@ import XCTest
 @testable import HarnessMonitorUIPreviewable
 
 /// Tests for the pure grouping/sorting/filtering logic behind `DecisionsSidebar`. The view
-/// binds to these results via `DecisionsSidebarViewModel.grouped(decisions:query:minSeverity:)`.
+/// binds to these results via `DecisionsSidebarViewModel.grouped(decisions:query:severities:)`.
+/// An empty `severities` set means "show all severities"; any non-empty set filters to exactly
+/// the supplied members (multi-select semantics).
 final class DecisionsSidebarViewModelTests: XCTestCase {
   private func makeDecision(
     id: String,
@@ -35,7 +37,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .info
+      severities: []
     )
 
     XCTAssertEqual(groups.count, 2)
@@ -54,7 +56,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .info
+      severities: []
     )
 
     XCTAssertTrue(groups.contains { $0.sessionID == nil })
@@ -72,7 +74,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .info
+      severities: []
     )
 
     XCTAssertEqual(groups.count, 1)
@@ -89,14 +91,14 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "agent",
-      minSeverity: .info
+      severities: []
     )
 
     let ids = groups.flatMap { $0.decisions.map(\.id) }
     XCTAssertEqual(ids, ["d1"])
   }
 
-  func test_grouped_filtersByMinimumSeverity() {
+  func test_grouped_filtersBySeveritySet() {
     let decisions = [
       makeDecision(id: "info", severity: .info, summary: "a", sessionID: "s1"),
       makeDecision(id: "warn", severity: .warn, summary: "b", sessionID: "s1"),
@@ -107,11 +109,47 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .needsUser
+      severities: [.needsUser, .critical]
     )
 
     let ids = groups.flatMap { $0.decisions.map(\.id) }
     XCTAssertEqual(ids.sorted(), ["crit", "needs"])
+  }
+
+  func test_grouped_severitySetIsExactMatchNotFloor() {
+    // Picking only `.warn` must hide critical and needsUser above it, proving multi-select
+    // semantics (exact membership) rather than the old minimum-severity floor behavior.
+    let decisions = [
+      makeDecision(id: "info", severity: .info, summary: "a", sessionID: "s1"),
+      makeDecision(id: "warn", severity: .warn, summary: "b", sessionID: "s1"),
+      makeDecision(id: "needs", severity: .needsUser, summary: "c", sessionID: "s1"),
+      makeDecision(id: "crit", severity: .critical, summary: "d", sessionID: "s1"),
+    ]
+
+    let groups = DecisionsSidebarViewModel.grouped(
+      decisions: decisions,
+      query: "",
+      severities: [.warn]
+    )
+
+    let ids = groups.flatMap { $0.decisions.map(\.id) }
+    XCTAssertEqual(ids, ["warn"])
+  }
+
+  func test_grouped_emptySeveritySetShowsAll() {
+    let decisions = [
+      makeDecision(id: "info", severity: .info, summary: "a", sessionID: "s1"),
+      makeDecision(id: "crit", severity: .critical, summary: "b", sessionID: "s1"),
+    ]
+
+    let groups = DecisionsSidebarViewModel.grouped(
+      decisions: decisions,
+      query: "",
+      severities: []
+    )
+
+    let ids = groups.flatMap { $0.decisions.map(\.id) }
+    XCTAssertEqual(ids.sorted(), ["crit", "info"])
   }
 
   func test_grouped_dropsEmptySessionGroupsAfterFiltering() {
@@ -123,7 +161,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .critical
+      severities: [.critical]
     )
 
     XCTAssertEqual(groups.count, 1)
@@ -138,7 +176,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "zzz",
-      minSeverity: .info
+      severities: []
     )
 
     XCTAssertTrue(groups.isEmpty)
@@ -153,7 +191,7 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     let groups = DecisionsSidebarViewModel.grouped(
       decisions: decisions,
       query: "",
-      minSeverity: .info
+      severities: []
     )
 
     XCTAssertEqual(groups.count, 2)
