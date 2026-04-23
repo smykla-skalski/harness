@@ -40,8 +40,8 @@ actor SwiftDataSupervisorAuditWriter: SupervisorAuditWriter {
       )
       try context.save()
     } catch {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.audit_append_failed error=\(String(describing: error), privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.audit_append_failed error=\(String(describing: error))"
       )
     }
   }
@@ -108,8 +108,8 @@ extension HarnessMonitorStore {
         )
       }
     } catch {
-      HarnessMonitorLogger.supervisor.warning(
-        "supervisor.policy_config_load_failed error=\(String(describing: error), privacy: .public)"
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.policy_config_load_failed error=\(String(describing: error))"
       )
       return []
     }

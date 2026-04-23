@@ -138,7 +138,7 @@ public struct DaemonDisconnectRule: PolicyRule {
       ),
       let json = String(data: data, encoding: .utf8)
     else {
-      HarnessMonitorLogger.supervisor.error(
+      HarnessMonitorLogger.supervisorError(
         "daemon-disconnect failed to encode context JSON"
       )
       return "{}"
