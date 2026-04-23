@@ -31,9 +31,7 @@ public struct PreferencesMCPSection: View {
             .scaledFont(.caption)
             .foregroundStyle(.orange)
         }
-        Text(socketDescription)
-          .scaledFont(.caption)
-          .foregroundStyle(.secondary)
+        socketPathRow
       } header: {
         Text("Accessibility Registry")
       } footer: {
@@ -56,11 +54,26 @@ public struct PreferencesMCPSection: View {
       + "regardless of the toggle."
   }
 
-  private var socketDescription: String {
+  @ViewBuilder private var socketPathRow: some View {
     if let socket = HarnessMonitorMCPSocketPath.resolved() {
-      "Socket path: \(socket.path)"
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Text("Socket path:")
+          .fixedSize(horizontal: true, vertical: false)
+        Text(socket.path)
+          .monospaced()
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .scaledFont(.caption)
+      .foregroundStyle(.secondary)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(Text("Socket path: \(socket.path)"))
     } else {
-      "Socket path: unavailable (app-group container not resolved)"
+      Text("Socket path: unavailable (app-group container not resolved)")
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
     }
   }
 }
