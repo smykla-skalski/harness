@@ -2,6 +2,31 @@ import Foundation
 import Observation
 import UserNotifications
 
+public protocol HarnessMonitorUserNotificationCenter: AnyObject {
+  var delegate: UNUserNotificationCenterDelegate? { get set }
+
+  func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
+  func notificationSettings() async -> UNNotificationSettings
+  func pendingNotificationRequests() async -> [UNNotificationRequest]
+  func deliveredNotifications() async -> [UNNotification]
+  func notificationCategories() async -> Set<UNNotificationCategory>
+  func add(_ request: UNNotificationRequest) async throws
+  func removeAllPendingNotificationRequests()
+  func removeAllDeliveredNotifications()
+  func setBadgeCount(_ newBadgeCount: Int) async throws
+  func setNotificationCategories(_ categories: Set<UNNotificationCategory>)
+}
+
+extension UNUserNotificationCenter: HarnessMonitorUserNotificationCenter {}
+
+private final class HarnessMonitorUserNotificationCenterBox: @unchecked Sendable {
+  let base: any HarnessMonitorUserNotificationCenter
+
+  init(_ base: any HarnessMonitorUserNotificationCenter) {
+    self.base = base
+  }
+}
+
 @MainActor
 @Observable
 public final class HarnessMonitorUserNotificationController: NSObject,
@@ -17,20 +42,29 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   public private(set) var lastResponse: HarnessMonitorNotificationResponseSnapshot?
   public private(set) var settingsOpenRequestID = 0
 
-  /// Last decision id requested by a supervisor notification tap. Phase 2 worker 21 publishes
-  /// into this property from the response handler; the scene-support layer observes it and
-  /// calls `openWindow(id: .decisions)` with the selected decision.
+  /// Last decision id requested by a supervisor notification tap. The scene-support layer
+  /// observes this property and calls `openWindow(id: .decisions)` with the selected decision.
+  /// The value is rewritten on every `Open` tap - even when the new id equals the previous one -
+  /// so observers see each tap as a fresh event (the scene view reads the value once per change
+  /// of `@Bindable`/`@Observable` tracking).
   public private(set) var decisionRequestedID: UUID?
 
-  @ObservationIgnored private let center: UNUserNotificationCenter
+  /// Bumped on every supervisor decision tap that publishes `decisionRequestedID`. Observers
+  /// key off this counter to distinguish consecutive taps that resolve to the same decision id.
+  public private(set) var decisionRequestTick: Int = 0
+
+  public typealias DecisionResolveHandler = @Sendable (String, DecisionOutcome) async -> Void
+
+  @ObservationIgnored private let centerBox: HarnessMonitorUserNotificationCenterBox
   @ObservationIgnored private let assetWriter: HarnessMonitorNotificationAssetWriting
   @ObservationIgnored private var isActivated = false
+  @ObservationIgnored private var resolveHandler: DecisionResolveHandler?
 
   public init(
-    center: UNUserNotificationCenter = .current(),
+    center: any HarnessMonitorUserNotificationCenter = UNUserNotificationCenter.current(),
     assetWriter: HarnessMonitorNotificationAssetWriting = HarnessMonitorNotificationAssetWriter()
   ) {
-    self.center = center
+    centerBox = HarnessMonitorUserNotificationCenterBox(center)
     self.assetWriter = assetWriter
     super.init()
   }
@@ -50,9 +84,57 @@ public final class HarnessMonitorUserNotificationController: NSObject,
       return
     }
     isActivated = true
-    center.delegate = self
+    centerBox.base.delegate = self
     registerCategories()
     Task { await refreshStatus() }
+  }
+
+  /// Attaches the supervisor `DecisionStore` so notification action handlers can mutate
+  /// decisions without going through the Decisions window. `Acknowledge` maps to
+  /// `DecisionStore.dismiss(id:)` because the notification action is a lightweight dismissal,
+  /// not an in-app suggested-action resolution.
+  public func attachDecisionStore(_ store: DecisionStore) {
+    attachResolveHandler { id, outcome in
+      _ = outcome
+      do {
+        try await store.dismiss(id: id)
+      } catch {
+        // Swallow resolve errors here - the notification tap handler logs via `lastResult`
+        // and the decision stays visible in the Decisions window for manual resolution.
+      }
+    }
+  }
+
+  /// Installs a closure that handles supervisor decision resolution triggered from outside the
+  /// Decisions window (for example, the `Acknowledge` notification action). The closure is
+  /// `@Sendable` and called from a detached task.
+  public func attachResolveHandler(_ handler: @escaping DecisionResolveHandler) {
+    resolveHandler = handler
+  }
+
+  /// Schedules a supervisor decision notification for the given severity and decision id.
+  /// Registers the supervisor categories on first call so action icons and titles match the
+  /// category lookup in Notification Center.
+  public func deliverSupervisorDecision(
+    severity: DecisionSeverity,
+    summary: String,
+    decisionID: UUID
+  ) async {
+    await performNotificationOperation {
+      do {
+        registerCategories()
+        let request = try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
+          severity: severity,
+          summary: summary,
+          decisionID: decisionID
+        )
+        try await centerBox.base.add(request)
+        lastResult = "Scheduled supervisor decision \(decisionID.uuidString)."
+        await refreshStatus()
+      } catch {
+        lastResult = "Scheduling supervisor decision failed: \(error.localizedDescription)"
+      }
+    }
   }
 
   public func applyPreset(_ preset: HarnessMonitorNotificationPreset) {
@@ -65,7 +147,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   ) async {
     await performNotificationOperation {
       do {
-        let granted = try await center.requestAuthorization(options: profile.options)
+        let granted = try await centerBox.base.requestAuthorization(options: profile.options)
         if granted {
           lastResult = "Notification authorization granted."
         } else {
@@ -79,11 +161,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   public func refreshStatus() async {
-    let settings = await center.notificationSettings()
+    let settings = await centerBox.base.notificationSettings()
     settingsSnapshot = HarnessMonitorNotificationSettingsSnapshot(settings: settings)
-    pendingRequestCount = await center.pendingNotificationRequests().count
-    deliveredNotificationCount = await center.deliveredNotifications().count
-    registeredCategoryCount = await center.notificationCategories().count
+    pendingRequestCount = await centerBox.base.pendingNotificationRequests().count
+    deliveredNotificationCount = await centerBox.base.deliveredNotifications().count
+    registeredCategoryCount = await centerBox.base.notificationCategories().count
   }
 
   public func deliverDraft() async {
@@ -94,7 +176,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
           from: draft,
           assetWriter: assetWriter
         )
-        try await center.add(request)
+        try await centerBox.base.add(request)
         lastResult = "Scheduled notification \(request.identifier)."
         await refreshStatus()
       } catch {
@@ -104,20 +186,20 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   public func removeAllPendingRequests() async {
-    center.removeAllPendingNotificationRequests()
+    centerBox.base.removeAllPendingNotificationRequests()
     lastResult = "Removed pending notification requests."
     await refreshStatus()
   }
 
   public func removeAllDeliveredNotifications() async {
-    center.removeAllDeliveredNotifications()
+    centerBox.base.removeAllDeliveredNotifications()
     lastResult = "Removed delivered notifications."
     await refreshStatus()
   }
 
   public func resetBadge() async {
     do {
-      try await center.setBadgeCount(0)
+      try await centerBox.base.setBadgeCount(0)
       lastResult = "Reset the app badge."
       await refreshStatus()
     } catch {
@@ -137,10 +219,82 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     didReceive response: UNNotificationResponse
   ) async {
     let snapshot = HarnessMonitorNotificationResponseSnapshot(response: response)
+    let userInfo = response.notification.request.content.userInfo
+    let decisionID = Self.decisionID(from: userInfo)
+    let actionIdentifier = response.actionIdentifier
     await MainActor.run {
-      lastResponse = snapshot
-      lastResult = "Handled notification action \(snapshot.actionIdentifier)."
+      handleNotificationResponse(
+        snapshot: snapshot,
+        actionIdentifier: actionIdentifier,
+        decisionID: decisionID
+      )
     }
+  }
+
+  func handleNotificationResponseForTesting(_ response: UNNotificationResponse) {
+    let snapshot = HarnessMonitorNotificationResponseSnapshot(response: response)
+    let decisionID = Self.decisionID(from: response.notification.request.content.userInfo)
+    handleNotificationResponse(
+      snapshot: snapshot,
+      actionIdentifier: response.actionIdentifier,
+      decisionID: decisionID
+    )
+  }
+
+  nonisolated private static func decisionID(from userInfo: [AnyHashable: Any]) -> UUID? {
+    guard let raw = userInfo[HarnessMonitorSupervisorNotificationID.decisionIDKey] as? String else {
+      return nil
+    }
+    return UUID(uuidString: raw)
+  }
+
+  private func routeSupervisorAction(actionIdentifier: String, decisionID: UUID?) {
+    guard let decisionID else {
+      return
+    }
+    switch actionIdentifier {
+    case HarnessMonitorNotificationActionID.open,
+      UNNotificationDefaultActionIdentifier:
+      publishDecisionRequest(decisionID: decisionID)
+    case HarnessMonitorNotificationActionID.acknowledge:
+      dismissDecision(decisionID: decisionID)
+    case UNNotificationDismissActionIdentifier:
+      // User swiped the notification away; leave the decision untouched so the Decisions window
+      // still surfaces it.
+      break
+    default:
+      // Rule-specific actions route through the Decisions window once opened.
+      publishDecisionRequest(decisionID: decisionID)
+    }
+  }
+
+  private func publishDecisionRequest(decisionID: UUID) {
+    decisionRequestedID = decisionID
+    decisionRequestTick &+= 1
+  }
+
+  private func dismissDecision(decisionID: UUID) {
+    guard let handler = resolveHandler else {
+      return
+    }
+    let outcome = DecisionOutcome(
+      chosenActionID: HarnessMonitorNotificationActionID.acknowledge,
+      note: "Acknowledged from notification"
+    )
+    let id = decisionID.uuidString
+    Task { @Sendable in
+      await handler(id, outcome)
+    }
+  }
+
+  private func handleNotificationResponse(
+    snapshot: HarnessMonitorNotificationResponseSnapshot,
+    actionIdentifier: String,
+    decisionID: UUID?
+  ) {
+    lastResponse = snapshot
+    lastResult = "Handled notification action \(snapshot.actionIdentifier)."
+    routeSupervisorAction(actionIdentifier: actionIdentifier, decisionID: decisionID)
   }
 
   nonisolated public func userNotificationCenter(
@@ -154,7 +308,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   private func registerCategories() {
-    center.setNotificationCategories(HarnessMonitorNotificationRequestFactory.categories())
+    centerBox.base.setNotificationCategories(HarnessMonitorNotificationRequestFactory.categories())
     registeredCategoryCount = HarnessMonitorNotificationRequestFactory.categories().count
   }
 
