@@ -50,10 +50,10 @@ processors:
     timeout: 10s
 
 exporters:
-  prometheus:
-    endpoint: 127.0.0.1:10103
-    resource_to_telemetry_conversion:
-      enabled: true
+  otlp_http/prom:
+    endpoint: http://127.0.0.1:9090/api/v1/otlp
+    tls:
+      insecure: true
 
 service:
   extensions:
@@ -66,4 +66,4 @@ service:
         - resource/process_cardinality
         - batch
       exporters:
-        - prometheus
+        - otlp_http/prom
