@@ -10,7 +10,8 @@ final class TestClock: @unchecked Sendable, SupervisorClock {
   private let lock = NSLock()
   private var nowValue: Date
   private var budget: TimeInterval = 0
-  private var sleepers: [(deadline: TimeInterval, continuation: CheckedContinuation<Void, Error>)] = []
+  private var sleepers:
+    [(deadline: TimeInterval, continuation: CheckedContinuation<Void, Error>)] = []
 
   init(now: Date = .fixed) {
     self.nowValue = now
