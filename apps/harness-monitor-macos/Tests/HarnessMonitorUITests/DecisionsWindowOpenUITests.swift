@@ -60,7 +60,7 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
       Self.uiTestsKey: "1",
       Self.decisionSeedEnvKey: seededPayload,
     ]
-    let app = launch(mode: "preview", additionalEnvironment: environment)
+    let app = launch(mode: "empty", additionalEnvironment: environment)
 
     let badge = app.buttons
       .matching(identifier: Accessibility.supervisorBadge)
@@ -77,9 +77,10 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
       XCTFail("Supervisor badge is not reachable for tapping")
     }
 
-    let seededRow = app.otherElements
-      .matching(identifier: Accessibility.decisionRow(Self.seededDecisionID))
-      .firstMatch
+    let seededRow = button(
+      in: app,
+      identifier: Accessibility.decisionRow(Self.seededDecisionID)
+    )
 
     XCTAssertTrue(
       waitForElement(seededRow, timeout: Self.uiTimeout),
