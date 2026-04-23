@@ -302,6 +302,7 @@ public final class HarnessMonitorStore {
       connectionState = .connecting
       startResourceMetricsSampling()
       recordActiveTaskGauge()
+      await startSupervisor()
 
       isBootstrapping = true
       defer {

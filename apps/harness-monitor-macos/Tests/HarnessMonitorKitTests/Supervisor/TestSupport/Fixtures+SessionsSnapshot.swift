@@ -15,6 +15,20 @@ enum SessionsFixture: Sendable {
 
 @MainActor
 extension HarnessMonitorStore {
+  /// Constructs a minimal `HarnessMonitorStore` with no seeded sessions. Used by tests that need
+  /// a store object but don't care about snapshot content.
+  static func fixture() -> HarnessMonitorStore {
+    HarnessMonitorStore(
+      daemonController: PreviewDaemonController(
+        fixtures: .empty,
+        isDaemonRunning: false,
+        isLaunchAgentInstalled: false
+      ),
+      voiceCapture: PreviewVoiceCaptureService(),
+      daemonOwnership: .managed
+    )
+  }
+
   /// Constructs a lightweight `HarnessMonitorStore` pre-populated with the seeds required by the
   /// supervisor snapshot tests. The controller is the real `PreviewDaemonController` in a
   /// non-running mode so no manifest watcher, daemon probe, or bootstrap kicks in.
