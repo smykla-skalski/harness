@@ -20,9 +20,9 @@ struct BackgroundThumbnailCacheTests {
     _ = await cache.thumbnail(for: selections[1])
     _ = await cache.thumbnail(for: selections[2])
 
-    let firstKey = await cache.cacheKey(for: selections[0])
-    let secondKey = await cache.cacheKey(for: selections[1])
-    let thirdKey = await cache.cacheKey(for: selections[2])
+    let firstKey = cache.cacheKey(for: selections[0])
+    let secondKey = cache.cacheKey(for: selections[1])
+    let thirdKey = cache.cacheKey(for: selections[2])
 
     #expect(Set(await cache.thumbnailMemoryCache.keys) == Set([secondKey, thirdKey]))
     #expect(await cache.thumbnailMemoryCache[firstKey] == nil)
@@ -43,8 +43,8 @@ struct BackgroundThumbnailCacheTests {
     _ = await cache.fullImage(for: selections[0])
     _ = await cache.fullImage(for: selections[1])
 
-    let firstKey = await cache.cacheKey(for: selections[0])
-    let secondKey = await cache.cacheKey(for: selections[1])
+    let firstKey = cache.cacheKey(for: selections[0])
+    let secondKey = cache.cacheKey(for: selections[1])
     let firstFullKey = "full:\(firstKey)"
     let secondFullKey = "full:\(secondKey)"
 
@@ -77,7 +77,7 @@ struct BackgroundThumbnailCacheTests {
 
     _ = await cache.thumbnail(for: selection)
 
-    let key = await cache.cacheKey(for: selection)
+    let key = cache.cacheKey(for: selection)
     let thumbnailURL = cacheDirectory.appendingPathComponent("\(key).jpg")
 
     #expect(thumbnailURL.path.contains("/cache.noindex/thumbnails/"))
