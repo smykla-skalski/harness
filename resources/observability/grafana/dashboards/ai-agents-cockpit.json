@@ -76,6 +76,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "decimals": 2,
                   "noValue": "0",
                   "thresholds": {
                     "mode": "absolute",
@@ -94,7 +95,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -136,7 +137,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -148,7 +149,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions started over the selected time range.",
+          "description": "Claude sessions observed over the selected time range.",
           "id": 202,
           "links": [],
           "title": "Claude Sessions",
@@ -161,6 +162,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "decimals": 2,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -304,7 +306,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -316,10 +318,10 @@
               "transformations": []
             }
           },
-          "description": "Codex exec sessions started over the selected time range.",
+          "description": "Codex session starts over the selected time range.",
           "id": 204,
           "links": [],
-          "title": "Codex Sessions",
+          "title": "Codex Session Starts",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -726,7 +728,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "claude"
                       }
                     },
@@ -746,7 +748,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__rate_interval]))",
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__rate_interval]))",
                         "legendFormat": "codex"
                       }
                     },
@@ -772,7 +774,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -856,7 +858,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -979,7 +981,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "Claude {{model}}"
+                "legendFormat": "{{model}}"
                       }
                     },
                     "refId": "A",
@@ -999,7 +1001,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (model) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]))",
-                        "legendFormat": "Codex {{model}}"
+                "legendFormat": "{{model}}"
                       }
                     },
                     "refId": "B",
@@ -1147,7 +1149,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[5m])) or on() vector(0)",
-                        "legendFormat": "Claude"
+                        "legendFormat": "claude"
                       }
                     },
                     "refId": "A",
@@ -1166,8 +1168,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"codex_cli_rs|codex_exec\"}[5m])) or on() vector(0)",
-                        "legendFormat": "Codex"
+                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[5m])) or on() vector(0)",
+                        "legendFormat": "codex"
                       }
                     },
                     "refId": "B",
@@ -1250,7 +1252,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(rate(traces_spanmetrics_calls_total{service=~\"codex_cli_rs|codex_exec\"}[5m]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(rate(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[5m]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
                         "legendFormat": "codex :: {{pretty_span}}"
                       }
                     },
@@ -1356,7 +1358,7 @@
                       }
                     ]
                   },
-                  "unit": "percent"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -1462,7 +1464,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (terminal_type) (increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (terminal_type) (max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{terminal_type}}"
                       },
                       "version": "v0"
@@ -1475,7 +1477,7 @@
               "transformations": []
             }
           },
-          "description": "Session starts by terminal type.",
+          "description": "Sessions observed by terminal type.",
           "id": 11,
           "links": [],
           "title": "Sessions by Terminal",
@@ -1744,7 +1746,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -1974,7 +1976,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -1986,7 +1988,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions started over selected time range.",
+          "description": "Claude sessions observed over selected time range.",
           "id": 2,
           "links": [],
           "title": "Total Sessions",
@@ -2588,7 +2590,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currencyUSD"
                 },
                 "overrides": []
               },
@@ -2626,7 +2628,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -2638,10 +2640,10 @@
               "transformations": []
             }
           },
-          "description": "Codex exec sessions started over selected time range.",
+          "description": "Codex session starts over selected time range.",
           "id": 101,
           "links": [],
-          "title": "Sessions",
+          "title": "Session Starts",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -4489,7 +4491,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(codex_thread_started_total, deployment_environment)",
+          "definition": "label_values(codex_tool_call_total, deployment_environment)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Environment",
@@ -4503,7 +4505,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "__legacyStringValue": "label_values(codex_thread_started_total, deployment_environment)"
+              "__legacyStringValue": "label_values(codex_tool_call_total, deployment_environment)"
             },
             "version": "v0"
           },
@@ -4522,7 +4524,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)",
+          "definition": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Service",
@@ -4536,7 +4538,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)"
+              "__legacyStringValue": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)"
             },
             "version": "v0"
           },
@@ -4555,7 +4557,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)",
+          "definition": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Codex Model",
@@ -4569,7 +4571,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)"
+              "__legacyStringValue": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)"
             },
             "version": "v0"
           },
@@ -4588,7 +4590,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)",
+          "definition": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Auth",
@@ -4602,7 +4604,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)"
+              "__legacyStringValue": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)"
             },
             "version": "v0"
           },
@@ -4621,7 +4623,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)",
+          "definition": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Source",
@@ -4635,7 +4637,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)"
+              "__legacyStringValue": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)"
             },
             "version": "v0"
           },
