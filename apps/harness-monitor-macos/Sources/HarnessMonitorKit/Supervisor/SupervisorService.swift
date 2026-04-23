@@ -144,7 +144,7 @@ public actor SupervisorService {
     defer { span.end() }
 
     let now = clock.now()
-    let snapshot = buildSnapshot(now: now)
+    let snapshot = await buildSnapshot(now: now)
     HarnessMonitorLogger.supervisor.debug(
       "supervisor.tick snapshot=\(snapshot.id, privacy: .public)"
     )
@@ -289,9 +289,11 @@ public actor SupervisorService {
     }
   }
 
-  private func buildSnapshot(now: Date) -> SessionsSnapshot {
+  private func buildSnapshot(now: Date) async -> SessionsSnapshot {
     if let store {
-      return SessionsSnapshot.build(from: store, now: now)
+      return await MainActor.run {
+        SessionsSnapshot.build(from: store, now: now)
+      }
     }
     return SessionsSnapshot(
       id: UUID().uuidString,
