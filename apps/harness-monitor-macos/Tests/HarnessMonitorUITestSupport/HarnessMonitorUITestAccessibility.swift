@@ -25,6 +25,12 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionDetail = "harness.decisions.detail"
   static let decisionDetailTabs = "harness.decisions.detail.tabs"
   static let decisionAuditTrail = "harness.decisions.audit"
+  static let decisionInspector = "harness.decisions.inspector"
+  static let decisionInspectorMetadata = "harness.decisions.inspector.metadata"
+  static let decisionInspectorToggle = "harness.decisions.inspector.toggle"
+  static let decisionBulkActions = "harness.decisions.bulk-actions"
+  static let decisionBulkSnoozeCritical = "harness.decisions.bulk-actions.snooze-critical"
+  static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
   static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
   }

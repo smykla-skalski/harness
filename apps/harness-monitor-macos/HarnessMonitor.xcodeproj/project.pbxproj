@@ -471,6 +471,7 @@
 		B375DCC36339CFA52944DC11 /* HarnessMonitorStoreBridgeRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633302CBEAB7C36E54A5AA6C /* HarnessMonitorStoreBridgeRefreshTests.swift */; };
 		B3BBD82E35D24A4F23ED965B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1CF41F819F6EDFD0E6DBF1AF /* Assets.xcassets */; };
 		B3C69FF9230224E6E90660AA /* SupervisorAuditExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A1B895AB6F4106959B03B /* SupervisorAuditExporter.swift */; };
+		B3F5504F25D7DB10E7B020DD /* DecisionsInspectorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3CBE843EB23146F43D226E4 /* DecisionsInspectorUITests.swift */; };
 		B4C7C292638E1CBDAE3500DB /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F533A4850AAF12F488ECE8FF /* AppKit.framework */; };
 		B4CBFA1EA1295191ED29CD90 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BCBC5959481D5B05E95B487 /* PreviewFixtures.swift */; };
 		B5211030D6206929F3EF46E1 /* HarnessMonitorMainWindowLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CFD24DC0EA2A4F54E632B0 /* HarnessMonitorMainWindowLauncher.swift */; };
@@ -1250,6 +1251,7 @@
 		B1EBA3E1FF5A39BD5C768DBA /* HarnessMonitorStore+SelectionNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+SelectionNavigation.swift"; sourceTree = "<group>"; };
 		B299CB970E3D04507BD4D2B9 /* RuntimeModelEffortTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeModelEffortTests.swift; sourceTree = "<group>"; };
 		B358D26A40CB98F776B1E929 /* SessionAgentDropFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionAgentDropFeedback.swift; sourceTree = "<group>"; };
+		B3CBE843EB23146F43D226E4 /* DecisionsInspectorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionsInspectorUITests.swift; sourceTree = "<group>"; };
 		B423312060ADB65F1C7B8EBC /* HarnessMonitorStoreSelectionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreSelectionTestSupport.swift; sourceTree = "<group>"; };
 		B448F087426E53EA5AE35A51 /* AgentTuiWindowView+Titles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentTuiWindowView+Titles.swift"; sourceTree = "<group>"; };
 		B4D8FC9AFFFFDFA2E04522B5 /* HarnessMonitorStoreSelectionFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreSelectionFlowTests.swift; sourceTree = "<group>"; };
@@ -2100,6 +2102,7 @@
 				AB4868968A8D26ED92543435 /* AuthorizedFoldersTests.swift */,
 				BDBAFC27B9139DD6CE6713C9 /* CodexApprovalUnificationUITests.swift */,
 				942C4D6D898BE38262D656B8 /* DecisionsDetailUITests.swift */,
+				B3CBE843EB23146F43D226E4 /* DecisionsInspectorUITests.swift */,
 				8692405F1121446DCA47C5CD /* DecisionsWindowOpenUITests.swift */,
 				FF71276D31DAFCC299EF4989 /* HarnessMonitorActionToastUITests.swift */,
 				E2E74FC6E075B8D3E696AA41 /* HarnessMonitorFocusRingUITests.swift */,
@@ -3403,6 +3406,7 @@
 				8F9990B5E2E89D65758FECD8 /* AuthorizedFoldersTests.swift in Sources */,
 				0177C3630DDF305619BF3A40 /* CodexApprovalUnificationUITests.swift in Sources */,
 				ED2D154FEFDEF4CCC94BAF9F /* DecisionsDetailUITests.swift in Sources */,
+				B3F5504F25D7DB10E7B020DD /* DecisionsInspectorUITests.swift in Sources */,
 				195F1E1F7E10CE9FA8BAA182 /* DecisionsWindowOpenUITests.swift in Sources */,
 				F99CA96759E4C9DC3BAE3C26 /* HarnessMonitorActionToastUITests.swift in Sources */,
 				00B3877249535856986F9CD6 /* HarnessMonitorFocusRingUITests.swift in Sources */,
