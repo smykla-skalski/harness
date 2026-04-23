@@ -50,13 +50,6 @@ struct SidebarSearchHost: View {
     ]
   }
 
-  private var showsSearchAccessoryBar: Bool {
-    SidebarFilterVisibilityPolicy.showsControls(
-      for: controls,
-      isSearchPresented: searchPresentationState.isPresented
-    )
-  }
-
   private var searchText: Binding<String> {
     Binding(
       get: { store.searchText },
@@ -80,7 +73,6 @@ struct SidebarSearchHost: View {
           projection: projection,
           searchResults: searchResults,
           sidebarUI: sidebarUI,
-          showsSearchControls: showsSearchAccessoryBar,
           dateTimeConfiguration: dateTimeConfiguration,
           fontScale: fontScale,
           collapsedCheckoutKeys: collapsedCheckoutKeys,
@@ -88,6 +80,14 @@ struct SidebarSearchHost: View {
         )
         .listStyle(.sidebar)
         .scrollEdgeEffectStyle(.soft, for: .top)
+        .safeAreaInset(edge: .top) {
+          HStack {
+            SidebarFilterMenu(store: store, controls: controls)
+            Spacer()
+          }
+          .padding(.horizontal)
+          .padding(.bottom, HarnessMonitorTheme.spacingSM)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
           SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
         }

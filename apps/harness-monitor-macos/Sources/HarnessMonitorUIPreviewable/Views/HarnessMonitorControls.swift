@@ -234,4 +234,8 @@ extension View {
   public func harnessDismissButtonStyle() -> some View {
     modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: nil))
   }
+
+  public func harnessGlassButtonStyle() -> some View {
+    buttonStyle(.glass)
+  }
 }

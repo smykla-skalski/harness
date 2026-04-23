@@ -7,6 +7,7 @@ extension HarnessMonitorAccessibility {
   public static let decisionsWindow = "harness.decisions.window"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"
+  public static let decisionDetailTabs = "harness.decisions.detail.tabs"
   public static let decisionContextPanel = "harness.decisions.context"
   public static let decisionAuditTrail = "harness.decisions.audit"
   public static let decisionsLiveTick = "harness.decisions.live-tick"
