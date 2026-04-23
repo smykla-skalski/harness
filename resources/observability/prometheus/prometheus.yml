@@ -5,6 +5,17 @@ global:
     cluster: harness-local
     environment: development
 
+otlp:
+  keep_identifying_resource_attributes: true
+  promote_resource_attributes:
+    - service.name
+    - service.namespace
+    - service.instance.id
+    - service.version
+    - deployment.environment
+    - host.name
+  translation_strategy: UnderscoreEscapingWithSuffixes
+
 rule_files:
   - /etc/prometheus/rules/*.yml
 
@@ -34,13 +45,8 @@ scrape_configs:
       - targets:
           - sqlite-exporter:9560
 
-  # low-cardinality host process metrics exported by the repo-managed Alloy OTel agent
-  - job_name: alloy-host-processes
-    static_configs:
-      - targets:
-          - host.docker.internal:10103
-
-  # macOS host metrics (darwin-exporter for battery, thermal, wifi)
+  # macOS host metrics (darwin-exporter for battery, thermal, wifi).
+  # host process metrics now arrive via OTLP push from the host Alloy OTel agent.
   - job_name: darwin-exporter
     static_configs:
       - targets:

@@ -32,7 +32,7 @@ otelcol.processor.batch "logs" {
 otelcol.processor.batch "metrics" {
   output {
     metrics = [
-      otelcol.exporter.prometheus.harness.input,
+      otelcol.exporter.otlphttp.prom.input,
     ]
   }
 }
@@ -91,18 +91,18 @@ otelcol.connector.spanmetrics "harness" {
 
   output {
     metrics = [
-      otelcol.exporter.prometheus.harness.input,
+      otelcol.exporter.otlphttp.prom.input,
     ]
   }
 }
 
-otelcol.exporter.prometheus "harness" {
-  forward_to = [prometheus.remote_write.harness.receiver]
-}
-
-prometheus.remote_write "harness" {
-  endpoint {
-    url = "http://prometheus:9090/api/v1/write"
+otelcol.exporter.otlphttp "prom" {
+  client {
+    endpoint = "http://prometheus:9090/api/v1/otlp"
+    tls {
+      insecure             = true
+      insecure_skip_verify = true
+    }
   }
 }
 
