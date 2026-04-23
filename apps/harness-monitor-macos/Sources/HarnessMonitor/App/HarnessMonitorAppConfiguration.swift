@@ -73,6 +73,7 @@ struct HarnessMonitorAppConfiguration {
       seedTestToasts(environment: resolvedEnvironment, store: store)
       #if DEBUG
         seedPreseedBookmark(environment: resolvedEnvironment, store: store)
+        seedSupervisorScenario(environment: resolvedEnvironment, store: store)
       #endif
     }
 
