@@ -162,55 +162,59 @@ private struct SupervisorRuleSection: View {
           )
         }
       }
-
-      Button("Reset to defaults", role: .destructive, action: onReset)
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.preferencesActionButton(
-            "Supervisor Rules Reset \(rule.id)"
-          )
-        )
     } header: {
-      SupervisorRuleSectionHeader(rule: rule)
+      SupervisorRuleSectionHeader(rule: rule, onReset: onReset)
     } footer: {
-      SupervisorRuleSectionFooter(status: status, error: error)
+      SupervisorRuleSectionFooter(rule: rule, status: status, error: error)
     }
   }
 }
 
 private struct SupervisorRuleSectionHeader: View {
   let rule: PreferencesSupervisorRuleDescriptor
+  let onReset: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+    HStack(alignment: .firstTextBaseline) {
       Text(rule.name)
         .scaledFont(.headline)
         .accessibilityAddTraits(.isHeader)
-      Text(rule.id)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(.secondary)
-      Text("Version \(rule.version) · \(rule.parameters.fields.count) parameters")
-        .scaledFont(.caption)
-        .foregroundStyle(.secondary)
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      Button("Reset to defaults", role: .destructive, action: onReset)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesActionButton(
+            "Supervisor Rules Reset \(rule.id)"
+          )
+        )
     }
   }
 }
 
 private struct SupervisorRuleSectionFooter: View {
+  let rule: PreferencesSupervisorRuleDescriptor
   let status: String?
   let error: String?
 
   var body: some View {
-    if let error {
-      Text(error)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.danger)
-    } else if let status {
-      Text(status)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.accent)
-    } else {
-      EmptyView()
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(rule.id)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(.secondary)
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        Text("Version \(rule.version) · \(rule.parameters.fields.count) parameters")
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+      }
+      if let error {
+        Text(error)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.danger)
+      } else if let status {
+        Text(status)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.accent)
+      }
     }
   }
 }
