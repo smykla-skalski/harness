@@ -44,6 +44,12 @@ struct PersistenceOfflineDurabilityTests {
     return try ModelContainer(for: schema, configurations: [config])
   }
 
+  private func makeV6Container(at url: URL) throws -> ModelContainer {
+    let schema = Schema(versionedSchema: HarnessMonitorSchemaV6.self)
+    let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+    return try ModelContainer(for: schema, configurations: [config])
+  }
+
   private func seedV1Store(
     at url: URL,
     metricsData: Data,
@@ -79,6 +85,45 @@ struct PersistenceOfflineDurabilityTests {
       container.mainContext.insert(session)
     }
 
+    try container.mainContext.save()
+  }
+
+  private func seedV6Store(
+    at url: URL,
+    metricsData: Data
+  ) throws {
+    let container = try makeV6Container(at: url)
+    let project = HarnessMonitorSchemaV6.CachedProject(
+      projectId: "proj-v6",
+      name: "Harness",
+      projectDir: "/tmp/harness",
+      contextRoot: "/tmp/harness-context",
+      activeSessionCount: 1,
+      totalSessionCount: 1
+    )
+    let session = HarnessMonitorSchemaV6.CachedSession(
+      sessionId: "sess-v6",
+      projectId: "proj-v6",
+      projectName: "Harness",
+      projectDir: "/tmp/harness",
+      contextRoot: "/tmp/harness-context",
+      worktreePath: "/tmp/harness/.worktrees/fix",
+      sharedPath: "/tmp/harness-shared",
+      originPath: "/tmp/harness-origin",
+      branchRef: "fix/review-findings",
+      title: "Migrated V6 session",
+      context: "Migrated V6 context",
+      statusRaw: SessionStatus.active.rawValue,
+      createdAt: "2026-04-03T12:00:00Z",
+      updatedAt: "2026-04-03T12:05:00Z",
+      lastActivityAt: "2026-04-03T12:05:00Z",
+      leaderId: "leader-v6",
+      observeId: "observe-v6",
+      metricsData: metricsData
+    )
+
+    container.mainContext.insert(project)
+    container.mainContext.insert(session)
     try container.mainContext.save()
   }
 
@@ -282,5 +327,51 @@ struct PersistenceOfflineDurabilityTests {
     #expect(migratedSession?.sharedPath.isEmpty == true)
     #expect(migratedSession?.branchRef.isEmpty == true)
     #expect(sessions.first?.metricsData == metricsData)
+  }
+
+  @Test("Live SwiftData store migrates V6 cache records into V7 supervisor schema")
+  func liveStoreMigratesV6CacheRecordsIntoSupervisorSchema() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: harnessRoot,
+      withIntermediateDirectories: true,
+      attributes: nil
+    )
+
+    let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
+    let metricsData = try JSONEncoder().encode(
+      SessionMetrics(
+        agentCount: 2,
+        activeAgentCount: 1,
+        openTaskCount: 3,
+        inProgressTaskCount: 1,
+        blockedTaskCount: 0,
+        completedTaskCount: 4
+      ))
+    try seedV6Store(at: storeURL, metricsData: metricsData)
+
+    let container = try HarnessMonitorModelContainer.live(using: environment)
+    let projects = try container.mainContext.fetch(FetchDescriptor<CachedProject>())
+    let sessions = try container.mainContext.fetch(FetchDescriptor<CachedSession>())
+    let decisions = try container.mainContext.fetch(FetchDescriptor<Decision>())
+    let events = try container.mainContext.fetch(FetchDescriptor<SupervisorEvent>())
+    let configs = try container.mainContext.fetch(FetchDescriptor<PolicyConfigRow>())
+
+    #expect(projects.count == 1)
+    #expect(projects.first?.projectId == "proj-v6")
+    #expect(sessions.count == 1)
+    #expect(sessions.first?.sessionId == "sess-v6")
+    #expect(sessions.first?.branchRef == "fix/review-findings")
+    #expect(decisions.isEmpty)
+    #expect(events.isEmpty)
+    #expect(configs.isEmpty)
   }
 }

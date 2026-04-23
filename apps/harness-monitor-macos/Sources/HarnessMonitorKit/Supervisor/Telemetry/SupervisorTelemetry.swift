@@ -21,4 +21,8 @@ public enum SupervisorTelemetry {
       instrumentationVersion: nil
     )
   }
+
+  public static func meter() -> any Meter {
+    OpenTelemetry.instance.meterProvider.meterBuilder(name: instrumentationName).build()
+  }
 }

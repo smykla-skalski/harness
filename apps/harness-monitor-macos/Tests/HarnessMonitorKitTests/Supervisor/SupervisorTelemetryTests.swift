@@ -19,4 +19,8 @@ final class SupervisorTelemetryTests: XCTestCase {
     // return nil. Phase 2 tick-loop code will call the same accessor per tick.
     _ = SupervisorTelemetry.tracer()
   }
+
+  func test_meterIsAvailable() {
+    _ = SupervisorTelemetry.meter()
+  }
 }

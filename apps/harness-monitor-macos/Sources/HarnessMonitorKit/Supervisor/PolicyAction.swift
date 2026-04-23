@@ -1,8 +1,8 @@
 import Foundation
 
-/// Exhaustive set of actions a Monitor supervisor rule can emit. The `actionKey` format is part
-/// of the Phase 1 signature freeze — Phase 2 workers rely on it for the idempotency cache and
-/// audit joins.
+/// Exhaustive set of actions a Monitor supervisor rule can emit. The `actionKey` prefixes stay
+/// stable while tick-bound actions key on `snapshotHash` so equivalent snapshots dedupe across
+/// ticks. Payloads still carry `snapshotID` for audit/log correlation.
 public enum PolicyAction: Sendable, Codable, Hashable {
   case nudgeAgent(NudgePayload)
   case assignTask(AssignPayload)
@@ -15,17 +15,17 @@ public enum PolicyAction: Sendable, Codable, Hashable {
   public var actionKey: String {
     switch self {
     case .nudgeAgent(let payload):
-      return "nudge:\(payload.ruleID):\(payload.agentID):\(payload.snapshotID)"
+      return "nudge:\(payload.ruleID):\(payload.agentID):\(payload.snapshotHash)"
     case .assignTask(let payload):
-      return "assign:\(payload.ruleID):\(payload.taskID):\(payload.snapshotID)"
+      return "assign:\(payload.ruleID):\(payload.taskID):\(payload.snapshotHash)"
     case .dropTask(let payload):
-      return "drop:\(payload.ruleID):\(payload.taskID):\(payload.snapshotID)"
+      return "drop:\(payload.ruleID):\(payload.taskID):\(payload.snapshotHash)"
     case .queueDecision(let payload):
       return "decision:\(payload.ruleID):\(payload.id)"
     case .notifyOnly(let payload):
-      return "notify:\(payload.ruleID):\(payload.snapshotID)"
+      return "notify:\(payload.ruleID):\(payload.snapshotHash)"
     case .logEvent(let payload):
-      return "log:\(payload.ruleID):\(payload.snapshotID):\(payload.id)"
+      return "log:\(payload.ruleID):\(payload.id)"
     case .suggestConfigChange(let payload):
       return "suggest:\(payload.id)"
     }
@@ -36,12 +36,20 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     public let prompt: String
     public let ruleID: String
     public let snapshotID: String
+    public let snapshotHash: String
 
-    public init(agentID: String, prompt: String, ruleID: String, snapshotID: String) {
+    public init(
+      agentID: String,
+      prompt: String,
+      ruleID: String,
+      snapshotID: String,
+      snapshotHash: String
+    ) {
       self.agentID = agentID
       self.prompt = prompt
       self.ruleID = ruleID
       self.snapshotID = snapshotID
+      self.snapshotHash = snapshotHash
     }
   }
 
@@ -50,12 +58,20 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     public let agentID: String
     public let ruleID: String
     public let snapshotID: String
+    public let snapshotHash: String
 
-    public init(taskID: String, agentID: String, ruleID: String, snapshotID: String) {
+    public init(
+      taskID: String,
+      agentID: String,
+      ruleID: String,
+      snapshotID: String,
+      snapshotHash: String
+    ) {
       self.taskID = taskID
       self.agentID = agentID
       self.ruleID = ruleID
       self.snapshotID = snapshotID
+      self.snapshotHash = snapshotHash
     }
   }
 
@@ -64,12 +80,20 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     public let reason: String
     public let ruleID: String
     public let snapshotID: String
+    public let snapshotHash: String
 
-    public init(taskID: String, reason: String, ruleID: String, snapshotID: String) {
+    public init(
+      taskID: String,
+      reason: String,
+      ruleID: String,
+      snapshotID: String,
+      snapshotHash: String
+    ) {
       self.taskID = taskID
       self.reason = reason
       self.ruleID = ruleID
       self.snapshotID = snapshotID
+      self.snapshotHash = snapshotHash
     }
   }
 
@@ -110,17 +134,20 @@ public enum PolicyAction: Sendable, Codable, Hashable {
   public struct NotifyPayload: Codable, Sendable, Hashable {
     public let ruleID: String
     public let snapshotID: String
+    public let snapshotHash: String
     public let severity: DecisionSeverity
     public let summary: String
 
     public init(
       ruleID: String,
       snapshotID: String,
+      snapshotHash: String,
       severity: DecisionSeverity,
       summary: String
     ) {
       self.ruleID = ruleID
       self.snapshotID = snapshotID
+      self.snapshotHash = snapshotHash
       self.severity = severity
       self.summary = summary
     }
