@@ -32,6 +32,16 @@ public actor PolicyRegistry {
     PolicyParameterValues(raw: overrides[ruleID]?.parameters ?? [:])
   }
 
+  /// Returns `false` only when an explicit override disables the rule; defaults to `true`.
+  public func isEnabled(ruleID: String) -> Bool {
+    overrides[ruleID]?.enabled ?? true
+  }
+
+  /// Returns the overridden default behavior for a rule, or `.cautious` if no override exists.
+  public func defaultBehavior(forRule ruleID: String) -> RuleDefaultBehavior {
+    overrides[ruleID]?.defaultBehavior ?? .cautious
+  }
+
   public var observerList: [any PolicyObserver] {
     observers
   }
