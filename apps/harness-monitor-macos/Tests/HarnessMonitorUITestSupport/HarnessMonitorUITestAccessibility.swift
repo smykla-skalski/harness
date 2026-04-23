@@ -17,6 +17,12 @@ enum HarnessMonitorUITestAccessibility {
   static let refreshButton = "harness.toolbar.refresh"
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
+  static let supervisorBadge = "harness.supervisor.badge"
+  static let decisionsWindow = "harness.decisions.window"
+  static let decisionsSidebar = "harness.decisions.sidebar"
+  static func decisionRow(_ id: String) -> String {
+    "harness.decisions.row.\(id)"
+  }
   static let sessionHeaderCard = "harness.session.header"
   static let sessionHeaderCardFrame = "harness.session.header.frame"
   static let sidebarRoot = "harness.sidebar.root"
