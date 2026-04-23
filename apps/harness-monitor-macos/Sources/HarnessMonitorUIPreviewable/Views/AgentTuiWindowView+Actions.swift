@@ -1,7 +1,6 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
-
 extension AgentTuiWindowView {
   static func initialSelection(
     displayState: AgentTuiDisplayState,
@@ -16,12 +15,8 @@ extension AgentTuiWindowView {
     if let selectedCodexRunID, orderedRunIDs.contains(selectedCodexRunID) {
       return .codex(selectedCodexRunID)
     }
-    if let fallbackTuiID = orderedSessionIDs.first {
-      return .terminal(fallbackTuiID)
-    }
-    if let fallbackRunID = orderedRunIDs.first {
-      return .codex(fallbackRunID)
-    }
+    if let fallbackTuiID = orderedSessionIDs.first { return .terminal(fallbackTuiID) }
+    if let fallbackRunID = orderedRunIDs.first { return .codex(fallbackRunID) }
     return .create
   }
   func selectCreateTab() {
@@ -171,7 +166,6 @@ extension AgentTuiWindowView {
       case .paste:
         .paste(trimmedInput)
       }
-
     viewModel.isSubmitting = true
     Task {
       await flushPendingKeySequenceIfNeeded()
@@ -219,10 +213,8 @@ extension AgentTuiWindowView {
   func queueKeyInput(_ input: AgentTuiInput, glyph: String, to tuiID: String) {
     let store = store
     let viewModel = viewModel
-    let sendRequest: @MainActor (_ targetTuiID: String, _ request: AgentTuiInputRequest) async -> Void = {
-      [weak viewModel] targetTuiID,
-      request in
-      guard let viewModel else { return }
+    @MainActor
+    func sendRequest(_ targetTuiID: String, _ request: AgentTuiInputRequest) async {
       guard
         let targetTui = store.selectedAgentTuis.first(where: { $0.tuiId == targetTuiID }),
         targetTui.status.isActive
@@ -288,7 +280,6 @@ extension AgentTuiWindowView {
     else {
       return
     }
-
     viewModel.pendingViewportResizeTarget = terminalSize
     viewModel.expectedSize = terminalSize
     viewModel.viewportResizeTask?.cancel()
@@ -307,7 +298,6 @@ extension AgentTuiWindowView {
         }
         return
       }
-
       await flushPendingKeySequenceIfNeeded()
       let resized = await store.resizeAgentTui(
         tuiID: tuiID,
@@ -354,12 +344,10 @@ extension AgentTuiWindowView {
       selectedTerminalID: store.selectedAgentTui?.tuiId,
       selectedCodexRunID: store.selectedCodexRun?.runId
     )
-
     if afterRefresh {
       applyProgrammaticSelection(preferredSelection)
       return
     }
-
     switch viewModel.selection {
     case .create:
       break

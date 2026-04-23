@@ -2,21 +2,17 @@ import AppKit
 import HarnessMonitorKit
 import Observation
 import SwiftUI
-
 extension AgentTuiWindowView {
   protocol KeySequenceClock: AnyObject, Sendable {
     @MainActor var now: ContinuousClock.Instant { get }
     func sleep(until deadline: ContinuousClock.Instant) async throws
   }
-
   final class LiveKeySequenceClock: KeySequenceClock, @unchecked Sendable {
     @MainActor var now: ContinuousClock.Instant { ContinuousClock.now }
-
     func sleep(until deadline: ContinuousClock.Instant) async throws {
       try await ContinuousClock().sleep(until: deadline)
     }
   }
-
   @MainActor
   @Observable
   final class KeySequenceBuffer {
@@ -24,13 +20,11 @@ extension AgentTuiWindowView {
       case buffered
       case sendImmediately(AgentTuiInputRequest)
     }
-
     struct PendingStep: Equatable {
       let delayBeforeMs: Int
       let input: AgentTuiInput
       let glyph: String
     }
-
     private let clock: any KeySequenceClock
     private let idleDelay: Duration
     private var pendingSteps: [PendingStep] = []
@@ -40,10 +34,8 @@ extension AgentTuiWindowView {
     @ObservationIgnored private var flushTask: Task<Void, Never>?
     @ObservationIgnored private var flushHandler:
       (@MainActor (_ tuiID: String, _ request: AgentTuiInputRequest) async -> Void)?
-
     var pendingHint: String?
     var pendingTuiID: String?
-
     init(
       clock: any KeySequenceClock = LiveKeySequenceClock(),
       idleDelay: Duration = .milliseconds(350)
@@ -51,15 +43,12 @@ extension AgentTuiWindowView {
       self.clock = clock
       self.idleDelay = idleDelay
     }
-
     deinit {
       flushTask?.cancel()
     }
-
     var hasPendingInputs: Bool {
       pendingTuiID != nil && !pendingSteps.isEmpty
     }
-
     @discardableResult
     func enqueue(
       input: AgentTuiInput,
@@ -98,7 +87,6 @@ extension AgentTuiWindowView {
       scheduleIdleFlush()
       return .buffered
     }
-
     func flush() async {
       let flushHandler = flushHandler
       guard let pending = takePendingRequest(), let flushHandler else {
@@ -106,11 +94,9 @@ extension AgentTuiWindowView {
       }
       await flushHandler(pending.tuiID, pending.request)
     }
-
     func drop() {
       clearAllState()
     }
-
     private func takePendingRequest() -> (tuiID: String, request: AgentTuiInputRequest)? {
       guard
         let tuiID = pendingTuiID,
@@ -140,7 +126,6 @@ extension AgentTuiWindowView {
       }
       return (tuiID, request)
     }
-
     private func scheduleIdleFlush() {
       flushTask?.cancel()
       let deadline = clock.now.advanced(by: idleDelay)
@@ -155,7 +140,6 @@ extension AgentTuiWindowView {
         await flush()
       }
     }
-
     private func shouldSendImmediately(
       to tuiID: String,
       now: ContinuousClock.Instant
@@ -168,7 +152,6 @@ extension AgentTuiWindowView {
       }
       return now >= lastImmediateInputAt.advanced(by: idleDelay)
     }
-
     private func clearPendingState() {
       flushTask?.cancel()
       flushTask = nil
@@ -178,35 +161,29 @@ extension AgentTuiWindowView {
       lastQueuedAt = nil
       flushHandler = nil
     }
-
     private func clearBurstState() {
       lastImmediateInputAt = nil
       lastImmediateTuiID = nil
     }
-
     private func clearAllState() {
       clearPendingState()
       clearBurstState()
     }
-
     private static func durationMilliseconds(_ duration: Duration) -> Int {
       max(0, Int(duration.components.seconds * 1_000))
         + Int(duration.components.attoseconds / 1_000_000_000_000_000)
     }
   }
-
   enum Field: Hashable {
     case name
     case prompt
     case argv
     case input
   }
-
   struct AgentNameMapping: Equatable {
     let agentID: String
     let name: String
   }
-
   struct AgentTuiDisplayState: Equatable {
     let sortedAgentTuis: [AgentTuiSnapshot]
     let sessionTitlesByID: [String: String]
@@ -215,19 +192,15 @@ extension AgentTuiWindowView {
     let externalAgents: [AgentRegistration]
     let agentTuiUnavailable: Bool
     let codexUnavailable: Bool
-
     var hasAgentTuis: Bool {
       !sortedAgentTuis.isEmpty
     }
-
     var hasCodexRuns: Bool {
       !sortedCodexRuns.isEmpty
     }
-
     var hasExternalAgents: Bool {
       !externalAgents.isEmpty
     }
-
     init() {
       sortedAgentTuis = []
       sessionTitlesByID = [:]
@@ -237,7 +210,6 @@ extension AgentTuiWindowView {
       agentTuiUnavailable = false
       codexUnavailable = false
     }
-
     @MainActor
     init(store: HarnessMonitorStore) {
       let sortedAgentTuis = store.selectedAgentTuis.sorted { left, right in
@@ -261,13 +233,11 @@ extension AgentTuiWindowView {
         }
         return left.runId < right.runId
       }
-
       var codexTitlesByID: [String: String] = [:]
       codexTitlesByID.reserveCapacity(sortedCodexRuns.count)
       for run in sortedCodexRuns {
         codexTitlesByID[run.runId] = Self.codexTitle(for: run)
       }
-
       let agentNames = Dictionary(
         uniqueKeysWithValues: (store.selectedSession?.agents ?? []).map { ($0.agentId, $0.name) }
       )
@@ -277,7 +247,6 @@ extension AgentTuiWindowView {
         sessionTitlesByID[tui.tuiId] =
           agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
       }
-
       let externalAgents = (store.selectedSession?.agents ?? [])
         .sorted { left, right in
           if left.name != right.name {
@@ -285,7 +254,6 @@ extension AgentTuiWindowView {
           }
           return left.agentId < right.agentId
         }
-
       self.sortedAgentTuis = sortedAgentTuis
       self.sessionTitlesByID = sessionTitlesByID
       self.sortedCodexRuns = sortedCodexRuns
@@ -294,7 +262,6 @@ extension AgentTuiWindowView {
       self.agentTuiUnavailable = store.agentTuiUnavailable
       self.codexUnavailable = store.codexUnavailable
     }
-
     static func codexTitle(for run: CodexRunSnapshot) -> String {
       let promptSummary =
         run.prompt
@@ -309,13 +276,10 @@ extension AgentTuiWindowView {
       return "Codex · \(run.mode.title) · \(clippedPrompt)"
     }
   }
-
   enum AgentTuiInputMode: String, CaseIterable, Identifiable {
     case text
     case paste
-
     var id: String { rawValue }
-
     var title: String {
       switch self {
       case .text:
@@ -325,7 +289,6 @@ extension AgentTuiWindowView {
       }
     }
   }
-
   enum TerminalViewportSizing {
     static let rowRange = 8...240
     static let colRange = 20...400
@@ -341,7 +304,6 @@ extension AgentTuiWindowView {
       width: HarnessMonitorTheme.spacingMD * 2,
       height: HarnessMonitorTheme.spacingMD * 2
     )
-
     @MainActor
     static func terminalSize(for viewportSize: CGSize, fontScale: CGFloat) -> AgentTuiSize? {
       let cellSize = measuredCellSize(for: fontScale)
@@ -362,7 +324,6 @@ extension AgentTuiWindowView {
         cols: min(max(rawCols, colRange.lowerBound), colRange.upperBound)
       )
     }
-
     static func stabilizedAutomaticSize(
       measured: AgentTuiSize,
       baseline: AgentTuiSize
@@ -380,7 +341,6 @@ extension AgentTuiWindowView {
         )
       )
     }
-
     @MainActor
     private static func measuredCellSize(for fontScale: CGFloat) -> CGSize {
       let pointSize = 13 * max(fontScale, 0.78)
@@ -392,7 +352,6 @@ extension AgentTuiWindowView {
       let height = max(ceil(font.ascender - font.descender + font.leading), 1)
       return CGSize(width: width, height: height)
     }
-
     private static func stabilizedDimension(
       measured: Int,
       baseline: Int,
@@ -401,7 +360,6 @@ extension AgentTuiWindowView {
       abs(measured - baseline) >= minimumDelta ? measured : baseline
     }
   }
-
   @MainActor
   @Observable
   final class ViewModel {
@@ -443,7 +401,6 @@ extension AgentTuiWindowView {
     var viewportResizeTask: Task<Void, Never>?
     var expectedSize: AgentTuiSize?
     var keySequenceBuffer = KeySequenceBuffer()
-
     init(
       selection: AgentTuiSheetSelection = .create
     ) {
