@@ -8,11 +8,11 @@ private let diskCacheLog = Logger(subsystem: "io.harnessmonitor", category: "thu
 extension BackgroundThumbnailCache {
   // MARK: - Disk cache
 
-  private func diskCachePath(key: String, extension ext: String) -> URL {
+  nonisolated private func diskCachePath(key: String, extension ext: String) -> URL {
     cacheDirectory.appendingPathComponent("\(key).\(ext)")
   }
 
-  func loadFromDiskCache(key: String, expectedMtime: TimeInterval?) -> CGImage? {
+  nonisolated func loadFromDiskCache(key: String, expectedMtime: TimeInterval?) -> CGImage? {
     let jpegURL = diskCachePath(key: key, extension: "jpg")
     let metaURL = diskCachePath(key: key, extension: "meta")
 
@@ -57,7 +57,7 @@ extension BackgroundThumbnailCache {
     return CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary)
   }
 
-  func saveToDiskCache(image: CGImage, key: String, sourceMtime: TimeInterval?) {
+  nonisolated func saveToDiskCache(image: CGImage, key: String, sourceMtime: TimeInterval?) {
     let fileManager = FileManager.default
     let legacyDirectories = indexedLegacyCacheDirectory().map { [$0] } ?? []
 
@@ -108,7 +108,7 @@ extension BackgroundThumbnailCache {
     }
   }
 
-  private func indexedLegacyCacheDirectory() -> URL? {
+  nonisolated private func indexedLegacyCacheDirectory() -> URL? {
     let noIndexRoot = cacheDirectory.deletingLastPathComponent()
     guard cacheDirectory.lastPathComponent == "thumbnails",
       noIndexRoot.lastPathComponent == "cache.noindex"

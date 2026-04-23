@@ -35,51 +35,77 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Public
 
-  public func thumbnail(for selection: HarnessMonitorBackgroundSelection) -> CGImage? {
+  public func thumbnail(for selection: HarnessMonitorBackgroundSelection) async -> CGImage? {
     let key = cacheKey(for: selection)
 
     if let cached = cachedMemoryImage(for: key, kind: .thumbnail) {
       return cached
     }
 
-    switch selection.source {
-    case .bundled(let image):
-      return loadBundledThumbnail(key: key, image: image)
-    case .system(let wallpaper):
-      return loadSystemThumbnail(key: key, wallpaper: wallpaper)
+    let generated = await Task.detached(priority: Task.currentPriority) { [self] in
+      generateThumbnail(key: key, selection: selection)
+    }.value
+
+    if let generated {
+      cacheMemoryImage(generated, for: key, kind: .thumbnail)
     }
+    return generated
   }
 
-  public func fullImage(for selection: HarnessMonitorBackgroundSelection) -> CGImage? {
+  public func fullImage(for selection: HarnessMonitorBackgroundSelection) async -> CGImage? {
     let key = "full:\(cacheKey(for: selection))"
 
     if let cached = cachedMemoryImage(for: key, kind: .fullImage) {
       return cached
     }
 
-    switch selection.source {
-    case .bundled(let image):
-      return loadBundledFullImage(key: key, image: image)
-    case .system(let wallpaper):
-      return loadSystemFullImage(key: key, wallpaper: wallpaper)
+    let generated = await Task.detached(priority: Task.currentPriority) { [self] in
+      generateFullImage(selection: selection)
+    }.value
+
+    if let generated {
+      cacheMemoryImage(generated, for: key, kind: .fullImage)
     }
+    return generated
   }
 
-  public func prefetch(_ selections: [HarnessMonitorBackgroundSelection]) {
+  public func prefetch(_ selections: [HarnessMonitorBackgroundSelection]) async {
     for selection in selections {
       if Task.isCancelled { return }
-      _ = thumbnail(for: selection)
+      _ = await thumbnail(for: selection)
     }
   }
 
-  // MARK: - Bundled thumbnails
+  // MARK: - Off-actor generation
 
-  private func loadBundledThumbnail(
+  nonisolated private func generateThumbnail(
+    key: String,
+    selection: HarnessMonitorBackgroundSelection
+  ) -> CGImage? {
+    switch selection.source {
+    case .bundled(let image):
+      return generateBundledThumbnail(key: key, image: image)
+    case .system(let wallpaper):
+      return generateSystemThumbnail(key: key, wallpaper: wallpaper)
+    }
+  }
+
+  nonisolated private func generateFullImage(
+    selection: HarnessMonitorBackgroundSelection
+  ) -> CGImage? {
+    switch selection.source {
+    case .bundled(let image):
+      return generateBundledFullImage(image: image)
+    case .system(let wallpaper):
+      return generateSystemFullImage(wallpaper: wallpaper)
+    }
+  }
+
+  nonisolated private func generateBundledThumbnail(
     key: String,
     image: HarnessMonitorBackgroundImage
   ) -> CGImage? {
     if let diskImage = loadFromDiskCache(key: key, expectedMtime: nil) {
-      cacheMemoryImage(diskImage, for: key, kind: .thumbnail)
       return diskImage
     }
 
@@ -99,29 +125,19 @@ public actor BackgroundThumbnailCache {
     }
 
     saveToDiskCache(image: thumbnail, key: key, sourceMtime: nil)
-    cacheMemoryImage(thumbnail, for: key, kind: .thumbnail)
     return thumbnail
   }
 
-  private func loadBundledFullImage(
-    key: String,
+  nonisolated private func generateBundledFullImage(
     image: HarnessMonitorBackgroundImage
   ) -> CGImage? {
     guard let nsImage = HarnessMonitorUIAssets.bundle.image(forResource: image.assetName) else {
       return nil
     }
-
-    guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-      return nil
-    }
-
-    cacheMemoryImage(cgImage, for: key, kind: .fullImage)
-    return cgImage
+    return nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
   }
 
-  // MARK: - System thumbnails
-
-  private func loadSystemThumbnail(
+  nonisolated private func generateSystemThumbnail(
     key: String,
     wallpaper: HarnessMonitorSystemWallpaper
   ) -> CGImage? {
@@ -132,7 +148,6 @@ public actor BackgroundThumbnailCache {
     let sourceMtime = fileMtime(at: wallpaper.imagePath)
 
     if let diskImage = loadFromDiskCache(key: key, expectedMtime: sourceMtime) {
-      cacheMemoryImage(diskImage, for: key, kind: .thumbnail)
       return diskImage
     }
 
@@ -142,12 +157,10 @@ public actor BackgroundThumbnailCache {
     }
 
     saveToDiskCache(image: thumbnail, key: key, sourceMtime: sourceMtime)
-    cacheMemoryImage(thumbnail, for: key, kind: .thumbnail)
     return thumbnail
   }
 
-  private func loadSystemFullImage(
-    key: String,
+  nonisolated private func generateSystemFullImage(
     wallpaper: HarnessMonitorSystemWallpaper
   ) -> CGImage? {
     guard validateSourcePath(wallpaper.imagePath) else {
@@ -169,19 +182,12 @@ public actor BackgroundThumbnailCache {
     }
 
     let imageOptions: [CFString: Any] = [kCGImageSourceShouldCacheImmediately: true]
-
-    guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary)
-    else {
-      return nil
-    }
-
-    cacheMemoryImage(cgImage, for: key, kind: .fullImage)
-    return cgImage
+    return CGImageSourceCreateImageAtIndex(source, 0, imageOptions as CFDictionary)
   }
 
   // MARK: - Security validation
 
-  private func validateSourcePath(_ path: String) -> Bool {
+  nonisolated private func validateSourcePath(_ path: String) -> Bool {
     let resolvedPath = URL(fileURLWithPath: path).standardized.path
 
     let hasAllowedPrefix = Self.allowedPathPrefixes.contains { resolvedPath.hasPrefix($0) }
@@ -217,7 +223,7 @@ public actor BackgroundThumbnailCache {
 
   // MARK: - Thumbnail generation
 
-  private func downsampleFile(at path: String) -> CGImage? {
+  nonisolated private func downsampleFile(at path: String) -> CGImage? {
     let url = URL(fileURLWithPath: path)
     let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
 
@@ -256,17 +262,17 @@ public actor BackgroundThumbnailCache {
     return opaqueRGBImage(from: thumbnail, maxPixelSize: nil)
   }
 
-  private func downsample(cgImage: CGImage) -> CGImage? {
+  nonisolated private func downsample(cgImage: CGImage) -> CGImage? {
     opaqueRGBImage(from: cgImage, maxPixelSize: maxPixelSize)
   }
 
-  // MARK: - Helpers
-  private enum MemoryCacheKind {
+  // MARK: - Memory cache
+  enum MemoryCacheKind {
     case thumbnail
     case fullImage
   }
 
-  private func cachedMemoryImage(for key: String, kind: MemoryCacheKind) -> CGImage? {
+  func cachedMemoryImage(for key: String, kind: MemoryCacheKind) -> CGImage? {
     switch kind {
     case .thumbnail:
       guard let cached = thumbnailMemoryCache[key] else {
@@ -283,7 +289,7 @@ public actor BackgroundThumbnailCache {
     }
   }
 
-  private func cacheMemoryImage(_ image: CGImage, for key: String, kind: MemoryCacheKind) {
+  func cacheMemoryImage(_ image: CGImage, for key: String, kind: MemoryCacheKind) {
     let limit: Int
     switch kind {
     case .thumbnail:
