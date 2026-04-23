@@ -62,6 +62,13 @@ mkdir -p "$(dirname "$out")"
 touch "$out"
 """,
             )
+            write_executable(
+                fake_bin / "jq",
+                """#!/bin/bash
+set -euo pipefail
+printf '{}\n'
+""",
+            )
 
             env = os.environ.copy()
             env["PATH"] = f"{fake_bin}:/usr/bin:/bin"

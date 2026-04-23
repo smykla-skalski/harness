@@ -15,10 +15,10 @@ The install step also reconciles stale same-tool `harness` binaries found earlie
 
 ## Fast Local Rust Workflow
 
-The repo `mise` tasks route Rust compilation through [`scripts/cargo-local.sh`](scripts/cargo-local.sh). The wrapper keeps local development responsive and avoids multi-agent target-dir lock contention.
+The repo `mise` tasks route Rust compilation through the shared local cargo wrapper. Use `mise run cargo:local -- <cargo-args...>` when you need a wrapper-backed command outside the canned `mise` tasks. This keeps local development responsive and avoids multi-agent target-dir lock contention.
 
 - If `sccache` is installed, the wrapper enables it automatically through `RUSTC_WRAPPER`.
-- Plain `cargo` invocations also pick up local compiler caching through [`.cargo/config.toml`](.cargo/config.toml), which dispatches to [`scripts/rustc-cache-wrapper.sh`](scripts/rustc-cache-wrapper.sh) and falls back cleanly when `sccache` is unavailable.
+- Plain `cargo` invocations also pick up local compiler caching through [`.cargo/config.toml`](.cargo/config.toml), which dispatches to the repo's Rust compiler cache wrapper and falls back cleanly when `sccache` is unavailable.
 - Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
 - Concurrent wrapper invocations automatically reduce their default job budgets based on the number of active local Rust builds, so a second or third agent does not assume it owns the whole machine.
 - Agent sessions get isolated target directories under the shared git-common-root `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use the shared `target/dev/local`, so extra worktrees reuse the same artifacts instead of cloning a new `target/` tree per checkout.
@@ -364,6 +364,6 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:ma
 The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. `project.yml` is the generator input and the generated `HarnessMonitor.xcodeproj` is checked in; use `mise run monitor:macos:generate` if you need to refresh it for Xcode.
 Its strict style gate runs `swift format` directly and uses `SwiftLintBuildToolPlugin` during `xcodebuild`, so local builds and CI share the same sandbox-safe lint path.
 
-When you need to bump the release version, update the canonical package version with `./scripts/version.sh set <version>`. That syncs the derived surfaces in `testkit/`, the checked-in monitor project metadata, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
+When you need to bump the release version, update the canonical package version with `mise run version:set -- <version>`. That syncs the derived surfaces in `testkit/`, the checked-in monitor project metadata, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.

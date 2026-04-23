@@ -17,9 +17,17 @@ run = "./scripts/clean-stale-state.sh"
 description = "Print the canonical harness package version"
 run = "./scripts/version.sh show"
 
+[tasks."version:set"]
+description = "Update Cargo.toml to the requested version and sync all derived version surfaces (pass the version after --)"
+run = "./scripts/version.sh set"
+
 [tasks."version:sync"]
 description = "Sync all derived version surfaces from Cargo.toml"
 run = "./scripts/version.sh sync"
+
+[tasks."version:sync:monitor"]
+description = "Sync only the Harness Monitor derived version surfaces from Cargo.toml"
+run = "./scripts/version.sh sync-monitor"
 
 [tasks."version:check"]
 description = "Verify all derived version surfaces are in sync"
@@ -64,6 +72,10 @@ run = [
   "./scripts/install-harness-release.sh",
 ]
 
+[tasks."cargo:local"]
+description = "Run cargo through the shared local wrapper (pass cargo args after --)"
+run = "./scripts/cargo-local.sh"
+
 [tasks."cargo:env"]
 description = "Print the local cargo wrapper environment used by mise tasks"
 run = "./scripts/cargo-local.sh --print-env"
@@ -71,6 +83,14 @@ run = "./scripts/cargo-local.sh --print-env"
 [tasks."monitor:macos:generate"]
 description = "Generate the Harness Monitor macOS Xcode project"
 run = "apps/harness-monitor-macos/Scripts/generate-project.sh"
+
+[tasks."monitor:macos:xcodebuild"]
+description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"
+run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
+
+[tasks."monitor:macos:build"]
+description = "Build the Harness Monitor macOS app (Debug) via the lock-aware shared xcodebuild wrapper"
+run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
 [tasks."monitor:macos:lint"]
 description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
@@ -80,9 +100,21 @@ run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 description = "Generate, lint, and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
+[tasks."monitor:macos:test:scripts"]
+description = "Run the Harness Monitor Instruments/parser Python regression tests"
+run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'"
+
 [tasks."monitor:macos:test:agents-e2e"]
 description = "Run the explicit Harness Monitor Agents end-to-end UI lane"
 run = "apps/harness-monitor-macos/Scripts/test-agents-e2e.sh"
+
+[tasks."monitor:macos:audit"]
+description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"
+run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
+
+[tasks."monitor:macos:audit:from-ref"]
+description = "Run the Harness Monitor Instruments audit pipeline from a temporary detached worktree (pass args after --)"
+run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
 
 [tasks."preview:render"]
 description = "Render one SwiftUI preview via xcode-cli (args: --id <EntryID> or --file <path> [--index N])"
@@ -120,9 +152,17 @@ run = "./scripts/observability.sh open"
 description = "Stop the local observability stack, drop its Docker volumes, and remove the shared harness observability config"
 run = "./scripts/observability.sh reset"
 
+[tasks."observability:wipe"]
+description = "Stop the local observability stack, drop its Docker volumes, and wipe the shared observability scratch state"
+run = "./scripts/observability.sh wipe"
+
 [tasks."observability:smoke"]
 description = "Start the local observability stack, emit smoke telemetry, and verify traces, metrics, and logs arrive"
 run = "./scripts/observability.sh smoke"
+
+[tasks."observability:restore-smoke-stack-fixture"]
+description = "Recreate the SQLite-mounted observability consumers after smoke fixture churn"
+run = "./scripts/observability.sh --restore-smoke-stack-fixture"
 
 [tasks."host-metrics:install"]
 description = "Install and start macOS host metrics services (Alloy + darwin-exporter)"

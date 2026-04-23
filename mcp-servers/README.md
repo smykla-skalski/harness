@@ -124,7 +124,7 @@ The Swift host is implemented as a sibling SPM package so the app's `project.yml
            product: HarnessMonitorRegistry
    ```
 
-3. Regenerate with `apps/harness-monitor-macos/Scripts/generate-project.sh`.
+3. Regenerate with `mise run monitor:macos:generate`.
 
 4. Bind the listener at app startup, gated by the Preferences toggle (see that module's README).
 

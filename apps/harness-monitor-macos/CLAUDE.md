@@ -4,24 +4,25 @@ This file provides guidance to Claude Code when working in the Harness Monitor m
 
 ## Build and test
 
-The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. That script also refreshes the repo-root and app-local `buildServer.json` SourceKit configs. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
+The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `mise run monitor:macos:generate`. That task also refreshes the repo-root and app-local `buildServer.json` SourceKit configs. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
 
 Validation expectations (run from repo root):
 
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" -derivedDataPath xcode-derived -skipPackagePluginValidation build`
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" -derivedDataPath xcode-derived -skipPackagePluginValidation test -skip-testing:HarnessMonitorUITests`
+- `mise run monitor:macos:build`
+- `mise run monitor:macos:test`
+- `mise run monitor:macos:xcodebuild -- -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
 - All xcodebuild invocations must use one of two approved `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
-  Repo scripts and `apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh` resolve those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout.
+  The `mise run monitor:macos:xcodebuild` wrapper resolves those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout.
 - For local macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'`. Xcode sees both `My Mac` and `Any Mac`, prints `Using the first of multiple matching destinations`, and silently picks one. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64` destinations. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless you intentionally need a stricter `id=...` selector.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
 - Keep the `-ApplePersistenceIgnoreState YES` UI-test launch argument in place for the isolated host so macOS window restoration does not make targeted UI runs flaky.
-- SwiftLint runs externally via `Scripts/run-quality-gates.sh` and CI, not as an Xcode build plugin. This keeps SwiftLint out of the build graph so SwiftUI previews and local builds stay fast. Config lives in `.swiftlint.yml`.
+- SwiftLint runs externally via `mise run monitor:macos:lint` and CI, not as an Xcode build plugin. This keeps SwiftLint out of the build graph so SwiftUI previews and local builds stay fast. Config lives in `.swiftlint.yml`.
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
@@ -41,25 +42,22 @@ The perf driver (`HarnessMonitorPerfDriver` in `HarnessMonitorAppSceneSupport.sw
 Targeted run (single scenario):
 
 ```bash
-xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' \
-  -scheme 'HarnessMonitor' -destination "platform=macOS,arch=$(uname -m),name=My Mac" \
-  -derivedDataPath "$(git rev-parse --path-format=absolute --git-common-dir | sed 's#/\\.git$##')/xcode-derived" \
-  test -only-testing:HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate
+XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate \
+  mise run monitor:macos:test
 ```
 
-**Layer 2: Instruments xctrace pipeline** (`Scripts/`) - periodic deep-dive attribution for data no public API exposes (SwiftUI body evaluations, update groups, causes, allocation call trees):
+**Layer 2: Instruments xctrace pipeline** (`mise run monitor:macos:audit`) - periodic deep-dive attribution for data no public API exposes (SwiftUI body evaluations, update groups, causes, allocation call trees):
 
 ```bash
 # Full baseline capture
-apps/harness-monitor-macos/Scripts/run-instruments-audit.sh --label baseline
+mise run monitor:macos:audit -- --label baseline
 
 # Compare against baseline
-apps/harness-monitor-macos/Scripts/run-instruments-audit.sh \
+mise run monitor:macos:audit -- \
   --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
 
 # Parser regression tests
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'
+mise run monitor:macos:test:scripts
 ```
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/`. Each run produces `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and optional comparison reports.

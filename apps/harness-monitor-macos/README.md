@@ -14,23 +14,26 @@ From the repo root:
 
 ```bash
 mise run version:check
+mise run monitor:macos:build
 mise run monitor:macos:generate
 mise run monitor:macos:lint
 mise run monitor:macos:test
+mise run monitor:macos:audit -- --label baseline
+mise run monitor:macos:test:scripts
 ```
 
-Direct scripts:
+Focused task entrypoints:
 
 ```bash
-apps/harness-monitor-macos/Scripts/generate-project.sh
-apps/harness-monitor-macos/Scripts/run-quality-gates.sh
-apps/harness-monitor-macos/Scripts/test-swift.sh
+mise run monitor:macos:xcodebuild -- -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj ...
+mise run monitor:macos:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
+mise run monitor:macos:audit:from-ref -- --ref <sha-or-ref> --label baseline
 ```
 
 When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `xcode-derived` build database:
 
 ```bash
-apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug build CODE_SIGNING_ALLOWED=NO
+mise run monitor:macos:build
 ```
 
 The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one DerivedData tree instead of bloating each checkout.
@@ -51,14 +54,14 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:ma
 
 `XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
 
-Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `./scripts/version.sh set <version>` from the repo root when you bump a release. `Scripts/generate-project.sh` regenerates the Xcode project first, then resyncs `project.yml`, `HarnessMonitor.xcodeproj/project.pbxproj`, the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version so XcodeGen cannot reintroduce stale build numbers.
+Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `mise run version:set -- <version>` from the repo root when you bump a release. `mise run monitor:macos:generate` regenerates the Xcode project first, then resyncs `project.yml`, `HarnessMonitor.xcodeproj/project.pbxproj`, the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version so XcodeGen cannot reintroduce stale build numbers.
 
 Do not pass `CODE_SIGNING_ALLOWED=NO` to `HarnessMonitorUITests`. macOS UI tests need Xcode to re-sign the generated `HarnessMonitorUITests-Runner.app`; otherwise Gatekeeper can reject the copied `com.apple.XCTRunner` runner before the test bundle bootstraps.
 
 Example targeted UI regression:
 
 ```bash
-xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived -destination 'platform=macOS' test -only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow
+XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow mise run monitor:macos:test
 ```
 
 The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. Lint enforcement lives in the monitor quality-gate scripts and CI instead.
@@ -68,5 +71,5 @@ For SwiftUI canvas previews, open `HarnessMonitor.xcodeproj` and select the shar
 Regenerate the project after target or configuration changes:
 
 ```bash
-apps/harness-monitor-macos/Scripts/generate-project.sh
+mise run monitor:macos:generate
 ```
