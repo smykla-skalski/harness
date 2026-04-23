@@ -2,13 +2,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_CHECKOUT_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
 ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 ROOT="${HARNESS_MONITOR_APP_ROOT:-$ROOT}"
-REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 
-DEFAULT_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
+DEFAULT_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
 LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
 MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"

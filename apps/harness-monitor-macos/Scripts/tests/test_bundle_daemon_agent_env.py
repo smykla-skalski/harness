@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -45,6 +46,66 @@ class ResolveCargoTargetDirTests(unittest.TestCase):
         )
 
         self.assertEqual(resolved, f"{repo_root}/target/harness-monitor-xcode-daemon")
+
+    def test_worktree_defaults_to_common_repo_target_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir) / "repo"
+            subprocess.run(["git", "init", str(repo_root)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "-C", str(repo_root), "config", "user.name", "Test User"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo_root), "config", "user.email", "test@example.com"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (repo_root / "README.md").write_text("repo\n")
+            subprocess.run(
+                ["git", "-C", str(repo_root), "add", "README.md"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo_root), "commit", "-m", "init"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            worktree_root = repo_root / ".claude" / "worktrees" / "feature"
+            worktree_root.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "worktree",
+                    "add",
+                    str(worktree_root),
+                    "-b",
+                    "feature",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            resolved = run_helper(
+                f'repo_root="{worktree_root}"; '
+                'export TARGET_TEMP_DIR="/tmp/DerivedData/HarnessMonitorUITestHost.build"; '
+                "unset CARGO_TARGET_DIR; "
+                "resolve_cargo_target_dir"
+            )
+
+            self.assertEqual(
+                resolved,
+                f"{repo_root.resolve()}/target/harness-monitor-xcode-daemon",
+            )
 
 
 if __name__ == "__main__":

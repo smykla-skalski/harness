@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh"
 STACK_ROOT="$ROOT/resources/observability"
@@ -840,7 +843,7 @@ run_monitor_smoke() {
         -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
         -scheme "HarnessMonitor" \
         -configuration Debug \
-        -derivedDataPath "$ROOT/xcode-derived" \
+        -derivedDataPath "$COMMON_REPO_ROOT/xcode-derived" \
         -skipPackagePluginValidation \
         test \
         CODE_SIGNING_ALLOWED=NO \
