@@ -6,6 +6,8 @@
 # so regens and resets do not destroy its fetched SourcePackages cache.
 set -euo pipefail
 
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+readonly ROOT
 readonly APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
 readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harness/daemon"
 readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
@@ -45,6 +47,13 @@ matching_process_pids() {
       if (process_kind == "debug" && $0 ~ /target\/(debug|dev\/.*\/debug)\/harness (daemon|bridge)/) {
         print pid
       }
+      if (process_kind == "gate" && $0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /(^| )mise run test(:| |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|test|test:scripts|test:agents-e2e|audit|audit:from-ref)( |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /(^| )bash \.\/scripts\/check(\.sh|-scripts\.sh)( |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|test|run --quiet -- setup agents generate --check)( |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|test-swift|test-agents-e2e|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) { print pid }
+      if (process_kind == "gate" && $0 ~ /python3 -m unittest discover -s .*apps\/harness-monitor-macos\/Scripts\/tests/) { print pid }
     }
   '
 }
@@ -59,6 +68,24 @@ root_lock_holder_pids() {
     [[ -e "$lock_path" ]] || continue
     lsof -t "$lock_path" 2>/dev/null || true
   done | sort -u
+}
+
+process_cwd() {
+  local pid="$1"
+  lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
+}
+
+repo_gate_pids() {
+  local pid
+  local cwd
+
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    cwd="$(process_cwd "$pid")"
+    if [[ "$cwd" == "$ROOT" || "$cwd" == "$ROOT/"* ]]; then
+      echo "$pid"
+    fi
+  done < <(matching_process_pids gate)
 }
 
 quit_monitor_app() {
@@ -90,6 +117,33 @@ stop_launchd_daemon() {
 
 kill_orphan_harness_processes() {
   kill_matching_processes debug "orphan local debug harness processes"
+}
+
+kill_repo_gate_processes() {
+  local pids
+
+  pids="$(repo_gate_pids)"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "killing repo-local gate helper processes..."
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done <<<"$pids"
+  sleep 1
+
+  pids="$(repo_gate_pids)"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "force-stopping stubborn repo-local gate helper processes..."
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -KILL "$pid" 2>/dev/null || true
+  done <<<"$pids"
 }
 
 kill_live_harness_processes() {
@@ -157,6 +211,7 @@ wipe_stale_bridge_state() {
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
+kill_repo_gate_processes
 kill_live_harness_processes "$GROUP_CONTAINER_ROOT"
 kill_live_harness_processes "$APPLICATION_SUPPORT_ROOT"
 remove_tmp_bridge_sockets
