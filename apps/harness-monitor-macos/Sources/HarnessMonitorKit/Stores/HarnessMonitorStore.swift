@@ -13,6 +13,7 @@ public final class HarnessMonitorStore {
   public let sidebarUI: SidebarUISlice
   public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
+  @ObservationIgnored public let supervisorToolbarSlice: SupervisorToolbarSlice
   public let bookmarkStore: BookmarkStore?
 
   public var openFolderRequest = 0
@@ -193,6 +194,7 @@ public final class HarnessMonitorStore {
     self.sidebarUI = SidebarUISlice()
     self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
+    self.supervisorToolbarSlice = SupervisorToolbarSlice()
     self.bookmarkStore = Self.makeBookmarkStore()
     self.daemonController = daemonController
     self.daemonOwnership = daemonOwnership
