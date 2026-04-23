@@ -29,24 +29,20 @@ public struct DecisionDetailView: View {
 
   private let viewModel: DecisionDetailViewModel?
   private let auditEvents: [SupervisorEvent]
-  private let liveTick: DecisionLiveTickSnapshot
 
   public init(selectedTab: Binding<DecisionDetailTab> = .constant(.context)) {
     viewModel = nil
     auditEvents = []
-    liveTick = .placeholder
     _selectedTab = selectedTab
   }
 
   public init(
     viewModel: DecisionDetailViewModel,
     auditEvents: [SupervisorEvent] = [],
-    liveTick: DecisionLiveTickSnapshot = .placeholder,
     selectedTab: Binding<DecisionDetailTab> = .constant(.context)
   ) {
     self.viewModel = viewModel
     self.auditEvents = auditEvents
-    self.liveTick = liveTick
     _selectedTab = selectedTab
   }
 
@@ -54,13 +50,11 @@ public struct DecisionDetailView: View {
     decision: Decision,
     handler: any DecisionActionHandler = NullDecisionActionHandler(),
     auditEvents: [SupervisorEvent] = [],
-    liveTick: DecisionLiveTickSnapshot = .placeholder,
     selectedTab: Binding<DecisionDetailTab> = .constant(.context)
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
       auditEvents: auditEvents,
-      liveTick: liveTick,
       selectedTab: selectedTab
     )
   }
@@ -117,7 +111,6 @@ public struct DecisionDetailView: View {
         )
         suggestedActions(viewModel)
         detailTabs(viewModel)
-        liveTickSection
       }
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -194,15 +187,6 @@ public struct DecisionDetailView: View {
     case .audit:
       DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
     }
-  }
-
-  private var liveTickSection: some View {
-    DisclosureGroup("Live Tick") {
-      DecisionsLiveTickView(snapshot: liveTick)
-        .padding(.top, HarnessMonitorTheme.spacingSM)
-    }
-    .scaledFont(.callout)
-    .accessibilityElement(children: .contain)
   }
 
   private func snoozeBinding(

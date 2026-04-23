@@ -63,6 +63,9 @@ public struct DecisionsWindowView: View {
   @State private var detailTab: DecisionDetailTab = .context
   @State private var runtime = DecisionsWindowRuntime()
 
+  @AppStorage("harness.decisions.inspector.visible")
+  private var inspectorVisible: Bool = true
+
   public init(store: HarnessMonitorStore? = nil) {
     self.store = store
   }
@@ -78,22 +81,32 @@ public struct DecisionsWindowView: View {
     return runtime.decisions.first
   }
 
+  @ViewBuilder private var detailColumn: some View {
+    if let selectedDecision {
+      DecisionDetailView(
+        decision: selectedDecision,
+        handler: actionHandler,
+        auditEvents: runtime.auditEvents,
+        selectedTab: $detailTab
+      )
+    } else {
+      DecisionDetailView(selectedTab: $detailTab)
+    }
+  }
+
   public var body: some View {
     NavigationSplitView {
       DecisionsSidebar(decisions: runtime.decisions, selection: $selection)
         .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
     } detail: {
-      if let selectedDecision {
-        DecisionDetailView(
-          decision: selectedDecision,
-          handler: actionHandler,
-          auditEvents: runtime.auditEvents,
-          liveTick: runtime.liveTick,
-          selectedTab: $detailTab
-        )
-      } else {
-        DecisionDetailView(selectedTab: $detailTab)
-      }
+      detailColumn
+        .inspector(isPresented: $inspectorVisible) {
+          DecisionInspector(
+            decision: selectedDecision,
+            liveTick: runtime.liveTick
+          )
+          .inspectorColumnWidth(min: 260, ideal: 320, max: 420)
+        }
     }
     .navigationSplitViewStyle(.balanced)
     .accessibilityElement(children: .contain)

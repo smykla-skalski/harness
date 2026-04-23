@@ -62,14 +62,7 @@ import SwiftUI
 
   return DecisionDetailView(
     decision: decision,
-    auditEvents: [first, second],
-    liveTick: DecisionLiveTickSnapshot(
-      lastSnapshotID: "snap-42",
-      tickLatencyP50Ms: 118,
-      tickLatencyP95Ms: 286,
-      activeObserverCount: 3,
-      quarantinedRuleIDs: ["stuck-agent"]
-    )
+    auditEvents: [first, second]
   )
   .frame(width: 700, height: 640)
 }
