@@ -13,7 +13,13 @@ final class PolicyExecutorTests: XCTestCase {
 
     let outcome = await exec.execute(
       .nudgeAgent(
-        .init(agentID: "a1", prompt: "status?", ruleID: "stuck-agent", snapshotID: "s1")
+        .init(
+          agentID: "a1",
+          prompt: "status?",
+          ruleID: "stuck-agent",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -25,7 +31,7 @@ final class PolicyExecutorTests: XCTestCase {
       XCTFail("expected executed, got \(outcome)")
       return
     }
-    XCTAssertEqual(key, "nudge:stuck-agent:a1:s1")
+    XCTAssertEqual(key, "nudge:stuck-agent:a1:hash-1")
   }
 
   func test_auditEventsRecordDispatchBeforeExecute() async throws {
@@ -36,7 +42,13 @@ final class PolicyExecutorTests: XCTestCase {
 
     _ = await exec.execute(
       .nudgeAgent(
-        .init(agentID: "a2", prompt: "ping", ruleID: "stuck-agent", snapshotID: "s1")
+        .init(
+          agentID: "a2",
+          prompt: "ping",
+          ruleID: "stuck-agent",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -55,12 +67,24 @@ final class PolicyExecutorTests: XCTestCase {
 
     let first = await exec.execute(
       .nudgeAgent(
-        .init(agentID: "a1", prompt: "x", ruleID: "r1", snapshotID: "s1")
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
     let second = await exec.execute(
       .nudgeAgent(
-        .init(agentID: "a1", prompt: "x", ruleID: "r1", snapshotID: "s1")
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -72,10 +96,51 @@ final class PolicyExecutorTests: XCTestCase {
       XCTFail("second call should dedup, got \(second)")
       return
     }
-    XCTAssertEqual(key, "nudge:r1:a1:s1")
+    XCTAssertEqual(key, "nudge:r1:a1:hash-1")
     XCTAssertEqual(api.nudgeCalls.count, 1)
     let events = await audit.snapshot()
     XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
+  }
+
+  func test_duplicateActionAcrossSnapshotIDsIsSkippedForEquivalentNudge() async throws {
+    let api = FakeAPIClient()
+    let store = try DecisionStore.makeInMemory()
+    let audit = InMemoryAuditWriter()
+    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
+
+    let first = await exec.execute(
+      .nudgeAgent(
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "tick-1",
+          snapshotHash: "stable-hash"
+        )
+      )
+    )
+    let second = await exec.execute(
+      .nudgeAgent(
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "tick-2",
+          snapshotHash: "stable-hash"
+        )
+      )
+    )
+
+    guard case .executed = first else {
+      XCTFail("first call should dispatch")
+      return
+    }
+    guard case .skippedDuplicate(let key) = second else {
+      XCTFail("second call should dedup across equivalent snapshots, got \(second)")
+      return
+    }
+    XCTAssertEqual(key, "nudge:r1:a1:stable-hash")
+    XCTAssertEqual(api.nudgeCalls.count, 1)
   }
 
   func test_failedNudgeEmitsActionFailed() async throws {
@@ -87,7 +152,13 @@ final class PolicyExecutorTests: XCTestCase {
 
     let outcome = await exec.execute(
       .nudgeAgent(
-        .init(agentID: "a1", prompt: "x", ruleID: "r1", snapshotID: "s1")
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -107,7 +178,13 @@ final class PolicyExecutorTests: XCTestCase {
 
     let outcome = await exec.execute(
       .assignTask(
-        .init(taskID: "t1", agentID: "a1", ruleID: "unassigned", snapshotID: "s1")
+        .init(
+          taskID: "t1",
+          agentID: "a1",
+          ruleID: "unassigned",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -126,7 +203,13 @@ final class PolicyExecutorTests: XCTestCase {
 
     let outcome = await exec.execute(
       .dropTask(
-        .init(taskID: "t2", reason: "stale", ruleID: "r1", snapshotID: "s1")
+        .init(
+          taskID: "t2",
+          reason: "stale",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
       )
     )
 
@@ -180,6 +263,7 @@ final class PolicyExecutorTests: XCTestCase {
         .init(
           ruleID: "daemon-disconnect",
           snapshotID: "s1",
+          snapshotHash: "hash-1",
           severity: .warn,
           summary: "daemon down"
         )
@@ -203,7 +287,12 @@ final class PolicyExecutorTests: XCTestCase {
 
     let outcome = await exec.execute(
       .logEvent(
-        .init(id: "l1", ruleID: "policy-gap", snapshotID: "s1", message: "unknown code")
+        .init(
+          id: "l1",
+          ruleID: "policy-gap",
+          snapshotID: "s1",
+          message: "unknown code"
+        )
       )
     )
 
@@ -256,11 +345,27 @@ final class PolicyExecutorTests: XCTestCase {
     )
 
     _ = await exec.execute(
-      .nudgeAgent(.init(agentID: "a1", prompt: "x", ruleID: "r1", snapshotID: "s1"))
+      .nudgeAgent(
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
+      )
     )
     try await Task.sleep(nanoseconds: 80_000_000)
     let second = await exec.execute(
-      .nudgeAgent(.init(agentID: "a1", prompt: "x", ruleID: "r1", snapshotID: "s1"))
+      .nudgeAgent(
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
+      )
     )
 
     guard case .executed = second else {
@@ -274,7 +379,12 @@ final class PolicyExecutorTests: XCTestCase {
     let exec = try PolicyExecutor.fixture()
     let outcome = await exec.execute(
       .logEvent(
-        .init(id: "l1", ruleID: "r1", snapshotID: "s1", message: "m")
+        .init(
+          id: "l1",
+          ruleID: "r1",
+          snapshotID: "s1",
+          message: "m"
+        )
       )
     )
     guard case .executed = outcome else {

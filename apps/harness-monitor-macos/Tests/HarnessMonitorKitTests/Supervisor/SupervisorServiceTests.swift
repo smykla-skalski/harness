@@ -265,7 +265,8 @@ private struct AutoActionRule: PolicyRule {
           agentID: "agent-1",
           prompt: "wake up",
           ruleID: id,
-          snapshotID: snapshot.id
+          snapshotID: snapshot.id,
+          snapshotHash: snapshot.hash
         )
       ),
       .queueDecision(
