@@ -44,9 +44,15 @@ public struct SessionsSnapshot: Sendable, Hashable {
   public static func build(
     from store: HarnessMonitorStore,
     now: Date
-  ) -> Self {
-    let sessions = buildSessions(store: store, now: now)
-    let connection = ConnectionSnapshot.from(store.connectionState)
+  ) async -> Self {
+    let sessions = await buildSessions(store: store, now: now)
+    let connection = await MainActor.run {
+      ConnectionSnapshot.from(
+        store.connectionState,
+        metrics: store.connectionMetrics,
+        transport: store.activeTransport
+      )
+    }
     let hash = canonicalHash(sessions: sessions, connection: connection)
     return Self(
       id: UUID().uuidString,
@@ -61,14 +67,57 @@ public struct SessionsSnapshot: Sendable, Hashable {
   private static func buildSessions(
     store: HarnessMonitorStore,
     now: Date
-  ) -> [SessionSnapshot] {
-    let summaries = store.sessionIndex.sessions
-    let selected = store.selectedSession
-    return summaries.map { summary in
-      if let selected, selected.session.sessionId == summary.sessionId {
-        return SessionSnapshot.from(detail: selected, summary: summary, now: now)
+  ) async -> [SessionSnapshot] {
+    let (
+      summaries,
+      selectedSessionID,
+      selectedDetail,
+      selectedTimeline,
+      selectedCodexRuns,
+      codexRunsBySessionID,
+      cacheService
+    ) =
+      await MainActor.run {
+        (
+          store.sessionIndex.sessions,
+          store.selectedSessionID,
+          store.selectedSession,
+          store.timeline,
+          store.selectedCodexRuns,
+          store.codexRunsBySessionID,
+          store.cacheService
+        )
       }
-      return SessionSnapshot.from(summary: summary)
+    let cachedByID: [String: SessionCacheService.CachedSessionSnapshot] =
+      if let cacheService {
+        await cacheService.loadSessionDetails(sessionIDs: summaries.map(\.sessionId))
+      } else {
+        [:]
+      }
+
+    return summaries.compactMap { summary -> SessionSnapshot? in
+      let detailSource: (detail: SessionDetail, timeline: [TimelineEntry])
+      if let selectedDetail, selectedSessionID == summary.sessionId {
+        detailSource = (selectedDetail, selectedTimeline)
+      } else if let cached = cachedByID[summary.sessionId] {
+        detailSource = (cached.detail, cached.timeline)
+      } else {
+        HarnessMonitorLogger.supervisor.debug(
+          "supervisor.snapshot skipping unhydrated session \(summary.sessionId, privacy: .public)"
+        )
+        return nil
+      }
+
+      let sessionRuns =
+        codexRunsBySessionID[summary.sessionId]
+        ?? (selectedSessionID == summary.sessionId ? selectedCodexRuns : [])
+      return SessionSnapshot.from(
+        detail: detailSource.detail,
+        summary: summary,
+        timeline: detailSource.timeline,
+        pendingCodexRuns: sessionRuns,
+        now: now
+      )
     }
   }
 
@@ -88,53 +137,6 @@ public struct SessionsSnapshot: Sendable, Hashable {
     }
     let digest = SHA256.hash(data: data)
     return digest.map { String(format: "%02x", $0) }.joined()
-  }
-}
-
-/// Canonical encoding that feeds the SHA-256 hash. Deliberately narrower than the public
-/// `SessionsSnapshot` surface:
-/// - `id` and `createdAt` are excluded so two ticks built from the same store state hash-match.
-/// - `idleSeconds` is excluded because it is derived from `now` and would make the hash drift
-///   between ticks that observe identical store state.
-/// `lastActivityAt` stays in the payload because it is a pure store-state timestamp.
-private struct SessionsCanonicalPayload: Codable {
-  let sessions: [SessionCanonicalPayload]
-  let connection: ConnectionSnapshot
-}
-
-private struct SessionCanonicalPayload: Codable {
-  let id: String
-  let title: String?
-  let agents: [AgentCanonicalPayload]
-  let tasks: [TaskSnapshot]
-  let timelineDensityLastMinute: Int
-  let observerIssues: [ObserverIssueSnapshot]
-  let pendingCodexApprovals: [CodexApprovalSnapshot]
-
-  init(session: SessionSnapshot) {
-    id = session.id
-    title = session.title
-    agents = session.agents.map(AgentCanonicalPayload.init(agent:))
-    tasks = session.tasks
-    timelineDensityLastMinute = session.timelineDensityLastMinute
-    observerIssues = session.observerIssues
-    pendingCodexApprovals = session.pendingCodexApprovals
-  }
-}
-
-private struct AgentCanonicalPayload: Codable {
-  let id: String
-  let runtime: String
-  let statusRaw: String
-  let lastActivityAt: Date?
-  let currentTaskID: String?
-
-  init(agent: AgentSnapshot) {
-    id = agent.id
-    runtime = agent.runtime
-    statusRaw = agent.statusRaw
-    lastActivityAt = agent.lastActivityAt
-    currentTaskID = agent.currentTaskID
   }
 }
 
@@ -165,40 +167,31 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
     self.pendingCodexApprovals = pendingCodexApprovals
   }
 
-  /// Builds a detail-backed snapshot for the session the user currently has selected.
   @MainActor
   fileprivate static func from(
     detail: SessionDetail,
     summary: SessionSummary,
+    timeline: [TimelineEntry],
+    pendingCodexRuns: [CodexRunSnapshot],
     now: Date
   ) -> Self {
     let agents = detail.agents.map { AgentSnapshot.from(registration: $0, now: now) }
     let tasks = detail.tasks.map(TaskSnapshot.from(workItem:))
     let observerIssues =
       detail.observer?.openIssues?.map(ObserverIssueSnapshot.from(summary:)) ?? []
+    let timelineDensityLastMinute = timeline.reduce(into: 0) { count, entry in
+      guard let timestamp = SessionsSnapshotDateParser.parse(entry.recordedAt) else { return }
+      guard timestamp <= now, now.timeIntervalSince(timestamp) < 60 else { return }
+      count += 1
+    }
     return Self(
       id: summary.sessionId,
       title: summary.title,
       agents: agents,
       tasks: tasks,
-      timelineDensityLastMinute: 0,
+      timelineDensityLastMinute: timelineDensityLastMinute,
       observerIssues: observerIssues,
-      pendingCodexApprovals: []
-    )
-  }
-
-  /// Builds a summary-only snapshot for sessions the store knows about but has not hydrated yet.
-  /// Rules that need agent/task detail must select the session first; this shape still lets the
-  /// tick loop reason about session counts and titles.
-  fileprivate static func from(summary: SessionSummary) -> Self {
-    Self(
-      id: summary.sessionId,
-      title: summary.title,
-      agents: [],
-      tasks: [],
-      timelineDensityLastMinute: 0,
-      observerIssues: [],
-      pendingCodexApprovals: []
+      pendingCodexApprovals: CodexApprovalSnapshot.from(runs: pendingCodexRuns)
     )
   }
 }
@@ -281,14 +274,14 @@ public struct ObserverIssueSnapshot: Sendable, Hashable, Codable {
   public let id: String
   public let severityRaw: String
   public let code: String
-  public let firstSeen: Date
+  public let firstSeen: Date?
   public let count: Int
 
   public init(
     id: String,
     severityRaw: String,
     code: String,
-    firstSeen: Date,
+    firstSeen: Date?,
     count: Int
   ) {
     self.id = id
@@ -303,7 +296,7 @@ public struct ObserverIssueSnapshot: Sendable, Hashable, Codable {
       id: summary.issueId,
       severityRaw: summary.severity,
       code: summary.code,
-      firstSeen: Date(timeIntervalSince1970: 0),
+      firstSeen: nil,
       count: summary.occurrenceCount ?? 0
     )
   }
@@ -342,48 +335,27 @@ public struct ConnectionSnapshot: Sendable, Hashable, Codable {
     self.reconnectAttempt = reconnectAttempt
   }
 
-  fileprivate static func from(_ state: HarnessMonitorStore.ConnectionState) -> Self {
+  fileprivate static func from(
+    _ state: HarnessMonitorStore.ConnectionState,
+    metrics: ConnectionMetrics,
+    transport: TransportKind
+  ) -> Self {
     let kind: String
     switch state {
-    case .idle:
+    case .idle, .connecting, .offline:
       kind = "disconnected"
-    case .connecting:
-      kind = "connecting"
     case .online:
-      kind = "sse"
-    case .offline:
-      kind = "offline"
+      switch transport {
+      case .webSocket:
+        kind = "ws"
+      case .httpSSE:
+        kind = "sse"
+      }
     }
-    return Self(kind: kind, lastMessageAt: nil, reconnectAttempt: 0)
+    return Self(
+      kind: kind,
+      lastMessageAt: metrics.lastMessageAt,
+      reconnectAttempt: metrics.reconnectAttempt
+    )
   }
-}
-
-/// Shared ISO-8601 parser for the snapshot builder. Parses both the extended
-/// (`yyyy-MM-ddTHH:mm:ss.SSS±HH:MM`) and basic (`yyyy-MM-ddTHH:mm:ssZ`) variants the daemon
-/// emits so idle-seconds math stays accurate regardless of which serializer ran upstream.
-/// Cached on `@MainActor` because the supervisor builds snapshots from the main actor and
-/// `ISO8601DateFormatter` is not `Sendable`.
-@MainActor
-private enum SessionsSnapshotDateParser {
-  static func parse(_ iso: String) -> Date? {
-    if let date = Self.internetDateFormatter.date(from: iso) {
-      return date
-    }
-    if let date = Self.fractionalFormatter.date(from: iso) {
-      return date
-    }
-    return nil
-  }
-
-  private static let internetDateFormatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter
-  }()
-
-  private static let fractionalFormatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter
-  }()
 }

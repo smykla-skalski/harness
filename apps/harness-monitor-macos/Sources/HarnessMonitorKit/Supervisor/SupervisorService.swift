@@ -309,9 +309,7 @@ public actor SupervisorService {
 
   private func buildSnapshot(now: Date) async -> SessionsSnapshot {
     if let store {
-      return await MainActor.run {
-        SessionsSnapshot.build(from: store, now: now)
-      }
+      return await SessionsSnapshot.build(from: store, now: now)
     }
     return SessionsSnapshot(
       id: UUID().uuidString,
