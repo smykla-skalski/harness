@@ -209,6 +209,7 @@
 		58CEA5FBC73338AA79F1BA19 /* HarnessMonitorAPIClient+Sessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D062DDB63A154F172FC4B /* HarnessMonitorAPIClient+Sessions.swift */; };
 		594CBBA08376E758BB01387B /* HarnessMonitorPreviewStoreLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCB2ACED4F19171B31742C5 /* HarnessMonitorPreviewStoreLifecycleTests.swift */; };
 		59C12935D92AEA870AC474E6 /* HarnessMonitorAppConfiguration+PreseedBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96A84B943C8A68814E77302 /* HarnessMonitorAppConfiguration+PreseedBookmark.swift */; };
+		5A0B7197150F07AE2240C40A /* LoggingPolicyObserverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE501A30BDDB3D73A1A240AB /* LoggingPolicyObserverTests.swift */; };
 		5A39EF93F60B09406FDFB6BA /* HarnessMonitorDaemonOwnership.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA8A31A9D7AA2AE8012AD17C /* HarnessMonitorDaemonOwnership.swift */; };
 		5A7E63671B6591BF761BFDD1 /* HarnessMonitorTelemetry+DeferredExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781DD8064D5450549CC62999 /* HarnessMonitorTelemetry+DeferredExport.swift */; };
 		5A90725349BE22D05F53F69F /* SidebarSearchControlsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44784EAE56C818B446F2CB76 /* SidebarSearchControlsSection.swift */; };
@@ -1148,6 +1149,7 @@
 		ADD468233E13778FF6BAEE05 /* SessionDiscoveryProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDiscoveryProbeTests.swift; sourceTree = "<group>"; };
 		ADF6D98502442489798CCBB4 /* SessionCockpitHeaderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCockpitHeaderCard.swift; sourceTree = "<group>"; };
 		AE40BFCCF99AAF5267973C21 /* ModelConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelConversion.swift; sourceTree = "<group>"; };
+		AE501A30BDDB3D73A1A240AB /* LoggingPolicyObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggingPolicyObserverTests.swift; sourceTree = "<group>"; };
 		AE8C308135A674A0C2BEBD53 /* URL+SecurityScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+SecurityScope.swift"; sourceTree = "<group>"; };
 		AF58A855ABBF0D80524A82E3 /* HarnessMonitorStoreLifecycleCoreTests+StartDaemon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStoreLifecycleCoreTests+StartDaemon.swift"; sourceTree = "<group>"; };
 		AFA1FEA3B5C2B249095FAC74 /* HarnessMonitorStore+FilteringProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+FilteringProjection.swift"; sourceTree = "<group>"; };
@@ -1449,6 +1451,7 @@
 				47C1E3FA688555176EB8555F /* PolicyExecutorTests.swift */,
 				7CA208A19A3A3AC0B9415B8A /* SupervisorTelemetryTests.swift */,
 				42C5D59F57F68B72980D7E54 /* SwiftDataSchemaV7Tests.swift */,
+				695C2A9503DF103DA3BAD8A4 /* Observers */,
 				536D4C5794CB004C2D2D09E5 /* TestSupport */,
 			);
 			path = Supervisor;
@@ -1866,6 +1869,14 @@
 				0270B78FDF370D7590620E80 /* Supervisor */,
 			);
 			path = HarnessMonitorKitTests;
+			sourceTree = "<group>";
+		};
+		695C2A9503DF103DA3BAD8A4 /* Observers */ = {
+			isa = PBXGroup;
+			children = (
+				AE501A30BDDB3D73A1A240AB /* LoggingPolicyObserverTests.swift */,
+			);
+			path = Observers;
 			sourceTree = "<group>";
 		};
 		73A921EDCEA35617624B4EAC /* Tests */ = {
@@ -2894,6 +2905,7 @@
 				C35DDDA6BB96E421E0E80336 /* HarnessSidebarSearchFocusTests.swift in Sources */,
 				0DD065F7DC79B62A1CFEB497 /* InMemoryAuditWriter.swift in Sources */,
 				9FAC0F4601EDF832C1C78340 /* InspectorActionIDTests.swift in Sources */,
+				5A0B7197150F07AE2240C40A /* LoggingPolicyObserverTests.swift in Sources */,
 				CC9215982CD6D802B1ACAFFC /* NewSessionAPIClientTests.swift in Sources */,
 				75F101033A98A177290573A8 /* NewSessionSheetRenderingTests.swift in Sources */,
 				DC61A419DC225EF9D73FA3E5 /* NewSessionViewModelErrorMappingTests.swift in Sources */,
