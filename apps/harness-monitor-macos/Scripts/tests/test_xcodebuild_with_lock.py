@@ -87,6 +87,100 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-showBuildSettings -scheme HarnessMonitor", log)
 
+    def test_normalizes_shared_schemes_after_successful_xcodebuild(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            app_root = temp_root / "HarnessMonitor"
+            schemes_root = (
+                app_root / "HarnessMonitor.xcodeproj" / "xcshareddata" / "xcschemes"
+            )
+            scripts_root = app_root / "Scripts"
+            tool_log = temp_root / "tool.log"
+
+            schemes_root.mkdir(parents=True)
+            scripts_root.mkdir(parents=True, exist_ok=True)
+            (app_root / "project.yml").write_text("name: HarnessMonitor\n")
+            (app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj").write_text("")
+
+            write_executable(
+                scripts_root / "generate-project.sh",
+                (APP_ROOT / "Scripts" / "generate-project.sh").read_text(),
+            )
+            write_executable(
+                fake_bin / "rtk",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'RTK=%s\\n' "$*" > "{tool_log}"
+"$@"
+""",
+            )
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+cat > "{schemes_root / 'HarnessMonitor.xcscheme'}" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1430"
+   version = "1.3">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+     >
+      <BuildActionEntries>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+     >
+      <Testables>
+      </Testables>
+   </TestAction>
+</Scheme>
+EOF
+printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            scheme_text = (schemes_root / "HarnessMonitor.xcscheme").read_text()
+            self.assertIn('buildImplicitDependencies = "YES">', scheme_text)
+            self.assertIn('shouldUseLaunchSchemeArgsEnv = "YES">', scheme_text)
+            self.assertNotIn('buildImplicitDependencies = "YES"\n     >', scheme_text)
+            self.assertNotIn('shouldUseLaunchSchemeArgsEnv = "YES"\n     >', scheme_text)
+
 
 if __name__ == "__main__":
     unittest.main()
