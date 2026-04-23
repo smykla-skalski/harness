@@ -13,7 +13,7 @@ done
 echo "Grafana is ready"
 
 # star each dashboard
-DASHBOARDS="harness-investigation-cockpit claude-code-global harness-host-machine harness-host-processes harness-daemon-transport harness-monitor-client harness-runtime-execution harness-sqlite-forensics harness-service-map"
+DASHBOARDS="harness-investigation-cockpit ai-agents-cockpit harness-host-machine harness-host-processes harness-daemon-transport harness-monitor-client harness-runtime-execution harness-sqlite-forensics harness-service-map"
 
 for uid in $DASHBOARDS; do
   if curl -sf -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/dashboards/uid/$uid" > /dev/null; then

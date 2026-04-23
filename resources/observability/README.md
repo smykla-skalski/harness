@@ -80,7 +80,7 @@ The local stack now provisions a repo-managed forensic suite into the `Harness O
 
 - `Harness Investigation Cockpit` - the landing page for short-window local slowdowns
 - `Harness Investigation Cockpit` now uses a v2 tabs-and-rows layout with auto-grid summary KPIs, activity and reliability trends, and a separate workstation tab so the landing page behaves more like an operator cockpit than a flat wall of charts
-- `Claude Code Global` - stack-level Claude Code usage and productivity telemetry backed by the live `claude_code_*` Prometheus series (cost, sessions, tokens, active time, commits, LOC, and edit-tool decisions)
+- `AI Agents Cockpit` - shared Claude Code plus Codex landing dashboard with a cross-agent cockpit first, then agent-specific tabs for Claude cost, productivity, tools, and Codex runtime, tracing, and logs backed by live `claude_code_*`, `codex_*`, and spanmetrics signals
 - `Harness Host Machine` - CPU, load, memory, swap, disk, filesystem, network, process states, tracked-process CPU/RSS/VM/thread/fd/uptime, WiFi, battery, and thermal drilldown
 - `Harness Host Processes` - low-cardinality process triage with top offenders, process-state pressure, per-process CPU/RSS/VM/thread/fd/uptime trends, and current rankings
 - `Harness Runtime & Hooks` - CLI and hook execution bottlenecks
