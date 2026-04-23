@@ -110,7 +110,7 @@ impl AgentAdapter for CodexAdapter {
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {
         match tool_name {
-            "exec_command" | "shell_command" | "local_shell" => ToolCategory::Shell,
+            "Bash" | "exec_command" | "shell_command" | "local_shell" => ToolCategory::Shell,
             "read_file" | "view" | "read" => ToolCategory::FileRead,
             "write_file" | "create_file" | "write" | "create" => ToolCategory::FileWrite,
             "apply_patch" | "edit_file" | "replace_in_file" | "edit" | "replace" => {

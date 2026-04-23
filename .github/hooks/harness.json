@@ -20,6 +20,12 @@
     "preToolUse": [
       {
         "type": "command",
+        "bash": "harness agents repo-policy --agent copilot",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
         "bash": "harness hook --agent copilot suite:run tool-guard",
         "cwd": ".",
         "timeoutSec": 30

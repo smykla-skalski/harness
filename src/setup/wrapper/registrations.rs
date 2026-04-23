@@ -57,6 +57,12 @@ fn shared_runtime_hooks(agent: HookAgent) -> Vec<HookRegistration> {
             NormalizedEvent::UserPromptSubmit,
             None,
         ),
+        command_registration(
+            "repo-policy",
+            repo_policy_command(agent),
+            NormalizedEvent::BeforeToolUse,
+            Some(".*"),
+        ),
         hook_registration(
             agent,
             "tool-guard",
@@ -77,6 +83,12 @@ fn shared_runtime_hooks(agent: HookAgent) -> Vec<HookRegistration> {
 
 fn claude_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
+        command_registration(
+            "repo-policy",
+            repo_policy_command(agent),
+            NormalizedEvent::BeforeToolUse,
+            Some(".*"),
+        ),
         hook_registration(
             agent,
             "tool-guard",
@@ -103,6 +115,12 @@ fn claude_hooks(agent: HookAgent) -> Vec<HookRegistration> {
 
 fn gemini_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
+        command_registration(
+            "repo-policy",
+            repo_policy_command(agent),
+            NormalizedEvent::BeforeToolUse,
+            Some(".*"),
+        ),
         hook_registration(
             agent,
             "tool-guard",
@@ -131,6 +149,12 @@ fn copilot_hooks(agent: HookAgent) -> Vec<HookRegistration> {
             "prompt-submit",
             lifecycle_command(agent, "prompt-submit"),
             NormalizedEvent::UserPromptSubmit,
+            None,
+        ),
+        command_registration(
+            "repo-policy",
+            repo_policy_command(agent),
+            NormalizedEvent::BeforeToolUse,
             None,
         ),
         hook_registration(agent, "tool-guard", NormalizedEvent::BeforeToolUse, None),
@@ -178,6 +202,13 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
         }
         _ => format!("harness {subcommand} --project-dir {project_dir}"),
     }
+}
+
+fn repo_policy_command(agent: HookAgent) -> String {
+    format!(
+        "harness agents repo-policy --agent {}",
+        adapter_for(agent).name()
+    )
 }
 
 fn hook_registration(

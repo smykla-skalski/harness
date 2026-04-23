@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tokio::task;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::{HookAgent, adapter_for};
+use crate::hooks::adapters::{HookAgent, RenderedHookResponse, adapter_for};
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::exec::RUNTIME;
@@ -12,7 +12,7 @@ use crate::session::service as orchestration_service;
 use crate::setup::services::session as session_service;
 use crate::workspace::utc_now;
 
-use super::storage;
+use super::{repo_policy, storage};
 
 /// Start or resume the active agent session for a project.
 ///
@@ -31,7 +31,11 @@ pub async fn session_start(
         storage::set_current_session_id(&project_dir, agent, &session_id)?;
         storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
         signal_managed_terminal_readiness_if_managed();
-        session_service::restore_compact_handoff(&project_dir)
+        let mut contexts = vec![repo_policy::session_start_context().to_string()];
+        if let Some(handoff) = session_service::restore_compact_handoff(&project_dir)? {
+            contexts.push(handoff);
+        }
+        Ok(Some(contexts.join("\n\n")))
     })
     .await
     .map_err(|error| {
@@ -39,6 +43,15 @@ pub async fn session_start(
             "session-start join error: {error}"
         )))
     })?
+}
+
+/// Render the repo-wide pre-tool policy response for an agent runtime.
+#[must_use]
+pub fn repo_policy_pre_tool_use(
+    agent: HookAgent,
+    raw_payload: &[u8],
+) -> Option<RenderedHookResponse> {
+    repo_policy::pre_tool_use_output(agent, raw_payload)
 }
 
 /// When running inside a daemon-managed TUI process, signal the daemon that
