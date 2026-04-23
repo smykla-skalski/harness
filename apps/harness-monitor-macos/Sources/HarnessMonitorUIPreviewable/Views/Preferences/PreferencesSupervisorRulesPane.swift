@@ -175,6 +175,7 @@ private struct SupervisorRuleSection: View {
             }
           )
         )
+        .toggleStyle(.switch)
         .labelsHidden()
         .controlSize(.small)
         .scaledFont(.subheadline)
