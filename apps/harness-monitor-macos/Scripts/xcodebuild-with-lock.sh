@@ -68,6 +68,106 @@ create_temp_log_path() {
   printf '%s\n' "$log_path"
 }
 
+latest_nonempty_activity_log() {
+  local logs_root latest_entry
+  logs_root="$derive_data_path/Logs/Build"
+  if [[ ! -d "$logs_root" ]]; then
+    return 1
+  fi
+
+  latest_entry="$(
+    /usr/bin/find "$logs_root" -type f -name '*.xcactivitylog' -size +0c \
+      -exec /usr/bin/stat -f '%m %N' {} + 2>/dev/null \
+      | /usr/bin/sort -n \
+      | /usr/bin/tail -1
+  )"
+  if [[ -z "$latest_entry" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${latest_entry#* }"
+}
+
+latest_swift_file_list_from_activity_log() {
+  local activity_log compile_line swift_file_list
+  activity_log="$1"
+  compile_line="$(
+    /usr/bin/gzip -dc "$activity_log" 2>/dev/null \
+      | strings \
+      | /usr/bin/grep 'builtin-Swift-Compilation -- ' \
+      | /usr/bin/tail -1 || true
+  )"
+  if [[ -z "$compile_line" ]]; then
+    return 1
+  fi
+
+  swift_file_list="$(
+    printf '%s\n' "$compile_line" \
+      | /usr/bin/sed -n 's/.* @\([^[:space:]]*SwiftFileList\).*/\1/p'
+  )"
+  if [[ -z "$swift_file_list" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${swift_file_list//\\ / }"
+}
+
+log_needs_swift_compile_context() {
+  local log_path="$1"
+  if /usr/bin/grep -Eq '^/.*:[0-9]+:[0-9]+:\s+(error|warning|note):' "$log_path"; then
+    return 1
+  fi
+  if /usr/bin/grep -Eq "^Test (Suite|Case) '|^Executed [0-9]+ tests?" "$log_path"; then
+    return 1
+  fi
+  if /usr/bin/grep -Eq '^ld:\s+|^Undefined symbols|^Code Sign error:' "$log_path"; then
+    return 1
+  fi
+  return 0
+}
+
+emit_swift_compile_context() {
+  local activity_log swift_file_list total_sources shown_sources source_path
+  activity_log="$(latest_nonempty_activity_log || true)"
+  if [[ -z "$activity_log" ]]; then
+    return 0
+  fi
+
+  printf 'swift-compile-context: latest non-empty activity log: %s\n' "$activity_log" >&2
+
+  swift_file_list="$(latest_swift_file_list_from_activity_log "$activity_log" || true)"
+  if [[ -z "$swift_file_list" ]]; then
+    printf 'swift-compile-context: no Swift compilation batch found in that activity log\n' >&2
+    return 0
+  fi
+
+  printf 'swift-compile-context: latest Swift batch file list: %s\n' "$swift_file_list" >&2
+  if [[ ! -f "$swift_file_list" ]]; then
+    printf 'swift-compile-context: Swift file list path missing on disk\n' >&2
+    return 0
+  fi
+
+  total_sources="$(/usr/bin/wc -l < "$swift_file_list" | tr -d ' ')"
+  printf 'swift-compile-context: candidate source files (%s total, showing up to 8)\n' "$total_sources" >&2
+
+  shown_sources=0
+  while IFS= read -r source_path; do
+    if [[ -z "$source_path" ]]; then
+      continue
+    fi
+    printf 'swift-compile-context: source: %s\n' "$source_path" >&2
+    shown_sources=$((shown_sources + 1))
+    if (( shown_sources >= 8 )); then
+      break
+    fi
+  done < "$swift_file_list"
+
+  if (( total_sources > shown_sources )); then
+    printf 'swift-compile-context: additional source files omitted: %s\n' \
+      "$((total_sources - shown_sources))" >&2
+  fi
+}
+
 acquire_lock() {
   local started_at now owner_pid
   /bin/mkdir -p "$derive_data_path"
@@ -110,6 +210,10 @@ run_once() {
     return "$TRANSIENT_DB_STATUS"
   fi
 
+  if log_needs_swift_compile_context "$log_path"; then
+    emit_swift_compile_context
+  fi
+
   /bin/rm -f "$log_path"
   return "$status"
 }
@@ -121,9 +225,9 @@ attempt=1
 while true; do
   if run_once; then
     exit 0
+  else
+    status="$?"
   fi
-
-  status="$?"
   if (( status != TRANSIENT_DB_STATUS )) || (( attempt >= MAX_DB_RETRIES )); then
     exit "$status"
   fi
