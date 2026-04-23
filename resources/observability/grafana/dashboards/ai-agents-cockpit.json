@@ -159,7 +159,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)"
+                        "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -171,7 +171,7 @@
               "transformations": []
             }
           },
-  "description": "Current Claude sessions reporting telemetry.",
+          "description": "Current Claude sessions reporting telemetry.",
           "id": 202,
           "links": [],
           "title": "Claude Sessions",
@@ -867,7 +867,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex token usage aligned on the same chart.",
+          "description": "Tokens produced per bucket by agent runtime. Stacked bars reveal both total throughput and share; gaps are honest (no samples).",
           "id": 210,
           "links": [],
           "title": "Tokens by Agent",
@@ -878,20 +878,104 @@
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "palette-classic-by-name"
                   },
-                  "unit": "short"
+                  "unit": "short",
+                  "decimals": 0,
+                  "custom": {
+                    "drawStyle": "bars",
+                    "lineWidth": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "opacity",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.8,
+                    "barMaxWidth": 50,
+                    "spanNulls": false,
+                    "insertNulls": false,
+                    "showPoints": "never",
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    },
+                    "axisPlacement": "auto",
+                    "axisLabel": "tokens",
+                    "axisSoftMin": 0,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "hideFrom": {
+                      "tooltip": false,
+                      "viz": false,
+                      "legend": false
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "transparent",
+                        "value": 0
+                      }
+                    ]
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "claude"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "green"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "codex"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "bottom"
+                  "placement": "right",
+                  "showLegend": true,
+                  "calcs": [
+                    "sum",
+                    "mean",
+                    "max",
+                    "lastNotNull"
+                  ],
+                  "sortBy": "Total",
+                  "sortDesc": true,
+                  "width": 340
                 },
                 "tooltip": {
                   "mode": "multi",
-                  "sort": "desc"
+                  "sort": "desc",
+                  "hideZeros": true,
+                  "maxHeight": 600
                 }
               }
             },
@@ -1035,7 +1119,7 @@
               "transformations": []
             }
           },
-          "description": "Token usage split by model for both agent runtimes.",
+          "description": "Token usage split by model across both agent runtimes. Stacked bars compare model mix per bucket over the selected range.",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -1046,20 +1130,164 @@
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "palette-classic-by-name"
                   },
-                  "unit": "short"
+                  "unit": "short",
+                  "decimals": 0,
+                  "custom": {
+                    "drawStyle": "bars",
+                    "lineWidth": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "opacity",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.8,
+                    "barMaxWidth": 50,
+                    "spanNulls": false,
+                    "insertNulls": false,
+                    "showPoints": "never",
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    },
+                    "axisPlacement": "auto",
+                    "axisLabel": "tokens",
+                    "axisSoftMin": 0,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "hideFrom": {
+                      "tooltip": false,
+                      "viz": false,
+                      "legend": false
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "transparent",
+                        "value": 0
+                      }
+                    ]
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-opus.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "purple"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-sonnet.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-haiku.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "semi-dark-blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gpt-5.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gpt-4.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "dark-orange"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^o1.*|^o3.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "yellow"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "bottom"
+                  "placement": "right",
+                  "showLegend": true,
+                  "calcs": [
+                    "sum",
+                    "mean",
+                    "max",
+                    "lastNotNull"
+                  ],
+                  "sortBy": "Total",
+                  "sortDesc": true,
+                  "width": 340
                 },
                 "tooltip": {
                   "mode": "multi",
-                  "sort": "desc"
+                  "sort": "desc",
+                  "hideZeros": true,
+                  "maxHeight": 600
                 }
               }
             },
@@ -1086,7 +1314,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "claude decisions"
                       }
                     },
@@ -1119,7 +1347,7 @@
               "transformations": []
             }
           },
-  "description": "Claude decisions observed and Codex tool calls on the same chart.",
+          "description": "Claude decisions observed and Codex tool calls on the same chart.",
           "id": 213,
           "links": [],
           "title": "Tooling Activity by Agent",
@@ -3457,6 +3685,364 @@
             "version": ""
           }
         }
+      },
+      "cockpit-panel-tokens-agent-total": {
+        "kind": "Panel",
+        "spec": {
+          "id": 260,
+          "title": "Tokens by Agent (range total)",
+          "description": "Aggregate token volume per agent over the selected time range.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range]))",
+                        "legendFormat": "claude",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range]))",
+                        "legendFormat": "codex",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "vizConfig": {
+            "group": "bargauge",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic-by-name"
+                  },
+                  "unit": "short",
+                  "decimals": 0,
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1000000
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5000000
+                      },
+                      {
+                        "color": "red",
+                        "value": 20000000
+                      }
+                    ]
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "claude"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "green"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "codex"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient",
+                "valueMode": "color",
+                "showUnfilled": true,
+                "minVizWidth": 0,
+                "minVizHeight": 18,
+                "maxVizHeight": 300,
+                "namePlacement": "left",
+                "reduceOptions": {
+                  "calcs": [
+                    "sum"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "sizing": "auto",
+                "legend": {
+                  "showLegend": false
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-model-share": {
+        "kind": "Panel",
+        "spec": {
+          "id": 262,
+          "title": "Model Share (range)",
+          "description": "Share of token volume per model across selected time range.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range]))",
+                        "legendFormat": "{{model}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (model) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range]))",
+                        "legendFormat": "{{model}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "vizConfig": {
+            "group": "piechart",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic-by-name"
+                  },
+                  "unit": "short",
+                  "decimals": 0,
+                  "custom": {
+                    "hideFrom": {
+                      "tooltip": false,
+                      "viz": false,
+                      "legend": false
+                    }
+                  },
+                  "mappings": []
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-opus.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "purple"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-sonnet.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude-haiku.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "semi-dark-blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gpt-5.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gpt-4.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "dark-orange"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^o1.*|^o3.*"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "yellow"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "sum"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "pieType": "donut",
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "desc",
+                  "hideZeros": true
+                },
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "right",
+                  "showLegend": true,
+                  "values": [
+                    "value",
+                    "percent"
+                  ]
+                },
+                "displayLabels": [
+                  "percent"
+                ]
+              }
+            },
+            "version": ""
+          }
+        }
       }
     },
     "layout": {
@@ -3663,6 +4249,32 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "cockpit-panel-15"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 40,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-tokens-agent-total"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 40,
+                        "width": 12,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-model-share"
                         }
                       }
                     }
