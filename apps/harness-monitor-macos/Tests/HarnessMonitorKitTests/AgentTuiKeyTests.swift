@@ -34,7 +34,11 @@ struct AgentTuiKeyTests {
     await drainTasks()
     #expect(await recorder.snapshot().isEmpty)
 
-    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-1") { tuiID, request in
+    let second = buffer.enqueue(
+      input: .control("c"),
+      glyph: "⌃C",
+      tuiID: "tui-1"
+    ) { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
     #expect(second == .buffered)
@@ -63,15 +67,21 @@ struct AgentTuiKeyTests {
     let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
-    let first = buffer.enqueue(input: .key(.tab), glyph: "⇥", tuiID: "tui-original") { tuiID, request in
+    let first = buffer.enqueue(
+      input: .key(.tab),
+      glyph: "⇥",
+      tuiID: "tui-original"
+    ) { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
     #expect(first == .sendImmediately(AgentTuiInputRequest(input: .key(.tab))))
 
     clock.advance(by: .milliseconds(120))
-    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-original") {
-      tuiID,
-      request in
+    let second = buffer.enqueue(
+      input: .control("c"),
+      glyph: "⌃C",
+      tuiID: "tui-original"
+    ) { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
     #expect(second == .buffered)
@@ -93,17 +103,21 @@ struct AgentTuiKeyTests {
     let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
-    let first = buffer.enqueue(input: .key(.escape), glyph: "⎋", tuiID: "tui-drop") {
-      tuiID,
-      request in
+    let first = buffer.enqueue(
+      input: .key(.escape),
+      glyph: "⎋",
+      tuiID: "tui-drop"
+    ) { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
     #expect(first == .sendImmediately(AgentTuiInputRequest(input: .key(.escape))))
 
     clock.advance(by: .milliseconds(90))
-    let second = buffer.enqueue(input: .control("c"), glyph: "⌃C", tuiID: "tui-drop") {
-      tuiID,
-      request in
+    let second = buffer.enqueue(
+      input: .control("c"),
+      glyph: "⌃C",
+      tuiID: "tui-drop"
+    ) { tuiID, request in
       await recorder.record(tuiID: tuiID, request: request)
     }
     #expect(second == .buffered)
