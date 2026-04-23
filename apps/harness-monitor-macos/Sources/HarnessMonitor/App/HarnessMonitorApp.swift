@@ -62,9 +62,10 @@ struct HarnessMonitorApp: App {
   }
 
   var body: some Scene {
-    WindowGroup("Harness Monitor") {
+    WindowGroup("Harness Monitor", id: HarnessMonitorWindowID.main) {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+        .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
@@ -101,6 +102,7 @@ struct HarnessMonitorApp: App {
         selectedSection: $preferencesSelectedSection
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+      .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
@@ -114,6 +116,7 @@ struct HarnessMonitorApp: App {
         themeMode: $themeMode
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+      .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 980, height: 620)
@@ -122,6 +125,7 @@ struct HarnessMonitorApp: App {
     Window("Decisions", id: HarnessMonitorWindowID.decisions) {
       DecisionsWindowView(store: store)
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+        .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 900, height: 640)
