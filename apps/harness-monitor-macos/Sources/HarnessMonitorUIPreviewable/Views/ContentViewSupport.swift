@@ -172,7 +172,8 @@ public struct ContentDetailColumn: View {
       canStartNewSession: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector
+      showInspector: showInspector,
+      supervisorDecisionRefreshTick: store.supervisorDecisionRefreshTick
     )
   }
 
