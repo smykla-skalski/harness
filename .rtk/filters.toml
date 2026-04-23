@@ -13,6 +13,7 @@
 # - env-prefixed variants like `env KEY=value mise run <task>` or `KEY=value mise <task>`
 # - shell-wrapped variants like `bash -lc 'mise run <task>'` or `fish --login -c 'mise <task>'`
 # - combined wrappers like `rtk env KEY=value zsh -o no_nomatch -c 'mise <task>'`
+# - shell prelude variants like `rtk bash -lc 'set -o pipefail; mise run <task>'`
 #
 # Task-family coverage:
 # - check:stale / clean:stale -> harness-mise-stale-state
@@ -32,7 +33,7 @@ schema_version = 1
 # ---------------------------------------------------------------------------
 [filters.harness-mise-stale-state]
 description = "Compact stale-state mise tasks — keep actionable failures and cleanup actions"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+(check:stale|clean:stale)((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+(check:stale|clean:stale)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -80,7 +81,7 @@ expected = "stale-state: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-version]
 description = "Compact version mise tasks — keep semver output and sync mismatches"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+version:(show|set|sync|sync:monitor|check)((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+version:(show|set|sync|sync:monitor|check)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -121,7 +122,7 @@ expected = "version: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-check-scripts]
 description = "Compact check:scripts output — keep shellcheck and python diagnostics"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+check:scripts((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+check:scripts((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -170,7 +171,7 @@ expected = "check:scripts: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-cargo-env]
 description = "Compact cargo:env output — keep resolved environment only"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+cargo:env((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+cargo:env((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -201,7 +202,7 @@ expected = "cargo:env: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-cargo-local]
 description = "Compact cargo:local output — keep env dumps plus rust diagnostics"
-match_command = "^(cargo-local\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+cargo:local)((['\"])?(\\s|$))"
+match_command = "^(cargo-local\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+cargo:local)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -258,7 +259,7 @@ expected = "cargo:local: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-rust]
 description = "Compact root rust mise lanes — keep diagnostics, failed tests, install results"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+(test(?::(unit|integration|slow))?|check(?::agent-assets)?|lint:fix|install|mcp:test)((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+(test(?::(unit|integration|slow))?|check(?::agent-assets)?|lint:fix|install|mcp:test)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -322,7 +323,7 @@ expected = "rust mise lane: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-quality-gates]
 description = "Compact Harness Monitor quality-gates output (SwiftLint + Swift Format + xcodebuild)"
-match_command = "^(run-quality-gates\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:lint)((['\"])?(\\s|$))"
+match_command = "^(run-quality-gates\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:lint)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -406,7 +407,7 @@ expected = "run-quality-gates: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-xcodebuild]
 description = "Aggressive xcodebuild filter for HarnessMonitor scheme — keep only diagnostics and verdict"
-match_command = "^(xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor.*|xcodebuild-with-lock\\.sh(\\s|$)|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+(monitor:macos:(xcodebuild|build)|mcp:build:monitor)((['\"])?(\\s|$)))"
+match_command = "^(xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor.*|xcodebuild-with-lock\\.sh(\\s|$)|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+(monitor:macos:(xcodebuild|build)|mcp:build:monitor)((['\"])?(\\s|$)))"
 strip_ansi = true
 keep_lines_matching = [
   # Diagnostics (any path:line:col: error/warning/note:)
@@ -476,6 +477,17 @@ Ld /Users/x/Build/Products/Debug/HarnessMonitor normal arm64
 expected = "** BUILD SUCCEEDED **"
 
 [[tests.harness-monitor-xcodebuild]]
+name = "keeps verdict when shell prelude output is present"
+input = """
+set -o pipefail
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project foo.xcodeproj -scheme HarnessMonitor build
+note: Building targets in dependency order
+** BUILD FAILED **
+"""
+expected = "** BUILD FAILED **"
+
+[[tests.harness-monitor-xcodebuild]]
 name = "empty returns on_empty message"
 input = ""
 expected = "xcodebuild (HarnessMonitor): ok"
@@ -485,7 +497,7 @@ expected = "xcodebuild (HarnessMonitor): ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-generate-project]
 description = "Compact XcodeGen output — keep warnings, errors, created-at path"
-match_command = "^(generate-project\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:generate)((['\"])?(\\s|$))"
+match_command = "^(generate-project\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:generate)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -532,7 +544,7 @@ expected = "generate-project: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-swift]
 description = "Compact test-swift.sh output — keep verdicts, diagnostics, and failures"
-match_command = "^(test-swift\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:test)((['\"])?(\\s|$))"
+match_command = "^(test-swift\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:test)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -578,6 +590,16 @@ daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Mon
 expected = "daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness"
 
 [[tests.harness-monitor-test-swift]]
+name = "keeps failure verdict when shell prelude output is present"
+input = """
+set -o pipefail
+Generating project...
+Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).
+** TEST FAILED **
+"""
+expected = "Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).\n** TEST FAILED **"
+
+[[tests.harness-monitor-test-swift]]
 name = "empty returns on_empty"
 input = ""
 expected = "test-swift: ok"
@@ -587,7 +609,7 @@ expected = "test-swift: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-scripts]
 description = "Compact monitor:test:scripts output — keep unittest failures and final verdict"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:test:scripts((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:test:scripts((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -637,7 +659,7 @@ expected = "monitor:test:scripts: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-agents-e2e]
 description = "Compact explicit Agents e2e output — keep build/test verdicts and preserved-state hints"
-match_command = "^(test-agents-e2e\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:test:agents-e2e)((['\"])?(\\s|$))"
+match_command = "^(test-agents-e2e\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:test:agents-e2e)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -695,7 +717,7 @@ expected = "test-agents-e2e: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-instruments-audit]
 description = "Compact xctrace audit output — keep metric totals and threshold verdicts"
-match_command = "^(run-instruments-audit\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+monitor:macos:audit(:from-ref)?)((['\"])?(\\s|$))"
+match_command = "^(run-instruments-audit\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:audit(:from-ref)?)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -738,7 +760,7 @@ expected = "run-instruments-audit: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-preview-render]
 description = "Compact preview-render.sh output — keep retry hints, failures, and rendered path"
-match_command = "^(preview-render\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+preview:render)((['\"])?(\\s|$))"
+match_command = "^(preview-render\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+preview:render)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -779,7 +801,7 @@ expected = "preview-render: ok"
 
 [filters.harness-monitor-preview-smoke]
 description = "Compact preview-smoke.sh output — keep per-entry progress and final summary"
-match_command = "^(preview-smoke\\.sh|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+preview:smoke)((['\"])?(\\s|$))"
+match_command = "^(preview-smoke\\.sh|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+preview:smoke)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -826,7 +848,7 @@ expected = "preview-smoke: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-observability]
 description = "Compact observability mise tasks — keep readiness failures, service URLs, and smoke verdicts"
-match_command = "^(observability\\.sh\\s+(start|stop|restart|status|logs|open|reset|wipe|smoke|--restore-smoke-stack-fixture)|((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture))((['\"])?(\\s|$))"
+match_command = "^(observability\\.sh\\s+(start|stop|restart|status|logs|open|reset|wipe|smoke|--restore-smoke-stack-fixture)|((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture))((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -885,7 +907,7 @@ expected = "observability: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-host-metrics]
 description = "Compact host-metrics mise tasks — keep service actions, status, metrics, and failures"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+host-metrics:(install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter)((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+host-metrics:(install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -943,7 +965,7 @@ expected = "host-metrics: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-mise-mcp]
 description = "Compact MCP mise tasks — keep doctor verdicts, registration actions, socket readiness, and nested build failures"
-match_command = "^((rtk\\s+env\\s+)?((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?(((sh|bash|zsh|fish)\\b.*?['\"]))?mise(\\s+run)?\\s+mcp:(build:input-helper|install|socket-path|serve|smoke|doctor|register-claude|wait-socket|launch:monitor|launch:dev|dev)((['\"])?(\\s|$))"
+match_command = "^((rtk\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+mcp:(build:input-helper|install|socket-path|serve|smoke|doctor|register-claude|wait-socket|launch:monitor|launch:dev|dev)((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
