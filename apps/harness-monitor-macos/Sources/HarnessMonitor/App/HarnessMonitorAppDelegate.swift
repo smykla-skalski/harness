@@ -1,6 +1,7 @@
 import AppKit
 import Darwin
 import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
 
 @MainActor
 final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
@@ -32,6 +33,30 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     NSApplication.shared.setActivationPolicy(.accessory)
+  }
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    guard !hidesDockIconForPerfRuns else {
+      return
+    }
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(300))
+      guard !hasVisibleMainWindow() else {
+        return
+      }
+      HarnessMonitorMainWindowLauncher.shared.openMainWindow?()
+    }
+  }
+
+  @MainActor
+  private func hasVisibleMainWindow() -> Bool {
+    NSApplication.shared.windows.contains { window in
+      guard window.isVisible else {
+        return false
+      }
+      let identifier = window.identifier?.rawValue ?? ""
+      return identifier.contains(HarnessMonitorWindowID.main)
+    }
   }
 
   func bind(store: HarnessMonitorStore) {
