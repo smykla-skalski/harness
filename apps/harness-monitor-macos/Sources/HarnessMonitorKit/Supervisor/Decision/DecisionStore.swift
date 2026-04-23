@@ -91,7 +91,7 @@ public actor DecisionStore {
     yield(.init(kind: .inserted, decisionID: draft.id))
   }
 
-  public func openDecisions() async throws -> [Decision] {
+  public nonisolated func openDecisions() async throws -> [Decision] {
     let context = ModelContext(container)
     let now = Date()
     let descriptor = FetchDescriptor<Decision>(
@@ -101,7 +101,7 @@ public actor DecisionStore {
     return rows.filter { isOpen($0, now: now) }
   }
 
-  public func decision(id: String) async throws -> Decision? {
+  public nonisolated func decision(id: String) async throws -> Decision? {
     let context = ModelContext(container)
     return try fetchDecision(id: id, context: context)
   }
@@ -163,7 +163,7 @@ public actor DecisionStore {
 
   // MARK: - Private
 
-  private func fetchDecision(id: String, context: ModelContext) throws -> Decision? {
+  private nonisolated func fetchDecision(id: String, context: ModelContext) throws -> Decision? {
     var descriptor = FetchDescriptor<Decision>(
       predicate: #Predicate<Decision> { $0.id == id }
     )
@@ -171,7 +171,7 @@ public actor DecisionStore {
     return try context.fetch(descriptor).first
   }
 
-  private func isOpen(_ decision: Decision, now: Date) -> Bool {
+  private nonisolated func isOpen(_ decision: Decision, now: Date) -> Bool {
     guard decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed else {
       return false
     }
