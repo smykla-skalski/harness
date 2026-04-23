@@ -76,16 +76,72 @@ enum HarnessMonitorNotificationRequestFactory {
     }
   }
 
-  /// Placeholder supervisor notification draft. Phase 2 worker 21 replaces the body with a
-  /// severity → category mapping and a `userInfo` payload carrying `decisionID` for tap
-  /// routing into the Decisions window.
+  /// Builds a `UNNotificationRequest` for a supervisor `Decision` notification. The request
+  /// carries the decision id inside `userInfo` so the tap handler can route back into the
+  /// Decisions window via `HarnessMonitorUserNotificationController.decisionRequestedID`.
+  ///
+  /// Severity → interruption-level mapping:
+  /// - `.info` -> `.passive`
+  /// - `.warn` -> `.active`
+  /// - `.needsUser` / `.critical` -> `.timeSensitive`
+  ///
+  /// Each severity maps to a unique category identifier so Notification Center can attach
+  /// per-severity actions (`Open` + `Acknowledge`).
+  static func makeSupervisorRequest(
+    severity: DecisionSeverity,
+    summary: String,
+    decisionID: UUID
+  ) async throws -> UNNotificationRequest {
+    let content = UNMutableNotificationContent()
+    content.title = "Harness Monitor"
+    content.subtitle = severity.supervisorNotificationSubtitle
+    content.body = summary
+    content.threadIdentifier = HarnessMonitorSupervisorNotificationID.threadIdentifier
+    content.categoryIdentifier = HarnessMonitorSupervisorNotificationID.category(for: severity)
+    content.interruptionLevel = severity.supervisorInterruptionLevel
+    content.relevanceScore = severity.supervisorRelevanceScore
+    content.sound = severity.supervisorSound
+    content.userInfo = [
+      HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID.uuidString,
+      HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,
+    ]
+    let identifier =
+      "\(HarnessMonitorSupervisorNotificationID.requestPrefix)\(decisionID.uuidString)"
+    return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+  }
+
+  /// Convenience helper mirroring `makeSupervisorRequest` that produces a
+  /// `HarnessMonitorNotificationDraft` for surfaces that still use the Preferences draft flow
+  /// (for example, the debug "Send test supervisor notification" affordance).
   static func supervisorDecision(
     severity: DecisionSeverity,
     summary: String,
     decisionID: String
   ) -> HarnessMonitorNotificationDraft {
-    _ = (severity, summary, decisionID)
-    return HarnessMonitorNotificationDraft()
+    HarnessMonitorNotificationDraft(
+      title: "Harness Monitor",
+      subtitle: severity.supervisorNotificationSubtitle,
+      body: summary,
+      threadIdentifier: HarnessMonitorSupervisorNotificationID.threadIdentifier,
+      targetContentIdentifier: decisionID,
+      filterCriteria: severity.rawValue,
+      summaryArgument: "Harness Monitor",
+      summaryArgumentCount: 1,
+      includesBadge: false,
+      badgeNumber: 0,
+      includesUserInfo: true,
+      category: .fullControls,
+      soundMode: severity == .info ? .none : .systemDefault,
+      attachmentMode: .none,
+      hidesAttachmentThumbnail: true,
+      thumbnailClipping: .full,
+      thumbnailTime: 0,
+      interruptionMode: severity.supervisorDraftInterruptionMode,
+      relevanceScore: severity.supervisorRelevanceScore,
+      triggerMode: .immediate,
+      delaySeconds: 0,
+      calendarDate: Date().addingTimeInterval(60)
+    )
   }
 
   static func categories() -> Set<UNNotificationCategory> {
@@ -97,7 +153,7 @@ enum HarnessMonitorNotificationRequestFactory {
     )
     let open = UNNotificationAction(
       identifier: HarnessMonitorNotificationActionID.open,
-      title: "Open Harness",
+      title: "Open",
       options: [.foreground],
       icon: UNNotificationActionIcon(systemImageName: "arrow.up.forward.app")
     )
@@ -122,7 +178,7 @@ enum HarnessMonitorNotificationRequestFactory {
       textInputPlaceholder: "Reply with updated run context"
     )
 
-    return [
+    var categories: Set<UNNotificationCategory> = [
       UNNotificationCategory(
         identifier: HarnessMonitorNotificationCategoryID.statusActions,
         actions: [acknowledge, open],
@@ -148,6 +204,18 @@ enum HarnessMonitorNotificationRequestFactory {
         options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
       ),
     ]
+    for severity in DecisionSeverity.allCases {
+      categories.insert(
+        UNNotificationCategory(
+          identifier: HarnessMonitorSupervisorNotificationID.category(for: severity),
+          actions: [open, acknowledge],
+          intentIdentifiers: [],
+          hiddenPreviewsBodyPlaceholder: "Harness Monitor supervisor decision",
+          categorySummaryFormat: "%u Harness Monitor supervisor decisions",
+          options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
+        ))
+    }
+    return categories
   }
 
   private static func sound(
@@ -210,5 +278,67 @@ enum HarnessMonitorNotificationRequestFactory {
   private static func optionalTrimmed(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+/// Constants used by supervisor notifications. Category identifiers, the shared thread, and
+/// `userInfo` keys all live together so the controller tap handler and the factory stay in sync.
+public enum HarnessMonitorSupervisorNotificationID {
+  public static let threadIdentifier = "io.harnessmonitor.supervisor"
+  public static let requestPrefix = "io.harnessmonitor.supervisor.decision."
+  public static let decisionIDKey = "io.harnessmonitor.supervisor.decisionID"
+  public static let severityKey = "io.harnessmonitor.supervisor.severity"
+
+  public static func category(for severity: DecisionSeverity) -> String {
+    switch severity {
+    case .info: "io.harnessmonitor.supervisor.category.info"
+    case .warn: "io.harnessmonitor.supervisor.category.warn"
+    case .needsUser: "io.harnessmonitor.supervisor.category.needsUser"
+    case .critical: "io.harnessmonitor.supervisor.category.critical"
+    }
+  }
+}
+
+extension DecisionSeverity {
+  fileprivate var supervisorInterruptionLevel: UNNotificationInterruptionLevel {
+    switch self {
+    case .info: .passive
+    case .warn: .active
+    case .needsUser, .critical: .timeSensitive
+    }
+  }
+
+  fileprivate var supervisorDraftInterruptionMode: HarnessMonitorNotificationInterruptionMode {
+    switch self {
+    case .info: .passive
+    case .warn: .active
+    case .needsUser, .critical: .timeSensitive
+    }
+  }
+
+  fileprivate var supervisorRelevanceScore: Double {
+    switch self {
+    case .info: 0.25
+    case .warn: 0.55
+    case .needsUser: 0.8
+    case .critical: 1
+    }
+  }
+
+  fileprivate var supervisorSound: UNNotificationSound? {
+    switch self {
+    case .info: nil
+    case .warn, .needsUser: .default
+    case .critical: .defaultCritical
+    }
+  }
+
+  fileprivate var supervisorNotificationSubtitle: String {
+    switch self {
+    case .info: "Update"
+    case .warn: "Heads up"
+    case .needsUser: "Needs your decision"
+    case .critical: "Critical"
+    }
   }
 }
