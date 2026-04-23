@@ -41,15 +41,13 @@ struct SidebarSearchPresentationStateTests {
   }
 
   @MainActor
-  @Test("filter visibility treats presented search as engaged")
-  func filterVisibilityTreatsPresentedSearchAsEngaged() {
+  @Test("filter visibility treats entered search text as active filtering")
+  func filterVisibilityTreatsSearchTextAsActiveFilter() {
     let controls = HarnessMonitorStore.SessionControlsSlice()
+    controls.searchText = "needs attention"
 
-    let isVisible = SidebarFilterVisibilityPolicy.showsControls(
-      for: controls,
-      isSearchPresented: true
-    )
+    let hasActiveFilters = SidebarFilterVisibilityPolicy.hasActiveFilters(in: controls)
 
-    #expect(isVisible == true)
+    #expect(hasActiveFilters == true)
   }
 }

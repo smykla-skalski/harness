@@ -75,14 +75,10 @@ struct SidebarFilterStateMarker: View {
   }
 
   private var sidebarSearchStateValue: String {
-    let isVisible = SidebarFilterVisibilityPolicy.showsControls(
-      for: controls,
-      isSearchPresented: isSidebarSearchPresented
-    )
-    return [
+    [
       "presented=\(isSidebarSearchPresented)",
       "active=\(isSidebarSearchPresented)",
-      "visible=\(isVisible)",
+      "visible=true",
     ].joined(separator: ", ")
   }
 
@@ -108,7 +104,6 @@ struct SidebarSessionListColumn: View {
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
-  let showsSearchControls: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
@@ -156,12 +151,6 @@ struct SidebarSessionListColumn: View {
 
   var body: some View {
     List(selection: sidebarSelection) {
-      if showsSearchControls {
-        SidebarSearchControlsSection(
-          store: store,
-          controls: controls
-        )
-      }
       SidebarSessionListContent(
         store: store,
         renderState: renderState,
@@ -188,13 +177,6 @@ enum SidebarFilterVisibilityPolicy {
       || controls.sessionFilter != .all
       || controls.sessionFocusFilter != .all
       || controls.sessionSortOrder != .recentActivity
-  }
-
-  static func showsControls(
-    for controls: HarnessMonitorStore.SessionControlsSlice,
-    isSearchPresented: Bool
-  ) -> Bool {
-    isSearchPresented || hasActiveFilters(in: controls)
   }
 }
 

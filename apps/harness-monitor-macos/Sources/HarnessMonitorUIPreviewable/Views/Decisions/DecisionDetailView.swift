@@ -175,12 +175,23 @@ public struct DecisionDetailView: View {
 
   private func detailTabs(_ viewModel: DecisionDetailViewModel) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Picker("Decision detail section", selection: $selectedTab) {
+      HarnessMonitorSegmentedPicker(
+        title: "Decision detail section",
+        selection: $selectedTab,
+        accessibilityIdentifier: HarnessMonitorAccessibility.decisionDetailTabs,
+        fillsWidth: true
+      ) {
         ForEach(DetailTab.allCases) { tab in
-          Text(tab.title).tag(tab)
+          Text(tab.title)
+            .tag(tab)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.decisionDetailTabs,
+                option: tab.title
+              )
+            )
         }
       }
-      .pickerStyle(.segmented)
 
       switch selectedTab {
       case .context:
