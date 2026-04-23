@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import Synchronization
 
 /// SwiftData-backed store for Monitor supervisor decisions.
 ///
@@ -42,6 +43,7 @@ public actor DecisionStore {
   private let eventsContinuation: AsyncStream<DecisionEvent>.Continuation
 
   private let container: ModelContainer
+  private let readContextLock = Mutex(())
 
   public init(container: ModelContainer) {
     self.container = container
@@ -67,87 +69,90 @@ public actor DecisionStore {
   }
 
   public func insert(_ draft: DecisionDraft) async throws {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
-    if try fetchDecision(id: draft.id, context: context) != nil {
-      // Duplicate id: treat as no-op. Snapshot-driven rule evaluation re-emits the same
-      // `queueDecision` action every tick until resolution, so swallowing duplicates here keeps
-      // the store deduped without pushing the burden onto every rule.
-      return
+    let inserted = try withMutationContext { context in
+      if try fetchDecision(id: draft.id, context: context) != nil {
+        return false
+      }
+      let model = Decision(
+        id: draft.id,
+        severity: draft.severity,
+        ruleID: draft.ruleID,
+        sessionID: draft.sessionID,
+        agentID: draft.agentID,
+        taskID: draft.taskID,
+        summary: draft.summary,
+        contextJSON: draft.contextJSON,
+        suggestedActionsJSON: draft.suggestedActionsJSON
+      )
+      context.insert(model)
+      return true
     }
-    let model = Decision(
-      id: draft.id,
-      severity: draft.severity,
-      ruleID: draft.ruleID,
-      sessionID: draft.sessionID,
-      agentID: draft.agentID,
-      taskID: draft.taskID,
-      summary: draft.summary,
-      contextJSON: draft.contextJSON,
-      suggestedActionsJSON: draft.suggestedActionsJSON
-    )
-    context.insert(model)
-    try context.save()
+    guard inserted else { return }
     yield(.init(kind: .inserted, decisionID: draft.id))
   }
 
   nonisolated public func openDecisions() async throws -> [Decision] {
-    let context = ModelContext(container)
-    let now = Date()
-    let descriptor = FetchDescriptor<Decision>(
-      sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-    )
-    let rows = try context.fetch(descriptor)
-    return rows.filter { isOpen($0, now: now) }
+    try withReadContext { context in
+      let descriptor = FetchDescriptor<Decision>(
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      let rows = try context.fetch(descriptor)
+      let now = Date()
+      return rows.filter { isOpen($0, now: now) }
+    }
   }
 
   nonisolated public func decision(id: String) async throws -> Decision? {
-    let context = ModelContext(container)
-    return try fetchDecision(id: id, context: context)
+    try withReadContext { context in
+      try fetchDecision(id: id, context: context)
+    }
   }
 
   public func snooze(id: String, until: Date) async throws {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
-    guard let decision = try fetchDecision(id: id, context: context) else { return }
-    decision.snoozedUntil = until
-    decision.statusRaw = Status.snoozed
-    try context.save()
+    let updated = try withMutationContext { context in
+      guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      decision.snoozedUntil = until
+      decision.statusRaw = Status.snoozed
+      return true
+    }
+    guard updated else { return }
     yield(.init(kind: .snoozed, decisionID: id))
   }
 
   public func resolve(id: String, outcome: DecisionOutcome) async throws {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
-    guard let decision = try fetchDecision(id: id, context: context) else { return }
-    decision.statusRaw = Status.resolved
-    decision.resolutionJSON = try encodeOutcome(outcome)
-    try context.save()
+    let updated = try withMutationContext { context in
+      guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      decision.statusRaw = Status.resolved
+      decision.resolutionJSON = try encodeOutcome(outcome)
+      return true
+    }
+    guard updated else { return }
     yield(.init(kind: .resolved, decisionID: id))
   }
 
   public func expire(beforeAge: TimeInterval) async throws -> Int {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
     let cutoff = Date().addingTimeInterval(-beforeAge)
-    let descriptor = FetchDescriptor<Decision>(
-      predicate: #Predicate<Decision> { $0.createdAt < cutoff }
-    )
-    let rows = try context.fetch(descriptor)
-    guard !rows.isEmpty else { return 0 }
-    let ids = rows.map(\.id)
-    for row in rows { context.delete(row) }
-    try context.save()
+    let ids = try withMutationContext { context in
+      let descriptor = FetchDescriptor<Decision>(
+        predicate: #Predicate<Decision> { $0.createdAt < cutoff }
+      )
+      let rows = try context.fetch(descriptor).filter(isUnresolved)
+      let ids = rows.map(\.id)
+      rows.forEach(context.delete)
+      return ids
+    }
+    guard !ids.isEmpty else { return 0 }
     for id in ids { yield(.init(kind: .expired, decisionID: id)) }
     return ids.count
   }
 
   public func dismiss(id: String) async throws {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
-    guard let decision = try fetchDecision(id: id, context: context) else { return }
-    decision.statusRaw = Status.dismissed
-    try context.save()
+    let updated = try withMutationContext { context in
+      guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      decision.statusRaw = Status.dismissed
+      return true
+    }
+    guard updated else { return }
     yield(.init(kind: .dismissed, decisionID: id))
   }
 
@@ -182,6 +187,10 @@ public actor DecisionStore {
     return true
   }
 
+  nonisolated private func isUnresolved(_ decision: Decision) -> Bool {
+    decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed
+  }
+
   private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {
     let data = try JSONEncoder().encode(outcome)
     guard let string = String(bytes: data, encoding: .utf8) else {
@@ -195,6 +204,23 @@ public actor DecisionStore {
 
   private func yield(_ event: DecisionEvent) {
     eventsContinuation.yield(event)
+  }
+
+  nonisolated private func withReadContext<T>(_ operation: (ModelContext) throws -> T) throws -> T {
+    try readContextLock.withLock { _ in
+      let context = ModelContext(container)
+      return try operation(context)
+    }
+  }
+
+  private func withMutationContext<T>(_ operation: (ModelContext) throws -> T) throws -> T {
+    let context = ModelContext(container)
+    context.autosaveEnabled = false
+    let result = try operation(context)
+    if context.hasChanges {
+      try context.save()
+    }
+    return result
   }
 }
 
