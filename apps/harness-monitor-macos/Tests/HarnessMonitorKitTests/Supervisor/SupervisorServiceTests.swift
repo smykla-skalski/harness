@@ -112,6 +112,36 @@ final class SupervisorServiceTests: XCTestCase {
     )
   }
 
+  func test_quietHoursSuppressAutomaticSideEffectsButKeepDecisions() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(AutoActionRule())
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let executor = try PolicyExecutor.fixture()
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: executor,
+      clock: clock,
+      interval: 10
+    )
+    await service.setQuietHoursWindow(SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0))
+
+    await service.runOneTick()
+
+    let evaluations = await observer.evaluations
+    XCTAssertEqual(evaluations.count, 1)
+    XCTAssertEqual(evaluations.first?.actions.count, 2)
+
+    let executions = await observer.executions
+    XCTAssertEqual(executions.count, 1, "quiet hours should suppress the automatic side effect")
+    guard case .queueDecision(let payload) = executions.first?.action else {
+      return XCTFail("quiet hours should still allow decision queueing")
+    }
+    XCTAssertEqual(payload.id, "decision-auto-action")
+  }
+
   func test_stopDrainsInFlightTick() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()
@@ -214,6 +244,44 @@ private struct SlowRule: PolicyRule {
   ) async -> [PolicyAction] {
     await gate.wait()
     return []
+  }
+}
+
+private struct AutoActionRule: PolicyRule {
+  let id: String = "test.auto-action"
+  let name: String = "Auto Action"
+  let version: Int = 1
+  let parameters = PolicyParameterSchema(fields: [])
+
+  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
+
+  func evaluate(
+    snapshot: SessionsSnapshot,
+    context: PolicyContext
+  ) async -> [PolicyAction] {
+    [
+      .nudgeAgent(
+        .init(
+          agentID: "agent-1",
+          prompt: "wake up",
+          ruleID: id,
+          snapshotID: snapshot.id
+        )
+      ),
+      .queueDecision(
+        .init(
+          id: "decision-auto-action",
+          severity: .warn,
+          ruleID: id,
+          sessionID: "session-1",
+          agentID: "agent-1",
+          taskID: nil,
+          summary: "Manual follow-up required",
+          contextJSON: "{}",
+          suggestedActionsJSON: "[]"
+        )
+      ),
+    ]
   }
 }
 

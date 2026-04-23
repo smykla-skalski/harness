@@ -103,6 +103,7 @@ extension HarnessMonitorStore {
       clock: nil,
       interval: SupervisorPreferencesDefaults.defaultIntervalSeconds
     )
+    await service.setQuietHoursWindow(SupervisorPreferencesDefaults.quietHoursWindow())
 
     let lifecycle = SupervisorLifecycle(
       interval: SupervisorPreferencesDefaults.defaultIntervalSeconds,
@@ -147,6 +148,27 @@ extension HarnessMonitorStore {
     HarnessMonitorLogger.supervisor.info("supervisor.stopped")
   }
 
+  public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {
+    UserDefaults.standard.set(enabled, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    guard let stack = _stack else {
+      return
+    }
+    if enabled {
+      stack.lifecycle.startBackgroundActivity()
+    } else {
+      stack.lifecycle.stopBackgroundActivity()
+    }
+  }
+
+  public func setSupervisorQuietHoursWindow(_ window: SupervisorQuietHoursWindow?) {
+    guard let service = _stack?.service else {
+      return
+    }
+    Task {
+      await self.applySupervisorQuietHoursWindow(window, service: service)
+    }
+  }
+
   // MARK: - Test hooks
 
   /// Runs one supervisor tick inline. Only for tests — production code uses the tick loop.
@@ -165,6 +187,26 @@ extension HarnessMonitorStore {
     try await stack.decisionStore.insert(draft)
   }
 
+  public func isSupervisorBackgroundActivityScheduledForTesting() -> Bool {
+    _stack?.lifecycle.isBackgroundActivityScheduled ?? false
+  }
+
+  public func isSupervisorAutoActionSuppressedForTesting(at date: Date) async -> Bool {
+    guard let service = _stack?.service else {
+      return false
+    }
+    return await service.isAutoActionSuppressed(at: date)
+  }
+
+  public func applySupervisorQuietHoursWindowForTesting(
+    _ window: SupervisorQuietHoursWindow?
+  ) async {
+    guard let service = _stack?.service else {
+      return
+    }
+    await applySupervisorQuietHoursWindow(window, service: service)
+  }
+
   // MARK: - Private helpers
 
   private func buildDefaultRegistry(_ registry: PolicyRegistry) async {
@@ -180,6 +222,13 @@ extension HarnessMonitorStore {
 
     let loggingObserver = LoggingPolicyObserver()
     await registry.registerObserver(loggingObserver)
+  }
+
+  private func applySupervisorQuietHoursWindow(
+    _ window: SupervisorQuietHoursWindow?,
+    service: SupervisorService
+  ) async {
+    await service.setQuietHoursWindow(window)
   }
 }
 

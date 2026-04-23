@@ -42,6 +42,7 @@ public actor SupervisorService {
   private var tickTask: Task<Void, Never>?
   private var running = false
   private var autoActionsSuppressed = false
+  private var quietHoursWindow: SupervisorQuietHoursWindow?
 
   /// Per-rule error flags for the last N ticks. Each ring entry is keyed by rule id; `true`
   /// means the rule errored during that tick. Oldest entries are dropped as the window slides.
@@ -95,11 +96,18 @@ public actor SupervisorService {
   /// Suppress automatic actions for the duration of the supplied operation. Useful while a user
   /// is actively resolving a decision so the supervisor doesn't fire additional nudges.
   public func suppressAutoActions<Result>(
-    during operation: () async throws -> Result
+    during operation: @Sendable () async throws -> Result
   ) async rethrows -> Result {
     autoActionsSuppressed = true
     defer { autoActionsSuppressed = false }
     return try await operation()
+  }
+
+  /// Persisted quiet-hours preferences are wired through the store and applied on every tick,
+  /// so the supervisor can suppress side effects without requiring the preferences UI to stay
+  /// open.
+  public func setQuietHoursWindow(_ window: SupervisorQuietHoursWindow?) {
+    quietHoursWindow = window
   }
 
   // MARK: - Test hooks
@@ -115,6 +123,10 @@ public actor SupervisorService {
   /// Set of rules the supervisor has quarantined in the current run.
   public func quarantinedRuleIDs() -> Set<String> {
     quarantined
+  }
+
+  public func isAutoActionSuppressed(at date: Date) -> Bool {
+    suppressionActive(at: date)
   }
 
   /// Arm the supervisor to treat evaluate calls for `ruleID` as failures. Used only by the
@@ -263,6 +275,12 @@ public actor SupervisorService {
   ) async {
     for entry in actionsByRule {
       for action in entry.actions {
+        if shouldSuppress(action, at: clock.now()) {
+          HarnessMonitorLogger.supervisor.info(
+            "supervisor.action.suppressed key=\(action.actionKey, privacy: .public)"
+          )
+          continue
+        }
         await dispatch(action, observers: observers)
       }
     }
@@ -316,5 +334,27 @@ public actor SupervisorService {
       contextJSON: "{}",
       suggestedActionsJSON: "[]"
     )
+  }
+
+  private func shouldSuppress(_ action: PolicyAction, at now: Date) -> Bool {
+    action.isAutomaticSideEffect && suppressionActive(at: now)
+  }
+
+  private func suppressionActive(at now: Date) -> Bool {
+    if autoActionsSuppressed {
+      return true
+    }
+    return quietHoursWindow?.contains(now) == true
+  }
+}
+
+extension PolicyAction {
+  fileprivate var isAutomaticSideEffect: Bool {
+    switch self {
+    case .nudgeAgent, .assignTask, .dropTask, .notifyOnly:
+      true
+    case .queueDecision, .logEvent, .suggestConfigChange:
+      false
+    }
   }
 }

@@ -92,6 +92,7 @@ enum HarnessMonitorNotificationRequestFactory {
     summary: String,
     decisionID: UUID
   ) async throws -> UNNotificationRequest {
+    let preferences = SupervisorNotificationPreferences.load()
     let content = UNMutableNotificationContent()
     content.title = "Harness Monitor"
     content.subtitle = severity.supervisorNotificationSubtitle
@@ -100,7 +101,7 @@ enum HarnessMonitorNotificationRequestFactory {
     content.categoryIdentifier = HarnessMonitorSupervisorNotificationID.category(for: severity)
     content.interruptionLevel = severity.supervisorInterruptionLevel
     content.relevanceScore = severity.supervisorRelevanceScore
-    content.sound = severity.supervisorSound
+    content.sound = preferences.requestSound(for: severity)
     content.userInfo = [
       HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID.uuidString,
       HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,

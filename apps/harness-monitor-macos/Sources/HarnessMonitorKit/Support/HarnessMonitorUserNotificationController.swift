@@ -121,6 +121,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     decisionID: UUID
   ) async {
     await performNotificationOperation {
+      let preferences = SupervisorNotificationPreferences.load()
+      guard preferences.allowsAnyDelivery(for: severity) else {
+        lastResult = "Supervisor notification suppressed by preferences."
+        return
+      }
       do {
         registerCategories()
         let request = try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
@@ -211,7 +216,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
-    [.banner, .list, .sound, .badge]
+    let userInfo = notification.request.content.userInfo
+    guard let rawSeverity = userInfo[HarnessMonitorSupervisorNotificationID.severityKey] as? String,
+      let severity = DecisionSeverity(rawValue: rawSeverity)
+    else {
+      return [.banner, .list, .sound, .badge]
+    }
+    return SupervisorNotificationPreferences.load().foregroundPresentationOptions(for: severity)
   }
 
   nonisolated public func userNotificationCenter(
