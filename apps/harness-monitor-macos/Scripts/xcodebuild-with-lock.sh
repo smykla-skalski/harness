@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+ROOT="${HARNESS_MONITOR_APP_ROOT:-$ROOT}"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
@@ -46,6 +47,13 @@ recover_build_db() {
   fi
 }
 
+normalize_shared_schemes_after_xcodebuild() {
+  HARNESS_MONITOR_APP_ROOT="$ROOT" \
+  HARNESS_MONITOR_NORMALIZE_ONLY=1 \
+  HARNESS_MONITOR_SKIP_VERSION_SYNC=1 \
+    "$ROOT/Scripts/generate-project.sh" >/dev/null
+}
+
 acquire_lock() {
   local started_at now owner_pid
   /bin/mkdir -p "$derive_data_path"
@@ -78,6 +86,7 @@ run_once() {
   set -e
 
   if (( status == 0 )); then
+    normalize_shared_schemes_after_xcodebuild
     /bin/rm -f "$log_path"
     return 0
   fi
