@@ -41,7 +41,13 @@ apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project 'apps/harnes
 xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -destination platform=macOS -derivedDataPath xcode-derived test-without-building
 ```
 
-For routine work, prefer the smallest targeted command instead of the full `monitor:macos:test` lane. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
+For routine work, prefer the smallest targeted command instead of the full `monitor:macos:test` lane. Stay on the `mise` path and pass the selector through `XCODE_ONLY_TESTING`, for example:
+
+```bash
+XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:macos:test
+```
+
+`XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
 
 Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `./scripts/version.sh set <version>` from the repo root when you bump a release. `Scripts/generate-project.sh` regenerates the Xcode project first, then resyncs `project.yml`, `HarnessMonitor.xcodeproj/project.pbxproj`, the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version so XcodeGen cannot reintroduce stale build numbers.
 
