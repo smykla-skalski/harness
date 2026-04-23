@@ -60,6 +60,7 @@ public struct DecisionsWindowView: View {
   private let store: HarnessMonitorStore?
 
   @State private var selection: String?
+  @State private var detailTab: DecisionDetailTab = .context
   @State private var runtime = DecisionsWindowRuntime()
 
   public init(store: HarnessMonitorStore? = nil) {
@@ -87,10 +88,11 @@ public struct DecisionsWindowView: View {
           decision: selectedDecision,
           handler: actionHandler,
           auditEvents: runtime.auditEvents,
-          liveTick: runtime.liveTick
+          liveTick: runtime.liveTick,
+          selectedTab: $detailTab
         )
       } else {
-        DecisionDetailView()
+        DecisionDetailView(selectedTab: $detailTab)
       }
     }
     .navigationSplitViewStyle(.balanced)
