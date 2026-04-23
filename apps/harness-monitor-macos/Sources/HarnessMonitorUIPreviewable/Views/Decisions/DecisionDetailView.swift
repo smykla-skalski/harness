@@ -1,60 +1,67 @@
 import HarnessMonitorKit
 import SwiftUI
 
+/// Which detail section the Decisions detail column renders. Lifted to the window root so the
+/// principal-toolbar segmented picker and the detail body share one source of truth.
+public enum DecisionDetailTab: String, CaseIterable, Identifiable {
+  case context
+  case audit
+
+  public var id: Self { self }
+
+  public var title: String {
+    switch self {
+    case .context:
+      "Context"
+    case .audit:
+      "Audit Trail"
+    }
+  }
+}
+
 /// Decisions detail column with header, suggested actions, context, audit trail, and live tick.
 @MainActor
 public struct DecisionDetailView: View {
-  private enum DetailTab: String, CaseIterable, Identifiable {
-    case context
-    case audit
-
-    var id: Self { self }
-
-    var title: String {
-      switch self {
-      case .context:
-        "Context"
-      case .audit:
-        "Audit Trail"
-      }
-    }
-  }
-
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
-  @State private var selectedTab: DetailTab = .context
+  @Binding private var selectedTab: DecisionDetailTab
 
   private let viewModel: DecisionDetailViewModel?
   private let auditEvents: [SupervisorEvent]
   private let liveTick: DecisionLiveTickSnapshot
 
-  public init() {
+  public init(selectedTab: Binding<DecisionDetailTab> = .constant(.context)) {
     viewModel = nil
     auditEvents = []
     liveTick = .placeholder
+    _selectedTab = selectedTab
   }
 
   public init(
     viewModel: DecisionDetailViewModel,
     auditEvents: [SupervisorEvent] = [],
-    liveTick: DecisionLiveTickSnapshot = .placeholder
+    liveTick: DecisionLiveTickSnapshot = .placeholder,
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context)
   ) {
     self.viewModel = viewModel
     self.auditEvents = auditEvents
     self.liveTick = liveTick
+    _selectedTab = selectedTab
   }
 
   public init(
     decision: Decision,
     handler: any DecisionActionHandler = NullDecisionActionHandler(),
     auditEvents: [SupervisorEvent] = [],
-    liveTick: DecisionLiveTickSnapshot = .placeholder
+    liveTick: DecisionLiveTickSnapshot = .placeholder,
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context)
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
       auditEvents: auditEvents,
-      liveTick: liveTick
+      liveTick: liveTick,
+      selectedTab: selectedTab
     )
   }
 
@@ -73,6 +80,32 @@ public struct DecisionDetailView: View {
     .backgroundExtensionEffect()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        detailTabPicker
+      }
+    }
+  }
+
+  private var detailTabPicker: some View {
+    HarnessMonitorSegmentedPicker(
+      title: "Decision detail section",
+      selection: $selectedTab,
+      accessibilityIdentifier: HarnessMonitorAccessibility.decisionDetailTabs,
+      fillsWidth: false
+    ) {
+      ForEach(DecisionDetailTab.allCases) { tab in
+        Text(tab.title)
+          .tag(tab)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.decisionDetailTabs,
+              option: tab.title
+            )
+          )
+      }
+    }
+    .fixedSize()
   }
 
   private func populatedBody(_ viewModel: DecisionDetailViewModel) -> some View {
@@ -153,32 +186,13 @@ public struct DecisionDetailView: View {
     }
   }
 
+  @ViewBuilder
   private func detailTabs(_ viewModel: DecisionDetailViewModel) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HarnessMonitorSegmentedPicker(
-        title: "Decision detail section",
-        selection: $selectedTab,
-        accessibilityIdentifier: HarnessMonitorAccessibility.decisionDetailTabs,
-        fillsWidth: true
-      ) {
-        ForEach(DetailTab.allCases) { tab in
-          Text(tab.title)
-            .tag(tab)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.decisionDetailTabs,
-                option: tab.title
-              )
-            )
-        }
-      }
-
-      switch selectedTab {
-      case .context:
-        DecisionContextPanel(sections: viewModel.contextSections)
-      case .audit:
-        DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
-      }
+    switch selectedTab {
+    case .context:
+      DecisionContextPanel(sections: viewModel.contextSections)
+    case .audit:
+      DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
     }
   }
 
