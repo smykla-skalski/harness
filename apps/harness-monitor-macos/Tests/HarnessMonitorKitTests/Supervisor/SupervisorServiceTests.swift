@@ -8,6 +8,31 @@ import XCTest
 /// is isolated + quarantined after 5 errors in 10 ticks, and `stop()` drains any tick already in
 /// flight. All timing is driven by `TestClock` so the suite stays deterministic.
 final class SupervisorServiceTests: XCTestCase {
+  @MainActor
+  func test_singleTickBuildsSnapshotFromStore() async throws {
+    let clock = TestClock()
+    let store = HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    let registry = PolicyRegistry()
+    await registry.register(NoopRule(id: "test.noop"))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let executor = try PolicyExecutor.fixture()
+    let service = SupervisorService(
+      store: store,
+      registry: registry,
+      executor: executor,
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+
+    let snapshots = await observer.snapshots
+    XCTAssertEqual(snapshots.count, 1, "store-backed tick should notify observers once")
+    XCTAssertEqual(snapshots[0].sessions.count, 2, "snapshot should include fixture sessions")
+    XCTAssertEqual(snapshots[0].connection.kind, "sse")
+  }
+
   func test_singleTickEvaluatesAndDispatches() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()
@@ -15,8 +40,7 @@ final class SupervisorServiceTests: XCTestCase {
     await registry.register(emitter)
     let observer = SpyObserver()
     await registry.registerObserver(observer)
-    let decisions = try DecisionStore.makeInMemory()
-    let executor = PolicyExecutor(api: nil, decisions: decisions, audit: nil)
+    let executor = try PolicyExecutor.fixture()
     let service = SupervisorService(
       store: nil,
       registry: registry,
@@ -46,8 +70,7 @@ final class SupervisorServiceTests: XCTestCase {
     await registry.register(healthy)
     let observer = SpyObserver()
     await registry.registerObserver(observer)
-    let decisions = try DecisionStore.makeInMemory()
-    let executor = PolicyExecutor(api: nil, decisions: decisions, audit: nil)
+    let executor = try PolicyExecutor.fixture()
     let service = SupervisorService(
       store: nil,
       registry: registry,
@@ -83,7 +106,8 @@ final class SupervisorServiceTests: XCTestCase {
       return false
     }
     XCTAssertGreaterThanOrEqual(
-      quarantineDecisions.count, 1,
+      quarantineDecisions.count,
+      1,
       "quarantine must queue a decision for the failing rule"
     )
   }
@@ -96,8 +120,7 @@ final class SupervisorServiceTests: XCTestCase {
     await registry.register(slow)
     let observer = SpyObserver()
     await registry.registerObserver(observer)
-    let decisions = try DecisionStore.makeInMemory()
-    let executor = PolicyExecutor(api: nil, decisions: decisions, audit: nil)
+    let executor = try PolicyExecutor.fixture()
     let service = SupervisorService(
       store: nil,
       registry: registry,
@@ -229,10 +252,13 @@ private actor SpyObserver: PolicyObserver {
     let outcome: PolicyOutcome
   }
 
+  private(set) var snapshots: [SessionsSnapshot] = []
   private(set) var evaluations: [Evaluation] = []
   private(set) var executions: [Execution] = []
 
-  func willTick(_ snapshot: SessionsSnapshot) async {}
+  func willTick(_ snapshot: SessionsSnapshot) async {
+    snapshots.append(snapshot)
+  }
   func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async {
     evaluations.append(Evaluation(ruleID: rule.id, actions: actions))
   }
