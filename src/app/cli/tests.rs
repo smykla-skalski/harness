@@ -3,7 +3,7 @@ use std::path::Path;
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
-use crate::agents::transport::AgentPromptSubmitArgs;
+use crate::agents::transport::{AgentPromptSubmitArgs, AgentRepoPolicyArgs};
 use crate::daemon::bridge::BridgeCapability;
 use crate::daemon::transport::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
 use crate::hooks::adapters::HookAgent;

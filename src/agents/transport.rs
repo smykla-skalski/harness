@@ -18,6 +18,9 @@ pub enum AgentsCommand {
     SessionStop(AgentSessionStopArgs),
     /// Record a prompt-submission event in the shared agent ledger.
     PromptSubmit(AgentPromptSubmitArgs),
+    /// Enforce repo-wide task policy before agent shell execution.
+    #[command(hide = true)]
+    RepoPolicy(AgentRepoPolicyArgs),
 }
 
 impl Execute for AgentsCommand {
@@ -26,6 +29,7 @@ impl Execute for AgentsCommand {
             Self::SessionStart(args) => args.execute(context),
             Self::SessionStop(args) => args.execute(context),
             Self::PromptSubmit(args) => args.execute(context),
+            Self::RepoPolicy(args) => args.execute(context),
         }
     }
 }
@@ -109,6 +113,25 @@ impl Execute for AgentPromptSubmitArgs {
             self.session_id.clone(),
             payload,
         ))?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AgentRepoPolicyArgs {
+    #[arg(long, value_enum)]
+    pub agent: HookAgent,
+}
+
+impl Execute for AgentRepoPolicyArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let payload = read_stdin_bytes()?;
+        if let Some(rendered) = service::repo_policy_pre_tool_use(self.agent, &payload) {
+            if !rendered.stdout.is_empty() {
+                print!("{}", rendered.stdout);
+            }
+            return Ok(rendered.exit_code);
+        }
         Ok(0)
     }
 }

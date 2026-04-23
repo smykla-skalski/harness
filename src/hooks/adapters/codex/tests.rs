@@ -68,6 +68,26 @@ fn parse_local_shell_payload_maps_to_shell_tool() {
 }
 
 #[test]
+fn parse_bash_payload_maps_to_shell_tool() {
+    let adapter = CodexAdapter;
+    let raw = br#"{
+        "session_id":"session-123",
+        "cwd":"/tmp/project",
+        "hook_event_name":"PreToolUse",
+        "tool_name":"Bash",
+        "tool_input":{"command":"cargo test --lib"}
+    }"#
+    .to_vec();
+
+    let context = adapter.parse_input(&raw).unwrap();
+    let tool = context.tool.as_ref().expect("expected tool");
+
+    assert_eq!(context.event, NormalizedEvent::BeforeToolUse);
+    assert_eq!(tool.category, ToolCategory::Shell);
+    assert_eq!(tool.input.command_text(), Some("cargo test --lib"));
+}
+
+#[test]
 fn parse_user_prompt_submit_extracts_nested_prompt_and_turn_id() {
     let adapter = CodexAdapter;
     let raw = br#"{

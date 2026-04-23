@@ -79,6 +79,7 @@ fn assert_codex_hooks(hooks: &str) {
     assert!(hooks.contains("\"PostToolUse\""));
     assert!(hooks.contains("\"SubagentStart\""));
     assert!(hooks.contains("\"SubagentStop\""));
+    assert!(hooks.contains("repo-policy"));
     assert!(hooks.contains("tool-guard"));
     assert!(hooks.contains("tool-result"));
 }
@@ -217,6 +218,7 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     assert!(config.contains("\"version\": 1"));
     assert!(config.contains("\"preToolUse\""));
     assert!(config.contains("\"userPromptSubmitted\""));
+    assert!(config.contains("repo-policy"));
     assert!(
         config.contains(
             "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""

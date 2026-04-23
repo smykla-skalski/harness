@@ -57,6 +57,14 @@ depends = ["test:unit", "test:integration"]
 description = "Verify generated agent assets are in sync with sources"
 run = "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"
 
+[tasks."setup:agents:generate"]
+description = "Render shared agent assets from canonical sources (pass harness setup args after --)"
+run = "./scripts/cargo-local.sh run --quiet -- setup agents generate"
+
+[tasks."setup:bootstrap"]
+description = "Write runtime bootstrap configs and managed agent outputs (pass harness setup args after --)"
+run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
+
 [tasks.check]
 description = "Type-check without building"
 run = ["./scripts/version.sh check", "./scripts/check-scripts.sh", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib", "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"]

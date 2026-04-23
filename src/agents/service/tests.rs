@@ -123,6 +123,24 @@ fn session_start_preserves_pending_signals() {
 }
 
 #[test]
+fn session_start_injects_repo_policy_context() {
+    with_temp_project(|project| {
+        let context = RUNTIME
+            .block_on(session_start(
+                HookAgent::Claude,
+                project.to_path_buf(),
+                Some("sess-policy".to_string()),
+            ))
+            .expect("session start")
+            .expect("repo policy context");
+
+        assert!(context.contains("mise tasks ls"));
+        assert!(context.contains("Every commit uses `-sS`"));
+        assert!(context.contains("Do not run raw `cargo`"));
+    });
+}
+
+#[test]
 fn project_dir_for_context_unescapes_shell_escaped_cwd_when_original_path_is_missing() {
     with_temp_project_without_runtime_ids("project@team", |project| {
         let escaped = project.to_string_lossy().replace("@", "\\@");
