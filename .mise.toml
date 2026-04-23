@@ -67,7 +67,7 @@ run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
 
 [tasks.check]
 description = "Type-check without building"
-run = ["./scripts/version.sh check", "./scripts/check-scripts.sh", "./scripts/cargo-local.sh check", "./scripts/cargo-local.sh clippy --lib", "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"]
+run = "./scripts/check.sh"
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"

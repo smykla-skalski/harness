@@ -76,6 +76,47 @@ fn denies_manual_observability_restart_chain() {
 }
 
 #[test]
+fn denies_bash_lc_wrapped_mise_command() {
+    let reason = manual_command_denial_reason("bash -lc 'mise run monitor:macos:test'")
+        .expect("shell-wrapped mise command should be blocked");
+    assert!(reason.contains("mise run monitor:macos:test"));
+}
+
+#[test]
+fn denies_bash_split_flags_wrapped_mise_command() {
+    let reason = manual_command_denial_reason("bash -l -c 'mise run check'")
+        .expect("split shell flags should still be blocked");
+    assert!(reason.contains("mise run check"));
+}
+
+#[test]
+fn denies_zsh_combined_flags_wrapped_raw_cargo_command() {
+    let reason = manual_command_denial_reason("zsh -lic 'cargo test --lib cli::tests'")
+        .expect("combined shell flags should still be blocked");
+    assert!(reason.contains("mise run cargo:local -- test --lib cli::tests"));
+}
+
+#[test]
+fn denies_rtk_env_shell_wrapped_mise_command_and_preserves_env() {
+    let reason = manual_command_denial_reason(
+        "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:macos:test'",
+    )
+    .expect("rtk env shell wrapper should be blocked");
+    assert!(reason.contains("XCODE_ONLY_TESTING="));
+    assert!(reason.contains("HarnessMonitorKitTests/SupervisorServiceTests"));
+    assert!(reason.contains("mise run monitor:macos:test"));
+}
+
+#[test]
+fn denies_rtk_shell_wrapped_mise_command_after_shell_prelude() {
+    let reason = manual_command_denial_reason(
+        "rtk bash -lc 'set -o pipefail; mise run monitor:macos:xcodebuild -- -scheme HarnessMonitor build'",
+    )
+    .expect("rtk shell wrapper with prelude should be blocked");
+    assert!(reason.contains("mise run monitor:macos:xcodebuild -- -scheme HarnessMonitor build"));
+}
+
+#[test]
 fn allows_existing_mise_commands() {
     assert!(manual_command_denial_reason("mise run check").is_none());
 }
@@ -90,7 +131,6 @@ fn renders_codex_pre_tool_use_denial_output() {
             "tool_input":{"command":"./scripts/version.sh check"}
         }"#,
     )
-    .expect("hook output should render")
     .expect("manual command should be blocked");
     assert!(output.stdout.contains("\"decision\":\"block\""));
     assert!(output.stdout.contains("mise run version:check"));
@@ -106,7 +146,6 @@ fn renders_claude_pre_tool_use_denial_output() {
             "tool_input":{"command":"cargo test --lib"}
         }"#,
     )
-    .expect("hook output should render")
     .expect("manual command should be blocked");
     assert!(output.stdout.contains("\"hookEventName\":\"PreToolUse\""));
     assert!(output.stdout.contains("\"permissionDecision\":\"deny\""));
