@@ -27,6 +27,7 @@ struct SupervisorRuleParameterRow: View {
   private var booleanRow: some View {
     LabeledContent(field.label) {
       Toggle("", isOn: booleanBinding)
+        .toggleStyle(.switch)
         .labelsHidden()
         .scaledFont(.subheadline)
     }
