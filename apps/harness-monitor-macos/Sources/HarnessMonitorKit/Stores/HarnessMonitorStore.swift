@@ -20,6 +20,7 @@ public final class HarnessMonitorStore {
   public var attachSessionRequest = 0
   public var lastExternalSessionAttachOutcome: ExternalSessionAttachOutcome?
   public var supervisorSelectedDecisionID: String?
+  public var supervisorOpenDecisions: [Decision] = []
   public var supervisorDecisionRefreshTick: Int = 0
 
   public var persistenceError: String? {

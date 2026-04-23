@@ -39,6 +39,7 @@ enum HarnessMonitorAppStoreFactory {
     case cockpit
     case emptyCockpit = "empty-cockpit"
     case toolbarCountRegression = "toolbar-count-regression"
+    case codexApprovalUnification = "codex-approval-unification"
     case agentTuiOverflow = "agent-tui-overflow"
     case taskDrop = "task-drop"
     case offlineCached = "offline-cached"
@@ -67,6 +68,8 @@ enum HarnessMonitorAppStoreFactory {
         .emptyCockpit
       case .toolbarCountRegression:
         .toolbarCountRegression
+      case .codexApprovalUnification:
+        .codexApprovalUnification
       case .agentTuiOverflow:
         .agentTuiOverflow
       case .taskDrop:

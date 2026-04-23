@@ -255,6 +255,7 @@ extension HarnessMonitorStore {
     stack.auditRetention?.stopBackgroundCompaction()
     await stack.service.stop()
     supervisorToolbarSlice.stop()
+    supervisorOpenDecisions = []
     supervisorSelectedDecisionID = nil
     supervisorDecisionRefreshTick &+= 1
 
@@ -356,7 +357,15 @@ extension HarnessMonitorStore {
   }
 
   private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
-    let counts = (try? await decisions.openCountBySeverity()) ?? [:]
+    let openDecisions = (try? await decisions.openDecisions()) ?? []
+    var counts: [DecisionSeverity: Int] = [:]
+    for decision in openDecisions {
+      guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
+        continue
+      }
+      counts[severity, default: 0] += 1
+    }
+    supervisorOpenDecisions = openDecisions
     supervisorToolbarSlice.refresh(counts: counts)
     supervisorDecisionRefreshTick &+= 1
   }

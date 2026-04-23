@@ -18,10 +18,15 @@ enum HarnessMonitorUITestAccessibility {
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   static let inspectorToggleButton = "harness.toolbar.inspector-toggle"
   static let supervisorBadge = "harness.supervisor.badge"
+  static let supervisorBadgeState = "harness.supervisor.badge.state"
+  static let supervisorForceTick = "harness.supervisor.force-tick"
   static let decisionsWindow = "harness.decisions.window"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static func decisionRow(_ id: String) -> String {
-    "harness.decisions.row.\(id)"
+    "harness.decisions.row.\(slug(id))"
+  }
+  static func decisionAction(_ id: String) -> String {
+    "harness.decisions.action.\(slug(id))"
   }
   static let sessionHeaderCard = "harness.session.header"
   static let sessionHeaderCardFrame = "harness.session.header.frame"
@@ -275,6 +280,9 @@ enum HarnessMonitorUITestAccessibility {
   static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
   static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
   static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
+  static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
+    "harness.window.agents.codex.approval.\(slug(approvalID)).\(slug(decision))"
+  }
 
   static func sessionEmptyState(_ section: String) -> String {
     "harness.session.empty-state.\(slug(section))"
