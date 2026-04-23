@@ -9,6 +9,52 @@ otelcol.receiver.otlp "harness" {
 
   output {
     logs = [
+      otelcol.processor.transform.normalize_service_name.input,
+    ]
+    metrics = [
+      otelcol.processor.transform.normalize_service_name.input,
+    ]
+    traces = [
+      otelcol.processor.transform.normalize_service_name.input,
+    ]
+  }
+}
+
+otelcol.processor.transform "normalize_service_name" {
+  error_mode = "ignore"
+
+  trace_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
+      `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
+      `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+    ]
+  }
+
+  metric_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
+      `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
+      `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+    ]
+  }
+
+  log_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
+      `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
+      `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+    ]
+  }
+
+  output {
+    logs = [
       otelcol.processor.batch.logs.input,
     ]
     metrics = [
