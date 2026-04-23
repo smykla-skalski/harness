@@ -10,7 +10,13 @@ public struct ObserverIssueRule: PolicyRule {
   public let parameters = PolicyParameterSchema(fields: [
     .init(key: "issueWindow", label: "Issue window", kind: .duration, default: "300"),
     .init(key: "minCount", label: "Minimum issue count", kind: .integer, default: "3"),
-    .init(key: "minSeverity", label: "Minimum severity", kind: .string, default: "warn"),
+    .init(
+      key: "minSeverity",
+      label: "Minimum severity",
+      kind: .string,
+      default: "warn",
+      allowedValues: ["info", "warn", "needsUser", "critical"]
+    ),
   ])
 
   public init() {}

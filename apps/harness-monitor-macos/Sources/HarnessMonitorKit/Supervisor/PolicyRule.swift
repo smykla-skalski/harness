@@ -7,6 +7,7 @@ public struct PolicyParameterSchema: Sendable, Codable, Hashable {
     public let label: String
     public let kind: Kind
     public let `default`: String
+    public let allowedValues: [String]?
 
     public enum Kind: String, Codable, Sendable {
       case duration
@@ -15,11 +16,18 @@ public struct PolicyParameterSchema: Sendable, Codable, Hashable {
       case string
     }
 
-    public init(key: String, label: String, kind: Kind, default: String) {
+    public init(
+      key: String,
+      label: String,
+      kind: Kind,
+      default: String,
+      allowedValues: [String]? = nil
+    ) {
       self.key = key
       self.label = label
       self.kind = kind
       self.default = `default`
+      self.allowedValues = allowedValues
     }
   }
 

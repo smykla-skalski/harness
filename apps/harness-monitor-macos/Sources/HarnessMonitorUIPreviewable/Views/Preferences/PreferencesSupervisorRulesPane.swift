@@ -202,7 +202,7 @@ private struct SupervisorRuleSectionFooter: View {
           .scaledFont(.caption.monospaced())
           .foregroundStyle(.secondary)
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        Text("Version \(rule.version) · \(rule.parameters.fields.count) parameters")
+        Text(metadataText)
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
       }
@@ -217,6 +217,17 @@ private struct SupervisorRuleSectionFooter: View {
       }
     }
   }
+
+  private var metadataText: String {
+    let fieldCount = rule.parameters.fields.count
+    let plural = fieldCount == 1 ? "parameter" : "parameters"
+    let version = Self.formatSemver(rule.version)
+    return "\(fieldCount) \(plural) · \(version)"
+  }
+
+  static func formatSemver(_ version: Int) -> String {
+    "v\(version).0.0"
+  }
 }
 
 private struct SupervisorRuleParameterRow: View {
@@ -226,41 +237,89 @@ private struct SupervisorRuleParameterRow: View {
   let onCommit: () -> Void
 
   var body: some View {
-    switch field.kind {
-    case .boolean:
-      LabeledContent(field.label) {
-        Toggle("", isOn: booleanBinding)
-          .labelsHidden()
+    if let allowedValues = field.allowedValues, !allowedValues.isEmpty {
+      enumerationRow(allowedValues: allowedValues)
+    } else {
+      switch field.kind {
+      case .boolean:
+        booleanRow
+      case .integer:
+        numericRow(helpSuffix: "")
+      case .duration:
+        numericRow(helpSuffix: "Stored in seconds. ")
+      case .string:
+        stringRow
       }
-      .harnessNativeFormControl()
-      .help("Default: \(field.default)")
-    case .duration:
-      LabeledContent(field.label) {
-        TextField("", text: textBinding)
-          .textFieldStyle(.roundedBorder)
-          .labelsHidden()
-          .frame(minWidth: 140)
-          .onSubmit(onCommit)
-      }
-      .harnessNativeFormControl()
-      .help("Stored in seconds. Default: \(field.default)")
-    case .integer, .string:
-      LabeledContent(field.label) {
-        TextField("", text: textBinding)
-          .textFieldStyle(.roundedBorder)
-          .labelsHidden()
-          .frame(minWidth: 140)
-          .onSubmit(onCommit)
-      }
-      .harnessNativeFormControl()
-      .help("Default: \(field.default)")
     }
+  }
+
+  private var booleanRow: some View {
+    LabeledContent(field.label) {
+      Toggle("", isOn: booleanBinding)
+        .labelsHidden()
+    }
+    .harnessNativeFormControl()
+    .help("Default: \(field.default)")
+  }
+
+  private func numericRow(helpSuffix: String) -> some View {
+    LabeledContent(field.label) {
+      TextField("", value: intBinding, format: .number)
+        .textFieldStyle(.roundedBorder)
+        .labelsHidden()
+        .multilineTextAlignment(.trailing)
+        .monospacedDigit()
+        .frame(minWidth: 140)
+        .onSubmit(onCommit)
+    }
+    .harnessNativeFormControl()
+    .help("\(helpSuffix)Default: \(field.default)")
+  }
+
+  private var stringRow: some View {
+    LabeledContent(field.label) {
+      TextField("", text: textBinding)
+        .textFieldStyle(.roundedBorder)
+        .labelsHidden()
+        .frame(minWidth: 140)
+        .onSubmit(onCommit)
+    }
+    .harnessNativeFormControl()
+    .help("Default: \(field.default)")
+  }
+
+  private func enumerationRow(allowedValues: [String]) -> some View {
+    LabeledContent(field.label) {
+      Picker("", selection: enumerationBinding(allowedValues: allowedValues)) {
+        ForEach(allowedValues, id: \.self) { value in
+          Text(Self.enumerationDisplayName(value)).tag(value)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .frame(minWidth: 140)
+    }
+    .harnessNativeFormControl()
+    .help("Default: \(Self.enumerationDisplayName(field.default))")
   }
 
   private var textBinding: Binding<String> {
     Binding(
       get: { viewModel.ruleParameterValue(for: field.key, ruleID: ruleID) },
       set: { viewModel.setRuleParameterValue($0, for: field.key, ruleID: ruleID) }
+    )
+  }
+
+  private var intBinding: Binding<Int> {
+    Binding(
+      get: {
+        Int(viewModel.ruleParameterValue(for: field.key, ruleID: ruleID))
+          ?? Int(field.default) ?? 0
+      },
+      set: { value in
+        viewModel.setRuleParameterValue(String(value), for: field.key, ruleID: ruleID)
+        onCommit()
+      }
     )
   }
 
@@ -276,12 +335,35 @@ private struct SupervisorRuleParameterRow: View {
     )
   }
 
+  private func enumerationBinding(allowedValues: [String]) -> Binding<String> {
+    Binding(
+      get: {
+        let current = viewModel.ruleParameterValue(for: field.key, ruleID: ruleID)
+        return allowedValues.contains(current) ? current : (allowedValues.first ?? current)
+      },
+      set: { value in
+        viewModel.setRuleParameterValue(value, for: field.key, ruleID: ruleID)
+        onCommit()
+      }
+    )
+  }
+
   private static func boolValue(from value: String) -> Bool {
     switch value.lowercased() {
     case "1", "true", "yes", "on":
       true
     default:
       false
+    }
+  }
+
+  static func enumerationDisplayName(_ rawValue: String) -> String {
+    switch rawValue {
+    case "info": "Info"
+    case "warn": "Warning"
+    case "needsUser": "Needs user"
+    case "critical": "Critical"
+    default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
     }
   }
 }
