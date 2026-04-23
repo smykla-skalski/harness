@@ -30,6 +30,18 @@ otelcol.processor.transform "normalize_service_name" {
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+      `set(attributes["service.name"], "vibe") where attributes["service.name"] == "mistral-vibe"`,
+    ]
+  }
+
+  trace_statements {
+    context = "span"
+    statements = [
+      `set(attributes["service.name"], "codex") where attributes["service.name"] == "codex_exec"`,
+      `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
+      `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
+      `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+      `set(attributes["service.name"], "vibe") where attributes["service.name"] == "mistral-vibe"`,
     ]
   }
 
@@ -40,6 +52,7 @@ otelcol.processor.transform "normalize_service_name" {
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+      `set(attributes["service.name"], "vibe") where attributes["service.name"] == "mistral-vibe"`,
     ]
   }
 
@@ -50,6 +63,7 @@ otelcol.processor.transform "normalize_service_name" {
       `set(attributes["service.name"], "copilot") where attributes["service.name"] == "github-copilot-cli"`,
       `set(attributes["service.name"], "gemini") where attributes["service.name"] == "gemini-cli"`,
       `set(attributes["service.name"], "claude") where attributes["service.name"] == "claude-code"`,
+      `set(attributes["service.name"], "vibe") where attributes["service.name"] == "mistral-vibe"`,
     ]
   }
 
