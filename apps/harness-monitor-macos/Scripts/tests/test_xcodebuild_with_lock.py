@@ -181,6 +181,59 @@ printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
             self.assertNotIn('buildImplicitDependencies = "YES"\n     >', scheme_text)
             self.assertNotIn('shouldUseLaunchSchemeArgsEnv = "YES"\n     >', scheme_text)
 
+    def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            tool_log = temp_root / "tool.log"
+            literal_template = temp_root / "harness-xcodebuild.XXXXXX.log"
+            literal_template.write_text("")
+
+            write_executable(
+                fake_bin / "rtk",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'RTK=%s\\n' "$*" > "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotIn("mktemp:", completed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
