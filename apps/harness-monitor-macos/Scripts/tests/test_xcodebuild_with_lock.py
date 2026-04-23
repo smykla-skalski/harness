@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import os
 import stat
 import subprocess
@@ -234,6 +235,102 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertNotIn("mktemp:", completed.stderr)
+
+    def test_emits_swift_compile_context_when_failure_lacks_file_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            logs_root = derived_data_path / "Logs" / "Build"
+            swift_file_list = (
+                derived_data_path
+                / "Build"
+                / "Intermediates.noindex"
+                / "HarnessMonitor.build"
+                / "Debug"
+                / "HarnessMonitorKit.build"
+                / "Objects-normal"
+                / "arm64"
+                / "HarnessMonitorKit.SwiftFileList"
+            )
+
+            logs_root.mkdir(parents=True)
+            swift_file_list.parent.mkdir(parents=True, exist_ok=True)
+            swift_file_list.write_text(
+                "/Users/x/Sources/RulesPane.swift\n/Users/x/Sources/SidebarView.swift\n"
+            )
+
+            empty_log = logs_root / "Z-empty.xcactivitylog"
+            empty_log.write_bytes(b"")
+
+            activity_log = logs_root / "A-build.xcactivitylog"
+            with gzip.open(activity_log, "wt", encoding="utf-8") as handle:
+                handle.write(
+                    "builtin-Swift-Compilation -- "
+                    "/Applications/Xcode.app/Contents/Developer/usr/bin/swiftc "
+                    f"@{swift_file_list} -DDEBUG\n"
+                )
+            os.utime(activity_log, (1, 1))
+            os.utime(empty_log, (2, 2))
+
+            write_executable(
+                fake_bin / "rtk",
+                """#!/bin/bash
+set -euo pipefail
+""",
+            )
+            write_executable(
+                fake_bin / "xcodebuild",
+                """#!/bin/bash
+set -euo pipefail
+echo "error: emit-module command failed with exit code 1" >&2
+echo "** BUILD FAILED **" >&2
+exit 65
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 65)
+            self.assertIn(
+                "swift-compile-context: latest non-empty activity log:",
+                completed.stderr,
+            )
+            self.assertIn(str(activity_log), completed.stderr)
+            self.assertIn(
+                "swift-compile-context: latest Swift batch file list:",
+                completed.stderr,
+            )
+            self.assertIn(str(swift_file_list), completed.stderr)
+            self.assertIn(
+                "swift-compile-context: source: /Users/x/Sources/RulesPane.swift",
+                completed.stderr,
+            )
+            self.assertNotIn(str(empty_log), completed.stderr)
 
 
 if __name__ == "__main__":

@@ -353,6 +353,7 @@ keep_lines_matching = [
   "^daemon missing bookmarks.app-scope$",
   "^built app missing at ",
   "^daemon binary missing at ",
+  "^swift-compile-context:",
   "^error: ",
   "^warning: ",
   "^fatal: ",
@@ -398,6 +399,16 @@ built app missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor
 expected = "daemon missing bookmarks.app-scope\nbuilt app missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app"
 
 [[tests.harness-monitor-run-quality-gates]]
+name = "keeps derived swift compile context"
+input = """
+error: emit-module command failed with exit code 1
+swift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog
+swift-compile-context: source: /Users/x/Sources/RulesPane.swift
+** BUILD FAILED **
+"""
+expected = "error: emit-module command failed with exit code 1\nswift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog\nswift-compile-context: source: /Users/x/Sources/RulesPane.swift\n** BUILD FAILED **"
+
+[[tests.harness-monitor-run-quality-gates]]
 name = "empty input returns on_empty"
 input = ""
 expected = "run-quality-gates: ok"
@@ -432,6 +443,7 @@ keep_lines_matching = [
   "^Undefined symbols",
   # Code signing failures
   "^Code Sign error:",
+  "^swift-compile-context:",
 ]
 max_lines = 150
 on_empty = "xcodebuild (HarnessMonitor): ok"
@@ -487,6 +499,17 @@ note: Building targets in dependency order
 ** BUILD FAILED **
 """
 expected = "** BUILD FAILED **"
+
+[[tests.harness-monitor-xcodebuild]]
+name = "keeps derived swift compile context when xcodebuild hides file diagnostics"
+input = """
+error: emit-module command failed with exit code 1
+swift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog
+swift-compile-context: latest Swift batch file list: /Users/x/HarnessMonitorKit.SwiftFileList
+swift-compile-context: source: /Users/x/Sources/RulesPane.swift
+** BUILD FAILED **
+"""
+expected = "error: emit-module command failed with exit code 1\nswift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog\nswift-compile-context: latest Swift batch file list: /Users/x/HarnessMonitorKit.SwiftFileList\nswift-compile-context: source: /Users/x/Sources/RulesPane.swift\n** BUILD FAILED **"
 
 [[tests.harness-monitor-xcodebuild]]
 name = "empty returns on_empty message"
@@ -563,6 +586,7 @@ keep_lines_matching = [
   "^daemon missing bookmarks.app-scope$",
   "^built app missing at ",
   "^daemon binary missing at ",
+  "^swift-compile-context:",
   "^error: ",
   "^warning: ",
   "^fatal: ",
@@ -589,6 +613,16 @@ input = """
 daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness
 """
 expected = "daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness"
+
+[[tests.harness-monitor-test-swift]]
+name = "keeps derived swift compile context"
+input = """
+error: emit-module command failed with exit code 1
+swift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog
+swift-compile-context: source: /Users/x/Tests/Rules/CodexApprovalRuleTests.swift
+** BUILD FAILED **
+"""
+expected = "error: emit-module command failed with exit code 1\nswift-compile-context: latest non-empty activity log: /Users/x/xcode-derived/Logs/Build/latest.xcactivitylog\nswift-compile-context: source: /Users/x/Tests/Rules/CodexApprovalRuleTests.swift\n** BUILD FAILED **"
 
 [[tests.harness-monitor-test-swift]]
 name = "keeps failure verdict when shell prelude output is present"
