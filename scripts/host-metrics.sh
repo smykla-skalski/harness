@@ -10,6 +10,10 @@ DARWIN_EXPORTER_PORT="${DARWIN_EXPORTER_PORT:-10102}"
 
 ALLOY_BIN="${ALLOY_BIN:-$(command -v alloy 2>/dev/null || printf '%s' /opt/homebrew/bin/alloy)}"
 ALLOY_CONFIG="/opt/homebrew/etc/alloy/config.alloy"
+ALLOY_UNIX_LABEL="io.harness.alloy-unix"
+ALLOY_UNIX_PLIST="$HOME/Library/LaunchAgents/${ALLOY_UNIX_LABEL}.plist"
+ALLOY_UNIX_PORT="${ALLOY_UNIX_PORT:-12346}"
+ALLOY_UNIX_STORAGE="/opt/homebrew/var/lib/alloy/data"
 ALLOY_PROCESS_CONFIG_SOURCE="$ROOT/resources/observability/alloy/host-processes.otel.yaml"
 ALLOY_PROCESS_CONFIG="/opt/homebrew/etc/alloy/harness-host-processes.otel.yaml"
 ALLOY_PROCESS_LABEL="io.harness.alloy-host-processes"
@@ -19,6 +23,8 @@ ALLOY_PROCESS_HEALTH_URL="http://127.0.0.1:10104"
 ALLOY_PROCESS_LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/harness/observability"
 ALLOY_PROCESS_LOG="$ALLOY_PROCESS_LOG_DIR/alloy-host-processes.log"
 ALLOY_PROCESS_ERR="$ALLOY_PROCESS_LOG_DIR/alloy-host-processes.err"
+ALLOY_UNIX_LOG="$ALLOY_PROCESS_LOG_DIR/alloy-unix.log"
+ALLOY_UNIX_ERR="$ALLOY_PROCESS_LOG_DIR/alloy-unix.err"
 PROMETHEUS_URL="${HARNESS_PROMETHEUS_URL:-http://127.0.0.1:9090}"
 
 require_macos() {
@@ -96,6 +102,51 @@ install_alloy_process_exporter() {
   printf 'alloy host-process exporter installed and listening on port %s\n' "$ALLOY_PROCESS_PORT"
 }
 
+disable_brew_alloy_service() {
+  if command -v brew >/dev/null 2>&1; then
+    brew services stop grafana/grafana/alloy >/dev/null 2>&1 || true
+  fi
+}
+
+write_alloy_unix_plist() {
+  mkdir -p "$(dirname "$ALLOY_UNIX_PLIST")" "$ALLOY_PROCESS_LOG_DIR" "$ALLOY_UNIX_STORAGE"
+  cat >"$ALLOY_UNIX_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${ALLOY_UNIX_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${ALLOY_BIN}</string>
+        <string>run</string>
+        <string>${ALLOY_CONFIG}</string>
+        <string>--server.http.listen-addr=127.0.0.1:${ALLOY_UNIX_PORT}</string>
+        <string>--storage.path=${ALLOY_UNIX_STORAGE}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${ALLOY_UNIX_LOG}</string>
+    <key>StandardErrorPath</key>
+    <string>${ALLOY_UNIX_ERR}</string>
+</dict>
+</plist>
+EOF
+}
+
+load_alloy_unix() {
+  launchctl unload "$ALLOY_UNIX_PLIST" 2>/dev/null || true
+  launchctl load "$ALLOY_UNIX_PLIST"
+}
+
+unload_alloy_unix() {
+  launchctl unload "$ALLOY_UNIX_PLIST" 2>/dev/null || true
+}
+
 install_alloy() {
   require_tool brew
 
@@ -106,10 +157,11 @@ install_alloy() {
     brew install grafana/grafana/alloy
   fi
 
+  disable_brew_alloy_service
   write_alloy_config
-  printf 'starting alloy service...\n'
-  brew services start grafana/grafana/alloy || brew services restart grafana/grafana/alloy
-  printf 'alloy installed and running\n'
+  write_alloy_unix_plist
+  load_alloy_unix
+  printf 'alloy host exporter running on 127.0.0.1:%s\n' "$ALLOY_UNIX_PORT"
 }
 
 write_alloy_config() {
@@ -251,8 +303,10 @@ install_all() {
 uninstall_all() {
   require_macos
 
-  printf 'stopping alloy...\n'
-  brew services stop grafana/grafana/alloy 2>/dev/null || true
+  printf 'stopping alloy (host)...\n'
+  disable_brew_alloy_service
+  unload_alloy_unix
+  rm -f "$ALLOY_UNIX_PLIST" "$ALLOY_UNIX_LOG" "$ALLOY_UNIX_ERR"
 
   printf 'stopping Alloy host-process exporter...\n'
   unload_alloy_process_exporter
@@ -268,8 +322,10 @@ uninstall_all() {
 
 start_services() {
   require_macos
-  printf 'starting alloy...\n'
-  brew services start grafana/grafana/alloy || true
+  disable_brew_alloy_service
+  printf 'starting alloy (host) on 127.0.0.1:%s...\n' "$ALLOY_UNIX_PORT"
+  write_alloy_unix_plist
+  load_alloy_unix || true
   printf 'starting Alloy host-process exporter...\n'
   load_alloy_process_exporter || true
   printf 'starting darwin-exporter...\n'
@@ -279,8 +335,9 @@ start_services() {
 
 stop_services() {
   require_macos
-  printf 'stopping alloy...\n'
-  brew services stop grafana/grafana/alloy 2>/dev/null || true
+  printf 'stopping alloy (host)...\n'
+  disable_brew_alloy_service
+  unload_alloy_unix
   printf 'stopping Alloy host-process exporter...\n'
   unload_alloy_process_exporter
   printf 'stopping darwin-exporter...\n'
@@ -297,13 +354,19 @@ restart_services() {
 show_status() {
   require_macos
 
-  printf '=== Grafana Alloy ===\n'
-  if brew services list | grep -q "alloy.*started"; then
-    printf 'status: running\n'
+  printf '=== Grafana Alloy (host) ===\n'
+  if launchctl list 2>/dev/null | grep -q "$ALLOY_UNIX_LABEL"; then
+    alloy_unix_pid="$(launchctl list | grep "$ALLOY_UNIX_LABEL" | awk '{print $1}')"
+    if [ "$alloy_unix_pid" != "-" ] && [ -n "$alloy_unix_pid" ]; then
+      printf 'status: running (pid %s)\n' "$alloy_unix_pid"
+    else
+      printf 'status: loaded but not running\n'
+    fi
     printf 'config: %s\n' "$ALLOY_CONFIG"
-    printf 'logs: /opt/homebrew/var/log/alloy.log\n'
+    printf 'debug: http://127.0.0.1:%s\n' "$ALLOY_UNIX_PORT"
+    printf 'logs: %s\n' "$ALLOY_UNIX_LOG"
   else
-    printf 'status: stopped\n'
+    printf 'status: not installed\n'
   fi
 
   printf '\n=== Alloy Host Processes ===\n'
@@ -414,8 +477,8 @@ show_metrics() {
 
 show_logs() {
   require_macos
-  printf '=== Alloy logs ===\n'
-  tail -20 /opt/homebrew/var/log/alloy.log 2>/dev/null || printf 'no alloy logs\n'
+  printf '=== Alloy host logs ===\n'
+  tail -20 "$ALLOY_UNIX_LOG" 2>/dev/null || printf 'no alloy logs\n'
   printf '\n=== Alloy host-process exporter logs ===\n'
   tail -20 "$ALLOY_PROCESS_LOG" 2>/dev/null || printf 'no Alloy host-process exporter logs\n'
   printf '\n=== darwin-exporter logs ===\n'
