@@ -1086,7 +1086,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                "expr": "(sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) ) or on() vector(0)",
+                "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "claude decisions"
                       }
                     },
@@ -1119,7 +1119,7 @@
               "transformations": []
             }
           },
-          "description": "Claude edit decisions and Codex tool calls on the same event-rate chart.",
+  "description": "Claude decisions observed and Codex tool calls on the same chart.",
           "id": 213,
           "links": [],
           "title": "Tooling Activity by Agent",
