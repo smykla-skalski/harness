@@ -11,6 +11,8 @@ extension HarnessMonitorAccessibility {
   public static let decisionContextPanel = "harness.decisions.context"
   public static let decisionAuditTrail = "harness.decisions.audit"
   public static let decisionsLiveTick = "harness.decisions.live-tick"
+  public static let decisionInspector = "harness.decisions.inspector"
+  public static let decisionInspectorMetadata = "harness.decisions.inspector.metadata"
 
   public static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
