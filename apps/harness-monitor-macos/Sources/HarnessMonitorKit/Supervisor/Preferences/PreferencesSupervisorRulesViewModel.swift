@@ -28,6 +28,7 @@ public final class PreferencesSupervisorRulesViewModel {
 
   @ObservationIgnored private var overridesByRuleID: [String: RuleOverrideState] = [:]
   @ObservationIgnored private var parameterValuesByKey: [String: String] = [:]
+  private var editorStates: [String: RuleEditorState] = [:]
 
   public init(rules: [any PolicyRule] = HarnessMonitorSupervisorRuleCatalog.makeRules()) {
     self.rules = rules.map(PreferencesSupervisorRuleDescriptor.init(rule:))
@@ -38,6 +39,11 @@ public final class PreferencesSupervisorRulesViewModel {
     if let firstRule {
       parameterValuesByKey = Self.defaultParameters(for: firstRule)
     }
+    editorStates = Dictionary(
+      uniqueKeysWithValues: self.rules.map { rule in
+        (rule.id, Self.builtInEditorState(for: rule))
+      }
+    )
   }
 
   public var selectedRule: PreferencesSupervisorRuleDescriptor? {
@@ -68,7 +74,88 @@ public final class PreferencesSupervisorRulesViewModel {
         )
       }
     )
+    for rule in rules {
+      if let override = overridesByRuleID[rule.id] {
+        editorStates[rule.id] = RuleEditorState(
+          enabled: override.enabled,
+          defaultBehavior: override.defaultBehavior,
+          parameterValues: Self.defaultParameters(for: rule)
+            .merging(override.parameters) { _, overrideValue in overrideValue }
+        )
+      } else {
+        editorStates[rule.id] = Self.builtInEditorState(for: rule)
+      }
+    }
     loadSelectedRule()
+  }
+
+  public func isRuleEnabled(_ ruleID: String) -> Bool {
+    editorStates[ruleID]?.enabled ?? true
+  }
+
+  public func setRuleEnabled(_ value: Bool, ruleID: String) {
+    guard var state = editorStates[ruleID] else { return }
+    state.enabled = value
+    editorStates[ruleID] = state
+    syncSelectedRuleState(ruleID: ruleID)
+  }
+
+  public func ruleDefaultBehavior(ruleID: String) -> RuleDefaultBehavior {
+    editorStates[ruleID]?.defaultBehavior
+      ?? rules.first(where: { $0.id == ruleID })?.defaultBehavior
+      ?? .cautious
+  }
+
+  public func setRuleDefaultBehavior(_ value: RuleDefaultBehavior, ruleID: String) {
+    guard var state = editorStates[ruleID] else { return }
+    state.defaultBehavior = value
+    editorStates[ruleID] = state
+    syncSelectedRuleState(ruleID: ruleID)
+  }
+
+  public func ruleParameterValue(for key: String, ruleID: String) -> String {
+    if let value = editorStates[ruleID]?.parameterValues[key] {
+      return value
+    }
+    return rules.first(where: { $0.id == ruleID })?
+      .parameters.fields.first(where: { $0.key == key })?.default ?? ""
+  }
+
+  public func setRuleParameterValue(_ value: String, for key: String, ruleID: String) {
+    guard var state = editorStates[ruleID] else { return }
+    state.parameterValues[key] = value
+    editorStates[ruleID] = state
+    syncSelectedRuleState(ruleID: ruleID)
+  }
+
+  public func resetRule(ruleID: String) {
+    guard let rule = rules.first(where: { $0.id == ruleID }) else { return }
+    editorStates[ruleID] = Self.builtInEditorState(for: rule)
+    syncSelectedRuleState(ruleID: ruleID)
+  }
+
+  public func makePolicyConfigRow(forRuleID ruleID: String) throws -> PolicyConfigRow {
+    guard
+      let rule = rules.first(where: { $0.id == ruleID }),
+      let state = editorStates[ruleID]
+    else {
+      throw PreferencesSupervisorRulesViewModelError.noRuleSelected
+    }
+    let parameters = Dictionary(
+      uniqueKeysWithValues: rule.parameters.fields.map { field in
+        (field.key, state.parameterValues[field.key] ?? field.default)
+      }
+    )
+    let data = try JSONSerialization.data(withJSONObject: parameters, options: [.sortedKeys])
+    guard let json = String(bytes: data, encoding: .utf8) else {
+      throw PreferencesSupervisorRulesViewModelError.invalidParametersEncoding
+    }
+    return PolicyConfigRow(
+      ruleID: rule.id,
+      enabled: state.enabled,
+      defaultBehavior: state.defaultBehavior.rawValue,
+      parametersJSON: json
+    )
   }
 
   public func parameterValue(for key: String) -> String {
@@ -117,13 +204,10 @@ public final class PreferencesSupervisorRulesViewModel {
       return
     }
 
-    if let override = overridesByRuleID[selectedRule.id] {
-      enabled = override.enabled
-      defaultBehavior = override.defaultBehavior
-      parameterValuesByKey =
-        Self.defaultParameters(for: selectedRule).merging(override.parameters) { _, newValue in
-          newValue
-        }
+    if let state = editorStates[selectedRule.id] {
+      enabled = state.enabled
+      defaultBehavior = state.defaultBehavior
+      parameterValuesByKey = state.parameterValues
       return
     }
 
@@ -134,6 +218,28 @@ public final class PreferencesSupervisorRulesViewModel {
     enabled = true
     defaultBehavior = rule.defaultBehavior
     parameterValuesByKey = Self.defaultParameters(for: rule)
+    editorStates[rule.id] = RuleEditorState(
+      enabled: true,
+      defaultBehavior: rule.defaultBehavior,
+      parameterValues: parameterValuesByKey
+    )
+  }
+
+  private func syncSelectedRuleState(ruleID: String) {
+    guard selectedRuleID == ruleID, let state = editorStates[ruleID] else { return }
+    enabled = state.enabled
+    defaultBehavior = state.defaultBehavior
+    parameterValuesByKey = state.parameterValues
+  }
+
+  private static func builtInEditorState(
+    for rule: PreferencesSupervisorRuleDescriptor
+  ) -> RuleEditorState {
+    RuleEditorState(
+      enabled: true,
+      defaultBehavior: rule.defaultBehavior,
+      parameterValues: Self.defaultParameters(for: rule)
+    )
   }
 
   private static func defaultParameters(
@@ -171,6 +277,12 @@ private struct RuleOverrideState {
   let enabled: Bool
   let defaultBehavior: RuleDefaultBehavior
   let parameters: [String: String]
+}
+
+private struct RuleEditorState {
+  var enabled: Bool
+  var defaultBehavior: RuleDefaultBehavior
+  var parameterValues: [String: String]
 }
 
 public enum PreferencesSupervisorRulesViewModelError: Error {

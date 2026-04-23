@@ -7,8 +7,8 @@ public struct PreferencesSupervisorRulesPane: View {
 
   @State private var viewModel = PreferencesSupervisorRulesViewModel()
   @State private var persistedRowsByRuleID: [String: PolicyConfigRow] = [:]
-  @State private var statusMessage: String?
-  @State private var errorMessage: String?
+  @State private var statusMessages: [String: String] = [:]
+  @State private var errorMessages: [String: String] = [:]
 
   public init(store: HarnessMonitorStore) {
     self.store = store
@@ -19,185 +19,31 @@ public struct PreferencesSupervisorRulesPane: View {
   }
 
   public var body: some View {
-    Group {
+    Form {
       if modelContext == nil {
-        ContentUnavailableView(
-          "Rules unavailable",
-          systemImage: "externaldrive.badge.exclamationmark",
-          description: Text("Rule overrides require a writable Monitor data store.")
-        )
+        Section {
+          ContentUnavailableView(
+            "Rules unavailable",
+            systemImage: "externaldrive.badge.exclamationmark",
+            description: Text("Rule overrides require a writable Monitor data store.")
+          )
+        }
       } else {
-        HSplitView {
-          sidebar
-            .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
-          editor
-            .frame(minWidth: 360, idealWidth: 480, maxWidth: .infinity)
+        ForEach(viewModel.rules) { rule in
+          SupervisorRuleSection(
+            rule: rule,
+            viewModel: viewModel,
+            status: statusMessages[rule.id],
+            error: errorMessages[rule.id],
+            onCommit: { persistRule(rule) },
+            onReset: { resetRule(rule) }
+          )
         }
       }
     }
+    .preferencesDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesSupervisorPane("rules"))
-    .task {
-      reloadRows()
-    }
-  }
-
-  private var sidebar: some View {
-    List(viewModel.rules, selection: selectedRuleBinding) { rule in
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text(rule.name)
-          .scaledFont(.body.bold())
-        Text(rule.id)
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .padding(.vertical, HarnessMonitorTheme.spacingXS)
-      .tag(rule.id)
-    }
-  }
-
-  private var editor: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        if let selectedRule = viewModel.selectedRule {
-          header(for: selectedRule)
-
-          Toggle("Enable rule", isOn: enabledBinding)
-
-          Picker("Default behavior", selection: defaultBehaviorBinding) {
-            Text("Cautious").tag(RuleDefaultBehavior.cautious)
-            Text("Aggressive").tag(RuleDefaultBehavior.aggressive)
-          }
-          .pickerStyle(.segmented)
-
-          if selectedRule.parameters.fields.isEmpty {
-            Text("This rule has no configurable parameters.")
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          } else {
-            VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-              Text("Parameters")
-                .scaledFont(.headline)
-              ForEach(selectedRule.parameters.fields, id: \.key) { field in
-                parameterEditor(for: field)
-              }
-            }
-          }
-
-          if let statusMessage {
-            Text(statusMessage)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.accent)
-          }
-          if let errorMessage {
-            Text(errorMessage)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.danger)
-          }
-
-          HStack(spacing: HarnessMonitorTheme.spacingSM) {
-            HarnessMonitorActionButton(
-              title: "Save",
-              variant: .prominent,
-              accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
-                "Supervisor Rules Save"
-              ),
-              action: saveSelectedRule
-            )
-            HarnessMonitorActionButton(
-              title: "Reset",
-              variant: .bordered,
-              accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
-                "Supervisor Rules Reset"
-              ),
-              action: resetSelectedRule
-            )
-          }
-        }
-      }
-      .padding()
-    }
-  }
-
-  private var selectedRuleBinding: Binding<String?> {
-    Binding(
-      get: { viewModel.selectedRuleID },
-      set: { newValue in
-        guard let newValue else {
-          return
-        }
-        statusMessage = nil
-        errorMessage = nil
-        viewModel.selectRule(id: newValue)
-      }
-    )
-  }
-
-  private var enabledBinding: Binding<Bool> {
-    Binding(
-      get: { viewModel.enabled },
-      set: { viewModel.enabled = $0 }
-    )
-  }
-
-  private var defaultBehaviorBinding: Binding<RuleDefaultBehavior> {
-    Binding(
-      get: { viewModel.defaultBehavior },
-      set: { viewModel.defaultBehavior = $0 }
-    )
-  }
-
-  private func header(for rule: PreferencesSupervisorRuleDescriptor) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(rule.name)
-        .scaledFont(.title3.bold())
-      Text(rule.id)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("Version \(rule.version) · \(rule.parameters.fields.count) parameter fields")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-  }
-
-  @ViewBuilder
-  private func parameterEditor(for field: PolicyParameterSchema.Field) -> some View {
-    switch field.kind {
-    case .boolean:
-      Toggle(field.label, isOn: booleanBinding(for: field.key))
-      Text("Default: \(field.default)")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    case .duration:
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        TextField(field.label, text: textBinding(for: field.key))
-          .textFieldStyle(.roundedBorder)
-        Text("Stored in seconds. Default: \(field.default)")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-    case .integer, .string:
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        TextField(field.label, text: textBinding(for: field.key))
-          .textFieldStyle(.roundedBorder)
-        Text("Default: \(field.default)")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-    }
-  }
-
-  private func textBinding(for key: String) -> Binding<String> {
-    Binding(
-      get: { viewModel.parameterValue(for: key) },
-      set: { viewModel.setParameterValue($0, for: key) }
-    )
-  }
-
-  private func booleanBinding(for key: String) -> Binding<Bool> {
-    Binding(
-      get: { Self.boolValue(from: viewModel.parameterValue(for: key)) },
-      set: { viewModel.setParameterValue($0 ? "true" : "false", for: key) }
-    )
+    .task { reloadRows() }
   }
 
   private func reloadRows() {
@@ -206,33 +52,26 @@ public struct PreferencesSupervisorRulesPane: View {
       viewModel.applyRows([])
       return
     }
-
     do {
-      let descriptor = FetchDescriptor<PolicyConfigRow>(
-        sortBy: [SortDescriptor(\.ruleID)]
-      )
+      let descriptor = FetchDescriptor<PolicyConfigRow>(sortBy: [SortDescriptor(\.ruleID)])
       let rows = try modelContext.fetch(descriptor)
       persistedRowsByRuleID = Dictionary(uniqueKeysWithValues: rows.map { ($0.ruleID, $0) })
       viewModel.applyRows(rows)
-      errorMessage = nil
+      errorMessages = [:]
     } catch {
       persistedRowsByRuleID = [:]
       viewModel.applyRows([])
-      errorMessage = error.localizedDescription
+      errorMessages = Dictionary(
+        uniqueKeysWithValues: viewModel.rules.map { ($0.id, error.localizedDescription) }
+      )
     }
   }
 
-  private func saveSelectedRule() {
-    guard
-      let modelContext,
-      let selectedRuleID = viewModel.selectedRuleID
-    else {
-      return
-    }
-
+  private func persistRule(_ rule: PreferencesSupervisorRuleDescriptor) {
+    guard let modelContext else { return }
     do {
-      let row = try viewModel.makePolicyConfigRow()
-      if let persistedRow = persistedRowsByRuleID[selectedRuleID] {
+      let row = try viewModel.makePolicyConfigRow(forRuleID: rule.id)
+      if let persistedRow = persistedRowsByRuleID[rule.id] {
         persistedRow.enabled = row.enabled
         persistedRow.defaultBehaviorRaw = row.defaultBehaviorRaw
         persistedRow.parametersJSON = row.parametersJSON
@@ -242,44 +81,195 @@ public struct PreferencesSupervisorRulesPane: View {
       }
       try modelContext.save()
       reloadRows()
-      statusMessage = "Saved rule override."
-      errorMessage = nil
-      Task {
-        await store.refreshSupervisorPolicyOverrides()
-      }
+      statusMessages[rule.id] = "Saved rule override."
+      errorMessages[rule.id] = nil
+      Task { await store.refreshSupervisorPolicyOverrides() }
     } catch {
-      statusMessage = nil
-      errorMessage = error.localizedDescription
+      statusMessages[rule.id] = nil
+      errorMessages[rule.id] = error.localizedDescription
     }
   }
 
-  private func resetSelectedRule() {
-    guard
-      let modelContext,
-      let selectedRuleID = viewModel.selectedRuleID
-    else {
-      return
-    }
-
-    if let persistedRow = persistedRowsByRuleID[selectedRuleID] {
+  private func resetRule(_ rule: PreferencesSupervisorRuleDescriptor) {
+    guard let modelContext else { return }
+    if let persistedRow = persistedRowsByRuleID[rule.id] {
       modelContext.delete(persistedRow)
       do {
         try modelContext.save()
       } catch {
-        statusMessage = nil
-        errorMessage = error.localizedDescription
+        statusMessages[rule.id] = nil
+        errorMessages[rule.id] = error.localizedDescription
         return
       }
     }
-
+    viewModel.resetRule(ruleID: rule.id)
     reloadRows()
-    viewModel.selectRule(id: selectedRuleID)
-    viewModel.resetSelectedRule()
-    statusMessage = "Reset to built-in defaults."
-    errorMessage = nil
-    Task {
-      await store.refreshSupervisorPolicyOverrides()
+    statusMessages[rule.id] = "Reset to built-in defaults."
+    errorMessages[rule.id] = nil
+    Task { await store.refreshSupervisorPolicyOverrides() }
+  }
+}
+
+private struct SupervisorRuleSection: View {
+  let rule: PreferencesSupervisorRuleDescriptor
+  let viewModel: PreferencesSupervisorRulesViewModel
+  let status: String?
+  let error: String?
+  let onCommit: () -> Void
+  let onReset: () -> Void
+
+  var body: some View {
+    Section {
+      Toggle(
+        "Enable rule",
+        isOn: Binding(
+          get: { viewModel.isRuleEnabled(rule.id) },
+          set: { value in
+            viewModel.setRuleEnabled(value, ruleID: rule.id)
+            onCommit()
+          }
+        )
+      )
+      .harnessNativeFormControl()
+
+      Picker(
+        "Default behavior",
+        selection: Binding(
+          get: { viewModel.ruleDefaultBehavior(ruleID: rule.id) },
+          set: { value in
+            viewModel.setRuleDefaultBehavior(value, ruleID: rule.id)
+            onCommit()
+          }
+        )
+      ) {
+        Text("Cautious").tag(RuleDefaultBehavior.cautious)
+        Text("Aggressive").tag(RuleDefaultBehavior.aggressive)
+      }
+      .pickerStyle(.segmented)
+      .harnessNativeFormControl()
+
+      if rule.parameters.fields.isEmpty {
+        LabeledContent("Parameters") {
+          Text("None").foregroundStyle(.secondary)
+        }
+      } else {
+        ForEach(rule.parameters.fields, id: \.key) { field in
+          SupervisorRuleParameterRow(
+            ruleID: rule.id,
+            field: field,
+            viewModel: viewModel,
+            onCommit: onCommit
+          )
+        }
+      }
+
+      Button("Reset to defaults", role: .destructive, action: onReset)
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesActionButton(
+            "Supervisor Rules Reset \(rule.id)"
+          )
+        )
+    } header: {
+      SupervisorRuleSectionHeader(rule: rule)
+    } footer: {
+      SupervisorRuleSectionFooter(status: status, error: error)
     }
+  }
+}
+
+private struct SupervisorRuleSectionHeader: View {
+  let rule: PreferencesSupervisorRuleDescriptor
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(rule.name)
+        .scaledFont(.headline)
+        .accessibilityAddTraits(.isHeader)
+      Text(rule.id)
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(.secondary)
+      Text("Version \(rule.version) · \(rule.parameters.fields.count) parameters")
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+private struct SupervisorRuleSectionFooter: View {
+  let status: String?
+  let error: String?
+
+  var body: some View {
+    if let error {
+      Text(error)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.danger)
+    } else if let status {
+      Text(status)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.accent)
+    } else {
+      EmptyView()
+    }
+  }
+}
+
+private struct SupervisorRuleParameterRow: View {
+  let ruleID: String
+  let field: PolicyParameterSchema.Field
+  let viewModel: PreferencesSupervisorRulesViewModel
+  let onCommit: () -> Void
+
+  var body: some View {
+    switch field.kind {
+    case .boolean:
+      LabeledContent(field.label) {
+        Toggle("", isOn: booleanBinding)
+          .labelsHidden()
+      }
+      .harnessNativeFormControl()
+      .help("Default: \(field.default)")
+    case .duration:
+      LabeledContent(field.label) {
+        TextField("", text: textBinding)
+          .textFieldStyle(.roundedBorder)
+          .labelsHidden()
+          .frame(minWidth: 140)
+          .onSubmit(onCommit)
+      }
+      .harnessNativeFormControl()
+      .help("Stored in seconds. Default: \(field.default)")
+    case .integer, .string:
+      LabeledContent(field.label) {
+        TextField("", text: textBinding)
+          .textFieldStyle(.roundedBorder)
+          .labelsHidden()
+          .frame(minWidth: 140)
+          .onSubmit(onCommit)
+      }
+      .harnessNativeFormControl()
+      .help("Default: \(field.default)")
+    }
+  }
+
+  private var textBinding: Binding<String> {
+    Binding(
+      get: { viewModel.ruleParameterValue(for: field.key, ruleID: ruleID) },
+      set: { viewModel.setRuleParameterValue($0, for: field.key, ruleID: ruleID) }
+    )
+  }
+
+  private var booleanBinding: Binding<Bool> {
+    Binding(
+      get: {
+        Self.boolValue(from: viewModel.ruleParameterValue(for: field.key, ruleID: ruleID))
+      },
+      set: { value in
+        viewModel.setRuleParameterValue(value ? "true" : "false", for: field.key, ruleID: ruleID)
+        onCommit()
+      }
+    )
   }
 
   private static func boolValue(from value: String) -> Bool {
