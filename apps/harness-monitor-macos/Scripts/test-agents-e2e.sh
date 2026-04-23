@@ -25,14 +25,13 @@ STATE_ROOT="${HARNESS_MONITOR_E2E_STATE_ROOT:-$STATE_ROOT_PARENT/$RUN_ID}"
 DATA_ROOT="${HARNESS_MONITOR_E2E_DATA_ROOT:-$STATE_ROOT/data-root}"
 DATA_HOME="$DATA_ROOT/data-home"
 LOG_ROOT="$STATE_ROOT/logs"
-WORKSPACE_ROOT="$STATE_ROOT/workspaces"
-TERMINAL_WORKSPACE="$WORKSPACE_ROOT/terminal"
-CODEX_WORKSPACE="$WORKSPACE_ROOT/codex"
 TERMINAL_SESSION_ID="sess-agents-e2e-terminal-${RUN_ID}"
 CODEX_SESSION_ID="sess-agents-e2e-codex-${RUN_ID}"
 DAEMON_LOG="$LOG_ROOT/daemon.log"
 BRIDGE_LOG="$LOG_ROOT/bridge.log"
-APPROVAL_FILE="$CODEX_WORKSPACE/approved.txt"
+E2E_PROJECT_DIR="${HARNESS_MONITOR_E2E_PROJECT_DIR:-$CHECKOUT_ROOT}"
+CODEX_WORKSPACE=""
+APPROVAL_FILE=""
 
 if [[ "$XCODEBUILD_RUNNER" != "$CANONICAL_XCODEBUILD_RUNNER" ]]; then
   echo "XCODEBUILD_RUNNER override is unsupported; use $CANONICAL_XCODEBUILD_RUNNER" >&2
@@ -64,7 +63,7 @@ if [[ -z "$CODEX_BINARY" ]]; then
   exit 1
 fi
 
-mkdir -p "$DATA_HOME" "$LOG_ROOT" "$TERMINAL_WORKSPACE" "$CODEX_WORKSPACE"
+mkdir -p "$DATA_HOME" "$LOG_ROOT"
 
 cleanup() {
   local status="$1"
@@ -143,7 +142,7 @@ EOF
 }
 
 run_harness() {
-  HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" "$@"
+  XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" "$@"
 }
 
 wait_for_daemon() {
@@ -247,17 +246,29 @@ start_bridge() {
 
 create_session() {
   local session_id="$1"
-  local workspace="$2"
-  local title="$3"
-  local context="$4"
+  local title="$2"
+  local context="$3"
 
   run_harness session start \
     --context "$context" \
     --title "$title" \
-    --runtime codex \
-    --project-dir "$workspace" \
+    --project-dir "$E2E_PROJECT_DIR" \
     --session-id "$session_id" \
     >/dev/null
+}
+
+resolve_session_workspace() {
+  local session_id="$1"
+  local workspace
+  workspace="$(
+    run_harness session status "$session_id" --json --project-dir "$E2E_PROJECT_DIR" \
+      | jq -r '.worktree_path'
+  )"
+  if [[ -z "$workspace" ]]; then
+    echo "Failed to resolve workspace for session $session_id" >&2
+    return 1
+  fi
+  printf '%s\n' "$workspace"
 }
 
 verify_nonempty_file() {
@@ -343,7 +354,7 @@ TEST_ARGS=(
   -derivedDataPath "$DERIVED_DATA_PATH"
 )
 
-"$XCODEBUILD_RUNNER" \
+HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}" \
   CODE_SIGNING_ALLOWED=NO \
   build-for-testing
@@ -373,17 +384,17 @@ start_bridge
 
 create_session \
   "$TERMINAL_SESSION_ID" \
-  "$TERMINAL_WORKSPACE" \
   "Agents E2E Terminal" \
   "Run the explicit monitor Agents end-to-end smoke for terminal-backed agents."
 
 create_session \
   "$CODEX_SESSION_ID" \
-  "$CODEX_WORKSPACE" \
   "Agents E2E Codex" \
   "Run the explicit monitor Agents end-to-end smoke for Codex threads."
+CODEX_WORKSPACE="$(resolve_session_workspace "$CODEX_SESSION_ID")"
+APPROVAL_FILE="$CODEX_WORKSPACE/approved.txt"
 
-if "$XCODEBUILD_RUNNER" \
+if HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   -xctestrun "$CONFIGURED_XCTESTRUN" \
   -destination "$DESTINATION" \
   CODE_SIGNING_ALLOWED=NO \
