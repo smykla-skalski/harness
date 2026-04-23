@@ -6,14 +6,258 @@
 # The Claude Code hook auto-wraps certain commands (xcodebuild, cargo, git, ...).
 # Scripts are matched by basename (so `rtk Scripts/run-quality-gates.sh` activates
 # the `harness-monitor-run-quality-gates` filter).
+#
+# Task-family coverage:
+# - check:stale / clean:stale -> harness-mise-stale-state
+# - version:* -> harness-mise-version
+# - check:scripts -> harness-mise-check-scripts
+# - cargo:env -> harness-mise-cargo-env
+# - check / test / install / mcp:test -> harness-mise-rust
+# - monitor:macos:* / preview:* -> monitor-specific filters below
+# - observability:* -> harness-mise-observability
+# - host-metrics:* -> harness-mise-host-metrics
+# - mcp:* composite lanes -> harness-mise-mcp
 schema_version = 1
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — stale-state preflight / cleanup
+# ---------------------------------------------------------------------------
+[filters.harness-mise-stale-state]
+description = "Compact stale-state mise tasks — keep actionable failures and cleanup actions"
+match_command = "^mise(\\s+run)?\\s+(check:stale|clean:stale)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^error: dev state is stale$",
+  "^  - ",
+  "^run 'mise run clean:stale' to reset$",
+  "^(killing|quitting|stopping|force-stopping|removing|wiping)\\b",
+  "^  wiped \\d+ bridge artifact\\(s\\) in ",
+  "^clean:stale complete$",
+  "^error: ",
+  "^warning: ",
+]
+max_lines = 80
+on_empty = "stale-state: ok"
+
+[[tests.harness-mise-stale-state]]
+name = "keeps stale failure bullets"
+input = """
+error: dev state is stale
+  - stale /tmp bridge sockets: /tmp/h-bridge-a.sock
+  - orphan local debug harness processes: 1234
+run 'mise run clean:stale' to reset
+"""
+expected = "error: dev state is stale\n  - stale /tmp bridge sockets: /tmp/h-bridge-a.sock\n  - orphan local debug harness processes: 1234\nrun 'mise run clean:stale' to reset"
+
+[[tests.harness-mise-stale-state]]
+name = "keeps cleanup actions"
+input = """
+quitting Harness Monitor app...
+stopping launchd daemon io.harnessmonitor.daemon...
+removing 2 stale /tmp bridge socket(s)...
+wiping stale bridge state files...
+  wiped 1 bridge artifact(s) in /Users/x/Library/Application Support/harness/daemon
+clean:stale complete
+"""
+expected = "quitting Harness Monitor app...\nstopping launchd daemon io.harnessmonitor.daemon...\nremoving 2 stale /tmp bridge socket(s)...\nwiping stale bridge state files...\n  wiped 1 bridge artifact(s) in /Users/x/Library/Application Support/harness/daemon\nclean:stale complete"
+
+[[tests.harness-mise-stale-state]]
+name = "empty returns on_empty"
+input = ""
+expected = "stale-state: ok"
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — version surfaces
+# ---------------------------------------------------------------------------
+[filters.harness-mise-version]
+description = "Compact version mise tasks — keep semver output and sync mismatches"
+match_command = "^mise(\\s+run)?\\s+version:(show|set|sync|sync:monitor|check)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^[0-9]+\\.[0-9]+\\.[0-9]+([-.][0-9A-Za-z.-]+)?$",
+  "^version sync check failed:$",
+  "^  - ",
+  "^invalid version: ",
+  "^show does not accept arguments$",
+  "^check does not accept arguments$",
+  "^sync does not accept arguments$",
+  "^sync-monitor does not accept arguments$",
+  "^set requires exactly one version argument$",
+]
+max_lines = 80
+on_empty = "version: ok"
+
+[[tests.harness-mise-version]]
+name = "keeps canonical version output"
+input = "0.3.1\n"
+expected = "0.3.1"
+
+[[tests.harness-mise-version]]
+name = "keeps sync mismatch bullets"
+input = """
+version sync check failed:
+  - testkit/Cargo.toml version 0.3.0 != Cargo.toml version 0.3.1
+  - apps/harness-monitor-macos/project.yml MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1
+"""
+expected = "version sync check failed:\n  - testkit/Cargo.toml version 0.3.0 != Cargo.toml version 0.3.1\n  - apps/harness-monitor-macos/project.yml MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1"
+
+[[tests.harness-mise-version]]
+name = "empty returns on_empty"
+input = ""
+expected = "version: ok"
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — script lint / syntax
+# ---------------------------------------------------------------------------
+[filters.harness-mise-check-scripts]
+description = "Compact check:scripts output — keep shellcheck and python diagnostics"
+match_command = "^mise(\\s+run)?\\s+check:scripts(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^In /.* line \\d+:$",
+  "^/.*:\\d+:\\d+: ",
+  "^\\s*\\^-- ",
+  "^Did you mean:$",
+  "^SyntaxError: ",
+  "^Sorry: ",
+  "^Traceback \\(most recent call last\\):$",
+  "^  File \".*\", line \\d+",
+  "^error: ",
+  "^warning: ",
+]
+max_lines = 80
+on_empty = "check:scripts: ok"
+
+[[tests.harness-mise-check-scripts]]
+name = "keeps shellcheck finding"
+input = """
+In /Users/x/scripts/foo.sh line 7:
+echo $x
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$x"
+"""
+expected = "In /Users/x/scripts/foo.sh line 7:\n     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.\nDid you mean:"
+
+[[tests.harness-mise-check-scripts]]
+name = "keeps python syntax error"
+input = """
+Traceback (most recent call last):
+  File "/Users/x/scripts/bar.py", line 12
+SyntaxError: invalid syntax
+"""
+expected = "Traceback (most recent call last):\n  File \"/Users/x/scripts/bar.py\", line 12\nSyntaxError: invalid syntax"
+
+[[tests.harness-mise-check-scripts]]
+name = "empty returns on_empty"
+input = ""
+expected = "check:scripts: ok"
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — cargo env dump
+# ---------------------------------------------------------------------------
+[filters.harness-mise-cargo-env]
+description = "Compact cargo:env output — keep resolved environment only"
+match_command = "^mise(\\s+run)?\\s+cargo:env(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^[A-Z_]+=",
+  "^error: ",
+  "^warning: ",
+]
+max_lines = 40
+on_empty = "cargo:env: ok"
+
+[[tests.harness-mise-cargo-env]]
+name = "keeps resolved env vars"
+input = """
+CARGO_TARGET_DIR=/Users/x/harness/target/dev/local
+CARGO_BUILD_JOBS=4
+SESSION_MODE=local
+TMPDIR=/var/folders/tmp/
+"""
+expected = "CARGO_TARGET_DIR=/Users/x/harness/target/dev/local\nCARGO_BUILD_JOBS=4\nSESSION_MODE=local\nTMPDIR=/var/folders/tmp/"
+
+[[tests.harness-mise-cargo-env]]
+name = "empty returns on_empty"
+input = ""
+expected = "cargo:env: ok"
+
+# ---------------------------------------------------------------------------
+# Root mise tasks — rust / cargo composite lanes
+# ---------------------------------------------------------------------------
+[filters.harness-mise-rust]
+description = "Compact root rust mise lanes — keep diagnostics, failed tests, install results"
+match_command = "^mise(\\s+run)?\\s+(test(?::(unit|integration|slow))?|check(?::agent-assets)?|lint:fix|install|mcp:test)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^version sync check failed:$",
+  "^error(\\[[A-Z0-9]+\\])?:",
+  "^warning: ",
+  "^note: ",
+  "^help: ",
+  "^\\s*--> /.*:\\d+:\\d+",
+  "^\\s*= (note|help):",
+  "^running \\d+ tests?$",
+  "^test [^ ]+ \\.\\.\\. FAILED$",
+  "^failures:$",
+  "^---- .* ----$",
+  "^thread '.*' panicked at ",
+  "^test result: (ok|FAILED)\\.",
+  "^error: test failed,",
+  "^error: could not compile ",
+  "^failed to resolve CARGO_TARGET_DIR via ",
+  "^installed harness ",
+  "^reconciled shadowed harness binary at ",
+  "^unable to reconcile shadowed harness binary path\\(s\\); clean them up before using `harness`:$",
+  "^  - /",
+]
+max_lines = 120
+on_empty = "rust mise lane: ok"
+
+[[tests.harness-mise-rust]]
+name = "keeps failing rust test context"
+input = """
+Compiling harness v0.3.1 (/Users/x/harness)
+running 2 tests
+test cli::tests::fails_fast ... FAILED
+
+failures:
+
+---- cli::tests::fails_fast stdout ----
+thread 'cli::tests::fails_fast' panicked at src/cli.rs:42:9:
+assertion failed: left == right
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+error: test failed, to rerun pass `--lib`
+"""
+expected = "running 2 tests\ntest cli::tests::fails_fast ... FAILED\nfailures:\n---- cli::tests::fails_fast stdout ----\nthread 'cli::tests::fails_fast' panicked at src/cli.rs:42:9:\ntest result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out\nerror: test failed, to rerun pass `--lib`"
+
+[[tests.harness-mise-rust]]
+name = "keeps install reconciliation summary"
+input = """
+warning: unable to stop existing CLI daemon; continuing binary install
+reconciled shadowed harness binary at /Users/x/.cargo/bin/harness -> /Users/x/.local/bin/harness
+installed harness 0.3.1 at /Users/x/.local/bin/harness
+"""
+expected = "warning: unable to stop existing CLI daemon; continuing binary install\nreconciled shadowed harness binary at /Users/x/.cargo/bin/harness -> /Users/x/.local/bin/harness\ninstalled harness 0.3.1 at /Users/x/.local/bin/harness"
+
+[[tests.harness-mise-rust]]
+name = "empty returns on_empty"
+input = ""
+expected = "rust mise lane: ok"
 
 # ---------------------------------------------------------------------------
 # Harness Monitor — apps/harness-monitor-macos quality gate
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-quality-gates]
 description = "Compact Harness Monitor quality-gates output (SwiftLint + Swift Format + xcodebuild)"
-match_command = "^run-quality-gates\\.sh(\\s|$)"
+match_command = "^(run-quality-gates\\.sh|mise(\\s+run)?\\s+monitor:macos:lint)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -31,6 +275,17 @@ keep_lines_matching = [
   # Sandbox / quality gate harness output
   "^=== Sandbox violations detected ===$",
   "^Sandbox violation:",
+  # Entitlement / bundle checks emitted by the shell script
+  "^swift is required on PATH$",
+  "^swiftlint is required on PATH$",
+  "^xcodebuild runner is not executable: ",
+  "^generate-project script is not executable: ",
+  "^missing .* entitlement:",
+  "^daemon still has temporary-exception entitlement$",
+  "^daemon missing user-selected.read-write$",
+  "^daemon missing bookmarks.app-scope$",
+  "^built app missing at ",
+  "^daemon binary missing at ",
   "^error: ",
   "^warning: ",
   "^fatal: ",
@@ -67,13 +322,13 @@ error: use of unresolved identifier 'foo'
 expected = "warning: variable 'x' was never used\nerror: use of unresolved identifier 'foo'\n** BUILD FAILED **"
 
 [[tests.harness-monitor-run-quality-gates]]
-name = "keeps swiftlint violations with path line col"
+name = "keeps bare entitlement failures"
 input = """
 ⚙️  Generating project...
-/Users/x/Sources/HarnessMonitorKit/Foo.swift:42:3: error: Attributes Violation: Attributes should be on their own lines (attributes)
-/Users/x/Sources/HarnessMonitorKit/Bar.swift:7:1: warning: File Length Violation: File should contain 420 lines or less: currently contains 456 (file_length)
+daemon missing bookmarks.app-scope
+built app missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app
 """
-expected = "/Users/x/Sources/HarnessMonitorKit/Foo.swift:42:3: error: Attributes Violation: Attributes should be on their own lines (attributes)\n/Users/x/Sources/HarnessMonitorKit/Bar.swift:7:1: warning: File Length Violation: File should contain 420 lines or less: currently contains 456 (file_length)"
+expected = "daemon missing bookmarks.app-scope\nbuilt app missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app"
 
 [[tests.harness-monitor-run-quality-gates]]
 name = "empty input returns on_empty"
@@ -86,7 +341,7 @@ expected = "run-quality-gates: ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-xcodebuild]
 description = "Aggressive xcodebuild filter for HarnessMonitor scheme — keep only diagnostics and verdict"
-match_command = "^xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor"
+match_command = "^(xcodebuild\\b.*-scheme\\s+[\"']?HarnessMonitor.*|xcodebuild-with-lock\\.sh(\\s|$)|mise(\\s+run)?\\s+(monitor:macos:(xcodebuild|build)|mcp:build:monitor)(\\s|$))"
 strip_ansi = true
 keep_lines_matching = [
   # Diagnostics (any path:line:col: error/warning/note:)
@@ -99,6 +354,7 @@ keep_lines_matching = [
   "^Test Suite '.*' (started|passed|failed)",
   "^Test Case '.*' (passed|failed)",
   "^Executed \\d+ tests?, with \\d+ failures?",
+  "^Testing failed:$",
   # Test-level assertion context
   "^\\s+XCTAssert",
   "^\\s+failed - ",
@@ -164,7 +420,7 @@ expected = "xcodebuild (HarnessMonitor): ok"
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-generate-project]
 description = "Compact XcodeGen output — keep warnings, errors, created-at path"
-match_command = "^generate-project\\.sh(\\s|$)"
+match_command = "^(generate-project\\.sh|mise(\\s+run)?\\s+monitor:macos:generate)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -210,8 +466,8 @@ expected = "generate-project: ok"
 # Swift test runner wrapper
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-test-swift]
-description = "Compact test-swift.sh output — keep test verdicts and failures"
-match_command = "^test-swift\\.sh(\\s|$)"
+description = "Compact test-swift.sh output — keep verdicts, diagnostics, and failures"
+match_command = "^(test-swift\\.sh|mise(\\s+run)?\\s+monitor:macos:test)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -221,6 +477,14 @@ keep_lines_matching = [
   "^\\*\\* (BUILD|TEST) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
   "^\\s+XCTAssert",
   "^\\s+failed - ",
+  "^=== Sandbox violations detected ===$",
+  "^Sandbox violation:",
+  "^missing .* entitlement:",
+  "^daemon still has temporary-exception entitlement$",
+  "^daemon missing user-selected.read-write$",
+  "^daemon missing bookmarks.app-scope$",
+  "^built app missing at ",
+  "^daemon binary missing at ",
   "^error: ",
   "^warning: ",
   "^fatal: ",
@@ -242,16 +506,131 @@ Executed 1 test, with 1 failure in 0.01 seconds
 expected = "Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).\n    XCTAssertEqual failed: (\"1\") is not equal to (\"2\")\nExecuted 1 test, with 1 failure in 0.01 seconds\n** TEST FAILED **"
 
 [[tests.harness-monitor-test-swift]]
+name = "keeps quality-gate bundle failures"
+input = """
+daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness
+"""
+expected = "daemon binary missing at /Users/x/xcode-derived/Build/Products/Debug/Harness Monitor.app/Contents/Helpers/harness"
+
+[[tests.harness-monitor-test-swift]]
 name = "empty returns on_empty"
 input = ""
 expected = "test-swift: ok"
+
+# ---------------------------------------------------------------------------
+# Harness Monitor script regression tests
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-test-scripts]
+description = "Compact monitor:test:scripts output — keep unittest failures and final verdict"
+match_command = "^mise(\\s+run)?\\s+monitor:macos:test:scripts(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^\\.+$",
+  "^Ran \\d+ tests? in ",
+  "^OK$",
+  "^FAILED \\(",
+  "^ERROR: ",
+  "^FAIL: ",
+  "^Traceback \\(most recent call last\\):$",
+  "^  File \".*\", line \\d+",
+  "^AssertionError: ",
+  "^ImportError: ",
+  "^error: ",
+]
+max_lines = 80
+on_empty = "monitor:test:scripts: ok"
+
+[[tests.harness-monitor-test-scripts]]
+name = "keeps unittest summary on success"
+input = """
+....
+Ran 4 tests in 0.019s
+
+OK
+"""
+expected = "....\nRan 4 tests in 0.019s\nOK"
+
+[[tests.harness-monitor-test-scripts]]
+name = "keeps traceback on failure"
+input = """
+FAIL: test_parse (test_parser.ParserTests.test_parse)
+Traceback (most recent call last):
+  File "/Users/x/apps/harness-monitor-macos/Scripts/tests/test_parser.py", line 42, in test_parse
+AssertionError: expected parse result
+FAILED (failures=1)
+"""
+expected = "FAIL: test_parse (test_parser.ParserTests.test_parse)\nTraceback (most recent call last):\n  File \"/Users/x/apps/harness-monitor-macos/Scripts/tests/test_parser.py\", line 42, in test_parse\nAssertionError: expected parse result\nFAILED (failures=1)"
+
+[[tests.harness-monitor-test-scripts]]
+name = "empty returns on_empty"
+input = ""
+expected = "monitor:test:scripts: ok"
+
+# ---------------------------------------------------------------------------
+# Harness Monitor explicit Agents e2e lane
+# ---------------------------------------------------------------------------
+[filters.harness-monitor-test-agents-e2e]
+description = "Compact explicit Agents e2e output — keep build/test verdicts and preserved-state hints"
+match_command = "^(test-agents-e2e\\.sh|mise(\\s+run)?\\s+monitor:macos:test:agents-e2e)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^/.*:\\d+:\\d+:\\s+(error|warning|note):",
+  "^Test (Suite|Case) ",
+  "^Executed \\d+ tests?,",
+  "^\\*\\* (BUILD|TEST) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
+  "^\\s+XCTAssert",
+  "^\\s+failed - ",
+  "^Agents e2e state preserved at: ",
+  "^Agents e2e data root preserved at: ",
+  "^--- daemon log tail ---$",
+  "^--- bridge log tail ---$",
+  "^Timed out waiting for (daemon|bridge) ",
+  "^Bridge exited before readiness$",
+  "^Bridge failed to start after \\d+ attempts$",
+  "^Unexpected approval file contents in ",
+  "^Expected non-empty file at ",
+  "^Failed to locate generated HarnessMonitorAgentsE2E \\.xctestrun file$",
+  "^codex binary not found in PATH; set HARNESS_MONITOR_E2E_CODEX_BINARY to run Agents e2e$",
+  "^error: ",
+  "^warning: ",
+]
+max_lines = 120
+on_empty = "test-agents-e2e: ok"
+
+[[tests.harness-monitor-test-agents-e2e]]
+name = "keeps preserved state hints on failure"
+input = """
+Bridge failed to start after 5 attempts
+Agents e2e state preserved at: /tmp/HarnessMonitorAgentsE2E/run-1
+Agents e2e data root preserved at: /tmp/HarnessMonitorAgentsE2E/run-1/data-root
+--- daemon log tail ---
+--- bridge log tail ---
+"""
+expected = "Bridge failed to start after 5 attempts\nAgents e2e state preserved at: /tmp/HarnessMonitorAgentsE2E/run-1\nAgents e2e data root preserved at: /tmp/HarnessMonitorAgentsE2E/run-1/data-root\n--- daemon log tail ---\n--- bridge log tail ---"
+
+[[tests.harness-monitor-test-agents-e2e]]
+name = "keeps xc test failure context"
+input = """
+Test Case '-[HarnessMonitorAgentsE2ETests testCodexThreadSteersAndApprovesThroughSandboxedBridge]' failed (8.01 seconds).
+    XCTAssertTrue failed - expected approval artifact
+Executed 1 test, with 1 failure in 8.01 seconds
+** TEST FAILED **
+"""
+expected = "Test Case '-[HarnessMonitorAgentsE2ETests testCodexThreadSteersAndApprovesThroughSandboxedBridge]' failed (8.01 seconds).\n    XCTAssertTrue failed - expected approval artifact\nExecuted 1 test, with 1 failure in 8.01 seconds\n** TEST FAILED **"
+
+[[tests.harness-monitor-test-agents-e2e]]
+name = "empty returns on_empty"
+input = ""
+expected = "test-agents-e2e: ok"
 
 # ---------------------------------------------------------------------------
 # Instruments / xctrace performance audit
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-instruments-audit]
 description = "Compact xctrace audit output — keep metric totals and threshold verdicts"
-match_command = "^run-instruments-audit\\.sh(\\s|$)"
+match_command = "^(run-instruments-audit\\.sh|mise(\\s+run)?\\s+monitor:macos:audit(:from-ref)?)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -293,38 +672,40 @@ expected = "run-instruments-audit: ok"
 # SwiftUI preview render / smoke helpers
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-preview-render]
-description = "Compact preview-render.sh output — keep rendered previews and failures"
-match_command = "^preview-render\\.sh(\\s|$)"
+description = "Compact preview-render.sh output — keep retry hints, failures, and rendered path"
+match_command = "^(preview-render\\.sh|mise(\\s+run)?\\s+preview:render)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
-  "^Rendered ",
-  "^Preview: ",
-  "^Saved ",
-  "^Timeout ",
-  "^error: ",
-  "^warning: ",
-  "^fatal: ",
-  "^\\*\\* ",
-  "^✅ ",
-  "^❌ ",
-  "^💥 ",
-  "^[0-9]+/[0-9]+ previews",
+  "^.*/tmp/previews/.*\\.png$",
+  "^warning: first attempt failed; resetting intermediates and retrying$",
+  "^info: resetting .* before retry$",
+  "^error: preview render failed for .*",
+  "^error: required tool '.*' not installed$",
+  "^error: preview file '.*' must be app-relative, repo-root-relative, or absolute within this repo$",
+  "^error: id '.*' not in .*Previews\\.json$",
+  "^error: manifest not found at ",
+  "^error: must pass --id <EntryID> or --file <path>$",
+  "^error: unknown arg '.*'$",
 ]
 max_lines = 60
 on_empty = "preview-render: ok"
 
 [[tests.harness-monitor-preview-render]]
-name = "keeps render results and final tally"
+name = "keeps retry hint and rendered path"
 input = """
-Starting XOJIT preview host...
-Compiling module...
-Rendered AgentTuiWindowView_Previews/Idle → tmp/previews/AgentTuiWindowView_Idle.png
-Rendered AgentTuiWindowView_Previews/Running → tmp/previews/AgentTuiWindowView_Running.png
-Timeout rendering FlakyPreview_Previews after 48s
-20/20 previews rendered
+warning: first attempt failed; resetting intermediates and retrying
+info: resetting /Users/x/apps/harness-monitor-macos/Build/Intermediates.noindex/HarnessMonitor.build before retry
+/Users/x/apps/harness-monitor-macos/tmp/previews/ContentView@0.png
 """
-expected = "Rendered AgentTuiWindowView_Previews/Idle → tmp/previews/AgentTuiWindowView_Idle.png\nRendered AgentTuiWindowView_Previews/Running → tmp/previews/AgentTuiWindowView_Running.png\nTimeout rendering FlakyPreview_Previews after 48s\n20/20 previews rendered"
+expected = "warning: first attempt failed; resetting intermediates and retrying\ninfo: resetting /Users/x/apps/harness-monitor-macos/Build/Intermediates.noindex/HarnessMonitor.build before retry\n/Users/x/apps/harness-monitor-macos/tmp/previews/ContentView@0.png"
+
+[[tests.harness-monitor-preview-render]]
+name = "keeps render failure"
+input = """
+error: preview render failed for ContentView@0 (see /Users/x/apps/harness-monitor-macos/tmp/previews/ContentView@0.json)
+"""
+expected = "error: preview render failed for ContentView@0 (see /Users/x/apps/harness-monitor-macos/tmp/previews/ContentView@0.json)"
 
 [[tests.harness-monitor-preview-render]]
 name = "empty returns on_empty"
@@ -332,38 +713,226 @@ input = ""
 expected = "preview-render: ok"
 
 [filters.harness-monitor-preview-smoke]
-description = "Compact preview-smoke.sh output — keep canonical preview verdicts"
-match_command = "^preview-smoke\\.sh(\\s|$)"
+description = "Compact preview-smoke.sh output — keep per-entry progress and final summary"
+match_command = "^(preview-smoke\\.sh|mise(\\s+run)?\\s+preview:smoke)(\\s|$)"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
-  "^Preview: ",
-  "^Canonical ",
-  "^[0-9]+/[0-9]+ previews",
+  "^---\\[[0-9]+/[0-9]+\\] .+---$",
+  "^preview smoke: [0-9]+/[0-9]+ passed in [0-9]+s \\(budget [0-9]+s\\)$",
+  "^summary: ",
+  "^PASS$",
+  "^FAIL: ",
   "^error: ",
   "^warning: ",
   "^fatal: ",
-  "^\\*\\* ",
-  "^✅ ",
-  "^❌ ",
-  "^💥 ",
 ]
-max_lines = 60
+max_lines = 80
 on_empty = "preview-smoke: ok"
 
 [[tests.harness-monitor-preview-smoke]]
-name = "keeps canonical preview counters"
+name = "keeps progress and final verdict"
 input = """
-Starting smoke test...
-Compiling...
-Canonical preview AgentTuiWindowView_Previews/Idle rendered
-Canonical preview AgentTuiWindowView_Previews/Running rendered
-20/20 previews rendered
-✅ smoke passed
+---[1/3] ContentView---
+---[2/3] SessionView---
+---[3/3] InspectorView---
+preview smoke: 3/3 passed in 42s (budget 600s)
+summary: /Users/x/apps/harness-monitor-macos/tmp/previews/summary.json
+PASS
 """
-expected = "Canonical preview AgentTuiWindowView_Previews/Idle rendered\nCanonical preview AgentTuiWindowView_Previews/Running rendered\n20/20 previews rendered\n✅ smoke passed"
+expected = "---[1/3] ContentView---\n---[2/3] SessionView---\n---[3/3] InspectorView---\npreview smoke: 3/3 passed in 42s (budget 600s)\nsummary: /Users/x/apps/harness-monitor-macos/tmp/previews/summary.json\nPASS"
+
+[[tests.harness-monitor-preview-smoke]]
+name = "keeps failing verdict"
+input = """
+preview smoke: 19/20 passed in 610s (budget 600s)
+summary: /Users/x/apps/harness-monitor-macos/tmp/previews/summary.json
+FAIL: elapsed 610s exceeds budget 600s
+"""
+expected = "preview smoke: 19/20 passed in 610s (budget 600s)\nsummary: /Users/x/apps/harness-monitor-macos/tmp/previews/summary.json\nFAIL: elapsed 610s exceeds budget 600s"
 
 [[tests.harness-monitor-preview-smoke]]
 name = "empty returns on_empty"
 input = ""
 expected = "preview-smoke: ok"
+
+# ---------------------------------------------------------------------------
+# Observability stack tasks
+# ---------------------------------------------------------------------------
+[filters.harness-mise-observability]
+description = "Compact observability mise tasks — keep readiness failures, service URLs, and smoke verdicts"
+match_command = "^mise(\\s+run)?\\s+observability:(start|stop|restart|status|logs|open|reset|wipe|smoke|restore-smoke-stack-fixture)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^NAME\\s+IMAGE\\s+COMMAND\\s+SERVICE\\s+CREATED\\s+STATUS\\s+PORTS$",
+  "^[A-Za-z0-9_.-]+\\s+[A-Za-z0-9_.:/-]+\\s+.*$",
+  "^[A-Za-z0-9_.-]+\\s+\\|\\s+",
+  "^(Grafana|Prometheus|Tempo|Loki|Pyroscope|Alloy|SQLite Exporter|Shared config|Grafana MCP Launcher): ",
+  "^Shared config paths:$",
+  "^https?://",
+  "^timed out waiting for ",
+  "^sqlite exporter cannot see ",
+  "^expected .* for observability smoke at ",
+  "^missing observability config: ",
+  "^start the local stack with scripts/observability\\.sh start first$",
+  "^failed to resolve .*",
+  "^configured harness smoke binary is not executable: ",
+  "^daemon did not exit cleanly; log follows$",
+  "^monitor smoke emitted a SwiftNIO shutdown warning$",
+  "^observability smoke passed$",
+  "^error: ",
+  "^warning: ",
+]
+max_lines = 120
+on_empty = "observability: ok"
+
+[[tests.harness-mise-observability]]
+name = "keeps endpoint summary on start"
+input = """
+grafana  grafana/grafana:12.1.0  "/run.sh"  grafana  3s ago  Up 2s  0.0.0.0:3000->3000/tcp
+Grafana: http://127.0.0.1:3000
+Prometheus: http://127.0.0.1:9090
+Tempo: http://127.0.0.1:3200
+Loki: http://127.0.0.1:3100
+Pyroscope: http://127.0.0.1:4040
+Alloy: http://127.0.0.1:12345
+SQLite Exporter: http://127.0.0.1:9560
+Shared config: /Users/x/Library/Application Support/harness/observability/config.json
+Grafana MCP Launcher: /Users/x/.local/bin/codex-grafana-mcp
+"""
+expected = "grafana  grafana/grafana:12.1.0  \"/run.sh\"  grafana  3s ago  Up 2s  0.0.0.0:3000->3000/tcp\nGrafana: http://127.0.0.1:3000\nPrometheus: http://127.0.0.1:9090\nTempo: http://127.0.0.1:3200\nLoki: http://127.0.0.1:3100\nPyroscope: http://127.0.0.1:4040\nAlloy: http://127.0.0.1:12345\nSQLite Exporter: http://127.0.0.1:9560\nShared config: /Users/x/Library/Application Support/harness/observability/config.json\nGrafana MCP Launcher: /Users/x/.local/bin/codex-grafana-mcp"
+
+[[tests.harness-mise-observability]]
+name = "keeps smoke timeout"
+input = """
+timed out waiting for Tempo traces for harness-cli
+"""
+expected = "timed out waiting for Tempo traces for harness-cli"
+
+[[tests.harness-mise-observability]]
+name = "empty returns on_empty"
+input = ""
+expected = "observability: ok"
+
+# ---------------------------------------------------------------------------
+# Host metrics tasks
+# ---------------------------------------------------------------------------
+[filters.harness-mise-host-metrics]
+description = "Compact host-metrics mise tasks — keep service actions, status, metrics, and failures"
+match_command = "^mise(\\s+run)?\\s+host-metrics:(install|uninstall|start|stop|restart|status|metrics|logs|build-darwin-exporter)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^=== ",
+  "^(installing|starting|stopping|building|writing|wrote|built|alloy|darwin-exporter|host metrics).*",
+  "^(status|config|logs|metrics|health|port): ",
+  "^(CPU usage|Load \\(1m\\)|Running processes|Tracked process groups|Top tracked RSS|Top tracked CPU|CPU temp|Battery health|WiFi RSSI|Thermal pressure): ",
+  "^[A-Za-z0-9_./-]+: (up|down|unknown|healthy|unhealthy)$",
+  "^prometheus not reachable at ",
+  "^required tool not found: ",
+  "^host-metrics commands are macOS-only$",
+  "^run: ",
+  "^warning: ",
+  "^error: ",
+]
+max_lines = 120
+on_empty = "host-metrics: ok"
+
+[[tests.harness-mise-host-metrics]]
+name = "keeps install and status summary"
+input = """
+installing grafana alloy via homebrew...
+wrote alloy config to /opt/homebrew/etc/alloy/config.alloy
+darwin-exporter installed and running on port 10102
+host metrics installation complete
+=== Grafana Alloy ===
+status: running
+config: /opt/homebrew/etc/alloy/config.alloy
+=== Prometheus Targets ===
+darwin-exporter: up
+"""
+expected = "installing grafana alloy via homebrew...\nwrote alloy config to /opt/homebrew/etc/alloy/config.alloy\ndarwin-exporter installed and running on port 10102\nhost metrics installation complete\n=== Grafana Alloy ===\nstatus: running\nconfig: /opt/homebrew/etc/alloy/config.alloy\n=== Prometheus Targets ===\ndarwin-exporter: up"
+
+[[tests.harness-mise-host-metrics]]
+name = "keeps metrics summary"
+input = """
+=== System Metrics (Alloy) ===
+CPU usage: 14.2%
+Load (1m): 2.10
+=== macOS Metrics (darwin-exporter) ===
+CPU temp: 58.0°C
+Battery health: 93%
+WiFi RSSI: -55 dBm
+Thermal pressure: nominal
+"""
+expected = "=== System Metrics (Alloy) ===\nCPU usage: 14.2%\nLoad (1m): 2.10\n=== macOS Metrics (darwin-exporter) ===\nCPU temp: 58.0°C\nBattery health: 93%\nWiFi RSSI: -55 dBm\nThermal pressure: nominal"
+
+[[tests.harness-mise-host-metrics]]
+name = "empty returns on_empty"
+input = ""
+expected = "host-metrics: ok"
+
+# ---------------------------------------------------------------------------
+# MCP tasks
+# ---------------------------------------------------------------------------
+[filters.harness-mise-mcp]
+description = "Compact MCP mise tasks — keep doctor verdicts, registration actions, socket readiness, and nested build failures"
+match_command = "^mise(\\s+run)?\\s+mcp:(build:input-helper|install|socket-path|serve|smoke|doctor|register-claude|wait-socket|launch:monitor|launch:dev|dev)(\\s|$)"
+strip_ansi = true
+filter_stderr = true
+keep_lines_matching = [
+  "^  (PASS|FAIL|WARN|•)  ",
+  "^OK: ",
+  "^FAIL: ",
+  "^socket ready at ",
+  "^registered harness-monitor in ",
+  "^removed harness-monitor from ",
+  "^harness-monitor not present in ",
+  "^\\.mcp\\.json.*",
+  "^launching with HARNESS_MONITOR_MCP_FORCE_ENABLE=1\\.\\.\\.$",
+  "^Harness Monitor\\.app is already running;.*",
+  "^Quit it first if you want to apply HARNESS_MONITOR_MCP_FORCE_ENABLE=1\\.$",
+  "^MCP install complete\\. Next steps:$",
+  "^  [1-3]\\. ",
+  "^Build complete! ",
+  "^/.*",
+  "^error(\\[[A-Z0-9]+\\])?:",
+  "^warning: ",
+  "^/.*:\\d+:\\d+:\\s+(error|warning|note):",
+  "^\\*\\* (BUILD|TEST|TEST BUILD|CLEAN|ANALYZE) (SUCCEEDED|FAILED|PASSED) \\*\\*$",
+  "^\\s*[{\\[}\\],]$",
+  "^\\s*\"(jsonrpc|id|result|error|protocolVersion|serverInfo|capabilities|tools|name|description|content|text)\":",
+]
+max_lines = 140
+on_empty = "mcp: ok"
+
+[[tests.harness-mise-mcp]]
+name = "keeps doctor summary"
+input = """
+Rust CLI
+  PASS  harness on PATH
+Input helpers
+  WARN  Swift helper missing, falling back to cliclick
+Registry socket
+  FAIL  socket not bound
+OK: 1 warning(s), no critical failures.
+"""
+expected = "  PASS  harness on PATH\n  WARN  Swift helper missing, falling back to cliclick\n  FAIL  socket not bound\nOK: 1 warning(s), no critical failures."
+
+[[tests.harness-mise-mcp]]
+name = "keeps install instructions and socket path"
+input = """
+Build complete! (1.93s)
+/Users/x/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/mcp/registry.sock
+MCP install complete. Next steps:
+  1. mise run mcp:launch:monitor
+  2. Cmd+, -> MCP -> enable the toggle
+  3. mise run mcp:smoke
+"""
+expected = "Build complete! (1.93s)\n/Users/x/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/mcp/registry.sock\nMCP install complete. Next steps:\n  1. mise run mcp:launch:monitor\n  2. Cmd+, -> MCP -> enable the toggle\n  3. mise run mcp:smoke"
+
+[[tests.harness-mise-mcp]]
+name = "empty returns on_empty"
+input = ""
+expected = "mcp: ok"
