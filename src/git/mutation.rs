@@ -27,7 +27,9 @@ pub(crate) fn create_linked_worktree(
     branch_name: &str,
     base_commit: &str,
 ) -> GitResult<()> {
-    let repo = open(repo_path)?;
+    let mut repo = open(repo_path)?;
+    repo.committer_or_set_generic_fallback()
+        .map_err(|error| GitError::mutation(repo_path, error))?;
     let common_dir = repo.common_dir().to_path_buf();
 
     let commit_id = repo
