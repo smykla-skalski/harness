@@ -5,12 +5,14 @@ import SwiftUI
 /// structure that mirrors the Preferences `NavigationSplitView` pattern. Phase 2 worker 19
 /// fills the sidebar and worker 20 fills the detail surface.
 public struct DecisionsWindowView: View {
+  @State private var selection: String?
+
   public init() {}
 
   public var body: some View {
     NavigationSplitView {
-      DecisionsSidebar()
-        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
+      DecisionsSidebar(decisions: [], selection: $selection)
+        .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
     } detail: {
       DecisionDetailView()
     }
