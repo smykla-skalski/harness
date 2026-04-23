@@ -35,14 +35,13 @@ public struct PreferencesMCPSection: View {
       } header: {
         Text("Accessibility Registry")
       } footer: {
-        Text(
+        HarnessMonitorMarkdownText(
           "When enabled, Harness Monitor binds a Unix-domain socket inside the "
             + "app-group container so the `harness mcp serve` MCP server can "
             + "enumerate windows and elements, click UI, and type text. "
-            + "Clients still need Accessibility permission in System Settings."
+            + "Clients still need Accessibility permission in System Settings.",
+          font: .footnote
         )
-        .scaledFont(.footnote)
-        .foregroundStyle(.secondary)
       }
     }
     .preferencesDetailFormStyle()
