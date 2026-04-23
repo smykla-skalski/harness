@@ -180,6 +180,9 @@ extension HarnessMonitorStore {
     guard !selectedCodexRuns.isEmpty || selectedCodexRun != nil else {
       return
     }
+    if let sessionID = selectedSessionID {
+      codexRunsBySessionID[sessionID] = []
+    }
     selectedCodexRuns = []
     selectedCodexRun = nil
   }
@@ -195,6 +198,10 @@ extension HarnessMonitorStore {
   }
 
   func applyCodexRun(_ run: CodexRunSnapshot, selectingRun: Bool = false) {
+    codexRunsBySessionID[run.sessionId] = upsertingCodexRun(
+      run,
+      into: codexRunsBySessionID[run.sessionId] ?? []
+    )
     guard run.sessionId == selectedSessionID else {
       return
     }
@@ -219,6 +226,7 @@ extension HarnessMonitorStore {
         try await client.codexRuns(sessionID: sessionID)
       }
       recordRequestSuccess()
+      codexRunsBySessionID[sessionID] = measuredRuns.value.runs
       guard selectedSessionID == sessionID else {
         return true
       }
@@ -243,6 +251,7 @@ extension HarnessMonitorStore {
         try await client.codexRuns(sessionID: sessionID)
       }
       recordRequestSuccess()
+      codexRunsBySessionID[sessionID] = measuredRuns.value.runs
       guard selectedSessionID == sessionID else {
         return
       }
