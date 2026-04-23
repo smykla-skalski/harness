@@ -116,6 +116,20 @@ public struct SupervisorNotificationPreferences: Equatable, Sendable {
     }
   }
 
+  public mutating func setAllowed(_ allowed: Bool, for severity: DecisionSeverity) {
+    if allowed {
+      enabledChannels[severity] = Self.defaultChannels[severity, default: []]
+    } else {
+      enabledChannels[severity] = []
+    }
+  }
+
+  public static func defaultChannels(
+    for severity: DecisionSeverity
+  ) -> Set<SupervisorNotificationChannel> {
+    defaultChannels[severity, default: []]
+  }
+
   private static let defaultChannels: [DecisionSeverity: Set<SupervisorNotificationChannel>] =
     makeDefaultChannels()
 
@@ -166,12 +180,21 @@ public final class PreferencesSupervisorNotificationsViewModel {
     preferences.save(to: userDefaults)
   }
 
+  public func allowsAny(for severity: DecisionSeverity) -> Bool {
+    preferences.allowsAnyDelivery(for: severity)
+  }
+
+  public func setAllowed(_ allowed: Bool, for severity: DecisionSeverity) {
+    preferences.setAllowed(allowed, for: severity)
+    preferences.save(to: userDefaults)
+  }
+
   public func enabledChannelsDescription(for severity: DecisionSeverity) -> String {
     let channels = SupervisorNotificationChannel.allCases.filter {
       preferences.isEnabled($0, for: severity)
     }
     if channels.isEmpty {
-      return "All channels disabled."
+      return "All channels disabled"
     }
     return channels.map(\.title).joined(separator: " · ")
   }
