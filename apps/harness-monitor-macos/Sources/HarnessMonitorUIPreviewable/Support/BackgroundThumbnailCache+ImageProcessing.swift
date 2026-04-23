@@ -3,7 +3,7 @@ import HarnessMonitorKit
 import ImageIO
 
 extension BackgroundThumbnailCache {
-  func thumbnailMaxPixelSize(for source: CGImageSource) -> Int? {
+  nonisolated func thumbnailMaxPixelSize(for source: CGImageSource) -> Int? {
     guard
       let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?,
       let width = properties[kCGImagePropertyPixelWidth] as? Int,
@@ -18,7 +18,7 @@ extension BackgroundThumbnailCache {
     return min(maxPixelSize, sourceMaxPixelSize)
   }
 
-  func opaqueRGBImage(from image: CGImage, maxPixelSize: Int?) -> CGImage? {
+  nonisolated func opaqueRGBImage(from image: CGImage, maxPixelSize: Int?) -> CGImage? {
     let targetSize = targetPixelSize(for: image, maxPixelSize: maxPixelSize)
     guard targetSize.width > 0, targetSize.height > 0 else { return nil }
 
@@ -52,7 +52,10 @@ extension BackgroundThumbnailCache {
     return context.makeImage()
   }
 
-  func targetPixelSize(for image: CGImage, maxPixelSize: Int?) -> (width: Int, height: Int) {
+  nonisolated func targetPixelSize(
+    for image: CGImage,
+    maxPixelSize: Int?
+  ) -> (width: Int, height: Int) {
     let sourceSize = (width: image.width, height: image.height)
     guard let maxPixelSize, maxPixelSize > 0 else { return sourceSize }
 
@@ -66,14 +69,14 @@ extension BackgroundThumbnailCache {
     )
   }
 
-  func cacheKey(for selection: HarnessMonitorBackgroundSelection) -> String {
+  nonisolated func cacheKey(for selection: HarnessMonitorBackgroundSelection) -> String {
     switch selection.source {
     case .bundled(let image): image.rawValue
     case .system(let wallpaper): wallpaper.id
     }
   }
 
-  func fileMtime(at path: String) -> TimeInterval? {
+  nonisolated func fileMtime(at path: String) -> TimeInterval? {
     guard
       let attributes = try? FileManager.default.attributesOfItem(atPath: path),
       let date = attributes[.modificationDate] as? Date
