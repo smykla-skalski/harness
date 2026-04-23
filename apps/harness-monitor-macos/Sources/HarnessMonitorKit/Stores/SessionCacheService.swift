@@ -87,6 +87,56 @@ public actor SessionCacheService {
     return result
   }
 
+  func loadSessionDetails(
+    sessionIDs: [String]
+  ) -> [String: CachedSessionSnapshot] {
+    let startedAt = ContinuousClock.now
+    guard !sessionIDs.isEmpty else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_details", hit: false, durationMs: durationMs
+      )
+      return [:]
+    }
+
+    let context = makeContext()
+    let descriptor = FetchDescriptor<CachedSession>(
+      predicate: #Predicate { sessionIDs.contains($0.sessionId) }
+    )
+    guard let cached = try? context.fetch(descriptor), !cached.isEmpty else {
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_details", hit: false, durationMs: durationMs
+      )
+      return [:]
+    }
+
+    let snapshots = Dictionary(
+      uniqueKeysWithValues: cached.map { session in
+        (
+          session.sessionId,
+          CachedSessionSnapshot(
+            detail: session.toSessionDetail(),
+            timeline: session.timelineEntries
+              .map { $0.toTimelineEntry() }
+              .sorted { left, right in
+                if left.recordedAt != right.recordedAt {
+                  return left.recordedAt > right.recordedAt
+                }
+                return left.entryId > right.entryId
+              },
+            timelineWindow: session.decodedTimelineWindow()
+          )
+        )
+      }
+    )
+    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+    HarnessMonitorTelemetry.shared.recordCacheRead(
+      operation: "load_session_details", hit: true, durationMs: durationMs
+    )
+    return snapshots
+  }
+
   func loadSessionList() -> (
     sessions: [SessionSummary],
     projects: [ProjectSummary]

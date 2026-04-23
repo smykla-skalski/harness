@@ -11,7 +11,7 @@ final class SupervisorServiceTests: XCTestCase {
   @MainActor
   func test_singleTickBuildsSnapshotFromStore() async throws {
     let clock = TestClock()
-    let store = HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
     let registry = PolicyRegistry()
     await registry.register(NoopRule(id: "test.noop"))
     let observer = SpyObserver()
@@ -30,7 +30,7 @@ final class SupervisorServiceTests: XCTestCase {
     let snapshots = await observer.snapshots
     XCTAssertEqual(snapshots.count, 1, "store-backed tick should notify observers once")
     XCTAssertEqual(snapshots[0].sessions.count, 2, "snapshot should include fixture sessions")
-    XCTAssertEqual(snapshots[0].connection.kind, "sse")
+    XCTAssertEqual(snapshots[0].connection.kind, "ws")
   }
 
   func test_singleTickEvaluatesAndDispatches() async throws {

@@ -119,6 +119,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
   var selectionTask: Task<Void, Never>?
+  var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   @ObservationIgnored var pendingListSelectionTask: Task<Void, Never>?
   @ObservationIgnored var pendingListSelectionTaskToken: UInt64 = 0
   @ObservationIgnored var selectedTimelinePageLoadTask: Task<Void, Never>?
