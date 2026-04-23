@@ -351,9 +351,12 @@ private func crowdedAuditEvents() -> [SupervisorEvent] {
   } detail: {
     DecisionDetailView(
       decision: selected,
-      auditEvents: auditEvents,
-      liveTick: liveTick
+      auditEvents: auditEvents
     )
+    .inspector(isPresented: .constant(true)) {
+      DecisionInspector(decision: selected, liveTick: liveTick)
+        .inspectorColumnWidth(min: 260, ideal: 320, max: 420)
+    }
   }
   .navigationSplitViewStyle(.balanced)
   .frame(width: 1_200, height: 820)

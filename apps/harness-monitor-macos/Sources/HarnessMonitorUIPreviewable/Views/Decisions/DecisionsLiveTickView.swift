@@ -1,17 +1,21 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Collapsible live-tick view showing last snapshot id, tick latency (rolling p50/p95), active
-/// observer count, and quarantined rules.
+/// Live-tick view showing last snapshot id, tick latency (rolling p50/p95), active observer
+/// count, and quarantined rules. `chrome: true` (default) wraps the metrics in a card surface;
+/// `chrome: false` is used inside the inspector column where the column itself provides the
+/// surface and stacking another card would double-paint glass on glass.
 public struct DecisionsLiveTickView: View {
   private let snapshot: DecisionLiveTickSnapshot
+  private let chrome: Bool
 
-  public init(snapshot: DecisionLiveTickSnapshot = .placeholder) {
+  public init(snapshot: DecisionLiveTickSnapshot = .placeholder, chrome: Bool = true) {
     self.snapshot = snapshot
+    self.chrome = chrome
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    let metrics = VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Grid(alignment: .leading, horizontalSpacing: HarnessMonitorTheme.spacingLG) {
         GridRow {
           LiveTickMetricCell(title: "Last Snapshot", value: snapshot.lastSnapshotID ?? "n/a")
@@ -35,15 +39,24 @@ public struct DecisionsLiveTickView: View {
         }
       }
     }
-    .padding(HarnessMonitorTheme.cardPadding)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.04))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
+
+    return Group {
+      if chrome {
+        metrics
+          .padding(HarnessMonitorTheme.cardPadding)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background {
+            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+              .fill(HarnessMonitorTheme.ink.opacity(0.04))
+          }
+          .overlay {
+            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+              .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
+          }
+      } else {
+        metrics
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsLiveTick)
