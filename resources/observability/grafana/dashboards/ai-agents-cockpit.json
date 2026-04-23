@@ -119,7 +119,68 @@
                   },
                   "unit": "currencyUSD"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gemini\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#B877D9"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -204,7 +265,38 @@
                   },
                   "unit": "short"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -288,7 +380,38 @@
                   },
                   "unit": "short"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -372,7 +495,68 @@
                   },
                   "unit": "short"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gemini\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#B877D9"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -456,7 +640,53 @@
                   },
                   "unit": "short"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -540,7 +770,68 @@
                   },
                   "unit": "percent"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gemini\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#B877D9"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -626,7 +917,68 @@
                   },
                   "unit": "percent"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gemini\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#B877D9"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -710,7 +1062,68 @@
                   },
                   "unit": "ms"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^claude\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#FF9830"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#5794F2"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^gemini\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#B877D9"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "colorMode": "value",
@@ -797,16 +1210,36 @@
                     "refId": "C",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval])) or on() vector(0)",
+                        "legendFormat": "gemini"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude sessions, Codex thread starts, and Copilot agent runs shown together for direct workload comparison.",
+          "description": "Claude sessions, Codex thread starts, Copilot agent runs, and Gemini chat spans shown together as each agent's primary activity signal.",
           "id": 209,
           "links": [],
-          "title": "Sessions, Threads, and Runs by Agent",
+          "title": "Primary Activity by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -881,16 +1314,56 @@
                     "refId": "B",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]))",
+                        "legendFormat": "copilot"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]))",
+                        "legendFormat": "gemini"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude and Codex token usage aligned on the same chart.",
+          "description": "Claude and Codex token usage plus Copilot and Gemini chat span volume aligned on the same chart.",
           "id": 210,
           "links": [],
-          "title": "Tokens by Agent",
+          "title": "Tokens and Prompt Activity by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -965,13 +1438,53 @@
                     "refId": "B",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "(100 * ((sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",status_code!=\"STATUS_CODE_ERROR\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
+                        "legendFormat": "copilot success %"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "(100 * ((sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",status_code!=\"STATUS_CODE_ERROR\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
+                        "legendFormat": "gemini success %"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude acceptance and Codex tool success rates tracked together.",
+          "description": "Claude acceptance plus Codex, Copilot, and Gemini success signals tracked together.",
           "id": 211,
           "links": [],
           "title": "Reliability Signals",
@@ -1069,13 +1582,33 @@
                     "refId": "C",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "legendFormat": "gemini :: {{pretty_model}}"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude and Codex token volume plus Copilot chat activity, grouped by normalized model name.",
+          "description": "Claude and Codex token volume plus Copilot and Gemini chat activity, grouped by normalized model name.",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -1173,16 +1706,36 @@
                     "refId": "C",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval])) or on() vector(0)",
+                        "legendFormat": "gemini"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude decisions, Codex tool calls, and Copilot tool calls on the same chart.",
+          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini chat spans on the same chart.",
           "id": 213,
           "links": [],
-          "title": "Tooling Activity by Agent",
+          "title": "Tooling and Prompt Activity by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1277,13 +1830,33 @@
                     "refId": "C",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)",
+                        "legendFormat": "gemini"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Tempo span totals over the selected range, normalized to Claude, Codex, and Copilot.",
+          "description": "Tempo span totals over the selected range, normalized to Claude, Codex, Copilot, and Gemini.",
           "id": 214,
           "links": [],
           "title": "Trace Volume by Agent",
@@ -1381,13 +1954,33 @@
                     "refId": "C",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
+                        "legendFormat": "gemini :: {{pretty_span}}"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Highest-volume trace spans over the selected range for Claude, Codex, and Copilot.",
+          "description": "Highest-volume trace spans over the selected range for Claude, Codex, Copilot, and Gemini.",
           "id": 215,
           "links": [],
           "title": "Top Trace Spans by Agent",
@@ -1733,6 +2326,342 @@
                     ]
                   },
                   "unit": "ms"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-20": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Gemini trace span volume over the selected range.",
+          "id": 220,
+          "links": [],
+          "title": "Gemini Trace Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-21": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Current Gemini span throughput from Tempo spanmetrics.",
+          "id": 221,
+          "links": [],
+          "title": "Gemini Span Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  "unit": "ops"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-22": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Gemini chat spans over the selected range.",
+          "id": 222,
+          "links": [],
+          "title": "Gemini Chat Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-23": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "count(count by (span_name) (traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"})) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Distinct Gemini span names currently exposed through Tempo spanmetrics.",
+          "id": 223,
+          "links": [],
+          "title": "Gemini Span Names",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 15
+                      }
+                    ]
+                  },
+                  "unit": "short"
                 },
                 "overrides": []
               },
@@ -3434,6 +4363,535 @@
           }
         }
       },
+      "gemini-panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Gemini trace span volume over selected time range.",
+          "id": 401,
+          "links": [],
+          "title": "Trace Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Current Gemini span throughput from Tempo spanmetrics.",
+          "id": 402,
+          "links": [],
+          "title": "Span Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  "unit": "ops"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Observed Gemini chat spans over selected time range.",
+          "id": 403,
+          "links": [],
+          "title": "Chat Spans",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "count(count by (span_name) (traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"})) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Distinct Gemini span names currently exposed through Tempo spanmetrics.",
+          "id": 404,
+          "links": [],
+          "title": "Span Names",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 15
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "legendFormat": "gemini :: {{pretty_model}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Gemini chat span activity grouped by normalized model name.",
+          "id": 405,
+          "links": [],
+          "title": "Model Activity",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(10, sum by (service, span_name) (increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])))",
+                        "legendFormat": "{{service}} :: {{span_name}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Highest-volume Gemini trace spans over the selected range.",
+          "id": 406,
+          "links": [],
+          "title": "Top Trace Spans",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "loki"
+                      },
+                      "group": "loki",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "{service_name=~\"gemini|gemini-cli\",detected_level=~\"${level:regex}\"} | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
+                        "queryType": "range"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Structured Gemini OTEL logs from Loki for the selected level.",
+          "id": 407,
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore",
+              "oneClick": true
+            }
+          ],
+          "title": "Gemini Logs",
+          "vizConfig": {
+            "group": "logs",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              },
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              }
+            },
+            "version": ""
+          }
+        }
+      },
       "panel-14": {
         "kind": "Panel",
         "spec": {
@@ -3628,13 +5086,33 @@
                     },
                     "refId": "C"
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "legendFormat": "gemini :: {{pretty_model}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "D"
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": []
             }
           },
-          "description": "Claude and Codex token volume plus Copilot chat activity, grouped by normalized model name.",
+          "description": "Claude and Codex token volume plus Copilot and Gemini chat activity, grouped by normalized model name.",
           "id": 16,
           "links": [],
           "title": "Model Activity by Agent",
@@ -5447,6 +6925,58 @@
                       "spec": {
                         "x": 0,
                         "y": 12,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-20"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 6,
+                        "y": 12,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-21"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 12,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-22"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 12,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cockpit-panel-23"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 16,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5459,7 +6989,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 12,
+                        "y": 16,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5472,7 +7002,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 20,
+                        "y": 24,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5485,7 +7015,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 20,
+                        "y": 24,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5498,7 +7028,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 28,
+                        "y": 32,
                         "width": 24,
                         "height": 8,
                         "element": {
@@ -5511,7 +7041,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 36,
+                        "y": 40,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5524,7 +7054,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 36,
+                        "y": 40,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -5552,8 +7082,7 @@
                         "layout": {
                           "kind": "AutoGridLayout",
                           "spec": {
-                            "columnWidth": 220,
-                            "columnWidthMode": "custom",
+                            "columnWidthMode": "standard",
                             "fillScreen": true,
                             "items": [
                               {
@@ -5993,8 +7522,7 @@
                         "layout": {
                           "kind": "AutoGridLayout",
                           "spec": {
-                            "columnWidth": 220,
-                            "columnWidthMode": "custom",
+                            "columnWidthMode": "standard",
                             "fillScreen": true,
                             "items": [
                               {
@@ -6143,6 +7671,149 @@
                           "kind": "AutoGridLayout",
                           "spec": {
                             "columnWidthMode": "standard",
+                            "fillScreen": true,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-1"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-2"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-3"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-4"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 4,
+                            "rowHeightMode": "short"
+                          }
+                        },
+                        "title": "Summary KPIs"
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-5"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-6"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 2,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Tracing"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Gemini Overview"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "gemini-panel-7"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 1,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Structured OTEL Events"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Gemini Logs"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
                             "fillScreen": false,
                             "items": [
                               {
@@ -6230,6 +7901,7 @@
       "claude",
       "copilot",
       "codex",
+      "gemini",
       "global",
       "observability"
     ],
@@ -6758,6 +8430,14 @@
           "options": [],
           "query": "debug,info,warn,error",
           "skipUrlSync": false
+        }
+      }
+    ],
+    "preload": true
+  },
+  "status": {}
+}
+ "skipUrlSync": false
         }
       }
     ],
