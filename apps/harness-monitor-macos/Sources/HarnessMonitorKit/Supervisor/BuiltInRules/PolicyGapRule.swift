@@ -80,7 +80,7 @@ public struct PolicyGapRule: PolicyRule {
   public init() {}
 
   public func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior {
-    _ = actionKey
+    if actionKey.hasPrefix("decision:") { return .cautious }
     return .aggressive
   }
 
