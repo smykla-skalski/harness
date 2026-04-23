@@ -92,6 +92,23 @@ final class DecisionStoreTests: XCTestCase {
     XCTAssertEqual(open.count, 1)
   }
 
+  func test_expirePreservesResolvedAndDismissedRows() async throws {
+    let store = try DecisionStore.makeInMemory()
+    try await seedExpirableRows(into: store)
+
+    let removed = try await store.expire(beforeAge: -1)
+    let open = try await store.decision(id: "open")
+    let snoozed = try await store.decision(id: "snoozed")
+    let resolved = try await store.decision(id: "resolved")
+    let dismissed = try await store.decision(id: "dismissed")
+
+    XCTAssertEqual(removed, 2, "expire should only delete unresolved rows")
+    XCTAssertNil(open)
+    XCTAssertNil(snoozed)
+    XCTAssertEqual(resolved?.statusRaw, "resolved")
+    XCTAssertEqual(dismissed?.statusRaw, "dismissed")
+  }
+
   func test_openCountBySeverity() async throws {
     let store = try DecisionStore.makeInMemory()
     try await store.insert(.fixture(id: "d1", severity: .info))
@@ -150,6 +167,31 @@ final class DecisionStoreTests: XCTestCase {
     let kinds = await collector.snapshot()
     XCTAssertEqual(Set(kinds), Set([.snoozed, .resolved, .dismissed, .expired]))
   }
+
+  func test_expireEmitsEventsOnlyForDeletedRows() async throws {
+    let store = try DecisionStore.makeInMemory()
+    try await seedExpirableRows(into: store)
+
+    let collector = EventCollector()
+    let expectation = expectation(description: "receives unresolved expiry events only")
+    let task = Task {
+      for await event in store.events where event.kind == .expired {
+        let total = await collector.append(event.kind)
+        if total == 2 {
+          expectation.fulfill()
+          break
+        }
+      }
+    }
+
+    let removed = try await store.expire(beforeAge: -1)
+
+    await fulfillment(of: [expectation], timeout: 2.0)
+    task.cancel()
+    XCTAssertEqual(removed, 2)
+    let kinds = await collector.snapshot()
+    XCTAssertEqual(kinds, [.expired, .expired])
+  }
 }
 
 private actor EventCollector {
@@ -161,4 +203,17 @@ private actor EventCollector {
   }
 
   func snapshot() -> [DecisionStore.DecisionEvent.Kind] { kinds }
+}
+
+private func seedExpirableRows(into store: DecisionStore) async throws {
+  try await store.insert(.fixture(id: "open"))
+  try await store.insert(.fixture(id: "snoozed"))
+  try await store.insert(.fixture(id: "resolved"))
+  try await store.insert(.fixture(id: "dismissed"))
+  try await store.snooze(id: "snoozed", until: Date().addingTimeInterval(300))
+  try await store.resolve(
+    id: "resolved",
+    outcome: DecisionOutcome(chosenActionID: "ack", note: "keep for history")
+  )
+  try await store.dismiss(id: "dismissed")
 }
