@@ -414,6 +414,7 @@
 		AC65AB212F252723C0696D06 /* PolicyConfigOverride.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5A8819E3FCDE71FA61D9FB /* PolicyConfigOverride.swift */; };
 		AC8563C47E530CB2C2DEDFBC /* PolicyGapRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F2CE37D91944F7075659E12 /* PolicyGapRule.swift */; };
 		ACB4E5CDCB95446B94E3A12C /* ContentViewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088E0CF5BBA60BA62E684971 /* ContentViewSupport.swift */; };
+		AD0D4BA3911855C22EC9CD26 /* PolicyExecutorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C1E3FA688555176EB8555F /* PolicyExecutorTests.swift */; };
 		ADA33FF3C5E86A0810F31825 /* HarnessMonitorStore+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10E1481437BD4742C54F7E9 /* HarnessMonitorStore+Diagnostics.swift */; };
 		ADE885FF8A2C44E41AED0C26 /* HarnessMonitorStore+DaemonControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157ECE4C4CA679D1C54FC4CF /* HarnessMonitorStore+DaemonControl.swift */; };
 		ADF102401308D6AFEBDCA095 /* HarnessMonitorStore+SelectionTimelinePaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755A65FB49DC1C394965A7B4 /* HarnessMonitorStore+SelectionTimelinePaging.swift */; };
@@ -929,6 +930,7 @@
 		4678C0419B4E42D681ED4F27 /* HarnessMonitorStoreFeedbackForwardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreFeedbackForwardTests.swift; sourceTree = "<group>"; };
 		469939496F2EC1C20C4D628B /* PreviewFixtures+SingleAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreviewFixtures+SingleAgent.swift"; sourceTree = "<group>"; };
 		47206BA6ED1A21BD23207C6E /* HarnessMonitorTelemetry+BufferedExporters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorTelemetry+BufferedExporters.swift"; sourceTree = "<group>"; };
+		47C1E3FA688555176EB8555F /* PolicyExecutorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyExecutorTests.swift; sourceTree = "<group>"; };
 		47E9331FBDE3FEEC0C7DBAE8 /* PreferencesActionButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesActionButtons.swift; sourceTree = "<group>"; };
 		4867E04ECF63D0A2715695EF /* CachedModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedModelsTests.swift; sourceTree = "<group>"; };
 		48B17387C1C91F9AEF2B4668 /* PersistenceIntegrationTestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceIntegrationTestHarness.swift; sourceTree = "<group>"; };
@@ -1430,7 +1432,7 @@
 		0270B78FDF370D7590620E80 /* Supervisor */ = {
 			isa = PBXGroup;
 			children = (
-				0444C7BF070941E7285EAB79 /* PolicyRegistryTests.swift */,
+				47C1E3FA688555176EB8555F /* PolicyExecutorTests.swift */,
 				7CA208A19A3A3AC0B9415B8A /* SupervisorTelemetryTests.swift */,
 				42C5D59F57F68B72980D7E54 /* SwiftDataSchemaV7Tests.swift */,
 				536D4C5794CB004C2D2D09E5 /* TestSupport */,
@@ -2891,7 +2893,7 @@
 				E919E31C6D44EA1D6C712BF3 /* PersistenceSnapshotIntegrationTests+Ordering.swift in Sources */,
 				A7069CDCA0EF1850476AEBE4 /* PersistenceSnapshotIntegrationTests.swift in Sources */,
 				293298424C14724193DC78F0 /* PersistenceUserDataIntegrationTests.swift in Sources */,
-				D4B02A3FD43FB2646DA6BF56 /* PolicyRegistryTests.swift in Sources */,
+				AD0D4BA3911855C22EC9CD26 /* PolicyExecutorTests.swift in Sources */,
 				AF27C4689989F69300B33449 /* PresentedSheetTests.swift in Sources */,
 				5E5A70CFBF5648EB9CCA7732 /* RecordingDaemonController.swift in Sources */,
 				41F1466B59622244818900A5 /* RecordingHarnessClient+AgentTui.swift in Sources */,
