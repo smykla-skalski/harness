@@ -159,7 +159,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -171,7 +171,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions observed over the selected time range.",
+  "description": "Current Claude sessions reporting telemetry.",
           "id": 202,
           "links": [],
           "title": "Claude Sessions",
@@ -496,7 +496,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(max_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__range])) or on() vector(0)) / clamp_min((sum(max_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)), 1))"
+                        "expr": "100 * ((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)), 1))"
                       }
                     },
                     "refId": "A",
@@ -750,7 +750,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)",
                         "legendFormat": "claude"
                       }
                     },
@@ -918,7 +918,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))) or on() vector(0)",
+                        "expr": "(100 * ((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))) or on() vector(0)",
                         "legendFormat": "claude accept %"
                       }
                     },
@@ -1486,7 +1486,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (terminal_type) (max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "count by (terminal_type) (count by (session_id, terminal_type) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)",
                         "legendFormat": "{{terminal_type}}"
                       },
                       "version": "v0"
@@ -1499,7 +1499,7 @@
               "transformations": []
             }
           },
-          "description": "Sessions observed by terminal type.",
+          "description": "Current Claude sessions by terminal type.",
           "id": 11,
           "links": [],
           "title": "Sessions by Terminal",
@@ -1678,7 +1678,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (decision) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (decision) (last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{decision}}"
                       },
                       "version": "v0"
@@ -1870,7 +1870,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (tool_name) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (tool_name) (last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{tool_name}}"
                       },
                       "version": "v0"
@@ -1934,7 +1934,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (language, decision) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (language, decision) (last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{language}} {{decision}}"
                       },
                       "version": "v0"
@@ -1998,7 +1998,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(max_over_time(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -2010,7 +2010,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions observed over selected time range.",
+          "description": "Current Claude sessions reporting telemetry.",
           "id": 2,
           "links": [],
           "title": "Total Sessions",
@@ -2250,7 +2250,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_commit_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(last_over_time(claude_code_commit_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -2418,7 +2418,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(max_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__range])) or on() vector(0)) / clamp_min((sum(max_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)), 1))"
+                        "expr": "100 * ((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)), 1))"
                       },
                       "version": "v0"
                     },
@@ -2502,7 +2502,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -4271,7 +4271,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(claude_code_session_count_total, organization_id)",
+          "definition": "label_values(claude_code_active_time_seconds_total, organization_id)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Organization",
@@ -4285,7 +4285,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "expr": "label_values(claude_code_session_count_total, organization_id)"
+              "expr": "label_values(claude_code_active_time_seconds_total, organization_id)"
             },
             "version": "v0"
           },
@@ -4304,7 +4304,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\"}, user_email)",
+          "definition": "label_values(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\"}, user_email)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "User",
@@ -4318,7 +4318,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "expr": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\"}, user_email)"
+              "expr": "label_values(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\"}, user_email)"
             },
             "version": "v0"
           },
@@ -4403,7 +4403,7 @@
             "text": "All",
             "value": "$__all"
           },
-          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)",
+          "definition": "label_values(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)",
           "hide": "dontHide",
           "includeAll": true,
           "label": "Terminal",
@@ -4417,7 +4417,7 @@
             "group": "prometheus",
             "kind": "DataQuery",
             "spec": {
-              "expr": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)"
+              "expr": "label_values(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)"
             },
             "version": "v0"
           },
