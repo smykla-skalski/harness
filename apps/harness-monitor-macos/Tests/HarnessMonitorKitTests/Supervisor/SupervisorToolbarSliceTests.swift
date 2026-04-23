@@ -51,6 +51,18 @@ final class SupervisorToolbarSliceTests: XCTestCase {
     XCTAssertLessThan(slice.count, 1)
   }
 
+  func test_start_primesExistingDecisionCountsBeforeStreamEventsArrive() async throws {
+    let decisions = try DecisionStore.makeInMemory()
+    try await decisions.insert(.fixture(id: "d-critical", severity: .critical))
+    try await decisions.insert(.fixture(id: "d-needs-user", severity: .needsUser))
+    let slice = SupervisorToolbarSlice()
+    defer { slice.stop() }
+
+    slice.start(decisions: decisions)
+
+    await waitUntil(slice.count == 2 && slice.maxSeverity == .critical)
+  }
+
   // MARK: - Helpers
 
   private func waitUntil(

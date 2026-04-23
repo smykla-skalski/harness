@@ -89,6 +89,21 @@ final class LoggingPolicyObserverTests: XCTestCase {
     XCTAssertEqual(entries.first?.fields["error"], "boom")
   }
 
+  func test_didExecuteFailedOutcomeRedactsRawErrorDetails() async {
+    let sink = RecordingSupervisorLogSink()
+    let observer = LoggingPolicyObserver(sink: sink)
+    let action = makeAction()
+
+    await observer.didExecute(
+      action: action,
+      outcome: .failed(actionKey: action.actionKey, error: "token=super-secret-value")
+    )
+
+    let redacted = sink.snapshot().first?.fields["error"]
+    XCTAssertNotNil(redacted)
+    XCTAssertFalse(redacted?.contains("super-secret-value") ?? false)
+  }
+
   func test_proposeConfigSuggestionReturnsEmpty() async {
     let observer = LoggingPolicyObserver(sink: RecordingSupervisorLogSink())
     let window = PolicyHistoryWindow(recentEvents: [], recentDecisions: [])

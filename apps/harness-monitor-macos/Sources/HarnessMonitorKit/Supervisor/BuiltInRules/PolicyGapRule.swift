@@ -119,18 +119,24 @@ public struct PolicyGapRule: PolicyRule {
     snapshotID: String,
     sessionID: String?
   ) -> [PolicyAction] {
-    let escapedCode = unknownCode.replacingOccurrences(of: "\"", with: "\\\"")
     let logID = "policy-gap-log-\(unknownCode)"
     let decisionID = "policy-gap-decision-\(unknownCode)"
     let message = "Unknown classifier code detected: \(unknownCode)"
-    let contextJSON =
-      """
-      {"snapshotID":"\(snapshotID)","unknownCode":"\(escapedCode)","sessionID":\(jsonString(sessionID))}
-      """
-    let suggestedActionsJSON =
-      """
-      [{"kind":"teachClassifierCode","code":"\(escapedCode)"}]
-      """
+    let contextJSON = encode(
+      ContextPayload(
+        snapshotID: snapshotID,
+        unknownCode: unknownCode,
+        sessionID: sessionID
+      )
+    )
+    let suggestedActionsJSON = encode([
+      SuggestedAction(
+        id: "teachClassifierCode",
+        title: "Teach classifier code",
+        kind: .custom,
+        payloadJSON: encode(TeachClassifierCodePayload(code: unknownCode))
+      )
+    ])
 
     return [
       .logEvent(
@@ -152,9 +158,25 @@ public struct PolicyGapRule: PolicyRule {
     ]
   }
 
-  private func jsonString(_ value: String?) -> String {
-    guard let value else { return "null" }
-    let escaped = value.replacingOccurrences(of: "\"", with: "\\\"")
-    return "\"\(escaped)\""
+  private func encode<T: Encodable>(_ value: T) -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard
+      let data = try? encoder.encode(value),
+      let string = String(data: data, encoding: .utf8)
+    else {
+      return "{}"
+    }
+    return string
   }
+}
+
+private struct ContextPayload: Encodable {
+  let snapshotID: String
+  let unknownCode: String
+  let sessionID: String?
+}
+
+private struct TeachClassifierCodePayload: Encodable {
+  let code: String
 }

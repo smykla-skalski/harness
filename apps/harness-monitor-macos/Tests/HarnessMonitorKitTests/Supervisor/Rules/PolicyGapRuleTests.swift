@@ -3,6 +3,10 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class PolicyGapRuleTests: XCTestCase {
+  private func decodeSuggestedActions(_ json: String) throws -> [SuggestedAction] {
+    try JSONDecoder().decode([SuggestedAction].self, from: Data(json.utf8))
+  }
+
   func test_knownClassifierCodesIsSeededFromRustCatalog() {
     XCTAssertTrue(PolicyGapRule.knownClassifierCodes.contains("hook_denied_tool_call"))
     XCTAssertTrue(PolicyGapRule.knownClassifierCodes.contains("build_or_lint_failure"))
@@ -56,6 +60,23 @@ final class PolicyGapRuleTests: XCTestCase {
     XCTAssertEqual(decisionPayload.ruleID, "policy-gap")
     XCTAssertEqual(decisionPayload.severity, .info)
     XCTAssertTrue(decisionPayload.summary.contains(unknownCode))
+  }
+
+  func test_unknownClassifierDecisionSuggestedActionsDecodeToContracts() async throws {
+    let rule = PolicyGapRule()
+    let unknownCode = "future_classifier_contract_gap"
+    let snapshot = makeSnapshot(issueCodes: [unknownCode])
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: .empty)
+    guard case .queueDecision(let payload) = actions[1] else {
+      XCTFail("Second action must be .queueDecision; got \(actions[1])")
+      return
+    }
+
+    let suggested = try decodeSuggestedActions(payload.suggestedActionsJSON)
+    XCTAssertEqual(suggested.count, 1)
+    XCTAssertEqual(suggested.first?.kind, .custom)
+    XCTAssertTrue(suggested.first?.payloadJSON.contains(unknownCode) ?? false)
   }
 
   func test_mixedKnownAndUnknownCodesOnlyEmitsForUnknown() async {

@@ -28,6 +28,19 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
     let ruleID: String
     let severity: DecisionSeverity
     let summary: String
+    let decisionID: String?
+
+    init(
+      ruleID: String,
+      severity: DecisionSeverity,
+      summary: String,
+      decisionID: String? = nil
+    ) {
+      self.ruleID = ruleID
+      self.severity = severity
+      self.summary = summary
+      self.decisionID = decisionID
+    }
   }
 
   private let queue = DispatchQueue(label: "io.harnessmonitor.tests.fake-api")
@@ -60,10 +73,13 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
   func postNotification(
     ruleID: String,
     severity: DecisionSeverity,
-    summary: String
+    summary: String,
+    decisionID: String?
   ) async {
     queue.sync {
-      _notifyCalls.append(.init(ruleID: ruleID, severity: severity, summary: summary))
+      _notifyCalls.append(
+        .init(ruleID: ruleID, severity: severity, summary: summary, decisionID: decisionID)
+      )
     }
   }
 }

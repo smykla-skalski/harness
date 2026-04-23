@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -136,30 +137,32 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   // MARK: - Tick callback wiring
 
-  func test_forceTickInvokesOnTickCallback() {
+  func test_forceTickInvokesOnTickCallback() async {
     let lifecycle = SupervisorLifecycle()
-    var called = false
-    lifecycle.onTick = { called = true }
+    let recorder = TickRecorder()
+    lifecycle.onTick = { await recorder.recordTick() }
 
-    lifecycle.forceTick()
+    await lifecycle.forceTick()
 
-    XCTAssertTrue(called, "forceTick must invoke the onTick closure")
+    let count = await recorder.count
+    XCTAssertTrue(count > 0, "forceTick must invoke the onTick closure")
   }
 
-  func test_onTickCallbackIsNilWhenNotSet() {
+  func test_onTickCallbackIsNilWhenNotSet() async {
     let lifecycle = SupervisorLifecycle()
-    lifecycle.forceTick()
+    await lifecycle.forceTick()
   }
 
-  func test_forceTickCanBeCalledMultipleTimes() {
+  func test_forceTickCanBeCalledMultipleTimes() async {
     let lifecycle = SupervisorLifecycle()
-    var count = 0
-    lifecycle.onTick = { count += 1 }
+    let recorder = TickRecorder()
+    lifecycle.onTick = { await recorder.recordTick() }
 
-    lifecycle.forceTick()
-    lifecycle.forceTick()
-    lifecycle.forceTick()
+    await lifecycle.forceTick()
+    await lifecycle.forceTick()
+    await lifecycle.forceTick()
 
+    let count = await recorder.count
     XCTAssertEqual(count, 3)
   }
 
@@ -186,6 +189,23 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_startSupervisorHonorsDisabledBackgroundPreference() async throws {
+    UserDefaults.standard.set(false, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
+
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertFalse(store.isSupervisorAuditRetentionScheduledForTesting())
+  }
+
+  @MainActor
   func test_startSupervisorIsIdempotent() async {
     let store = HarnessMonitorStore.fixture()
     await store.startSupervisor()
@@ -206,6 +226,29 @@ final class SupervisorLifecycleTests: XCTestCase {
     defer { Task { await store.stopSupervisor() } }
 
     await store.runSupervisorTickForTesting()
+  }
+
+  @MainActor
+  func test_runSupervisorTickPersistsAuditEventsWithLiveTickIDs() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    await store.runSupervisorTickForTesting()
+
+    let context = try XCTUnwrap(store.modelContext)
+    let events = try context.fetch(FetchDescriptor<SupervisorEvent>())
+    XCTAssertFalse(events.isEmpty)
+    XCTAssertTrue(events.allSatisfy { $0.tickID != "executor" })
+  }
+
+  @MainActor
+  func test_startSupervisorWithPersistenceSchedulesAuditRetention() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
   }
 
   @MainActor
@@ -243,18 +286,21 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
-  func test_setSupervisorRunInBackgroundEnabledStopsAndStartsScheduler() async {
-    let store = HarnessMonitorStore.fixture()
+  func test_setSupervisorRunInBackgroundEnabledStopsAndStartsScheduler() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
     await store.startSupervisor()
     defer { Task { await store.stopSupervisor() } }
 
     XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(false)
     XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertFalse(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(true)
     XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
   }
 
   @MainActor
@@ -272,5 +318,13 @@ final class SupervisorLifecycleTests: XCTestCase {
     await store.applySupervisorQuietHoursWindowForTesting(nil)
     let isCleared = await store.isSupervisorAutoActionSuppressedForTesting(at: .fixed)
     XCTAssertFalse(isCleared)
+  }
+}
+
+private actor TickRecorder {
+  private(set) var count = 0
+
+  func recordTick() {
+    count += 1
   }
 }

@@ -61,6 +61,89 @@ final class SupervisorServiceTests: XCTestCase {
     XCTAssertEqual(executions.first?.action.actionKey, evaluations.first?.actions[0].actionKey)
   }
 
+  func test_disabledRuleOverrideSkipsEvaluation() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    let recorder = ContextRecorder()
+    await registry.register(ContextRecordingRule(id: "test.disabled", recorder: recorder))
+    await registry.applyOverrides([
+      PolicyConfigOverride(
+        ruleID: "test.disabled",
+        enabled: false,
+        defaultBehavior: .cautious,
+        parameters: [:]
+      )
+    ])
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+
+    let contexts = await recorder.snapshot()
+    XCTAssertTrue(contexts.isEmpty)
+  }
+
+  func test_ruleReceivesRegistryParameterOverrides() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    let recorder = ContextRecorder()
+    await registry.register(ContextRecordingRule(id: "test.parameters", recorder: recorder))
+    await registry.applyOverrides([
+      PolicyConfigOverride(
+        ruleID: "test.parameters",
+        enabled: true,
+        defaultBehavior: .aggressive,
+        parameters: ["threshold": "120"]
+      )
+    ])
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+
+    let contexts = await recorder.snapshot()
+    XCTAssertEqual(contexts.count, 1)
+    XCTAssertEqual(contexts.first?.parameters.int("threshold", default: 0), 120)
+  }
+
+  func test_secondTickContextIncludesRecentActionKeysAndLastFiredAt() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    let recorder = ContextRecorder()
+    let rule = ContextRecordingRule(
+      id: "test.context",
+      recorder: recorder,
+      emittedActionID: "context-action"
+    )
+    await registry.register(rule)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+    await service.runOneTick()
+
+    let contexts = await recorder.snapshot()
+    XCTAssertEqual(contexts.count, 2)
+    XCTAssertNil(contexts[0].lastFiredAt)
+    XCTAssertNotNil(contexts[1].lastFiredAt)
+    XCTAssertTrue(contexts[1].recentActionKeys.contains("log:test.context:context-action"))
+  }
+
   func test_failingRuleIsIsolatedAndQuarantinedAfterThreshold() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()
@@ -179,162 +262,4 @@ final class SupervisorServiceTests: XCTestCase {
     let evaluations = await observer.evaluations
     XCTAssertEqual(evaluations.count, 1, "the in-flight tick must finish before stop returns")
   }
-}
-
-/// Rule that emits a single `logEvent` action every tick. Drives the happy path assertion.
-private struct EmitOnceRule: PolicyRule {
-  static let ruleID = "test.emit-once"
-  let id: String = ruleID
-  let name: String = "Emit Once"
-  let version: Int = 1
-  let parameters = PolicyParameterSchema(fields: [])
-
-  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
-
-  func evaluate(
-    snapshot: SessionsSnapshot,
-    context: PolicyContext
-  ) async -> [PolicyAction] {
-    [
-      .logEvent(
-        .init(
-          id: "emit-\(snapshot.id)",
-          ruleID: id,
-          snapshotID: snapshot.id,
-          message: "emit-once"
-        ))
-    ]
-  }
-}
-
-/// Rule whose evaluate returns no actions. Used in the quarantine test paired with the
-/// `SupervisorService.injectFailure(forRuleID:)` test hook.
-private struct NoopRule: PolicyRule {
-  let id: String
-  let name: String = "Noop"
-  let version: Int = 1
-  let parameters = PolicyParameterSchema(fields: [])
-
-  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
-
-  func evaluate(
-    snapshot: SessionsSnapshot,
-    context: PolicyContext
-  ) async -> [PolicyAction] {
-    []
-  }
-}
-
-/// Rule that blocks on an external actor gate, simulating a slow evaluate call so
-/// `stop()`-while-in-flight tests can assert draining semantics.
-private struct SlowRule: PolicyRule {
-  static let ruleID = "test.slow"
-  let id: String = ruleID
-  let name: String = "Slow"
-  let version: Int = 1
-  let parameters = PolicyParameterSchema(fields: [])
-
-  let gate: RuleGate
-
-  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
-
-  func evaluate(
-    snapshot: SessionsSnapshot,
-    context: PolicyContext
-  ) async -> [PolicyAction] {
-    await gate.wait()
-    return []
-  }
-}
-
-private struct AutoActionRule: PolicyRule {
-  let id: String = "test.auto-action"
-  let name: String = "Auto Action"
-  let version: Int = 1
-  let parameters = PolicyParameterSchema(fields: [])
-
-  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
-
-  func evaluate(
-    snapshot: SessionsSnapshot,
-    context: PolicyContext
-  ) async -> [PolicyAction] {
-    [
-      .nudgeAgent(
-        .init(
-          agentID: "agent-1",
-          prompt: "wake up",
-          ruleID: id,
-          snapshotID: snapshot.id,
-          snapshotHash: snapshot.hash
-        )
-      ),
-      .queueDecision(
-        .init(
-          id: "decision-auto-action",
-          severity: .warn,
-          ruleID: id,
-          sessionID: "session-1",
-          agentID: "agent-1",
-          taskID: nil,
-          summary: "Manual follow-up required",
-          contextJSON: "{}",
-          suggestedActionsJSON: "[]"
-        )
-      ),
-    ]
-  }
-}
-
-/// Actor-backed latch the slow rule awaits before returning.
-private actor RuleGate {
-  private var isReleased = false
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-
-  var released: Bool { isReleased }
-  var waitCount: Int { waiters.count }
-
-  func wait() async {
-    if isReleased { return }
-    await withCheckedContinuation { cont in
-      waiters.append(cont)
-    }
-  }
-
-  func release() {
-    isReleased = true
-    let pending = waiters
-    waiters.removeAll()
-    for cont in pending { cont.resume() }
-  }
-}
-
-/// Observer spy that captures `didEvaluate` / `didExecute` payloads.
-private actor SpyObserver: PolicyObserver {
-  struct Evaluation: Sendable {
-    let ruleID: String
-    let actions: [PolicyAction]
-  }
-
-  struct Execution: Sendable {
-    let action: PolicyAction
-    let outcome: PolicyOutcome
-  }
-
-  private(set) var snapshots: [SessionsSnapshot] = []
-  private(set) var evaluations: [Evaluation] = []
-  private(set) var executions: [Execution] = []
-
-  func willTick(_ snapshot: SessionsSnapshot) async {
-    snapshots.append(snapshot)
-  }
-  func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async {
-    evaluations.append(Evaluation(ruleID: rule.id, actions: actions))
-  }
-  func didExecute(action: PolicyAction, outcome: PolicyOutcome) async {
-    executions.append(Execution(action: action, outcome: outcome))
-  }
-  func proposeConfigSuggestion(
-    history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion] { [] }
 }

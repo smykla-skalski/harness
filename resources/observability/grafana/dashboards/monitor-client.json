@@ -27,6 +27,28 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "name": "Deployments",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "loki"
+            },
+            "spec": {
+              "expr": "{service_name=~\"harness-daemon|harness-monitor\"} |~ \"(?i)(starting|shutdown|version=)\"",
+              "refId": "DEPLOY",
+              "maxLines": 100
+            }
+          }
+        }
       }
     ],
     "cursorSync": "Crosshair",
@@ -1403,7 +1425,8 @@
             {
               "title": "Open Metrics Drilldown",
               "url": "/a/grafana-metricsdrilldown-app/drilldown",
-              "targetBlank": false
+              "targetBlank": false,
+              "oneClick": true
             }
           ],
           "data": {
@@ -1605,13 +1628,7 @@
           "id": 8,
           "title": "Monitor Logs",
           "description": "Harness Monitor logs for the selected severity levels.",
-          "links": [
-            {
-              "title": "Open Logs Drilldown",
-              "url": "/a/grafana-lokiexplore-app/explore",
-              "targetBlank": false
-            }
-          ],
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1757,16 +1774,16 @@
             "spec": {
               "title": "Health",
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 4,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 0,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-9"
@@ -1774,12 +1791,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 0,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-11"
@@ -1787,12 +1800,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 0,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-12"
@@ -1800,12 +1809,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 18,
-                        "y": 0,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-15"
@@ -1813,12 +1818,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 4,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-16"
@@ -1826,12 +1827,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 4,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-17"
@@ -1839,12 +1836,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 4,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-18"
@@ -1852,12 +1845,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 18,
-                        "y": 4,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-19"
@@ -1865,12 +1854,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 8,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-20"
@@ -1878,12 +1863,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 8,
-                        "width": 6,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-21"
@@ -1891,12 +1872,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 8,
-                        "width": 12,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-13"
@@ -1904,12 +1881,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 16,
-                        "width": 12,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-14"
@@ -1917,12 +1890,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 16,
-                        "width": 12,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-8"
@@ -1939,16 +1908,16 @@
             "spec": {
               "title": "HTTP",
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 4,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 0,
-                        "width": 12,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-1"
@@ -1956,12 +1925,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 0,
-                        "width": 12,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-2"
@@ -1969,12 +1934,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 4,
-                        "width": 12,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-5"
@@ -1982,12 +1943,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 4,
-                        "width": 12,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-6"
@@ -2004,16 +1961,16 @@
             "spec": {
               "title": "WebSocket",
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 4,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 0,
-                        "width": 8,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-3"
@@ -2021,12 +1978,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 8,
-                        "y": 0,
-                        "width": 8,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-4"
@@ -2034,12 +1987,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 16,
-                        "y": 0,
-                        "width": 8,
-                        "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-10"
@@ -2047,12 +1996,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 4,
-                        "width": 24,
-                        "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-7"
@@ -2176,18 +2121,6 @@
       "from": "now-15m",
       "to": "now",
       "autoRefresh": "10s",
-      "autoRefreshIntervals": [
-        "5s",
-        "10s",
-        "30s",
-        "1m",
-        "5m",
-        "15m",
-        "30m",
-        "1h",
-        "2h",
-        "1d"
-      ],
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
@@ -2213,7 +2146,7 @@
               "name": "prometheus"
             },
             "spec": {
-              "__legacyStringValue": "label_values(harness_monitor_http_requests_total, url_path)"
+              "expr": "label_values(harness_monitor_http_requests_total, url_path)"
             }
           },
           "regex": "",

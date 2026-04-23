@@ -59,6 +59,12 @@ final class CodexApprovalRuleTests: XCTestCase {
     return try JSONDecoder().decode(Body.self, from: data).mode
   }
 
+  private func decodeContext(_ json: String) throws -> [String: Any] {
+    let data = Data(json.utf8)
+    let object = try JSONSerialization.jsonObject(with: data)
+    return try XCTUnwrap(object as? [String: Any])
+  }
+
   // MARK: - Trigger
 
   func test_noPendingApprovals_emitsNoActions() async {
@@ -158,6 +164,28 @@ final class CodexApprovalRuleTests: XCTestCase {
     XCTAssertEqual(body.approvalID, "appr-42")
   }
 
+  func test_contextPayload_omitsRawApprovalTitleAndDetail() async throws {
+    let rule = CodexApprovalRule()
+    let approval = makeApproval(
+      title: "Run deploy --prod?",
+      detail: "Command includes environment credentials and a full shell fragment."
+    )
+    let snapshot = makeSnapshot(pendingApprovals: [approval])
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: .empty)
+    guard case .queueDecision(let payload) = actions.first else {
+      XCTFail("Expected queueDecision")
+      return
+    }
+    let context = try decodeContext(payload.contextJSON)
+
+    XCTAssertEqual(context["snapshotID"] as? String, "snap-1")
+    XCTAssertEqual(context["approvalID"] as? String, "appr-1")
+    XCTAssertEqual(context["agentID"] as? String, "agent-1")
+    XCTAssertNil(context["title"])
+    XCTAssertNil(context["detail"])
+  }
+
   // MARK: - Idempotency
 
   func test_decisionID_isStablePerApprovalID() async {
@@ -181,7 +209,33 @@ final class CodexApprovalRuleTests: XCTestCase {
       return
     }
     XCTAssertEqual(firstPayload.id, secondPayload.id)
-    XCTAssertEqual(firstPayload.id, "codex-approval:appr-stable")
+    XCTAssertEqual(firstPayload.id, "codex-approval:sess-1:appr-stable")
+  }
+
+  func test_decisionID_includesSessionScope() async {
+    let rule = CodexApprovalRule()
+    let approval = makeApproval(id: "appr-shared")
+
+    let first = await rule.evaluate(
+      snapshot: makeSnapshot(sessionID: "sess-1", pendingApprovals: [approval]),
+      context: .empty
+    )
+    let second = await rule.evaluate(
+      snapshot: makeSnapshot(sessionID: "sess-2", pendingApprovals: [approval]),
+      context: .empty
+    )
+
+    guard
+      case .queueDecision(let firstPayload) = first.first,
+      case .queueDecision(let secondPayload) = second.first
+    else {
+      XCTFail("Expected queueDecision in both evaluations")
+      return
+    }
+
+    XCTAssertNotEqual(firstPayload.id, secondPayload.id)
+    XCTAssertEqual(firstPayload.id, "codex-approval:sess-1:appr-shared")
+    XCTAssertEqual(secondPayload.id, "codex-approval:sess-2:appr-shared")
   }
 
   func test_actionKey_isStableAcrossEvaluations() async {
