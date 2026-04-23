@@ -173,8 +173,8 @@ private enum SessionsFixtureBuilder {
         runtime: "codex",
         role: .worker,
         lastActivityAt: lastActivityAt,
-        currentTaskId: nil
-      )
+        currentTaskId: nil,
+      ),
     ]
   }
 
