@@ -87,41 +87,33 @@ public actor PolicyExecutor {
       return .skippedDuplicate(actionKey: key)
     }
 
-    let dispatchID = UUID().uuidString
-    await audit.append(SupervisorAuditRecord(
-      id: dispatchID,
-      tickID: "executor",
+    let dispatchRecord = auditRecord(
+      id: UUID().uuidString,
       kind: "actionDispatched",
-      ruleID: ruleID(for: action),
-      severity: severity(for: action),
-      payloadJSON: actionPayloadJSON(action)
-    ))
-
+      action: action
+    )
+    await audit.append(dispatchRecord)
     recentKeys[key] = Date()
 
     do {
       try await dispatch(action)
-      await audit.append(SupervisorAuditRecord(
+      let executedRecord = auditRecord(
         id: UUID().uuidString,
-        tickID: "executor",
         kind: "actionExecuted",
-        ruleID: ruleID(for: action),
-        severity: severity(for: action),
-        payloadJSON: actionPayloadJSON(action)
-      ))
+        action: action
+      )
+      await audit.append(executedRecord)
       return .executed(actionKey: key)
     } catch {
       HarnessMonitorLogger.supervisor.warning(
         "action failed key=\(key, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
       )
-      await audit.append(SupervisorAuditRecord(
+      let failedRecord = auditRecord(
         id: UUID().uuidString,
-        tickID: "executor",
         kind: "actionFailed",
-        ruleID: ruleID(for: action),
-        severity: severity(for: action),
-        payloadJSON: actionPayloadJSON(action)
-      ))
+        action: action
+      )
+      await audit.append(failedRecord)
       return .failed(actionKey: key, error: error.localizedDescription)
     }
   }
@@ -131,6 +123,21 @@ public actor PolicyExecutor {
   private func pruneExpiredKeys() {
     let cutoff = Date().addingTimeInterval(-cooldown)
     recentKeys = recentKeys.filter { $0.value > cutoff }
+  }
+
+  private func auditRecord(
+    id: String,
+    kind: String,
+    action: PolicyAction
+  ) -> SupervisorAuditRecord {
+    SupervisorAuditRecord(
+      id: id,
+      tickID: "executor",
+      kind: kind,
+      ruleID: ruleID(for: action),
+      severity: severity(for: action),
+      payloadJSON: actionPayloadJSON(action)
+    )
   }
 
   private func dispatch(_ action: PolicyAction) async throws {
@@ -145,7 +152,7 @@ public actor PolicyExecutor {
       try await api.dropTask(taskID: payload.taskID, reason: payload.reason)
 
     case .queueDecision(let payload):
-      try await decisions.insert(DecisionDraft(
+      let draft = DecisionDraft(
         id: payload.id,
         severity: payload.severity,
         ruleID: payload.ruleID,
@@ -155,7 +162,8 @@ public actor PolicyExecutor {
         summary: payload.summary,
         contextJSON: payload.contextJSON,
         suggestedActionsJSON: payload.suggestedActionsJSON
-      ))
+      )
+      try await decisions.insert(draft)
 
     case .notifyOnly(let payload):
       await api.postNotification(
@@ -195,8 +203,10 @@ public actor PolicyExecutor {
   }
 
   private func actionPayloadJSON(_ action: PolicyAction) -> String {
-    guard let data = try? JSONEncoder().encode(action),
-      let text = String(data: data, encoding: .utf8) else {
+    guard
+      let data = try? JSONEncoder().encode(action),
+      let text = String(data: data, encoding: .utf8)
+    else {
       return "{}"
     }
     return text
