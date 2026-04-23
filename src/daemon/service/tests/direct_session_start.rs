@@ -1,6 +1,8 @@
 use super::*;
 
 use std::net::TcpListener;
+use std::path::Path;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -144,6 +146,32 @@ fn start_session_direct_creates_worktree() {
 }
 
 #[test]
+fn start_session_direct_creates_worktree_without_git_identity_config() {
+    with_temp_project(|project| {
+        unset_local_git_identity(project);
+        let db = setup_db_with_project(project);
+        let state = start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "worktree start".into(),
+                context: "survives missing git identity".into(),
+                session_id: Some("identityless".into()),
+                project_dir: project.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            },
+            Some(&db),
+        )
+        .expect("start session creates worktree without git identity config");
+
+        assert_eq!(state.session_id, "identityless");
+        assert!(
+            state.worktree_path.join("README.md").exists(),
+            "checked-out README.md must exist"
+        );
+    });
+}
+
+#[test]
 fn start_session_direct_rejects_unknown_policy_preset() {
     with_temp_project(|project| {
         let db = setup_db_with_project(project);
@@ -203,4 +231,24 @@ fn session_start_honors_custom_base_ref() {
             );
         });
     });
+}
+
+fn unset_local_git_identity(project: &Path) {
+    run_git(project, &["config", "--unset", "user.email"]);
+    run_git(project, &["config", "--unset", "user.name"]);
+}
+
+fn run_git(dir: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
