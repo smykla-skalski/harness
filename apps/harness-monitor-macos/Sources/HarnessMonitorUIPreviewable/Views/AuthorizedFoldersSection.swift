@@ -70,28 +70,32 @@ public struct AuthorizedFoldersSection: View {
   // MARK: - Row
 
   private func folderRow(for record: BookmarkStore.Record) -> some View {
-    LabeledContent(record.displayName) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Text(abbreviateHomePath(record.lastResolvedPath))
-          .scaledFont(.caption.monospaced())
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-        Menu {
-          Button("Reveal in Finder") {
-            Task { await reveal(record) }
-          }
-          Button("Remove", role: .destructive) {
-            Task { await remove(record) }
-          }
-        } label: {
-          Image(systemName: "ellipsis.circle")
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text(record.displayName)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+      Text(abbreviateHomePath(record.lastResolvedPath))
+        .scaledFont(.caption.monospaced())
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+      Menu {
+        Button("Reveal in Finder") {
+          Task { await reveal(record) }
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
+        Button("Remove", role: .destructive) {
+          Task { await remove(record) }
+        }
+      } label: {
+        Image(systemName: "ellipsis.circle")
       }
+      .menuStyle(.borderlessButton)
+      .fixedSize()
     }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(Text("\(record.displayName), \(record.lastResolvedPath)"))
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.preferencesAuthorizedFolderRow(record.id)
     )
