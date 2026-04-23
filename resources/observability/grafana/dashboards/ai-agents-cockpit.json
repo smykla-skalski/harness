@@ -959,7 +959,7 @@
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "right",
+                  "placement": "bottom",
                   "showLegend": true,
                   "calcs": [
                     "sum",
@@ -968,8 +968,7 @@
                     "lastNotNull"
                   ],
                   "sortBy": "Total",
-                  "sortDesc": true,
-                  "width": 340
+                  "sortDesc": true
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -1271,7 +1270,7 @@
               "options": {
                 "legend": {
                   "displayMode": "table",
-                  "placement": "right",
+                  "placement": "bottom",
                   "showLegend": true,
                   "calcs": [
                     "sum",
@@ -1280,8 +1279,7 @@
                     "lastNotNull"
                   ],
                   "sortBy": "Total",
-                  "sortDesc": true,
-                  "width": 340
+                  "sortDesc": true
                 },
                 "tooltip": {
                   "mode": "multi",
