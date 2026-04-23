@@ -809,7 +809,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=\"user_prompt\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -822,7 +822,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions, Codex thread starts, Copilot agent runs, and Gemini user prompts shown together as each agent's primary activity signal.",
+          "description": "Claude sessions, Codex thread starts, Copilot agent runs, and Gemini API requests shown together as each agent's primary activity signal.",
           "id": 209,
           "links": [],
           "title": "Primary Activity by Agent",
@@ -974,7 +974,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]))",
+                        "expr": "sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -994,7 +994,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]))",
+                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\",type=~\"input|output\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -1007,7 +1007,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex token usage plus Copilot and Gemini chat span volume aligned on the same chart.",
+          "description": "Claude and Codex token usage plus Copilot and Gemini input/output token volume aligned on the same chart.",
           "id": 210,
           "links": [],
           "title": "Tokens and Prompt Activity by Agent",
@@ -1159,7 +1159,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",status_code!=\"STATUS_CODE_ERROR\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
+                        "expr": "(100 * ((sum(increase(github_copilot_tool_call_count_total{success=\"true\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_count_total[$__rate_interval])) or on() vector(0)), 1)))",
                         "legendFormat": "copilot success %"
                       }
                     },
@@ -1179,7 +1179,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",status_code!=\"STATUS_CODE_ERROR\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
+                        "expr": "(100 * ((sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\",status_code=~\"2..\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
                         "legendFormat": "gemini success %"
                       }
                     },
@@ -1192,7 +1192,7 @@
               "transformations": []
             }
           },
-          "description": "Claude acceptance plus Codex, Copilot, and Gemini success signals tracked together.",
+          "description": "Claude acceptance plus Codex, Copilot, and Gemini native reliability signals tracked together.",
           "id": 211,
           "links": [],
           "title": "Reliability Signals",
@@ -1344,7 +1344,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
                         "legendFormat": "copilot :: {{pretty_model}}"
                       }
                     },
@@ -1364,8 +1364,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (span_name) (increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__rate_interval]))",
-                        "legendFormat": "gemini :: {{span_name}}"
+                        "expr": "sum by (model) (increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval]))",
+                        "legendFormat": "gemini :: {{model}}"
                       }
                     },
                     "refId": "D",
@@ -1377,7 +1377,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex token volume plus Copilot and Gemini chat activity, grouped by normalized model name.",
+          "description": "Claude and Codex token volume plus Copilot and Gemini activity, grouped by normalized model name when available.",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -1549,7 +1549,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -1562,7 +1562,7 @@
               "transformations": []
             }
           },
-          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini chat spans on the same chart.",
+          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini tool calls on the same chart.",
           "id": 213,
           "links": [],
           "title": "Tooling and Prompt Activity by Agent",
@@ -1714,7 +1714,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)",
+                        "expr": "sum(increase(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -1734,7 +1734,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)",
+                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -1747,10 +1747,10 @@
               "transformations": []
             }
           },
-          "description": "Tempo span totals over the selected range, normalized to Claude, Codex, Copilot, and Gemini.",
+          "description": "Trace totals for Claude and Codex plus native Copilot and Gemini activity volume over the selected range.",
           "id": 214,
           "links": [],
-          "title": "Trace Volume by Agent",
+          "title": "Activity Volume by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1899,8 +1899,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
-                        "legendFormat": "copilot :: {{pretty_span}}"
+                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(github_copilot_tool_call_count_total[$__range]), \"pretty_operation\", \"$1\", \"gen_ai_tool_name\", \"(.*)\"))) > 0",
+                        "legendFormat": "copilot :: {{pretty_operation}}"
                       }
                     },
                     "refId": "C",
@@ -1919,8 +1919,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
-                        "legendFormat": "gemini :: {{pretty_span}}"
+                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__range]), \"pretty_operation\", \"$1\", \"function_name\", \"(.*)\"))) > 0",
+                        "legendFormat": "gemini :: {{pretty_operation}}"
                       }
                     },
                     "refId": "D",
@@ -1932,10 +1932,10 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume trace spans over the selected range for Claude, Codex, Copilot, and Gemini.",
+          "description": "Highest-volume trace spans for Claude and Codex plus Copilot and Gemini tool functions over the selected range.",
           "id": 215,
           "links": [],
-          "title": "Top Trace Spans by Agent",
+          "title": "Top Operations by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -2044,7 +2044,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2128,7 +2128,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2212,7 +2212,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2380,7 +2380,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2392,10 +2392,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini trace span volume over the selected range.",
+          "description": "Observed Gemini API requests over the selected range.",
           "id": 220,
           "links": [],
-          "title": "Gemini Trace Spans",
+          "title": "Gemini API Requests",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2464,7 +2464,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
+                        "expr": "sum(rate(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2476,10 +2476,10 @@
               "transformations": []
             }
           },
-          "description": "Current Gemini span throughput from Tempo spanmetrics.",
+          "description": "Current Gemini API request throughput from native OTEL counters.",
           "id": 221,
           "links": [],
-          "title": "Gemini Span Rate",
+          "title": "Gemini Request Rate",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2548,7 +2548,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2560,10 +2560,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini chat spans over the selected range.",
+          "description": "Observed Gemini token usage over the selected range across input, output, thought, cache, and tool tokens.",
           "id": 222,
           "links": [],
-          "title": "Gemini Chat Spans",
+          "title": "Gemini Total Tokens",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2582,11 +2582,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 1000000
                       },
                       {
                         "color": "red",
-                        "value": 20
+                        "value": 10000000
                       }
                     ]
                   },
@@ -2632,7 +2632,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (span_name) (traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"})) or on() vector(0)"
+                        "expr": "((histogram_quantile(0.95, sum by (le) (rate(gemini_cli_api_request_latency_milliseconds_bucket{service_name=~\"gemini|gemini-cli\"}[5m]))) and on() (sum(rate(gemini_cli_api_request_latency_milliseconds_count{service_name=~\"gemini|gemini-cli\"}[5m])) > 0)) or on() vector(0))"
                       }
                     },
                     "refId": "A",
@@ -2644,10 +2644,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Gemini span names currently exposed through Tempo spanmetrics.",
+          "description": "p95 Gemini API latency from the native OTEL histogram family.",
           "id": 223,
           "links": [],
-          "title": "Gemini Span Names",
+          "title": "Gemini API p95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2666,15 +2666,15 @@
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 1000
                       },
                       {
                         "color": "red",
-                        "value": 15
+                        "value": 5000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "ms"
                 },
                 "overrides": []
               },
@@ -2968,7 +2968,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "((sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)), 1))"
+                        "expr": "((sum(increase(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)), 1))"
                       },
                       "version": "v0"
                     },
@@ -3053,7 +3053,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "((sum(last_over_time(github_copilot_tool_call_duration_seconds_sum[$__range])) or on() vector(0)) / clamp_min((sum(last_over_time(github_copilot_tool_call_duration_seconds_count[$__range])) or on() vector(0)), 1))"
+                        "expr": "((sum(increase(github_copilot_tool_call_duration_seconds_sum[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_duration_seconds_count[$__range])) or on() vector(0)), 1))"
                       },
                       "version": "v0"
                     },
@@ -3138,7 +3138,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gen_ai_client_operation_duration_seconds_count{service_name=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -3150,10 +3150,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot trace span volume over selected time range.",
+          "description": "Observed Copilot LLM operations over selected time range.",
           "id": 306,
           "links": [],
-          "title": "Trace Spans",
+          "title": "LLM Operations",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3222,7 +3222,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service_name) (last_over_time(github_copilot_agent_turn_count_count[$__rate_interval]))",
+                        "expr": "sum by (service_name) (increase(github_copilot_agent_turn_count_count[$__rate_interval]))",
                         "legendFormat": "{{service_name}}"
                       },
                       "version": "v0"
@@ -3286,7 +3286,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service_name, gen_ai_tool_name, success) (last_over_time(github_copilot_tool_call_count_total[$__rate_interval]))",
+                        "expr": "sum by (service_name, gen_ai_tool_name, success) (increase(github_copilot_tool_call_count_total[$__rate_interval]))",
                         "legendFormat": "{{service_name}} :: {{gen_ai_tool_name}} :: success={{success}}"
                       },
                       "version": "v0"
@@ -3350,8 +3350,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(10, sum by (service, span_name) (increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\"}[$__range])))",
-                        "legendFormat": "{{service}} :: {{span_name}}"
+                        "expr": "topk(10, sum by (gen_ai_tool_name) (increase(github_copilot_tool_call_count_total[$__range]))) > 0",
+                        "legendFormat": "copilot :: {{gen_ai_tool_name}}"
                       },
                       "version": "v0"
                     },
@@ -3363,10 +3363,10 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume Copilot trace spans over the selected range.",
+          "description": "Highest-volume Copilot tool functions over the selected range.",
           "id": 309,
           "links": [],
-          "title": "Top Trace Spans",
+          "title": "Top Tool Functions",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -4370,7 +4370,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -4382,10 +4382,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini trace span volume over selected time range.",
+          "description": "Observed Gemini API requests over selected time range.",
           "id": 401,
           "links": [],
-          "title": "Trace Spans",
+          "title": "API Requests",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -4454,7 +4454,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
+                        "expr": "sum(rate(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -4466,10 +4466,10 @@
               "transformations": []
             }
           },
-          "description": "Current Gemini span throughput from Tempo spanmetrics.",
+          "description": "Current Gemini API request throughput from native OTEL counters.",
           "id": 402,
           "links": [],
-          "title": "Span Rate",
+          "title": "Request Rate",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -4538,7 +4538,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -4550,10 +4550,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini chat spans over selected time range.",
+          "description": "Observed Gemini token usage over selected time range across input, output, thought, cache, and tool tokens.",
           "id": 403,
           "links": [],
-          "title": "Chat Spans",
+          "title": "Total Tokens",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -4572,11 +4572,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 1000000
                       },
                       {
                         "color": "red",
-                        "value": 20
+                        "value": 10000000
                       }
                     ]
                   },
@@ -4622,7 +4622,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (span_name) (traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"})) or on() vector(0)"
+                        "expr": "((histogram_quantile(0.95, sum by (le) (rate(gemini_cli_api_request_latency_milliseconds_bucket{service_name=~\"gemini|gemini-cli\"}[5m]))) and on() (sum(rate(gemini_cli_api_request_latency_milliseconds_count{service_name=~\"gemini|gemini-cli\"}[5m])) > 0)) or on() vector(0))"
                       },
                       "version": "v0"
                     },
@@ -4634,10 +4634,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Gemini span names currently exposed through Tempo spanmetrics.",
+          "description": "p95 Gemini API latency from the native OTEL histogram family.",
           "id": 404,
           "links": [],
-          "title": "Span Names",
+          "title": "API p95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -4656,15 +4656,15 @@
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 1000
                       },
                       {
                         "color": "red",
-                        "value": 15
+                        "value": 5000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "ms"
                 },
                 "overrides": []
               },
@@ -4706,8 +4706,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
-                        "legendFormat": "gemini :: {{pretty_model}}"
+                        "expr": "sum by (model) (increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval]))",
+                        "legendFormat": "gemini :: {{model}}"
                       },
                       "version": "v0"
                     },
@@ -4719,10 +4719,10 @@
               "transformations": []
             }
           },
-          "description": "Gemini span activity grouped by real span name. Current spanmetrics do not expose per-model labels for Gemini.",
+          "description": "Gemini API request activity grouped by reported model.",
           "id": 405,
           "links": [],
-          "title": "Span Activity",
+          "title": "Model Activity",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -4770,8 +4770,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(10, sum by (service, span_name) (increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\"}[$__range])))",
-                        "legendFormat": "{{service}} :: {{span_name}}"
+                        "expr": "topk(10, sum by (function_name) (increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__range]))) > 0",
+                        "legendFormat": "gemini :: {{function_name}}"
                       },
                       "version": "v0"
                     },
@@ -4783,10 +4783,10 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume Gemini trace spans over the selected range.",
+          "description": "Highest-volume Gemini tool functions over the selected range.",
           "id": 406,
           "links": [],
-          "title": "Top Trace Spans",
+          "title": "Tool Calls by Function",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -5067,7 +5067,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"copilot|github-copilot-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
                         "legendFormat": "copilot :: {{pretty_model}}"
                       },
                       "version": "v0"
@@ -5087,8 +5087,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"gemini|gemini-cli\",span_name=~\"chat .*\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"span_name\", \"chat (.*)\"))",
-                        "legendFormat": "gemini :: {{pretty_model}}"
+                        "expr": "sum by (model) (increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval]))",
+                        "legendFormat": "gemini :: {{model}}"
                       },
                       "version": "v0"
                     },
@@ -5100,7 +5100,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex token volume plus Copilot and Gemini chat activity, grouped by normalized model name.",
+          "description": "Claude and Codex token volume plus Copilot and Gemini activity, grouped by normalized model name when available.",
           "id": 16,
           "links": [],
           "title": "Model Activity by Agent",
@@ -6140,7 +6140,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "{service_name=~\"${service_name:regex}\",deployment_environment=~\"${deployment_environment:regex}\",detected_level=~\"${level:regex}\"} | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
+                        "expr": "{service_name=~\"${service_name:regex}\",service_name!=\"\"} | env=~\"${deployment_environment:regex}\" | detected_level=~\"${level:regex}\" | keep event_timestamp,event_name,model,tool,success,trace_id | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
                         "queryType": "range"
                       },
                       "version": "v0"
@@ -8267,7 +8267,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allValue": ".*",
+          "allValue": "codex|codex_cli_rs|codex_exec",
           "allowCustomValue": true,
           "current": {
             "text": "All",
