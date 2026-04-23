@@ -2,29 +2,29 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "claude-code-global"
+    "name": "ai-agents-cockpit"
   },
   "spec": {
     "annotations": [
       {
         "kind": "AnnotationQuery",
         "spec": {
-          "query": {
-            "kind": "DataQuery",
-            "group": "grafana",
-            "version": "v0",
-            "datasource": {
-              "name": "-- Grafana --"
-            },
-            "spec": {}
-          },
+          "builtIn": true,
           "enable": true,
           "hide": true,
           "iconColor": "rgba(0, 211, 255, 1)",
-          "name": "Annotations & Alerts",
-          "builtIn": true,
           "legacyOptions": {
             "type": "dashboard"
+          },
+          "name": "Annotations & Alerts",
+          "query": {
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "group": "grafana",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
           }
         }
       }
@@ -32,13 +32,9 @@
     "cursorSync": "Crosshair",
     "editable": true,
     "elements": {
-      "panel-1": {
+      "cockpit-panel-1": {
         "kind": "Panel",
         "spec": {
-          "id": 1,
-          "title": "Total Cost",
-          "description": "Claude Code estimated spend over selected time range.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -55,7 +51,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -63,15 +59,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Claude Code estimated spend over the selected time range.",
+          "id": 201,
+          "links": [],
+          "title": "Claude Spend",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -85,44 +110,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "currencyUSD",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 10,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 50,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-2": {
+      "cockpit-panel-2": {
         "kind": "Panel",
         "spec": {
-          "id": 2,
-          "title": "Total Sessions",
-          "description": "Claude Code sessions started over selected time range.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -147,15 +143,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Claude Code sessions started over the selected time range.",
+          "id": 202,
+          "links": [],
+          "title": "Claude Sessions",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -169,44 +194,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 10,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 50,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-3": {
+      "cockpit-panel-3": {
         "kind": "Panel",
         "spec": {
-          "id": 3,
-          "title": "Total Tokens",
-          "description": "All Claude Code tokens across input, output, and cache classes.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -223,7 +219,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -231,15 +227,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Claude Code total token usage over the selected time range.",
+          "id": 203,
+          "links": [],
+          "title": "Claude Tokens",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -253,44 +278,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 500000,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 2000000,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-4": {
+      "cockpit-panel-4": {
         "kind": "Panel",
         "spec": {
-          "id": 4,
-          "title": "Active Time",
-          "description": "Combined CLI and user active time over selected range.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -307,7 +303,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -315,15 +311,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Codex CLI exec sessions started over the selected time range.",
+          "id": 204,
+          "links": [],
+          "title": "Codex Sessions",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -337,44 +362,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 3600,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 14400,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-5": {
+      "cockpit-panel-5": {
         "kind": "Panel",
         "spec": {
-          "id": 5,
-          "title": "Commits",
-          "description": "Git commits credited by Claude Code telemetry.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -391,7 +387,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_commit_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -399,15 +395,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Codex total token usage over the selected time range using the aggregate token class.",
+          "id": 205,
+          "links": [],
+          "title": "Codex Tokens",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -421,128 +446,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 5,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 20,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-6": {
+      "cockpit-panel-6": {
         "kind": "Panel",
         "spec": {
-          "id": 6,
-          "title": "Net LOC",
-          "description": "Lines added minus removed over selected range.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "((sum(increase(claude_code_lines_of_code_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"added\"}[$__range])) or on() vector(0)) - (sum(increase(claude_code_lines_of_code_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"removed\"}[$__range])) or on() vector(0)))"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 500,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 2000,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-7": {
-        "kind": "Panel",
-        "spec": {
-          "id": 7,
-          "title": "Edit Accept Rate",
-          "description": "Accepted code-edit decisions as a percentage of all recorded decisions.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -567,15 +479,44 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Accepted Claude code-edit decisions as a percentage of all Claude edit decisions.",
+          "id": 206,
+          "links": [],
+          "title": "Claude Accept Rate",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 50
+                      },
+                      {
+                        "color": "green",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -589,44 +530,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "percent",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "red"
-                      },
-                      {
-                        "value": 50,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 80,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-8": {
+      "cockpit-panel-7": {
         "kind": "Panel",
         "spec": {
-          "id": 8,
-          "title": "Tool Decisions",
-          "description": "All edit-tool accept/reject decisions over selected range.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -643,7 +555,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__range])) or on() vector(0)), 1))"
                       }
                     },
                     "refId": "A",
@@ -651,15 +563,46 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Percent of Codex tool calls that completed successfully.",
+          "id": 207,
+          "links": [],
+          "title": "Codex Tool Success Rate",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "stat",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "max": 100,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 90
+                      },
+                      {
+                        "color": "green",
+                        "value": 98
+                      }
+                    ]
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -673,44 +616,15 @@
                   "values": false
                 },
                 "textMode": "value"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 20,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 100,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
-      "panel-9": {
+      "cockpit-panel-8": {
         "kind": "Panel",
         "spec": {
-          "id": 9,
-          "title": "Cost by Model",
-          "description": "Spend trend broken down by Claude model.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -727,8 +641,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "{{model}}"
+                        "expr": "((histogram_quantile(0.95, sum by (le) (rate(codex_tool_call_duration_ms_milliseconds_bucket{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m]))) and on() (sum(rate(codex_tool_call_duration_ms_milliseconds_count{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m])) > 0)) or on() vector(0))"
                       }
                     },
                     "refId": "A",
@@ -736,15 +649,132 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "95th percentile Codex tool-call duration.",
+          "id": 208,
+          "links": [],
+          "title": "Codex Tool p95",
           "vizConfig": {
+            "group": "stat",
             "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 250
+                      },
+                      {
+                        "color": "red",
+                        "value": 1000
+                      }
+                    ]
+                  },
+                  "unit": "ms"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Claude Code"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Codex CLI"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude session starts and Codex thread starts shown together for direct workload comparison.",
+          "id": 209,
+          "links": [],
+          "title": "Sessions and Threads by Agent",
+          "vizConfig": {
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -754,27 +784,563 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "currencyUSD",
-                  "color": {
-                    "mode": "palette-classic"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-10": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Claude Code"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
-                "overrides": []
-              }
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]))",
+                        "legendFormat": "Codex CLI"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
             }
+          },
+          "description": "Claude and Codex token usage aligned on the same chart.",
+          "id": 210,
+          "links": [],
+          "title": "Tokens by Agent",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))",
+                        "legendFormat": "Claude accept %"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__rate_interval])) / clamp_min(sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval])), 1)))",
+                        "legendFormat": "Codex success %"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude acceptance and Codex tool success rates tracked together.",
+          "id": 211,
+          "links": [],
+          "title": "Reliability Signals",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Claude {{model}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (model) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__rate_interval]))",
+                        "legendFormat": "Codex {{model}}"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Token usage split by model for both agent runtimes.",
+          "id": 212,
+          "links": [],
+          "title": "Model Mix by Agent",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-13": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Claude decisions"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "Codex tool calls"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude edit decisions and Codex tool calls on the same event-rate chart.",
+          "id": 213,
+          "links": [],
+          "title": "Tooling Activity by Agent",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-14": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude-code\"}[5m]))",
+                        "legendFormat": "{{service}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Tempo spanmetrics rate for the Claude and Codex services.",
+          "id": 214,
+          "links": [],
+          "title": "Trace Span Rate by Service",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "ops"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "cockpit-panel-15": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(12, sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}|claude-code\"}[5m])))",
+                        "legendFormat": "{{service}} :: {{span_name}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Highest-volume trace spans across the Claude and Codex services.",
+          "id": 215,
+          "links": [],
+          "title": "Top Cross-Agent Trace Spans",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "ops"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude Code estimated spend over selected time range.",
+          "id": 1,
+          "links": [],
+          "title": "Total Cost",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
           }
         }
       },
       "panel-10": {
         "kind": "Panel",
         "spec": {
-          "id": 10,
-          "title": "Token Usage by Type",
-          "description": "Token growth by token class.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -782,33 +1348,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{type}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Token growth by token class.",
+          "id": 10,
+          "links": [],
+          "title": "Token Usage by Type",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -818,27 +1396,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-11": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
-          "title": "Sessions by Terminal",
-          "description": "Session starts by terminal type.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -846,33 +1412,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (terminal_type) (increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{terminal_type}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Session starts by terminal type.",
+          "id": 11,
+          "links": [],
+          "title": "Sessions by Terminal",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -882,27 +1460,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-12": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
-          "title": "Active Time by Type",
-          "description": "CLI versus user active time.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -910,33 +1476,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (type) (increase(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{type}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "CLI versus user active time.",
+          "id": 12,
+          "links": [],
+          "title": "Active Time by Type",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -946,27 +1524,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-13": {
         "kind": "Panel",
         "spec": {
-          "id": 13,
-          "title": "Lines Added vs Removed",
-          "description": "Code churn attributed to Claude Code.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -974,33 +1540,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (type) (increase(claude_code_lines_of_code_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"added|removed\"}[$__rate_interval]))",
                         "legendFormat": "{{type}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Code churn attributed to Claude Code.",
+          "id": 13,
+          "links": [],
+          "title": "Lines Added vs Removed",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1010,27 +1588,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-14": {
         "kind": "Panel",
         "spec": {
-          "id": 14,
-          "title": "Tool Decisions by Outcome",
-          "description": "Accept versus reject trend.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1038,33 +1604,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (decision) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{decision}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Accept versus reject trend.",
+          "id": 14,
+          "links": [],
+          "title": "Tool Decisions by Outcome",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1074,27 +1652,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-15": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
-          "title": "Cost by Query Source",
-          "description": "Main, auxiliary, and subagent spend mix.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1102,33 +1668,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (query_source) (increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (query_source) (increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{query_source}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Main, auxiliary, and subagent spend mix.",
+          "id": 15,
+          "links": [],
+          "title": "Cost by Query Source",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1138,27 +1716,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "currencyUSD",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-16": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
-          "title": "Token Usage by Model",
-          "description": "Token growth broken down by Claude model.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1166,33 +1732,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{model}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Token growth broken down by Claude model.",
+          "id": 16,
+          "links": [],
+          "title": "Token Usage by Model",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1202,27 +1780,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-17": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
-          "title": "Tool Decisions by Tool",
-          "description": "Edit versus Write tool pressure.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1230,33 +1796,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (tool_name) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{tool_name}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Edit versus Write tool pressure.",
+          "id": 17,
+          "links": [],
+          "title": "Tool Decisions by Tool",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1266,27 +1844,15 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": ""
           }
         }
       },
       "panel-18": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
-          "title": "Tool Decisions by Language",
-          "description": "Accepted and rejected edits by language.",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1294,33 +1860,45 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
                       "datasource": {
                         "name": "prometheus"
                       },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (language, decision) (increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval]))",
                         "legendFormat": "{{language}} {{decision}}"
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "Accepted and rejected edits by language.",
+          "id": 18,
+          "links": [],
+          "title": "Tool Decisions by Language",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
               "options": {
                 "legend": {
                   "displayMode": "table",
@@ -1330,17 +1908,1487 @@
                   "mode": "multi",
                   "sort": "desc"
                 }
-              },
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude Code sessions started over selected time range.",
+          "id": 2,
+          "links": [],
+          "title": "Total Sessions",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
                   "color": {
-                    "mode": "palette-classic"
-                  }
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
                 },
                 "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
               }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
             }
+          },
+          "description": "All Claude Code tokens across input, output, and cache classes.",
+          "id": 3,
+          "links": [],
+          "title": "Total Tokens",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Combined CLI and user active time over selected range.",
+          "id": 4,
+          "links": [],
+          "title": "Active Time",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 3600
+                      },
+                      {
+                        "color": "red",
+                        "value": 14400
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_commit_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Git commits credited by Claude Code telemetry.",
+          "id": 5,
+          "links": [],
+          "title": "Commits",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((sum(increase(claude_code_lines_of_code_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"added\"}[$__range])) or on() vector(0)) - (sum(increase(claude_code_lines_of_code_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"removed\"}[$__range])) or on() vector(0)))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Lines added minus removed over selected range.",
+          "id": 6,
+          "links": [],
+          "title": "Net LOC",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)), 1))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Accepted code-edit decisions as a percentage of all recorded decisions.",
+          "id": 7,
+          "links": [],
+          "title": "Edit Accept Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 50
+                      },
+                      {
+                        "color": "green",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "All edit-tool accept/reject decisions over selected range.",
+          "id": 8,
+          "links": [],
+          "title": "Tool Decisions",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 20
+                      },
+                      {
+                        "color": "red",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "{{model}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Spend trend broken down by Claude model.",
+          "id": 9,
+          "links": [],
+          "title": "Cost by Model",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Codex exec sessions started over selected time range.",
+          "id": 101,
+          "links": [],
+          "title": "Sessions",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 5
+                      },
+                      {
+                        "color": "red",
+                        "value": 20
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-10": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "topk(12, sum by (span_name) (rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_name=~\"${span_name:regex}\"}[5m])))",
+                        "legendFormat": "{{span_name}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Highest-volume Codex span names from Tempo spanmetrics.",
+          "id": 110,
+          "links": [],
+          "title": "Top Trace Spans",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "ops"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "loki"
+                      },
+                      "group": "loki",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "{service_name=~\"${service_name:regex}\",deployment_environment=~\"${deployment_environment:regex}\",detected_level=~\"${level:regex}\"} | line_format \"{{ .event_timestamp }} {{ .event_name }} model={{ .model }} tool={{ .tool }} success={{ .success }} trace={{ .trace_id }}\"",
+                        "queryType": "range"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Structured Codex OTEL logs from Loki for selected service and level.",
+          "id": 111,
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open Logs Drilldown",
+              "url": "/a/grafana-lokiexplore-app/explore"
+            }
+          ],
+          "title": "Codex Logs",
+          "vizConfig": {
+            "group": "logs",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              },
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Successful and failed Codex tool calls over selected time range.",
+          "id": 102,
+          "links": [],
+          "title": "Tool Calls",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 50
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Total Codex tokens over selected time range using the aggregate token class.",
+          "id": 103,
+          "links": [],
+          "title": "Total Tokens",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 100000
+                      },
+                      {
+                        "color": "red",
+                        "value": 500000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "100 * ((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__range])) or on() vector(0)), 1))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Percent of Codex tool calls that completed successfully.",
+          "id": 104,
+          "links": [],
+          "title": "Tool Success Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "max": 100,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 90
+                      },
+                      {
+                        "color": "green",
+                        "value": 98
+                      }
+                    ]
+                  },
+                  "unit": "percent"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "((histogram_quantile(0.95, sum by (le) (rate(codex_tool_call_duration_ms_milliseconds_bucket{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m]))) and on() (sum(rate(codex_tool_call_duration_ms_milliseconds_count{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m])) > 0)) or on() vector(0))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "p95 Codex tool-call latency from the OTEL histogram family.",
+          "id": 105,
+          "links": [],
+          "title": "Tool p95",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 250
+                      },
+                      {
+                        "color": "red",
+                        "value": 1000
+                      }
+                    ]
+                  },
+                  "unit": "ms"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (tool) (increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "{{tool}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Per-tool Codex activity over time.",
+          "id": 106,
+          "links": [],
+          "title": "Tool Calls by Tool",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (token_type) (increase(codex_turn_token_usage_sum{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=~\"input|output|reasoning_output|cached_input\"}[$__rate_interval]))",
+                        "legendFormat": "{{token_type}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Input, output, reasoning, and cache token growth over time.",
+          "id": 107,
+          "links": [],
+          "title": "Token Usage by Type",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by (tool, success) (increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "{{tool}} :: success={{success}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Successful versus failed tool calls, split by tool.",
+          "id": 108,
+          "links": [],
+          "title": "Tool Outcomes",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\",span_name=~\"${span_name:regex}\"}[5m])) or on() vector(0)"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Tempo span throughput for Codex spans routed through the stack.",
+          "id": 109,
+          "links": [],
+          "title": "Trace Span Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  "unit": "reqps"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
           }
         }
       }
@@ -1352,7 +3400,7 @@
           {
             "kind": "TabsLayoutTab",
             "spec": {
-              "title": "Overview",
+              "title": "Cockpit",
               "layout": {
                 "kind": "RowsLayout",
                 "spec": {
@@ -1367,6 +3415,197 @@
                           "spec": {
                             "columnWidthMode": "custom",
                             "columnWidth": 220,
+                            "fillScreen": true,
+                            "maxColumnCount": 4,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-1"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-2"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-3"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-4"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-5"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-6"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-7"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-8"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Cross-Agent Trends",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "custom",
+                            "columnWidth": 420,
+                            "fillScreen": true,
+                            "maxColumnCount": 2,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-9"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-10"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-11"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-12"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Service Correlation",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "custom",
+                            "columnWidth": 420,
+                            "fillScreen": true,
+                            "maxColumnCount": 2,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-14"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "cockpit-panel-15"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidth": 220,
+                            "columnWidthMode": "custom",
                             "fillScreen": true,
                             "items": [
                               {
@@ -1445,13 +3684,13 @@
                             "maxColumnCount": 4,
                             "rowHeightMode": "short"
                           }
-                        }
+                        },
+                        "title": "Summary KPIs"
                       }
                     },
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Cost & Tokens",
                         "collapse": false,
                         "layout": {
                           "kind": "AutoGridLayout",
@@ -1499,18 +3738,19 @@
                             "maxColumnCount": 2,
                             "rowHeightMode": "tall"
                           }
-                        }
+                        },
+                        "title": "Cost & Tokens"
                       }
                     }
                   ]
                 }
-              }
+              },
+              "title": "Claude Overview"
             }
           },
           {
             "kind": "TabsLayoutTab",
             "spec": {
-              "title": "Activity",
               "layout": {
                 "kind": "RowsLayout",
                 "spec": {
@@ -1518,7 +3758,6 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Sessions & Focus",
                         "collapse": false,
                         "layout": {
                           "kind": "AutoGridLayout",
@@ -1548,13 +3787,13 @@
                             "maxColumnCount": 2,
                             "rowHeightMode": "tall"
                           }
-                        }
+                        },
+                        "title": "Sessions & Focus"
                       }
                     },
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Productivity",
                         "collapse": false,
                         "layout": {
                           "kind": "AutoGridLayout",
@@ -1575,18 +3814,19 @@
                             "maxColumnCount": 1,
                             "rowHeightMode": "tall"
                           }
-                        }
+                        },
+                        "title": "Productivity"
                       }
                     }
                   ]
                 }
-              }
+              },
+              "title": "Claude Activity"
             }
           },
           {
             "kind": "TabsLayoutTab",
             "spec": {
-              "title": "Tools",
               "layout": {
                 "kind": "RowsLayout",
                 "spec": {
@@ -1594,7 +3834,6 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Decision Trends",
                         "collapse": false,
                         "layout": {
                           "kind": "AutoGridLayout",
@@ -1624,13 +3863,13 @@
                             "maxColumnCount": 2,
                             "rowHeightMode": "tall"
                           }
-                        }
+                        },
+                        "title": "Decision Trends"
                       }
                     },
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Language Detail",
                         "collapse": false,
                         "layout": {
                           "kind": "AutoGridLayout",
@@ -1651,12 +3890,225 @@
                             "maxColumnCount": 1,
                             "rowHeightMode": "tall"
                           }
-                        }
+                        },
+                        "title": "Language Detail"
                       }
                     }
                   ]
                 }
-              }
+              },
+              "title": "Claude Tools"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "custom",
+                            "fillScreen": true,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-1"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-2"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-3"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-4"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-5"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-9"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 4,
+                            "rowHeightMode": "short",
+                            "columnWidth": 220
+                          }
+                        },
+                        "title": "Summary KPIs"
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-6"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-7"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-8"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 2,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Activity Trends"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Codex Overview"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-10"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 1,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Span Activity"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Codex Tracing"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "columnWidthMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "codex-panel-11"
+                                  }
+                                }
+                              }
+                            ],
+                            "maxColumnCount": 1,
+                            "rowHeightMode": "tall"
+                          }
+                        },
+                        "title": "Structured OTEL Events"
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Codex Logs"
             }
           }
         ]
@@ -1664,26 +4116,26 @@
     },
     "links": [
       {
-        "title": "Metrics Drilldown",
-        "type": "link",
-        "icon": "external link",
-        "tooltip": "",
-        "url": "/a/grafana-metricsdrilldown-app/drilldown",
-        "tags": [],
         "asDropdown": false,
-        "targetBlank": false,
+        "icon": "external link",
         "includeVars": true,
-        "keepTime": true
+        "keepTime": true,
+        "tags": [],
+        "targetBlank": false,
+        "title": "Metrics Drilldown",
+        "tooltip": "",
+        "type": "link",
+        "url": "/a/grafana-metricsdrilldown-app/drilldown"
       }
     ],
     "tags": [
+      "ai-agents",
       "claude-code",
+      "codex",
       "global",
       "observability"
     ],
     "timeSettings": {
-      "from": "now-7d",
-      "to": "now",
       "autoRefresh": "10s",
       "autoRefreshIntervals": [
         "5s",
@@ -1697,6 +4149,9 @@
         "2h",
         "1d"
       ],
+      "fiscalYearStartMonth": 0,
+      "from": "now-7d",
+      "hideTimepicker": false,
       "quickRanges": [
         {
           "display": "Last 15 minutes",
@@ -1734,240 +4189,489 @@
           "to": "now"
         }
       ],
-      "hideTimepicker": false,
-      "fiscalYearStartMonth": 0
+      "to": "now"
     },
-    "title": "Claude Code Global",
+    "title": "AI Agents Cockpit",
     "variables": [
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "organization_id",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Organization",
+          "definition": "label_values(claude_code_session_count_total, organization_id)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Organization",
+          "multi": true,
+          "name": "organization_id",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_session_count_total, organization_id)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_session_count_total, organization_id)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "user_email",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "User",
+          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\"}, user_email)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "User",
+          "multi": true,
+          "name": "user_email",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\"}, user_email)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\"}, user_email)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "model",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Model",
+          "definition": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, model)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Claude Model",
+          "multi": true,
+          "name": "claude_model",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, model)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, model)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "query_source",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Query Source",
+          "definition": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, query_source)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Query Source",
+          "multi": true,
+          "name": "query_source",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, query_source)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_cost_usage_USD_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, query_source)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "terminal_type",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Terminal",
+          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Terminal",
+          "multi": true,
+          "name": "terminal_type",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_session_count_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, terminal_type)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "tool_name",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Tool",
+          "definition": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, tool_name)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Tool",
+          "multi": true,
+          "name": "tool_name",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, tool_name)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\"}, tool_name)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allValue": ".*",
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "language",
+          "allValue": ".*",
+          "allowCustomValue": true,
           "current": {
             "text": "All",
             "value": "$__all"
           },
-          "label": "Language",
+          "definition": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",tool_name=~\"${tool_name:regex}\"}, language)",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "label": "Language",
+          "multi": true,
+          "name": "language",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "prometheus",
-            "version": "v0",
             "datasource": {
               "name": "prometheus"
             },
+            "group": "prometheus",
+            "kind": "DataQuery",
             "spec": {
               "__legacyStringValue": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",tool_name=~\"${tool_name:regex}\"}, language)"
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
-          "sort": "alphabeticalAsc",
-          "definition": "label_values(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",tool_name=~\"${tool_name:regex}\"}, language)",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
           "allValue": ".*",
-          "allowCustomValue": true
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_thread_started_total, deployment_environment)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Environment",
+          "multi": true,
+          "name": "deployment_environment",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_thread_started_total, deployment_environment)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Service",
+          "multi": true,
+          "name": "service_name",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\"}, service_name)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Codex Model",
+          "multi": true,
+          "name": "codex_model",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\"}, model)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Auth",
+          "multi": true,
+          "name": "auth_mode",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\"}, auth_mode)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Source",
+          "multi": true,
+          "name": "session_source",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\"}, session_source)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}, tool)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Tool",
+          "multi": true,
+          "name": "tool",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}, tool)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "definition": "label_values(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\"}, span_name)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Span",
+          "multi": true,
+          "name": "span_name",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "prometheus"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "label_values(traces_spanmetrics_calls_total{service=~\"${service_name:regex}\"}, span_name)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Level",
+          "multi": true,
+          "name": "level",
+          "options": [],
+          "query": "debug,info,warn,error",
+          "skipUrlSync": false
         }
       }
     ]
