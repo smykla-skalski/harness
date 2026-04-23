@@ -314,6 +314,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       #expect(retryEvent.detail.contains("leaderless_degraded"))
     }
   }
+
   @Test("Bootstrap keeps a manifest watcher armed after managed warm-up failure")
   func bootstrapStartsManifestWatcherAfterManagedWarmUpFailure() async {
     let daemon = RecordingDaemonController(
@@ -343,15 +344,12 @@ extension HarnessMonitorStoreLifecycleCoreTests {
   func bootstrapReplaysReconnectQueuedDuringWarmUp() async {
     let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))
     let store = HarnessMonitorStore(daemonController: daemon)
-
     let bootstrapTask = Task { @MainActor in
       await store.bootstrap()
     }
-
     try? await Task.sleep(for: .milliseconds(50))
     await store.reconnect()
     await bootstrapTask.value
-
     for _ in 0..<50 {
       if await daemon.recordedWarmUpCallCount() == 2, store.connectionState == .online {
         break
@@ -362,7 +360,6 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(await daemon.recordedWarmUpCallCount() == 2)
   }
-
 }
 
 private struct SnapshotCodingKey: CodingKey, Sendable {
