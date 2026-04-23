@@ -424,6 +424,7 @@
 		AB8D413F5A5ED5B05D3D9913 /* SessionDiscoveryProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD468233E13778FF6BAEE05 /* SessionDiscoveryProbeTests.swift */; };
 		ABAA0783B7517D357D3D79BA /* SessionCacheMemoryTestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541F279DF1DE77AC4B2261E0 /* SessionCacheMemoryTestHarness.swift */; };
 		ABF1815C358F938D7B10A954 /* UserModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF83058E83D56832DD84366 /* UserModels.swift */; };
+		ABF247FAFAB6148120DCB3BA /* DaemonDisconnectRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6C99083C51C7BCEC9BB297 /* DaemonDisconnectRuleTests.swift */; };
 		AC0F183F8A21CD28E8EDB313 /* PreferencesGeneralSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A3BEBF6ED898271386BED7 /* PreferencesGeneralSection.swift */; };
 		AC552BE3183B6FC5A13A0466 /* HarnessMonitorStore+StreamingSelectionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD3E34C3B9EB13B3431ECEA /* HarnessMonitorStore+StreamingSelectionSupport.swift */; };
 		AC60B98A37D987B9DF726BAA /* DaemonDisconnectRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F82E9E50152D9E977DC2A2F /* DaemonDisconnectRule.swift */; };
@@ -1170,6 +1171,7 @@
 		A8AC90BC0D32E912EBB74766 /* SessionStartRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStartRequest.swift; sourceTree = "<group>"; };
 		A96A84B943C8A68814E77302 /* HarnessMonitorAppConfiguration+PreseedBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorAppConfiguration+PreseedBookmark.swift"; sourceTree = "<group>"; };
 		A9EE9145AFAF9EC87A0D9DEA /* PreviewHarnessClientFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHarnessClientFixtures.swift; sourceTree = "<group>"; };
+		AA6C99083C51C7BCEC9BB297 /* DaemonDisconnectRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonDisconnectRuleTests.swift; sourceTree = "<group>"; };
 		AB298FFDBFE1D7E4ED01C1EA /* HarnessMonitorStoreLifecycleCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorStoreLifecycleCoreTests.swift; sourceTree = "<group>"; };
 		AB4868968A8D26ED92543435 /* AuthorizedFoldersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizedFoldersTests.swift; sourceTree = "<group>"; };
 		AB9BDB723B7BA016EC560E30 /* HarnessMonitorObservabilityPhase2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorObservabilityPhase2Tests.swift; sourceTree = "<group>"; };
@@ -1932,6 +1934,7 @@
 			isa = PBXGroup;
 			children = (
 				06DB064C2A2C92C3B12FF479 /* CodexApprovalRuleTests.swift */,
+				AA6C99083C51C7BCEC9BB297 /* DaemonDisconnectRuleTests.swift */,
 				0FE5F438120CC2120BDEF72B /* FailedNudgeLoopRuleTests.swift */,
 				6E6979139B3910236F17E0BC /* PolicyGapRuleTests.swift */,
 			);
@@ -2884,6 +2887,7 @@
 				295E8FC3CDB68DDAB6BC49E4 /* DaemonControllerTests+BootstrapAndLaunchAgent.swift in Sources */,
 				609E24447E757EFD5A3E5DCB /* DaemonControllerTests+WarmUpSupport.swift in Sources */,
 				C2949E5EEE6FFD85CD548BA0 /* DaemonControllerTests.swift in Sources */,
+				ABF247FAFAB6148120DCB3BA /* DaemonDisconnectRuleTests.swift in Sources */,
 				B2FADE1182F1CEB6B7665DE3 /* DaemonManifestDecodingTests.swift in Sources */,
 				B63CB643CD3FAB3A9C73AF58 /* DaemonModelsTests.swift in Sources */,
 				BDE7CDCFEFEDBD8E8241BB0E /* DaemonPortProbeTests.swift in Sources */,
