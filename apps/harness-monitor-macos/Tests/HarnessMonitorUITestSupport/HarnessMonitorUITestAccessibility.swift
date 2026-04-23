@@ -22,6 +22,9 @@ enum HarnessMonitorUITestAccessibility {
   static let supervisorForceTick = "harness.supervisor.force-tick"
   static let decisionsWindow = "harness.decisions.window"
   static let decisionsSidebar = "harness.decisions.sidebar"
+  static let decisionDetail = "harness.decisions.detail"
+  static let decisionDetailTabs = "harness.decisions.detail.tabs"
+  static let decisionAuditTrail = "harness.decisions.audit"
   static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
   }
