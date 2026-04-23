@@ -8,6 +8,16 @@ source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/xcode-derived}"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$ROOT/Scripts/xcodebuild-with-lock.sh}"
+XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
+
+append_only_testing_args() {
+  local selector
+  while IFS= read -r selector; do
+    if [[ -n "$selector" ]]; then
+      TEST_ARGS+=("-only-testing:${selector}")
+    fi
+  done < <(printf '%s\n' "$XCODE_ONLY_TESTING" | tr ',' '\n')
+}
 
 clear_gatekeeper_metadata() {
   local build_products_path path
@@ -33,10 +43,16 @@ clear_gatekeeper_metadata() {
 
 clear_gatekeeper_metadata
 
-"$XCODEBUILD_RUNNER" \
+TEST_ARGS=(
   -project "$ROOT/HarnessMonitor.xcodeproj" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   CODE_SIGNING_ALLOWED=NO \
   test-without-building
+)
+
+append_only_testing_args
+
+"$XCODEBUILD_RUNNER" \
+  "${TEST_ARGS[@]}"

@@ -356,6 +356,7 @@ mise run version:check
 mise run check    # type-check + clippy
 mise run test     # unit + integration
 mise run monitor:macos:test  # generate + lint + test the macOS Harness Monitor app
+XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:macos:test  # focused macOS XCTest via the shared wrapper
 ```
 
 The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. `project.yml` is the generator input and the generated `HarnessMonitor.xcodeproj` is checked in; use `mise run monitor:macos:generate` if you need to refresh it for Xcode.
