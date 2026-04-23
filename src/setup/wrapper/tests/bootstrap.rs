@@ -62,14 +62,11 @@ fn build_codex_config_includes_notify_and_hooks_flag() {
     let config = build_codex_config();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
-    assert!(config.contains("[hooks]"));
-    assert!(config.contains(
-        "session_start = [\"harness\", \"agents\", \"session-start\", \"--agent\", \"codex\"]"
-    ));
-    assert!(config.contains("pre_compact = [\"harness\", \"pre-compact\"]"));
-    assert!(config.contains(
-        "session_end = [\"harness\", \"agents\", \"session-stop\", \"--agent\", \"codex\"]"
-    ));
+    assert!(!config.contains("[hooks]"));
+    assert!(!config.contains("session_start = ["));
+    assert!(!config.contains("pre_compact = ["));
+    assert!(!config.contains("session_end = ["));
+    assert!(config.contains("Hook definitions stay in hooks.json"));
 }
 
 fn assert_codex_hooks(hooks: &str) {
@@ -109,7 +106,7 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
-    assert!(config.contains("[hooks]"));
+    assert!(!config.contains("[hooks]"));
 }
 
 #[test]

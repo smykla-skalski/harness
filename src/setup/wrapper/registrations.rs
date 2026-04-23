@@ -173,16 +173,10 @@ pub(super) fn build_codex_config() -> String {
     concat!(
         "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
         "\n",
-        "# Project .codex/hooks.json entries are trust-gated and may be skipped when Codex\n",
-        "# runs with allow_managed_hooks_only enabled. Keep lifecycle state ingestion here\n",
-        "# so harness remains the source of truth for shared sessions and observe state.\n",
+        "# Enable official Codex hooks loaded from the adjacent .codex/hooks.json file.\n",
+        "# Hook definitions stay in hooks.json; config.toml only turns the engine on.\n",
         "[features]\n",
-        "codex_hooks = true\n",
-        "\n",
-        "[hooks]\n",
-        "session_start = [\"harness\", \"agents\", \"session-start\", \"--agent\", \"codex\"]\n",
-        "pre_compact = [\"harness\", \"pre-compact\"]\n",
-        "session_end = [\"harness\", \"agents\", \"session-stop\", \"--agent\", \"codex\"]\n"
+        "codex_hooks = true\n"
     )
     .to_string()
 }
