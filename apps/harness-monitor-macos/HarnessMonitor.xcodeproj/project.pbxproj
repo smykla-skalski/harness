@@ -402,6 +402,7 @@
 		A6F24AFDB97E5150CEBB61EB /* SessionCockpitSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670E5B76D47527CF1F978C90 /* SessionCockpitSupport.swift */; };
 		A7069CDCA0EF1850476AEBE4 /* PersistenceSnapshotIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F453EC1F33E46631C9C9C257 /* PersistenceSnapshotIntegrationTests.swift */; };
 		A70B5433320068E2D39419E7 /* HarnessMonitorStore+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB863FC1191D3B82A20DED /* HarnessMonitorStore+Persistence.swift */; };
+		A735307787DCD301144FFD4A /* PolicyGapRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6979139B3910236F17E0BC /* PolicyGapRuleTests.swift */; };
 		A7BA9D2A61D6D8A7B291DA53 /* HarnessMonitorControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02873BB8FCEA199F8F8B4F12 /* HarnessMonitorControls.swift */; };
 		A7DB834038B1FE67928267C9 /* SessionsSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AF03739367E9B741F14850 /* SessionsSnapshotTests.swift */; };
 		A7FC9D529C83A9BEFBB62AD1 /* TestClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C221C2C682C220A6D8FC149 /* TestClock.swift */; };
@@ -1022,6 +1023,7 @@
 		6C94D7B4938800D6B21F5992 /* HarnessMonitorStoreSelectionFlowTests+Reconnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStoreSelectionFlowTests+Reconnect.swift"; sourceTree = "<group>"; };
 		6D5A8819E3FCDE71FA61D9FB /* PolicyConfigOverride.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyConfigOverride.swift; sourceTree = "<group>"; };
 		6DD87AA389D253EBD485533F /* AgentTuiWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiWindowView.swift; sourceTree = "<group>"; };
+		6E6979139B3910236F17E0BC /* PolicyGapRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyGapRuleTests.swift; sourceTree = "<group>"; };
 		6F3AD648E176B88FCAB61F32 /* HarnessMonitorPerfDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorPerfDriver.swift; sourceTree = "<group>"; };
 		6F3B86F5C4D60F01C244C360 /* RecordingHarnessClient+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+Config.swift"; sourceTree = "<group>"; };
 		701ED83EC8C04A3AD14BC7DD /* DecisionDetailViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionDetailViewModelTests.swift; sourceTree = "<group>"; };
@@ -1458,6 +1460,7 @@
 				38BBD68AF8AAF09F41C2CB73 /* SupervisorToolbarSliceTests.swift */,
 				42C5D59F57F68B72980D7E54 /* SwiftDataSchemaV7Tests.swift */,
 				695C2A9503DF103DA3BAD8A4 /* Observers */,
+				717DDBE96B223C02A6741B03 /* Rules */,
 				536D4C5794CB004C2D2D09E5 /* TestSupport */,
 			);
 			path = Supervisor;
@@ -1884,6 +1887,14 @@
 				AE501A30BDDB3D73A1A240AB /* LoggingPolicyObserverTests.swift */,
 			);
 			path = Observers;
+			sourceTree = "<group>";
+		};
+		717DDBE96B223C02A6741B03 /* Rules */ = {
+			isa = PBXGroup;
+			children = (
+				6E6979139B3910236F17E0BC /* PolicyGapRuleTests.swift */,
+			);
+			path = Rules;
 			sourceTree = "<group>";
 		};
 		73A921EDCEA35617624B4EAC /* Tests */ = {
@@ -2929,6 +2940,8 @@
 				A7069CDCA0EF1850476AEBE4 /* PersistenceSnapshotIntegrationTests.swift in Sources */,
 				293298424C14724193DC78F0 /* PersistenceUserDataIntegrationTests.swift in Sources */,
 				AD0D4BA3911855C22EC9CD26 /* PolicyExecutorTests.swift in Sources */,
+				A735307787DCD301144FFD4A /* PolicyGapRuleTests.swift in Sources */,
+				D4B02A3FD43FB2646DA6BF56 /* PolicyRegistryTests.swift in Sources */,
 				AF27C4689989F69300B33449 /* PresentedSheetTests.swift in Sources */,
 				5E5A70CFBF5648EB9CCA7732 /* RecordingDaemonController.swift in Sources */,
 				41F1466B59622244818900A5 /* RecordingHarnessClient+AgentTui.swift in Sources */,
