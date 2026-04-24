@@ -1,6 +1,7 @@
 use std::fs;
 
 use fs2::FileExt;
+use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::super::{
@@ -12,22 +13,16 @@ use super::sample_manifest;
 #[test]
 fn singleton_lock_rejects_second_holder() {
     let tmp = tempdir().expect("tempdir");
-    temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
-        || {
-            let _guard = acquire_singleton_lock().expect("first lock");
-            write_manifest(&sample_manifest(4242, "http://127.0.0.1:9999")).expect("manifest");
+    with_isolated_harness_env(tmp.path(), || {
+        let _guard = acquire_singleton_lock().expect("first lock");
+        write_manifest(&sample_manifest(4242, "http://127.0.0.1:9999")).expect("manifest");
 
-            let error = acquire_singleton_lock().expect_err("second lock should fail");
-            let message = error.to_string();
-            assert!(message.contains("daemon already running"));
-            assert!(message.contains("4242"));
-            assert!(message.contains("127.0.0.1:9999"));
-        },
-    );
+        let error = acquire_singleton_lock().expect_err("second lock should fail");
+        let message = error.to_string();
+        assert!(message.contains("daemon already running"));
+        assert!(message.contains("4242"));
+        assert!(message.contains("127.0.0.1:9999"));
+    });
 }
 
 #[test]
