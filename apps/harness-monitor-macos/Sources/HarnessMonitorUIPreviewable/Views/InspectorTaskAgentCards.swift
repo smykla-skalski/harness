@@ -23,7 +23,11 @@ struct TaskInspectorCard: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text(task.context ?? "No task context provided.")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if task.source == .improver {
+        ImproverTaskCardView(task: task)
+      }
       InspectorFactGrid(facts: facts)
+      InspectorReviewStateSection(task: task)
       if let checkpoint = task.checkpointSummary {
         InspectorSection(title: "Checkpoint") {
           InspectorFactGrid(
