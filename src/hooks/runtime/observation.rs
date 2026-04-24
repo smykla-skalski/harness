@@ -32,6 +32,10 @@ pub(super) struct HookExecution {
     pub(super) result: NormalizedHookResult,
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 pub(super) fn finish_hook_observation(
     span: &tracing::Span,
     hook_name: &str,
