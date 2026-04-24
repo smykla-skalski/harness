@@ -7,7 +7,7 @@
 use super::{
     CliError, Path, TaskStatus, apply_arbitrate, apply_claim_review, apply_respond_review,
     apply_submit_for_review, apply_submit_review, generate_review_id, load_state_or_err,
-    log_task_status_changed, storage, utc_now,
+    log_task_status_changed, storage, utc_now, validate_submit_review,
 };
 use crate::session::types::{Review, ReviewPoint, ReviewVerdict};
 /// Submit a task for review.
@@ -97,6 +97,7 @@ pub fn submit_review(
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
     let state_before = load_state_or_err(session_id, project_dir)?;
+    validate_submit_review(&state_before, task_id, actor_id)?;
     let round = state_before
         .tasks
         .get(task_id)

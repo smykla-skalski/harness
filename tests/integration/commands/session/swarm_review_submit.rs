@@ -278,6 +278,42 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
 }
 
 #[test]
+fn rejected_submit_review_leaves_no_durable_record() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-no-record-on-reject", || {
+        let project = tmp.path().join("project");
+        let (_leader, worker_id, task_id) = prepare_in_progress_task("nr-reject", &project);
+        service::submit_for_review("nr-reject", &task_id, &worker_id, None, &project).unwrap();
+        let gemini_id = join_reviewer("nr-reject", "gemini", "GEMINI_SESSION_ID", &project);
+        // Skip claim: submit_review must reject AND must not touch reviews.jsonl.
+
+        let err = service::submit_review(
+            "nr-reject",
+            &task_id,
+            &gemini_id,
+            ReviewVerdict::Approve,
+            "sneaky",
+            vec![],
+            &project,
+        )
+        .expect_err("unclaimed reviewer cannot submit");
+        drop(err);
+
+        let reviews_path = project
+            .join("agents")
+            .join("sessions")
+            .join("nr-reject")
+            .join("tasks")
+            .join(&task_id)
+            .join("reviews.jsonl");
+        assert!(
+            !reviews_path.exists() || std::fs::read_to_string(&reviews_path).unwrap().is_empty(),
+            "rejected submit_review must leave no durable review record at {reviews_path:?}"
+        );
+    });
+}
+
+#[test]
 fn submit_review_rejects_non_claimed_reviewer() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-submit-review-nonclaim", || {

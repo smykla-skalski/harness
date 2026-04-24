@@ -20,6 +20,7 @@ use crate::session::service::{
     apply_respond_review, apply_submit_for_review, apply_submit_review, arbitrate as svc_arbitrate,
     claim_review as svc_claim_review, generate_review_id, respond_review as svc_respond_review,
     submit_for_review as svc_submit_for_review, submit_review as svc_submit_review,
+    validate_submit_review,
 };
 use crate::session::storage as session_storage;
 use crate::session::types::{Review, TaskStatus};
@@ -312,6 +313,7 @@ pub(crate) async fn submit_review_async(
         .ok_or_else(|| session_not_found(session_id))?;
     let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
 
+    validate_submit_review(&resolved.state, task_id, &request.actor)?;
     let round = resolved
         .state
         .tasks
