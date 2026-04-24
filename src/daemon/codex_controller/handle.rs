@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::convert::identity;
 use std::env::var;
 use std::future::Future;
+use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::Duration;
@@ -51,13 +52,8 @@ struct ActiveRun {
 
 #[derive(Debug)]
 pub(super) enum CodexControlMessage {
-    Approval {
-        approval_id: String,
-        decision: CodexApprovalDecision,
-    },
-    Steer {
-        prompt: String,
-    },
+    Approval { approval_id: String, decision: CodexApprovalDecision },
+    Steer { prompt: String },
     Interrupt,
 }
 
@@ -246,10 +242,7 @@ impl CodexControllerHandle {
         );
         state::append_event_best_effort(
             "info",
-            &format!(
-                "queued codex run {} for session {}",
-                snapshot.run_id, snapshot.session_id
-            ),
+            &format!("queued codex run {} for session {}", snapshot.run_id, snapshot.session_id),
         );
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
@@ -334,9 +327,7 @@ impl CodexControllerHandle {
         active
             .control_tx
             .send(CodexControlMessage::Interrupt)
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("queue codex interrupt: {error}"))
-            })?;
+            .map_err(|error| CliErrorKind::workflow_io(format!("queue codex interrupt: {error}")))?;
         self.run(run_id)
     }
 
@@ -373,13 +364,13 @@ impl CodexControllerHandle {
             Ok(async_db
                 .resolve_session(&session_id_owned)
                 .await?
-                .and_then(|resolved| {
-                    resolved
-                        .project
-                        .project_dir
-                        .or(resolved.project.repository_root)
-                        .map(|path| path.display().to_string())
-                        .or_else(|| Some(resolved.project.context_root.display().to_string()))
+                .map(|resolved| {
+                    preferred_codex_project_dir(
+                        &resolved.state.worktree_path,
+                        resolved.project.project_dir.as_deref(),
+                        resolved.project.repository_root.as_deref(),
+                        &resolved.project.context_root,
+                    )
                 }))
         }) && let Some(project_dir) = result?
         {
@@ -393,12 +384,12 @@ impl CodexControllerHandle {
         drop(guard);
 
         let resolved = index::resolve_session(session_id)?;
-        let fallback = resolved
-            .project
-            .project_dir
-            .or(resolved.project.repository_root)
-            .unwrap_or(resolved.project.context_root);
-        Ok(fallback.display().to_string())
+        Ok(preferred_codex_project_dir(
+            &resolved.state.worktree_path,
+            resolved.project.project_dir.as_deref(),
+            resolved.project.repository_root.as_deref(),
+            &resolved.project.context_root,
+        ))
     }
 
     fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
@@ -490,6 +481,20 @@ impl CodexControllerHandle {
             Err(_) => runtime.block_on(future),
         })
     }
+}
+
+pub(super) fn preferred_codex_project_dir(
+    worktree_path: &Path,
+    project_dir: Option<&Path>,
+    repository_root: Option<&Path>,
+    context_root: &Path,
+) -> String {
+    let path = if worktree_path.as_os_str().is_empty() {
+        project_dir.or(repository_root).unwrap_or(context_root)
+    } else {
+        worktree_path
+    };
+    path.display().to_string()
 }
 
 fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {

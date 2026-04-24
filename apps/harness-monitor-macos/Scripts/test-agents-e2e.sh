@@ -15,6 +15,8 @@ XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
 CODEX_BINARY="${HARNESS_MONITOR_E2E_CODEX_BINARY:-$(command -v codex || true)}"
+CODEX_MODEL_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_MODEL:-}"
+CODEX_EFFORT_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_EFFORT:-}"
 ONLY_TESTING="${XCODE_ONLY_TESTING:-HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests}"
 RUN_ID="${HARNESS_MONITOR_E2E_RUN_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 STATE_ROOT_PARENT="${HARNESS_MONITOR_E2E_STATE_ROOT_PARENT:-${TMPDIR:-/tmp}/HarnessMonitorAgentsE2E}"
@@ -69,10 +71,8 @@ cleanup() {
   local status="$1"
 
   stop_bridge_process
-  if [[ -n "$DAEMON_PID" ]] && kill -0 "$DAEMON_PID" 2>/dev/null; then
-    kill "$DAEMON_PID" 2>/dev/null || true
-    wait "$DAEMON_PID" 2>/dev/null || true
-  fi
+  stop_process_tree "$DAEMON_PID"
+  DAEMON_PID=""
 
   if [[ "$status" -eq 0 ]] && [[ "$KEEP_STATE_ROOT" != "1" ]]; then
     rm -rf "$STATE_ROOT"
@@ -99,13 +99,48 @@ cleanup() {
 trap 'status=$?; cleanup "$status"; exit "$status"' EXIT
 
 stop_bridge_process() {
-  if [[ -n "$BRIDGE_PID" ]] && kill -0 "$BRIDGE_PID" 2>/dev/null; then
-    kill "$BRIDGE_PID" 2>/dev/null || true
-  fi
   if [[ -n "$BRIDGE_PID" ]]; then
-    wait "$BRIDGE_PID" 2>/dev/null || true
+    stop_process_tree "$BRIDGE_PID"
   fi
   BRIDGE_PID=""
+}
+
+stop_child_processes_recursive() {
+  local parent_pid="$1"
+  local child_pid=""
+
+  while IFS= read -r child_pid; do
+    if [[ -n "$child_pid" ]]; then
+      stop_process_tree "$child_pid"
+    fi
+  done < <(pgrep -P "$parent_pid" 2>/dev/null || true)
+}
+
+stop_process_tree() {
+  local root_pid="$1"
+  if [[ -z "$root_pid" ]]; then
+    return
+  fi
+  if ! kill -0 "$root_pid" 2>/dev/null; then
+    wait "$root_pid" 2>/dev/null || true
+    return
+  fi
+
+  stop_child_processes_recursive "$root_pid"
+  kill -TERM "$root_pid" 2>/dev/null || true
+
+  local deadline=$((SECONDS + 5))
+  while (( SECONDS < deadline )); do
+    if ! kill -0 "$root_pid" 2>/dev/null; then
+      wait "$root_pid" 2>/dev/null || true
+      return
+    fi
+    sleep 0.2
+  done
+
+  stop_child_processes_recursive "$root_pid"
+  kill -KILL "$root_pid" 2>/dev/null || true
+  wait "$root_pid" 2>/dev/null || true
 }
 
 allocate_unused_local_port() {
@@ -116,6 +151,101 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
     sock.bind(("127.0.0.1", 0))
     print(sock.getsockname()[1])
 PY
+}
+
+resolve_supported_codex_launch() {
+  if [[ -n "$CODEX_MODEL_OVERRIDE" ]]; then
+    return 0
+  fi
+
+  local launch_json
+  if ! launch_json="$("$CODEX_BINARY" debug models 2>/dev/null)"; then
+    return 0
+  fi
+
+  local resolved
+  resolved="$(
+    CODEX_DEBUG_MODELS_JSON="$launch_json" python3 - <<'PY'
+import json
+import os
+
+preferred = [
+    "gpt-5.4-mini",
+    "gpt-5.3-codex-spark",
+    "gpt-5.3-codex",
+    "gpt-5.2",
+    "gpt-5.4",
+    "gpt-5.5",
+]
+
+try:
+    payload = json.loads(os.environ["CODEX_DEBUG_MODELS_JSON"])
+except Exception:
+    raise SystemExit(0)
+
+models = payload.get("models") or []
+by_slug = {}
+for model in models:
+    slug = model.get("slug")
+    if isinstance(slug, str) and slug:
+        by_slug[slug] = model
+
+def resolve_effort(model):
+    levels = [
+        item.get("effort")
+        for item in (model.get("supported_reasoning_levels") or [])
+        if isinstance(item, dict)
+    ]
+    for candidate in ("low", "medium", "high", "xhigh"):
+        if candidate in levels:
+            return candidate
+    return None
+
+selected_slug = None
+selected_model = None
+for slug in preferred:
+    model = by_slug.get(slug)
+    if model is None:
+        continue
+    effort = resolve_effort(model)
+    if effort is None:
+        continue
+    selected_slug = slug
+    selected_model = model
+    break
+
+if selected_model is None:
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        slug = model.get("slug")
+        if not isinstance(slug, str) or not slug:
+            continue
+        effort = resolve_effort(model)
+        if effort is None:
+            continue
+        selected_slug = slug
+        selected_model = model
+        break
+
+if selected_model is None or selected_slug is None:
+    raise SystemExit(0)
+
+effort = resolve_effort(selected_model)
+if effort is None:
+    raise SystemExit(0)
+
+print(selected_slug)
+print(effort)
+PY
+  )"
+
+  if [[ -z "$resolved" ]]; then
+    return 0
+  fi
+
+  CODEX_MODEL_OVERRIDE="$(printf '%s\n' "$resolved" | sed -n '1p')"
+  CODEX_EFFORT_OVERRIDE="$(printf '%s\n' "$resolved" | sed -n '2p')"
 }
 
 bridge_failed_with_port_conflict() {
@@ -215,7 +345,7 @@ start_bridge() {
       echo "=== bridge attempt $attempt codex_port=$codex_port ==="
     } >>"$BRIDGE_LOG"
 
-    run_harness bridge start \
+    env XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" bridge start \
       --capability codex \
       --capability agent-tui \
       --codex-port "$codex_port" \
@@ -302,7 +432,8 @@ configure_xctestrun() {
 
   python3 - "$source_path" "$destination_path" \
     "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$BRIDGE_LOG" \
-    "$TERMINAL_SESSION_ID" "$CODEX_SESSION_ID" <<'PY'
+    "$TERMINAL_SESSION_ID" "$CODEX_SESSION_ID" \
+    "$CODEX_MODEL_OVERRIDE" "$CODEX_EFFORT_OVERRIDE" <<'PY'
 import plistlib
 import shutil
 import sys
@@ -316,6 +447,8 @@ import sys
     bridge_log,
     terminal_session_id,
     codex_session_id,
+    codex_model,
+    codex_effort,
 ) = sys.argv[1:]
 
 shutil.copyfile(source_path, destination_path)
@@ -332,6 +465,10 @@ updates = {
     "HARNESS_MONITOR_E2E_CODEX_SESSION_ID": codex_session_id,
     "HARNESS_MONITOR_ENABLE_AGENTS_E2E": "1",
 }
+if codex_model:
+    updates["HARNESS_MONITOR_E2E_CODEX_MODEL"] = codex_model
+if codex_effort:
+    updates["HARNESS_MONITOR_E2E_CODEX_EFFORT"] = codex_effort
 
 for key in ("EnvironmentVariables", "TestingEnvironmentVariables"):
     environment = target.setdefault(key, {})
@@ -343,6 +480,7 @@ PY
 }
 
 seed_observability_config
+resolve_supported_codex_launch
 
 "$ROOT/Scripts/generate-project.sh"
 "$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
@@ -375,7 +513,7 @@ fi
 CONFIGURED_XCTESTRUN="${GENERATED_XCTESTRUN%.xctestrun}.configured.xctestrun"
 configure_xctestrun "$GENERATED_XCTESTRUN" "$CONFIGURED_XCTESTRUN"
 
-run_harness daemon serve --sandboxed --host 127.0.0.1 --port 0 >"$DAEMON_LOG" 2>&1 &
+env XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" daemon serve --sandboxed --host 127.0.0.1 --port 0 >"$DAEMON_LOG" 2>&1 &
 DAEMON_PID="$!"
 wait_for_daemon
 
@@ -402,4 +540,6 @@ if HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   "-only-testing:${ONLY_TESTING}"
 then
   verify_post_run_state
+else
+  exit $?
 fi

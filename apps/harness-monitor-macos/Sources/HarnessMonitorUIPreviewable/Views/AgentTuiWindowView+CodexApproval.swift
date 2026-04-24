@@ -49,9 +49,9 @@ extension AgentTuiWindowView {
       decisionItemByApprovalID[approval.approvalId]
         ?? CodexApprovalItem.fallback(from: approval)
     }
-    items.append(
-      contentsOf: decisionItems.filter { requestsByApprovalID[$0.approvalID] == nil }
-    )
+    if run.pendingApprovals.isEmpty {
+      items.append(contentsOf: decisionItems)
+    }
     return items
   }
 

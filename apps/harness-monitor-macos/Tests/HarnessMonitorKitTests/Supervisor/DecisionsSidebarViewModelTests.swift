@@ -260,4 +260,59 @@ final class AgentTuiCodexApprovalViewModelTests: XCTestCase {
     XCTAssertEqual(items[0].title, "Approve workspace write")
     XCTAssertEqual(items[0].actions.map(\.id), ["accept", "decline"])
   }
+
+  @MainActor
+  func test_codexApprovalItems_dropMismatchedDecisionRowsWhenRunHasPendingApproval() {
+    let approval = CodexApprovalRequest(
+      approvalId: "pending-approval",
+      requestId: "request-1",
+      kind: "command",
+      title: "Command approval requested",
+      detail: "rtk touch approved.txt",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-1",
+      cwd: "/tmp/harness",
+      command: "rtk touch approved.txt",
+      filePath: nil
+    )
+    let run = CodexRunSnapshot(
+      runId: "run-1",
+      sessionId: "sess-1",
+      projectDir: "/tmp/harness",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      mode: .approval,
+      status: .waitingApproval,
+      prompt: "Approve patch",
+      latestSummary: nil,
+      finalMessage: nil,
+      error: nil,
+      pendingApprovals: [approval],
+      createdAt: "2026-04-23T08:00:00Z",
+      updatedAt: "2026-04-23T08:05:00Z"
+    )
+    let decision = Decision(
+      id: "codex-approval:sess-1:stale-approval",
+      severity: .needsUser,
+      ruleID: "codex-approval",
+      sessionID: "sess-1",
+      agentID: "run-1",
+      taskID: nil,
+      summary: "Command approval requested",
+      contextJSON: #"{"agentID":"run-1","approvalID":"stale-approval"}"#,
+      suggestedActionsJSON: """
+        [
+          {"id":"accept","kind":"custom","payloadJSON":"{}","title":"Accept"},
+          {"id":"decline","kind":"custom","payloadJSON":"{}","title":"Decline"}
+        ]
+        """
+    )
+
+    let items = AgentTuiWindowView.codexApprovalItems(for: run, decisions: [decision])
+
+    XCTAssertEqual(items.count, 1)
+    XCTAssertEqual(items[0].approvalID, "pending-approval")
+    XCTAssertNil(items[0].decisionID)
+  }
 }

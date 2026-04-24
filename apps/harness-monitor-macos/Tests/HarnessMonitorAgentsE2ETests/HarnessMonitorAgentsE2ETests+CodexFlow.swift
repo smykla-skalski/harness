@@ -3,6 +3,8 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 extension HarnessMonitorAgentsE2ETests {
+  private static let codexApprovalIdentifierPrefix = "harness.window.agents.codex.approval."
+
   func launchSteeredCodexRun(in app: XCUIApplication) {
     selectSegment(
       in: app,
@@ -117,6 +119,7 @@ extension HarnessMonitorAgentsE2ETests {
     harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
     var sawApproval = false
+    var submittedApproval = false
     let approvalFinalMessage = element(in: app, identifier: Accessibility.agentsCodexFinalMessage)
     XCTAssertTrue(
       waitUntil(timeout: Self.codexCompletionTimeout, pollInterval: 0.25) {
@@ -127,14 +130,18 @@ extension HarnessMonitorAgentsE2ETests {
           return true
         }
 
-        let approveButton = self.button(in: app, title: "Approve")
+        if let acceptIdentifier = self.codexApprovalIdentifier(in: app, decision: "accept") {
+          sawApproval = true
+          if !submittedApproval {
+            submittedApproval = true
+            self.tapButton(in: app, identifier: acceptIdentifier)
+          }
+          return false
+        }
+
+        let approveButton = self.button(in: app, title: "Accept")
         if approveButton.exists {
           sawApproval = true
-          if approveButton.isHittable {
-            approveButton.tap()
-          } else if let coordinate = self.centerCoordinate(in: app, for: approveButton) {
-            coordinate.tap()
-          }
         }
         return false
       },
@@ -153,5 +160,49 @@ extension HarnessMonitorAgentsE2ETests {
       \(harness.diagnosticsSummary())
       """
     )
+  }
+
+  private func codexApprovalIdentifier(in app: XCUIApplication, decision: String) -> String? {
+    let predicate = NSPredicate(
+      format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+      Self.codexApprovalIdentifierPrefix,
+      ".\(decision)"
+    )
+    let mainWindowMatch = mainWindow(in: app)
+      .descendants(matching: .any)
+      .matching(predicate)
+      .firstMatch
+    if mainWindowMatch.exists {
+      return mainWindowMatch.identifier
+    }
+
+    let appMatch = app.descendants(matching: .any)
+      .matching(predicate)
+      .firstMatch
+    if appMatch.exists {
+      return appMatch.identifier
+    }
+
+    let framePredicate = NSPredicate(
+      format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+      Self.codexApprovalIdentifierPrefix,
+      ".\(decision).frame"
+    )
+    let mainWindowFrame = mainWindow(in: app)
+      .descendants(matching: .any)
+      .matching(framePredicate)
+      .firstMatch
+    if mainWindowFrame.exists {
+      return String(mainWindowFrame.identifier.dropLast(".frame".count))
+    }
+
+    let appFrame = app.descendants(matching: .any)
+      .matching(framePredicate)
+      .firstMatch
+    if appFrame.exists {
+      return String(appFrame.identifier.dropLast(".frame".count))
+    }
+
+    return nil
   }
 }
