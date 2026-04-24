@@ -64,6 +64,12 @@ pub(crate) fn apply_assign_task(
     require_permission(state, actor_id, SessionAction::AssignTask)?;
     require_active_worker_target_agent(state, agent_id)?;
 
+    let current_status = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .status;
+    reject_generic_mutation_on_review_state(task_id, current_status, "reassigned")?;
     let previous_assignee = state
         .tasks
         .get(task_id)
@@ -193,6 +199,21 @@ fn reject_review_only_status(task_id: &str, status: TaskStatus) -> Result<(), Cl
     Ok(())
 }
 
+fn reject_generic_mutation_on_review_state(
+    task_id: &str,
+    current: TaskStatus,
+    operation: &str,
+) -> Result<(), CliError> {
+    if matches!(current, TaskStatus::AwaitingReview | TaskStatus::InReview) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' is {} and cannot be {operation}; use respond_review or arbitrate",
+            task_status_label(current)
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 /// Update a task's status. Returns the previous status.
 pub(crate) fn apply_update_task(
     state: &mut SessionState,
@@ -207,6 +228,12 @@ pub(crate) fn apply_update_task(
 
     reject_review_only_status(task_id, status)?;
 
+    let current_status = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .status;
+    reject_generic_mutation_on_review_state(task_id, current_status, "updated generically")?;
     let assigned_to = state
         .tasks
         .get(task_id)
