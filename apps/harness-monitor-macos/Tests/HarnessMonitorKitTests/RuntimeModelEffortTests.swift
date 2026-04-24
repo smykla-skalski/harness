@@ -10,19 +10,19 @@ struct RuntimeModelEffortTests {
   func decodesDaemonCatalog() throws {
     let json = #"""
       {
-        "id": "gpt-5-codex",
-        "display_name": "GPT-5 Codex",
+        "id": "gpt-5.5",
+        "display_name": "GPT-5.5",
         "tier": "balanced",
         "effort_kind": "reasoning_effort",
-        "effort_values": ["minimal", "low", "medium", "high"]
+        "effort_values": ["low", "medium", "high", "xhigh"]
       }
       """#
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let model = try decoder.decode(RuntimeModel.self, from: Data(json.utf8))
-    #expect(model.id == "gpt-5-codex")
+    #expect(model.id == "gpt-5.5")
     #expect(model.effortKind == .reasoningEffort)
-    #expect(model.effortValues == ["minimal", "low", "medium", "high"])
+    #expect(model.effortValues == ["low", "medium", "high", "xhigh"])
     #expect(model.supportsEffort)
   }
 
@@ -63,7 +63,7 @@ struct AgentTuiWindowViewEffortHelperTests {
 
   @Test("default effort falls back to the middle index when no medium")
   func defaultFallsBackToMiddle() {
-    let values = ["minimal", "low", "high"]
+    let values = ["off", "low", "high"]
     #expect(AgentTuiWindowView.defaultEffortLevel(from: values) == "low")
   }
 
@@ -77,7 +77,7 @@ struct AgentTuiWindowViewEffortHelperTests {
     let resolved = AgentTuiWindowView.effectiveModelId(
       pickerValue: RuntimeCustomModel.tag,
       customValue: "  gpt-6-private  ",
-      catalogDefault: "gpt-5-codex"
+      catalogDefault: "gpt-5.5"
     )
     #expect(resolved.id == "gpt-6-private")
     #expect(resolved.allowCustom)
@@ -88,9 +88,9 @@ struct AgentTuiWindowViewEffortHelperTests {
     let resolved = AgentTuiWindowView.effectiveModelId(
       pickerValue: "",
       customValue: "",
-      catalogDefault: "gpt-5-codex"
+      catalogDefault: "gpt-5.5"
     )
-    #expect(resolved.id == "gpt-5-codex")
+    #expect(resolved.id == "gpt-5.5")
     #expect(!resolved.allowCustom)
   }
 
@@ -120,6 +120,6 @@ struct AgentTuiWindowViewEffortHelperTests {
       catalog: catalog,
       selectedModelId: RuntimeCustomModel.tag
     )
-    #expect(values == ["off", "minimal", "low", "medium", "high"])
+    #expect(values == ["off", "low", "medium", "high", "xhigh"])
   }
 }
