@@ -212,6 +212,7 @@ mod direct;
 mod leave;
 mod mutations;
 mod mutations_async;
+mod improver_apply;
 mod review_mutations;
 mod review_submit_txn;
 mod observe_async;
@@ -251,9 +252,10 @@ pub(crate) use mutations_async::{
     drop_task_async, end_session_async, remove_agent_async, transfer_leader_async,
     update_task_async, update_task_queue_policy_async,
 };
+pub use improver_apply::improver_apply;
+pub(crate) use improver_apply::improver_apply_async;
 pub use review_mutations::{
-    arbitrate as arbitrate_review, claim_review, improver_apply, respond_review,
-    submit_for_review, submit_review,
+    arbitrate as arbitrate_review, claim_review, respond_review, submit_for_review, submit_review,
 };
 pub(crate) use review_mutations::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,

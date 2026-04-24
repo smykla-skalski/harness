@@ -7,6 +7,88 @@ use crate::session::types::{SessionRole, TaskStatus};
 use super::*;
 
 #[test]
+fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
+    with_temp_project(|project| {
+        std::fs::create_dir_all(project.join("agents/skills")).expect("skills dir");
+        std::fs::write(project.join("agents/skills/SKILL.md"), "before\n").expect("skill");
+        let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
+        runtime_tokio.block_on(async {
+            let db_path = project
+                .parent()
+                .expect("project parent")
+                .join("daemon-improver-async.sqlite");
+            let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                .await
+                .expect("open async daemon db");
+
+            let state = start_direct_session_async(
+                &async_db,
+                project,
+                "daemon-improver-async",
+                "async improver apply",
+                "async flow",
+                None,
+            )
+            .await;
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let improver_id = temp_env::async_with_vars(
+                [("CODEX_SESSION_ID", Some("async-improver"))],
+                async {
+                    let joined = join_session_direct_async(
+                        &state.session_id,
+                        &crate::daemon::protocol::SessionJoinRequest {
+                            runtime: "codex".into(),
+                            role: SessionRole::Improver,
+                            fallback_role: None,
+                            capabilities: vec![],
+                            name: Some("Improver".into()),
+                            project_dir: project.to_string_lossy().into(),
+                            persona: None,
+                        },
+                        &async_db,
+                    )
+                    .await
+                    .expect("join improver");
+                    joined
+                        .agents
+                        .values()
+                        .find(|agent| agent.role == SessionRole::Improver)
+                        .expect("improver")
+                        .agent_id
+                        .clone()
+                },
+            )
+            .await;
+
+            let outcome = crate::daemon::service::improver_apply_async(
+                &state.session_id,
+                &ImproverApplyRequest {
+                    actor: improver_id,
+                    issue_id: "async-issue".into(),
+                    target: crate::session::service::ImproverTarget::Skill,
+                    rel_path: "SKILL.md".into(),
+                    new_contents: "after\n".into(),
+                    project_dir: project.to_string_lossy().into_owned(),
+                    dry_run: true,
+                },
+                &async_db,
+            )
+            .await
+            .expect("async dry-run resolves via async db");
+            assert!(!outcome.applied, "dry-run must not modify disk");
+            assert_ne!(outcome.before_sha256, outcome.after_sha256);
+            assert_eq!(
+                std::fs::read_to_string(project.join("agents/skills/SKILL.md")).unwrap(),
+                "before\n",
+                "skill file unchanged on dry-run"
+            );
+
+            let _ = leader_id;
+        });
+    });
+}
+
+#[test]
 fn improver_apply_rejects_worker_and_uses_session_project_dir_for_dry_run() {
     with_temp_project(|project| {
         std::fs::create_dir_all(project.join("agents/skills")).expect("skills dir");
@@ -69,6 +151,7 @@ fn improver_apply_rejects_worker_and_uses_session_project_dir_for_dry_run() {
                 project_dir: bogus.path().to_string_lossy().into_owned(),
                 dry_run: true,
             },
+            None,
         )
         .expect_err("worker cannot apply");
         assert_eq!(denied.code(), "KSRCLI091");
@@ -84,6 +167,7 @@ fn improver_apply_rejects_worker_and_uses_session_project_dir_for_dry_run() {
                 project_dir: bogus.path().to_string_lossy().into_owned(),
                 dry_run: true,
             },
+            None,
         )
         .expect("dry run uses session project");
         assert!(!outcome.applied);
