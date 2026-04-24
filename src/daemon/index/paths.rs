@@ -53,3 +53,17 @@ pub(super) fn task_checkpoints_path(
         .join(task_id)
         .join("checkpoints.jsonl")
 }
+
+pub(super) fn task_reviews_path(
+    context_root: &Path,
+    session_id: &str,
+    task_id: &str,
+) -> PathBuf {
+    context_root
+        .join("orchestration")
+        .join("sessions")
+        .join(session_id)
+        .join("tasks")
+        .join(task_id)
+        .join("reviews.jsonl")
+}

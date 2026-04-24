@@ -51,6 +51,7 @@ mod async_writes;
 mod conversation;
 mod diagnostics;
 mod imports;
+mod rebuild;
 mod runtime;
 mod schema;
 mod schema_repairs;
