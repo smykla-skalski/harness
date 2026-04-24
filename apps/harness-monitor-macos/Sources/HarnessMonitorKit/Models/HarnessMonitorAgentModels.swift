@@ -42,13 +42,45 @@ public enum SessionRole: String, Codable, CaseIterable, Sendable {
 
 public enum AgentStatus: String, Codable, CaseIterable, Sendable {
   case active
+  case awaitingReview = "awaiting_review"
+  case idle
   case disconnected
   case removed
+
+  init?(rawOrLegacyValue value: String) {
+    switch value {
+    case "awaitingReview":
+      self = .awaitingReview
+    default:
+      self.init(rawValue: value)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    guard let status = Self(rawOrLegacyValue: value) else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Invalid agent status: \(value)"
+      )
+    }
+    self = status
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
 
   public var title: String {
     switch self {
     case .active:
       "Active"
+    case .awaitingReview:
+      "Awaiting Review"
+    case .idle:
+      "Idle"
     case .disconnected:
       "Disconnected"
     case .removed:

@@ -331,4 +331,51 @@ struct HarnessMonitorSessionModelsTests {
     #expect(summary.status.rawValue == "leaderless_degraded")
     #expect(summary.leaderId == nil)
   }
+
+  @Test("SessionMetrics decodes legacy v9 payload without v10 fields")
+  func sessionMetricsDecodesLegacyPayload() throws {
+    let json = """
+      {
+        "agent_count": 3,
+        "active_agent_count": 2,
+        "open_task_count": 5,
+        "in_progress_task_count": 1,
+        "blocked_task_count": 0,
+        "completed_task_count": 7
+      }
+      """
+    let metrics = try decoder.decode(SessionMetrics.self, from: Data(json.utf8))
+    #expect(metrics.agentCount == 3)
+    #expect(metrics.activeAgentCount == 2)
+    #expect(metrics.idleAgentCount == 0)
+    #expect(metrics.awaitingReviewAgentCount == 0)
+    #expect(metrics.awaitingReviewTaskCount == 0)
+    #expect(metrics.inReviewTaskCount == 0)
+    #expect(metrics.arbitrationTaskCount == 0)
+  }
+
+  @Test("SessionMetrics decodes v10 payload with all review counts")
+  func sessionMetricsDecodesV10Payload() throws {
+    let json = """
+      {
+        "agent_count": 5,
+        "active_agent_count": 2,
+        "idle_agent_count": 1,
+        "awaiting_review_agent_count": 2,
+        "open_task_count": 3,
+        "in_progress_task_count": 1,
+        "awaiting_review_task_count": 4,
+        "in_review_task_count": 2,
+        "arbitration_task_count": 1,
+        "blocked_task_count": 0,
+        "completed_task_count": 9
+      }
+      """
+    let metrics = try decoder.decode(SessionMetrics.self, from: Data(json.utf8))
+    #expect(metrics.idleAgentCount == 1)
+    #expect(metrics.awaitingReviewAgentCount == 2)
+    #expect(metrics.awaitingReviewTaskCount == 4)
+    #expect(metrics.inReviewTaskCount == 2)
+    #expect(metrics.arbitrationTaskCount == 1)
+  }
 }

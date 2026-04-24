@@ -23,6 +23,7 @@ public enum TaskSeverity: String, Codable, CaseIterable, Sendable {
 public enum TaskStatus: String, Codable, CaseIterable, Sendable {
   case open
   case inProgress = "in_progress"
+  case awaitingReview = "awaiting_review"
   case inReview = "in_review"
   case done
   case blocked
@@ -33,6 +34,8 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
       self = .inProgress
     case "inReview":
       self = .inReview
+    case "awaitingReview":
+      self = .awaitingReview
     default:
       self.init(rawValue: value)
     }
@@ -61,6 +64,8 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
       "Open"
     case .inProgress:
       "In Progress"
+    case .awaitingReview:
+      "Awaiting Review"
     case .inReview:
       "In Review"
     case .done:
@@ -147,6 +152,7 @@ public enum TaskSource: String, Codable, CaseIterable, Sendable {
   case observe
   case signal
   case system
+  case improver
 
   public var title: String {
     switch self {
@@ -158,6 +164,8 @@ public enum TaskSource: String, Codable, CaseIterable, Sendable {
       "Signal"
     case .system:
       "System"
+    case .improver:
+      "Improver"
     }
   }
 }
@@ -208,6 +216,12 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
   public let blockedReason: String?
   public let completedAt: String?
   public let checkpointSummary: TaskCheckpointSummary?
+  public let awaitingReview: AwaitingReview?
+  public let reviewClaim: ReviewClaim?
+  public let consensus: ReviewConsensus?
+  public let reviewRound: Int
+  public let arbitration: ArbitrationOutcome?
+  public let suggestedPersona: String?
 
   public var id: String { taskId }
 
@@ -229,6 +243,12 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     case blockedReason
     case completedAt
     case checkpointSummary
+    case awaitingReview
+    case reviewClaim
+    case consensus
+    case reviewRound
+    case arbitration
+    case suggestedPersona
   }
 
   public init(
@@ -248,7 +268,13 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     source: TaskSource,
     blockedReason: String?,
     completedAt: String?,
-    checkpointSummary: TaskCheckpointSummary?
+    checkpointSummary: TaskCheckpointSummary?,
+    awaitingReview: AwaitingReview? = nil,
+    reviewClaim: ReviewClaim? = nil,
+    consensus: ReviewConsensus? = nil,
+    reviewRound: Int = 0,
+    arbitration: ArbitrationOutcome? = nil,
+    suggestedPersona: String? = nil
   ) {
     self.taskId = taskId
     self.title = title
@@ -267,6 +293,12 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     self.blockedReason = blockedReason
     self.completedAt = completedAt
     self.checkpointSummary = checkpointSummary
+    self.awaitingReview = awaitingReview
+    self.reviewClaim = reviewClaim
+    self.consensus = consensus
+    self.reviewRound = reviewRound
+    self.arbitration = arbitration
+    self.suggestedPersona = suggestedPersona
   }
 
   public init(from decoder: Decoder) throws {
@@ -292,5 +324,11 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
       TaskCheckpointSummary.self,
       forKey: .checkpointSummary
     )
+    awaitingReview = try container.decodeIfPresent(AwaitingReview.self, forKey: .awaitingReview)
+    reviewClaim = try container.decodeIfPresent(ReviewClaim.self, forKey: .reviewClaim)
+    consensus = try container.decodeIfPresent(ReviewConsensus.self, forKey: .consensus)
+    reviewRound = try container.decodeIfPresent(Int.self, forKey: .reviewRound) ?? 0
+    arbitration = try container.decodeIfPresent(ArbitrationOutcome.self, forKey: .arbitration)
+    suggestedPersona = try container.decodeIfPresent(String.self, forKey: .suggestedPersona)
   }
 }

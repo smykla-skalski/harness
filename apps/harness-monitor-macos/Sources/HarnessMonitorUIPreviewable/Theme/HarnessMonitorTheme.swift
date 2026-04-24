@@ -104,11 +104,28 @@ func taskStatusColor(for status: TaskStatus) -> Color {
     HarnessMonitorTheme.accent
   case .inProgress:
     HarnessMonitorTheme.warmAccent
+  case .awaitingReview:
+    HarnessMonitorTheme.caution
   case .inReview:
     HarnessMonitorTheme.caution
   case .done:
     HarnessMonitorTheme.success
   case .blocked:
+    HarnessMonitorTheme.danger
+  }
+}
+
+func agentStatusColor(for status: AgentStatus) -> Color {
+  switch status {
+  case .active:
+    HarnessMonitorTheme.success
+  case .awaitingReview:
+    HarnessMonitorTheme.caution
+  case .idle:
+    HarnessMonitorTheme.ink.opacity(0.55)
+  case .disconnected:
+    HarnessMonitorTheme.ink.opacity(0.55)
+  case .removed:
     HarnessMonitorTheme.danger
   }
 }

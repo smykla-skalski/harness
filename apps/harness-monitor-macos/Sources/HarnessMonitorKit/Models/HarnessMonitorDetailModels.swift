@@ -187,10 +187,14 @@ extension AgentStatus {
     switch self {
     case .active:
       0
-    case .disconnected:
+    case .awaitingReview:
       1
-    case .removed:
+    case .idle:
       2
+    case .disconnected:
+      3
+    case .removed:
+      4
     }
   }
 }
