@@ -42,7 +42,7 @@ final class DecisionsWindowOpenUITests: HarnessMonitorUITestCase {
       XCTFail("Supervisor badge is not reachable for tapping")
     }
 
-    let decisionsWindow = app.windows["Decisions"]
+    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {

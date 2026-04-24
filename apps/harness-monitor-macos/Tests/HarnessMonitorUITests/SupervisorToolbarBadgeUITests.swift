@@ -49,7 +49,7 @@ final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
 
     tapButton(in: app, identifier: Accessibility.supervisorBadge)
 
-    let decisionsWindow = app.windows["Decisions"]
+    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { decisionsWindow.exists },
       "Decisions window should open after tapping the toolbar badge"
