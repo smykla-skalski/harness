@@ -33,7 +33,7 @@ stale_scan_ensure_ps() {
 # Print pids whose ps line matches the requested bucket:
 #   build - any cargo-built harness daemon/bridge under target/{debug,release,dev/*/(debug|release)}
 #   live  - installed harness daemon serve / bridge start on PATH
-#   gate  - repo-local build/test/lint runners driven by mise or scripts/
+#   gate  - repo-local check/lint/build runners driven by mise or scripts/
 stale_scan_matching_pids() {
   local process_kind="$1"
   stale_scan_ensure_ps
@@ -47,12 +47,10 @@ stale_scan_matching_pids() {
       if (process_kind == "live"  && $0 ~ /(^|\/)harness (daemon serve|bridge start)( |$)/) matched = 1
       if (process_kind == "gate") {
         if ($0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) matched = 1
-        if ($0 ~ /(^| )mise run test(:| |$)/) matched = 1
-        if ($0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|test|test:scripts|test:agents-e2e|audit|audit:from-ref)( |$)/) matched = 1
+        if ($0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
         if ($0 ~ /(^| )bash \.\/scripts\/check(\.sh|-scripts\.sh)( |$)/) matched = 1
-        if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|test|run --quiet -- setup agents generate --check)( |$)/) matched = 1
-        if ($0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|test-swift|test-agents-e2e|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) matched = 1
-        if ($0 ~ /python3 -m unittest discover -s .*apps\/harness-monitor-macos\/Scripts\/tests/) matched = 1
+        if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|run --quiet -- setup agents generate --check)( |$)/) matched = 1
+        if ($0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) matched = 1
       }
       if (matched) print pid
     }
