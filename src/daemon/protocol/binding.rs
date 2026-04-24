@@ -3,11 +3,13 @@ use serde_json::Value;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::{
-    AgentRemoveRequest, CodexRunRequest, LeaderTransferRequest, ObserveSessionRequest,
-    RoleChangeRequest, SessionEndRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
-    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
+    AgentRemoveRequest, CodexRunRequest, ImproverApplyRequest, LeaderTransferRequest,
+    ObserveSessionRequest, RoleChangeRequest, SessionEndRequest, SignalCancelRequest,
+    SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest, TaskCheckpointRequest,
+    TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
+    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
 };
 
 /// Rebind actor-bearing daemon requests to the authenticated control-plane
@@ -137,6 +139,42 @@ impl ControlPlaneActorRequest for VoiceTranscriptUpdateRequest {
 }
 
 impl ControlPlaneActorRequest for VoiceSessionFinishRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskSubmitForReviewRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskClaimReviewRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskSubmitReviewRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskRespondReviewRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskArbitrateRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for ImproverApplyRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.actor);
     }
