@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::observe::types::{Issue, IssueSeverity};
+use crate::observe::types::{Issue, IssueCode, IssueSeverity};
 use crate::session::types::{TaskSeverity, TaskSource};
 
 use super::{
@@ -162,9 +162,26 @@ fn issue_task_spec(issue: &Issue) -> ObserveTaskSpec {
     ObserveTaskSpec {
         title: format!("[{}] {}", issue.code, issue.summary),
         context: Some(issue.details.clone()),
-        severity: map_issue_severity(issue.severity),
+        severity: task_severity_for_issue(issue),
         suggested_fix: issue.fix_hint.clone(),
         observe_issue_id: Some(issue.id.clone()),
+    }
+}
+
+/// Issue-aware severity bridge for observer-authored tasks.
+///
+/// Overrides the base severity mapping for high-impact heuristics that
+/// should surface as [`TaskSeverity::High`] or [`TaskSeverity::Critical`]
+/// regardless of the classifier's own [`IssueSeverity`].
+pub(crate) fn task_severity_for_issue(issue: &Issue) -> TaskSeverity {
+    match issue.code {
+        IssueCode::PythonTracebackOutput
+        | IssueCode::PythonUsedInBashToolUse
+        | IssueCode::HookDeniedToolCall
+        | IssueCode::CrossAgentFileConflict => TaskSeverity::High,
+        IssueCode::UnauthorizedGitCommitDuringRun
+        | IssueCode::UnverifiedRecursiveRemove => TaskSeverity::Critical,
+        _ => map_issue_severity(issue.severity),
     }
 }
 
@@ -191,5 +208,171 @@ fn map_issue_severity(severity: IssueSeverity) -> TaskSeverity {
         IssueSeverity::Critical => TaskSeverity::Critical,
         IssueSeverity::Medium => TaskSeverity::Medium,
         IssueSeverity::Low => TaskSeverity::Low,
+    }
+}
+
+/// Inject a synthetic classifier issue and auto-file it as a task using
+/// the same code path as production observer persistence. Crate-test
+/// only; returns the resulting [`WorkItem`] for assertion.
+#[cfg(test)]
+pub(crate) fn test_inject_issue(
+    state: &mut crate::session::types::SessionState,
+    agent_id: &str,
+    code: IssueCode,
+    now: &str,
+) -> Result<crate::session::types::WorkItem, CliError> {
+    use crate::observe::types::{
+        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole,
+    };
+
+    let issue = Issue {
+        id: format!("{code}/{agent_id}/1"),
+        line: 1,
+        code,
+        category: IssueCategory::UnexpectedBehavior,
+        severity: IssueSeverity::Medium,
+        confidence: Confidence::Medium,
+        fix_safety: FixSafety::TriageRequired,
+        summary: format!("synthetic {code}"),
+        details: String::new(),
+        fingerprint: code.to_string(),
+        source_role: MessageRole::Assistant,
+        source_tool: None,
+        fix_target: None,
+        fix_hint: None,
+        evidence_excerpt: None,
+    };
+    let spec_owned = issue_task_spec(&issue);
+    let spec = session_service::TaskSpec {
+        title: &spec_owned.title,
+        context: spec_owned.context.as_deref(),
+        severity: spec_owned.severity,
+        suggested_fix: spec_owned.suggested_fix.as_deref(),
+        source: TaskSource::Observe,
+        observe_issue_id: spec_owned.observe_issue_id.as_deref(),
+    };
+    session_service::apply_create_task(state, &spec, agent_id, now)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::observe::types::{
+        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole,
+    };
+    use crate::session::types::{
+        AgentRegistration, AgentStatus, SessionMetrics, SessionPolicy, SessionRole, SessionState,
+        SessionStatus,
+    };
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    fn issue_with_code(code: IssueCode, severity: IssueSeverity) -> Issue {
+        Issue {
+            id: format!("{code}/x/1"),
+            line: 1,
+            code,
+            category: IssueCategory::UnexpectedBehavior,
+            severity,
+            confidence: Confidence::Medium,
+            fix_safety: FixSafety::TriageRequired,
+            summary: "s".into(),
+            details: String::new(),
+            fingerprint: code.to_string(),
+            source_role: MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        }
+    }
+
+    #[test]
+    fn task_severity_for_issue_overrides_python_traceback_to_high() {
+        let issue = issue_with_code(IssueCode::PythonTracebackOutput, IssueSeverity::Medium);
+        assert_eq!(task_severity_for_issue(&issue), TaskSeverity::High);
+    }
+
+    #[test]
+    fn task_severity_for_issue_overrides_hook_denied_to_high() {
+        let issue = issue_with_code(IssueCode::HookDeniedToolCall, IssueSeverity::Medium);
+        assert_eq!(task_severity_for_issue(&issue), TaskSeverity::High);
+    }
+
+    #[test]
+    fn task_severity_for_issue_overrides_recursive_remove_to_critical() {
+        let issue = issue_with_code(IssueCode::UnverifiedRecursiveRemove, IssueSeverity::Medium);
+        assert_eq!(task_severity_for_issue(&issue), TaskSeverity::Critical);
+    }
+
+    #[test]
+    fn task_severity_for_issue_preserves_base_mapping_for_other_codes() {
+        let issue = issue_with_code(IssueCode::JqErrorInCommandOutput, IssueSeverity::Medium);
+        assert_eq!(task_severity_for_issue(&issue), TaskSeverity::Medium);
+        let issue_low = issue_with_code(IssueCode::JqErrorInCommandOutput, IssueSeverity::Low);
+        assert_eq!(task_severity_for_issue(&issue_low), TaskSeverity::Low);
+    }
+
+    fn base_state() -> SessionState {
+        let mut state = SessionState {
+            schema_version: 10,
+            state_version: 1,
+            session_id: "sess-inject".to_string(),
+            project_name: String::new(),
+            worktree_path: PathBuf::new(),
+            shared_path: PathBuf::new(),
+            origin_path: PathBuf::new(),
+            branch_ref: "harness/sess-inject".to_string(),
+            title: "t".into(),
+            context: "c".into(),
+            status: SessionStatus::Active,
+            policy: SessionPolicy::default(),
+            created_at: "now".into(),
+            updated_at: "now".into(),
+            agents: BTreeMap::new(),
+            tasks: BTreeMap::new(),
+            leader_id: Some("leader".into()),
+            archived_at: None,
+            last_activity_at: None,
+            observe_id: None,
+            pending_leader_transfer: None,
+            external_origin: None,
+            adopted_at: None,
+            metrics: SessionMetrics::default(),
+        };
+        state.agents.insert(
+            "leader".into(),
+            AgentRegistration {
+                agent_id: "leader".into(),
+                name: "leader".into(),
+                runtime: "claude".into(),
+                role: SessionRole::Leader,
+                capabilities: Vec::new(),
+                joined_at: "now".into(),
+                updated_at: "now".into(),
+                status: AgentStatus::Active,
+                agent_session_id: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: Default::default(),
+                persona: None,
+            },
+        );
+        state
+    }
+
+    #[test]
+    fn test_inject_issue_creates_task_with_issue_aware_severity() {
+        let mut state = base_state();
+        let task = test_inject_issue(
+            &mut state,
+            "leader",
+            IssueCode::PythonTracebackOutput,
+            "2026-04-24T00:00:00Z",
+        )
+        .expect("inject");
+        assert_eq!(task.severity, TaskSeverity::High);
+        assert_eq!(task.source, TaskSource::Observe);
+        assert!(task.observe_issue_id.as_deref().unwrap().starts_with("python_traceback_output/"));
     }
 }
