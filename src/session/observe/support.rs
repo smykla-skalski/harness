@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::observe::types::{CycleRecord, Issue, IssueSeverity, OpenIssue};
+use crate::observe::types::{CycleRecord, Issue, IssueCode, IssueSeverity, OpenIssue};
 use crate::observe::{is_observer_conflict, load_observer_state, save_observer_state};
 use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, TaskSeverity, TaskSource};
@@ -22,11 +22,29 @@ pub(super) fn emit_watch_issues(issues: &[Issue], json: bool) {
     }
 }
 
-pub(super) fn map_severity(severity: IssueSeverity) -> TaskSeverity {
+fn map_issue_severity(severity: IssueSeverity) -> TaskSeverity {
     match severity {
         IssueSeverity::Critical => TaskSeverity::Critical,
         IssueSeverity::Medium => TaskSeverity::Medium,
         IssueSeverity::Low => TaskSeverity::Low,
+    }
+}
+
+/// Issue-aware task severity bridge shared by file-backed observe
+/// (`session::observe`) and daemon observe (`daemon::service::
+/// observe_persistence`). High-impact non-critical issue codes surface
+/// as [`TaskSeverity::High`] or [`TaskSeverity::Critical`] regardless
+/// of the classifier's own [`IssueSeverity`] tier.
+pub fn task_severity_for_issue(issue: &Issue) -> TaskSeverity {
+    match issue.code {
+        IssueCode::PythonTracebackOutput
+        | IssueCode::PythonUsedInBashToolUse
+        | IssueCode::HookDeniedToolCall
+        | IssueCode::CrossAgentFileConflict => TaskSeverity::High,
+        IssueCode::UnauthorizedGitCommitDuringRun | IssueCode::UnverifiedRecursiveRemove => {
+            TaskSeverity::Critical
+        }
+        _ => map_issue_severity(issue.severity),
     }
 }
 
@@ -70,7 +88,7 @@ pub(super) fn create_work_items_for_issues(
         let spec = TaskSpec {
             title: &title,
             context: Some(&issue.details),
-            severity: map_severity(issue.severity),
+            severity: task_severity_for_issue(issue),
             suggested_fix: issue.fix_hint.as_deref(),
             source: TaskSource::Observe,
             observe_issue_id: Some(&issue.id),

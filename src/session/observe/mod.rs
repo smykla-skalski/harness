@@ -15,5 +15,5 @@ mod test_support;
 pub use once::execute_session_observe;
 pub(crate) use once::run_session_observe;
 pub(crate) use scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
-pub(crate) use support::persist_observer_snapshot;
+pub(crate) use support::{persist_observer_snapshot, task_severity_for_issue};
 pub use watch::{execute_session_watch, execute_session_watch_async};
