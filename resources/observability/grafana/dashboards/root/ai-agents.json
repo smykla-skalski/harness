@@ -85,10 +85,10 @@
               "transformations": []
             }
           },
-          "description": "Trace-derived p95 Claude tool execution latency over the last 5 minutes. Uses local spanmetrics because Claude Code does not export a native latency histogram metric.",
+          "description": "",
           "id": 201,
           "links": [],
-          "title": "p95",
+          "title": "P95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -103,15 +103,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#FFD6A8",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#FFC27A",
+                        "value": 125
+                      },
+                      {
+                        "color": "#FF9830",
                         "value": 250
                       },
                       {
-                        "color": "red",
+                        "color": "#E57C10",
+                        "value": 625
+                      },
+                      {
+                        "color": "#C76B00",
                         "value": 1000
                       }
                     ]
@@ -174,7 +182,7 @@
               "transformations": []
             }
           },
-          "description": "Current Claude sessions reporting telemetry.",
+          "description": "",
           "id": 202,
           "links": [],
           "title": "Claude Sessions",
@@ -205,7 +213,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -263,7 +271,7 @@
               "transformations": []
             }
           },
-          "description": "Claude input tokens over the selected time range. Excludes cache reads and cache creation tokens.",
+          "description": "",
           "id": 203,
           "links": [],
           "title": "Input",
@@ -281,20 +289,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#FFD6A8",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#FFC27A",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#FF9830",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#E57C10",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#C76B00",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -352,7 +368,7 @@
               "transformations": []
             }
           },
-          "description": "Claude output tokens over the selected time range. Excludes cache reads and cache creation tokens.",
+          "description": "",
           "id": 912,
           "links": [],
           "title": "Output",
@@ -370,20 +386,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#FFD6A8",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#FFC27A",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#FF9830",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#E57C10",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#C76B00",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -439,7 +463,7 @@
               "transformations": []
             }
           },
-          "description": "Codex sessions active in the last 2 minutes (distinct conversation IDs with recent log activity).",
+          "description": "",
           "id": 204,
           "links": [],
           "title": "Codex Sessions",
@@ -470,7 +494,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -528,7 +552,7 @@
               "transformations": []
             }
           },
-          "description": "Codex input token usage over the selected time range using the explicit input token class.",
+          "description": "",
           "id": 205,
           "links": [],
           "title": "Input",
@@ -546,20 +570,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C6E8BF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#A7D7A0",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#73BF69",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#4CA553",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#2E7D32",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -617,7 +649,7 @@
               "transformations": []
             }
           },
-          "description": "Codex output token usage over the selected time range using the explicit output token class.",
+          "description": "",
           "id": 913,
           "links": [],
           "title": "Output",
@@ -635,20 +667,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C6E8BF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#A7D7A0",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#73BF69",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#4CA553",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#2E7D32",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -706,10 +746,10 @@
               "transformations": []
             }
           },
-          "description": "Accepted Claude edit decisions as a percentage of all Claude edit decisions.",
+          "description": "",
           "id": 206,
           "links": [],
-          "title": "Success Rate",
+          "title": "S/R",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -723,15 +763,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "red",
+                        "color": "#FFD6A8",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#FFC27A",
+                        "value": 25
+                      },
+                      {
+                        "color": "#FF9830",
                         "value": 50
                       },
                       {
-                        "color": "green",
+                        "color": "#E57C10",
+                        "value": 65
+                      },
+                      {
+                        "color": "#C76B00",
                         "value": 80
                       }
                     ]
@@ -794,10 +842,10 @@
               "transformations": []
             }
           },
-          "description": "Percent of Codex tool calls that completed successfully.",
+          "description": "",
           "id": 207,
           "links": [],
-          "title": "Success Rate",
+          "title": "S/R",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -813,15 +861,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "red",
+                        "color": "#C6E8BF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#A7D7A0",
+                        "value": 45
+                      },
+                      {
+                        "color": "#73BF69",
                         "value": 90
                       },
                       {
-                        "color": "green",
+                        "color": "#4CA553",
+                        "value": 94
+                      },
+                      {
+                        "color": "#2E7D32",
                         "value": 98
                       }
                     ]
@@ -884,10 +940,10 @@
               "transformations": []
             }
           },
-          "description": "95th percentile Codex tool-call duration.",
+          "description": "",
           "id": 208,
           "links": [],
-          "title": "p95",
+          "title": "P95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -901,15 +957,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C6E8BF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#A7D7A0",
+                        "value": 125
+                      },
+                      {
+                        "color": "#73BF69",
                         "value": 250
                       },
                       {
-                        "color": "red",
+                        "color": "#4CA553",
+                        "value": 625
+                      },
+                      {
+                        "color": "#2E7D32",
                         "value": 1000
                       }
                     ]
@@ -1033,7 +1097,7 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions, Codex model requests, Copilot agent turns, and Gemini API requests shown together as each agent's primary activity signal.",
+          "description": "",
           "id": 209,
           "links": [],
           "title": "Primary Activity by Agent",
@@ -1046,28 +1110,32 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
@@ -1082,7 +1150,22 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
                     },
                     "properties": [
                       {
@@ -1097,7 +1180,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
@@ -1113,7 +1196,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -1218,7 +1301,7 @@
               "transformations": []
             }
           },
-          "description": "Claude input/output token usage, Codex rolling 1h token volume, Copilot token usage, and Gemini input/output token volume aligned on the same chart.",
+          "description": "",
           "id": 210,
           "links": [],
           "title": "Tokens and Prompt Activity by Agent",
@@ -1231,28 +1314,32 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
@@ -1267,7 +1354,22 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
                     },
                     "properties": [
                       {
@@ -1282,7 +1384,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
@@ -1298,7 +1400,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -1330,8 +1432,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1)))) or on() vector(0)",
-                        "legendFormat": "claude accept %"
+                        "expr": "100 * (sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\",decision=\"accept\"}[$__rate_interval])) / clamp_min(sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])), 1))",
+                        "legendFormat": "claude"
                       }
                     },
                     "refId": "A",
@@ -1350,8 +1452,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(codex_tool_call_total{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[5m])) / clamp_min(sum(increase(codex_tool_call_total{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m])), 1)))) or on() vector(0)",
-                        "legendFormat": "codex success %"
+                        "expr": "100 * (sum(increase(codex_tool_call_total{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\",success=\"true\"}[5m])) / clamp_min(sum(increase(codex_tool_call_total{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m])), 1))",
+                        "legendFormat": "codex"
                       }
                     },
                     "refId": "B",
@@ -1370,8 +1472,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(github_copilot_tool_call_count_total{success=\"true\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_count_total[$__rate_interval])) or on() vector(0)), 1)))",
-                        "legendFormat": "copilot success %"
+                        "expr": "100 * (sum(increase(github_copilot_tool_call_count_total{success=\"true\"}[$__rate_interval])) / clamp_min(sum(increase(github_copilot_tool_call_count_total[$__rate_interval])), 1))",
+                        "legendFormat": "copilot"
                       }
                     },
                     "refId": "C",
@@ -1390,8 +1492,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(100 * ((sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\",status_code=~\"2..\"}[$__rate_interval])) or on() vector(0)) / clamp_min((sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)), 1)))",
-                        "legendFormat": "gemini success %"
+                        "expr": "100 * (sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\",status_code=~\"2..\"}[$__rate_interval])) / clamp_min(sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])), 1))",
+                        "legendFormat": "gemini"
                       }
                     },
                     "refId": "D",
@@ -1403,91 +1505,57 @@
               "transformations": []
             }
           },
-          "description": "Claude acceptance plus Codex, Copilot, and Gemini native reliability signals tracked together.",
+          "description": "",
           "id": 211,
           "links": [],
           "title": "Reliability Signals",
           "vizConfig": {
-            "group": "timeseries",
+            "group": "state-timeline",
             "kind": "VizConfig",
             "spec": {
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "thresholds"
                   },
-                  "unit": "percent"
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^claude\b"
-                    },
-                    "properties": [
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
                       {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 95
+                      },
+                      {
+                        "color": "green",
+                        "value": 99
                       }
                     ]
                   },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#FF9830"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^copilot\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#5794F2"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^gemini\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#B877D9"
-                        }
-                      }
-                    ]
+                  "custom": {
+                    "lineWidth": 0,
+                    "fillOpacity": 80,
+                    "spanNulls": false,
+                    "insertNulls": false
                   }
-                ]
+                },
+                "overrides": []
               },
               "options": {
+                "mergeValues": true,
+                "showValue": "never",
+                "alignValue": "left",
+                "rowHeight": 0.9,
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
-                  "mode": "multi",
+                  "mode": "single",
                   "sort": "desc"
                 }
               }
@@ -1516,7 +1584,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
-                        "legendFormat": "claude :: {{pretty_model}}"
+                        "legendFormat": "claude::{{pretty_model}}"
                       }
                     },
                     "refId": "A",
@@ -1536,7 +1604,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (pretty_model) (label_replace(increase(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[1h]), \"pretty_model\", \"$1\", \"model\", \"(.*)\"))",
-                        "legendFormat": "codex :: {{pretty_model}}"
+                        "legendFormat": "codex::{{pretty_model}}"
                       }
                     },
                     "refId": "B",
@@ -1556,7 +1624,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[5m]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
-                        "legendFormat": "copilot :: {{pretty_model}}"
+                        "legendFormat": "copilot::{{pretty_model}}"
                       }
                     },
                     "refId": "C",
@@ -1575,8 +1643,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (model) (increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval]))",
-                        "legendFormat": "gemini :: {{model}}"
+                        "expr": "sum by (pretty_model) (label_replace(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(gemini[-_])?(.*)\"))",
+                        "legendFormat": "gemini::{{pretty_model}}"
                       }
                     },
                     "refId": "D",
@@ -1588,7 +1656,7 @@
               "transformations": []
             }
           },
-          "description": "Claude input/output token volume, Codex rolling 1h token volume, Copilot token activity, and Gemini activity grouped by normalized model name when available.",
+          "description": "",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -1601,34 +1669,38 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
                           "fixedColor": "#FF9830"
                         }
                       }
@@ -1637,13 +1709,28 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex\\b"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "shades",
                           "fixedColor": "#5794F2"
                         }
                       }
@@ -1652,13 +1739,13 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
                           "fixedColor": "#B877D9"
                         }
                       }
@@ -1668,7 +1755,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -1773,7 +1860,7 @@
               "transformations": []
             }
           },
-          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini tool calls shown as 5-minute activity on the same chart.",
+          "description": "",
           "id": 213,
           "links": [],
           "title": "Tooling and Prompt Activity by Agent",
@@ -1786,28 +1873,32 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
@@ -1822,7 +1913,22 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
                     },
                     "properties": [
                       {
@@ -1837,7 +1943,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
@@ -1853,7 +1959,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -1958,7 +2064,7 @@
               "transformations": []
             }
           },
-          "description": "Trace totals for Claude and Codex plus native Copilot and Gemini activity volume over the selected range.",
+          "description": "",
           "id": 214,
           "links": [],
           "title": "Activity Volume by Agent",
@@ -1971,28 +2077,32 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
@@ -2007,7 +2117,22 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex\\b"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot\\b"
                     },
                     "properties": [
                       {
@@ -2022,7 +2147,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
@@ -2038,7 +2163,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -2070,8 +2195,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"claude_code\\\\.(.*)\")))",
-                        "legendFormat": "claude :: {{pretty_span}}"
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"claude|claude-code\"}[$__range]), \"pretty_span\", \"::$1\", \"span_name\", \"claude_code\\\\.(.*)\")))",
+                        "legendFormat": "claude{{pretty_span}}"
                       }
                     },
                     "refId": "A",
@@ -2090,8 +2215,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[$__range]), \"pretty_span\", \"$1\", \"span_name\", \"(.*)\")))",
-                        "legendFormat": "codex :: {{pretty_span}}"
+                        "expr": "topk(6, sum by (pretty_span) (label_replace(increase(traces_spanmetrics_calls_total{service=~\"codex|codex_cli_rs|codex_exec\"}[$__range]), \"pretty_span\", \"::$1\", \"span_name\", \"(.*)\")))",
+                        "legendFormat": "codex{{pretty_span}}"
                       }
                     },
                     "refId": "B",
@@ -2110,8 +2235,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(github_copilot_tool_call_count_total[$__range]), \"pretty_operation\", \"$1\", \"gen_ai_tool_name\", \"(.*)\"))) > 0",
-                        "legendFormat": "copilot :: {{pretty_operation}}"
+                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(github_copilot_tool_call_count_total[$__range]), \"pretty_operation\", \"::$1\", \"gen_ai_tool_name\", \"(.*)\"))) > 0",
+                        "legendFormat": "copilot{{pretty_operation}}"
                       }
                     },
                     "refId": "C",
@@ -2130,8 +2255,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__range]), \"pretty_operation\", \"$1\", \"function_name\", \"(.*)\"))) > 0",
-                        "legendFormat": "gemini :: {{pretty_operation}}"
+                        "expr": "topk(6, sum by (pretty_operation) (label_replace(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__range]), \"pretty_operation\", \"::$1\", \"function_name\", \"(.*)\"))) > 0",
+                        "legendFormat": "gemini{{pretty_operation}}"
                       }
                     },
                     "refId": "D",
@@ -2143,7 +2268,7 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume trace spans for Claude and Codex plus Copilot and Gemini tool functions over the selected range.",
+          "description": "",
           "id": 215,
           "links": [],
           "title": "Top Operations by Agent",
@@ -2156,34 +2281,38 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:",
+                  "custom": {
+                    "lineInterpolation": "smooth",
+                    "spanNulls": true,
+                    "drawStyle": "line",
+                    "insertNulls": false,
+                    "lineWidth": 1,
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "barAlignment": "center",
+                    "barWidthFactor": 0.6,
+                    "showValues": false,
+                    "axisGridShow": true,
+                    "axisCenteredZero": false,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    }
+                  }
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
+                      "options": "^claude(::.*)?$"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
-                          "fixedColor": "#73BF69"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^codex\b"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
                           "fixedColor": "#FF9830"
                         }
                       }
@@ -2192,13 +2321,28 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^codex(::.*)?$"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
+                          "fixedColor": "#73BF69"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "^copilot(::.*)?$"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "shades",
                           "fixedColor": "#5794F2"
                         }
                       }
@@ -2207,13 +2351,13 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini(::.*)?$"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
-                          "mode": "fixed",
+                          "mode": "shades",
                           "fixedColor": "#B877D9"
                         }
                       }
@@ -2223,7 +2367,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -2267,7 +2411,7 @@
               "transformations": []
             }
           },
-          "description": "Copilot input tokens over the selected range.",
+          "description": "",
           "id": 216,
           "links": [],
           "title": "Input",
@@ -2284,20 +2428,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C2D9FF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#8FB9FF",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#5794F2",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#3579E0",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#1F5FBF",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -2355,7 +2507,7 @@
               "transformations": []
             }
           },
-          "description": "Copilot output tokens over the selected range.",
+          "description": "",
           "id": 910,
           "links": [],
           "title": "Output",
@@ -2372,20 +2524,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C2D9FF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#8FB9FF",
+                        "value": 250000
+                      },
+                      {
+                        "color": "#5794F2",
                         "value": 500000
                       },
                       {
-                        "color": "red",
+                        "color": "#3579E0",
+                        "value": 1250000
+                      },
+                      {
+                        "color": "#1F5FBF",
                         "value": 2000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -2443,7 +2603,7 @@
               "transformations": []
             }
           },
-          "description": "Distinct Copilot session_id values with activity in the last 2 minutes.",
+          "description": "",
           "id": 217,
           "links": [],
           "title": "Copilot Sessions",
@@ -2474,7 +2634,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -2532,10 +2692,10 @@
               "transformations": []
             }
           },
-          "description": "Percent of Copilot tool calls that completed successfully.",
+          "description": "",
           "id": 218,
           "links": [],
-          "title": "Success Rate",
+          "title": "S/R",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2551,15 +2711,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "red",
+                        "color": "#C2D9FF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#8FB9FF",
+                        "value": 45
+                      },
+                      {
+                        "color": "#5794F2",
                         "value": 90
                       },
                       {
-                        "color": "green",
+                        "color": "#3579E0",
+                        "value": 94
+                      },
+                      {
+                        "color": "#1F5FBF",
                         "value": 98
                       }
                     ]
@@ -2622,10 +2790,10 @@
               "transformations": []
             }
           },
-          "description": "p95 Copilot tool-call latency over the last 5 minutes.",
+          "description": "",
           "id": 219,
           "links": [],
-          "title": "p95",
+          "title": "P95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2639,15 +2807,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#C2D9FF",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#8FB9FF",
+                        "value": 125
+                      },
+                      {
+                        "color": "#5794F2",
                         "value": 250
                       },
                       {
-                        "color": "red",
+                        "color": "#3579E0",
+                        "value": 625
+                      },
+                      {
+                        "color": "#1F5FBF",
                         "value": 1000
                       }
                     ]
@@ -2710,7 +2886,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini API requests over the selected range.",
+          "description": "",
           "id": 220,
           "links": [],
           "title": "Gemini API Requests",
@@ -2740,7 +2916,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -2798,10 +2974,10 @@
               "transformations": []
             }
           },
-          "description": "Percent of Gemini API requests that completed with a 2xx status code.",
+          "description": "",
           "id": 221,
           "links": [],
-          "title": "Success Rate",
+          "title": "S/R",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2817,15 +2993,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "red",
+                        "color": "#DEC0F0",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#D3A7EA",
+                        "value": 45
+                      },
+                      {
+                        "color": "#B877D9",
                         "value": 90
                       },
                       {
-                        "color": "green",
+                        "color": "#A15AC5",
+                        "value": 94
+                      },
+                      {
+                        "color": "#8E44AD",
                         "value": 98
                       }
                     ]
@@ -2888,7 +3072,7 @@
               "transformations": []
             }
           },
-          "description": "Gemini input tokens over the selected range. Excludes cache, thought, and tool tokens.",
+          "description": "",
           "id": 222,
           "links": [],
           "title": "Input",
@@ -2905,20 +3089,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#DEC0F0",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#D3A7EA",
+                        "value": 500000
+                      },
+                      {
+                        "color": "#B877D9",
                         "value": 1000000
                       },
                       {
-                        "color": "red",
+                        "color": "#A15AC5",
+                        "value": 5500000
+                      },
+                      {
+                        "color": "#8E44AD",
                         "value": 10000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -2976,7 +3168,7 @@
               "transformations": []
             }
           },
-          "description": "Gemini output tokens over the selected range. Excludes cache, thought, and tool tokens.",
+          "description": "",
           "id": 911,
           "links": [],
           "title": "Output",
@@ -2993,20 +3185,28 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#DEC0F0",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#D3A7EA",
+                        "value": 500000
+                      },
+                      {
+                        "color": "#B877D9",
                         "value": 1000000
                       },
                       {
-                        "color": "red",
+                        "color": "#A15AC5",
+                        "value": 5500000
+                      },
+                      {
+                        "color": "#8E44AD",
                         "value": 10000000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3064,10 +3264,10 @@
               "transformations": []
             }
           },
-          "description": "p95 Gemini API latency from the native OTEL histogram family.",
+          "description": "",
           "id": 223,
           "links": [],
-          "title": "p95",
+          "title": "P95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3081,15 +3281,23 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "#DEC0F0",
                         "value": 0
                       },
                       {
-                        "color": "orange",
+                        "color": "#D3A7EA",
+                        "value": 500
+                      },
+                      {
+                        "color": "#B877D9",
                         "value": 1000
                       },
                       {
-                        "color": "red",
+                        "color": "#A15AC5",
+                        "value": 3000
+                      },
+                      {
+                        "color": "#8E44AD",
                         "value": 5000
                       }
                     ]
@@ -3152,10 +3360,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Claude session_id values with activity in the last 2 minutes.",
+          "description": "",
           "id": 224,
           "links": [],
-          "title": "Active",
+          "title": "",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3164,10 +3372,10 @@
                 "defaults": {
                   "color": {
                     "mode": "fixed",
-                    "fixedColor": "#73BF69"
+                    "fixedColor": "#FF9830"
                   },
                   "noValue": "0",
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3223,10 +3431,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Codex conversation_id values in Loki logs over the last 2 minutes.",
+          "description": "",
           "id": 225,
           "links": [],
-          "title": "Active",
+          "title": "",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3235,10 +3443,10 @@
                 "defaults": {
                   "color": {
                     "mode": "fixed",
-                    "fixedColor": "#FF9830"
+                    "fixedColor": "#73BF69"
                   },
                   "noValue": "0",
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3296,10 +3504,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Copilot session_id values on github_copilot_agent_turn_count_count activity in the last 2 minutes. Falls back to 0 when the label is absent.",
+          "description": "",
           "id": 226,
           "links": [],
-          "title": "Active",
+          "title": "",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3311,7 +3519,7 @@
                     "fixedColor": "#5794F2"
                   },
                   "noValue": "0",
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3369,10 +3577,10 @@
               "transformations": []
             }
           },
-          "description": "Distinct Gemini session_id values on gemini_cli_api_request_count_total activity in the last 2 minutes. Falls back to 0 when the label is absent.",
+          "description": "",
           "id": 227,
           "links": [],
-          "title": "Active",
+          "title": "",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3384,7 +3592,7 @@
                     "fixedColor": "#B877D9"
                   },
                   "noValue": "0",
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3442,7 +3650,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot agent invocations over selected time range.",
+          "description": "",
           "id": 301,
           "links": [],
           "title": "Agent Runs",
@@ -3472,7 +3680,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3526,7 +3734,7 @@
               "transformations": []
             }
           },
-          "description": "Distinct Copilot session_id values with activity in the last 2 minutes.",
+          "description": "",
           "id": 302,
           "links": [],
           "title": "Active Sessions",
@@ -3556,7 +3764,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3610,7 +3818,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot tool calls over selected time range.",
+          "description": "",
           "id": 303,
           "links": [],
           "title": "Tool Calls",
@@ -3640,7 +3848,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3694,7 +3902,7 @@
               "transformations": []
             }
           },
-          "description": "Total Copilot LLM tokens over the selected time range.",
+          "description": "",
           "id": 304,
           "links": [],
           "title": "Total Tokens",
@@ -3724,7 +3932,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -3778,7 +3986,7 @@
               "transformations": []
             }
           },
-          "description": "Percent of Copilot tool calls that completed successfully.",
+          "description": "",
           "id": 305,
           "links": [],
           "title": "Tool Success Rate",
@@ -3864,7 +4072,7 @@
               "transformations": []
             }
           },
-          "description": "95th percentile Copilot tool-call latency over the last 5 minutes.",
+          "description": "",
           "id": 306,
           "links": [],
           "title": "Tool p95",
@@ -3949,7 +4157,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot agent runs split by service identity.",
+          "description": "",
           "id": 307,
           "links": [],
           "title": "Agent Runs by Service",
@@ -3962,13 +4170,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -4013,7 +4221,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot tool calls split by service, tool, and success.",
+          "description": "",
           "id": 308,
           "links": [],
           "title": "Tool Calls by Service",
@@ -4026,13 +4234,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -4077,7 +4285,7 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume Copilot tool functions over the selected range.",
+          "description": "",
           "id": 309,
           "links": [],
           "title": "Top Tool Functions",
@@ -4090,13 +4298,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -4231,7 +4439,7 @@
               "transformations": []
             }
           },
-          "description": "Canvas summary of Claude prompt and completion tokens (excluding cache) and Codex token totals for the selected range. Keep Tokens by Agent for the live trend line.",
+          "description": "",
           "id": 216,
           "links": [],
           "title": "Token Command Center",
@@ -4698,7 +4906,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
+                  "unit": "currency:",
                   "decimals": 0,
                   "mappings": [],
                   "color": {
@@ -4756,7 +4964,7 @@
               "transformations": []
             }
           },
-          "description": "Claude estimated spend over selected time range.",
+          "description": "",
           "id": 1,
           "links": [],
           "title": "Total Cost",
@@ -4841,7 +5049,7 @@
               "transformations": []
             }
           },
-          "description": "Token growth by token class.",
+          "description": "",
           "id": 10,
           "links": [],
           "title": "Token Usage by Type",
@@ -4854,13 +5062,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -4905,7 +5113,7 @@
               "transformations": []
             }
           },
-          "description": "Current Claude sessions by terminal type.",
+          "description": "",
           "id": 11,
           "links": [],
           "title": "Sessions by Terminal",
@@ -4918,13 +5126,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -4969,7 +5177,7 @@
               "transformations": []
             }
           },
-          "description": "CLI versus user active time.",
+          "description": "",
           "id": 12,
           "links": [],
           "title": "Active Time by Type",
@@ -4988,7 +5196,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5033,7 +5241,7 @@
               "transformations": []
             }
           },
-          "description": "Code churn attributed to Claude.",
+          "description": "",
           "id": 13,
           "links": [],
           "title": "Lines Added vs Removed",
@@ -5046,13 +5254,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5096,7 +5304,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini API requests over selected time range.",
+          "description": "",
           "id": 401,
           "links": [],
           "title": "API Requests",
@@ -5126,7 +5334,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -5180,7 +5388,7 @@
               "transformations": []
             }
           },
-          "description": "Current Gemini API request throughput from native OTEL counters.",
+          "description": "",
           "id": 402,
           "links": [],
           "title": "Request Rate",
@@ -5264,7 +5472,7 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini token usage over selected time range across input, output, thought, cache, and tool tokens.",
+          "description": "",
           "id": 403,
           "links": [],
           "title": "Total Tokens",
@@ -5294,7 +5502,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -5348,7 +5556,7 @@
               "transformations": []
             }
           },
-          "description": "p95 Gemini API latency from the native OTEL histogram family.",
+          "description": "",
           "id": 404,
           "links": [],
           "title": "API p95",
@@ -5433,7 +5641,7 @@
               "transformations": []
             }
           },
-          "description": "Gemini API request activity grouped by reported model.",
+          "description": "",
           "id": 405,
           "links": [],
           "title": "Model Activity",
@@ -5446,13 +5654,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5497,7 +5705,7 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume Gemini tool functions over the selected range.",
+          "description": "",
           "id": 406,
           "links": [],
           "title": "Tool Calls by Function",
@@ -5510,13 +5718,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5561,7 +5769,7 @@
               "transformations": []
             }
           },
-          "description": "Structured Gemini OTEL logs from Loki for the selected level.",
+          "description": "",
           "id": 407,
           "links": [
             {
@@ -5626,7 +5834,7 @@
               "transformations": []
             }
           },
-          "description": "Accept versus reject trend.",
+          "description": "",
           "id": 14,
           "links": [],
           "title": "Tool Decisions by Outcome",
@@ -5639,13 +5847,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5690,7 +5898,7 @@
               "transformations": []
             }
           },
-          "description": "Main, auxiliary, and subagent spend mix.",
+          "description": "",
           "id": 15,
           "links": [],
           "title": "Cost by Query Source",
@@ -5709,7 +5917,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5814,7 +6022,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex prompt/completion token volume plus Copilot and Gemini activity, grouped by normalized model name when available.",
+          "description": "",
           "id": 16,
           "links": [],
           "title": "Model Activity by Agent",
@@ -5827,13 +6035,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": [
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^claude\b"
+                      "options": "^claude\\b"
                     },
                     "properties": [
                       {
@@ -5848,7 +6056,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^codex\b"
+                      "options": "^codex\\b"
                     },
                     "properties": [
                       {
@@ -5863,7 +6071,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^copilot\b"
+                      "options": "^copilot\\b"
                     },
                     "properties": [
                       {
@@ -5878,7 +6086,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "^gemini\b"
+                      "options": "^gemini\\b"
                     },
                     "properties": [
                       {
@@ -5894,7 +6102,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -5939,7 +6147,7 @@
               "transformations": []
             }
           },
-          "description": "Edit versus Write tool pressure.",
+          "description": "",
           "id": 17,
           "links": [],
           "title": "Tool Decisions by Tool",
@@ -5952,13 +6160,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -6003,7 +6211,7 @@
               "transformations": []
             }
           },
-          "description": "Accepted and rejected edits by language.",
+          "description": "",
           "id": 18,
           "links": [],
           "title": "Tool Decisions by Language",
@@ -6016,13 +6224,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -6066,7 +6274,7 @@
               "transformations": []
             }
           },
-          "description": "Current Claude sessions reporting telemetry.",
+          "description": "",
           "id": 2,
           "links": [],
           "title": "Total Sessions",
@@ -6096,7 +6304,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6150,7 +6358,7 @@
               "transformations": []
             }
           },
-          "description": "Claude prompt and completion tokens, excluding cache reads and cache creation.",
+          "description": "",
           "id": 3,
           "links": [],
           "title": "Total Tokens",
@@ -6180,7 +6388,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6234,7 +6442,7 @@
               "transformations": []
             }
           },
-          "description": "Combined CLI and user active time over selected range.",
+          "description": "",
           "id": 4,
           "links": [],
           "title": "Active Time",
@@ -6318,7 +6526,7 @@
               "transformations": []
             }
           },
-          "description": "Git commits credited by Claude telemetry.",
+          "description": "",
           "id": 5,
           "links": [],
           "title": "Commits",
@@ -6348,7 +6556,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6402,7 +6610,7 @@
               "transformations": []
             }
           },
-          "description": "Lines added minus removed over selected range.",
+          "description": "",
           "id": 6,
           "links": [],
           "title": "Net LOC",
@@ -6432,7 +6640,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6486,7 +6694,7 @@
               "transformations": []
             }
           },
-          "description": "Accepted code-edit decisions as a percentage of all recorded decisions.",
+          "description": "",
           "id": 7,
           "links": [],
           "title": "Edit Accept Rate",
@@ -6570,7 +6778,7 @@
               "transformations": []
             }
           },
-          "description": "All edit-tool accept/reject decisions over selected range.",
+          "description": "",
           "id": 8,
           "links": [],
           "title": "Tool Decisions",
@@ -6600,7 +6808,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6655,7 +6863,7 @@
               "transformations": []
             }
           },
-          "description": "Claude spend trend grouped by normalized model name.",
+          "description": "",
           "id": 9,
           "links": [],
           "title": "Cost by Model",
@@ -6674,7 +6882,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -6718,7 +6926,7 @@
               "transformations": []
             }
           },
-          "description": "Codex model requests over the selected time range.",
+          "description": "",
           "id": 101,
           "links": [],
           "title": "Prompt Requests",
@@ -6748,7 +6956,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -6803,7 +7011,7 @@
               "transformations": []
             }
           },
-          "description": "Highest-volume Codex span names from Tempo spanmetrics.",
+          "description": "",
           "id": 110,
           "links": [],
           "title": "Top Trace Spans",
@@ -6822,7 +7030,7 @@
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -6867,7 +7075,7 @@
               "transformations": []
             }
           },
-          "description": "Structured Codex OTEL logs from Loki for selected service and level.",
+          "description": "",
           "id": 111,
           "links": [
             {
@@ -6931,7 +7139,7 @@
               "transformations": []
             }
           },
-          "description": "Successful and failed Codex tool calls over selected time range.",
+          "description": "",
           "id": 102,
           "links": [],
           "title": "Tool Calls",
@@ -6961,7 +7169,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -7015,7 +7223,7 @@
               "transformations": []
             }
           },
-          "description": "Total Codex tokens over selected time range using the aggregate token class.",
+          "description": "",
           "id": 103,
           "links": [],
           "title": "Total Tokens",
@@ -7045,7 +7253,7 @@
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
@@ -7099,7 +7307,7 @@
               "transformations": []
             }
           },
-          "description": "Percent of Codex tool calls that completed successfully.",
+          "description": "",
           "id": 104,
           "links": [],
           "title": "Tool Success Rate",
@@ -7185,7 +7393,7 @@
               "transformations": []
             }
           },
-          "description": "p95 Codex tool-call latency from the OTEL histogram family.",
+          "description": "",
           "id": 105,
           "links": [],
           "title": "Tool p95",
@@ -7270,7 +7478,7 @@
               "transformations": []
             }
           },
-          "description": "Per-tool Codex activity over rolling 5m windows.",
+          "description": "",
           "id": 106,
           "links": [],
           "title": "Tool Calls by Tool",
@@ -7283,13 +7491,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -7334,7 +7542,7 @@
               "transformations": []
             }
           },
-          "description": "Rolling 1h input, output, reasoning, and cache token growth over time.",
+          "description": "",
           "id": 107,
           "links": [],
           "title": "Token Usage by Type",
@@ -7347,13 +7555,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -7398,7 +7606,7 @@
               "transformations": []
             }
           },
-          "description": "Successful versus failed tool calls over rolling 5m windows, split by tool.",
+          "description": "",
           "id": 108,
           "links": [],
           "title": "Tool Outcomes",
@@ -7411,13 +7619,13 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "unit": "short"
+                  "unit": "currency:"
                 },
                 "overrides": []
               },
               "options": {
                 "legend": {
-                  "displayMode": "table",
+                  "displayMode": "list",
                   "placement": "bottom"
                 },
                 "tooltip": {
@@ -7461,7 +7669,7 @@
               "transformations": []
             }
           },
-          "description": "Tempo span throughput for Codex spans routed through the stack.",
+          "description": "",
           "id": 109,
           "links": [],
           "title": "Trace Span Rate",
@@ -7519,7 +7727,7 @@
         "spec": {
           "id": 914,
           "title": "",
-          "description": "Claude brand logo.",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7551,7 +7759,7 @@
         "spec": {
           "id": 915,
           "title": "",
-          "description": "Codex brand logo.",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7583,7 +7791,7 @@
         "spec": {
           "id": 916,
           "title": "",
-          "description": "Copilot brand logo.",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7615,7 +7823,7 @@
         "spec": {
           "id": 917,
           "title": "",
-          "description": "Gemini brand logo.",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7660,7 +7868,7 @@
                       "spec": {
                         "x": 0,
                         "y": 0,
-                        "width": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7673,7 +7881,7 @@
                       "spec": {
                         "x": 6,
                         "y": 0,
-                        "width": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7686,7 +7894,7 @@
                       "spec": {
                         "x": 12,
                         "y": 0,
-                        "width": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7699,7 +7907,7 @@
                       "spec": {
                         "x": 18,
                         "y": 0,
-                        "width": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7710,9 +7918,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 3,
-                        "width": 6,
+                        "x": 3,
+                        "y": 0,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7723,9 +7931,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 3,
-                        "width": 6,
+                        "x": 9,
+                        "y": 0,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7736,9 +7944,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 3,
-                        "width": 6,
+                        "x": 15,
+                        "y": 0,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7749,9 +7957,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 18,
-                        "y": 3,
-                        "width": 6,
+                        "x": 21,
+                        "y": 0,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7762,9 +7970,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 15,
-                        "width": 6,
+                        "x": 3,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7776,8 +7984,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 6,
-                        "width": 6,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7788,9 +7996,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 9,
-                        "width": 6,
+                        "x": 3,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7802,8 +8010,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 12,
-                        "width": 6,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7815,8 +8023,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 6,
-                        "y": 6,
-                        "width": 6,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7827,9 +8035,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 9,
-                        "width": 6,
+                        "x": 9,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7841,8 +8049,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 6,
-                        "y": 12,
-                        "width": 6,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7853,9 +8061,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 15,
-                        "width": 6,
+                        "x": 9,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7867,8 +8075,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 6,
-                        "width": 6,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7879,9 +8087,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 9,
-                        "width": 6,
+                        "x": 15,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7893,8 +8101,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 12,
-                        "width": 6,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7905,9 +8113,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 15,
-                        "width": 6,
+                        "x": 15,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7919,8 +8127,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 18,
-                        "y": 12,
-                        "width": 6,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7932,8 +8140,8 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 18,
-                        "y": 6,
-                        "width": 6,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7944,9 +8152,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 18,
-                        "y": 9,
-                        "width": 6,
+                        "x": 21,
+                        "y": 3,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7957,9 +8165,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 18,
-                        "y": 15,
-                        "width": 6,
+                        "x": 21,
+                        "y": 6,
+                        "width": 3,
                         "height": 3,
                         "element": {
                           "kind": "ElementReference",
@@ -7971,7 +8179,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 18,
+                        "y": 9,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -7984,7 +8192,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 18,
+                        "y": 9,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -7997,7 +8205,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 26,
+                        "y": 17,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -8010,7 +8218,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 26,
+                        "y": 17,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -8023,7 +8231,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 34,
+                        "y": 25,
                         "width": 24,
                         "height": 8,
                         "element": {
@@ -8036,7 +8244,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 42,
+                        "y": 33,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -8049,7 +8257,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 42,
+                        "y": 33,
                         "width": 12,
                         "height": 8,
                         "element": {
