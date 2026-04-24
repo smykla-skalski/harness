@@ -184,7 +184,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "decimals": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -437,6 +437,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
