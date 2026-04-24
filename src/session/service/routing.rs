@@ -9,16 +9,21 @@ use crate::session::types::{AgentRegistration, WorkItem};
 ///
 /// The caller is expected to have already filtered workers for liveness
 /// and assignability.
-pub(crate) fn rank_workers_for_task(task: &WorkItem, workers: &[&AgentRegistration]) -> Vec<String> {
+pub(crate) fn rank_workers_for_task(
+    task: &WorkItem,
+    workers: &[&AgentRegistration],
+) -> Vec<String> {
     let mut ranked: Vec<(u8, &str)> = workers
         .iter()
-        .map(|agent| (persona_distance(task.suggested_persona.as_deref(), agent), agent.agent_id.as_str()))
+        .map(|agent| {
+            (
+                persona_distance(task.suggested_persona.as_deref(), agent),
+                agent.agent_id.as_str(),
+            )
+        })
         .collect();
     ranked.sort_unstable();
-    ranked
-        .into_iter()
-        .map(|(_, id)| id.to_string())
-        .collect()
+    ranked.into_iter().map(|(_, id)| id.to_string()).collect()
 }
 
 fn persona_distance(suggested: Option<&str>, agent: &AgentRegistration) -> u8 {
@@ -33,8 +38,8 @@ fn persona_distance(suggested: Option<&str>, agent: &AgentRegistration) -> u8 {
 mod tests {
     use super::*;
     use crate::session::types::{
-        AgentPersona, AgentStatus, PersonaSymbol, SessionRole, TaskSeverity, TaskSource, TaskStatus,
-        WorkItem,
+        AgentPersona, AgentStatus, PersonaSymbol, SessionRole, TaskSeverity, TaskSource,
+        TaskStatus, WorkItem,
     };
 
     fn persona(identifier: &str) -> AgentPersona {

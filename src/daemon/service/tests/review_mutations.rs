@@ -13,9 +13,12 @@ use super::*;
 #[test]
 fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
     with_temp_project(|project| {
-        temp_env::with_var("CODEX_SESSION_ID", Some("async-submit-review-worker"), || {
-            let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
-            runtime_tokio.block_on(async {
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("async-submit-review-worker"),
+            || {
+                let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
+                runtime_tokio.block_on(async {
                 let db_path = project
                     .parent()
                     .expect("project parent")
@@ -147,6 +150,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                     signal_dir.display(),
                 );
             });
-        });
+            },
+        );
     });
 }

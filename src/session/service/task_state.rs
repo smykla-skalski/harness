@@ -1,11 +1,11 @@
-use crate::session::types::AgentRegistration;
+use crate::session::types::{ARBITRATION_BLOCKED_REASON, AgentRegistration};
 
 use super::{
     CliError, CliErrorKind, DeliveryConfig, Duration, SessionAction, SessionState, Signal,
     SignalPayload, SignalPriority, TaskCheckpoint, TaskCheckpointSummary, TaskDropEffect, TaskNote,
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
-    generate_signal_id, next_task_id, protocol, refresh_session, rank_workers_for_task,
+    generate_signal_id, next_task_id, protocol, rank_workers_for_task, refresh_session,
     require_active, require_active_worker_target_agent, require_permission,
     require_task_creation_state, start_next_locked_task_for_worker, start_task_for_agent,
     task_not_found, task_status_label, touch_agent,
@@ -67,12 +67,11 @@ pub(crate) fn apply_assign_task(
     require_permission(state, actor_id, SessionAction::AssignTask)?;
     require_active_worker_target_agent(state, agent_id)?;
 
-    let current_status = state
+    let task = state
         .tasks
         .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?
-        .status;
-    reject_generic_mutation_on_review_state(task_id, current_status, "reassigned")?;
+        .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, task, "reassigned")?;
     let previous_assignee = state
         .tasks
         .get(task_id)
@@ -139,6 +138,7 @@ pub(crate) fn apply_update_task_queue_policy(
         .tasks
         .get_mut(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, task, "queue policy changed")?;
     task.queue_policy = queue_policy;
     task.updated_at = now.to_string();
     touch_agent(state, actor_id, now);
@@ -221,19 +221,28 @@ fn reject_review_only_status(task_id: &str, status: TaskStatus) -> Result<(), Cl
     Ok(())
 }
 
-fn reject_generic_mutation_on_review_state(
+pub(crate) fn reject_generic_mutation_on_review_state(
     task_id: &str,
-    current: TaskStatus,
+    task: &WorkItem,
     operation: &str,
 ) -> Result<(), CliError> {
-    if matches!(current, TaskStatus::AwaitingReview | TaskStatus::InReview) {
+    if matches!(
+        task.status,
+        TaskStatus::AwaitingReview | TaskStatus::InReview
+    ) || is_arbitration_blocked(task)
+    {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "task '{task_id}' is {} and cannot be {operation}; use respond_review or arbitrate",
-            task_status_label(current)
+            task_status_label(task.status)
         ))
         .into());
     }
     Ok(())
+}
+
+pub(crate) fn is_arbitration_blocked(task: &WorkItem) -> bool {
+    task.status == TaskStatus::Blocked
+        && task.blocked_reason.as_deref() == Some(ARBITRATION_BLOCKED_REASON)
 }
 
 /// Update a task's status. Returns the previous status.
@@ -250,12 +259,11 @@ pub(crate) fn apply_update_task(
 
     reject_review_only_status(task_id, status)?;
 
-    let current_status = state
+    let current_task = state
         .tasks
         .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?
-        .status;
-    reject_generic_mutation_on_review_state(task_id, current_status, "updated generically")?;
+        .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, current_task, "updated generically")?;
     let assigned_to = state
         .tasks
         .get(task_id)
@@ -328,6 +336,11 @@ pub(crate) fn apply_record_checkpoint(
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
 
+    let current_task = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, current_task, "checkpointed")?;
     let assigned_to = state
         .tasks
         .get(task_id)

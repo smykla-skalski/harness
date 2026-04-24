@@ -9,13 +9,14 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::agents::runtime::runtime_for_name;
 use crate::daemon::index as daemon_index;
 use crate::daemon::protocol::{
     ImproverApplyRequest, SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use crate::errors::CliError;
-use crate::agents::runtime::runtime_for_name;
+use crate::session::roles::SessionAction;
 use crate::session::service::{
     self as session_service, ImproverApplyOutcome, apply_arbitrate, apply_claim_review,
     apply_respond_review, apply_submit_for_review, apply_submit_review, arbitrate as svc_arbitrate,
@@ -45,10 +46,7 @@ fn project_dir_from_db_or_index(
     Ok(effective_project_dir(&resolved).to_path_buf())
 }
 
-fn bump_and_refresh(
-    db: Option<&super::db::DaemonDb>,
-    session_id: &str,
-) -> Result<(), CliError> {
+fn bump_and_refresh(db: Option<&super::db::DaemonDb>, session_id: &str) -> Result<(), CliError> {
     if let Some(db) = db {
         db.load_session_state_for_mutation(session_id)?;
         db.bump_change(session_id)?;
@@ -177,22 +175,25 @@ pub fn arbitrate(
 /// Returns `CliError` when the path is disallowed, the target is
 /// missing, or the write fails.
 pub fn improver_apply(
-    _session_id: &str,
+    session_id: &str,
     request: &ImproverApplyRequest,
 ) -> Result<ImproverApplyOutcome, CliError> {
-    let repo_root = Path::new(&request.project_dir);
+    let resolved = index::resolve_session(session_id)?;
+    session_service::require_permission(
+        &resolved.state,
+        &request.actor,
+        SessionAction::ImproverApply,
+    )?;
+    let repo_root = effective_project_dir(&resolved);
     let rel = Path::new(&request.rel_path);
     let now = utc_now();
     if request.dry_run {
-        let canonical = session_service::validate_skill_patch_path(repo_root, request.target, rel)?;
-        return Ok(ImproverApplyOutcome {
-            canonical_path: canonical,
-            before_sha256: String::new(),
-            after_sha256: String::new(),
-            applied: false,
-            backup_path: None,
-            unified_diff: String::new(),
-        });
+        return session_service::preview_improver_apply(
+            repo_root,
+            request.target,
+            rel,
+            &request.new_contents,
+        );
     }
     session_service::apply_improver_apply(
         repo_root,
@@ -219,10 +220,7 @@ async fn resolve_async(
         .ok_or_else(|| session_not_found(session_id))
 }
 
-async fn bump_async(
-    async_db: &super::db::AsyncDaemonDb,
-    session_id: &str,
-) -> Result<(), CliError> {
+async fn bump_async(async_db: &super::db::AsyncDaemonDb, session_id: &str) -> Result<(), CliError> {
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await
 }
@@ -336,24 +334,27 @@ pub(crate) async fn claim_review_async(
     request: &TaskClaimReviewRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
-    apply_claim_review(&mut resolved.state, task_id, &request.actor, &now)?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            apply_claim_review(state, task_id, &request.actor, &now)?;
+            let new_status = state.tasks.get(task_id).map(|task| task.status);
+            Ok((prev_status, new_status))
+        })
         .await?;
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_task_status_changed(
-                task_id,
-                TaskStatus::AwaitingReview,
-                TaskStatus::InReview,
-            ),
-            Some(&request.actor),
-            None,
-        ))
-        .await?;
+    if let (Some(prev), Some(new)) = (prev_status, new_status)
+        && prev != new
+    {
+        async_db
+            .append_log_entry(&build_log_entry(
+                session_id,
+                session_service::log_task_status_changed(task_id, prev, new),
+                Some(&request.actor),
+                None,
+            ))
+            .await?;
+    }
     bump_async(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
@@ -368,7 +369,7 @@ pub(crate) async fn submit_review_async(
     request: &TaskSubmitReviewRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolve_async(async_db, session_id).await?;
+    let resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
     let project_dir = resolved
         .project
@@ -378,36 +379,35 @@ pub(crate) async fn submit_review_async(
     let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
 
     validate_submit_review(&resolved.state, task_id, &request.actor)?;
-    let round = resolved
-        .state
-        .tasks
-        .get(task_id)
-        .map_or(1, |task| task.review_round.saturating_add(1));
-    let reviewer_runtime = resolved
-        .state
-        .agents
-        .get(&request.actor)
-        .map(|agent| agent.runtime.clone())
-        .unwrap_or_default();
-    let review = Review {
-        review_id: generate_review_id(task_id),
-        round,
-        reviewer_agent_id: request.actor.clone(),
-        reviewer_runtime,
-        verdict: request.verdict,
-        summary: request.summary.clone(),
-        points: request.points.clone(),
-        recorded_at: now.clone(),
-    };
-    session_storage::append_review(&layout, task_id, &review)?;
-    let all_reviews = session_storage::load_reviews(&layout, task_id)?;
-
-    let prev_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-    apply_submit_review(&mut resolved.state, task_id, &review, &all_reviews, &now)?;
-    let new_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            validate_submit_review(state, task_id, &request.actor)?;
+            let round = state
+                .tasks
+                .get(task_id)
+                .map_or(1, |task| task.review_round.saturating_add(1));
+            let reviewer_runtime = state
+                .agents
+                .get(&request.actor)
+                .map(|agent| agent.runtime.clone())
+                .unwrap_or_default();
+            let review = Review {
+                review_id: generate_review_id(task_id),
+                round,
+                reviewer_agent_id: request.actor.clone(),
+                reviewer_runtime,
+                verdict: request.verdict,
+                summary: request.summary.clone(),
+                points: request.points.clone(),
+                recorded_at: now.clone(),
+            };
+            session_storage::append_review(&layout, task_id, &review)?;
+            let all_reviews = session_storage::load_reviews(&layout, task_id)?;
+            let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            apply_submit_review(state, task_id, &review, &all_reviews, &now)?;
+            let new_status = state.tasks.get(task_id).map(|task| task.status);
+            Ok((prev_status, new_status))
+        })
         .await?;
     if let (Some(prev), Some(new)) = (prev_status, new_status)
         && prev != new
@@ -507,4 +507,3 @@ pub(crate) async fn arbitrate_async(
     bump_async(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
-

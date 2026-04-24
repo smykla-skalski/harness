@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use super::test_support::{agent_registration, persona, session_state, work_item};
 use super::{
-    AgentStatus, AutoPromotionPolicy, LeaderJoinPolicy, LeaderRecoveryPolicy, SessionMetrics,
-    SessionPolicy, SessionRole, SessionState, SessionStatus, TaskCheckpointSummary, TaskNote,
-    TaskQueuePolicy, TaskSeverity, TaskStatus,
+    ARBITRATION_BLOCKED_REASON, AgentStatus, AutoPromotionPolicy, LeaderJoinPolicy,
+    LeaderRecoveryPolicy, SessionMetrics, SessionPolicy, SessionRole, SessionState, SessionStatus,
+    TaskCheckpointSummary, TaskNote, TaskQueuePolicy, TaskSeverity, TaskStatus,
 };
 
 #[test]
@@ -152,6 +152,44 @@ fn metrics_exclude_idle_from_active_count() {
         "only Active counts, not Idle"
     );
     assert_eq!(metrics.idle_agent_count, 1);
+}
+
+#[test]
+fn metrics_count_third_round_arbitration_blocked_tasks() {
+    let mut tasks = BTreeMap::new();
+    let mut blocked_for_arbitration = work_item(
+        "task-arb",
+        "disputed after three rounds",
+        TaskSeverity::High,
+        TaskStatus::Blocked,
+    );
+    blocked_for_arbitration.review_round = 3;
+    blocked_for_arbitration.blocked_reason = Some(ARBITRATION_BLOCKED_REASON.to_string());
+    tasks.insert("task-arb".into(), blocked_for_arbitration);
+
+    let metrics = SessionMetrics::recalculate(&session_state(BTreeMap::new(), tasks));
+    assert_eq!(metrics.blocked_task_count, 1);
+    assert_eq!(
+        metrics.arbitration_task_count, 1,
+        "awaiting_arbitration blocked_reason must increment arbitration_task_count"
+    );
+}
+
+#[test]
+fn metrics_do_not_count_generic_blocked_reason_as_arbitration() {
+    let mut tasks = BTreeMap::new();
+    let mut merely_blocked = work_item(
+        "task-stuck",
+        "waiting on dep",
+        TaskSeverity::Medium,
+        TaskStatus::Blocked,
+    );
+    merely_blocked.blocked_reason = Some("waiting_on_dep".into());
+    tasks.insert("task-stuck".into(), merely_blocked);
+
+    let metrics = SessionMetrics::recalculate(&session_state(BTreeMap::new(), tasks));
+    assert_eq!(metrics.blocked_task_count, 1);
+    assert_eq!(metrics.arbitration_task_count, 0);
 }
 
 #[test]
