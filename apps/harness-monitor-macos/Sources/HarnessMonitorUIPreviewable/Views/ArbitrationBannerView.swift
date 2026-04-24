@@ -61,12 +61,3 @@ public struct ArbitrationBannerView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.arbitrationBanner(task.taskId))
   }
 }
-
-extension WorkItem {
-  /// Whether the task should surface the arbitration banner in content chrome.
-  /// Matches either an emitted arbitration decision or a task that has burned
-  /// through the three review rounds without consensus.
-  public var requiresArbitrationBanner: Bool {
-    arbitration != nil || reviewRound >= 3
-  }
-}
