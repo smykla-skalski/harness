@@ -9,7 +9,6 @@ use crate::session::types::{AgentRegistration, WorkItem};
 ///
 /// The caller is expected to have already filtered workers for liveness
 /// and assignability.
-#[allow(dead_code, reason = "consumed by task_queue routing integration in Slice 3")]
 pub(crate) fn rank_workers_for_task(task: &WorkItem, workers: &[&AgentRegistration]) -> Vec<String> {
     let mut ranked: Vec<(u8, &str)> = workers
         .iter()
