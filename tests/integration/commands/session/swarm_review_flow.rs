@@ -172,6 +172,118 @@ fn submit_for_review_requires_in_progress_status() {
     });
 }
 
+fn join_reviewer(
+    session_id: &str,
+    runtime: &str,
+    runtime_session_env: &str,
+    project: &std::path::Path,
+) -> String {
+    let joined = temp_env::with_var(runtime_session_env, Some("rev-session"), || {
+        service::join_session(
+            session_id,
+            SessionRole::Reviewer,
+            runtime,
+            &[],
+            None,
+            project,
+            None,
+        )
+        .unwrap()
+    });
+    joined
+        .agents
+        .values()
+        .filter(|agent| agent.role == SessionRole::Reviewer && agent.runtime == runtime)
+        .max_by(|a, b| a.joined_at.cmp(&b.joined_at))
+        .expect("reviewer joined")
+        .agent_id
+        .clone()
+}
+
+#[test]
+fn claim_review_transitions_task_to_in_review_and_records_reviewer() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-claim-review", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("claim-rev-1", &project);
+        service::submit_for_review("claim-rev-1", &task_id, &worker_id, None, &project).unwrap();
+
+        let reviewer_id = join_reviewer("claim-rev-1", "gemini", "GEMINI_SESSION_ID", &project);
+        service::claim_review("claim-rev-1", &task_id, &reviewer_id, &project)
+            .expect("claim review");
+
+        let state = service::session_status("claim-rev-1", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::InReview);
+        let claim = task.review_claim.as_ref().expect("claim present");
+        assert_eq!(claim.reviewers.len(), 1);
+        assert_eq!(claim.reviewers[0].reviewer_agent_id, reviewer_id);
+        assert_eq!(claim.reviewers[0].reviewer_runtime, "gemini");
+    });
+}
+
+#[test]
+fn claim_review_rejects_same_runtime_second_reviewer() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-claim-dup", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("claim-dup-1", &project);
+        service::submit_for_review("claim-dup-1", &task_id, &worker_id, None, &project).unwrap();
+
+        let first = join_reviewer("claim-dup-1", "gemini", "GEMINI_SESSION_ID", &project);
+        service::claim_review("claim-dup-1", &task_id, &first, &project).unwrap();
+
+        let second = temp_env::with_var("GEMINI_SESSION_ID", Some("rev-session-2"), || {
+            service::join_session(
+                "claim-dup-1",
+                SessionRole::Reviewer,
+                "gemini",
+                &[],
+                Some("gemini-two"),
+                &project,
+                None,
+            )
+            .unwrap()
+        });
+        let second_id = second
+            .agents
+            .values()
+            .filter(|agent| agent.role == SessionRole::Reviewer && agent.runtime == "gemini")
+            .map(|agent| agent.agent_id.clone())
+            .find(|id| id != &first)
+            .expect("second gemini reviewer joined");
+
+        let result = service::claim_review("claim-dup-1", &task_id, &second_id, &project);
+        let err = result.expect_err("second same-runtime claim must fail");
+        assert!(
+            err.to_string().contains("runtime_already_reviewing"),
+            "expected runtime_already_reviewing in error, got: {err}"
+        );
+    });
+}
+
+#[test]
+fn claim_review_allows_second_reviewer_on_different_runtime() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-claim-multi", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("claim-multi-1", &project);
+        service::submit_for_review("claim-multi-1", &task_id, &worker_id, None, &project).unwrap();
+
+        let first = join_reviewer("claim-multi-1", "gemini", "GEMINI_SESSION_ID", &project);
+        service::claim_review("claim-multi-1", &task_id, &first, &project).unwrap();
+
+        let second = join_reviewer("claim-multi-1", "copilot", "COPILOT_SESSION_ID", &project);
+        service::claim_review("claim-multi-1", &task_id, &second, &project)
+            .expect("cross-runtime claim");
+
+        let state = service::session_status("claim-multi-1", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        let claim = task.review_claim.as_ref().unwrap();
+        assert_eq!(claim.reviewers.len(), 2);
+    });
+}
+
 #[test]
 fn awaiting_review_worker_refuses_new_assignment() {
     let tmp = tempfile::tempdir().unwrap();
