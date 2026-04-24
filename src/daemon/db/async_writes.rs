@@ -85,14 +85,8 @@ impl AsyncDaemonDb {
         F: FnOnce(&mut SessionState) -> Result<T, CliError>,
     {
         let mut transaction = self
-            .pool()
-            .begin_with("BEGIN IMMEDIATE")
-            .await
-            .map_err(|error| {
-                db_error(format!(
-                    "begin async immediate session mutation transaction: {error}"
-                ))
-            })?;
+            .begin_immediate_transaction("async immediate session mutation")
+            .await?;
         let row = query_as::<_, AsyncSessionMutationRow>(LOAD_SESSION_FOR_MUTATION_SQL)
             .bind(session_id)
             .fetch_optional(transaction.as_mut())
@@ -145,10 +139,7 @@ impl AsyncDaemonDb {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize async log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin async append log transaction: {error}"))
-            })?;
+        let mut transaction = self.begin_immediate_transaction("async append log").await?;
         let sequence = next_log_sequence(&mut transaction, entry).await?;
         if insert_log_entry(
             &mut transaction,
@@ -178,11 +169,9 @@ impl AsyncDaemonDb {
         session_id: &str,
         checkpoint: &TaskCheckpoint,
     ) -> Result<(), CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!(
-                "begin async append checkpoint transaction: {error}"
-            ))
-        })?;
+        let mut transaction = self
+            .begin_immediate_transaction("async append checkpoint")
+            .await?;
         let inserted = query(INSERT_CHECKPOINT_SQL)
             .bind(&checkpoint.checkpoint_id)
             .bind(&checkpoint.task_id)
@@ -244,10 +233,9 @@ impl AsyncDaemonDb {
     /// Returns [`CliError`] on SQL failures.
     pub(crate) async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
         let normalized_scope = normalize_change_scope(scope);
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin async change bump transaction: {error}"))
-            })?;
+        let mut transaction = self
+            .begin_immediate_transaction("async change bump")
+            .await?;
         query(ADVANCE_CHANGE_SEQUENCE_SQL)
             .execute(transaction.as_mut())
             .await
@@ -270,16 +258,25 @@ impl AsyncDaemonDb {
         Ok(())
     }
     async fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin async session sync transaction: {error}"))
-            })?;
+        let mut transaction = self
+            .begin_immediate_transaction("async session sync")
+            .await?;
         sync_session_in_transaction(&mut transaction, project_id, state).await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit async session sync: {error}")))?;
         Ok(())
+    }
+
+    async fn begin_immediate_transaction(
+        &self,
+        context: &str,
+    ) -> Result<Transaction<'_, Sqlite>, CliError> {
+        self.pool()
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(|error| db_error(format!("begin {context} transaction: {error}")))
     }
 }
 
