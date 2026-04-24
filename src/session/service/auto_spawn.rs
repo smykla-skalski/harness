@@ -16,7 +16,6 @@ const SPAWN_REVIEWER_ACTION_HINT: &str = "harness:session:spawn-reviewer";
 /// Returns `None` when the task is not awaiting review, already has a
 /// reviewer available, has no leader to receive the signal, or cannot
 /// be located.
-#[allow(dead_code, reason = "consumed by submit_for_review daemon handler in Slice 3")]
 pub(crate) fn maybe_emit_spawn_reviewer(
     state: &SessionState,
     task_id: &str,

@@ -7,8 +7,10 @@
 use super::{
     CliError, Path, TaskStatus, apply_arbitrate, apply_claim_review, apply_respond_review,
     apply_submit_for_review, apply_submit_review, generate_review_id, load_state_or_err,
-    log_task_status_changed, storage, utc_now, validate_submit_review,
+    log_signal_sent, log_task_status_changed, maybe_emit_spawn_reviewer, storage, utc_now,
+    validate_submit_review,
 };
+use crate::agents::runtime::runtime_for_name;
 use crate::session::types::{Review, ReviewPoint, ReviewVerdict};
 /// Submit a task for review.
 ///
@@ -39,6 +41,25 @@ pub fn submit_for_review(
         Some(actor_id),
         None,
     )?;
+
+    // Auto-spawn reviewer when no reviewer is present: materialize the
+    // signal on disk against the leader's runtime so hooks can pick it up.
+    let state_after = load_state_or_err(session_id, project_dir)?;
+    if let Some(record) = maybe_emit_spawn_reviewer(&state_after, task_id, &now)
+        && let Some(runtime) = runtime_for_name(&record.runtime)
+    {
+        runtime.write_signal(project_dir, &record.session_id, &record.signal)?;
+        storage::append_log_entry(
+            &layout,
+            log_signal_sent(
+                &record.signal.signal_id,
+                &record.agent_id,
+                &record.signal.command,
+            ),
+            None,
+            None,
+        )?;
+    }
     Ok(())
 }
 
