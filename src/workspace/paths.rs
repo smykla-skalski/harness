@@ -1,4 +1,5 @@
 use std::env;
+use std::io;
 use std::path::{Path, PathBuf};
 
 /// Prefix used for harness-owned resources (containers, networks, temp dirs).
@@ -62,6 +63,30 @@ pub(crate) fn normalized_env_value(name: &str) -> Option<String> {
 #[must_use]
 pub fn harness_data_root() -> PathBuf {
     super::session::data_root().join("harness")
+}
+
+/// Marker filename Spotlight honors to skip an entire directory subtree.
+pub const NON_INDEXABLE_MARKER_NAME: &str = ".metadata_never_index";
+
+/// Create `root` (if missing) and drop an empty `.metadata_never_index`
+/// marker at its top level so Spotlight (mdworker, spotlightknowledged)
+/// does not index anything below it.
+///
+/// Idempotent: safe to call on every daemon/session bootstrap.
+///
+/// # Errors
+/// Returns [`io::Error`] on filesystem failures.
+pub fn ensure_non_indexable(root: &Path) -> io::Result<()> {
+    fs_err::create_dir_all(root)?;
+    let marker = root.join(NON_INDEXABLE_MARKER_NAME);
+    if !marker.exists() {
+        fs_err::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&marker)?;
+    }
+    Ok(())
 }
 
 /// Legacy macOS data root used before the App Sandbox migration.

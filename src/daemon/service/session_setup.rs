@@ -15,7 +15,7 @@ use crate::workspace::ids;
 use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
 use crate::workspace::project_resolver;
 use crate::workspace::worktree::WorktreeController;
-use crate::workspace::{harness_data_root, project_context_dir, utc_now};
+use crate::workspace::{ensure_non_indexable, harness_data_root, project_context_dir, utc_now};
 
 use super::session_service;
 use super::session_storage;
@@ -37,7 +37,13 @@ pub(super) fn prepare_session(
     let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
     let canonical_origin = project_scope.path().to_path_buf();
 
-    let sessions_root = workspace_sessions_root(&harness_data_root());
+    let data_root = harness_data_root();
+    ensure_non_indexable(&data_root).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "mark harness data root non-indexable: {error}"
+        )))
+    })?;
+    let sessions_root = workspace_sessions_root(&data_root);
     fs::create_dir_all(&sessions_root).map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
             "create sessions root '{}': {error}",
