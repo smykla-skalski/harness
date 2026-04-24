@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+
 use super::super::{
     AgentStatus, AwaitingReview, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
     clear_agent_current_task, refresh_session, require_active, require_permission,
     task_not_found, task_status_label, touch_agent,
 };
 use crate::session::types::{
-    Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry,
+    Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry, WorkItem,
 };
 
 const DEFAULT_REQUIRED_CONSENSUS: u8 = 2;
@@ -266,59 +268,122 @@ fn try_close_quorum(
     required: u8,
     now: &str,
 ) {
-    let Some(task) = state.tasks.get_mut(task_id) else {
-        return;
+    let (submitted_ids, submitter_id, current_round) = {
+        let Some(task) = state.tasks.get(task_id) else {
+            return;
+        };
+        let Some(entries) = quorum_submitted_entries(task, required) else {
+            return;
+        };
+        let submitted_ids: Vec<String> = entries
+            .iter()
+            .map(|entry| entry.reviewer_agent_id.clone())
+            .collect();
+        let current_round = task.review_round.saturating_add(1);
+        let submitter = task
+            .awaiting_review
+            .as_ref()
+            .map(|meta| meta.submitter_agent_id.clone());
+        (submitted_ids, submitter, current_round)
     };
-    let Some(claim) = task.review_claim.as_ref() else {
-        return;
-    };
+    let relevant = filter_reviews_for_round(all_reviews, &submitted_ids, current_round);
+    let verdict = aggregate_verdict(&relevant);
+    if let Some(task) = state.tasks.get_mut(task_id) {
+        stamp_consensus(task, &submitted_ids, &relevant, verdict, now);
+    }
+    if verdict == ReviewVerdict::Approve {
+        close_task_as_done(state, task_id, submitter_id, now);
+    }
+}
 
+fn quorum_submitted_entries(task: &WorkItem, required: u8) -> Option<Vec<&ReviewerEntry>> {
+    let claim = task.review_claim.as_ref()?;
     let submitted: Vec<&ReviewerEntry> = claim
         .reviewers
         .iter()
         .filter(|entry| entry.submitted_at.is_some())
         .collect();
-    let mut distinct_runtimes: Vec<&str> = submitted
+    let mut distinct: Vec<&str> = submitted
         .iter()
         .map(|entry| entry.reviewer_runtime.as_str())
         .collect();
-    distinct_runtimes.sort_unstable();
-    distinct_runtimes.dedup();
-    if u8::try_from(distinct_runtimes.len()).unwrap_or(u8::MAX) < required {
-        return;
+    distinct.sort_unstable();
+    distinct.dedup();
+    if u8::try_from(distinct.len()).unwrap_or(u8::MAX) < required {
+        return None;
     }
+    Some(submitted)
+}
 
-    let relevant: Vec<&Review> = all_reviews
-        .iter()
-        .filter(|review| {
-            submitted
-                .iter()
-                .any(|entry| entry.reviewer_agent_id == review.reviewer_agent_id)
-        })
-        .collect();
-    let verdict = aggregate_verdict(&relevant);
+fn filter_reviews_for_round<'a>(
+    all_reviews: &'a [Review],
+    submitted_ids: &[String],
+    current_round: u8,
+) -> Vec<&'a Review> {
+    let mut latest: BTreeMap<&str, &Review> = BTreeMap::new();
+    for review in all_reviews {
+        if review.round != current_round {
+            continue;
+        }
+        if !submitted_ids
+            .iter()
+            .any(|id| id == &review.reviewer_agent_id)
+        {
+            continue;
+        }
+        let keep = latest
+            .get(review.reviewer_agent_id.as_str())
+            .is_none_or(|existing| review.recorded_at.as_str() >= existing.recorded_at.as_str());
+        if keep {
+            latest.insert(review.reviewer_agent_id.as_str(), review);
+        }
+    }
+    latest.into_values().collect()
+}
+
+fn stamp_consensus(
+    task: &mut WorkItem,
+    submitted_ids: &[String],
+    relevant: &[&Review],
+    verdict: ReviewVerdict,
+    now: &str,
+) {
     let summary = relevant
         .iter()
         .map(|review| review.summary.clone())
         .filter(|text| !text.is_empty())
         .collect::<Vec<_>>()
         .join("; ");
-    let points = collect_consensus_points(&relevant);
-    let reviewer_agent_ids = submitted
-        .iter()
-        .map(|entry| entry.reviewer_agent_id.clone())
-        .collect();
-
+    let points = collect_consensus_points(relevant);
     task.consensus = Some(ReviewConsensus {
         verdict,
         summary,
         points,
         closed_at: now.to_string(),
-        reviewer_agent_ids,
+        reviewer_agent_ids: submitted_ids.to_vec(),
     });
-    if verdict == ReviewVerdict::Approve {
+}
+
+fn close_task_as_done(
+    state: &mut SessionState,
+    task_id: &str,
+    submitter_id: Option<String>,
+    now: &str,
+) {
+    if let Some(task) = state.tasks.get_mut(task_id) {
         task.status = TaskStatus::Done;
         task.completed_at = Some(now.to_string());
+        task.assigned_to = None;
+        task.awaiting_review = None;
+        task.review_claim = None;
+    }
+    if let Some(submitter_id) = submitter_id
+        && let Some(agent) = state.agents.get_mut(&submitter_id)
+    {
+        agent.status = AgentStatus::Idle;
+        agent.current_task_id = None;
+        agent.updated_at = now.to_string();
+        agent.last_activity_at = Some(now.to_string());
     }
 }
 
