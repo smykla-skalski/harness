@@ -210,7 +210,9 @@ pub(crate) fn free_worker_ids(state: &SessionState) -> Vec<String> {
     state
         .agents
         .values()
-        .filter(|agent| agent.status.is_alive() && agent.role == SessionRole::Worker)
+        .filter(|agent| {
+            agent.status.accepts_assignment() && agent.role == SessionRole::Worker
+        })
         .filter(|agent| is_worker_free(state, &agent.agent_id))
         .map(|agent| agent.agent_id.clone())
         .collect()
@@ -220,7 +222,7 @@ pub(crate) fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
     let Some(agent) = state.agents.get(agent_id) else {
         return false;
     };
-    agent.status.is_alive()
+    agent.status.accepts_assignment()
         && agent.role == SessionRole::Worker
         && agent.current_task_id.is_none()
         && !state.tasks.values().any(|task| {

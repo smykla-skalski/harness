@@ -5,7 +5,8 @@ use super::{
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
     generate_signal_id, next_task_id, protocol, refresh_session, require_active,
     require_active_worker_target_agent, require_permission, require_task_creation_state,
-    start_next_locked_task_for_worker, start_task_for_agent, task_not_found, touch_agent,
+    start_next_locked_task_for_worker, start_task_for_agent, task_not_found, task_status_label,
+    touch_agent,
 };
 
 /// Create a work item. Returns the new `WorkItem`.
@@ -181,6 +182,17 @@ pub(crate) fn apply_advance_queued_tasks(
     Ok(effects)
 }
 
+fn reject_review_only_status(task_id: &str, status: TaskStatus) -> Result<(), CliError> {
+    if matches!(status, TaskStatus::AwaitingReview | TaskStatus::InReview) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' cannot transition to '{}' via generic update; use submit_for_review or claim_review",
+            task_status_label(status)
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 /// Update a task's status. Returns the previous status.
 pub(crate) fn apply_update_task(
     state: &mut SessionState,
@@ -192,6 +204,8 @@ pub(crate) fn apply_update_task(
 ) -> Result<TaskStatus, CliError> {
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
+
+    reject_review_only_status(task_id, status)?;
 
     let assigned_to = state
         .tasks
