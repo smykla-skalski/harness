@@ -68,8 +68,12 @@ public actor SessionCacheService {
       return nil
     }
 
+    let reviewMetadata = fetchReviewMetadata(
+      context: context,
+      sessionID: sessionID
+    )
     let result = CachedSessionSnapshot(
-      detail: cached.toSessionDetail(),
+      detail: cached.toSessionDetail(reviewMetadataByTaskId: reviewMetadata),
       timeline: cached.timelineEntries
         .map { $0.toTimelineEntry() }
         .sorted { left, right in
@@ -113,10 +117,14 @@ public actor SessionCacheService {
 
     let snapshots = Dictionary(
       uniqueKeysWithValues: cached.map { session in
-        (
+        let reviewMetadata = fetchReviewMetadata(
+          context: context,
+          sessionID: session.sessionId
+        )
+        return (
           session.sessionId,
           CachedSessionSnapshot(
-            detail: session.toSessionDetail(),
+            detail: session.toSessionDetail(reviewMetadataByTaskId: reviewMetadata),
             timeline: session.timelineEntries
               .map { $0.toTimelineEntry() }
               .sorted { left, right in
@@ -251,6 +259,27 @@ public actor SessionCacheService {
       operation: "hydration_queue", hit: !cached.isEmpty, durationMs: durationMs
     )
     return result
+  }
+
+  /// Fetch the `(taskId -> review metadata)` map for a session from the
+  /// V8 side-table. Missing rows are simply absent from the returned
+  /// dictionary, which callers treat as an empty review block.
+  func fetchReviewMetadata(
+    context: ModelContext,
+    sessionID: String
+  ) -> [String: CachedReviewMetadata] {
+    let descriptor = FetchDescriptor<CachedTaskReviewMetadata>(
+      predicate: #Predicate { $0.sessionId == sessionID }
+    )
+    guard let rows = try? context.fetch(descriptor), !rows.isEmpty else {
+      return [:]
+    }
+    return Dictionary(
+      uniqueKeysWithValues: rows.compactMap { row in
+        let payload = decodedReviewMetadata(from: row.reviewBlob)
+        return payload.isEmpty ? nil : (row.taskId, payload)
+      }
+    )
   }
 
 }
