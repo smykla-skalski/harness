@@ -156,6 +156,11 @@ pub(crate) fn apply_arbitrate(
         .into());
     }
 
+    let submitter = state
+        .tasks
+        .get(task_id)
+        .and_then(|task| task.awaiting_review.as_ref())
+        .map(|meta| meta.submitter_agent_id.clone());
     let task = state
         .tasks
         .get_mut(task_id)
@@ -174,6 +179,14 @@ pub(crate) fn apply_arbitrate(
         task.review_claim = None;
         task.awaiting_review = None;
         task.consensus = None;
+        if let Some(submitter_id) = submitter
+            && let Some(agent) = state.agents.get_mut(&submitter_id)
+        {
+            agent.status = AgentStatus::Idle;
+            agent.current_task_id = None;
+            agent.updated_at = now.to_string();
+            agent.last_activity_at = Some(now.to_string());
+        }
     }
 
     touch_agent(state, actor_id, now);
