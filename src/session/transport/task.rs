@@ -1,11 +1,15 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use crate::daemon::protocol::{
+    TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
+    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+};
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::service;
-use crate::session::types::{TaskSeverity, TaskSource, TaskStatus};
+use crate::session::types::{ReviewPoint, ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
 
-use super::support::{print_json, resolve_project_dir};
+use super::support::{daemon_client, print_json, resolve_project_dir};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskCreateArgs {
@@ -198,4 +202,183 @@ impl Execute for TaskCheckpointArgs {
         print_json(&checkpoint)?;
         Ok(0)
     }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskSubmitForReviewArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID to return for review.
+    pub task_id: String,
+    /// Agent ID of the caller.
+    #[arg(long)]
+    pub actor: String,
+    /// Optional short summary of the worker's hand-off.
+    #[arg(long)]
+    pub summary: Option<String>,
+    /// Optional persona hint for the reviewer queue.
+    #[arg(long)]
+    pub suggested_persona: Option<String>,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskSubmitForReviewArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = TaskSubmitForReviewRequest {
+            actor: self.actor.clone(),
+            summary: self.summary.clone(),
+            suggested_persona: self.suggested_persona.clone(),
+        };
+        let detail =
+            daemon_client()?.submit_task_for_review(&self.session_id, &self.task_id, &request)?;
+        print_json(&detail)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskClaimReviewArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID to claim for review.
+    pub task_id: String,
+    /// Agent ID of the reviewer claiming the task.
+    #[arg(long)]
+    pub actor: String,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskClaimReviewArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = TaskClaimReviewRequest {
+            actor: self.actor.clone(),
+        };
+        let detail =
+            daemon_client()?.claim_task_review(&self.session_id, &self.task_id, &request)?;
+        print_json(&detail)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskSubmitReviewArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID under review.
+    pub task_id: String,
+    /// Agent ID of the reviewer.
+    #[arg(long)]
+    pub actor: String,
+    /// Overall verdict.
+    #[arg(long, value_enum)]
+    pub verdict: ReviewVerdict,
+    /// Human-readable summary of the review.
+    #[arg(long)]
+    pub summary: String,
+    /// JSON array of review points (`ReviewPoint`). Defaults to empty.
+    #[arg(long)]
+    pub points: Option<String>,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskSubmitReviewArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let points = parse_review_points(self.points.as_deref())?;
+        let request = TaskSubmitReviewRequest {
+            actor: self.actor.clone(),
+            verdict: self.verdict,
+            summary: self.summary.clone(),
+            points,
+        };
+        let detail =
+            daemon_client()?.submit_task_review(&self.session_id, &self.task_id, &request)?;
+        print_json(&detail)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskRespondReviewArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID the worker is responding on.
+    pub task_id: String,
+    /// Agent ID of the worker.
+    #[arg(long)]
+    pub actor: String,
+    /// Comma-separated point ids the worker agrees with.
+    #[arg(long, value_delimiter = ',')]
+    pub agreed: Vec<String>,
+    /// Comma-separated point ids the worker disputes.
+    #[arg(long, value_delimiter = ',')]
+    pub disputed: Vec<String>,
+    /// Optional worker note.
+    #[arg(long)]
+    pub note: Option<String>,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskRespondReviewArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = TaskRespondReviewRequest {
+            actor: self.actor.clone(),
+            agreed: self.agreed.clone(),
+            disputed: self.disputed.clone(),
+            note: self.note.clone(),
+        };
+        let detail =
+            daemon_client()?.respond_task_review(&self.session_id, &self.task_id, &request)?;
+        print_json(&detail)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskArbitrateArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID awaiting arbitration.
+    pub task_id: String,
+    /// Agent ID of the leader arbitrating.
+    #[arg(long)]
+    pub actor: String,
+    /// Final arbitration verdict.
+    #[arg(long, value_enum)]
+    pub verdict: ReviewVerdict,
+    /// Human-readable arbitration summary.
+    #[arg(long)]
+    pub summary: String,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskArbitrateArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = TaskArbitrateRequest {
+            actor: self.actor.clone(),
+            verdict: self.verdict,
+            summary: self.summary.clone(),
+        };
+        let detail = daemon_client()?.arbitrate_task(&self.session_id, &self.task_id, &request)?;
+        print_json(&detail)?;
+        Ok(0)
+    }
+}
+
+fn parse_review_points(raw: Option<&str>) -> Result<Vec<ReviewPoint>, CliError> {
+    let Some(value) = raw else {
+        return Ok(Vec::new());
+    };
+    serde_json::from_str::<Vec<ReviewPoint>>(value).map_err(|error| {
+        CliErrorKind::usage_error(format!("invalid --points JSON: {error}")).into()
+    })
 }

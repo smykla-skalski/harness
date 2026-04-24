@@ -27,6 +27,14 @@ mod run;
 mod session;
 #[path = "tests/session_adopt.rs"]
 mod session_adopt;
+#[path = "tests/session_improver.rs"]
+mod session_improver;
+#[path = "tests/session_join.rs"]
+mod session_join;
+#[path = "tests/session_review.rs"]
+mod session_review;
+#[path = "tests/session_task.rs"]
+mod session_task;
 #[path = "tests/setup.rs"]
 mod setup;
 
