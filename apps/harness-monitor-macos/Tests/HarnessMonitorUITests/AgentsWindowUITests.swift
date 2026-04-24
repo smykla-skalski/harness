@@ -3,10 +3,10 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
-  func testAgentTuiWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
+final class AgentsWindowUITests: HarnessMonitorUITestCase {
+  func testAgentsWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
@@ -17,7 +17,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testStartingAgentTuiCreatesAndSelectsSessionRow() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "Inspect the cockpit session")
     let sessionRow = element(
       in: app,
@@ -44,7 +44,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_CODEX_START": "success"]
     )
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     tapButton(in: app, title: "Codex")
     let promptField = editableField(in: app, identifier: Accessibility.agentsCodexPromptField)
@@ -74,9 +74,9 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testCommandNavigationRoutesBackAndForwardWithinActiveAgentTuiWindowHistory() throws {
+  func testCommandNavigationRoutesBackAndForwardWithinActiveAgentsWindowHistory() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "exercise command navigation")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let createTab = element(in: app, identifier: Accessibility.agentTuiCreateTab)
@@ -137,7 +137,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-overflow"]
     )
-    reopenAgentTuiWindow(in: app)
+    reopenAgentsWindow(in: app)
     for index in 1...6 {
       let sessionRow = element(
         in: app,
@@ -151,7 +151,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testCreatePaneSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     XCTAssertTrue(waitForElement(createRow, timeout: Self.actionTimeout))
     let agentWindow = window(in: app, containing: createRow)
@@ -185,7 +185,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testWrapToggleSwitchesViewportMode() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "wrap test")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(
@@ -211,7 +211,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testCommandReturnSendsAgentInputFromEditor() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "command return send")
     let inputField = editableField(in: app, identifier: Accessibility.agentTuiInputField)
     XCTAssertTrue(waitForElement(inputField, timeout: Self.actionTimeout))
@@ -228,7 +228,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testRapidKeyStripTapsShowPendingHintBeforeIdleFlush() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "buffer key strip input")
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("arrow-down"))
@@ -252,7 +252,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testSelectionChangeFlushesPendingKeySequenceImmediately() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "flush pending keys on selection change")
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
     let pendingHint = element(in: app, identifier: Accessibility.agentTuiKeyQueueHint)
@@ -273,7 +273,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testDraggingViewportDividerResizesLiveTerminal() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "resize with divider")
     let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
     let controls = element(in: app, identifier: Accessibility.agentTuiControls)
@@ -309,7 +309,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testStoppedSessionHidesLiveControlsButKeepsTranscriptAction() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "stop after start")
     tapButton(in: app, title: "Stop")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
@@ -341,7 +341,7 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
   }
   func testTerminalSizeRemainsStableAfterStartAndSelection() throws {
     let app = launchInCockpitPreview()
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Claude", prompt: "viewport size test")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))

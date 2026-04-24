@@ -1,6 +1,6 @@
 import HarnessMonitorKit
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   func resolvedTitle(for tui: AgentTuiSnapshot) -> String {
     displayState.sessionTitlesByID[tui.tuiId] ?? resolvedRuntimeTitle(for: tui)
   }

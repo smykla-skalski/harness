@@ -2,7 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
     @Bindable var viewModel = viewModel
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {

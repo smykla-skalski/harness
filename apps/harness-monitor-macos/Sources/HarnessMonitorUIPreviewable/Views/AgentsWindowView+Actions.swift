@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   static func initialSelection(
     displayState: AgentTuiDisplayState,
     selectedTerminalID: String?,
@@ -80,7 +80,7 @@ extension AgentTuiWindowView {
           ?? catalog?.default
           ?? ""
         let customValue = viewModel.customTerminalModelByRuntime[viewModel.runtime] ?? ""
-        let resolved = AgentTuiWindowView.effectiveModelId(
+        let resolved = AgentsWindowView.effectiveModelId(
           pickerValue: pickerValue,
           customValue: customValue,
           catalogDefault: catalog?.default ?? ""
@@ -118,7 +118,7 @@ extension AgentTuiWindowView {
         let catalog = viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
         let pickerValue = viewModel.selectedCodexModel ?? catalog?.default ?? ""
         let customValue = viewModel.customCodexModel ?? ""
-        let resolved = AgentTuiWindowView.effectiveModelId(
+        let resolved = AgentsWindowView.effectiveModelId(
           pickerValue: pickerValue,
           customValue: customValue,
           catalogDefault: catalog?.default ?? ""

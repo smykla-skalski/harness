@@ -2,11 +2,11 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-extension AgentTuiWindowUITests {
+extension AgentsWindowUITests {
   func testPersonaPickerVisibleInCreatePane() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let picker = element(in: app, identifier: Accessibility.agentTuiPersonaPicker)
     XCTAssertTrue(
@@ -18,7 +18,7 @@ extension AgentTuiWindowUITests {
   func testTerminalModelPickerVisibleInCreatePane() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
     XCTAssertTrue(
@@ -30,7 +30,7 @@ extension AgentTuiWindowUITests {
   func testEffortPickerVisibleForReasoningCapableDefaultModel() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let effortPicker = element(in: app, identifier: Accessibility.agentsEffortPicker)
     XCTAssertTrue(
@@ -42,7 +42,7 @@ extension AgentTuiWindowUITests {
   func testCustomModelOptionRevealsTextField() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
     XCTAssertTrue(waitForElement(picker, timeout: Self.uiTimeout))
@@ -65,7 +65,7 @@ extension AgentTuiWindowUITests {
   func testTerminalModelPickerSupportsNativePopupFallback() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     selectMenuOption(
       in: app,
@@ -83,7 +83,7 @@ extension AgentTuiWindowUITests {
   func testCodexModelPickerSupportsNativePopupFallback() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     tapButton(in: app, title: "Codex")
 
     selectMenuOption(
@@ -102,7 +102,7 @@ extension AgentTuiWindowUITests {
   func testEffortPickerHidesForModelWithoutReasoningSupport() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     tapButton(in: app, title: "Gemini")
 
     let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
@@ -130,7 +130,7 @@ extension AgentTuiWindowUITests {
   func testEffortSelectionPersistsAcrossRuntimeSwitch() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let effortPicker = element(in: app, identifier: Accessibility.agentsEffortPicker)
     XCTAssertTrue(waitForElement(effortPicker, timeout: Self.uiTimeout))
@@ -166,7 +166,7 @@ extension AgentTuiWindowUITests {
   func testStartingWithDefaultPersonaStartsTui() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "no persona test")
 
     let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
@@ -179,7 +179,7 @@ extension AgentTuiWindowUITests {
   func testCreatePaneTerminalModeRendersNativeFormSections() throws {
     let app = launchInCockpitPreview()
 
-    openAgentTuiWindow(in: app)
+    openAgentsWindow(in: app)
 
     let runtimeHeader = app.staticTexts["Runtime"]
     let detailsHeader = app.staticTexts["Details"]

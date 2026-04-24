@@ -1,6 +1,6 @@
 import HarnessMonitorKit
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   func terminalRuntimeCatalog(_ formModel: ViewModel) -> RuntimeModelCatalog? {
     formModel.availableRuntimeModels.first { $0.runtime == formModel.runtime.rawValue }
   }

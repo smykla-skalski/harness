@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   func consumePendingAgentsWindowSelection() {
     guard let pending = store.consumePendingAgentsWindowSelection() else {
       return

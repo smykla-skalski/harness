@@ -21,7 +21,7 @@ struct AgentTuiKeyTests {
   @Test("key sequence buffer sends first tap immediately and buffers follow-up taps")
   func keySequenceBufferSendsFirstTapImmediatelyAndBuffersFollowUps() async throws {
     let clock = TestKeySequenceClock()
-    let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
+    let buffer = AgentsWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
     let first = buffer.enqueue(input: .key(.enter), glyph: "↩", tuiID: "tui-1") { tuiID, request in
@@ -64,7 +64,7 @@ struct AgentTuiKeyTests {
   @Test("forced flush preserves the original TUI target")
   func forcedFlushPreservesOriginalTarget() async throws {
     let clock = TestKeySequenceClock()
-    let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
+    let buffer = AgentsWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
     let first = buffer.enqueue(
@@ -100,7 +100,7 @@ struct AgentTuiKeyTests {
   @Test("dropping a queued key sequence clears the hint and cancels idle flush")
   func droppingQueuedKeySequenceClearsState() async throws {
     let clock = TestKeySequenceClock()
-    let buffer = AgentTuiWindowView.KeySequenceBuffer(clock: clock)
+    let buffer = AgentsWindowView.KeySequenceBuffer(clock: clock)
     let recorder = FlushRecorder()
 
     let first = buffer.enqueue(
@@ -158,7 +158,7 @@ private func drainTasks() async {
 }
 
 @MainActor
-private final class TestKeySequenceClock: AgentTuiWindowView.KeySequenceClock {
+private final class TestKeySequenceClock: AgentsWindowView.KeySequenceClock {
   private var current = ContinuousClock.now
 
   var now: ContinuousClock.Instant {

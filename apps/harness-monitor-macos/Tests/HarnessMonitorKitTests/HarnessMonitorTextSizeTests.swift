@@ -308,9 +308,9 @@ struct AgentsWindowMountTests {
   @Test("Agents window mounts from the cockpit preview store without crashing")
   func agentsWindowMountsFromCockpitPreviewStore() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
-    let navigationBridge = AgentTuiWindowNavigationBridge()
+    let navigationBridge = AgentsWindowNavigationBridge()
     let host = NSHostingView(
-      rootView: AgentTuiWindowView(
+      rootView: AgentsWindowView(
         store: store,
         navigationBridge: navigationBridge
       )

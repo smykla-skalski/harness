@@ -13,7 +13,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentTuiWindow(in: app)
+    reopenAgentsWindow(in: app)
 
     let acceptIdentifier = Accessibility.codexApprovalButton(
       "approval-preview-1",
@@ -39,7 +39,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentTuiWindow(in: app)
+    reopenAgentsWindow(in: app)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let approveIdentifier = Accessibility.codexApprovalButton(
@@ -76,7 +76,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentTuiWindow(in: app)
+    reopenAgentsWindow(in: app)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let badgeState = element(in: app, identifier: Accessibility.supervisorBadgeState)
@@ -121,7 +121,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       }
     )
 
-    reopenAgentTuiWindow(in: app)
+    reopenAgentsWindow(in: app)
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         state.label.contains("selection=codex:preview-codex-approval-run")
@@ -134,7 +134,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
     )
   }
 
-  private func reopenAgentTuiWindow(in app: XCUIApplication) {
+  private func reopenAgentsWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentsButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
