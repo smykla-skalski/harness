@@ -13,6 +13,7 @@ public actor RegistryListener {
   private let logger: Logger
   private let queue: DispatchQueue
   private var socketFD: Int32 = -1
+  private var socketPath: String?
   private var acceptSource: DispatchSourceRead?
   private var connections: [Int32: Connection] = [:]
   private var running = false
@@ -62,6 +63,7 @@ public actor RegistryListener {
     if Darwin.listen(fd, 16) != 0 {
       let err = errno
       Darwin.close(fd)
+      removeSocketFile(path)
       throw RegistryListenerError.listenFailed(errno: err)
     }
 
@@ -72,6 +74,7 @@ public actor RegistryListener {
     source.resume()
 
     socketFD = fd
+    socketPath = path
     acceptSource = source
     running = true
     logger.info("harness-monitor MCP listener started at \(path, privacy: .public)")
@@ -85,6 +88,10 @@ public actor RegistryListener {
     if socketFD >= 0 {
       Darwin.close(socketFD)
       socketFD = -1
+    }
+    if let path = socketPath {
+      removeSocketFile(path)
+      socketPath = nil
     }
     for (fd, connection) in connections {
       connection.readSource.cancel()
@@ -248,4 +255,8 @@ private func ensureSocketPathAvailable(_ path: String) throws {
   if fileManager.fileExists(atPath: path) {
     try fileManager.removeItem(atPath: path)
   }
+}
+
+private func removeSocketFile(_ path: String) {
+  try? FileManager.default.removeItem(atPath: path)
 }

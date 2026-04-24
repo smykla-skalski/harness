@@ -50,4 +50,5 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
 fi
 
 "$ROOT/scripts/tests/test-run-step.sh"
+"$ROOT/scripts/tests/test-mcp-scripts.sh"
 "$ROOT/scripts/tests/test-stale-scan.sh"

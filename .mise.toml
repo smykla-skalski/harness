@@ -215,6 +215,10 @@ run = [
   "./scripts/cargo-local.sh test --test integration mcp:: -- --test-threads=1",
 ]
 
+[tasks."mcp:test:registry"]
+description = "Run the Harness Monitor registry Swift package tests"
+run = "swift test --package-path mcp-servers/harness-monitor-registry"
+
 [tasks."mcp:build:input-helper"]
 description = "Build the harness-monitor-input Swift helper (CGEvent backend)"
 run = "swift build -c release --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input"

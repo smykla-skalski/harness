@@ -7,7 +7,10 @@ set -uo pipefail
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$ROOT/scripts/lib/common-repo-root.sh"
+# shellcheck source=scripts/lib/mcp-socket.sh
+source "$ROOT/scripts/lib/mcp-socket.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+hash -r 2>/dev/null || true
 
 pass="\033[32mPASS\033[0m"
 fail="\033[31mFAIL\033[0m"
@@ -46,9 +49,9 @@ section() {
 # 1. Rust CLI
 
 section "Rust CLI"
-if command -v harness >/dev/null 2>&1; then
-  version=$(harness --version 2>/dev/null | head -1 || echo "unknown")
-  path=$(command -v harness)
+if harness_bin=$(command -v harness 2>/dev/null); then
+  version=$("$harness_bin" --version 2>/dev/null | head -1 || echo "unknown")
+  path="$harness_bin"
   ok "harness on PATH" "$version" "$path"
 else
   fail_critical "harness not on PATH" "Run: mise run install"
@@ -96,9 +99,16 @@ fi
 # 4. Socket + Preferences toggle
 
 section "Registry socket"
-socket_path=$(scripts/mcp-socket-path.sh)
+socket_path=$("$ROOT/scripts/mcp-socket-path.sh")
 if [[ -S "$socket_path" ]]; then
-  ok "socket is bound" "$socket_path"
+  if probe_output="$(mcp_probe_socket "$socket_path" 2>&1)"; then
+    ok "socket is accepting registry ping" "$socket_path"
+  else
+    fail_critical "socket is not accepting connections" \
+      "$socket_path" \
+      "$probe_output" \
+      "Launch with: mise run mcp:launch:dev"
+  fi
 elif [[ -e "$socket_path" ]]; then
   fail_critical "path exists but is not a socket" "$socket_path"
 else
@@ -111,9 +121,9 @@ fi
 # 5. Protocol round-trip
 
 section "Protocol round-trip"
-if command -v harness >/dev/null 2>&1; then
+if [[ -n "${harness_bin:-}" ]]; then
   probe_request='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"doctor","version":"0"},"capabilities":{}}}'
-  probe_response=$(printf '%s\n' "$probe_request" | harness mcp serve 2>/dev/null | head -1 || true)
+  probe_response=$(printf '%s\n' "$probe_request" | "$harness_bin" mcp serve 2>/dev/null | head -1 || true)
   if [[ -n "$probe_response" ]] \
     && printf '%s' "$probe_response" | grep -q '"protocolVersion":"2025-11-25"'; then
     ok "initialize round-trip succeeded (protocolVersion 2025-11-25)"
