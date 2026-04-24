@@ -153,6 +153,60 @@ fn parse_session_task_update_accepts_kebab_in_progress_alias() {
 }
 
 #[test]
+fn parse_session_task_update_accepts_snake_in_review_status() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "task",
+        "update",
+        "sess",
+        "task-1",
+        "--status",
+        "in_review",
+        "--actor",
+        "worker-1",
+    ])
+    .unwrap();
+    let Command::Session {
+        command:
+            crate::session::transport::SessionCommand::Task {
+                command: crate::session::transport::SessionTaskCommand::Update(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected task update");
+    };
+    assert_eq!(args.status, crate::session::types::TaskStatus::InReview);
+}
+
+#[test]
+fn parse_session_task_update_accepts_kebab_in_review_alias() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "task",
+        "update",
+        "sess",
+        "task-1",
+        "--status",
+        "in-review",
+        "--actor",
+        "worker-1",
+    ])
+    .unwrap();
+    let Command::Session {
+        command:
+            crate::session::transport::SessionCommand::Task {
+                command: crate::session::transport::SessionTaskCommand::Update(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected task update");
+    };
+    assert_eq!(args.status, crate::session::types::TaskStatus::InReview);
+}
+
+#[test]
 fn parse_session_task_update_accepts_awaiting_review_status() {
     let cli = Cli::try_parse_from([
         "harness",

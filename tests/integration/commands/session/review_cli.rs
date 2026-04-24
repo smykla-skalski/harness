@@ -1,11 +1,9 @@
 //! CLI → service → state integration coverage for the review workflow
-//! subcommands added in Slice 4 (T21-T23) plus the improver apply
-//! subcommand. Drives each command through `Cli::try_parse_from` and
-//! `run_command` so the clap parser (incl. snake_case + kebab-case alias
-//! surface) and the `Execute` dispatch are both exercised against real
-//! session state.
-
-use std::fs;
+//! subcommands added in Slice 4 (T21-T23). Drives each command through
+//! `Cli::try_parse_from` and `run_command` so the clap parser (incl.
+//! snake_case + kebab-case alias surface) and the `Execute` dispatch are
+//! both exercised against real session state. Improver permission +
+//! project-dir isolation tests live in [`super::improver_cli`].
 
 use clap::Parser;
 use harness::app::cli::Cli;
@@ -316,127 +314,5 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
         let arb = task.arbitration.as_ref().expect("arbitration recorded");
         assert_eq!(arb.verdict, ReviewVerdict::Approve);
         assert_eq!(task.status, TaskStatus::Done);
-    });
-}
-
-#[test]
-fn improver_apply_via_cli_writes_file_and_prints_outcome() {
-    let tmp = tempfile::tempdir().unwrap();
-    with_session_test_env(tmp.path(), "integ-rev-cli-improver", || {
-        let project = tmp.path().join("project");
-        fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
-        fs::write(project.join("agents/skills/demo/SKILL.md"), "old\n").unwrap();
-        let contents_file = tmp.path().join("new-contents.md");
-        fs::write(&contents_file, "new\n").unwrap();
-
-        // Start + join a leader so actor resolves; improver apply itself
-        // does not gate on session state, but the arg is required.
-        let _state = service::start_session_with_policy(
-            "",
-            "improver cli",
-            &project,
-            Some("rev-cli-6"),
-            Some("swarm-default"),
-        )
-        .unwrap();
-        let joined = service::join_session(
-            "rev-cli-6",
-            harness::session::types::SessionRole::Leader,
-            "claude",
-            &[],
-            Some("improver-persona"),
-            &project,
-            None,
-        )
-        .unwrap();
-        let actor = joined.leader_id.unwrap();
-
-        let project_str = project.to_string_lossy().to_string();
-        let contents_str = contents_file.to_string_lossy().to_string();
-        let exit = run_cli(&[
-            "harness",
-            "session",
-            "improver",
-            "apply",
-            "rev-cli-6",
-            "--actor",
-            &actor,
-            "--issue-id",
-            "python_traceback_output/abc",
-            "--target",
-            "skill",
-            "--rel-path",
-            "demo/SKILL.md",
-            "--new-contents-file",
-            &contents_str,
-            "--project-dir",
-            &project_str,
-        ]);
-        assert_eq!(exit, 0);
-
-        let on_disk = fs::read_to_string(project.join("agents/skills/demo/SKILL.md")).unwrap();
-        assert_eq!(on_disk, "new\n");
-    });
-}
-
-#[test]
-fn improver_apply_dry_run_leaves_file_unchanged() {
-    let tmp = tempfile::tempdir().unwrap();
-    with_session_test_env(tmp.path(), "integ-rev-cli-improver-dry", || {
-        let project = tmp.path().join("project");
-        fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
-        let target = project.join("agents/skills/demo/SKILL.md");
-        fs::write(&target, "pristine\n").unwrap();
-        let contents_file = tmp.path().join("new.md");
-        fs::write(&contents_file, "would-write\n").unwrap();
-
-        let _state = service::start_session_with_policy(
-            "",
-            "improver dry",
-            &project,
-            Some("rev-cli-7"),
-            Some("swarm-default"),
-        )
-        .unwrap();
-        let joined = service::join_session(
-            "rev-cli-7",
-            harness::session::types::SessionRole::Leader,
-            "claude",
-            &[],
-            None,
-            &project,
-            None,
-        )
-        .unwrap();
-        let actor = joined.leader_id.unwrap();
-
-        let project_str = project.to_string_lossy().to_string();
-        let contents_str = contents_file.to_string_lossy().to_string();
-        let exit = run_cli(&[
-            "harness",
-            "session",
-            "improver",
-            "apply",
-            "rev-cli-7",
-            "--actor",
-            &actor,
-            "--issue-id",
-            "x/y",
-            "--target",
-            "skill",
-            "--rel-path",
-            "demo/SKILL.md",
-            "--new-contents-file",
-            &contents_str,
-            "--dry-run",
-            "--project-dir",
-            &project_str,
-        ]);
-        assert_eq!(exit, 0);
-        assert_eq!(
-            fs::read_to_string(&target).unwrap(),
-            "pristine\n",
-            "dry-run must not modify target file"
-        );
     });
 }

@@ -132,6 +132,35 @@ fn parse_session_task_submit_review_accepts_kebab_verdict_alias() {
 }
 
 #[test]
+fn parse_session_task_submit_review_accepts_reject_verdict() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "task",
+        "submit-review",
+        "sess-rv",
+        "task-9",
+        "--actor",
+        "reviewer-1",
+        "--verdict",
+        "reject",
+        "--summary",
+        "not shipping",
+    ])
+    .unwrap();
+    let Command::Session {
+        command:
+            crate::session::transport::SessionCommand::Task {
+                command: crate::session::transport::SessionTaskCommand::SubmitReview(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected SubmitReview");
+    };
+    assert_eq!(args.verdict, crate::session::types::ReviewVerdict::Reject);
+}
+
+#[test]
 fn parse_session_task_submit_review_with_points_json() {
     let cli = Cli::try_parse_from([
         "harness",
