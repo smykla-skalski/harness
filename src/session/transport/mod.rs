@@ -3,6 +3,7 @@ use clap::Subcommand;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
+mod improver;
 mod managed_agents;
 mod recover;
 mod session_commands;
@@ -10,6 +11,7 @@ mod signal;
 mod support;
 mod task;
 
+pub use improver::SessionImproverApplyArgs;
 pub use managed_agents::{
     CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentStartArgs, CodexAgentSteerArgs,
     ManagedAgentAttachArgs, ManagedAgentListArgs, ManagedAgentShowArgs, ManagedTerminalInputArgs,
@@ -23,7 +25,11 @@ pub use session_commands::{
     SessionSyncArgs, SessionTitleArgs, SessionTransferLeaderArgs,
 };
 pub use signal::{SignalListArgs, SignalSendArgs};
-pub use task::{TaskAssignArgs, TaskCheckpointArgs, TaskCreateArgs, TaskListArgs, TaskUpdateArgs};
+pub use task::{
+    TaskArbitrateArgs, TaskAssignArgs, TaskCheckpointArgs, TaskClaimReviewArgs, TaskCreateArgs,
+    TaskListArgs, TaskRespondReviewArgs, TaskSubmitForReviewArgs, TaskSubmitReviewArgs,
+    TaskUpdateArgs,
+};
 
 /// Multi-agent session orchestration commands.
 #[derive(Debug, Clone, Subcommand)]
@@ -49,6 +55,11 @@ pub enum SessionCommand {
     Task {
         #[command(subcommand)]
         command: SessionTaskCommand,
+    },
+    /// Improver actions (apply observer-flagged patches to canonical sources).
+    Improver {
+        #[command(subcommand)]
+        command: SessionImproverCommand,
     },
     /// Signal management.
     Signal {
@@ -88,6 +99,24 @@ pub enum SessionTaskCommand {
     Update(TaskUpdateArgs),
     /// Record an append-only task checkpoint.
     Checkpoint(TaskCheckpointArgs),
+    /// Return a task to the reviewer queue.
+    SubmitForReview(TaskSubmitForReviewArgs),
+    /// Claim an awaiting-review task for review.
+    ClaimReview(TaskClaimReviewArgs),
+    /// Submit a review verdict.
+    SubmitReview(TaskSubmitReviewArgs),
+    /// Respond to review feedback as the worker.
+    RespondReview(TaskRespondReviewArgs),
+    /// Leader arbitration on an exhausted review cycle.
+    Arbitrate(TaskArbitrateArgs),
+}
+
+/// Session improver subcommands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum SessionImproverCommand {
+    /// Apply a patch to a canonical skill/plugin source.
+    Apply(SessionImproverApplyArgs),
 }
 
 /// Session signal subcommands.
@@ -112,6 +141,7 @@ impl Execute for SessionCommand {
             Self::TransferLeader(args) => args.execute(context),
             Self::RecoverLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
+            Self::Improver { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
             Self::Agents { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
@@ -132,6 +162,19 @@ impl Execute for SessionTaskCommand {
             Self::List(args) => args.execute(context),
             Self::Update(args) => args.execute(context),
             Self::Checkpoint(args) => args.execute(context),
+            Self::SubmitForReview(args) => args.execute(context),
+            Self::ClaimReview(args) => args.execute(context),
+            Self::SubmitReview(args) => args.execute(context),
+            Self::RespondReview(args) => args.execute(context),
+            Self::Arbitrate(args) => args.execute(context),
+        }
+    }
+}
+
+impl Execute for SessionImproverCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Apply(args) => args.execute(context),
         }
     }
 }
