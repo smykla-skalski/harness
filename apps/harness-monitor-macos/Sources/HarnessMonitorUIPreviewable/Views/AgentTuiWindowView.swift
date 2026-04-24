@@ -159,8 +159,14 @@ public struct AgentTuiWindowView: View {
   @MainActor var currentStateMarker: String {
     let selectedSessionLabel = "session=\(store.selectedSessionID ?? "none")"
     let readOnlyLabel = "readOnly=\(store.isSessionReadOnly)"
+    let focusedFieldLabel = "focus=\(focusedField.map(String.init(describing:)) ?? "none")"
+    let startTuiLabel = "startTui=\(viewModel.startTuiAttemptCount):\(viewModel.startTuiPhase)"
     let codexStartLabel =
       "codexStart=\(viewModel.codexStartAttemptCount):\(viewModel.codexStartResult)"
+    let codexReadyLabel =
+      "codexReady=\(viewModel.createMode == .codex ? canStartCodex : false)"
+    let codexPromptLengthLabel =
+      "codexPromptLen=\(viewModel.createMode == .codex ? trimmedCodexPrompt.count : 0)"
     let toastLabel: String = {
       guard let feedback = store.toast.activeFeedback.first else {
         return "toast=none"
@@ -181,7 +187,11 @@ public struct AgentTuiWindowView: View {
         "selection=create",
         selectedSessionLabel,
         readOnlyLabel,
+        focusedFieldLabel,
+        startTuiLabel,
         codexStartLabel,
+        codexReadyLabel,
+        codexPromptLengthLabel,
         toastLabel,
       ].joined(
         separator: ","

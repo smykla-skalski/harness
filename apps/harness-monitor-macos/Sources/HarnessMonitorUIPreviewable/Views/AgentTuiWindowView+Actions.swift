@@ -19,9 +19,7 @@ extension AgentTuiWindowView {
     if let fallbackRunID = orderedRunIDs.first { return .codex(fallbackRunID) }
     return .create
   }
-  func selectCreateTab() {
-    viewModel.selection = .create
-  }
+  func selectCreateTab() { viewModel.selection = .create }
 
   func refreshDisplayState() {
     let displayState = AgentTuiDisplayState(store: store)
@@ -66,9 +64,12 @@ extension AgentTuiWindowView {
   }
   func startTui() {
     viewModel.isSubmitting = true
+    viewModel.startTuiAttemptCount += 1
+    viewModel.startTuiPhase = "scheduled"
     Task {
       switch viewModel.createMode {
       case .terminal:
+        viewModel.startTuiPhase = "terminal"
         let startSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
         viewModel.expectedSize = startSize
         let catalog = viewModel.availableRuntimeModels.first {
@@ -111,6 +112,7 @@ extension AgentTuiWindowView {
           focusedField = .input
         }
       case .codex:
+        viewModel.startTuiPhase = "codex"
         viewModel.codexStartAttemptCount += 1
         viewModel.codexStartResult = "started"
         let catalog = viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
@@ -137,6 +139,7 @@ extension AgentTuiWindowView {
           viewModel.codexStartResult = "nil"
         }
       }
+      viewModel.startTuiPhase = "done"
       viewModel.isSubmitting = false
     }
   }

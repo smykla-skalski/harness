@@ -392,6 +392,8 @@ extension AgentTuiWindowView {
     var codexPrompt = ""
     var codexMode: CodexRunMode = .report
     var codexContext = ""
+    var startTuiAttemptCount = 0
+    var startTuiPhase = "idle"
     var codexStartAttemptCount = 0
     var codexStartResult = "idle"
     var resolvingCodexApprovalID: String?
