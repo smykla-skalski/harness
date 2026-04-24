@@ -1,6 +1,11 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::client::DaemonClient;
+use crate::daemon::protocol::{
+    TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
+    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service;
 use crate::session::types::{ReviewPoint, ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
@@ -222,6 +227,18 @@ pub struct TaskSubmitForReviewArgs {
 
 impl Execute for TaskSubmitForReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if let Some(client) = DaemonClient::try_connect() {
+            client.submit_task_for_review(
+                &self.session_id,
+                &self.task_id,
+                &TaskSubmitForReviewRequest {
+                    actor: self.actor.clone(),
+                    summary: self.summary.clone(),
+                    suggested_persona: self.suggested_persona.clone(),
+                },
+            )?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -253,6 +270,16 @@ pub struct TaskClaimReviewArgs {
 
 impl Execute for TaskClaimReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if let Some(client) = DaemonClient::try_connect() {
+            client.claim_task_review(
+                &self.session_id,
+                &self.task_id,
+                &TaskClaimReviewRequest {
+                    actor: self.actor.clone(),
+                },
+            )?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -287,6 +314,19 @@ pub struct TaskSubmitReviewArgs {
 impl Execute for TaskSubmitReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let points = parse_review_points(self.points.as_deref())?;
+        if let Some(client) = DaemonClient::try_connect() {
+            client.submit_task_review(
+                &self.session_id,
+                &self.task_id,
+                &TaskSubmitReviewRequest {
+                    actor: self.actor.clone(),
+                    verdict: self.verdict,
+                    summary: self.summary.clone(),
+                    points,
+                },
+            )?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -328,6 +368,19 @@ pub struct TaskRespondReviewArgs {
 
 impl Execute for TaskRespondReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if let Some(client) = DaemonClient::try_connect() {
+            client.respond_task_review(
+                &self.session_id,
+                &self.task_id,
+                &TaskRespondReviewRequest {
+                    actor: self.actor.clone(),
+                    agreed: self.agreed.clone(),
+                    disputed: self.disputed.clone(),
+                    note: self.note.clone(),
+                },
+            )?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -366,6 +419,18 @@ pub struct TaskArbitrateArgs {
 
 impl Execute for TaskArbitrateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if let Some(client) = DaemonClient::try_connect() {
+            client.arbitrate_task(
+                &self.session_id,
+                &self.task_id,
+                &TaskArbitrateRequest {
+                    actor: self.actor.clone(),
+                    verdict: self.verdict,
+                    summary: self.summary.clone(),
+                },
+            )?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
