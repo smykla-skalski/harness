@@ -2,6 +2,11 @@
 # Fail fast when the Harness dev environment is polluted with leftovers from
 # a prior aborted run. Wired into the mise check/test/monitor preflight gates
 # so CI and local runs never build or test on top of stale state.
+#
+# When HARNESS_CHECK_AUTOCLEAN=1 is set, a detected pollution triggers one
+# automatic clean:stale pass followed by a re-scan. The gate still fails if
+# pollution persists after the cleanup, so runaway state is never silently
+# absorbed.
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -11,7 +16,10 @@ export STALE_SCAN_ROOT
 # shellcheck source=scripts/lib/stale-scan.sh
 source "$ROOT/scripts/lib/stale-scan.sh"
 
-readonly RESET_HINT="run 'mise run clean:stale' to reset"
+readonly RESET_HINT="run 'mise run clean:stale' to reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
+# Allow tests to redirect autoclean to a sandbox-safe stub. Production runs
+# always resolve this to scripts/clean-stale-state.sh.
+readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
 
 stale_lines=()
 
@@ -40,34 +48,79 @@ append_path_block() {
   done
 }
 
-# 1. Orphan cargo-built harness daemon/bridge processes from any target dir
-#    (covers debug, release, and dev/<triple>/{debug,release}).
-orphans="$(stale_scan_matching_pids build)"
-append_pid_block "orphan local cargo-built harness processes" "$orphans"
+collect_stale_lines() {
+  stale_scan_refresh_ps
+  stale_lines=()
 
-# 2. Repo-local gate workers still rooted in this checkout.
-repo_gate_workers="$(stale_scan_repo_gate_pids "$$")"
-append_pid_block "repo-local gate helpers still running" "$repo_gate_workers"
+  # 1. Orphan cargo-built harness daemon/bridge processes from any target dir
+  #    (covers debug, release, and dev/<triple>/{debug,release}).
+  local orphans
+  orphans="$(stale_scan_matching_pids build)"
+  append_pid_block "orphan local cargo-built harness processes" "$orphans"
 
-# 3. Live installed harness daemon/bridge processes only count as stale when
-#    they still hold the well-known locks under the real Harness roots.
-group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
-append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
+  # 2. Repo-local gate workers still rooted in this checkout.
+  local repo_gate_workers
+  repo_gate_workers="$(stale_scan_repo_gate_pids "$$")"
+  append_pid_block "repo-local gate helpers still running" "$repo_gate_workers"
 
-app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
-append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
+  # 3. Live installed harness daemon/bridge processes only count as stale
+  #    when they still hold the well-known locks under the real Harness roots.
+  local group_lock_holders app_support_lock_holders
+  group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
+  append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
+  app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
+  append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
 
-# 4. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
-#    anything in /tmp is from before the sandbox fix or from an unsandboxed
-#    bridge that did not unlink on shutdown. Sweep .sock, .pid, and .lock.
-tmp_artifacts=()
-while IFS= read -r artifact; do
-  [[ -n "$artifact" ]] || continue
-  tmp_artifacts+=("$artifact")
-done < <(stale_scan_tmp_bridge_artifacts)
-if (( ${#tmp_artifacts[@]} > 0 )); then
-  append_path_block "stale /tmp bridge artifacts" "${tmp_artifacts[@]}"
-fi
+  # 4. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
+  #    anything in /tmp is from before the sandbox fix or from an unsandboxed
+  #    bridge that did not unlink on shutdown. Sweep .sock, .pid, and .lock.
+  local tmp_artifacts=()
+  local artifact
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] && tmp_artifacts+=("$artifact")
+  done < <(stale_scan_tmp_bridge_artifacts)
+  if (( ${#tmp_artifacts[@]} > 0 )); then
+    append_path_block "stale /tmp bridge artifacts" "${tmp_artifacts[@]}"
+  fi
+
+  # 5. Orphan SQLite sidecars under daemon roots where harness.db is gone.
+  local wal_orphans=()
+  local sidecar
+  while IFS= read -r sidecar; do
+    [[ -n "$sidecar" ]] && wal_orphans+=("$sidecar")
+  done < <(
+    stale_scan_orphan_sqlite_sidecars "$STALE_SCAN_GROUP_CONTAINER_ROOT"
+    stale_scan_orphan_sqlite_sidecars "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+  )
+  if (( ${#wal_orphans[@]} > 0 )); then
+    append_path_block "orphan SQLite sidecars (harness.db is gone)" "${wal_orphans[@]}"
+  fi
+
+  # 6. Foreign listener on the Codex WS port.
+  local port foreign_ws
+  port="$(stale_scan_codex_ws_port)"
+  foreign_ws="$(stale_scan_foreign_tcp_listeners "$port")"
+  append_pid_block "non-harness processes listening on Codex WS port $port" "$foreign_ws"
+
+  # 7. launchd agent drift (program path gone but service still loaded).
+  local drift_line
+  while IFS= read -r drift_line; do
+    [[ -n "$drift_line" ]] || continue
+    stale_lines+=("launchd drift:")
+    stale_lines+=("  - $drift_line")
+  done < <(stale_scan_launchd_drift)
+}
+
+report_stale() {
+  {
+    echo "error: dev state is stale"
+    local line
+    for line in "${stale_lines[@]}"; do
+      echo "  $line"
+    done
+    echo "$RESET_HINT"
+  } >&2
+}
 
 # Xcode UI silently recreates its default DerivedData HarnessMonitor bundle
 # as part of indexing whenever the project is open, so checking that path
@@ -76,13 +129,32 @@ fi
 # workflow hazard. `mise run clean:stale` still scrubs it on demand, and
 # `Scripts/generate-project.sh` still scrubs it on every project regen.
 
-if (( ${#stale_lines[@]} > 0 )); then
+collect_stale_lines
+if (( ${#stale_lines[@]} == 0 )); then
+  exit 0
+fi
+
+if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
   {
-    echo "error: dev state is stale"
+    echo "check:stale detected pollution; HARNESS_CHECK_AUTOCLEAN=1 is set, running clean:stale..."
+    echo "--- initial pollution ---"
     for line in "${stale_lines[@]}"; do
       echo "  $line"
     done
-    echo "$RESET_HINT"
+    echo "---"
   } >&2
-  exit 1
+  if ! "$CLEAN_SCRIPT" >&2; then
+    echo "error: auto-clean failed; dev state still stale" >&2
+    report_stale
+    exit 1
+  fi
+  collect_stale_lines
+  if (( ${#stale_lines[@]} == 0 )); then
+    echo "check:stale clean passed after auto-clean." >&2
+    exit 0
+  fi
+  echo "error: auto-clean did not resolve all pollution" >&2
 fi
+
+report_stale
+exit 1
