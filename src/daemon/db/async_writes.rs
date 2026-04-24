@@ -456,29 +456,32 @@ async fn replace_tasks(
         .map_err(|error| db_error(format!("delete async tasks: {error}")))?;
 
     for (task_id, task) in tasks {
-        let notes_json = serde_json::to_string(&task.notes).unwrap_or_default();
-        let checkpoint_summary_json = task
-            .checkpoint_summary
-            .as_ref()
-            .and_then(|summary| serde_json::to_string(summary).ok());
-
+        let row = super::task_row::TaskRowBindings::from_task(task);
         query(INSERT_TASK_SQL)
             .bind(task_id)
             .bind(session_id)
             .bind(&task.title)
             .bind(task.context.as_deref())
-            .bind(format!("{:?}", task.severity).to_lowercase())
-            .bind(format!("{:?}", task.status).to_lowercase())
+            .bind(&row.severity)
+            .bind(&row.status)
             .bind(task.assigned_to.as_deref())
             .bind(&task.created_at)
             .bind(&task.updated_at)
             .bind(&task.created_by)
             .bind(task.suggested_fix.as_deref())
-            .bind(format!("{:?}", task.source).to_lowercase())
+            .bind(&row.source)
             .bind(task.blocked_reason.as_deref())
             .bind(task.completed_at.as_deref())
-            .bind(notes_json)
-            .bind(checkpoint_summary_json.as_deref())
+            .bind(&row.notes_json)
+            .bind(row.checkpoint_summary_json.as_deref())
+            .bind(row.awaiting_queued_at.as_deref())
+            .bind(row.awaiting_submitter.as_deref())
+            .bind(row.awaiting_required_consensus)
+            .bind(row.review_round)
+            .bind(row.review_claim_json.as_deref())
+            .bind(row.consensus_json.as_deref())
+            .bind(row.arbitration_json.as_deref())
+            .bind(task.suggested_persona.as_deref())
             .execute(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("insert async task {task_id}: {error}")))?;
