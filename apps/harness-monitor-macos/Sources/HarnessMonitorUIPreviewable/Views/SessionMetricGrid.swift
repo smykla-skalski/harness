@@ -40,6 +40,34 @@ struct SessionMetricGrid: View {
         tint: HarnessMonitorTheme.danger
       )
       metricCard(
+        singular: "Awaiting Review",
+        plural: "Awaiting Review",
+        count: metrics.awaitingReviewAgentCount,
+        tint: HarnessMonitorTheme.caution,
+        identifier: HarnessMonitorAccessibility.metricAwaitingReviewAgent
+      )
+      metricCard(
+        singular: "To Review",
+        plural: "To Review",
+        count: metrics.awaitingReviewTaskCount,
+        tint: HarnessMonitorTheme.caution,
+        identifier: HarnessMonitorAccessibility.metricAwaitingReviewTask
+      )
+      metricCard(
+        singular: "In Review",
+        plural: "In Review",
+        count: metrics.inReviewTaskCount,
+        tint: HarnessMonitorTheme.accent,
+        identifier: HarnessMonitorAccessibility.metricInReviewTask
+      )
+      metricCard(
+        singular: "Arbitration",
+        plural: "Arbitration",
+        count: metrics.arbitrationTaskCount,
+        tint: HarnessMonitorTheme.danger,
+        identifier: HarnessMonitorAccessibility.metricArbitrationTask
+      )
+      metricCard(
         singular: "Completed",
         plural: "Completed",
         count: metrics.completedTaskCount,
@@ -48,7 +76,13 @@ struct SessionMetricGrid: View {
     }
   }
 
-  private func metricCard(singular: String, plural: String, count: Int, tint: Color) -> some View {
+  private func metricCard(
+    singular: String,
+    plural: String,
+    count: Int,
+    tint: Color,
+    identifier: String? = nil
+  ) -> some View {
     let title = count == 1 ? singular : plural
     return HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
       knockoutBadge(value: "\(count)", tint: tint)
@@ -59,6 +93,8 @@ struct SessionMetricGrid: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier(identifier ?? "")
   }
 
   private func knockoutBadge(value: String, tint: Color) -> some View {

@@ -69,7 +69,20 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
 struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
+  let arbitrationTasks: [WorkItem]
   @ViewBuilder let content: Content
+
+  init(
+    persistenceError: String?,
+    sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability,
+    arbitrationTasks: [WorkItem] = [],
+    @ViewBuilder content: () -> Content
+  ) {
+    self.persistenceError = persistenceError
+    self.sessionDataAvailability = sessionDataAvailability
+    self.arbitrationTasks = arbitrationTasks
+    self.content = content()
+  }
 
   var body: some View {
     contentWithTopChrome
@@ -90,6 +103,7 @@ struct ContentDetailChrome<Content: View>: View {
   private var showsTopChrome: Bool {
     persistenceError != nil
       || sessionDataAvailability != .live
+      || !arbitrationTasks.isEmpty
   }
 
   private var isStale: Bool {
@@ -105,6 +119,14 @@ struct ContentDetailChrome<Content: View>: View {
       if isStale {
         SessionDataAvailabilityBanner(availability: sessionDataAvailability)
         chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+      ForEach(arbitrationTasks) { task in
+        ArbitrationBannerView(task: task)
+        chromeDivider(
+          tint: task.arbitration != nil
+            ? HarnessMonitorTheme.success
+            : HarnessMonitorTheme.caution
+        )
       }
     }
     .background(Color(nsColor: .windowBackgroundColor))
