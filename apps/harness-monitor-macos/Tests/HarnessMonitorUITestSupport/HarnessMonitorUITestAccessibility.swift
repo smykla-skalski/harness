@@ -394,7 +394,7 @@ enum HarnessMonitorUITestAccessibility {
   }
 
   static func heuristicIssueCard(_ code: String) -> String {
-    "harness.cockpit.heuristic-issue.\(slug(code))"
+    "heuristicIssueCard.\(code)"
   }
 
   static func autoSpawnedBadge(_ agentID: String) -> String {

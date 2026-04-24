@@ -235,6 +235,67 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
 
+  @Test("Selected-session task push skips content chrome resync")
+  func selectedSessionTaskPushSkipsContentChromeResync() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.debugResetUISyncCounts()
+
+    let task = WorkItem(
+      taskId: "task-review-push",
+      title: "Review push",
+      context: "Task-only snapshot update",
+      severity: .medium,
+      status: .awaitingReview,
+      assignedTo: nil,
+      createdAt: "2026-03-28T14:21:00Z",
+      updatedAt: "2026-03-28T14:21:00Z",
+      createdBy: "leader-claude",
+      notes: [],
+      suggestedFix: nil,
+      source: .manual,
+      blockedReason: nil,
+      completedAt: nil,
+      checkpointSummary: nil
+    )
+    let metrics = SessionMetrics(
+      agentCount: PreviewFixtures.summary.metrics.agentCount,
+      activeAgentCount: PreviewFixtures.summary.metrics.activeAgentCount,
+      idleAgentCount: PreviewFixtures.summary.metrics.idleAgentCount,
+      awaitingReviewAgentCount: PreviewFixtures.summary.metrics.awaitingReviewAgentCount,
+      openTaskCount: PreviewFixtures.summary.metrics.openTaskCount + 1,
+      inProgressTaskCount: PreviewFixtures.summary.metrics.inProgressTaskCount,
+      awaitingReviewTaskCount: PreviewFixtures.summary.metrics.awaitingReviewTaskCount + 1,
+      inReviewTaskCount: PreviewFixtures.summary.metrics.inReviewTaskCount,
+      arbitrationTaskCount: PreviewFixtures.summary.metrics.arbitrationTaskCount,
+      blockedTaskCount: PreviewFixtures.summary.metrics.blockedTaskCount,
+      completedTaskCount: PreviewFixtures.summary.metrics.completedTaskCount
+    )
+    let updatedSummary = replacingMetrics(PreviewFixtures.summary, with: metrics)
+    let updatedDetail = SessionDetail(
+      session: updatedSummary,
+      agents: PreviewFixtures.agents,
+      tasks: PreviewFixtures.tasks + [task],
+      signals: PreviewFixtures.signals,
+      observer: PreviewFixtures.observer,
+      agentActivity: PreviewFixtures.agentActivity
+    )
+
+    store.applySelectedSessionSnapshot(
+      sessionID: PreviewFixtures.summary.sessionId,
+      detail: updatedDetail,
+      timeline: store.timeline,
+      timelineWindow: store.timelineWindow,
+      showingCachedData: false,
+      cancelPendingTimelineRefresh: false
+    )
+
+    #expect(store.contentUI.sessionDetail.selectedSessionTasks.last?.taskId == task.taskId)
+    #expect(store.debugUISyncCount(for: .contentSessionDetail) == 1)
+    #expect(store.debugUISyncCount(for: .inspector) == 1)
+    #expect(store.debugUISyncCount(for: .contentChrome) == 0)
+  }
+
   @Test("Sidebar summary counts reflect indexed session metrics")
   func sidebarSummaryCountsReflectIndexedSessionMetrics() async {
     let store = await makeBootstrappedStore()
@@ -300,5 +361,34 @@ struct HarnessMonitorContentSelectionTests {
         store.contentUI.toolbar.sleepPreventionEnabled
       )
     }
+  }
+
+  private func replacingMetrics(
+    _ summary: SessionSummary,
+    with metrics: SessionMetrics
+  ) -> SessionSummary {
+    SessionSummary(
+      projectId: summary.projectId,
+      projectName: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      sessionId: summary.sessionId,
+      worktreePath: summary.worktreePath,
+      sharedPath: summary.sharedPath,
+      originPath: summary.originPath,
+      branchRef: summary.branchRef,
+      title: summary.title,
+      context: summary.context,
+      status: summary.status,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      lastActivityAt: summary.lastActivityAt,
+      leaderId: summary.leaderId,
+      observeId: summary.observeId,
+      pendingLeaderTransfer: summary.pendingLeaderTransfer,
+      externalOrigin: summary.externalOrigin,
+      adoptedAt: summary.adoptedAt,
+      metrics: metrics
+    )
   }
 }

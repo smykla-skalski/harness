@@ -2,16 +2,14 @@ import Foundation
 import Observation
 
 private struct SessionDetailIdentity: Equatable {
-  let sessionID: String
-  let updatedAt: String
+  let detail: SessionDetail
 
   init?(_ detail: SessionDetail?) {
     guard let detail else {
       return nil
     }
 
-    sessionID = detail.session.sessionId
-    updatedAt = detail.session.updatedAt
+    self.detail = detail
   }
 }
 

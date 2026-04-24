@@ -258,6 +258,22 @@ struct ToastSliceTests {
     #expect(store.toast.activeFeedback.first?.severity == .failure)
   }
 
+  @Test("Review failure toasts carry stable accessibility identifiers")
+  func reviewFailureToastsCarryStableAccessibilityIdentifiers() async {
+    let slice = ToastSlice(clock: ManualClock())
+
+    _ = slice.presentWorkerRefusal(agentID: "agent-1", taskID: "task-1")
+    _ = slice.presentSignalCollision(signalID: "signal-1", actorID: "agent-2")
+
+    #expect(
+      slice.activeFeedback.map(\.accessibilityIdentifier)
+        == [
+          "harness.toast.signal-collision",
+          "harness.toast.worker-refusal",
+        ]
+    )
+  }
+
   @Test("Store dismiss feedback forwards to slice")
   func storeDismissFeedbackForwards() async {
     let store = await makeBootstrappedStore()

@@ -69,6 +69,9 @@ private struct HarnessMonitorFeedbackToastRow: View {
       cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
       tint: tintColor
     )
+    .accessibilityIdentifier(
+      feedback.accessibilityIdentifier ?? HarnessMonitorAccessibility.actionToast
+    )
   }
 
   private var tintColor: Color {

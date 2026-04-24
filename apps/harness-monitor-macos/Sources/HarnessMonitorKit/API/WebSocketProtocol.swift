@@ -46,6 +46,7 @@ struct WsErrorPayload: Codable, Sendable {
 }
 
 enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
+  case ping = "ping"
   case health = "health"
   case diagnostics = "diagnostics"
   case daemonStop = "daemon.stop"
@@ -63,9 +64,15 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case sessionUnsubscribe = "session.unsubscribe"
   case sessionStart = "session.start"
   case sessionAdopt = "session.adopt"
+  case sessionDelete = "session.delete"
+  case sessionJoin = "session.join"
+  case sessionRuntimeSession = "session.runtime_session"
+  case sessionTitle = "session.title"
   case sessionEnd = "session.end"
+  case sessionLeave = "session.leave"
   case signalSend = "signal.send"
   case signalCancel = "signal.cancel"
+  case signalAck = "signal.ack"
   case sessionObserve = "session.observe"
   case sessionManagedAgents = "session.managed_agents"
   case managedAgentDetail = "managed_agent.detail"
@@ -89,6 +96,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case managedAgentInput = "managed_agent.input"
   case managedAgentResize = "managed_agent.resize"
   case managedAgentStop = "managed_agent.stop"
+  case managedAgentReady = "managed_agent.ready"
   case managedAgentSteerCodex = "managed_agent.steer_codex"
   case managedAgentInterruptCodex = "managed_agent.interrupt_codex"
   case managedAgentResolveCodexApproval = "managed_agent.resolve_codex_approval"

@@ -94,6 +94,7 @@ extension HarnessMonitorStore {
     public enum Change {
       case selectedSessionID
       case selectedSession
+      case selectedSessionDetail
       case timeline
       case timelineWindow
       case inspectorSelection
@@ -106,6 +107,7 @@ extension HarnessMonitorStore {
     }
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
+    @ObservationIgnored private var selectedSessionChangeOverride: Change?
     public var selectedSessionID: String? {
       didSet {
         guard oldValue != selectedSessionID else { return }
@@ -115,7 +117,9 @@ extension HarnessMonitorStore {
     public var selectedSession: SessionDetail? {
       didSet {
         guard oldValue != selectedSession else { return }
-        onChanged?(.selectedSession)
+        let change = selectedSessionChangeOverride ?? .selectedSession
+        selectedSessionChangeOverride = nil
+        onChanged?(change)
       }
     }
     public var timeline: [TimelineEntry] = [] {
@@ -182,6 +186,12 @@ extension HarnessMonitorStore {
         return nil
       }
       return selectedSession
+    }
+
+    func applySelectedSession(_ detail: SessionDetail?, change: Change) {
+      guard selectedSession != detail else { return }
+      selectedSessionChangeOverride = change
+      selectedSession = detail
     }
   }
 
@@ -386,28 +396,6 @@ extension HarnessMonitorStore {
     public var sleepPreventionEnabled = false
 
     public init() {}
-  }
-
-  @MainActor
-  @Observable
-  public final class ContentChromeSlice {
-    public var persistenceError: String?
-    public var sessionDataAvailability: SessionDataAvailability = .live
-    public var sessionStatus: SessionStatus?
-
-    public init() {}
-
-    internal func apply(_ state: ContentChromeState) {
-      if persistenceError != state.persistenceError {
-        persistenceError = state.persistenceError
-      }
-      if sessionDataAvailability != state.sessionDataAvailability {
-        sessionDataAvailability = state.sessionDataAvailability
-      }
-      if sessionStatus != state.sessionStatus {
-        sessionStatus = state.sessionStatus
-      }
-    }
   }
 
 }

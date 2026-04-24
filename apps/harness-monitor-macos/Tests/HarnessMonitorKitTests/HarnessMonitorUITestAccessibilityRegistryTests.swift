@@ -55,7 +55,15 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       HarnessMonitorAccessibility.heuristicIssueCard("OBS_LOG_IO")
-        == "harness.cockpit.heuristic-issue.obs-log-io"
+        == "heuristicIssueCard.OBS_LOG_IO"
+    )
+    #expect(
+      HarnessMonitorAccessibility.workerRefusalToast
+        == "harness.toast.worker-refusal"
+    )
+    #expect(
+      HarnessMonitorAccessibility.signalCollisionToast
+        == "harness.toast.signal-collision"
     )
     #expect(
       HarnessMonitorAccessibility.metricAwaitingReviewAgent
@@ -81,5 +89,35 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.arbitrationBanner("Task_Foo:Bar.1")
         == "harness.banner.arbitration.task-foo-bar1"
     )
+    #expect(
+      HarnessMonitorAccessibility.heuristicIssueCard("runtime.already_reviewing")
+        == "heuristicIssueCard.runtime.already_reviewing"
+    )
+  }
+
+  @Test("Review accessibility identifiers are attached by production views")
+  func reviewAccessibilityIdentifiersAreAttachedByProductionViews() throws {
+    let cockpitView = try sourceFile(named: "SessionCockpitView.swift")
+    let toastView = try sourceFile(named: "HarnessMonitorFeedbackToastView.swift")
+
+    #expect(cockpitView.contains("SessionCockpitHeuristicIssuesSection"))
+    #expect(toastView.contains("feedback.accessibilityIdentifier"))
+  }
+
+  private func sourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views"
+      )
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
