@@ -246,14 +246,13 @@ extension AgentTuiWindowView {
       decision: actionID
     )
 
-    return HarnessMonitorActionButton(
-      title: title,
-      variant: .bordered,
-      accessibilityIdentifier: accessibilityIdentifier
-    ) {
+    return Button(title) {
       resolveCodexApproval(item, run: run, actionID: actionID)
     }
     .disabled(viewModel.resolvingCodexApprovalID != nil || viewModel.isSubmitting)
+    .harnessActionButtonStyle(variant: .bordered, tint: nil)
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
 
   func codexApprovalItems(for run: CodexRunSnapshot) -> [CodexApprovalItem] {
