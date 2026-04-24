@@ -7,21 +7,19 @@
 //! save + bump. `improver_apply` is a filesystem-level operation and
 //! does not touch session state.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::agents::runtime::runtime_for_name;
 use crate::daemon::index as daemon_index;
 use crate::daemon::protocol::{
-    ImproverApplyRequest, SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+    SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
+    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use crate::errors::CliError;
-use crate::session::roles::SessionAction;
 use crate::session::service::{
-    self as session_service, ImproverApplyOutcome, apply_arbitrate, apply_claim_review,
-    apply_respond_review, apply_submit_for_review, arbitrate as svc_arbitrate,
-    claim_review as svc_claim_review, maybe_emit_spawn_reviewer,
-    respond_review as svc_respond_review,
+    self as session_service, apply_arbitrate, apply_claim_review, apply_respond_review,
+    apply_submit_for_review, arbitrate as svc_arbitrate, claim_review as svc_claim_review,
+    maybe_emit_spawn_reviewer, respond_review as svc_respond_review,
     submit_for_review_with_persona as svc_submit_for_review_with_persona,
     submit_review as svc_submit_review, validate_submit_review,
 };
@@ -168,46 +166,6 @@ pub fn arbitrate(
     )?;
     bump_and_refresh(db, session_id)?;
     session_detail(session_id, db)
-}
-
-/// Apply an improver patch to a canonical skill/plugin source.
-///
-/// Validates the target path, backs up the existing contents, writes
-/// the new body atomically, and returns the outcome. On `dry_run` the
-/// validation + diff still run but no files are modified.
-///
-/// # Errors
-/// Returns `CliError` when the path is disallowed, the target is
-/// missing, or the write fails.
-pub fn improver_apply(
-    session_id: &str,
-    request: &ImproverApplyRequest,
-) -> Result<ImproverApplyOutcome, CliError> {
-    let resolved = index::resolve_session(session_id)?;
-    session_service::require_permission(
-        &resolved.state,
-        &request.actor,
-        SessionAction::ImproverApply,
-    )?;
-    let repo_root = effective_project_dir(&resolved);
-    let rel = Path::new(&request.rel_path);
-    let now = utc_now();
-    if request.dry_run {
-        return session_service::preview_improver_apply(
-            repo_root,
-            request.target,
-            rel,
-            &request.new_contents,
-        );
-    }
-    session_service::apply_improver_apply(
-        repo_root,
-        request.target,
-        rel,
-        &request.new_contents,
-        &request.issue_id,
-        &now,
-    )
 }
 
 // ============================================================================

@@ -395,7 +395,7 @@ pub(super) async fn dispatch_task_arbitrate(
 
 pub(super) async fn dispatch_improver_apply(
     request: &WsRequest,
-    _state: &DaemonHttpState,
+    state: &DaemonHttpState,
 ) -> WsResponse {
     use crate::daemon::protocol::bind_control_plane_actor_value;
     use crate::daemon::websocket::frames::{error_response, ok_response};
@@ -417,7 +417,13 @@ pub(super) async fn dispatch_improver_apply(
             );
         }
     };
-    match service::improver_apply(&session_id, &body) {
+    let result = if let Some(async_db) = state.async_db.get().cloned() {
+        service::improver_apply_async(&session_id, &body, async_db.as_ref()).await
+    } else {
+        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        service::improver_apply(&session_id, &body, db_guard.as_deref())
+    };
+    match result {
         Ok(outcome) => match serde_json::to_value(outcome) {
             Ok(value) => ok_response(&request.id, value),
             Err(error) => error_response(
