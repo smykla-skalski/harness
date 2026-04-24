@@ -74,6 +74,14 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
       "Blocked"
     }
   }
+
+  /// Statuses a caller may set through a generic task update. Review states
+  /// (`awaitingReview`, `inReview`) transition through dedicated review
+  /// actions on the daemon and are rejected by `apply_update_task`, so the
+  /// generic status picker must not offer them.
+  public static var genericStatusChoices: [Self] {
+    [.open, .inProgress, .done, .blocked]
+  }
 }
 
 extension WorkItem {
