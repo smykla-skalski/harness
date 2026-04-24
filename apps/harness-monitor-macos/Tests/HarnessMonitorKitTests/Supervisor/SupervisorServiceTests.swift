@@ -246,11 +246,12 @@ final class SupervisorServiceTests: XCTestCase {
     await clock.advance(by: .seconds(5))
     // Poll until the slow rule is blocked inside gate.wait(), confirming the tick body is
     // in flight. Polling replaces a fixed sleep which is flaky on loaded machines.
-    var attempts = 0
-    while await gate.waitCount == 0 && attempts < 200 {
-      await Task.yield()
-      attempts += 1
+    let deadline = Date().addingTimeInterval(2)
+    while await gate.waitCount == 0 && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
     }
+    let waitCount = await gate.waitCount
+    XCTAssertEqual(waitCount, 1, "slow rule should be waiting before stop")
     let isReleased = await gate.released
     XCTAssertFalse(isReleased, "slow rule should be blocked before stop")
 

@@ -5,7 +5,6 @@ import SwiftData
 public actor SupervisorService {
   private static let quarantineErrorThreshold = 5
   private static let quarantineWindowTicks = 10
-
   private let store: HarnessMonitorStore?
   private let registry: PolicyRegistry
   private let executor: PolicyExecutor
@@ -13,7 +12,7 @@ public actor SupervisorService {
   private let interval: TimeInterval
 
   private var tickTask: Task<Void, Never>?
-  private var running = false
+  private var running = false, tickInProgress = false
   private var autoActionsSuppressed = false
   private var quietHoursWindow: SupervisorQuietHoursWindow?
 
@@ -56,7 +55,9 @@ public actor SupervisorService {
   public func stop() async {
     guard running else { return }
     running = false
-    tickTask?.cancel()
+    if !tickInProgress {
+      tickTask?.cancel()
+    }
     _ = await tickTask?.value
     tickTask = nil
     HarnessMonitorLogger.supervisorInfo("supervisor.stop")
@@ -102,6 +103,8 @@ public actor SupervisorService {
         return
       }
       guard running && !Task.isCancelled else { return }
+      tickInProgress = true
+      defer { tickInProgress = false }
       await tickBody()
     }
   }
