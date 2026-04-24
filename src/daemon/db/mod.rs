@@ -52,6 +52,7 @@ mod conversation;
 mod diagnostics;
 mod imports;
 mod rebuild;
+mod review_writes;
 mod runtime;
 mod schema;
 mod schema_repairs;

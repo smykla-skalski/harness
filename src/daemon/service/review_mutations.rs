@@ -19,15 +19,17 @@ use crate::errors::CliError;
 use crate::session::roles::SessionAction;
 use crate::session::service::{
     self as session_service, ImproverApplyOutcome, apply_arbitrate, apply_claim_review,
-    apply_respond_review, apply_submit_for_review, apply_submit_review, arbitrate as svc_arbitrate,
-    claim_review as svc_claim_review, generate_review_id, maybe_emit_spawn_reviewer,
+    apply_respond_review, apply_submit_for_review, arbitrate as svc_arbitrate,
+    claim_review as svc_claim_review, maybe_emit_spawn_reviewer,
     respond_review as svc_respond_review,
     submit_for_review_with_persona as svc_submit_for_review_with_persona,
     submit_review as svc_submit_review, validate_submit_review,
 };
 use crate::session::storage as session_storage;
-use crate::session::types::{Review, TaskStatus};
+use crate::session::types::TaskStatus;
 use crate::workspace::utc_now;
+
+use super::review_submit_txn::apply_submit_review_in_txn;
 
 use super::sessions::session_detail_from_async_daemon_db;
 use super::{
@@ -105,7 +107,7 @@ pub fn submit_review(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
-    svc_submit_review(
+    let review = svc_submit_review(
         session_id,
         task_id,
         &request.actor,
@@ -114,6 +116,9 @@ pub fn submit_review(
         request.points.clone(),
         &project_dir,
     )?;
+    if let Some(db) = db {
+        db.insert_task_review(session_id, task_id, &review)?;
+    }
     bump_and_refresh(db, session_id)?;
     session_detail(session_id, db)
 }
@@ -379,50 +384,46 @@ pub(crate) async fn submit_review_async(
     let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
 
     validate_submit_review(&resolved.state, task_id, &request.actor)?;
-    let (prev_status, new_status) = async_db
+    let (prev_status, new_status, review) = async_db
         .update_session_state_immediate(session_id, |state| {
-            validate_submit_review(state, task_id, &request.actor)?;
-            let round = state
-                .tasks
-                .get(task_id)
-                .map_or(1, |task| task.review_round.saturating_add(1));
-            let reviewer_runtime = state
-                .agents
-                .get(&request.actor)
-                .map(|agent| agent.runtime.clone())
-                .unwrap_or_default();
-            let review = Review {
-                review_id: generate_review_id(task_id),
-                round,
-                reviewer_agent_id: request.actor.clone(),
-                reviewer_runtime,
-                verdict: request.verdict,
-                summary: request.summary.clone(),
-                points: request.points.clone(),
-                recorded_at: now.clone(),
-            };
-            session_storage::append_review(&layout, task_id, &review)?;
-            let all_reviews = session_storage::load_reviews(&layout, task_id)?;
-            let prev_status = state.tasks.get(task_id).map(|task| task.status);
-            apply_submit_review(state, task_id, &review, &all_reviews, &now)?;
-            let new_status = state.tasks.get(task_id).map(|task| task.status);
-            Ok((prev_status, new_status))
+            apply_submit_review_in_txn(
+                state, task_id, &request.actor, request.verdict,
+                &request.summary, &request.points, &layout, &now,
+            )
         })
         .await?;
-    if let (Some(prev), Some(new)) = (prev_status, new_status)
+    async_db
+        .insert_task_review(session_id, task_id, &review)
+        .await?;
+    append_task_status_change_log(
+        async_db, session_id, task_id, &request.actor, prev_status, new_status,
+    )
+    .await?;
+    bump_async(async_db, session_id).await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+async fn append_task_status_change_log(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    task_id: &str,
+    actor: &str,
+    prev: Option<TaskStatus>,
+    new: Option<TaskStatus>,
+) -> Result<(), CliError> {
+    if let (Some(prev), Some(new)) = (prev, new)
         && prev != new
     {
         async_db
             .append_log_entry(&build_log_entry(
                 session_id,
                 session_service::log_task_status_changed(task_id, prev, new),
-                Some(&request.actor),
+                Some(actor),
                 None,
             ))
             .await?;
     }
-    bump_async(async_db, session_id).await?;
-    session_detail_from_async_daemon_db(session_id, async_db).await
+    Ok(())
 }
 
 /// Worker response to reviewer feedback (async path).

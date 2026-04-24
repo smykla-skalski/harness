@@ -35,6 +35,7 @@ mod leave;
 mod observe;
 mod review_improver;
 mod review_mutations;
+mod review_persistence;
 mod review_quorum;
 mod session_liveness;
 mod session_reads;
