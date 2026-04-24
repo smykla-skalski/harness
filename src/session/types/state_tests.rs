@@ -223,7 +223,10 @@ fn session_state_round_trip_preserves_persona_tasks_and_metrics() {
     assert_eq!(metrics.agent_count, 2);
     assert_eq!(metrics.active_agent_count, 1);
     assert_eq!(metrics.idle_agent_count, 1);
-    assert_eq!(metrics.in_progress_task_count, 1);
+    assert_eq!(metrics.in_progress_task_count, 0);
+    assert_eq!(metrics.in_review_task_count, 1);
+    assert_eq!(metrics.awaiting_review_task_count, 0);
+    assert_eq!(metrics.arbitration_task_count, 0);
     assert_eq!(
         parsed
             .agents
