@@ -751,7 +751,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)",
+                        "expr": "count(count by (session_id) (last_over_time(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[2m]))) or on() vector(0)",
                         "legendFormat": "claude"
                       }
                     },
@@ -764,15 +764,12 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "prometheus",
+                      "group": "loki",
                       "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__rate_interval]))",
-                        "legendFormat": "codex"
+                        "expr": "count(sum by (conversation_id) (rate({service_name=\"codex\"}[2m])))",
+                        "queryType": "range"
                       }
                     },
                     "refId": "B",
@@ -791,7 +788,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__rate_interval])) or on() vector(0)",
+                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -811,7 +808,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "count(count by (session_id) (last_over_time(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[2m]))) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -824,10 +821,10 @@
               "transformations": []
             }
           },
-          "description": "Claude sessions, Codex thread starts, Copilot agent runs, and Gemini API requests shown together as each agent's primary activity signal.",
+          "description": "Claude, Codex, Copilot, and Gemini active sessions shown together as each agent's live session/activity signal.",
           "id": 209,
           "links": [],
-          "title": "Primary Activity by Agent",
+          "title": "Active Sessions by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1491,7 +1488,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(claude_code_code_edit_tool_decision_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\",tool_name=~\"${tool_name:regex}\",language=~\"${language:regex}\"}[5m])) or on() vector(0)",
                         "legendFormat": "claude"
                       }
                     },
@@ -1511,7 +1508,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[$__rate_interval]))",
+                        "expr": "sum(increase(codex_tool_call_total{deployment_environment=~\"${deployment_environment:regex}\",service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",tool=~\"${tool:regex}\"}[5m]))",
                         "legendFormat": "codex"
                       }
                     },
@@ -1531,7 +1528,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(github_copilot_tool_call_count_total[5m])) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -1551,7 +1548,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(gemini_cli_tool_call_count_total{service_name=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -1564,7 +1561,7 @@
               "transformations": []
             }
           },
-          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini tool calls on the same chart.",
+          "description": "Claude decisions, Codex tool calls, Copilot tool calls, and Gemini tool calls shown as 5-minute activity on the same chart.",
           "id": 213,
           "links": [],
           "title": "Tooling and Prompt Activity by Agent",
@@ -7098,7 +7095,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(rate(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -7113,25 +7110,28 @@
           "description": "Agent activity pulse with custom SVG background and trend sparkline.",
           "id": 501,
           "links": [],
-          "options": {
-            "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.A}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
-            "everyRow": false,
-            "useHandlebars": true,
-            "useMarkdown": false,
-            "styles": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
-            "onRender": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && data.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n\n  // Business Text v6 passes 'data' which contains the rows directly when everyRow is false\n  // We need to find the series values. In Business Text, 'data' is the joined rows.\n  const values = data.map(row => row.A).filter(v => v !== null && !isNaN(v));\n  \n  ctx.clearRect(0, 0, width, height);\n  if (values.length > 1) {\n    ctx.beginPath();\n    ctx.strokeStyle = '#00d3ff';\n    ctx.lineWidth = 2;\n    \n    const max = Math.max(...values);\n    const min = Math.min(...values);\n    const range = max - min || 1;\n    \n    values.forEach((v, i) => {\n      const x = (i / (values.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
-          },
           "title": "Agent Pulse",
           "vizConfig": {
             "group": "marcusolsson-dynamictext-panel",
             "kind": "VizConfig",
             "spec": {
-              "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.Value}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
-              "everyRow": false,
-              "useHandlebars": true,
-              "useMarkdown": false,
-              "styles": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
-              "onRender": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && data.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n\n  const values = data.map(row => row.Value).filter(v => v !== null && !isNaN(v));\n  \n  ctx.clearRect(0, 0, width, height);\n  if (values.length > 1) {\n    ctx.beginPath();\n    ctx.strokeStyle = '#00d3ff';\n    ctx.lineWidth = 2;\n    \n    const max = Math.max(...values);\n    const min = Math.min(...values);\n    const range = max - min || 1;\n    \n    values.forEach((v, i) => {\n      const x = (i / (values.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    // Add area fill\n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
+              "options": {
+                "content": "<div class=\"pulse-container\"><div class=\"pulse-label\">Agent Requests</div><div class=\"pulse-value\">{{#if data.length}}{{data.0.Value}}{{else}}0{{/if}}</div><div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div></div>",
+                "defaultContent": "<div class=\"pulse-container\"><div class=\"pulse-label\">Agent Requests</div><div class=\"pulse-value\">0</div></div>",
+                "renderMode": "allRows",
+                "editor": {
+                  "format": "auto",
+                  "language": "handlebars"
+                },
+                "editors": [],
+                "helpers": "",
+                "status": "",
+                "externalStyles": [],
+                "contentPartials": [],
+                "wrap": true,
+                "styles": ":host, .pulse-container { height: 100%; }\n.pulse-container {\n  width: 100%; min-height: 160px; height: 100%;\n  background: linear-gradient(135deg, rgba(0,211,255,0.18), rgba(0,128,255,0.08));\n  background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\"><defs><linearGradient id=\"g\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"rgb(0,211,255)\" stop-opacity=\"0.25\"/><stop offset=\"100%\" stop-color=\"rgb(0,80,200)\" stop-opacity=\"0.5\"/></linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(%23g)\"/><circle cx=\"50\" cy=\"50\" r=\"42\" stroke=\"rgba(0,211,255,0.45)\" stroke-width=\"0.8\" fill=\"none\"/><circle cx=\"50\" cy=\"50\" r=\"28\" stroke=\"rgba(0,211,255,0.35)\" stroke-width=\"0.6\" fill=\"none\"/><circle cx=\"50\" cy=\"50\" r=\"14\" stroke=\"rgba(0,211,255,0.6)\" stroke-width=\"0.6\" fill=\"none\"/></svg>');\n  background-size: 100% 100%; background-repeat: no-repeat;\n  display: flex; flex-direction: column; justify-content: center; align-items: center;\n  position: relative; color: #00d3ff; border-radius: 6px;\n}\n.pulse-label { font-size: 1em; opacity: 0.85; margin-bottom: 6px; letter-spacing: 0.04em; }\n.pulse-value { font-size: 3em; font-weight: 700; text-shadow: 0 0 12px rgba(0,211,255,0.6); color: #00d3ff; }\n.pulse-sparkline { position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; opacity: 0.55; pointer-events: none; }\n#pulse-sparkline-canvas { width: 100%; height: 100%; display: block; }\n",
+                "afterRender": "const { data, element } = context;\nconst canvas = element && element.querySelector('#pulse-sparkline-canvas');\nif (!canvas || !Array.isArray(data)) { return; }\nconst ctx = canvas.getContext('2d');\nconst width = canvas.offsetWidth || canvas.parentElement.offsetWidth;\nconst height = canvas.offsetHeight || 40;\ncanvas.width = width; canvas.height = height;\nconst values = data.map(r => Number(r.Value)).filter(v => !Number.isNaN(v));\nctx.clearRect(0, 0, width, height);\nif (values.length < 2) { return; }\nconst max = Math.max(...values), min = Math.min(...values), range = max - min || 1;\nctx.beginPath(); ctx.strokeStyle = '#00d3ff'; ctx.lineWidth = 2;\nvalues.forEach((v, i) => { const x = (i/(values.length-1))*width; const y = height-((v-min)/range)*height; if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });\nctx.stroke();\nctx.lineTo(width, height); ctx.lineTo(0, height); ctx.closePath();\nctx.fillStyle = 'rgba(0, 211, 255, 0.1)'; ctx.fill();\n"
+              }
             },
             "version": ""
           }
