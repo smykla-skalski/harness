@@ -1,4 +1,4 @@
-use sqlx::{Sqlite, Transaction, query, query_scalar};
+use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 mod sql;
 
@@ -15,7 +15,11 @@ use super::{
     extract_transition_kind, i64_from_u64, normalize_change_scope, session_status_db_label,
     stored_timeline_entry, u64_from_i64, utc_now,
 };
+use crate::errors::CliErrorKind;
 use crate::session::service::canonicalize_active_session_without_leader;
+
+const LOAD_SESSION_FOR_MUTATION_SQL: &str =
+    "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";
 
 impl AsyncDaemonDb {
     /// Upsert a discovered project through the canonical async daemon DB.
@@ -62,6 +66,57 @@ impl AsyncDaemonDb {
         state: &SessionState,
     ) -> Result<(), CliError> {
         self.sync_session(project_id, state).await
+    }
+
+    /// Load, mutate, and save session state under an immediate transaction.
+    ///
+    /// This serializes async mutation writers before they read state, avoiding
+    /// lost updates when independent HTTP/WebSocket requests mutate the same
+    /// session concurrently.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL, parse, or mutation failures.
+    pub(crate) async fn update_session_state_immediate<F, T>(
+        &self,
+        session_id: &str,
+        update: F,
+    ) -> Result<T, CliError>
+    where
+        F: FnOnce(&mut SessionState) -> Result<T, CliError>,
+    {
+        let mut transaction = self
+            .pool()
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(|error| {
+                db_error(format!(
+                    "begin async immediate session mutation transaction: {error}"
+                ))
+            })?;
+        let row = query_as::<_, AsyncSessionMutationRow>(LOAD_SESSION_FOR_MUTATION_SQL)
+            .bind(session_id)
+            .fetch_optional(transaction.as_mut())
+            .await
+            .map_err(|error| {
+                db_error(format!(
+                    "load async session for mutation {session_id}: {error}"
+                ))
+            })?
+            .ok_or_else(|| {
+                CliError::from(CliErrorKind::session_not_active(format!(
+                    "session '{session_id}' not found"
+                )))
+            })?;
+        let mut state: SessionState = serde_json::from_str(&row.state_json)
+            .map_err(|error| db_error(format!("parse session state: {error}")))?;
+        let result = update(&mut state)?;
+        sync_session_in_transaction(&mut transaction, &row.project_id, &state).await?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit async immediate session mutation transaction: {error}"
+            ))
+        })?;
+        Ok(result)
     }
 
     /// Insert a new session record and mark it active.
@@ -215,64 +270,11 @@ impl AsyncDaemonDb {
         Ok(())
     }
     async fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let now = utc_now();
-        let mut canonical_state = state.clone();
-        canonicalize_active_session_without_leader(&mut canonical_state, &now);
-        let state_json = serde_json::to_string(&canonical_state)
-            .map_err(|error| db_error(format!("serialize async session state: {error}")))?;
-        let metrics_json = serde_json::to_string(&canonical_state.metrics)
-            .map_err(|error| db_error(format!("serialize async session metrics: {error}")))?;
-        let pending_transfer_json = canonical_state
-            .pending_leader_transfer
-            .as_ref()
-            .and_then(|transfer| serde_json::to_string(transfer).ok());
-        let status = session_status_db_label(canonical_state.status)?;
-        let is_active = i32::from(canonical_state.status.is_default_visible());
-
         let mut transaction =
             self.pool().begin().await.map_err(|error| {
                 db_error(format!("begin async session sync transaction: {error}"))
             })?;
-        query(UPSERT_SESSION_SQL)
-            .bind(&canonical_state.session_id)
-            .bind(project_id)
-            .bind(canonical_state.schema_version)
-            .bind(i64_from_u64(canonical_state.state_version))
-            .bind(&canonical_state.title)
-            .bind(&canonical_state.context)
-            .bind(status)
-            .bind(canonical_state.leader_id.as_deref())
-            .bind(canonical_state.observe_id.as_deref())
-            .bind(&canonical_state.created_at)
-            .bind(&canonical_state.updated_at)
-            .bind(canonical_state.last_activity_at.as_deref())
-            .bind(canonical_state.archived_at.as_deref())
-            .bind(pending_transfer_json.as_deref())
-            .bind(metrics_json)
-            .bind(state_json)
-            .bind(is_active)
-            .execute(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("upsert async session: {error}")))?;
-
-        replace_agents(
-            &mut transaction,
-            &canonical_state.session_id,
-            &canonical_state.agents,
-        )
-        .await?;
-        replace_tasks(
-            &mut transaction,
-            &canonical_state.session_id,
-            &canonical_state.tasks,
-        )
-        .await?;
-        query(ENSURE_SESSION_TIMELINE_STATE_SQL)
-            .bind(&canonical_state.session_id)
-            .bind(&canonical_state.updated_at)
-            .execute(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("ensure async session timeline state: {error}")))?;
+        sync_session_in_transaction(&mut transaction, project_id, state).await?;
         transaction
             .commit()
             .await
@@ -280,6 +282,75 @@ impl AsyncDaemonDb {
         Ok(())
     }
 }
+
+#[derive(sqlx::FromRow)]
+struct AsyncSessionMutationRow {
+    state_json: String,
+    project_id: String,
+}
+
+async fn sync_session_in_transaction(
+    transaction: &mut Transaction<'_, Sqlite>,
+    project_id: &str,
+    state: &SessionState,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let mut canonical_state = state.clone();
+    canonicalize_active_session_without_leader(&mut canonical_state, &now);
+    let state_json = serde_json::to_string(&canonical_state)
+        .map_err(|error| db_error(format!("serialize async session state: {error}")))?;
+    let metrics_json = serde_json::to_string(&canonical_state.metrics)
+        .map_err(|error| db_error(format!("serialize async session metrics: {error}")))?;
+    let pending_transfer_json = canonical_state
+        .pending_leader_transfer
+        .as_ref()
+        .and_then(|transfer| serde_json::to_string(transfer).ok());
+    let status = session_status_db_label(canonical_state.status)?;
+    let is_active = i32::from(canonical_state.status.is_default_visible());
+
+    query(UPSERT_SESSION_SQL)
+        .bind(&canonical_state.session_id)
+        .bind(project_id)
+        .bind(canonical_state.schema_version)
+        .bind(i64_from_u64(canonical_state.state_version))
+        .bind(&canonical_state.title)
+        .bind(&canonical_state.context)
+        .bind(status)
+        .bind(canonical_state.leader_id.as_deref())
+        .bind(canonical_state.observe_id.as_deref())
+        .bind(&canonical_state.created_at)
+        .bind(&canonical_state.updated_at)
+        .bind(canonical_state.last_activity_at.as_deref())
+        .bind(canonical_state.archived_at.as_deref())
+        .bind(pending_transfer_json.as_deref())
+        .bind(metrics_json)
+        .bind(state_json)
+        .bind(is_active)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("upsert async session: {error}")))?;
+
+    replace_agents(
+        transaction,
+        &canonical_state.session_id,
+        &canonical_state.agents,
+    )
+    .await?;
+    replace_tasks(
+        transaction,
+        &canonical_state.session_id,
+        &canonical_state.tasks,
+    )
+    .await?;
+    query(ENSURE_SESSION_TIMELINE_STATE_SQL)
+        .bind(&canonical_state.session_id)
+        .bind(&canonical_state.updated_at)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("ensure async session timeline state: {error}")))?;
+    Ok(())
+}
+
 async fn replace_agents(
     transaction: &mut Transaction<'_, Sqlite>,
     session_id: &str,

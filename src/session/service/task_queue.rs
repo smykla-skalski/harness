@@ -1,8 +1,9 @@
 use super::{
     CliError, CliErrorKind, START_TASK_SIGNAL_COMMAND, SessionRole, SessionState, TaskDropEffect,
     TaskQueuePolicy, TaskStartSignalRecord, TaskStatus, WorkItem, apply_advance_queued_tasks,
-    build_signal, clear_agent_current_task, refresh_session, require_active_worker_target_agent,
-    task_not_found, task_status_label, touch_agent,
+    build_signal, clear_agent_current_task, refresh_session,
+    reject_generic_mutation_on_review_state, require_active_worker_target_agent, task_not_found,
+    task_status_label, touch_agent,
 };
 
 pub(crate) fn apply_drop_task_on_agent(
@@ -15,21 +16,11 @@ pub(crate) fn apply_drop_task_on_agent(
 ) -> Result<Vec<TaskDropEffect>, CliError> {
     require_active_worker_target_agent(state, agent_id)?;
 
-    let current_status = state
+    let task = state
         .tasks
         .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?
-        .status;
-    if matches!(
-        current_status,
-        TaskStatus::AwaitingReview | TaskStatus::InReview
-    ) {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' is {} and cannot be reassigned via drop; use respond_review or arbitrate",
-            task_status_label(current_status)
-        ))
-        .into());
-    }
+        .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, task, "reassigned via drop")?;
 
     let previous_assignee = state
         .tasks
@@ -72,6 +63,7 @@ pub(crate) fn queue_task_for_agent(
         .tasks
         .get_mut(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, task, "queued")?;
     if task.status != TaskStatus::Open {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "task '{task_id}' is {}, not open",
@@ -101,6 +93,12 @@ pub(crate) fn start_task_for_agent(
         ))
         .into());
     }
+
+    let task = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    reject_generic_mutation_on_review_state(task_id, task, "started")?;
 
     let previous_assignee = state
         .tasks
@@ -226,9 +224,7 @@ pub(crate) fn free_worker_ids(state: &SessionState) -> Vec<String> {
     state
         .agents
         .values()
-        .filter(|agent| {
-            agent.status.accepts_assignment() && agent.role == SessionRole::Worker
-        })
+        .filter(|agent| agent.status.accepts_assignment() && agent.role == SessionRole::Worker)
         .filter(|agent| is_worker_free(state, &agent.agent_id))
         .map(|agent| agent.agent_id.clone())
         .collect()

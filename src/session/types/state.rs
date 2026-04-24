@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AgentRegistration, AgentStatus, PendingLeaderTransfer, SessionPolicy, TaskStatus, WorkItem,
+    ARBITRATION_BLOCKED_REASON, AgentRegistration, AgentStatus, PendingLeaderTransfer,
+    SessionPolicy, TaskStatus, WorkItem,
 };
 
 /// Current schema version for session state files.
@@ -205,8 +206,8 @@ impl SessionMetrics {
                 TaskStatus::Done => completed_task_count += 1,
                 TaskStatus::Blocked => blocked_task_count += 1,
             }
-            if task.arbitration.is_some() || task.blocked_reason.as_deref()
-                == Some("awaiting arbitration")
+            if task.arbitration.is_some()
+                || task.blocked_reason.as_deref() == Some(ARBITRATION_BLOCKED_REASON)
             {
                 arbitration_task_count += 1;
             }

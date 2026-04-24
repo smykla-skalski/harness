@@ -73,7 +73,12 @@ pub fn submit_for_review_with_persona(
     if let Some(record) = maybe_emit_spawn_reviewer(&state_after, task_id, &now)
         && let Some(runtime) = runtime_for_name(&record.runtime)
     {
-        runtime.write_signal(project_dir, &record.session_id, &record.signal)?;
+        let target_session_id = state_after
+            .agents
+            .get(&record.agent_id)
+            .and_then(|agent| agent.agent_session_id.clone())
+            .unwrap_or_else(|| record.session_id.clone());
+        runtime.write_signal(project_dir, &target_session_id, &record.signal)?;
         storage::append_log_entry(
             &layout,
             log_signal_sent(
