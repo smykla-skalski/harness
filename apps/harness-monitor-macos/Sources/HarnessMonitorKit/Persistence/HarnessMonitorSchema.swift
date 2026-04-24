@@ -161,6 +161,36 @@ public enum HarnessMonitorSchemaV7: VersionedSchema {
   }
 }
 
+/// V8 adds a `CachedTaskReviewMetadata` side-table so the offline cache
+/// can round-trip the Slice 1 review workflow (awaiting review, reviewer
+/// claim, consensus, round counter, arbitration, persona hint, review
+/// history). The table is keyed by `(sessionId, taskId)` with a JSON
+/// `reviewBlob`, so future review-state fields stay lightweight.
+public enum HarnessMonitorSchemaV8: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(8, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      Self.CachedTaskReviewMetadata.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -171,11 +201,20 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV5.self,
       HarnessMonitorSchemaV6.self,
       HarnessMonitorSchemaV7.self,
+      HarnessMonitorSchemaV8.self,
     ]
   }
 
   public static var stages: [MigrationStage] {
-    [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7]
+    [
+      migrateV1toV2,
+      migrateV2toV3,
+      migrateV3toV4,
+      migrateV4toV5,
+      migrateV5toV6,
+      migrateV6toV7,
+      migrateV7toV8,
+    ]
   }
 
   static let migrateV1toV2 = MigrationStage.lightweight(
@@ -221,6 +260,16 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV6.self,
     toVersion: HarnessMonitorSchemaV7.self
   )
+
+  // V8 is purely additive: one new entity (CachedTaskReviewMetadata) with
+  // its own (sessionId, taskId) key and no relationship into the V6/V7
+  // model graph. Lightweight migration adds the empty table; the Swift
+  // conversion layer populates rows on the next sync and treats a
+  // missing row as an empty review metadata block.
+  static let migrateV7toV8 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV7.self,
+    toVersion: HarnessMonitorSchemaV8.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV7
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV8
