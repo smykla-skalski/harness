@@ -356,6 +356,51 @@ enum HarnessMonitorUITestAccessibility {
     "\(controlID).option.\(slug(option))"
   }
 
+  // Review workflow identifiers mirrored from HarnessMonitorAccessibility+Review
+  // and HarnessMonitorAccessibility+Sidebar. The registry test asserts the two
+  // sides stay in sync.
+
+  static let metricAwaitingReviewAgent = "harness.metrics.awaiting-review-agent"
+  static let metricAwaitingReviewTask = "harness.metrics.awaiting-review-task"
+  static let metricInReviewTask = "harness.metrics.in-review-task"
+  static let metricArbitrationTask = "harness.metrics.arbitration-task"
+
+  static func awaitingReviewBadge(_ taskID: String) -> String {
+    "harness.inspector.task.awaiting-review-badge.\(slug(taskID))"
+  }
+
+  static func reviewerClaimBadge(_ taskID: String, runtime: String) -> String {
+    "harness.inspector.task.reviewer-claim-badge.\(slug(taskID)).\(slug(runtime))"
+  }
+
+  static func reviewerQuorumIndicator(_ taskID: String) -> String {
+    "harness.inspector.task.reviewer-quorum.\(slug(taskID))"
+  }
+
+  static func reviewPointChip(_ pointID: String) -> String {
+    "harness.inspector.task.review-point.\(slug(pointID))"
+  }
+
+  static func roundCounter(_ taskID: String) -> String {
+    "harness.inspector.task.round-counter.\(slug(taskID))"
+  }
+
+  static func improverTaskCard(_ taskID: String) -> String {
+    "harness.inspector.task.improver-card.\(slug(taskID))"
+  }
+
+  static func arbitrationBanner(_ taskID: String) -> String {
+    "harness.banner.arbitration.\(slug(taskID))"
+  }
+
+  static func heuristicIssueCard(_ code: String) -> String {
+    "harness.cockpit.heuristic-issue.\(slug(code))"
+  }
+
+  static func autoSpawnedBadge(_ agentID: String) -> String {
+    "harness.sidebar.agent.\(slug(agentID)).auto-spawned"
+  }
+
   private static func slug(_ value: String) -> String {
     let lowercased = value.lowercased()
     return

@@ -180,6 +180,12 @@ public struct ContentDetailColumn: View {
     contentSessionDetail.presentedSessionDetail
   }
 
+  private var arbitrationBannerTasks: [WorkItem] {
+    contentSessionDetail.presentedSessionDetail?
+      .tasks
+      .filter(\.requiresArbitrationBanner) ?? []
+  }
+
   public var body: some View {
     ZStack {
       if toolbarGlassReproConfiguration.disablesContentDetailChrome {
@@ -187,7 +193,8 @@ public struct ContentDetailColumn: View {
       } else {
         ContentDetailChrome(
           persistenceError: contentChrome.persistenceError,
-          sessionDataAvailability: contentChrome.sessionDataAvailability
+          sessionDataAvailability: contentChrome.sessionDataAvailability,
+          arbitrationTasks: arbitrationBannerTasks
         ) {
           sessionContent
         }
