@@ -8,14 +8,13 @@ fn recover_leader_builds_managed_tui_request_from_policy_preset() {
     let tmp = tempfile::tempdir().expect("tempdir");
     with_session_test_env(tmp.path(), "recover-leader", || {
         let project = tmp.path().join("project");
-        let state = service::start_session_with_policy(
+        let state = super::start_active_session_with_policy(
             "",
             "recover leader",
             &project,
-            Some("recover-1"),
-            Some("swarm-default"),
-        )
-        .expect("start");
+            "recover-1",
+            "swarm-default",
+        );
         let leader_id = state.leader_id.clone().expect("leader");
 
         service::leave_session("recover-1", &leader_id, &project).expect("leave");
