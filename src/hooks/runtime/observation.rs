@@ -43,6 +43,13 @@ pub(super) fn finish_hook_observation(
     span.record("outcome", display(outcome));
     span.record("duration_ms", display(duration_ms));
     record_hook_metrics(hook_name, event_name, outcome, duration_ms);
+    tracing::info!(
+        hook_name = hook_name,
+        event = event_name,
+        outcome = outcome,
+        duration_ms = duration_ms,
+        "hook command finished"
+    );
 }
 
 pub(super) fn read_hook_payload(

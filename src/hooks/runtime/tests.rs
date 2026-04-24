@@ -1,12 +1,16 @@
 use std::env;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
 use tempfile::tempdir;
+use tracing::field::{Field, Visit};
+use tracing_subscriber::Layer;
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::prelude::*;
 
 use super::*;
 use crate::hooks::protocol::context::{
@@ -204,6 +208,70 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
             )
         }));
     });
+}
+
+#[derive(Clone, Default)]
+struct EventCaptureLayer {
+    messages: Arc<Mutex<Vec<String>>>,
+}
+
+#[derive(Default)]
+struct MessageVisitor {
+    message: Option<String>,
+}
+
+impl Visit for MessageVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "message" {
+            self.message = Some(value.to_string());
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = Some(format!("{value:?}"));
+        }
+    }
+}
+
+impl<S> Layer<S> for EventCaptureLayer
+where
+    S: tracing::Subscriber,
+{
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
+        let mut visitor = MessageVisitor::default();
+        event.record(&mut visitor);
+        if let Some(message) = visitor.message {
+            self.messages.lock().expect("messages lock").push(message);
+        }
+    }
+}
+
+#[test]
+fn finish_hook_observation_emits_completion_log() {
+    let layer = EventCaptureLayer::default();
+    let messages = Arc::clone(&layer.messages);
+    let subscriber = tracing_subscriber::registry().with(layer);
+
+    tracing::subscriber::with_default(subscriber, || {
+        let span = tracing::info_span!("hook_runtime_test");
+        let _guard = span.enter();
+        observation::finish_hook_observation(
+            &span,
+            "tool-guard",
+            "BeforeToolUse",
+            "allow",
+            Instant::now(),
+        );
+    });
+
+    let messages = messages.lock().expect("messages lock");
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("hook command finished")),
+        "expected hook completion log event, got {messages:?}"
+    );
 }
 
 #[test]
