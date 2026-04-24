@@ -63,10 +63,12 @@ assert_in_list() {
   local needle="$1"
   local label="$2"
   local haystack="$3"
-  if printf '%s\n' "$haystack" | grep -Fxq -- "$needle"; then
+  # Herestring avoids `printf | grep -q` which SIGPIPEs the writer when
+  # grep exits on first match; pipefail would then abort the test harness.
+  if grep -Fxq -- "$needle" <<<"$haystack"; then
     return 0
   fi
-  fail "expected $label '$needle' in list: $(printf '%s' "$haystack" | tr '\n' ' ')"
+  fail "expected $label '$needle' in list: $(tr '\n' ' ' <<<"$haystack")"
   return 1
 }
 
@@ -74,7 +76,7 @@ assert_not_in_list() {
   local needle="$1"
   local label="$2"
   local haystack="$3"
-  if ! printf '%s\n' "$haystack" | grep -Fxq -- "$needle"; then
+  if ! grep -Fxq -- "$needle" <<<"$haystack"; then
     return 0
   fi
   fail "did not expect $label '$needle' in list"
@@ -427,6 +429,436 @@ scenario_refresh_updates_cache() {
   assert_in_list "$pid" "post-refresh pid" "$after" && pass
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 16: SQLite sidecar orphan detection - .db-wal present, .db absent.
+# ---------------------------------------------------------------------------
+scenario_orphan_wal() {
+  start_test "orphan harness.db-wal detected when harness.db is gone"
+  local root="$SANDBOX/daemon-root-wal-$RUN_ID"
+  mkdir -p "$root"
+  local wal="$root/harness.db-wal"
+  : >"$wal"
+
+  local output
+  output="$(stale_scan_orphan_sqlite_sidecars "$root")"
+  assert_in_list "$wal" "orphan wal" "$output" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 17: SQLite sidecar orphan detection - .db-shm present, .db absent.
+# ---------------------------------------------------------------------------
+scenario_orphan_shm() {
+  start_test "orphan harness.db-shm detected when harness.db is gone"
+  local root="$SANDBOX/daemon-root-shm-$RUN_ID"
+  mkdir -p "$root"
+  local shm="$root/harness.db-shm"
+  : >"$shm"
+
+  local output
+  output="$(stale_scan_orphan_sqlite_sidecars "$root")"
+  assert_in_list "$shm" "orphan shm" "$output" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 18: sidecars alongside a live harness.db are NOT flagged. The DB
+# is the source of truth; sidecars are normal WAL-mode companions.
+# ---------------------------------------------------------------------------
+scenario_sidecars_with_db_noop() {
+  start_test "sidecars next to harness.db are treated as normal"
+  local root="$SANDBOX/daemon-root-live-$RUN_ID"
+  mkdir -p "$root"
+  : >"$root/harness.db"
+  : >"$root/harness.db-wal"
+  : >"$root/harness.db-shm"
+
+  local output
+  output="$(stale_scan_orphan_sqlite_sidecars "$root")"
+  if [[ -z "$output" ]]; then
+    pass
+  else
+    fail "expected no orphans with live .db; got: $output"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 19: nonexistent daemon root is a clean no-op (never errors).
+# ---------------------------------------------------------------------------
+scenario_orphan_sidecar_missing_root() {
+  start_test "sidecar scan on missing root is a no-op"
+  local output
+  output="$(stale_scan_orphan_sqlite_sidecars "$SANDBOX/no-such-root-$RUN_ID")"
+  if [[ -z "$output" ]]; then
+    pass
+  else
+    fail "expected empty output for missing root; got: $output"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 20: launchctl drift parser - missing program path emits drift line.
+# ---------------------------------------------------------------------------
+scenario_launchd_drift_parser_missing() {
+  start_test "launchd drift parser reports missing program path"
+  local fake_output
+  fake_output=$'gui/501/io.example.daemon = {\n\tactive count = 1\n\tpath = /foo/bar.plist\n\tstate = running\n\n\tprogram = /nonexistent/path-'"$RUN_ID"$'/harness\n}'
+  local line
+  line="$(stale_scan_launchd_drift_from_output "io.example.daemon" "$fake_output")"
+  if [[ "$line" == *"io.example.daemon"* && "$line" == *"/nonexistent/path-$RUN_ID/harness"* ]]; then
+    pass
+  else
+    fail "unexpected drift output: '$line'"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 21: launchctl drift parser - existing program path emits nothing.
+# /bin/sh is guaranteed present on macOS.
+# ---------------------------------------------------------------------------
+scenario_launchd_drift_parser_present() {
+  start_test "launchd drift parser ignores present program path"
+  local fake_output
+  fake_output=$'gui/501/io.example.daemon = {\n\tactive count = 1\n\tprogram = /bin/sh\n}'
+  local line
+  line="$(stale_scan_launchd_drift_from_output "io.example.daemon" "$fake_output")"
+  if [[ -z "$line" ]]; then
+    pass
+  else
+    fail "expected empty output for present program; got: '$line'"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 22: launchctl drift parser - empty input is a no-op.
+# ---------------------------------------------------------------------------
+scenario_launchd_drift_parser_empty() {
+  start_test "launchd drift parser tolerates empty input"
+  local line
+  line="$(stale_scan_launchd_drift_from_output "io.example.daemon" "")"
+  if [[ -z "$line" ]]; then
+    pass
+  else
+    fail "expected empty output for empty input; got: '$line'"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 23: launchctl drift parser - output without a program line is a
+# no-op (BundleProgram-backed services do not surface one).
+# ---------------------------------------------------------------------------
+scenario_launchd_drift_parser_no_program() {
+  start_test "launchd drift parser ignores output with no program line"
+  local fake_output
+  fake_output=$'gui/501/io.example.daemon = {\n\tactive count = 1\n\tstate = running\n}'
+  local line
+  line="$(stale_scan_launchd_drift_from_output "io.example.daemon" "$fake_output")"
+  if [[ -z "$line" ]]; then
+    pass
+  else
+    fail "expected empty output for no-program input; got: '$line'"
+  fi
+}
+
+# Bind an ephemeral TCP listener in a background Python process. Writes the
+# bound port to port_file so we can read it back without racing on stdout.
+# Writes the resulting pid to LAST_SPAWN_PID.
+spawn_python_listener() {
+  local port_file="$1"
+  local script='import socket, sys, time
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+s.listen(1)
+with open(sys.argv[1], "w") as f:
+    f.write(str(s.getsockname()[1]))
+sys.stdout.close()
+time.sleep(300)
+'
+  nohup python3 -c "$script" "$port_file" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  local attempts=0
+  while (( attempts < 60 )); do
+    if [[ -s "$port_file" ]]; then
+      return 0
+    fi
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 24: foreign process listening on the Codex WS port is flagged.
+# ---------------------------------------------------------------------------
+scenario_foreign_ws_listener() {
+  start_test "foreign TCP listener on Codex port is flagged as conflict"
+  local port_file="$SANDBOX/foreign-$RUN_ID.port"
+  spawn_python_listener "$port_file" || { fail "listener never bound"; return; }
+  local pid="$LAST_SPAWN_PID"
+  local port
+  port="$(cat "$port_file")"
+
+  stale_scan_refresh_ps
+  local foreign
+  foreign="$(stale_scan_foreign_tcp_listeners "$port")"
+  assert_in_list "$pid" "foreign listener pid" "$foreign" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 25: harness-labelled listener is NOT flagged as foreign. We write
+# the listener script at a path containing target/debug/harness so macOS ps
+# (which ignores exec -a for framework-wrapped Python) still surfaces an
+# argv line that matches the build-bucket regex.
+# ---------------------------------------------------------------------------
+scenario_harness_ws_listener_not_flagged() {
+  start_test "harness-labelled TCP listener is not flagged as foreign"
+  local target_dir="$SANDBOX/target/debug"
+  mkdir -p "$target_dir"
+  local script_path="$target_dir/harness"
+  cat >"$script_path" <<'EOF'
+import socket, sys, time
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+s.listen(1)
+with open(sys.argv[2], "w") as f:
+    f.write(str(s.getsockname()[1]))
+sys.stdout.close()
+time.sleep(300)
+EOF
+
+  local port_file="$SANDBOX/harness-$RUN_ID.port"
+  nohup python3 "$script_path" daemon "$port_file" >/dev/null 2>&1 &
+  local pid=$!
+  SPAWNED_PIDS+=("$pid")
+  wait_for_pid_registered "$pid" || { fail "listener never started"; return; }
+  local attempts=0
+  while (( attempts < 60 )); do
+    [[ -s "$port_file" ]] && break
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  [[ -s "$port_file" ]] || { fail "port file never populated"; return; }
+  local port
+  port="$(cat "$port_file")"
+
+  stale_scan_refresh_ps
+  # Sanity check: the pid should be in the build bucket because its argv
+  # matches the target/debug/harness daemon regex.
+  local build_pids
+  build_pids="$(stale_scan_matching_pids build)"
+  assert_in_list "$pid" "build-bucket pid (setup check)" "$build_pids" || return
+
+  local foreign
+  foreign="$(stale_scan_foreign_tcp_listeners "$port")"
+  assert_not_in_list "$pid" "harness listener pid" "$foreign" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 26: codex WS port helper respects HARNESS_CODEX_WS_PORT.
+# ---------------------------------------------------------------------------
+scenario_codex_ws_port_env() {
+  start_test "stale_scan_codex_ws_port honors env override"
+  local got_default
+  got_default="$(HARNESS_CODEX_WS_PORT='' stale_scan_codex_ws_port)"
+  if [[ "$got_default" != "4500" ]]; then
+    fail "expected default 4500, got '$got_default'"
+    return
+  fi
+  local got_override
+  got_override="$(HARNESS_CODEX_WS_PORT=31337 stale_scan_codex_ws_port)"
+  if [[ "$got_override" == "31337" ]]; then
+    pass
+  else
+    fail "expected 31337 override, got '$got_override'"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 27: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
+# planted marker disappears. The "exit 0" happy-path end-state is only
+# reachable when no other pollution exists, which is not the case mid-suite;
+# we assert the invariants we control (marker gone, autoclean banner, fake
+# clean stdout) and accept either exit 0 or 1 as success.
+# ---------------------------------------------------------------------------
+scenario_autoclean_success() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and removes the marker"
+  local marker="/tmp/h-bridge-TEST-$RUN_ID-autoclean.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local clean_script="$SANDBOX/fake-clean-$RUN_ID.sh"
+  cat >"$clean_script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+rm -f "$marker"
+echo "fake clean removed marker"
+EOF
+  chmod +x "$clean_script"
+
+  local output status=0
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if [[ -e "$marker" ]]; then
+    fail "marker still present after autoclean: $marker"
+    return
+  fi
+  if ! grep -Fq -- "HARNESS_CHECK_AUTOCLEAN=1 is set, running clean:stale" <<<"$output"; then
+    fail "expected autoclean invocation banner; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "fake clean removed marker" <<<"$output"; then
+    fail "expected fake clean stdout to surface; output: $output"
+    return
+  fi
+  if (( status != 0 && status != 1 )); then
+    fail "expected exit 0 or 1 after autoclean; got $status"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 28: HARNESS_CHECK_AUTOCLEAN=1 - pollution the stub clean cannot
+# resolve still fails the gate with exit 1.
+# ---------------------------------------------------------------------------
+scenario_autoclean_unresolved_still_fails() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 still fails when clean is incomplete"
+  local marker="/tmp/h-bridge-TEST-$RUN_ID-unresolved.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local clean_script="$SANDBOX/fake-clean-noop-$RUN_ID.sh"
+  cat >"$clean_script" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "fake clean did nothing"
+EOF
+  chmod +x "$clean_script"
+
+  local output status=0
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if (( status != 1 )); then
+    fail "expected exit 1 after failed autoclean; got $status (output: $output)"
+    return
+  fi
+  if ! grep -Fq -- "auto-clean did not resolve" <<<"$output"; then
+    fail "expected unresolved confirmation; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "$marker" <<<"$output"; then
+    fail "expected remaining marker listed; output: $output"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 29: HARNESS_CHECK_AUTOCLEAN=1 when clean script exits nonzero.
+# ---------------------------------------------------------------------------
+scenario_autoclean_clean_script_fails() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces clean-script failure"
+  local marker="/tmp/h-bridge-TEST-$RUN_ID-cleanfail.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local clean_script="$SANDBOX/fake-clean-fail-$RUN_ID.sh"
+  cat >"$clean_script" <<'EOF'
+#!/usr/bin/env bash
+echo "fake clean exploded" >&2
+exit 42
+EOF
+  chmod +x "$clean_script"
+
+  local output status=0
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if (( status != 1 )); then
+    fail "expected exit 1 after clean-script failure; got $status"
+    return
+  fi
+  if ! grep -Fq -- "auto-clean failed" <<<"$output"; then
+    fail "expected auto-clean failed message; output: $output"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 30: baseline e2e without HARNESS_CHECK_AUTOCLEAN - planted artifact
+# still fails the gate (regression check after autoclean plumbing).
+# ---------------------------------------------------------------------------
+scenario_end_to_end_without_autoclean() {
+  start_test "baseline: without autoclean env the gate still fails on /tmp artifact"
+  local marker="/tmp/h-bridge-TEST-$RUN_ID-baseline.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local output status=0
+  output="$(env -u HARNESS_CHECK_AUTOCLEAN "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if (( status != 1 )); then
+    fail "expected exit 1; got $status"
+    return
+  fi
+  if ! grep -Fq -- "$marker" <<<"$output"; then
+    fail "expected marker in output; output: $output"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 31: congestion + autoclean - plant multiple /tmp artifacts; fake
+# clean removes one; final report must list the remaining two and NOT the
+# cleaned one.
+# ---------------------------------------------------------------------------
+scenario_autoclean_congestion_partial() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces remaining pollution under congestion"
+  local a="/tmp/h-bridge-TEST-$RUN_ID-partial-a.sock"
+  local b="/tmp/h-bridge-TEST-$RUN_ID-partial-b.pid"
+  local c="/tmp/h-bridge-TEST-$RUN_ID-partial-c.lock"
+  : >"$a"
+  : >"$b"
+  : >"$c"
+  TMP_MARKERS+=("$a" "$b" "$c")
+
+  local clean_script="$SANDBOX/fake-clean-partial-$RUN_ID.sh"
+  cat >"$clean_script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+rm -f "$a"
+EOF
+  chmod +x "$clean_script"
+
+  local output status=0
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if (( status != 1 )); then
+    fail "expected exit 1 after partial autoclean; got $status"
+    return
+  fi
+  # Final 'error: dev state is stale' block must list b and c and NOT a.
+  local tail_output
+  tail_output="$(awk '/^error: dev state is stale$/ { show = 1 } show { print }' <<<"$output" | tail -n 60)"
+  if grep -Fq -- "$a" <<<"$tail_output"; then
+    fail "$a was not cleaned: final block still lists it"
+    return
+  fi
+  local ok=1
+  grep -Fq -- "$b" <<<"$tail_output" || ok=0
+  grep -Fq -- "$c" <<<"$tail_output" || ok=0
+  if (( ok )); then
+    pass
+  else
+    fail "expected remaining markers in final block: $tail_output"
+  fi
+}
+
 run_all() {
   scenario_debug_orphan
   scenario_release_orphan
@@ -443,6 +875,22 @@ run_all() {
   scenario_clean_tmp_removal_is_idempotent
   scenario_installed_not_in_build_bucket
   scenario_refresh_updates_cache
+  scenario_orphan_wal
+  scenario_orphan_shm
+  scenario_sidecars_with_db_noop
+  scenario_orphan_sidecar_missing_root
+  scenario_launchd_drift_parser_missing
+  scenario_launchd_drift_parser_present
+  scenario_launchd_drift_parser_empty
+  scenario_launchd_drift_parser_no_program
+  scenario_foreign_ws_listener
+  scenario_harness_ws_listener_not_flagged
+  scenario_codex_ws_port_env
+  scenario_autoclean_success
+  scenario_autoclean_unresolved_still_fails
+  scenario_autoclean_clean_script_fails
+  scenario_end_to_end_without_autoclean
+  scenario_autoclean_congestion_partial
 }
 
 run_all
