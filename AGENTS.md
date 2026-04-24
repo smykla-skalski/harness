@@ -89,6 +89,7 @@ Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
 - Errors use `CliErrorKind` enum variants with typed fields via thiserror
 - Hook messages use `HookMessage` enum with `into_result()` conversion
 - Commits: `{type}({scope}): {message}` — types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
+- Never create merge commits. Keep history flat with rebase/cherry-pick workflows only; if a merge commit appears locally, rewrite it out before pushing or handing off.
 
 ## Versioning
 
