@@ -146,6 +146,28 @@ wipe_stale_bridge_state() {
   wipe_bridge_state_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
 }
 
+# Remove orphan SQLite sidecars (harness.db-wal, harness.db-shm) when the DB
+# itself has already been deleted. SQLite rebuilds sidecars on next open, and
+# leaving them behind re-materializes pre-wipe WAL frames on first connect.
+remove_orphan_sqlite_sidecars_in_root() {
+  local root="$1"
+  [[ -d "$root" ]] || return 0
+  local paths=()
+  local path
+  while IFS= read -r path; do
+    [[ -n "$path" ]] && paths+=("$path")
+  done < <(stale_scan_orphan_sqlite_sidecars "$root")
+  (( ${#paths[@]} > 0 )) || return 0
+  echo "  removing ${#paths[@]} orphan SQLite sidecar(s) in $root"
+  rm -f "${paths[@]}"
+}
+
+remove_orphan_sqlite_sidecars() {
+  echo "sweeping orphan SQLite sidecars..."
+  remove_orphan_sqlite_sidecars_in_root "$STALE_SCAN_GROUP_CONTAINER_ROOT"
+  remove_orphan_sqlite_sidecars_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+}
+
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
@@ -154,5 +176,6 @@ kill_live_harness_processes "$STALE_SCAN_GROUP_CONTAINER_ROOT"
 kill_live_harness_processes "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
 remove_tmp_bridge_artifacts
 wipe_stale_bridge_state
+remove_orphan_sqlite_sidecars
 
 echo "clean:stale complete"
