@@ -191,15 +191,21 @@ pub(crate) fn apply_claim_review(
 /// - session is not active
 /// - actor lacks [`SessionAction::SubmitReview`]
 /// - task missing, not in `InReview`, or reviewer has no claim on it
-pub(crate) fn apply_submit_review(
-    state: &mut SessionState,
+/// Read-only guardrail for `apply_submit_review`.
+///
+/// Callers must invoke this BEFORE writing the review record to disk,
+/// so an unauthorized or out-of-state submission leaves no durable
+/// journal entry in `tasks/<task_id>/reviews.jsonl`.
+///
+/// # Errors
+/// Same error set as [`apply_submit_review`].
+pub(crate) fn validate_submit_review(
+    state: &SessionState,
     task_id: &str,
-    review: &Review,
-    all_reviews: &[Review],
-    now: &str,
+    reviewer_agent_id: &str,
 ) -> Result<(), CliError> {
     require_active(state)?;
-    require_permission(state, &review.reviewer_agent_id, SessionAction::SubmitReview)?;
+    require_permission(state, reviewer_agent_id, SessionAction::SubmitReview)?;
 
     let task = state
         .tasks
@@ -222,18 +228,29 @@ pub(crate) fn apply_submit_review(
     if !claim
         .reviewers
         .iter()
-        .any(|entry| entry.reviewer_agent_id == review.reviewer_agent_id)
+        .any(|entry| entry.reviewer_agent_id == reviewer_agent_id)
     {
         return Err(CliErrorKind::session_permission_denied(format!(
-            "reviewer '{}' has not claimed task '{task_id}'",
-            review.reviewer_agent_id
+            "reviewer '{reviewer_agent_id}' has not claimed task '{task_id}'"
         ))
         .into());
     }
+    Ok(())
+}
 
-    let required = task
-        .awaiting_review
-        .as_ref()
+pub(crate) fn apply_submit_review(
+    state: &mut SessionState,
+    task_id: &str,
+    review: &Review,
+    all_reviews: &[Review],
+    now: &str,
+) -> Result<(), CliError> {
+    validate_submit_review(state, task_id, &review.reviewer_agent_id)?;
+
+    let required = state
+        .tasks
+        .get(task_id)
+        .and_then(|task| task.awaiting_review.as_ref())
         .map_or(2u8, |meta| meta.required_consensus);
 
     let task = state
