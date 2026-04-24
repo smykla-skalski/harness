@@ -53,6 +53,26 @@ struct AgentsSidebarRow: View {
   }
 }
 
+public struct AutoSpawnedBadgeView: View {
+  public let agentID: String
+
+  public init(agentID: String) {
+    self.agentID = agentID
+  }
+
+  public var body: some View {
+    Image(systemName: "sparkles")
+      .imageScale(.small)
+      .symbolRenderingMode(.hierarchical)
+      .foregroundStyle(.white)
+      .padding(4)
+      .background(HarnessMonitorTheme.accent, in: Circle())
+      .accessibilityElement()
+      .accessibilityLabel(Text("Auto-spawned reviewer"))
+      .accessibilityIdentifier(HarnessMonitorAccessibility.autoSpawnedBadge(agentID))
+  }
+}
+
 struct CodexRunSidebarRow: View {
   let snapshot: CodexRunSnapshot
   let title: String

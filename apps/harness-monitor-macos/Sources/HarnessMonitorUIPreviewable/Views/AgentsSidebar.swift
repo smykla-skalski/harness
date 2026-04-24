@@ -61,6 +61,13 @@ struct AgentsSidebar: View {
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .topTrailing) {
+              if agent.isAutoSpawned {
+                AutoSpawnedBadgeView(agentID: agent.agentId)
+                  .allowsHitTesting(false)
+              }
+            }
             .padding(.vertical, rowPadding)
             .tag(AgentTuiSheetSelection.agent(agent.agentId))
             .accessibilityIdentifier(
