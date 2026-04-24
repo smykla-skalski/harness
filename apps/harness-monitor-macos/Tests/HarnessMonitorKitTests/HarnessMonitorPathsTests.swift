@@ -196,6 +196,27 @@ struct HarnessMonitorPathsTests {
     #expect(FileManager.default.fileExists(atPath: legacyNotificationDirectory.path) == false)
   }
 
+  @Test("Ensuring harness root non-indexable writes a metadata_never_index marker")
+  func ensureHarnessRootNonIndexableWritesMarker() throws {
+    let dataHome = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-noindex-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: dataHome) }
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": dataHome.path],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+
+    try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: environment)
+
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    let marker = harnessRoot.appendingPathComponent(".metadata_never_index")
+    #expect(FileManager.default.fileExists(atPath: marker.path))
+
+    // Second call must be idempotent.
+    try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: environment)
+    #expect(FileManager.default.fileExists(atPath: marker.path))
+  }
+
   @Test("Shared observability config prefers the native app group container when available")
   func sharedObservabilityConfigDefaultsToAppGroupWhenAvailable() {
     let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)

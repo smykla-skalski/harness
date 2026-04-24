@@ -32,6 +32,13 @@ struct HarnessMonitorApp: App {
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
     do {
+      try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: configuration.environment)
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
+      )
+    }
+    do {
       try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
     } catch {
       HarnessMonitorLogger.store.warning(
