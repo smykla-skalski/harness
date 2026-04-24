@@ -2,7 +2,7 @@ use super::{
     CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
     TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
     apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
-    apply_record_checkpoint, apply_submit_for_review, apply_update_task,
+    apply_claim_review, apply_record_checkpoint, apply_submit_for_review, apply_update_task,
     apply_update_task_queue_policy, ensure_valid_progress, generate_checkpoint_id,
     load_state_or_err, log_checkpoint_recorded, log_task_assigned, log_task_created,
     log_task_status_changed, protocol, reconcile_expired_pending_signals, refresh_session,
@@ -297,6 +297,38 @@ pub fn submit_for_review(
     storage::append_log_entry(
         &layout,
         log_task_status_changed(task_id, TaskStatus::InProgress, TaskStatus::AwaitingReview),
+        Some(actor_id),
+        None,
+    )?;
+    Ok(())
+}
+
+/// Claim a review slot on a task awaiting review.
+///
+/// Records the reviewer entry, transitions the task from `AwaitingReview`
+/// to `InReview` on the first claim, and enforces single-reviewer-per-
+/// runtime.
+///
+/// # Errors
+/// Returns `CliError` if the session is not active, the task is not in a
+/// reviewable state, the actor lacks `ClaimReview` permission, or a
+/// same-runtime reviewer already holds a claim on the task.
+pub fn claim_review(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+
+    storage::update_state(&layout, |state| {
+        apply_claim_review(state, task_id, actor_id, &now)
+    })?;
+
+    storage::append_log_entry(
+        &layout,
+        log_task_status_changed(task_id, TaskStatus::AwaitingReview, TaskStatus::InReview),
         Some(actor_id),
         None,
     )?;
