@@ -27,7 +27,7 @@ use crate::session::storage as session_storage;
 use crate::session::types::TaskStatus;
 use crate::workspace::utc_now;
 
-use super::review_submit_txn::apply_submit_review_in_txn;
+use super::review_submit_txn::{apply_submit_review_in_txn, prepare_submit_review};
 
 use super::sessions::session_detail_from_async_daemon_db;
 use super::{
@@ -342,16 +342,26 @@ pub(crate) async fn submit_review_async(
     let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
 
     validate_submit_review(&resolved.state, task_id, &request.actor)?;
-    let (prev_status, new_status, review) = async_db
+    // Append to reviews.jsonl + reload OUTSIDE the SQLite immediate txn so
+    // the writer lock is not held across disk I/O. Crash-recovery is via
+    // `rebuild_task_reviews` on daemon start.
+    let prepared = prepare_submit_review(
+        &resolved.state,
+        task_id,
+        &request.actor,
+        request.verdict,
+        &request.summary,
+        &request.points,
+        &layout,
+        &now,
+    )?;
+    let (prev_status, new_status) = async_db
         .update_session_state_immediate(session_id, |state| {
-            apply_submit_review_in_txn(
-                state, task_id, &request.actor, request.verdict,
-                &request.summary, &request.points, &layout, &now,
-            )
+            apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)
         })
         .await?;
     async_db
-        .insert_task_review(session_id, task_id, &review)
+        .insert_task_review(session_id, task_id, &prepared.review)
         .await?;
     append_task_status_change_log(
         async_db, session_id, task_id, &request.actor, prev_status, new_status,
