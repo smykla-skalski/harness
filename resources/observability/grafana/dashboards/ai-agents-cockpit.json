@@ -2155,6 +2155,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
