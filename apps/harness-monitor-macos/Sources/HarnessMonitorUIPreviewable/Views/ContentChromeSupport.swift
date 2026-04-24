@@ -85,19 +85,11 @@ struct ContentDetailChrome<Content: View>: View {
   }
 
   var body: some View {
-    contentWithTopChrome
+    content
+      .safeAreaInset(edge: .top, spacing: 0) {
+        topChrome
+      }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-
-  @ViewBuilder private var contentWithTopChrome: some View {
-    if showsTopChrome {
-      content
-        .safeAreaInset(edge: .top, spacing: 0) {
-          topChrome
-        }
-    } else {
-      content
-    }
   }
 
   private var showsTopChrome: Bool {
@@ -110,26 +102,31 @@ struct ContentDetailChrome<Content: View>: View {
     sessionDataAvailability != .live
   }
 
-  private var topChrome: some View {
-    VStack(spacing: 0) {
-      if let persistenceError {
-        PersistenceUnavailableBanner(message: persistenceError)
-        chromeDivider(tint: HarnessMonitorTheme.caution)
+  /// Always returns a view so the enclosing `safeAreaInset` keeps stable
+  /// subtree identity. When no chrome kind applies, `EmptyView` contributes
+  /// zero height and leaves content layout unchanged.
+  @ViewBuilder private var topChrome: some View {
+    if showsTopChrome {
+      VStack(spacing: 0) {
+        if let persistenceError {
+          PersistenceUnavailableBanner(message: persistenceError)
+          chromeDivider(tint: HarnessMonitorTheme.caution)
+        }
+        if isStale {
+          SessionDataAvailabilityBanner(availability: sessionDataAvailability)
+          chromeDivider(tint: HarnessMonitorTheme.caution)
+        }
+        ForEach(arbitrationTasks) { task in
+          ArbitrationBannerView(task: task)
+          chromeDivider(
+            tint: task.arbitration != nil
+              ? HarnessMonitorTheme.success
+              : HarnessMonitorTheme.caution
+          )
+        }
       }
-      if isStale {
-        SessionDataAvailabilityBanner(availability: sessionDataAvailability)
-        chromeDivider(tint: HarnessMonitorTheme.caution)
-      }
-      ForEach(arbitrationTasks) { task in
-        ArbitrationBannerView(task: task)
-        chromeDivider(
-          tint: task.arbitration != nil
-            ? HarnessMonitorTheme.success
-            : HarnessMonitorTheme.caution
-        )
-      }
+      .background(Color(nsColor: .windowBackgroundColor))
     }
-    .background(Color(nsColor: .windowBackgroundColor))
   }
 
   private func chromeDivider(tint: Color) -> some View {
