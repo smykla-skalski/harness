@@ -49,7 +49,7 @@ fn run_command_streaming_captures_stdout_and_stderr() {
             "-c",
             "printf 'stdout-line\\n'; printf 'stderr-line\\n' >&2",
         ],
-        None,
+        Some(Path::new("/tmp")),
         None,
         &[0],
     )
