@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+#[cfg(test)]
+use crate::observe::types::IssueCode;
 use crate::observe::types::Issue;
 use crate::session::types::{TaskSeverity, TaskSource};
 
