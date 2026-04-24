@@ -234,7 +234,31 @@ scenario_gate_bucket() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 7: /tmp bridge artifacts - .sock, .pid, .lock are all detected
+# Scenario 7: test runners are not stale gate helpers. They may be long-lived
+# legitimate foreground work, and clean:stale must never kill them or corrupt
+# their output stream.
+# ---------------------------------------------------------------------------
+scenario_test_runners_not_gate_bucket() {
+  start_test "unit test runners are not gate-bucket cleanup targets"
+  spawn_labelled "mise run test:unit" || { fail "spawn mise test failed"; return; }
+  local mise_test_pid="$LAST_SPAWN_PID"
+  spawn_labelled "./scripts/cargo-local.sh test --lib" || { fail "spawn cargo test failed"; return; }
+  local cargo_test_pid="$LAST_SPAWN_PID"
+  spawn_labelled "mise run monitor:macos:test" || { fail "spawn monitor test failed"; return; }
+  local monitor_test_pid="$LAST_SPAWN_PID"
+
+  stale_scan_refresh_ps
+  local pids
+  pids="$(stale_scan_matching_pids gate)"
+  local ok=1
+  assert_not_in_list "$mise_test_pid" "mise test pid" "$pids" || ok=0
+  assert_not_in_list "$cargo_test_pid" "cargo test pid" "$pids" || ok=0
+  assert_not_in_list "$monitor_test_pid" "monitor test pid" "$pids" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 8: /tmp bridge artifacts - .sock, .pid, .lock are all detected
 # ---------------------------------------------------------------------------
 scenario_tmp_artifacts() {
   start_test "tmp bridge artifacts sweep covers .sock/.pid/.lock"
@@ -888,6 +912,7 @@ run_all() {
   scenario_per_triple_release_orphan
   scenario_live_bucket
   scenario_gate_bucket
+  scenario_test_runners_not_gate_bucket
   scenario_tmp_artifacts
   scenario_lock_holder
   scenario_pid_describe_format
