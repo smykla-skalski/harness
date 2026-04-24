@@ -43,6 +43,7 @@ limits_config:
             - service.name
             - service.namespace
             - service.version
+            - deployment.environment.name
             - deployment.env
         # Drop high-cardinality resource attributes from index
         - action: drop

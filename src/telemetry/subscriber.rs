@@ -432,6 +432,7 @@ fn telemetry_resource(service: RuntimeService) -> Resource {
         .with_attributes([
             KeyValue::new("service.namespace", "harness"),
             KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+            KeyValue::new("deployment.environment.name", "local"),
             KeyValue::new("deployment.env", "local"),
         ])
         .build()
@@ -490,6 +491,26 @@ mod tests {
         assert!(
             result.is_ok(),
             "OTLP gRPC exporters should not require an existing Tokio runtime"
+        );
+    }
+
+    #[test]
+    fn telemetry_resource_keeps_semantic_and_legacy_environment_labels() {
+        let resource = telemetry_resource(RuntimeService::Cli);
+
+        assert_eq!(
+            resource
+                .get(&opentelemetry::Key::from_static_str(
+                    "deployment.environment.name"
+                ))
+                .map(|value| value.to_string()),
+            Some("local".to_string())
+        );
+        assert_eq!(
+            resource
+                .get(&opentelemetry::Key::from_static_str("deployment.env"))
+                .map(|value| value.to_string()),
+            Some("local".to_string())
         );
     }
 }
