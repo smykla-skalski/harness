@@ -38,6 +38,12 @@ pub(crate) fn apply_create_task(
         blocked_reason: None,
         completed_at: None,
         checkpoint_summary: None,
+        awaiting_review: None,
+        review_claim: None,
+        consensus: None,
+        review_round: 0,
+        arbitration: None,
+        suggested_persona: None,
     };
     state.tasks.insert(task_id, item.clone());
     touch_agent(state, actor_id, now);
@@ -221,7 +227,10 @@ pub(crate) fn apply_update_task(
             task.blocked_reason = note.map(ToString::to_string);
             task.completed_at = None;
         }
-        TaskStatus::Open | TaskStatus::InProgress | TaskStatus::InReview => {
+        TaskStatus::Open
+        | TaskStatus::InProgress
+        | TaskStatus::AwaitingReview
+        | TaskStatus::InReview => {
             task.blocked_reason = None;
             task.completed_at = None;
         }

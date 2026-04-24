@@ -55,6 +55,7 @@ mod runtime;
 mod schema;
 mod schema_repairs;
 mod schema_sql;
+mod schema_v10;
 mod session_data;
 mod signals;
 mod summaries;

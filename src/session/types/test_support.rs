@@ -100,5 +100,11 @@ pub(super) fn work_item(
         blocked_reason: None,
         completed_at: None,
         checkpoint_summary: None,
+        awaiting_review: None,
+        review_claim: None,
+        consensus: None,
+        review_round: 0,
+        arbitration: None,
+        suggested_persona: None,
     }
 }

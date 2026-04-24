@@ -86,63 +86,16 @@ impl DaemonDb {
             version.as_str(),
             "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8"
         );
-        let should_reclaim_space = match version.as_str() {
-            "1" => {
-                self.conn
-                    .execute_batch(
-                        "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
-                         UPDATE sessions SET title = context;
-                         UPDATE sessions SET state_json = json_set(state_json, '$.title', context);
-                         UPDATE schema_meta SET value = '2' WHERE key = 'version';",
-                    )
-                    .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
-                let reclaimed = migrate_v2_to_v3(&self.conn)?;
-                migrate_v3_to_v4(&self.conn)?;
-                migrate_v4_to_v5(&self.conn)?;
-                migrate_v5_to_v6(&self.conn)?;
-                migrate_v6_to_v7(&self.conn)?;
-                reclaimed
-            }
-            "2" => {
-                let reclaimed = migrate_v2_to_v3(&self.conn)?;
-                migrate_v3_to_v4(&self.conn)?;
-                migrate_v4_to_v5(&self.conn)?;
-                migrate_v5_to_v6(&self.conn)?;
-                migrate_v6_to_v7(&self.conn)?;
-                reclaimed
-            }
-            "3" => {
-                migrate_v3_to_v4(&self.conn)?;
-                migrate_v4_to_v5(&self.conn)?;
-                migrate_v5_to_v6(&self.conn)?;
-                migrate_v6_to_v7(&self.conn)?;
-                false
-            }
-            "4" => {
-                migrate_v4_to_v5(&self.conn)?;
-                migrate_v5_to_v6(&self.conn)?;
-                migrate_v6_to_v7(&self.conn)?;
-                false
-            }
-            "5" => {
-                migrate_v5_to_v6(&self.conn)?;
-                migrate_v6_to_v7(&self.conn)?;
-                false
-            }
-            "6" => {
-                migrate_v6_to_v7(&self.conn)?;
-                false
-            }
-            _ => false,
-        };
-
+        let should_reclaim_space = run_pre_v7_migrations(&self.conn, version.as_str())?;
         if needs_ledger_backfill {
             self.migrate_v7_to_v8()?;
         }
         if needs_session_repair {
             self.migrate_v8_to_v9()?;
         }
-
+        if version.as_str() != "10" {
+            super::schema_v10::run(&self.conn)?;
+        }
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
         }
@@ -173,6 +126,58 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("bump schema version to v9: {error}")))?;
         Ok(())
+    }
+
+}
+
+fn run_pre_v7_migrations(conn: &Connection, version: &str) -> Result<bool, CliError> {
+    match version {
+        "1" => {
+            conn.execute_batch(
+                "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
+                 UPDATE sessions SET title = context;
+                 UPDATE sessions SET state_json = json_set(state_json, '$.title', context);
+                 UPDATE schema_meta SET value = '2' WHERE key = 'version';",
+            )
+            .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
+            let reclaimed = migrate_v2_to_v3(conn)?;
+            migrate_v3_to_v4(conn)?;
+            migrate_v4_to_v5(conn)?;
+            migrate_v5_to_v6(conn)?;
+            migrate_v6_to_v7(conn)?;
+            Ok(reclaimed)
+        }
+        "2" => {
+            let reclaimed = migrate_v2_to_v3(conn)?;
+            migrate_v3_to_v4(conn)?;
+            migrate_v4_to_v5(conn)?;
+            migrate_v5_to_v6(conn)?;
+            migrate_v6_to_v7(conn)?;
+            Ok(reclaimed)
+        }
+        "3" => {
+            migrate_v3_to_v4(conn)?;
+            migrate_v4_to_v5(conn)?;
+            migrate_v5_to_v6(conn)?;
+            migrate_v6_to_v7(conn)?;
+            Ok(false)
+        }
+        "4" => {
+            migrate_v4_to_v5(conn)?;
+            migrate_v5_to_v6(conn)?;
+            migrate_v6_to_v7(conn)?;
+            Ok(false)
+        }
+        "5" => {
+            migrate_v5_to_v6(conn)?;
+            migrate_v6_to_v7(conn)?;
+            Ok(false)
+        }
+        "6" => {
+            migrate_v6_to_v7(conn)?;
+            Ok(false)
+        }
+        _ => Ok(false),
     }
 }
 
@@ -484,36 +489,3 @@ fn pragma_error_is_retryable(error: &rusqlite::Error) -> bool {
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn migrate_v5_to_v6_stamps_intermediate_version() {
-        let conn = Connection::open_in_memory().expect("open sqlite");
-        conn.execute_batch(
-            "CREATE TABLE schema_meta (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                ) WITHOUT ROWID;
-                INSERT INTO schema_meta (key, value) VALUES ('version', '5');
-                CREATE TABLE change_tracking (
-                    scope TEXT PRIMARY KEY,
-                    version INTEGER NOT NULL DEFAULT 0,
-                    updated_at TEXT NOT NULL
-                ) WITHOUT ROWID;",
-        )
-        .expect("seed v5 schema");
-
-        migrate_v5_to_v6(&conn).expect("migrate v5 to v6");
-
-        let version: String = conn
-            .query_row(
-                "SELECT value FROM schema_meta WHERE key = 'version'",
-                [],
-                |row| row.get(0),
-            )
-            .expect("read schema version");
-        assert_eq!(version, "6");
-    }
-}

@@ -8,7 +8,7 @@ use super::{
 };
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 9;
+pub const CURRENT_VERSION: u32 = 10;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///
@@ -140,9 +140,17 @@ pub struct SessionMetrics {
     #[serde(default)]
     pub idle_agent_count: u32,
     #[serde(default)]
+    pub awaiting_review_agent_count: u32,
+    #[serde(default)]
     pub open_task_count: u32,
     #[serde(default)]
     pub in_progress_task_count: u32,
+    #[serde(default)]
+    pub awaiting_review_task_count: u32,
+    #[serde(default)]
+    pub in_review_task_count: u32,
+    #[serde(default)]
+    pub arbitration_task_count: u32,
     #[serde(default)]
     pub blocked_task_count: u32,
     #[serde(default)]
@@ -173,17 +181,34 @@ impl SessionMetrics {
                 .filter(|agent| agent.status == AgentStatus::Idle)
                 .count(),
         );
+        let awaiting_review_agent_count = saturating_len(
+            state
+                .agents
+                .values()
+                .filter(|agent| agent.status == AgentStatus::AwaitingReview)
+                .count(),
+        );
 
         let mut open_task_count = 0_u32;
         let mut in_progress_task_count = 0_u32;
+        let mut awaiting_review_task_count = 0_u32;
+        let mut in_review_task_count = 0_u32;
+        let mut arbitration_task_count = 0_u32;
         let mut blocked_task_count = 0_u32;
         let mut completed_task_count = 0_u32;
         for task in state.tasks.values() {
             match task.status {
                 TaskStatus::Open => open_task_count += 1,
-                TaskStatus::InProgress | TaskStatus::InReview => in_progress_task_count += 1,
+                TaskStatus::InProgress => in_progress_task_count += 1,
+                TaskStatus::AwaitingReview => awaiting_review_task_count += 1,
+                TaskStatus::InReview => in_review_task_count += 1,
                 TaskStatus::Done => completed_task_count += 1,
                 TaskStatus::Blocked => blocked_task_count += 1,
+            }
+            if task.arbitration.is_some() || task.blocked_reason.as_deref()
+                == Some("awaiting arbitration")
+            {
+                arbitration_task_count += 1;
             }
         }
 
@@ -191,8 +216,12 @@ impl SessionMetrics {
             agent_count,
             active_agent_count,
             idle_agent_count,
+            awaiting_review_agent_count,
             open_task_count,
             in_progress_task_count,
+            awaiting_review_task_count,
+            in_review_task_count,
+            arbitration_task_count,
             blocked_task_count,
             completed_task_count,
         }

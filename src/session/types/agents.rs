@@ -64,6 +64,8 @@ pub enum AgentStatus {
     Active,
     /// Agent is alive but has not used tools recently.
     Idle,
+    /// Agent submitted a task for review and is holding for reviewer verdict.
+    AwaitingReview,
     Disconnected,
     Removed,
 }
@@ -72,6 +74,15 @@ impl AgentStatus {
     /// Whether the agent is considered alive (able to perform actions).
     #[must_use]
     pub const fn is_alive(self) -> bool {
+        matches!(self, Self::Active | Self::Idle | Self::AwaitingReview)
+    }
+
+    /// Whether the agent is eligible to accept a new task assignment.
+    ///
+    /// Agents awaiting reviewer feedback must not pick up new work until the
+    /// review round closes.
+    #[must_use]
+    pub const fn accepts_assignment(self) -> bool {
         matches!(self, Self::Active | Self::Idle)
     }
 }

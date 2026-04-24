@@ -34,6 +34,29 @@ pub struct WorkItem {
     pub completed_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checkpoint_summary: Option<TaskCheckpointSummary>,
+    /// Metadata for the awaiting-review queue entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub awaiting_review: Option<AwaitingReview>,
+    /// Active reviewer claim, including distinct-runtime reviewer entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_claim: Option<ReviewClaim>,
+    /// Closed quorum consensus, set once `required_consensus` reviewers agree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consensus: Option<ReviewConsensus>,
+    /// Review round counter; increments each time a reworked task goes back to review.
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub review_round: u8,
+    /// Leader arbitration outcome once recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arbitration: Option<ArbitrationOutcome>,
+    /// Persona hint to bias routing when assigning to a worker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggested_persona: Option<String>,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero_u8(value: &u8) -> bool {
+    *value == 0
 }
 
 /// Severity level for a work item.
@@ -48,10 +71,15 @@ pub enum TaskSeverity {
 
 /// Status of a work item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Open,
+    #[value(name = "in_progress", alias = "in-progress")]
     InProgress,
+    #[value(name = "awaiting_review")]
+    AwaitingReview,
+    #[value(name = "in_review", alias = "in-review")]
     InReview,
     Done,
     Blocked,
@@ -85,6 +113,7 @@ pub enum TaskSource {
     Observe,
     Signal,
     System,
+    Improver,
 }
 
 /// A note attached to a work item status transition.
@@ -129,4 +158,111 @@ impl From<&TaskCheckpoint> for TaskCheckpointSummary {
             progress: value.progress,
         }
     }
+}
+
+/// Metadata attached when a worker submits a task for review and the task
+/// returns to the queue awaiting a reviewer claim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AwaitingReview {
+    /// ISO-8601 timestamp when the task entered the awaiting-review state.
+    pub queued_at: String,
+    /// Agent id of the worker that submitted for review.
+    pub submitter_agent_id: String,
+    /// Optional summary text the worker attached on submission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// Number of distinct-runtime reviewers required to close consensus.
+    #[serde(default = "default_required_consensus")]
+    pub required_consensus: u8,
+}
+
+const fn default_required_consensus() -> u8 {
+    2
+}
+
+/// One entry in a task's reviewer claim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewerEntry {
+    pub reviewer_agent_id: String,
+    pub reviewer_runtime: String,
+    pub claimed_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitted_at: Option<String>,
+}
+
+/// Set of reviewers currently holding or having completed a claim on the task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewClaim {
+    #[serde(default)]
+    pub reviewers: Vec<ReviewerEntry>,
+}
+
+/// A single review record persisted in `tasks/<id>/reviews.jsonl`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Review {
+    pub review_id: String,
+    pub round: u8,
+    pub reviewer_agent_id: String,
+    pub reviewer_runtime: String,
+    pub verdict: ReviewVerdict,
+    pub summary: String,
+    #[serde(default)]
+    pub points: Vec<ReviewPoint>,
+    pub recorded_at: String,
+}
+
+/// Verdict a reviewer chooses on submission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[value(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewVerdict {
+    Approve,
+    #[value(name = "request_changes", alias = "request-changes")]
+    RequestChanges,
+    Reject,
+}
+
+/// Per-point review feedback state.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewPointState {
+    #[default]
+    Open,
+    Agreed,
+    Disputed,
+    Resolved,
+}
+
+/// A single numbered review point the worker may agree to or dispute.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewPoint {
+    pub point_id: String,
+    pub text: String,
+    #[serde(default)]
+    pub state: ReviewPointState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_note: Option<String>,
+}
+
+/// Aggregated quorum consensus once `required_consensus` distinct-runtime
+/// reviewers have submitted compatible verdicts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewConsensus {
+    pub verdict: ReviewVerdict,
+    pub summary: String,
+    #[serde(default)]
+    pub points: Vec<ReviewPoint>,
+    pub closed_at: String,
+    #[serde(default)]
+    pub reviewer_agent_ids: Vec<String>,
+}
+
+/// Leader arbitration result for a task that exhausted the three-round
+/// review cycle with outstanding disputed points.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArbitrationOutcome {
+    pub arbiter_agent_id: String,
+    pub verdict: ReviewVerdict,
+    pub summary: String,
+    pub recorded_at: String,
 }
