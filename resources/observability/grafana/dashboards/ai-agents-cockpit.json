@@ -7485,7 +7485,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
+                        "x": 18,
                         "y": 4,
                         "width": 6,
                         "height": 4,
@@ -7498,22 +7498,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 4,
-                        "width": 6,
-                        "height": 4,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "claude-sessions"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
                         "x": 0,
                         "y": 4,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7524,9 +7511,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 3,
+                        "x": 6,
                         "y": 4,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7537,7 +7524,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 18,
+                        "x": 12,
                         "y": 4,
                         "width": 6,
                         "height": 4,
@@ -7552,24 +7539,11 @@
                       "spec": {
                         "x": 0,
                         "y": 8,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "codex-tokens"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 3,
-                        "y": 8,
-                        "width": 3,
-                        "height": 4,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "codex-tokens-output"
                         }
                       }
                     },
@@ -7582,7 +7556,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "codex-sessions"
+                          "name": "codex-tokens-output"
                         }
                       }
                     },
@@ -7617,24 +7591,11 @@
                       "spec": {
                         "x": 0,
                         "y": 12,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "copilot-tokens"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 3,
-                        "y": 12,
-                        "width": 3,
-                        "height": 4,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "copilot-tokens-output"
                         }
                       }
                     },
@@ -7647,7 +7608,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "copilot-sessions"
+                          "name": "copilot-tokens-output"
                         }
                       }
                     },
@@ -7680,19 +7641,6 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
-                        "y": 16,
-                        "width": 6,
-                        "height": 4,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "gemini-api-requests"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
                         "x": 12,
                         "y": 16,
                         "width": 6,
@@ -7708,7 +7656,7 @@
                       "spec": {
                         "x": 0,
                         "y": 16,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7719,9 +7667,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 3,
+                        "x": 6,
                         "y": 16,
-                        "width": 3,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
