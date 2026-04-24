@@ -93,6 +93,7 @@ mod liveness;
 mod logging;
 mod misc;
 mod queries;
+mod auto_spawn;
 mod review_state;
 mod review_tasks;
 mod runtime_registration;
@@ -149,6 +150,8 @@ pub(crate) use session_helpers::*;
 pub(crate) use session_state::*;
 #[allow(unused_imports)]
 pub(crate) use signal_support::*;
+#[allow(unused_imports)]
+pub(crate) use auto_spawn::*;
 #[allow(unused_imports)]
 pub(crate) use review_state::*;
 #[allow(unused_imports)]
