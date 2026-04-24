@@ -8,84 +8,22 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
-readonly APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
-readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harness/daemon"
-readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
+STALE_SCAN_ROOT="$ROOT"
+export STALE_SCAN_ROOT
+# shellcheck source=scripts/lib/stale-scan.sh
+source "$ROOT/scripts/lib/stale-scan.sh"
+
 readonly MONITOR_APP_PATTERN='/Harness Monitor[.]app/Contents/MacOS/Harness Monitor'
 readonly LAUNCHD_LABEL="io.harnessmonitor.daemon"
 
-kill_matching_processes() {
-  local process_kind="$1"
-  local label="$2"
-  local pids
-
-  pids="$(matching_process_pids "$process_kind")"
-  if [[ -z "$pids" ]]; then
-    return
-  fi
-
-  echo "killing $label..."
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -TERM "$pid" 2>/dev/null || true
-  done <<<"$pids"
-  sleep 1
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -KILL "$pid" 2>/dev/null || true
-  done <<<"$pids"
-}
-
-matching_process_pids() {
-  local process_kind="$1"
-
-  ps -Ao pid=,command= | awk -v process_kind="$process_kind" '
-    {
-      pid = $1
-      $1 = ""
-      sub(/^ +/, "", $0)
-      if (process_kind == "debug" && $0 ~ /target\/(debug|dev\/.*\/debug)\/harness (daemon|bridge)/) {
-        print pid
-      }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run test(:| |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|test|test:scripts|test:agents-e2e|audit|audit:from-ref)( |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /(^| )bash \.\/scripts\/check(\.sh|-scripts\.sh)( |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|test|run --quiet -- setup agents generate --check)( |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|test-swift|test-agents-e2e|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) { print pid }
-      if (process_kind == "gate" && $0 ~ /python3 -m unittest discover -s .*apps\/harness-monitor-macos\/Scripts\/tests/) { print pid }
-    }
-  '
-}
-
-root_lock_holder_pids() {
-  local root="$1"
-  local lock_path
-
-  [[ -d "$root" ]] || return 0
-
-  for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
-    [[ -e "$lock_path" ]] || continue
-    lsof -t "$lock_path" 2>/dev/null || true
-  done | sort -u
-}
-
-process_cwd() {
-  local pid="$1"
-  lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
-}
-
-repo_gate_pids() {
+signal_pids() {
+  local signal="$1"
+  shift
   local pid
-  local cwd
-
-  while read -r pid; do
+  for pid in "$@"; do
     [[ -n "$pid" ]] || continue
-    cwd="$(process_cwd "$pid")"
-    if [[ "$cwd" == "$ROOT" || "$cwd" == "$ROOT/"* ]]; then
-      echo "$pid"
-    fi
-  done < <(matching_process_pids gate)
+    kill "-$signal" "$pid" 2>/dev/null || true
+  done
 }
 
 quit_monitor_app() {
@@ -116,81 +54,81 @@ stop_launchd_daemon() {
 }
 
 kill_orphan_harness_processes() {
-  kill_matching_processes debug "orphan local debug harness processes"
+  local pids=()
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_matching_pids build)
+  (( ${#pids[@]} > 0 )) || return 0
+
+  echo "killing orphan local cargo-built harness processes..."
+  signal_pids TERM "${pids[@]}"
+  sleep 1
+  signal_pids KILL "${pids[@]}"
 }
 
 kill_repo_gate_processes() {
-  local pids
-
-  pids="$(repo_gate_pids)"
-  if [[ -z "$pids" ]]; then
-    return
-  fi
+  local pids=()
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_repo_gate_pids "$$")
+  (( ${#pids[@]} > 0 )) || return 0
 
   echo "killing repo-local gate helper processes..."
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -TERM "$pid" 2>/dev/null || true
-  done <<<"$pids"
+  signal_pids TERM "${pids[@]}"
   sleep 1
 
-  pids="$(repo_gate_pids)"
-  if [[ -z "$pids" ]]; then
-    return
-  fi
+  stale_scan_refresh_ps
+  pids=()
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_repo_gate_pids "$$")
+  (( ${#pids[@]} > 0 )) || return 0
 
   echo "force-stopping stubborn repo-local gate helper processes..."
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -KILL "$pid" 2>/dev/null || true
-  done <<<"$pids"
+  signal_pids KILL "${pids[@]}"
 }
 
 kill_live_harness_processes() {
   local root="$1"
-  local pids
-
-  pids="$(root_lock_holder_pids "$root")"
-  if [[ -z "$pids" ]]; then
-    return
-  fi
+  local pids=()
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_root_lock_holder_pids "$root")
+  (( ${#pids[@]} > 0 )) || return 0
 
   echo "stopping live harness lock holders in $root..."
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -TERM "$pid" 2>/dev/null || true
-  done <<<"$pids"
+  signal_pids TERM "${pids[@]}"
   sleep 1
 
-  pids="$(root_lock_holder_pids "$root")"
-  if [[ -z "$pids" ]]; then
-    return
-  fi
+  pids=()
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_root_lock_holder_pids "$root")
+  (( ${#pids[@]} > 0 )) || return 0
 
   echo "force-stopping stubborn harness lock holders in $root..."
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -KILL "$pid" 2>/dev/null || true
-  done <<<"$pids"
+  signal_pids KILL "${pids[@]}"
 }
 
-remove_tmp_bridge_sockets() {
-  shopt -s nullglob
-  local sockets=(/tmp/h-bridge-*.sock)
-  shopt -u nullglob
-  if (( ${#sockets[@]} == 0 )); then
-    return
-  fi
-  echo "removing ${#sockets[@]} stale /tmp bridge socket(s)..."
-  rm -f "${sockets[@]}"
+remove_tmp_bridge_artifacts() {
+  local artifacts=()
+  local artifact
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] && artifacts+=("$artifact")
+  done < <(stale_scan_tmp_bridge_artifacts)
+  (( ${#artifacts[@]} > 0 )) || return 0
+  echo "removing ${#artifacts[@]} stale /tmp bridge artifact(s)..."
+  rm -f "${artifacts[@]}"
 }
 
 wipe_bridge_state_in_root() {
   local root="$1"
-  if [[ ! -d "$root" ]]; then
-    return
-  fi
+  [[ -d "$root" ]] || return 0
   local removed=0
+  local name
   for name in bridge.json bridge.lock bridge-config.json bridge.sock; do
     if [[ -e "$root/$name" ]]; then
       rm -f "$root/$name"
@@ -204,17 +142,17 @@ wipe_bridge_state_in_root() {
 
 wipe_stale_bridge_state() {
   echo "wiping stale bridge state files..."
-  wipe_bridge_state_in_root "$GROUP_CONTAINER_ROOT"
-  wipe_bridge_state_in_root "$APPLICATION_SUPPORT_ROOT"
+  wipe_bridge_state_in_root "$STALE_SCAN_GROUP_CONTAINER_ROOT"
+  wipe_bridge_state_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
 }
 
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
 kill_repo_gate_processes
-kill_live_harness_processes "$GROUP_CONTAINER_ROOT"
-kill_live_harness_processes "$APPLICATION_SUPPORT_ROOT"
-remove_tmp_bridge_sockets
+kill_live_harness_processes "$STALE_SCAN_GROUP_CONTAINER_ROOT"
+kill_live_harness_processes "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+remove_tmp_bridge_artifacts
 wipe_stale_bridge_state
 
 echo "clean:stale complete"
