@@ -24,7 +24,7 @@ async fn connect_reads_current_schema_version() {
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3, 4]);
 }
 
 #[tokio::test]
@@ -46,7 +46,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
         async_db.health_counts().await.expect("async health counts"),
         (0, 0, 0)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3, 4]);
 }
 
 #[tokio::test]
@@ -128,7 +128,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
         async_db.health_counts().await.expect("async health counts"),
         (1, 0, 1)
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3, 4]);
 }
 
 #[tokio::test]
@@ -169,7 +169,7 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3, 4]);
 }
 
 #[tokio::test]
@@ -256,7 +256,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
             .expect("async schema version"),
         SCHEMA_VERSION
     );
-    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3]);
+    assert_eq!(applied_migration_versions(&async_db).await, vec![1, 2, 3, 4]);
     drop(async_db);
 
     let sync_db = DaemonDb::open(&db_path).expect("reopen sync daemon db");

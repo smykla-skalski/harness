@@ -30,7 +30,62 @@ pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliErro
         return Ok(());
     }
     ensure_baseline_migration_recorded(pool).await?;
+    let version = read_async_schema_version(pool).await?;
+    ensure_schema_meta_migrations_recorded(pool, &version).await?;
     run_daemon_migrator(pool).await
+}
+
+async fn ensure_schema_meta_migrations_recorded(
+    pool: &SqlitePool,
+    version: &str,
+) -> Result<(), CliError> {
+    let reached: u64 = version.parse().unwrap_or(0);
+    for migration in DAEMON_DB_MIGRATOR.iter() {
+        if migration.version == 1 {
+            continue;
+        }
+        let migration_floor = migration_floor_version(migration.version);
+        if reached < migration_floor {
+            continue;
+        }
+        record_migration_if_missing(pool, migration).await?;
+    }
+    Ok(())
+}
+
+/// The `schema_meta.version` threshold for each sqlx migration id. Used to
+/// decide whether the sync path already applied an async migration so we can
+/// seed its ledger row instead of re-running the statements.
+const fn migration_floor_version(migration_version: i64) -> u64 {
+    match migration_version {
+        2 => 8,
+        3 => 9,
+        4 => 10,
+        _ => u64::MAX,
+    }
+}
+
+async fn record_migration_if_missing(
+    pool: &SqlitePool,
+    migration: &'static Migration,
+) -> Result<(), CliError> {
+    let checksum = migration.checksum.as_ref().to_vec();
+    let applied = query_as::<_, (String, Vec<u8>)>(SQLX_MIGRATION_METADATA_SQL)
+        .bind(migration.version)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| db_error(format!("load async migration metadata: {error}")))?;
+    if applied.is_some() {
+        return Ok(());
+    }
+    query(INSERT_SQLX_MIGRATION_SQL)
+        .bind(migration.version)
+        .bind(migration.description.to_string())
+        .bind(checksum)
+        .execute(pool)
+        .await
+        .map_err(|error| db_error(format!("seed async migration ledger: {error}")))?;
+    Ok(())
 }
 
 pub(super) async fn read_async_schema_version(pool: &SqlitePool) -> Result<String, CliError> {
