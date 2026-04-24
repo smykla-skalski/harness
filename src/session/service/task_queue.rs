@@ -15,6 +15,22 @@ pub(crate) fn apply_drop_task_on_agent(
 ) -> Result<Vec<TaskDropEffect>, CliError> {
     require_active_worker_target_agent(state, agent_id)?;
 
+    let current_status = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?
+        .status;
+    if matches!(
+        current_status,
+        TaskStatus::AwaitingReview | TaskStatus::InReview
+    ) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' is {} and cannot be reassigned via drop; use respond_review or arbitrate",
+            task_status_label(current_status)
+        ))
+        .into());
+    }
+
     let previous_assignee = state
         .tasks
         .get(task_id)

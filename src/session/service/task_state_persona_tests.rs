@@ -90,6 +90,7 @@ fn queued_task(task_id: &str, suggested: Option<&str>) -> WorkItem {
         awaiting_review: None,
         review_claim: None,
         consensus: None,
+        review_history: Vec::new(),
         review_round: 0,
         arbitration: None,
         suggested_persona: suggested.map(str::to_string),
