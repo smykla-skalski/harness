@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "29.10.5"
+version = "29.11.0"
 edition = "2024"
 rust-version = "1.94"
 include = [

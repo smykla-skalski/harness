@@ -2563,7 +2563,7 @@
           "description": "Observed Gemini token usage over the selected range across input, output, thought, cache, and tool tokens.",
           "id": 222,
           "links": [],
-          "title": "Gemini Total Tokens",
+          "title": "Gemini Tokens",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2990,7 +2990,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
+                        "expr": "round(sum(increase(github_copilot_agent_turn_count_count[$__range]))) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -3074,7 +3074,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
+                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -3086,10 +3086,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot turns over selected time range.",
+          "description": "Distinct Copilot session_id values with activity in the last 2 minutes.",
           "id": 302,
           "links": [],
-          "title": "Agent Turns",
+          "title": "Active Sessions",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3108,11 +3108,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 10
+                        "value": 5
                       },
                       {
                         "color": "red",
-                        "value": 50
+                        "value": 15
                       }
                     ]
                   },
@@ -3158,7 +3158,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
+                        "expr": "round(sum(increase(github_copilot_tool_call_count_total[$__range]))) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -3242,7 +3242,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "((sum(increase(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)), 1))"
+                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__range]))) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -3254,10 +3254,10 @@
               "transformations": []
             }
           },
-          "description": "Average turns per Copilot agent run over selected time range.",
+          "description": "Total Copilot LLM tokens over the selected time range.",
           "id": 304,
           "links": [],
-          "title": "Avg Turns / Run",
+          "title": "Total Tokens",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3267,7 +3267,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -3277,11 +3276,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 3
+                        "value": 500000
                       },
                       {
                         "color": "red",
-                        "value": 8
+                        "value": 2000000
                       }
                     ]
                   },
@@ -3327,7 +3326,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "((sum(increase(github_copilot_tool_call_duration_seconds_sum[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_duration_seconds_count[$__range])) or on() vector(0)), 1))"
+                        "expr": "100 * ((sum(increase(github_copilot_tool_call_count_total{success=\"true\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_count_total[$__range])) or on() vector(0)), 1))"
                       },
                       "version": "v0"
                     },
@@ -3339,10 +3338,10 @@
               "transformations": []
             }
           },
-          "description": "Average Copilot tool latency over selected time range.",
+          "description": "Percent of Copilot tool calls that completed successfully.",
           "id": 305,
           "links": [],
-          "title": "Avg Tool Duration",
+          "title": "Tool Success Rate",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3352,25 +3351,26 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "max": 100,
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "red",
                         "value": 0
                       },
                       {
                         "color": "orange",
-                        "value": 1
+                        "value": 90
                       },
                       {
-                        "color": "red",
-                        "value": 5
+                        "color": "green",
+                        "value": 98
                       }
                     ]
                   },
-                  "unit": "s"
+                  "unit": "percent"
                 },
                 "overrides": []
               },
@@ -3412,7 +3412,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gen_ai_client_operation_duration_seconds_count{service_name=~\"copilot|github-copilot-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "(1000 * (((histogram_quantile(0.95, sum by (le) (rate(github_copilot_tool_call_duration_seconds_bucket[5m])))) and on() (sum(rate(github_copilot_tool_call_duration_seconds_count[5m])) > 0)) or on() vector(0)))"
                       },
                       "version": "v0"
                     },
@@ -3424,10 +3424,10 @@
               "transformations": []
             }
           },
-          "description": "Observed Copilot LLM operations over selected time range.",
+          "description": "95th percentile Copilot tool-call latency over the last 5 minutes.",
           "id": 306,
           "links": [],
-          "title": "LLM Operations",
+          "title": "Tool p95",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3446,15 +3446,15 @@
                       },
                       {
                         "color": "orange",
-                        "value": 10
+                        "value": 250
                       },
                       {
                         "color": "red",
-                        "value": 100
+                        "value": 1000
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "ms"
                 },
                 "overrides": []
               },
@@ -3496,7 +3496,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service_name) (increase(github_copilot_agent_turn_count_count[$__rate_interval]))",
+                        "expr": "sum by (service_name) (increase(github_copilot_agent_turn_count_count[5m]))",
                         "legendFormat": "{{service_name}}"
                       },
                       "version": "v0"
@@ -3560,7 +3560,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service_name, gen_ai_tool_name, success) (increase(github_copilot_tool_call_count_total[$__rate_interval]))",
+                        "expr": "sum by (service_name, gen_ai_tool_name, success) (increase(github_copilot_tool_call_count_total[5m]))",
                         "legendFormat": "{{service_name}} :: {{gen_ai_tool_name}} :: success={{success}}"
                       },
                       "version": "v0"
@@ -7108,15 +7108,17 @@
           "description": "Agent activity pulse with custom SVG background and trend sparkline.",
           "id": 501,
           "links": [],
+          "options": {
+            "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.A}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
+            "renderTemplate": "allRows",
+            "styles": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
+            "javascript": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && context.panelData.series.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const series = context.panelData.series[0];\n  const values = series.fields.find(f => f.name === 'Value' || f.name === 'A')?.values.buffer || series.fields[1].values.buffer || series.fields[1].values;\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n  \n  ctx.clearRect(0, 0, width, height);\n  ctx.beginPath();\n  ctx.strokeStyle = '#00d3ff';\n  ctx.lineWidth = 2;\n  \n  const validValues = Array.from(values).filter(v => v !== null && !isNaN(v));\n  if (validValues.length > 1) {\n    const max = Math.max(...validValues);\n    const min = Math.min(...validValues);\n    const range = max - min || 1;\n    \n    validValues.forEach((v, i) => {\n      const x = (i / (validValues.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    // Add area fill\n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
+          },
           "title": "Agent Pulse",
           "vizConfig": {
             "group": "marcusolsson-dynamictext-panel",
             "kind": "VizConfig",
-            "spec": {
-              "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.fields.1.values.0}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
-              "defaultCss": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
-              "afterRender": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && data.length > 0 && data[0].fields.length > 1) {\n  const ctx = canvas.getContext('2d');\n  const field = data[0].fields[1];\n  const values = field.values.buffer || field.values;\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n  \n  ctx.clearRect(0, 0, width, height);\n  ctx.beginPath();\n  ctx.strokeStyle = '#00d3ff';\n  ctx.lineWidth = 2;\n  \n  const validValues = Array.from(values).filter(v => v !== null && !isNaN(v));\n  if (validValues.length > 1) {\n    const max = Math.max(...validValues);\n    const min = Math.min(...validValues);\n    const range = max - min || 1;\n    \n    validValues.forEach((v, i) => {\n      const x = (i / (validValues.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    // Add area fill\n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
-            },
+            "spec": {},
             "version": ""
           }
         }
@@ -7358,7 +7360,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 0,
+                        "x": 6,
                         "y": 16,
                         "width": 6,
                         "height": 4,
@@ -7371,7 +7373,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
+                        "x": 12,
                         "y": 16,
                         "width": 6,
                         "height": 4,
@@ -7384,7 +7386,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
+                        "x": 0,
                         "y": 16,
                         "width": 6,
                         "height": 4,
@@ -8082,7 +8084,7 @@
                             "rowHeightMode": "tall"
                           }
                         },
-                        "title": "Tracing"
+                        "title": "Tool Focus"
                       }
                     }
                   ]
