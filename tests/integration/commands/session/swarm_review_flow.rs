@@ -234,3 +234,98 @@ fn update_task_rejects_direct_in_review_transition() {
         );
     });
 }
+
+#[test]
+fn update_task_rejects_generic_status_on_awaiting_review_task() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-update-no-bypass", || {
+        let project = tmp.path().join("project");
+        let (leader_id, worker_id, task_id) =
+            prepare_in_progress_task("update-no-bypass", &project);
+        service::submit_for_review("update-no-bypass", &task_id, &worker_id, None, &project)
+            .unwrap();
+
+        // Now task is AwaitingReview. Generic update to Done/Blocked/Open/InProgress
+        // must be rejected so review metadata can't be silently rewritten.
+        for status in [
+            TaskStatus::Done,
+            TaskStatus::Blocked,
+            TaskStatus::Open,
+            TaskStatus::InProgress,
+        ] {
+            let err = service::update_task(
+                "update-no-bypass",
+                &task_id,
+                status,
+                None,
+                &leader_id,
+                &project,
+            )
+            .expect_err("generic update on AwaitingReview must fail");
+            assert!(
+                err.to_string().contains("respond_review")
+                    || err.to_string().contains("arbitrate"),
+                "error should steer caller to review primitives, got: {err}"
+            );
+        }
+    });
+}
+
+#[test]
+fn assign_task_rejects_awaiting_review_task() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-assign-no-bypass", || {
+        let project = tmp.path().join("project");
+        let (leader_id, worker_id, task_id) =
+            prepare_in_progress_task("assign-no-bypass", &project);
+        service::submit_for_review("assign-no-bypass", &task_id, &worker_id, None, &project)
+            .unwrap();
+
+        // Second fresh worker so the task-level guard runs even though the
+        // original submitter is stuck in AgentStatus::AwaitingReview.
+        let second_worker = temp_env::with_var("GEMINI_SESSION_ID", Some("fresh-worker"), || {
+            service::join_session(
+                "assign-no-bypass",
+                harness::session::types::SessionRole::Worker,
+                "gemini",
+                &[],
+                None,
+                &project,
+                None,
+            )
+            .unwrap()
+        });
+        let fresh_id = second_worker
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "gemini")
+            .unwrap()
+            .agent_id
+            .clone();
+        let err = service::assign_task(
+            "assign-no-bypass",
+            &task_id,
+            &fresh_id,
+            &leader_id,
+            &project,
+        )
+        .expect_err("assign on AwaitingReview must fail");
+        assert!(
+            err.to_string().contains("reassigned")
+                || err.to_string().contains("respond_review"),
+            "error should steer caller to review primitives, got: {err}"
+        );
+
+        // Task metadata must remain intact.
+        let state = service::session_status("assign-no-bypass", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::AwaitingReview);
+        assert!(task.awaiting_review.is_some());
+        assert!(task.assigned_to.is_none());
+        // Submitter stays AwaitingReview until review closes.
+        assert_eq!(
+            state.agents.get(&worker_id).unwrap().status,
+            AgentStatus::AwaitingReview
+        );
+    });
+}
