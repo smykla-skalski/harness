@@ -11,6 +11,7 @@ use super::super::helpers::*;
 
 mod persona;
 mod recovery;
+mod review_cli;
 mod review_wire_contract;
 mod swarm_auto_spawn;
 mod swarm_contract;
