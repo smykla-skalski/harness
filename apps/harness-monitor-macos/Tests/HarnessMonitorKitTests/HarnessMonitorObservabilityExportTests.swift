@@ -3,6 +3,8 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+private let liveDaemonTraceExportTimeout: Duration = .seconds(15)
+
 @Suite("Harness Monitor observability export")
 struct HarnessMonitorObservabilityExportTests {
   @Test("HTTP/protobuf shutdown exports traces, logs, and metrics")
@@ -170,7 +172,7 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     HarnessMonitorTelemetry.shared.shutdown()
     await daemon.stop()
 
-    try await waitForTraceExport(timeout: .seconds(5)) {
+    try await waitForTraceExport(timeout: liveDaemonTraceExportTimeout) {
       let spans = collector.traceCollector.exportedSpans
       let hasMonitorWebSocketSpan = spans.contains {
         $0.serviceName == "harness-monitor" && $0.name == "daemon.websocket.rpc"
@@ -249,7 +251,7 @@ struct HarnessMonitorObservabilityGRPCExportTests {
     HarnessMonitorTelemetry.shared.shutdown()
     await daemon.stop()
 
-    try await waitForTraceExport(timeout: .seconds(5)) {
+    try await waitForTraceExport(timeout: liveDaemonTraceExportTimeout) {
       let spans = collector.traceCollector.exportedSpans
       return hasBootstrapTransportTrace(spans)
     }

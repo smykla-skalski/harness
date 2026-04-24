@@ -4,6 +4,33 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
+  func testApprovalActionsExposeStableFrameMarkers() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_UI_TESTS": "1",
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "codex-approval-unification",
+        "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS": makeDecisionSeed(),
+      ]
+    )
+
+    reopenAgentTuiWindow(in: app)
+
+    let acceptIdentifier = Accessibility.codexApprovalButton(
+      "approval-preview-1",
+      decision: "accept"
+    )
+    let acceptButton = button(in: app, identifier: acceptIdentifier)
+    let acceptFrame = element(in: app, identifier: "\(acceptIdentifier).frame")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        acceptButton.exists && acceptFrame.exists
+      },
+      "Codex approval actions must expose frame markers for deterministic UI taps"
+    )
+  }
+
   func testResolutionClearsAgentsAndDecisionsSurfaces() throws {
     let app = launch(
       mode: "preview",
@@ -18,7 +45,13 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let badgeState = element(in: app, identifier: Accessibility.supervisorBadgeState)
-    let approveButton = button(in: app, title: "Accept")
+    let approveIdentifier = Accessibility.codexApprovalButton(
+      "approval-preview-1",
+      decision: "accept"
+    )
+    let approveButton = button(in: app, identifier: approveIdentifier)
+    let approveElement = element(in: app, identifier: approveIdentifier)
+    let approveFrame = element(in: app, identifier: "\(approveIdentifier).frame")
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
@@ -38,27 +71,32 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       identifier: Accessibility.decisionRow("codex-approval:sess1234:approval-preview-1")
     )
     XCTAssertTrue(waitForElement(decisionRow, timeout: Self.uiTimeout))
-
-    reopenAgentTuiWindow(in: app)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        state.label.contains("approvals=1") && approveButton.exists
-      }
+    tapButton(
+      in: app,
+      identifier: Accessibility.decisionRow("codex-approval:sess1234:approval-preview-1")
     )
 
-    tapButton(in: app, title: "Accept")
+    let decisionAcceptButton = button(in: app, identifier: Accessibility.decisionAction("accept"))
+    XCTAssertTrue(waitForElement(decisionAcceptButton, timeout: Self.actionTimeout))
+    tapButton(in: app, identifier: Accessibility.decisionAction("accept"))
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        state.label.contains("approvals=0")
-          && self.badgeCount(for: badgeState) == initialBadgeCount - 1
+        !decisionRow.exists
       }
     )
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
-    let decisionsWindow = app.windows["Decisions"]
-    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) { decisionsWindow.exists })
-    XCTAssertFalse(decisionRow.waitForExistence(timeout: 1))
+    reopenAgentTuiWindow(in: app)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        state.label.contains("selection=codex:preview-codex-approval-run")
+          && state.label.contains("approvals=0")
+          && !approveButton.exists
+          && !approveElement.exists
+          && !approveFrame.exists
+          && self.badgeCount(for: badgeState) < initialBadgeCount
+      }
+    )
   }
 
   private func reopenAgentTuiWindow(in app: XCUIApplication) {

@@ -14,7 +14,7 @@ enum RuntimeCustomModel {
 extension AgentTuiWindowView {
   /// The union of effort levels the system exposes, in low → high order. Used
   /// by the "Custom..." option where there is no catalog entry to consult.
-  static let allEffortLevels: [String] = ["off", "minimal", "low", "medium", "high"]
+  static let allEffortLevels: [String] = ["off", "low", "medium", "high", "xhigh"]
 
   /// Effort values to offer for a given model selection in a catalog. Returns
   /// an empty array when the model does not support effort; returns the union
