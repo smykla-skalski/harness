@@ -52,29 +52,29 @@ struct RuntimeModelEffortTests {
   }
 }
 
-@Suite("AgentTuiWindowView effort helpers")
+@Suite("AgentsWindowView effort helpers")
 @MainActor
-struct AgentTuiWindowViewEffortHelperTests {
+struct AgentsWindowViewEffortHelperTests {
   @Test("default effort prefers medium when offered")
   func defaultPrefersMedium() {
     let values = ["off", "low", "medium", "high"]
-    #expect(AgentTuiWindowView.defaultEffortLevel(from: values) == "medium")
+    #expect(AgentsWindowView.defaultEffortLevel(from: values) == "medium")
   }
 
   @Test("default effort falls back to the middle index when no medium")
   func defaultFallsBackToMiddle() {
     let values = ["off", "low", "high"]
-    #expect(AgentTuiWindowView.defaultEffortLevel(from: values) == "low")
+    #expect(AgentsWindowView.defaultEffortLevel(from: values) == "low")
   }
 
   @Test("default effort on empty values returns empty string")
   func defaultOnEmptyValues() {
-    #expect(AgentTuiWindowView.defaultEffortLevel(from: []).isEmpty)
+    #expect(AgentsWindowView.defaultEffortLevel(from: []).isEmpty)
   }
 
   @Test("effectiveModelId resolves custom tag to typed value")
   func customTagResolvesToTyped() {
-    let resolved = AgentTuiWindowView.effectiveModelId(
+    let resolved = AgentsWindowView.effectiveModelId(
       pickerValue: RuntimeCustomModel.tag,
       customValue: "  gpt-6-private  ",
       catalogDefault: "gpt-5.5"
@@ -85,7 +85,7 @@ struct AgentTuiWindowViewEffortHelperTests {
 
   @Test("effectiveModelId returns catalog default for empty picker")
   func emptyPickerFallsBackToDefault() {
-    let resolved = AgentTuiWindowView.effectiveModelId(
+    let resolved = AgentsWindowView.effectiveModelId(
       pickerValue: "",
       customValue: "",
       catalogDefault: "gpt-5.5"
@@ -104,7 +104,7 @@ struct AgentTuiWindowViewEffortHelperTests {
       default: "flash-lite",
       cheapestFastest: "flash-lite"
     )
-    let values = AgentTuiWindowView.effortValues(catalog: catalog, selectedModelId: "flash-lite")
+    let values = AgentsWindowView.effortValues(catalog: catalog, selectedModelId: "flash-lite")
     #expect(values.isEmpty)
   }
 
@@ -116,7 +116,7 @@ struct AgentTuiWindowViewEffortHelperTests {
       default: "",
       cheapestFastest: ""
     )
-    let values = AgentTuiWindowView.effortValues(
+    let values = AgentsWindowView.effortValues(
       catalog: catalog,
       selectedModelId: RuntimeCustomModel.tag
     )

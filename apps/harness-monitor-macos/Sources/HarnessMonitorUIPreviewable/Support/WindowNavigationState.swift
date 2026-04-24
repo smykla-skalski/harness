@@ -116,5 +116,3 @@ public final class AgentsWindowNavigationBridge {
     await state.navigateForward()
   }
 }
-
-public typealias AgentTuiWindowNavigationBridge = AgentsWindowNavigationBridge

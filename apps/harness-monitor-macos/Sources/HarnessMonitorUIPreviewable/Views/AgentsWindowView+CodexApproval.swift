@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   func resolveCodexApproval(_ item: CodexApprovalItem, run: CodexRunSnapshot, actionID: String) {
     viewModel.resolvingCodexApprovalID = item.approvalID
     Task {

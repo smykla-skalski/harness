@@ -5,7 +5,7 @@ import Testing
 
 @Suite("External Agents sidebar section")
 @MainActor
-struct AgentTuiSidebarExternalSectionTests {
+struct AgentsSidebarExternalSectionTests {
   @Test("External-tab identifier is scoped under agent-tui namespace")
   func externalTabIdentifier() {
     #expect(

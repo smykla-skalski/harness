@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Agents - Create") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
       bridgeState: .ready
@@ -11,7 +11,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Create With Recovery") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: [],
       bridgeState: .excluded
@@ -20,7 +20,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Running Session") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.runningSingle,
       selectedTuiID: AgentTuiPreviewSupport.runningSingle.first?.tuiId
@@ -29,7 +29,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Stopped Session") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.stoppedSingle,
       selectedTuiID: AgentTuiPreviewSupport.stoppedSingle.first?.tuiId
@@ -38,7 +38,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Multiple Sessions") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: Array(AgentTuiPreviewSupport.overflowMixed.prefix(3)),
@@ -48,7 +48,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Many Sessions") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.overflowMixed,
@@ -58,7 +58,7 @@ import SwiftUI
 }
 
 #Preview("Agents - Mixed Sessions") {
-  agentTuiWindowPreview(
+  agentsWindowPreview(
     width: 980,
     store: AgentTuiPreviewSupport.makeStore(
       tuis: AgentTuiPreviewSupport.overflowMixed,
@@ -68,12 +68,12 @@ import SwiftUI
 }
 
 @MainActor
-private func agentTuiWindowPreview(
+private func agentsWindowPreview(
   width: CGFloat = 980,
   height: CGFloat = 660,
   store: HarnessMonitorStore
 ) -> some View {
-  AgentTuiWindowView(store: store)
+  AgentsWindowView(store: store)
     .frame(width: width, height: height)
     .padding()
 }

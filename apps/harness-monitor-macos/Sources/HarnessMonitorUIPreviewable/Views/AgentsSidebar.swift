@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct AgentTuiSidebar: View {
+struct AgentsSidebar: View {
   @Binding var selection: AgentTuiSheetSelection
   let agentTuis: [AgentTuiSnapshot]
   let sessionTitlesByID: [String: String]
@@ -73,7 +73,7 @@ struct AgentTuiSidebar: View {
       if !activeTuis.isEmpty {
         Section("Interactive") {
           ForEach(activeTuis) { tui in
-            AgentTuiSidebarRow(
+            AgentsSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
@@ -87,7 +87,7 @@ struct AgentTuiSidebar: View {
       if !inactiveTuis.isEmpty {
         Section("Past Terminals") {
           ForEach(inactiveTuis) { tui in
-            AgentTuiSidebarRow(
+            AgentsSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
             )
