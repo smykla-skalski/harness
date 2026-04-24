@@ -7,12 +7,22 @@ extension HarnessMonitorAgentsE2ETests {
   static let liveActionTimeout: TimeInterval = 8
   static let liveStartupTimeout: TimeInterval = 20
   static let codexCompletionTimeout: TimeInterval = 120
+  static let liveCodexModelEnvKey = "HARNESS_MONITOR_E2E_CODEX_MODEL"
+  static let liveCodexEffortEnvKey = "HARNESS_MONITOR_E2E_CODEX_EFFORT"
+  static let codexModelDisplayNameByID: [String: String] = [
+    "gpt-5.5": "GPT-5.5",
+    "gpt-5.4": "GPT-5.4",
+    "gpt-5.4-mini": "GPT-5.4 mini",
+    "gpt-5.3-codex": "GPT-5.3 Codex",
+    "gpt-5.3-codex-spark": "GPT-5.3 Codex Spark",
+    "gpt-5.2": "GPT-5.2",
+  ]
 
   /// Display name of the cheapest/fastest model exposed by each runtime's
   /// catalog. E2E runs use these to keep token spend and turnaround low.
   /// Keep in sync with `src/agents/runtime/models.rs::cheapest_fastest`.
   static let e2eFastModelDisplayName: [String: String] = [
-    "codex": "GPT-5.1 Codex mini",
+    "codex": "GPT-5.4 mini",
     "claude": "Haiku 4.5",
     "gemini": "Gemini 2.5 Flash-Lite",
     "copilot": "GPT-5.4 mini",
@@ -36,6 +46,50 @@ extension HarnessMonitorAgentsE2ETests {
   }
 
   func selectFastModelForCodex(in app: XCUIApplication) {
+    if let customModel = ProcessInfo.processInfo.environment[Self.liveCodexModelEnvKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines),
+      !customModel.isEmpty
+    {
+      if let displayName = Self.codexModelDisplayNameByID[customModel] {
+        selectMenuOption(
+          in: app,
+          controlIdentifier: Accessibility.agentsCodexModelPicker,
+          optionTitle: displayName
+        )
+        if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
+          .trimmingCharacters(in: .whitespacesAndNewlines),
+          !effort.isEmpty
+        {
+          selectSegment(
+            in: app,
+            controlIdentifier: Accessibility.agentsCodexEffortPicker,
+            title: effort.capitalized
+          )
+        }
+        return
+      }
+      selectMenuOption(
+        in: app,
+        controlIdentifier: Accessibility.agentsCodexModelPicker,
+        optionTitle: "Custom..."
+      )
+      replaceText(
+        in: app,
+        identifier: Accessibility.agentsCodexCustomModelField,
+        text: customModel
+      )
+      if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+        !effort.isEmpty
+      {
+        selectSegment(
+          in: app,
+          controlIdentifier: Accessibility.agentsCodexEffortPicker,
+          title: effort.capitalized
+        )
+      }
+      return
+    }
     guard let displayName = Self.e2eFastModelDisplayName["codex"] else { return }
     revealAction(
       in: app,
@@ -205,7 +259,7 @@ extension HarnessMonitorAgentsE2ETests {
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
     if !text.isEmpty {
-      app.typeText(text)
+      field.typeText(text)
     }
   }
 

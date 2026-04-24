@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
-use crate::daemon::protocol::{CodexApprovalDecision, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::protocol::{
+    CodexApprovalDecision, CodexApprovalRequest, CodexRunSnapshot, CodexRunStatus,
+};
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
@@ -19,7 +21,7 @@ pub(super) struct CodexRunWorker {
     controller: CodexControllerHandle,
     snapshot: CodexRunSnapshot,
     control_rx: mpsc::UnboundedReceiver<CodexControlMessage>,
-    pending_approvals: HashMap<String, PendingApproval>,
+    pending_approvals: HashMap<String, Vec<PendingApproval>>,
     agent_message_delta: String,
 }
 
@@ -289,14 +291,14 @@ impl CodexRunWorker {
             return Ok(());
         };
 
-        self.pending_approvals.insert(
-            approval.approval_id.clone(),
-            PendingApproval {
+        self.pending_approvals
+            .entry(approval.approval_id.clone())
+            .or_default()
+            .push(PendingApproval {
                 request_id,
                 method: method.to_string(),
-            },
-        );
-        self.snapshot.pending_approvals.push(approval.clone());
+            });
+        upsert_pending_approval(&mut self.snapshot.pending_approvals, approval.clone());
         self.transition(
             CodexRunStatus::WaitingApproval,
             Some(approval.title.as_str()),
@@ -328,14 +330,16 @@ impl CodexRunWorker {
         approval_id: &str,
         decision: CodexApprovalDecision,
     ) -> Result<(), CliError> {
-        let Some(pending) = self.pending_approvals.remove(approval_id) else {
+        let Some(pending_requests) = self.pending_approvals.remove(approval_id) else {
             return Err(CliErrorKind::session_not_active(format!(
                 "codex approval '{approval_id}' is not pending"
             ))
             .into());
         };
-        let result = approval_result(&pending.method, decision);
-        rpc.send_response(pending.request_id, result).await?;
+        for pending in pending_requests {
+            let result = approval_result(&pending.method, decision);
+            rpc.send_response(pending.request_id, result).await?;
+        }
         self.snapshot
             .pending_approvals
             .retain(|approval| approval.approval_id != approval_id);
@@ -444,6 +448,20 @@ impl CodexRunWorker {
     fn touch_and_save(&mut self) -> Result<(), CliError> {
         self.snapshot.updated_at = utc_now();
         self.controller.save_and_broadcast(&self.snapshot)
+    }
+}
+
+pub(super) fn upsert_pending_approval(
+    approvals: &mut Vec<CodexApprovalRequest>,
+    approval: CodexApprovalRequest,
+) {
+    if let Some(existing) = approvals
+        .iter_mut()
+        .find(|candidate| candidate.approval_id == approval.approval_id)
+    {
+        *existing = approval;
+    } else {
+        approvals.push(approval);
     }
 }
 

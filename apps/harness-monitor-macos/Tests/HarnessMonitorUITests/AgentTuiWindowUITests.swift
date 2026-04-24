@@ -39,6 +39,41 @@ final class AgentTuiWindowUITests: HarnessMonitorUITestCase {
       }
     )
   }
+
+  func testCodexSubmitButtonStartsRunAfterPromptEntry() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_CODEX_START": "success"]
+    )
+    openAgentTuiWindow(in: app)
+
+    tapButton(in: app, title: "Codex")
+    let promptField = editableField(in: app, identifier: Accessibility.agentsCodexPromptField)
+    XCTAssertTrue(waitForElement(promptField, timeout: Self.actionTimeout))
+    tapElement(in: app, identifier: Accessibility.agentsCodexPromptField)
+    app.typeKey("a", modifierFlags: .command)
+    app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+    promptField.typeText("Start from the explicit click path")
+    let submitButton = button(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        submitButton.exists && submitButton.isEnabled
+      },
+      "Start Codex should enable once the prompt field contains non-whitespace text"
+    )
+    tapButton(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=codex:")
+      },
+      """
+      Clicking Start Codex should launch the run once the prompt has propagated.
+      state=\(state.label)
+      """
+    )
+  }
+
   func testCommandNavigationRoutesBackAndForwardWithinActiveAgentTuiWindowHistory() throws {
     let app = launchInCockpitPreview()
     openAgentTuiWindow(in: app)
