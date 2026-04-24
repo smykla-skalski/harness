@@ -12,17 +12,16 @@ fn thinking_levels() -> Vec<String> {
         .collect()
 }
 
-/// Named effort levels accepted by `OpenAI` `reasoning_effort` and the Mistral
-/// Magistral reasoning family. Order is low → high.
+/// Named effort levels accepted by the current `OpenAI` `reasoning_effort`
+/// family. Order is low → high.
 fn reasoning_levels() -> Vec<String> {
-    ["minimal", "low", "medium", "high"]
+    ["low", "medium", "high", "xhigh"]
         .iter()
         .map(ToString::to_string)
         .collect()
 }
 
-/// `OpenAI`-style reasoning effort values, no `minimal`. Used for the handful
-/// of runtimes that proxy reasoning but skip the `minimal` rung.
+/// Reasoning effort values for stacks that stop at `high`.
 fn reasoning_levels_without_minimal() -> Vec<String> {
     ["low", "medium", "high"]
         .iter()
@@ -100,25 +99,20 @@ pub(super) fn claude_catalog() -> RuntimeModelCatalog {
 }
 
 pub(super) fn codex_catalog() -> RuntimeModelCatalog {
-    // Identifiers sourced from developers.openai.com/api/docs/models/all.
-    // `reasoning_effort` is accepted only by the GPT-5 reasoning family
-    // (Codex and Pro variants). Mini/nano chat variants ignore the flag.
-    use RuntimeModelTier::{Balanced, Fast, Max};
+    // Identifiers sourced from the live Codex model picker.
+    use RuntimeModelTier::{Balanced, Fast};
     RuntimeModelCatalog {
         runtime: "codex".into(),
         models: vec![
-            plain("gpt-5.4-nano", "GPT-5.4 nano", Fast),
-            plain("gpt-5-nano", "GPT-5 nano", Fast),
-            plain("gpt-5.4-mini", "GPT-5.4 mini", Fast),
-            plain("gpt-5-mini", "GPT-5 mini", Fast),
-            reasoning("gpt-5.1-codex-mini", "GPT-5.1 Codex mini", Fast),
+            reasoning("gpt-5.4-mini", "GPT-5.4 mini", Fast),
+            reasoning("gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", Fast),
+            reasoning("gpt-5.5", "GPT-5.5", Balanced),
             reasoning("gpt-5.4", "GPT-5.4", Balanced),
-            reasoning("gpt-5", "GPT-5", Balanced),
-            reasoning("gpt-5-codex", "GPT-5 Codex", Balanced),
-            reasoning("gpt-5.4-pro", "GPT-5.4 Pro", Max),
+            reasoning("gpt-5.3-codex", "GPT-5.3 Codex", Balanced),
+            reasoning("gpt-5.2", "GPT-5.2", Balanced),
         ],
-        default: "gpt-5-codex".into(),
-        cheapest_fastest: "gpt-5.1-codex-mini".into(),
+        default: "gpt-5.5".into(),
+        cheapest_fastest: "gpt-5.4-mini".into(),
     }
 }
 
@@ -200,16 +194,17 @@ pub(super) fn opencode_catalog() -> RuntimeModelCatalog {
         runtime: "opencode".into(),
         models: vec![
             thinking("anthropic/claude-haiku-4-5", "Claude Haiku 4.5", Fast),
-            plain("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
-            reasoning("openai/gpt-5.1-codex-mini", "GPT-5.1 Codex mini", Fast),
+            reasoning("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
+            reasoning("openai/gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", Fast),
             thinking("google/gemini-2.5-flash", "Gemini 2.5 Flash", Fast),
             plain("mistral/mistral-small-4-0-26-03", "Mistral Small 4", Fast),
             thinking("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6", Balanced),
+            reasoning("openai/gpt-5.5", "GPT-5.5", Balanced),
             reasoning("openai/gpt-5.4", "GPT-5.4", Balanced),
-            reasoning("openai/gpt-5-codex", "GPT-5 Codex", Balanced),
+            reasoning("openai/gpt-5.3-codex", "GPT-5.3 Codex", Balanced),
+            reasoning("openai/gpt-5.2", "GPT-5.2", Balanced),
             thinking("google/gemini-2.5-pro", "Gemini 2.5 Pro", Balanced),
             thinking("anthropic/claude-opus-4-7", "Claude Opus 4.7", Max),
-            reasoning("openai/gpt-5.4-pro", "GPT-5.4 Pro", Max),
             thinking(
                 "google/gemini-3.1-pro-preview",
                 "Gemini 3.1 Pro (preview)",
