@@ -413,36 +413,43 @@ fn replace_tasks(
                 task_id, session_id, title, context, severity, status,
                 assigned_to, created_at, updated_at, created_by,
                 suggested_fix, source, blocked_reason, completed_at,
-                notes_json, checkpoint_summary_json
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                notes_json, checkpoint_summary_json,
+                awaiting_review_queued_at, awaiting_review_submitter_agent_id,
+                awaiting_review_required_consensus, review_round,
+                review_claim_json, consensus_json, arbitration_json, suggested_persona
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
+                ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
         )
         .map_err(|error| db_error(format!("prepare task insert: {error}")))?;
 
     for (task_id, task) in tasks {
-        let notes_json = serde_json::to_string(&task.notes).unwrap_or_default();
-        let checkpoint_summary_json = task
-            .checkpoint_summary
-            .as_ref()
-            .and_then(|summary| serde_json::to_string(summary).ok());
-
+        let row = super::task_row::TaskRowBindings::from_task(task);
         statement
             .execute(rusqlite::params![
                 task_id,
                 session_id,
                 task.title,
                 task.context,
-                format!("{:?}", task.severity).to_lowercase(),
-                format!("{:?}", task.status).to_lowercase(),
+                row.severity,
+                row.status,
                 task.assigned_to,
                 task.created_at,
                 task.updated_at,
                 task.created_by,
                 task.suggested_fix,
-                format!("{:?}", task.source).to_lowercase(),
+                row.source,
                 task.blocked_reason,
                 task.completed_at,
-                notes_json,
-                checkpoint_summary_json,
+                row.notes_json,
+                row.checkpoint_summary_json,
+                row.awaiting_queued_at,
+                row.awaiting_submitter,
+                row.awaiting_required_consensus,
+                row.review_round,
+                row.review_claim_json,
+                row.consensus_json,
+                row.arbitration_json,
+                task.suggested_persona,
             ])
             .map_err(|error| db_error(format!("insert task {task_id}: {error}")))?;
     }
