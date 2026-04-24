@@ -45,7 +45,6 @@ public struct HarnessMonitorActionButton: View {
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .accessibilityIdentifier(accessibilityIdentifier)
     }
-    .accessibilityTestProbe(accessibilityIdentifier, label: title)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
 }
@@ -115,10 +114,6 @@ public struct HarnessMonitorAsyncActionButton: View {
     .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityIdentifier(accessibilityIdentifier)
-    .accessibilityTestProbe(
-      accessibilityIdentifier,
-      label: isLoading ? "Cancel" : title
-    )
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
     .onDisappear {
       runningTask?.cancel()
