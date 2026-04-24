@@ -37,6 +37,7 @@ mod review_improver;
 mod review_mutations;
 mod review_persistence;
 mod review_quorum;
+mod review_v10_columns;
 mod session_liveness;
 mod session_reads;
 mod session_title;

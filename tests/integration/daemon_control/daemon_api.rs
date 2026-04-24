@@ -297,6 +297,43 @@ pub(super) fn start_session_via_http(
     }
 }
 
+pub(super) fn join_session_leader_via_http(
+    home: &Path,
+    xdg: &Path,
+    project_arg: &str,
+    session_id: &str,
+    runtime: &str,
+) -> SessionState {
+    let runtime_rt = Runtime::new().expect("runtime");
+    let (endpoint, token) = current_daemon_endpoint_and_token(home, xdg);
+    let url = format!(
+        "{}/v1/sessions/{session_id}/join",
+        endpoint.trim_end_matches('/')
+    );
+    let body = json!({
+        "runtime": runtime,
+        "role": "leader",
+        "project_dir": project_arg,
+    });
+    let response = runtime_rt.block_on(async {
+        reqwest::Client::new()
+            .post(&url)
+            .bearer_auth(&token)
+            .json(&body)
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+            .expect("join post")
+    });
+    let status = response.status().as_u16();
+    let value =
+        runtime_rt.block_on(async { response.json::<Value>().await.expect("join json body") });
+    assert_eq!(status, 200, "unexpected join body: {value}");
+    serde_json::from_value::<SessionMutationResponse>(value)
+        .expect("parse join response")
+        .state
+}
+
 pub(super) fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, String) {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
