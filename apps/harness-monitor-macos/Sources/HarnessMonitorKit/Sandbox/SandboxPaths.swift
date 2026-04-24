@@ -2,7 +2,16 @@ import Foundation
 
 public enum SandboxPaths {
   public static func appGroupContainerURL() -> URL? {
-    FileManager.default.containerURL(
+    #if DEBUG
+      let environment = ProcessInfo.processInfo.environment
+      if environment["XCTestConfigurationFilePath"] != nil
+        || environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+        || ProcessInfo.processInfo.processName == "xctest"
+      {
+        return nil
+      }
+    #endif
+    return FileManager.default.containerURL(
       forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
     )
   }

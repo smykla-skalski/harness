@@ -47,17 +47,7 @@ struct HarnessMonitorPathsTests {
       homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
     let expectedRoot: String
-    if let containerURL = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
-    ) {
-      expectedRoot =
-        containerURL
-        .appendingPathComponent("harness", isDirectory: true)
-        .appendingPathComponent("daemon", isDirectory: true)
-        .path
-    } else {
-      expectedRoot = "/Users/example/Library/Application Support/harness/daemon"
-    }
+    expectedRoot = "/Users/example/Library/Application Support/harness/daemon"
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
@@ -217,8 +207,8 @@ struct HarnessMonitorPathsTests {
     #expect(FileManager.default.fileExists(atPath: marker.path))
   }
 
-  @Test("Shared observability config prefers the native app group container when available")
-  func sharedObservabilityConfigDefaultsToAppGroupWhenAvailable() {
+  @Test("Tests skip native app group lookup for shared observability config")
+  func sharedObservabilityConfigSkipsNativeAppGroupLookupUnderXCTest() {
     let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let environment = HarnessMonitorEnvironment(
       values: [:],
@@ -226,8 +216,7 @@ struct HarnessMonitorPathsTests {
     )
 
     let expectedRoot =
-      nativeDefaultAppGroupContainerURL()
-      ?? homeDirectory
+      homeDirectory
       .appendingPathComponent("Library", isDirectory: true)
       .appendingPathComponent("Application Support", isDirectory: true)
 
@@ -241,48 +230,34 @@ struct HarnessMonitorPathsTests {
     )
   }
 
-  @Test("Default app group env prefers the native container URL when one is available")
-  func defaultAppGroupEnvironmentPrefersNativeContainerURL() {
-    guard
-      let containerURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
-      )
-    else {
-      return
-    }
-
+  @Test("Default app group env uses home-relative fallback under XCTest")
+  func defaultAppGroupEnvironmentUsesHomeRelativeFallbackUnderXCTest() {
+    let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let environment = HarnessMonitorEnvironment(
       values: [HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier],
-      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+      homeDirectory: homeDirectory
     )
 
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == containerURL
+        == expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("daemon", isDirectory: true)
         .path
     )
   }
 
-  @Test("Shared observability config prefers the native app group container when available")
-  func sharedObservabilityConfigPrefersNativeAppGroupContainer() {
-    guard
-      let containerURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: HarnessMonitorAppGroup.identifier
-      )
-    else {
-      return
-    }
-
+  @Test("Shared observability config uses home-relative app group fallback under XCTest")
+  func sharedObservabilityConfigUsesHomeRelativeAppGroupFallbackUnderXCTest() {
+    let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let environment = HarnessMonitorEnvironment(
       values: [HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier],
-      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+      homeDirectory: homeDirectory
     )
 
     #expect(
       HarnessMonitorPaths.sharedObservabilityConfigURL(using: environment).path
-        == containerURL
+        == expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("observability", isDirectory: true)
         .appendingPathComponent("config.json")
@@ -326,10 +301,6 @@ struct HarnessMonitorPathsTests {
   }
 }
 
-private func nativeDefaultAppGroupContainerURL() -> URL? {
-  nativeAppGroupContainerURL(identifier: HarnessMonitorAppGroup.identifier)
-}
-
 private func expectedDefaultAppGroupRoot(homeDirectory: URL) -> URL {
   expectedAppGroupRoot(
     identifier: HarnessMonitorAppGroup.identifier,
@@ -337,13 +308,8 @@ private func expectedDefaultAppGroupRoot(homeDirectory: URL) -> URL {
   )
 }
 
-private func nativeAppGroupContainerURL(identifier: String) -> URL? {
-  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier)
-}
-
 private func expectedAppGroupRoot(identifier: String, homeDirectory: URL) -> URL {
-  nativeAppGroupContainerURL(identifier: identifier)
-    ?? homeDirectory
+  homeDirectory
     .appendingPathComponent("Library", isDirectory: true)
     .appendingPathComponent("Group Containers", isDirectory: true)
     .appendingPathComponent(identifier, isDirectory: true)
