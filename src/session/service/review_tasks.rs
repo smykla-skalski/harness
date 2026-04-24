@@ -152,7 +152,7 @@ pub fn submit_review(
     summary: &str,
     points: Vec<ReviewPoint>,
     project_dir: &Path,
-) -> Result<(), CliError> {
+) -> Result<Review, CliError> {
     let now = utc_now();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
@@ -197,7 +197,7 @@ pub fn submit_review(
             None,
         )?;
     }
-    Ok(())
+    Ok(review)
 }
 
 /// Worker response to a request-changes consensus.

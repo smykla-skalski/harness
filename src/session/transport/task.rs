@@ -290,7 +290,7 @@ impl Execute for TaskSubmitReviewArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        service::submit_review(
+        let _review = service::submit_review(
             &self.session_id,
             &self.task_id,
             &self.actor,
