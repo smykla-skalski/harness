@@ -30,7 +30,7 @@ pub(super) async fn post_improver_apply(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let result = improver_apply_response(&session_id, &request);
+    let result = improver_apply_response(&state, &session_id, &request).await;
     timed_json(
         "POST",
         http_paths::SESSION_IMPROVER_APPLY,
@@ -40,9 +40,14 @@ pub(super) async fn post_improver_apply(
     )
 }
 
-fn improver_apply_response(
+async fn improver_apply_response(
+    state: &DaemonHttpState,
     session_id: &str,
     request: &ImproverApplyRequest,
 ) -> Result<ImproverApplyOutcome, CliError> {
-    service::improver_apply(session_id, request)
+    if let Some(async_db) = state.async_db.get() {
+        return service::improver_apply_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::improver_apply(session_id, request, db_guard.as_deref())
 }
