@@ -15,7 +15,7 @@ fn leader_request_with_fallback_stays_non_leader_until_transfer() {
     with_session_test_env(tmp.path(), "swarm-fallback", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
-        let state = service::start_session_with_policy(
+        service::start_session_with_policy(
             "",
             "fallback transfer",
             &project,
@@ -23,7 +23,26 @@ fn leader_request_with_fallback_stays_non_leader_until_transfer() {
             Some("swarm-default"),
         )
         .expect("start session");
-        let leader_id = state.leader_id.clone().expect("leader id");
+        // Sessions start leaderless (status=AwaitingLeader). Join a leader
+        // via the initial join path before exercising the join-conflict +
+        // transfer behavior below.
+        let joined_leader =
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("swarm-fallback-leader"), || {
+                service::join_session(
+                    "swarm-fallback-1",
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    Some("leader"),
+                    &project,
+                    None,
+                )
+                .expect("join leader")
+            });
+        let leader_id = joined_leader
+            .leader_id
+            .clone()
+            .expect("leader id after join");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("swarm-fallback-worker"), || {
             let cli = Cli::try_parse_from([
@@ -84,7 +103,7 @@ fn observer_creates_open_tasks_and_leader_assigns_worker() {
     with_session_test_env(tmp.path(), "swarm-tasks", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
-        let state = service::start_session_with_policy(
+        service::start_session_with_policy(
             "",
             "observer triage",
             &project,
@@ -92,7 +111,23 @@ fn observer_creates_open_tasks_and_leader_assigns_worker() {
             Some("swarm-default"),
         )
         .expect("start session");
-        let leader_id = state.leader_id.clone().expect("leader id");
+        let joined_leader =
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("swarm-tasks-leader"), || {
+                service::join_session(
+                    "swarm-tasks-1",
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    Some("leader"),
+                    &project,
+                    None,
+                )
+                .expect("join leader")
+            });
+        let leader_id = joined_leader
+            .leader_id
+            .clone()
+            .expect("leader id after join");
 
         let observer = temp_env::with_var("CODEX_SESSION_ID", Some("swarm-observer"), || {
             service::join_session(
