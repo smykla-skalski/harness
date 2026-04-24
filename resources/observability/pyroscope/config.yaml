@@ -1,0 +1,23 @@
+target: all
+
+server:
+  http_listen_port: 4040
+
+pyroscopedb:
+  data_path: /data
+
+architecture_storage: v2
+
+storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/v2/shared
+
+compactor:
+  data_dir: /data-compactor
+
+metastore:
+  data_dir: /data-metastore/data
+  raft:
+    dir: /data-metastore/raft
+    snapshots_dir: /data-metastore/raft

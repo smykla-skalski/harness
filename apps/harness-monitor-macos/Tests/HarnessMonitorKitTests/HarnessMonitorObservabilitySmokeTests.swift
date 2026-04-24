@@ -70,7 +70,6 @@ struct HarnessMonitorObservabilitySmokeTests {
     let daemonDataHome = temporaryHome.appendingPathComponent("daemon-data", isDirectory: true)
     try FileManager.default.createDirectory(at: xdgDataHome, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: daemonDataHome, withIntermediateDirectories: true)
-    try writeSharedConfig(homeDirectory: xdgDataHome, grpcEndpoint: "http://127.0.0.1:4317")
 
     let environment = HarnessMonitorEnvironment(
       values: [
@@ -79,6 +78,13 @@ struct HarnessMonitorObservabilitySmokeTests {
       ],
       homeDirectory: temporaryHome
     )
+    try writeSharedConfig(using: environment, grpcEndpoint: "http://127.0.0.1:4317")
+    let resolvedLocalConfig = try HarnessMonitorObservabilityConfig.resolve(using: environment)
+    let localConfig = try #require(resolvedLocalConfig)
+    #expect(localConfig.source == .sharedFile)
+    #expect(localConfig.transport == .grpc)
+    #expect(localConfig.grpcEndpoint?.absoluteString == "http://127.0.0.1:4317")
+    let traceSearchStart = Int(Date().timeIntervalSince1970) - 1
     let daemon = try await LiveDaemonFixture.start(
       xdgDataHome: xdgDataHome,
       daemonDataHome: daemonDataHome,
@@ -90,15 +96,21 @@ struct HarnessMonitorObservabilitySmokeTests {
       }
     }
 
+    HarnessMonitorTelemetry.shared.resetForTests()
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
     let transport = WebSocketTransport(connection: daemon.connection)
     try await transport.connect()
     _ = try await transport.sessions()
     await transport.shutdown()
     HarnessMonitorTelemetry.shared.shutdown()
-    // Keep the test host alive long enough for the live collector/Tempo path
-    // to observe the flushed websocket client span before xctest tears down.
-    try await Task.sleep(for: .seconds(2))
+    // Keep the test host alive until the live collector/Tempo path can see
+    // the current-run websocket client span.
+    try await waitForLocalTempoSpan(
+      serviceName: "harness-monitor",
+      spanName: "daemon.websocket.rpc",
+      start: traceSearchStart,
+      timeout: .seconds(60)
+    )
   }
 }
 

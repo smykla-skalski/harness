@@ -28,7 +28,9 @@ load_stack_env_defaults() {
   local saved_grafana_user=""
   local saved_grafana_password=""
 
-  [ -f "$env_file" ] || return
+  if [ ! -f "$env_file" ]; then
+    return 0
+  fi
 
   if [ "${GF_SECURITY_ADMIN_USER+x}" = x ]; then
     had_grafana_user=true
@@ -808,6 +810,10 @@ run_daemon_server_smoke() {
   curl -fsS \
     -H "Authorization: Bearer $token" \
     "$endpoint/v1/health" >/dev/null
+  # Exercise the instrumented daemon HTTP client path before shutdown so
+  # Prometheus observes daemon-client metrics during smoke validation.
+  HARNESS_DAEMON_DATA_HOME="$daemon_home" \
+  run_local_harness session list --json >/dev/null
 
   HARNESS_DAEMON_DATA_HOME="$daemon_home" \
   run_local_harness daemon stop --json >/dev/null

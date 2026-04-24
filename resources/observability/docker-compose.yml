@@ -111,10 +111,13 @@ services:
   pyroscope:
     image: grafana/pyroscope:2.0.1@sha256:704889ae04768d982a0a71935bb054948993ddc3fe80234611d20877ba8be4c9
     command:
-      - server
+      - -config.file=/etc/pyroscope/config.yaml
     restart: unless-stopped
     volumes:
-      - pyroscope-data:/var/lib/pyroscope
+      - ./pyroscope/config.yaml:/etc/pyroscope/config.yaml:ro
+      - pyroscope-v2-data:/data
+      - pyroscope-v2-compactor-data:/data-compactor
+      - pyroscope-v2-metastore-data:/data-metastore
     ports:
       - "127.0.0.1:4040:4040"
 
@@ -174,7 +177,11 @@ volumes:
     name: harness-observability_loki-data
   prometheus-data:
     name: harness-observability_prometheus-data
-  pyroscope-data:
-    name: harness-observability_pyroscope-data
+  pyroscope-v2-data:
+    name: harness-observability_pyroscope-v2-data
+  pyroscope-v2-compactor-data:
+    name: harness-observability_pyroscope-v2-compactor-data
+  pyroscope-v2-metastore-data:
+    name: harness-observability_pyroscope-v2-metastore-data
   grafana-data:
     name: harness-observability_grafana-data

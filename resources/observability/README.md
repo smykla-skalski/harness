@@ -12,6 +12,26 @@ Alloy still exports the repo's `harness.spanmetrics_*` metrics for the existing 
 
 The local Grafana Tempo data source is already provisioned with `serviceMap.datasourceUid: prometheus`, so Tempo Explore can render the built-in Service Graph as soon as Prometheus receives the Tempo-generated metrics.
 
+## Pyroscope v2 local mode
+
+The local stack now runs Pyroscope `2.0.1` from the repo-owned `resources/observability/pyroscope/config.yaml` in explicit single-node v2 mode.
+Compose mounts dedicated `harness-observability_pyroscope-v2-*` volumes for the main store, compactor state, and metastore state so resets do not reuse mixed-format local data.
+
+When you first pick up the v2 change or want a clean profiling slate, prefer the helper flow:
+
+```bash
+scripts/observability.sh reset
+scripts/observability.sh start
+scripts/observability.sh smoke
+scripts/observability.sh stop
+```
+
+`scripts/observability.sh` is the supported entrypoint for local validation.
+It can start from a clean checkout without `resources/observability/.env`, prepares the SQLite source and snapshot mounts automatically, writes the shared app config, and waits for Prometheus, Tempo, Loki, Pyroscope, Grafana, Alloy, and sqlite-exporter readiness.
+
+If you run `docker compose` directly instead, set all four SQLite mount variables in `resources/observability/.env` first:
+`HARNESS_SQLITE_SOURCE_DAEMON_DIR`, `HARNESS_SQLITE_SOURCE_MONITOR_DIR`, `HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR`, and `HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR`.
+
 ## macOS host metrics
 
 Three native services collect local workstation metrics from your Mac and feed them into the local Prometheus:
