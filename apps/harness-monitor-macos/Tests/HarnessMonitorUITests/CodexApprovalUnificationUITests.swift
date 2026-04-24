@@ -10,7 +10,6 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       additionalEnvironment: [
         "HARNESS_MONITOR_UI_TESTS": "1",
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "codex-approval-unification",
-        "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS": makeDecisionSeed(),
       ]
     )
 
@@ -28,6 +27,42 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
         acceptButton.exists && acceptFrame.exists
       },
       "Codex approval actions must expose frame markers for deterministic UI taps"
+    )
+  }
+
+  func testSingleTapOnAgentsApprovalActionResolvesApproval() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_UI_TESTS": "1",
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "codex-approval-unification",
+      ]
+    )
+
+    reopenAgentTuiWindow(in: app)
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    let approveIdentifier = Accessibility.codexApprovalButton(
+      "approval-preview-1",
+      decision: "accept"
+    )
+    let approveButton = button(in: app, identifier: approveIdentifier)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        state.label.contains("selection=codex:preview-codex-approval-run")
+          && state.label.contains("approvals=1")
+          && approveButton.exists
+      }
+    )
+
+    tapButton(in: app, identifier: approveIdentifier)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        state.label.contains("approvals=0")
+          && !approveButton.exists
+      },
+      "A single tap on the Agents approval action must resolve the approval"
     )
   }
 
