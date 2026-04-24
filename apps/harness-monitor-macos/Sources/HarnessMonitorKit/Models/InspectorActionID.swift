@@ -6,6 +6,12 @@ public enum InspectorActionID: Hashable, Sendable {
   case dropTask(sessionID: String, taskID: String)
   case updateTaskStatus(sessionID: String, taskID: String)
   case checkpointTask(sessionID: String, taskID: String)
+  case submitTaskForReview(sessionID: String, taskID: String)
+  case claimTaskReview(sessionID: String, taskID: String)
+  case submitTaskReview(sessionID: String, taskID: String)
+  case respondTaskReview(sessionID: String, taskID: String)
+  case arbitrateTask(sessionID: String, taskID: String)
+  case applyImproverPatch(sessionID: String, issueID: String)
   case updateTaskQueuePolicy(sessionID: String, taskID: String)
   case changeRole(sessionID: String, agentID: String)
   case removeAgent(sessionID: String, agentID: String)
@@ -27,6 +33,18 @@ public enum InspectorActionID: Hashable, Sendable {
       return "\(sessionID)/updateTaskStatus/\(taskID)"
     case .checkpointTask(let sessionID, let taskID):
       return "\(sessionID)/checkpointTask/\(taskID)"
+    case .submitTaskForReview(let sessionID, let taskID):
+      return "\(sessionID)/submitTaskForReview/\(taskID)"
+    case .claimTaskReview(let sessionID, let taskID):
+      return "\(sessionID)/claimTaskReview/\(taskID)"
+    case .submitTaskReview(let sessionID, let taskID):
+      return "\(sessionID)/submitTaskReview/\(taskID)"
+    case .respondTaskReview(let sessionID, let taskID):
+      return "\(sessionID)/respondTaskReview/\(taskID)"
+    case .arbitrateTask(let sessionID, let taskID):
+      return "\(sessionID)/arbitrateTask/\(taskID)"
+    case .applyImproverPatch(let sessionID, let issueID):
+      return "\(sessionID)/applyImproverPatch/\(issueID)"
     case .updateTaskQueuePolicy(let sessionID, let taskID):
       return "\(sessionID)/updateTaskQueuePolicy/\(taskID)"
     case .changeRole(let sessionID, let agentID):

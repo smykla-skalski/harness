@@ -118,6 +118,108 @@ public struct TaskCheckpointRequest: Codable, Equatable, Sendable {
   public let progress: Int
 }
 
+public struct TaskSubmitForReviewRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let summary: String?
+  public let suggestedPersona: String?
+
+  public init(
+    actor: String,
+    summary: String? = nil,
+    suggestedPersona: String? = nil
+  ) {
+    self.actor = actor
+    self.summary = summary
+    self.suggestedPersona = suggestedPersona
+  }
+}
+
+public struct TaskClaimReviewRequest: Codable, Equatable, Sendable {
+  public let actor: String
+
+  public init(actor: String) {
+    self.actor = actor
+  }
+}
+
+public struct TaskSubmitReviewRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let verdict: ReviewVerdict
+  public let summary: String
+  public let points: [ReviewPoint]
+
+  public init(
+    actor: String,
+    verdict: ReviewVerdict,
+    summary: String,
+    points: [ReviewPoint] = []
+  ) {
+    self.actor = actor
+    self.verdict = verdict
+    self.summary = summary
+    self.points = points
+  }
+}
+
+public struct TaskRespondReviewRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let agreed: [String]
+  public let disputed: [String]
+  public let note: String?
+
+  public init(
+    actor: String,
+    agreed: [String] = [],
+    disputed: [String] = [],
+    note: String? = nil
+  ) {
+    self.actor = actor
+    self.agreed = agreed
+    self.disputed = disputed
+    self.note = note
+  }
+}
+
+public struct TaskArbitrateRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let verdict: ReviewVerdict
+  public let summary: String
+
+  public init(actor: String, verdict: ReviewVerdict, summary: String) {
+    self.actor = actor
+    self.verdict = verdict
+    self.summary = summary
+  }
+}
+
+public struct ImproverApplyRequest: Codable, Equatable, Sendable {
+  public let actor: String
+  public let issueId: String
+  public let target: ImproverTarget
+  public let relPath: String
+  public let newContents: String
+  public let projectDir: String
+  public let dryRun: Bool
+
+  public init(
+    actor: String,
+    issueId: String,
+    target: ImproverTarget,
+    relPath: String,
+    newContents: String,
+    projectDir: String,
+    dryRun: Bool = false
+  ) {
+    self.actor = actor
+    self.issueId = issueId
+    self.target = target
+    self.relPath = relPath
+    self.newContents = newContents
+    self.projectDir = projectDir
+    self.dryRun = dryRun
+  }
+}
+
 public struct SessionEndRequest: Codable, Equatable, Sendable {
   public let actor: String
 }

@@ -256,6 +256,23 @@ public struct ReviewConsensus: Codable, Equatable, Sendable {
   }
 }
 
+public enum ImproverTarget: String, Codable, CaseIterable, Sendable {
+  case skill
+  case plugin
+  case localSkillClaude = "local_skill_claude"
+
+  public var title: String {
+    switch self {
+    case .skill:
+      "Skill"
+    case .plugin:
+      "Plugin"
+    case .localSkillClaude:
+      "Local Skill (Claude)"
+    }
+  }
+}
+
 public struct ArbitrationOutcome: Codable, Equatable, Sendable {
   public let arbiterAgentId: String
   public let verdict: ReviewVerdict
