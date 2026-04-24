@@ -191,7 +191,7 @@ pub(crate) fn apply_claim_review(
 /// - session is not active
 /// - actor lacks [`SessionAction::SubmitReview`]
 /// - task missing, not in `InReview`, or reviewer has no claim on it
-/// Read-only guardrail for `apply_submit_review`.
+/// Read-only guardrail for [`apply_submit_review`].
 ///
 /// Callers must invoke this BEFORE writing the review record to disk,
 /// so an unauthorized or out-of-state submission leaves no durable
