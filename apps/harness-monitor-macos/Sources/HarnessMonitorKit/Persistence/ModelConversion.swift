@@ -105,11 +105,15 @@ extension CachedSession {
     )
   }
 
-  func toSessionDetail() -> SessionDetail {
+  func toSessionDetail(
+    reviewMetadataByTaskId: [String: CachedReviewMetadata] = [:]
+  ) -> SessionDetail {
     SessionDetail(
       session: toSessionSummary(),
       agents: agents.map { $0.toAgentRegistration() },
-      tasks: tasks.map { $0.toWorkItem() },
+      tasks: tasks.map {
+        $0.toWorkItem(metadata: reviewMetadataByTaskId[$0.taskId] ?? .empty)
+      },
       signals: signals.map { $0.toSessionSignalRecord() },
       observer: observer?.toObserverSummary(),
       agentActivity: agentActivity.map { $0.toAgentToolActivitySummary() }
@@ -236,7 +240,13 @@ extension AgentRegistration {
 // MARK: - WorkItem <-> CachedWorkItem
 
 extension CachedWorkItem {
-  func toWorkItem() -> WorkItem {
+  /// Hydrate a `WorkItem` from cache. The review-state payload lives in
+  /// the `CachedTaskReviewMetadata` side-table and is passed in by the
+  /// caller (typically `CachedSession.toSessionDetail`), which already
+  /// has a `ModelContext` to query for it. When `metadata` is nil the
+  /// task predates V8 or never entered review — we decode an empty
+  /// review block so the SwiftUI layer still sees the full `WorkItem`.
+  func toWorkItem(metadata: CachedReviewMetadata = .empty) -> WorkItem {
     let notes = (try? Codecs.decoder.decode([TaskNote].self, from: notesData)) ?? []
     let checkpoint: TaskCheckpointSummary? =
       if let data = checkpointData {
@@ -262,7 +272,14 @@ extension CachedWorkItem {
       source: TaskSource(rawValue: sourceRaw) ?? .manual,
       blockedReason: blockedReason,
       completedAt: completedAt,
-      checkpointSummary: checkpoint
+      checkpointSummary: checkpoint,
+      awaitingReview: metadata.awaitingReview,
+      reviewClaim: metadata.reviewClaim,
+      consensus: metadata.consensus,
+      reviewRound: metadata.reviewRound,
+      arbitration: metadata.arbitration,
+      suggestedPersona: metadata.suggestedPersona,
+      reviewHistory: metadata.reviewHistory
     )
   }
 
@@ -308,4 +325,21 @@ extension WorkItem {
       checkpointData: checkpointSummary.flatMap { try? Codecs.encoder.encode($0) }
     )
   }
+}
+
+/// Encode a `WorkItem`'s review-state payload to `Data`. Returns nil when
+/// every review field is empty so the caller can skip writing a
+/// `CachedTaskReviewMetadata` row for tasks that never entered review.
+func encodedReviewMetadata(for item: WorkItem) -> Data? {
+  let metadata = CachedReviewMetadata(from: item)
+  if metadata.isEmpty { return nil }
+  return try? Codecs.encoder.encode(metadata)
+}
+
+/// Decode a `CachedTaskReviewMetadata.reviewBlob` into the structured
+/// `CachedReviewMetadata` payload. Returns `.empty` for absent or
+/// malformed rows.
+func decodedReviewMetadata(from blob: Data?) -> CachedReviewMetadata {
+  guard let blob else { return .empty }
+  return (try? Codecs.decoder.decode(CachedReviewMetadata.self, from: blob)) ?? .empty
 }

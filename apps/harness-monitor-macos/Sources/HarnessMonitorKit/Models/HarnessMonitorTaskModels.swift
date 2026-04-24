@@ -230,6 +230,7 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
   public let reviewRound: Int
   public let arbitration: ArbitrationOutcome?
   public let suggestedPersona: String?
+  public let reviewHistory: [ReviewConsensus]
 
   public var id: String { taskId }
 
@@ -257,6 +258,7 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     case reviewRound
     case arbitration
     case suggestedPersona
+    case reviewHistory
   }
 
   public init(
@@ -282,7 +284,8 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     consensus: ReviewConsensus? = nil,
     reviewRound: Int = 0,
     arbitration: ArbitrationOutcome? = nil,
-    suggestedPersona: String? = nil
+    suggestedPersona: String? = nil,
+    reviewHistory: [ReviewConsensus] = []
   ) {
     self.taskId = taskId
     self.title = title
@@ -307,6 +310,7 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     self.reviewRound = reviewRound
     self.arbitration = arbitration
     self.suggestedPersona = suggestedPersona
+    self.reviewHistory = reviewHistory
   }
 
   public init(from decoder: Decoder) throws {
@@ -338,5 +342,7 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
     reviewRound = try container.decodeIfPresent(Int.self, forKey: .reviewRound) ?? 0
     arbitration = try container.decodeIfPresent(ArbitrationOutcome.self, forKey: .arbitration)
     suggestedPersona = try container.decodeIfPresent(String.self, forKey: .suggestedPersona)
+    reviewHistory =
+      try container.decodeIfPresent([ReviewConsensus].self, forKey: .reviewHistory) ?? []
   }
 }
