@@ -212,6 +212,7 @@ mod direct;
 mod leave;
 mod mutations;
 mod mutations_async;
+mod review_mutations;
 mod observe_async;
 mod observe_loop;
 mod observe_persistence;
@@ -248,6 +249,14 @@ pub(crate) use mutations_async::{
     assign_task_async, change_role_async, checkpoint_task_async, create_task_async,
     drop_task_async, end_session_async, remove_agent_async, transfer_leader_async,
     update_task_async, update_task_queue_policy_async,
+};
+pub use review_mutations::{
+    arbitrate as arbitrate_review, claim_review, improver_apply, respond_review,
+    submit_for_review, submit_review,
+};
+pub(crate) use review_mutations::{
+    arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
+    submit_for_review_async, submit_review_async,
 };
 pub use observe_stream::{
     broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,
