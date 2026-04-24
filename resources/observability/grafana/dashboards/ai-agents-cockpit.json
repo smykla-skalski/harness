@@ -54,7 +54,7 @@
     "cursorSync": "Tooltip",
     "editable": true,
     "elements": {
-      "cockpit-panel-1": {
+      "claude-spend": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -140,7 +140,7 @@
           }
         }
       },
-      "cockpit-panel-2": {
+      "claude-sessions": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -225,7 +225,7 @@
           }
         }
       },
-      "cockpit-panel-3": {
+      "claude-tokens": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -309,7 +309,7 @@
           }
         }
       },
-      "cockpit-panel-4": {
+      "codex-sessions": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -326,7 +326,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "count(sum by (conversation_id) (rate({service_name=\"codex\"}[2m])))",
-                        "queryType": "instant"
+                        "queryType": "range"
                       }
                     },
                     "refId": "A",
@@ -341,7 +341,7 @@
           "description": "Codex sessions active in the last 2 minutes (distinct conversation IDs with recent log activity).",
           "id": 204,
           "links": [],
-          "title": "Active Codex Sessions",
+          "title": "Codex Sessions",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -351,6 +351,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "noValue": "0",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -374,7 +375,7 @@
               },
               "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
@@ -384,15 +385,14 @@
                   "fields": "",
                   "values": false
                 },
-                "textMode": "value",
-                "noValue": "0"
+                "textMode": "value"
               }
             },
             "version": ""
           }
         }
       },
-      "cockpit-panel-5": {
+      "codex-tokens": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -476,7 +476,7 @@
           }
         }
       },
-      "cockpit-panel-6": {
+      "claude-accept-rate": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -560,7 +560,7 @@
           }
         }
       },
-      "cockpit-panel-7": {
+      "codex-tool-success": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -646,7 +646,7 @@
           }
         }
       },
-      "cockpit-panel-8": {
+      "codex-tool-p95": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -730,7 +730,7 @@
           }
         }
       },
-      "cockpit-panel-9": {
+      "primary-activity": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -915,7 +915,7 @@
           }
         }
       },
-      "cockpit-panel-10": {
+      "tokens-prompt-activity": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1100,7 +1100,7 @@
           }
         }
       },
-      "cockpit-panel-11": {
+      "reliability-signals": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1285,7 +1285,7 @@
           }
         }
       },
-      "cockpit-panel-12": {
+      "model-mix": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1470,7 +1470,7 @@
           }
         }
       },
-      "cockpit-panel-13": {
+      "tooling-prompt-activity": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1655,7 +1655,7 @@
           }
         }
       },
-      "cockpit-panel-14": {
+      "activity-volume": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1840,7 +1840,7 @@
           }
         }
       },
-      "cockpit-panel-15": {
+      "top-operations": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2025,7 +2025,7 @@
           }
         }
       },
-      "cockpit-panel-16": {
+      "copilot-agent-runs": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2109,7 +2109,7 @@
           }
         }
       },
-      "cockpit-panel-17": {
+      "copilot-agent-turns": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2193,7 +2193,7 @@
           }
         }
       },
-      "cockpit-panel-18": {
+      "copilot-tool-calls": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2277,7 +2277,7 @@
           }
         }
       },
-      "cockpit-panel-19": {
+      "copilot-tool-p95": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2361,7 +2361,7 @@
           }
         }
       },
-      "cockpit-panel-20": {
+      "gemini-api-requests": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2445,7 +2445,7 @@
           }
         }
       },
-      "cockpit-panel-21": {
+      "gemini-request-rate": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2529,7 +2529,7 @@
           }
         }
       },
-      "cockpit-panel-22": {
+      "gemini-total-tokens": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2613,7 +2613,7 @@
           }
         }
       },
-      "cockpit-panel-23": {
+      "gemini-api-p95": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -6822,7 +6822,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-1"
+                          "name": "claude-spend"
                         }
                       }
                     },
@@ -6835,7 +6835,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-2"
+                          "name": "claude-sessions"
                         }
                       }
                     },
@@ -6848,7 +6848,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-3"
+                          "name": "claude-tokens"
                         }
                       }
                     },
@@ -6861,7 +6861,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-4"
+                          "name": "claude-accept-rate"
                         }
                       }
                     },
@@ -6874,7 +6874,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-5"
+                          "name": "codex-tokens"
                         }
                       }
                     },
@@ -6887,7 +6887,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-6"
+                          "name": "codex-sessions"
                         }
                       }
                     },
@@ -6900,7 +6900,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-7"
+                          "name": "codex-tool-success"
                         }
                       }
                     },
@@ -6913,7 +6913,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-8"
+                          "name": "codex-tool-p95"
                         }
                       }
                     },
@@ -6926,7 +6926,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-16"
+                          "name": "copilot-agent-runs"
                         }
                       }
                     },
@@ -6939,7 +6939,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-17"
+                          "name": "copilot-agent-turns"
                         }
                       }
                     },
@@ -6952,7 +6952,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-18"
+                          "name": "copilot-tool-calls"
                         }
                       }
                     },
@@ -6965,7 +6965,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-19"
+                          "name": "copilot-tool-p95"
                         }
                       }
                     },
@@ -6978,7 +6978,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-20"
+                          "name": "gemini-api-requests"
                         }
                       }
                     },
@@ -6991,7 +6991,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-21"
+                          "name": "gemini-request-rate"
                         }
                       }
                     },
@@ -7004,7 +7004,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-22"
+                          "name": "gemini-total-tokens"
                         }
                       }
                     },
@@ -7017,7 +7017,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-23"
+                          "name": "gemini-api-p95"
                         }
                       }
                     },
@@ -7030,7 +7030,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-9"
+                          "name": "primary-activity"
                         }
                       }
                     },
@@ -7043,7 +7043,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-10"
+                          "name": "tokens-prompt-activity"
                         }
                       }
                     },
@@ -7056,7 +7056,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-11"
+                          "name": "reliability-signals"
                         }
                       }
                     },
@@ -7069,7 +7069,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-12"
+                          "name": "model-mix"
                         }
                       }
                     },
@@ -7082,7 +7082,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-13"
+                          "name": "tooling-prompt-activity"
                         }
                       }
                     },
@@ -7095,7 +7095,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-14"
+                          "name": "activity-volume"
                         }
                       }
                     },
@@ -7108,7 +7108,7 @@
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "cockpit-panel-15"
+                          "name": "top-operations"
                         }
                       }
                     }
