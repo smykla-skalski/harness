@@ -275,6 +275,16 @@ extension HarnessMonitorStore {
         label: "Removed",
         accessibilityValue: "Removed"
       )
+    case .awaitingReview:
+      return AgentActivityPresentation(
+        label: "Awaiting Review",
+        accessibilityValue: "Awaiting review"
+      )
+    case .idle:
+      return AgentActivityPresentation(
+        label: "Idle",
+        accessibilityValue: "Idle"
+      )
     case .active:
       guard isSelectedSessionLive else {
         return AgentActivityPresentation(

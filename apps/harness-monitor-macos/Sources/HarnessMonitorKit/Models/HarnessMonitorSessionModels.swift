@@ -100,10 +100,69 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
 public struct SessionMetrics: Codable, Equatable, Sendable {
   public let agentCount: Int
   public let activeAgentCount: Int
+  public let idleAgentCount: Int
+  public let awaitingReviewAgentCount: Int
   public let openTaskCount: Int
   public let inProgressTaskCount: Int
+  public let awaitingReviewTaskCount: Int
+  public let inReviewTaskCount: Int
+  public let arbitrationTaskCount: Int
   public let blockedTaskCount: Int
   public let completedTaskCount: Int
+
+  public init(
+    agentCount: Int = 0,
+    activeAgentCount: Int = 0,
+    idleAgentCount: Int = 0,
+    awaitingReviewAgentCount: Int = 0,
+    openTaskCount: Int = 0,
+    inProgressTaskCount: Int = 0,
+    awaitingReviewTaskCount: Int = 0,
+    inReviewTaskCount: Int = 0,
+    arbitrationTaskCount: Int = 0,
+    blockedTaskCount: Int = 0,
+    completedTaskCount: Int = 0
+  ) {
+    self.agentCount = agentCount
+    self.activeAgentCount = activeAgentCount
+    self.idleAgentCount = idleAgentCount
+    self.awaitingReviewAgentCount = awaitingReviewAgentCount
+    self.openTaskCount = openTaskCount
+    self.inProgressTaskCount = inProgressTaskCount
+    self.awaitingReviewTaskCount = awaitingReviewTaskCount
+    self.inReviewTaskCount = inReviewTaskCount
+    self.arbitrationTaskCount = arbitrationTaskCount
+    self.blockedTaskCount = blockedTaskCount
+    self.completedTaskCount = completedTaskCount
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case agentCount, activeAgentCount, idleAgentCount, awaitingReviewAgentCount
+    case openTaskCount, inProgressTaskCount, awaitingReviewTaskCount, inReviewTaskCount
+    case arbitrationTaskCount, blockedTaskCount, completedTaskCount
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      agentCount: try container.decodeIfPresent(Int.self, forKey: .agentCount) ?? 0,
+      activeAgentCount: try container.decodeIfPresent(Int.self, forKey: .activeAgentCount) ?? 0,
+      idleAgentCount: try container.decodeIfPresent(Int.self, forKey: .idleAgentCount) ?? 0,
+      awaitingReviewAgentCount:
+        try container.decodeIfPresent(Int.self, forKey: .awaitingReviewAgentCount) ?? 0,
+      openTaskCount: try container.decodeIfPresent(Int.self, forKey: .openTaskCount) ?? 0,
+      inProgressTaskCount:
+        try container.decodeIfPresent(Int.self, forKey: .inProgressTaskCount) ?? 0,
+      awaitingReviewTaskCount:
+        try container.decodeIfPresent(Int.self, forKey: .awaitingReviewTaskCount) ?? 0,
+      inReviewTaskCount: try container.decodeIfPresent(Int.self, forKey: .inReviewTaskCount) ?? 0,
+      arbitrationTaskCount:
+        try container.decodeIfPresent(Int.self, forKey: .arbitrationTaskCount) ?? 0,
+      blockedTaskCount: try container.decodeIfPresent(Int.self, forKey: .blockedTaskCount) ?? 0,
+      completedTaskCount:
+        try container.decodeIfPresent(Int.self, forKey: .completedTaskCount) ?? 0
+    )
+  }
 }
 
 public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
