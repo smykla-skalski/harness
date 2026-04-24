@@ -60,6 +60,7 @@ mod schema_v10;
 mod session_data;
 mod signals;
 mod summaries;
+mod task_row;
 mod telemetry;
 mod timeline;
 mod timeline_store;
