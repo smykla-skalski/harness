@@ -244,7 +244,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"input\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -256,10 +256,95 @@
               "transformations": []
             }
           },
-          "description": "Claude total token usage over the selected time range.",
+          "description": "Claude input tokens over the selected time range. Excludes cache reads and cache creation tokens.",
           "id": 203,
           "links": [],
-          "title": "Claude Tokens",
+          "title": "Claude I",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "claude-tokens-output": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=\"output\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Claude output tokens over the selected time range. Excludes cache reads and cache creation tokens.",
+          "id": 912,
+          "links": [],
+          "title": "Claude O",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -412,7 +497,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"input\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -424,10 +509,95 @@
               "transformations": []
             }
           },
-          "description": "Codex total token usage over the selected time range using the aggregate token class.",
+          "description": "Codex input token usage over the selected time range using the explicit input token class.",
           "id": 205,
           "links": [],
-          "title": "Codex Tokens",
+          "title": "Codex I",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "codex-tokens-output": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"output\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Codex output token usage over the selected time range using the explicit output token class.",
+          "id": 913,
+          "links": [],
+          "title": "Codex O",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -936,7 +1106,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]))",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__rate_interval]))",
                         "legendFormat": "claude"
                       }
                     },
@@ -1009,7 +1179,7 @@
               "transformations": []
             }
           },
-          "description": "Claude token usage, Codex rolling 1h token volume, Copilot token usage, and Gemini input/output token volume aligned on the same chart.",
+          "description": "Claude input/output token usage, Codex rolling 1h token volume, Copilot token usage, and Gemini input/output token volume aligned on the same chart.",
           "id": 210,
           "links": [],
           "title": "Tokens and Prompt Activity by Agent",
@@ -1306,7 +1476,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
                         "legendFormat": "claude :: {{pretty_model}}"
                       }
                     },
@@ -1379,7 +1549,7 @@
               "transformations": []
             }
           },
-          "description": "Claude token volume, Codex rolling 1h token volume, Copilot token activity, and Gemini activity grouped by normalized model name when available.",
+          "description": "Claude input/output token volume, Codex rolling 1h token volume, Copilot token activity, and Gemini activity grouped by normalized model name when available.",
           "id": 212,
           "links": [],
           "title": "Model Mix by Agent",
@@ -2046,7 +2216,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__range]))) or on() vector(0)"
+                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=\"input\"}[$__range]))) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2058,10 +2228,94 @@
               "transformations": []
             }
           },
-          "description": "Total Copilot LLM tokens over the selected range.",
+          "description": "Copilot input tokens over the selected range.",
           "id": 216,
           "links": [],
-          "title": "Copilot Tokens",
+          "title": "Copilot I",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 500000
+                      },
+                      {
+                        "color": "red",
+                        "value": 2000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "copilot-tokens-output": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=\"output\"}[$__range]))) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Copilot output tokens over the selected range.",
+          "id": 910,
+          "links": [],
+          "title": "Copilot O",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2553,7 +2807,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\",type=\"input\"}[$__range])) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2565,10 +2819,94 @@
               "transformations": []
             }
           },
-          "description": "Observed Gemini token usage over the selected range across input, output, thought, cache, and tool tokens.",
+          "description": "Gemini input tokens over the selected range. Excludes cache, thought, and tool tokens.",
           "id": 222,
           "links": [],
-          "title": "Gemini Tokens",
+          "title": "Gemini I",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 1000000
+                      },
+                      {
+                        "color": "red",
+                        "value": 10000000
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "value"
+              }
+            },
+            "version": ""
+          }
+        }
+      },
+      "gemini-total-tokens-output": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum(increase(gemini_cli_token_usage_total{service_name=~\"gemini|gemini-cli\",type=\"output\"}[$__range])) or on() vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Gemini output tokens over the selected range. Excludes cache, thought, and tool tokens.",
+          "id": 911,
+          "links": [],
+          "title": "Gemini O",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3693,8 +4031,8 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)",
-                        "legendFormat": "claude total",
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)",
+                        "legendFormat": "claude prompt+completion",
                         "instant": true,
                         "range": false
                       }
@@ -3737,7 +4075,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))",
+                        "expr": "(sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))",
                         "legendFormat": "total tokens",
                         "instant": true,
                         "range": false
@@ -3759,7 +4097,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
+                        "expr": "100 * ((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
                         "legendFormat": "claude share",
                         "instant": true,
                         "range": false
@@ -3781,7 +4119,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "100 * ((sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
+                        "expr": "100 * ((sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0)) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)) + (sum(last_over_time(codex_turn_token_usage_sum{service_name=~\"${service_name:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\",token_type=\"total\"}[$__range])) or on() vector(0))), 1))",
                         "legendFormat": "codex share",
                         "instant": true,
                         "range": false
@@ -3796,7 +4134,7 @@
               "transformations": []
             }
           },
-          "description": "Canvas summary of Claude and Codex token totals for the selected range. Keep Tokens by Agent for the live trend line.",
+          "description": "Canvas summary of Claude prompt and completion tokens (excluding cache) and Codex token totals for the selected range. Keep Tokens by Agent for the live trend line.",
           "id": 216,
           "links": [],
           "title": "Token Command Center",
@@ -5306,7 +5644,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$2\", \"model\", \"(claude[-_])?(.*)\"))",
                         "legendFormat": "claude :: {{pretty_model}}"
                       },
                       "version": "v0"
@@ -5379,7 +5717,7 @@
               "transformations": []
             }
           },
-          "description": "Claude and Codex token volume plus Copilot and Gemini activity, grouped by normalized model name when available.",
+          "description": "Claude and Codex prompt/completion token volume plus Copilot and Gemini activity, grouped by normalized model name when available.",
           "id": 16,
           "links": [],
           "title": "Model Activity by Agent",
@@ -5703,7 +6041,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\"}[$__range])) or on() vector(0)"
+                        "expr": "sum(increase(claude_code_token_usage_tokens_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",model=~\"${claude_model:regex}\",query_source=~\"${query_source:regex}\",terminal_type=~\"${terminal_type:regex}\",type=~\"input|output\"}[$__range])) or on() vector(0)"
                       },
                       "version": "v0"
                     },
@@ -5715,7 +6053,7 @@
               "transformations": []
             }
           },
-          "description": "All Claude tokens across input, output, and cache classes.",
+          "description": "Claude prompt and completion tokens, excluding cache reads and cache creation.",
           "id": 3,
           "links": [],
           "title": "Total Tokens",
@@ -7175,11 +7513,24 @@
                       "spec": {
                         "x": 0,
                         "y": 4,
-                        "width": 6,
+                        "width": 3,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "claude-tokens"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 4,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "claude-tokens-output"
                         }
                       }
                     },
@@ -7201,11 +7552,24 @@
                       "spec": {
                         "x": 0,
                         "y": 8,
-                        "width": 6,
+                        "width": 3,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "codex-tokens"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 8,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "codex-tokens-output"
                         }
                       }
                     },
@@ -7253,11 +7617,24 @@
                       "spec": {
                         "x": 0,
                         "y": 12,
-                        "width": 6,
+                        "width": 3,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "copilot-tokens"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 12,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "copilot-tokens-output"
                         }
                       }
                     },
@@ -7331,11 +7708,24 @@
                       "spec": {
                         "x": 0,
                         "y": 16,
-                        "width": 6,
+                        "width": 3,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "gemini-total-tokens"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 16,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "gemini-total-tokens-output"
                         }
                       }
                     },
