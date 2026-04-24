@@ -42,11 +42,12 @@ public struct HeuristicIssueCardView: View {
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+    let tint = severityTint
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
         Text(issue.code)
           .scaledFont(.system(.subheadline, design: .monospaced, weight: .semibold))
-          .foregroundStyle(severityTint)
+          .foregroundStyle(tint)
         Text(categoryLabel)
           .scaledFont(.caption2)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -77,11 +78,11 @@ public struct HeuristicIssueCardView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(severityTint.opacity(0.08))
+        .fill(tint.opacity(0.08))
     }
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .stroke(severityTint.opacity(0.35), lineWidth: 1)
+        .stroke(tint.opacity(0.35), lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(Text("\(issue.code) \(issue.severity)"))
