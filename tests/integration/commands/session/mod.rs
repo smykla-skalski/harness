@@ -12,6 +12,7 @@ use super::super::helpers::*;
 mod persona;
 mod recovery;
 mod swarm_contract;
+mod swarm_review_arbitrate;
 mod swarm_review_flow;
 mod swarm_review_helpers;
 mod swarm_review_respond;
