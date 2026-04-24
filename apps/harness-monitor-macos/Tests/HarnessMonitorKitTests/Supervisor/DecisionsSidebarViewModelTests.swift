@@ -315,4 +315,60 @@ final class AgentTuiCodexApprovalViewModelTests: XCTestCase {
     XCTAssertEqual(items[0].approvalID, "pending-approval")
     XCTAssertNil(items[0].decisionID)
   }
+
+  @MainActor
+  func test_codexApprovalItems_dedupeDecisionRowsWithSameVisibleContent() {
+    let run = CodexRunSnapshot(
+      runId: "run-1",
+      sessionId: "sess-1",
+      projectDir: "/tmp/harness",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      mode: .approval,
+      status: .waitingApproval,
+      prompt: "Approve patch",
+      latestSummary: nil,
+      finalMessage: nil,
+      error: nil,
+      pendingApprovals: [],
+      createdAt: "2026-04-23T08:00:00Z",
+      updatedAt: "2026-04-23T08:05:00Z"
+    )
+    let actionsJSON = """
+      [
+        {"id":"accept","kind":"custom","payloadJSON":"{}","title":"Accept"},
+        {"id":"decline","kind":"custom","payloadJSON":"{}","title":"Decline"}
+      ]
+      """
+    let firstDecision = Decision(
+      id: "codex-approval:sess-1:approval-1",
+      severity: .needsUser,
+      ruleID: "codex-approval",
+      sessionID: "sess-1",
+      agentID: "run-1",
+      taskID: nil,
+      summary: "Command approval requested",
+      contextJSON: #"{"agentID":"run-1","approvalID":"approval-1"}"#,
+      suggestedActionsJSON: actionsJSON
+    )
+    let duplicateDecision = Decision(
+      id: "codex-approval:sess-1:approval-2",
+      severity: .needsUser,
+      ruleID: "codex-approval",
+      sessionID: "sess-1",
+      agentID: "run-1",
+      taskID: nil,
+      summary: "Command approval requested",
+      contextJSON: #"{"agentID":"run-1","approvalID":"approval-2"}"#,
+      suggestedActionsJSON: actionsJSON
+    )
+
+    let items = AgentTuiWindowView.codexApprovalItems(
+      for: run,
+      decisions: [firstDecision, duplicateDecision]
+    )
+
+    XCTAssertEqual(items.count, 1)
+    XCTAssertEqual(items[0].approvalID, "approval-1")
+  }
 }
