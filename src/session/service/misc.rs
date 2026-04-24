@@ -75,6 +75,10 @@ pub(crate) fn generate_checkpoint_id(task_id: &str) -> String {
     format!("{task_id}-cp-{}", Utc::now().format("%Y%m%d%H%M%S%f"))
 }
 
+pub(crate) fn generate_review_id(task_id: &str) -> String {
+    format!("{task_id}-rv-{}", Utc::now().format("%Y%m%d%H%M%S%f"))
+}
+
 pub(crate) fn generate_signal_id() -> String {
     format!("sig-{}", Utc::now().format("%Y%m%d%H%M%S%f"))
 }

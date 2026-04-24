@@ -72,7 +72,6 @@ pub(crate) fn append_task_checkpoint(
 ///
 /// # Errors
 /// Returns `CliError` on parse, serialization, or I/O failures.
-#[allow(dead_code, reason = "consumed by apply_submit_review in the next slice")]
 pub(crate) fn append_review(
     layout: &SessionLayout,
     task_id: &str,
@@ -99,7 +98,6 @@ pub(crate) fn append_review(
 ///
 /// # Errors
 /// Returns `CliError` on parse or I/O failure.
-#[allow(dead_code, reason = "consumed by try_close_quorum in the next slice")]
 pub(crate) fn load_reviews(
     layout: &SessionLayout,
     task_id: &str,

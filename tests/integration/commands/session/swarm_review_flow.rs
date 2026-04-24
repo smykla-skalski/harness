@@ -1,83 +1,8 @@
 use harness::session::service;
-use harness::session::types::{AgentStatus, SessionRole, TaskSeverity, TaskStatus};
+use harness::session::types::{AgentStatus, TaskSeverity, TaskStatus};
 
+use super::swarm_review_helpers::{join_reviewer, prepare_in_progress_task};
 use super::with_session_test_env;
-
-/// Helper: start session, join one worker, create + assign + start a task.
-/// Returns `(leader_id, worker_id, task_id)`.
-fn join_leader(session_id: &str, project: &std::path::Path) -> String {
-    let state = service::join_session(
-        session_id,
-        SessionRole::Leader,
-        "claude",
-        &[],
-        Some("leader"),
-        project,
-        None,
-    )
-    .unwrap();
-    state
-        .agents
-        .values()
-        .find(|agent| agent.role == SessionRole::Leader)
-        .expect("leader joined")
-        .agent_id
-        .clone()
-}
-
-fn prepare_in_progress_task(
-    session_id: &str,
-    project: &std::path::Path,
-) -> (String, String, String) {
-    service::start_session_with_policy(
-        "",
-        "review flow",
-        project,
-        Some(session_id),
-        Some("swarm-default"),
-    )
-    .unwrap();
-    let leader_id = join_leader(session_id, project);
-
-    let joined = service::join_session(
-        session_id,
-        SessionRole::Worker,
-        "codex",
-        &[],
-        None,
-        project,
-        None,
-    )
-    .unwrap();
-    let worker_id = joined
-        .agents
-        .keys()
-        .find(|id| id.starts_with("codex"))
-        .unwrap()
-        .clone();
-
-    let task = service::create_task(
-        session_id,
-        "ship review flow",
-        None,
-        TaskSeverity::Medium,
-        &leader_id,
-        project,
-    )
-    .unwrap();
-    service::assign_task(session_id, &task.task_id, &worker_id, &leader_id, project).unwrap();
-    service::update_task(
-        session_id,
-        &task.task_id,
-        TaskStatus::InProgress,
-        None,
-        &worker_id,
-        project,
-    )
-    .unwrap();
-
-    (leader_id, worker_id, task.task_id)
-}
 
 #[test]
 fn submit_for_review_moves_task_to_awaiting_review_and_unassigns_worker() {
@@ -130,16 +55,16 @@ fn submit_for_review_requires_in_progress_status() {
         let project = tmp.path().join("project");
         service::start_session_with_policy(
             "",
-            "review flow",
+            "ctx",
             &project,
             Some("submit-rev-3"),
             Some("swarm-default"),
         )
         .unwrap();
-        let leader_id = join_leader("submit-rev-3", &project);
+        let leader_id = super::swarm_review_helpers::join_leader("submit-rev-3", &project);
         let joined = service::join_session(
             "submit-rev-3",
-            SessionRole::Worker,
+            harness::session::types::SessionRole::Worker,
             "codex",
             &[],
             None,
@@ -153,51 +78,19 @@ fn submit_for_review_requires_in_progress_status() {
             .find(|id| id.starts_with("codex"))
             .unwrap()
             .clone();
-
         let task = service::create_task(
             "submit-rev-3",
-            "open task",
+            "open still",
             None,
-            TaskSeverity::Low,
+            TaskSeverity::Medium,
             &leader_id,
             &project,
         )
         .unwrap();
-        service::assign_task("submit-rev-3", &task.task_id, &worker_id, &leader_id, &project)
-            .unwrap();
-
         let result =
             service::submit_for_review("submit-rev-3", &task.task_id, &worker_id, None, &project);
         assert!(result.is_err(), "open task cannot be submitted");
     });
-}
-
-fn join_reviewer(
-    session_id: &str,
-    runtime: &str,
-    runtime_session_env: &str,
-    project: &std::path::Path,
-) -> String {
-    let joined = temp_env::with_var(runtime_session_env, Some("rev-session"), || {
-        service::join_session(
-            session_id,
-            SessionRole::Reviewer,
-            runtime,
-            &[],
-            None,
-            project,
-            None,
-        )
-        .unwrap()
-    });
-    joined
-        .agents
-        .values()
-        .filter(|agent| agent.role == SessionRole::Reviewer && agent.runtime == runtime)
-        .max_by(|a, b| a.joined_at.cmp(&b.joined_at))
-        .expect("reviewer joined")
-        .agent_id
-        .clone()
 }
 
 #[test]
@@ -232,32 +125,12 @@ fn claim_review_rejects_same_runtime_second_reviewer() {
 
         let first = join_reviewer("claim-dup-1", "gemini", "GEMINI_SESSION_ID", &project);
         service::claim_review("claim-dup-1", &task_id, &first, &project).unwrap();
-
-        let second = temp_env::with_var("GEMINI_SESSION_ID", Some("rev-session-2"), || {
-            service::join_session(
-                "claim-dup-1",
-                SessionRole::Reviewer,
-                "gemini",
-                &[],
-                Some("gemini-two"),
-                &project,
-                None,
-            )
-            .unwrap()
-        });
-        let second_id = second
-            .agents
-            .values()
-            .filter(|agent| agent.role == SessionRole::Reviewer && agent.runtime == "gemini")
-            .map(|agent| agent.agent_id.clone())
-            .find(|id| id != &first)
-            .expect("second gemini reviewer joined");
-
-        let result = service::claim_review("claim-dup-1", &task_id, &second_id, &project);
-        let err = result.expect_err("second same-runtime claim must fail");
+        let second = join_reviewer("claim-dup-1", "gemini", "GEMINI_SESSION_ID", &project);
+        let result = service::claim_review("claim-dup-1", &task_id, &second, &project);
+        let err = result.expect_err("same-runtime second claim must fail");
         assert!(
             err.to_string().contains("runtime_already_reviewing"),
-            "expected runtime_already_reviewing in error, got: {err}"
+            "error should signal runtime_already_reviewing, got: {err}"
         );
     });
 }
@@ -270,12 +143,10 @@ fn claim_review_allows_second_reviewer_on_different_runtime() {
         let (_, worker_id, task_id) = prepare_in_progress_task("claim-multi-1", &project);
         service::submit_for_review("claim-multi-1", &task_id, &worker_id, None, &project).unwrap();
 
-        let first = join_reviewer("claim-multi-1", "gemini", "GEMINI_SESSION_ID", &project);
-        service::claim_review("claim-multi-1", &task_id, &first, &project).unwrap();
-
-        let second = join_reviewer("claim-multi-1", "copilot", "COPILOT_SESSION_ID", &project);
-        service::claim_review("claim-multi-1", &task_id, &second, &project)
-            .expect("cross-runtime claim");
+        let gemini_id = join_reviewer("claim-multi-1", "gemini", "GEMINI_SESSION_ID", &project);
+        let copilot_id = join_reviewer("claim-multi-1", "copilot", "COPILOT_SESSION_ID", &project);
+        service::claim_review("claim-multi-1", &task_id, &gemini_id, &project).unwrap();
+        service::claim_review("claim-multi-1", &task_id, &copilot_id, &project).unwrap();
 
         let state = service::session_status("claim-multi-1", &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();

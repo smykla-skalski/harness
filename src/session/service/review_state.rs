@@ -3,7 +3,9 @@ use super::{
     clear_agent_current_task, refresh_session, require_active, require_permission,
     task_not_found, task_status_label, touch_agent,
 };
-use crate::session::types::{ReviewClaim, ReviewerEntry};
+use crate::session::types::{
+    Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry,
+};
 
 const DEFAULT_REQUIRED_CONSENSUS: u8 = 2;
 
@@ -172,4 +174,175 @@ pub(crate) fn apply_claim_review(
     touch_agent(state, actor_id, now);
     refresh_session(state, now);
     Ok(())
+}
+
+/// Record a reviewer's submitted review on the task and close quorum if
+/// the distinct-runtime submission count meets `required_consensus`.
+///
+/// The reviewer must already hold a claim; calling this before
+/// `apply_claim_review` is rejected. Submitting twice from the same
+/// reviewer updates `submitted_at` to the latest timestamp and rebuilds
+/// consensus from the supplied `all_reviews` slice; file-level
+/// idempotency on `review_id` lives in `storage::journal::append_review`.
+///
+/// # Errors
+/// - session is not active
+/// - actor lacks [`SessionAction::SubmitReview`]
+/// - task missing, not in `InReview`, or reviewer has no claim on it
+pub(crate) fn apply_submit_review(
+    state: &mut SessionState,
+    task_id: &str,
+    review: &Review,
+    all_reviews: &[Review],
+    now: &str,
+) -> Result<(), CliError> {
+    require_active(state)?;
+    require_permission(state, &review.reviewer_agent_id, SessionAction::SubmitReview)?;
+
+    let task = state
+        .tasks
+        .get(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+
+    if task.status != TaskStatus::InReview {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' is {}; submit_review requires 'in review'",
+            task_status_label(task.status)
+        ))
+        .into());
+    }
+
+    let claim = task.review_claim.as_ref().ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' has no reviewer claim; claim_review before submit_review"
+        )))
+    })?;
+    if !claim
+        .reviewers
+        .iter()
+        .any(|entry| entry.reviewer_agent_id == review.reviewer_agent_id)
+    {
+        return Err(CliErrorKind::session_permission_denied(format!(
+            "reviewer '{}' has not claimed task '{task_id}'",
+            review.reviewer_agent_id
+        ))
+        .into());
+    }
+
+    let required = task
+        .awaiting_review
+        .as_ref()
+        .map_or(2u8, |meta| meta.required_consensus);
+
+    let task = state
+        .tasks
+        .get_mut(task_id)
+        .ok_or_else(|| task_not_found(task_id))?;
+    task.updated_at = now.to_string();
+    if let Some(claim) = task.review_claim.as_mut()
+        && let Some(entry) = claim
+            .reviewers
+            .iter_mut()
+            .find(|entry| entry.reviewer_agent_id == review.reviewer_agent_id)
+    {
+        entry.submitted_at = Some(now.to_string());
+    }
+
+    try_close_quorum(state, task_id, all_reviews, required, now);
+
+    touch_agent(state, &review.reviewer_agent_id, now);
+    refresh_session(state, now);
+    Ok(())
+}
+
+/// Aggregate submitted reviews and stamp `ReviewConsensus` when the
+/// distinct-runtime count meets `required_consensus`. On an all-approve
+/// consensus the task transitions to `Done`; otherwise the task stays in
+/// `InReview` carrying the aggregated verdict for the worker response.
+fn try_close_quorum(
+    state: &mut SessionState,
+    task_id: &str,
+    all_reviews: &[Review],
+    required: u8,
+    now: &str,
+) {
+    let Some(task) = state.tasks.get_mut(task_id) else {
+        return;
+    };
+    let Some(claim) = task.review_claim.as_ref() else {
+        return;
+    };
+
+    let submitted: Vec<&ReviewerEntry> = claim
+        .reviewers
+        .iter()
+        .filter(|entry| entry.submitted_at.is_some())
+        .collect();
+    let mut distinct_runtimes: Vec<&str> = submitted
+        .iter()
+        .map(|entry| entry.reviewer_runtime.as_str())
+        .collect();
+    distinct_runtimes.sort_unstable();
+    distinct_runtimes.dedup();
+    if u8::try_from(distinct_runtimes.len()).unwrap_or(u8::MAX) < required {
+        return;
+    }
+
+    let relevant: Vec<&Review> = all_reviews
+        .iter()
+        .filter(|review| {
+            submitted
+                .iter()
+                .any(|entry| entry.reviewer_agent_id == review.reviewer_agent_id)
+        })
+        .collect();
+    let verdict = aggregate_verdict(&relevant);
+    let summary = relevant
+        .iter()
+        .map(|review| review.summary.clone())
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let points = collect_consensus_points(&relevant);
+    let reviewer_agent_ids = submitted
+        .iter()
+        .map(|entry| entry.reviewer_agent_id.clone())
+        .collect();
+
+    task.consensus = Some(ReviewConsensus {
+        verdict,
+        summary,
+        points,
+        closed_at: now.to_string(),
+        reviewer_agent_ids,
+    });
+    if verdict == ReviewVerdict::Approve {
+        task.status = TaskStatus::Done;
+        task.completed_at = Some(now.to_string());
+    }
+}
+
+fn aggregate_verdict(reviews: &[&Review]) -> ReviewVerdict {
+    if reviews.iter().all(|r| r.verdict == ReviewVerdict::Approve) {
+        ReviewVerdict::Approve
+    } else if reviews.iter().any(|r| r.verdict == ReviewVerdict::Reject) {
+        ReviewVerdict::Reject
+    } else {
+        ReviewVerdict::RequestChanges
+    }
+}
+
+fn collect_consensus_points(reviews: &[&Review]) -> Vec<ReviewPoint> {
+    let mut aggregated: Vec<ReviewPoint> = Vec::new();
+    for review in reviews {
+        for point in &review.points {
+            if !aggregated
+                .iter()
+                .any(|existing| existing.point_id == point.point_id)
+            {
+                aggregated.push(point.clone());
+            }
+        }
+    }
+    aggregated
 }
