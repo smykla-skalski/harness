@@ -60,7 +60,6 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
                         .to_string();
-
                     let response = post_role_change(
                         axum::extract::Path(("http-async-role".to_owned(), worker_id.clone())),
                         auth_headers(),
@@ -139,6 +138,7 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
                         .to_string();
+                    let leader_id = resolved.state.leader_id.clone().expect("leader id");
 
                     let response = post_transfer_leader(
                         axum::extract::Path("http-async-transfer".to_owned()),
@@ -154,7 +154,10 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
 
                     let (status, body) = response_json(response).await;
                     assert_eq!(status, StatusCode::OK);
-                    assert_eq!(body["session"]["leader_id"].as_str(), Some("claude-leader"));
+                    assert_eq!(
+                        body["session"]["leader_id"].as_str(),
+                        Some(leader_id.as_str())
+                    );
                     assert_eq!(
                         body["session"]["pending_leader_transfer"]["new_leader_id"].as_str(),
                         Some(worker_id.as_str())
