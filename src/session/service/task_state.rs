@@ -1,12 +1,14 @@
+use crate::session::types::AgentRegistration;
+
 use super::{
     CliError, CliErrorKind, DeliveryConfig, Duration, SessionAction, SessionState, Signal,
     SignalPayload, SignalPriority, TaskCheckpoint, TaskCheckpointSummary, TaskDropEffect, TaskNote,
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
-    generate_signal_id, next_task_id, protocol, refresh_session, require_active,
-    require_active_worker_target_agent, require_permission, require_task_creation_state,
-    start_next_locked_task_for_worker, start_task_for_agent, task_not_found, task_status_label,
-    touch_agent,
+    generate_signal_id, next_task_id, protocol, refresh_session, rank_workers_for_task,
+    require_active, require_active_worker_target_agent, require_permission,
+    require_task_creation_state, start_next_locked_task_for_worker, start_task_for_agent,
+    task_not_found, task_status_label, touch_agent,
 };
 
 /// Create a work item. Returns the new `WorkItem`.
@@ -178,14 +180,33 @@ pub(crate) fn apply_advance_queued_tasks(
     reassignable_tasks.sort_unstable();
 
     for (_, task_id) in reassignable_tasks {
-        let Some(worker_id) = free_workers.first().cloned() else {
+        if free_workers.is_empty() {
+            break;
+        }
+        let worker_id = select_worker_for_task(state, &task_id, &free_workers)
+            .or_else(|| free_workers.first().cloned());
+        let Some(worker_id) = worker_id else {
             break;
         };
         start_task_for_agent(state, &task_id, &worker_id, actor_id, now, &mut effects)?;
-        free_workers.remove(0);
+        free_workers.retain(|candidate| candidate != &worker_id);
     }
 
     Ok(effects)
+}
+
+fn select_worker_for_task(
+    state: &SessionState,
+    task_id: &str,
+    free_workers: &[String],
+) -> Option<String> {
+    let task = state.tasks.get(task_id)?;
+    let agents: Vec<&AgentRegistration> = free_workers
+        .iter()
+        .filter_map(|id| state.agents.get(id))
+        .collect();
+    let ranked = rank_workers_for_task(task, &agents);
+    ranked.into_iter().next()
 }
 
 fn reject_review_only_status(task_id: &str, status: TaskStatus) -> Result<(), CliError> {
@@ -418,3 +439,7 @@ pub(crate) fn build_signal(
 // ---------------------------------------------------------------------------
 // Log-entry builders (shared between file and daemon paths)
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+#[path = "task_state_persona_tests.rs"]
+mod persona_routing_tests;
