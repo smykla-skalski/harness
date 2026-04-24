@@ -317,3 +317,49 @@ fn awaiting_review_worker_refuses_new_assignment() {
         );
     });
 }
+
+#[test]
+fn update_task_rejects_direct_awaiting_review_transition() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-update-reject-ar", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("update-reject-1", &project);
+
+        let result = service::update_task(
+            "update-reject-1",
+            &task_id,
+            TaskStatus::AwaitingReview,
+            None,
+            &worker_id,
+            &project,
+        );
+        let err = result.expect_err("direct AwaitingReview via update_task must fail");
+        assert!(
+            err.to_string().contains("submit_for_review"),
+            "error should steer caller to submit_for_review, got: {err}"
+        );
+    });
+}
+
+#[test]
+fn update_task_rejects_direct_in_review_transition() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-update-reject-ir", || {
+        let project = tmp.path().join("project");
+        let (leader_id, _worker_id, task_id) = prepare_in_progress_task("update-reject-2", &project);
+
+        let result = service::update_task(
+            "update-reject-2",
+            &task_id,
+            TaskStatus::InReview,
+            None,
+            &leader_id,
+            &project,
+        );
+        let err = result.expect_err("direct InReview via update_task must fail");
+        assert!(
+            err.to_string().contains("claim_review"),
+            "error should steer caller to claim_review, got: {err}"
+        );
+    });
+}

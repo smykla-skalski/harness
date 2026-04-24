@@ -104,7 +104,10 @@ pub(crate) fn ensure_session_can_end(state: &SessionState) -> Result<(), CliErro
     let active_tasks = state.tasks.values().any(|task| {
         matches!(
             task.status,
-            TaskStatus::InProgress | TaskStatus::InReview | TaskStatus::Blocked
+            TaskStatus::InProgress
+                | TaskStatus::AwaitingReview
+                | TaskStatus::InReview
+                | TaskStatus::Blocked
         ) || (task.status == TaskStatus::Open && task.assigned_to.is_some())
     });
     if active_tasks {
