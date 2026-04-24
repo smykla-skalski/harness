@@ -2,10 +2,21 @@
 # Filters here override user-global and built-in filters.
 # Docs: https://github.com/rtk-ai/rtk#custom-filters
 #
-# Activation: TOML filters fire when a command flows through the `rtk` binary.
-# The Claude Code hook auto-wraps certain commands (xcodebuild, cargo, git, ...).
-# Scripts are matched by basename (so `rtk Scripts/run-quality-gates.sh` activates
-# the `harness-monitor-run-quality-gates` filter).
+# Activation: TOML filters fire only when a command flows through the `rtk`
+# binary. The Claude Code hook auto-wraps a short list of known tools
+# (xcodebuild, cargo, git, ...) but NOT `mise`. To get filtering for a mise
+# task, prefix the invocation with plain `rtk` (for example
+# `rtk mise run monitor:macos:test` or `rtk env KEY=value mise run <task>`).
+# Scripts are matched by basename (so `rtk Scripts/run-quality-gates.sh`
+# activates the `harness-monitor-run-quality-gates` filter).
+#
+# IMPORTANT: `rtk proxy <cmd>` intentionally bypasses every filter (it is
+# rtk's debug escape hatch). Never reach for `rtk proxy` when you want to
+# see "more output" — the filters below already keep every diagnostic we
+# care about (compiler errors, test failures, bundle checks, sandbox
+# violations). If you truly need the full log, redirect to a file:
+#   `rtk mise run monitor:macos:test 2>&1 | tee /tmp/out.log`
+# The tee sidecar is auto-populated by rtk; see its stderr line on failure.
 #
 # Task filters intentionally accept these CLI shapes:
 # - `mise run <task>`
@@ -14,7 +25,6 @@
 # - shell-wrapped variants like `bash -lc 'mise run <task>'` or `fish --login -c 'mise <task>'`
 # - combined wrappers like `rtk env KEY=value zsh -o no_nomatch -c 'mise <task>'`
 # - shell prelude variants like `rtk bash -lc 'set -o pipefail; mise run <task>'`
-# - proxy variants like `rtk proxy env KEY=value mise run <task>'`
 #
 # Task-family coverage:
 # - check:stale / clean:stale -> harness-mise-stale-state
@@ -692,6 +702,21 @@ Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).
 ** TEST FAILED **
 """
 expected = "Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).\n** TEST FAILED **"
+
+[[tests.harness-monitor-test-swift]]
+name = "keeps test verdict with large warning storm"
+input = """
+Generating plists...
+Generating project...
+/Users/x/Foo1.swift:1:5: warning: initialization of immutable value 'x' was never used
+/Users/x/Foo2.swift:2:5: warning: initialization of immutable value 'x' was never used
+/Users/x/Foo3.swift:3:5: warning: initialization of immutable value 'x' was never used
+Test Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).
+    XCTAssertEqual failed: ("1") is not equal to ("2")
+Executed 1 tests, with 1 failure in 0.01 seconds
+** TEST FAILED **
+"""
+expected = "/Users/x/Foo1.swift:1:5: warning: initialization of immutable value 'x' was never used\n/Users/x/Foo2.swift:2:5: warning: initialization of immutable value 'x' was never used\n/Users/x/Foo3.swift:3:5: warning: initialization of immutable value 'x' was never used\nTest Case '-[HarnessMonitorKitTests testFoo]' failed (0.01 seconds).\n    XCTAssertEqual failed: (\"1\") is not equal to (\"2\")\nExecuted 1 tests, with 1 failure in 0.01 seconds\n** TEST FAILED **"
 
 [[tests.harness-monitor-test-swift]]
 name = "empty returns on_empty"
