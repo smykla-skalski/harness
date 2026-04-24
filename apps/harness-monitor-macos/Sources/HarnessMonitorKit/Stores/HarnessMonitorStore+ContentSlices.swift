@@ -103,6 +103,12 @@ extension HarnessMonitorStore {
   @Observable
   public final class ContentSessionDetailSlice {
     public var selectedSessionDetail: SessionDetail?
+    public var selectedSessionSession: SessionSummary?
+    public var selectedSessionAgents: [AgentRegistration] = []
+    public var selectedSessionTasks: [WorkItem] = []
+    public var selectedSessionSignals: [SessionSignalRecord] = []
+    public var selectedSessionObserver: ObserverSummary?
+    public var selectedSessionAgentActivity: [AgentToolActivitySummary] = []
     public var timeline: [TimelineEntry] = []
     public var timelineWindow: TimelineWindowResponse?
     public var tuiStatusByAgent: [String: AgentTuiStatus] = [:]
@@ -175,6 +181,7 @@ extension HarnessMonitorStore {
 
       if didUpdateSelectedDetail {
         selectedSessionDetail = state.selectedSessionDetail
+        narrowlyWriteSelectedSessionSubSlices(from: state.selectedSessionDetail)
       }
       if selectedSessionDetailIdentity != nextSelectedIdentity {
         selectedSessionDetailIdentity = nextSelectedIdentity
@@ -230,6 +237,33 @@ extension HarnessMonitorStore {
       if retainedTimelineWindowIdentity != nil {
         retainedTimelineWindow = nil
         retainedTimelineWindowIdentity = nil
+      }
+    }
+
+    private func narrowlyWriteSelectedSessionSubSlices(from detail: SessionDetail?) {
+      let nextSession = detail?.session
+      let nextAgents = detail?.agents ?? []
+      let nextTasks = detail?.tasks ?? []
+      let nextSignals = detail?.signals ?? []
+      let nextObserver = detail?.observer
+      let nextAgentActivity = detail?.agentActivity ?? []
+      if selectedSessionSession != nextSession {
+        selectedSessionSession = nextSession
+      }
+      if selectedSessionAgents != nextAgents {
+        selectedSessionAgents = nextAgents
+      }
+      if selectedSessionTasks != nextTasks {
+        selectedSessionTasks = nextTasks
+      }
+      if selectedSessionSignals != nextSignals {
+        selectedSessionSignals = nextSignals
+      }
+      if selectedSessionObserver != nextObserver {
+        selectedSessionObserver = nextObserver
+      }
+      if selectedSessionAgentActivity != nextAgentActivity {
+        selectedSessionAgentActivity = nextAgentActivity
       }
     }
 
