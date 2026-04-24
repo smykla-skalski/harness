@@ -199,6 +199,12 @@ struct WebSocketProtocolTests {
     #expect(WebSocketRPCMethod.sessionAdopt.rawValue == "session.adopt")
     #expect(WebSocketRPCMethod.managedAgentInput.rawValue == "managed_agent.input")
     #expect(WebSocketRPCMethod.voiceFinishSession.rawValue == "voice.finish_session")
+    #expect(WebSocketRPCMethod.taskSubmitForReview.rawValue == "task.submit_for_review")
+    #expect(WebSocketRPCMethod.taskClaimReview.rawValue == "task.claim_review")
+    #expect(WebSocketRPCMethod.taskSubmitReview.rawValue == "task.submit_review")
+    #expect(WebSocketRPCMethod.taskRespondReview.rawValue == "task.respond_review")
+    #expect(WebSocketRPCMethod.taskArbitrate.rawValue == "task.arbitrate")
+    #expect(WebSocketRPCMethod.improverApply.rawValue == "improver.apply")
   }
 
   @Test("WsFrame decodes semantic response batch metadata")
