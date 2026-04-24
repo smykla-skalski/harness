@@ -8181,7 +8181,7 @@
                         "x": 0,
                         "y": 9,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "primary-activity"
@@ -8194,7 +8194,7 @@
                         "x": 12,
                         "y": 9,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "tokens-prompt-activity"
@@ -8205,9 +8205,9 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 17,
+                        "y": 15,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "reliability-signals"
@@ -8218,9 +8218,9 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 17,
+                        "y": 15,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "model-mix"
@@ -8231,9 +8231,9 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 25,
+                        "y": 21,
                         "width": 24,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "tooling-prompt-activity"
@@ -8244,9 +8244,9 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 33,
+                        "y": 27,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "activity-volume"
@@ -8257,9 +8257,9 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 33,
+                        "y": 27,
                         "width": 12,
-                        "height": 8,
+                        "height": 6,
                         "element": {
                           "kind": "ElementReference",
                           "name": "top-operations"
