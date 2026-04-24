@@ -172,3 +172,11 @@ pub(super) fn migrate_v8_to_v9(mut value: Value) -> Result<Value, CliError> {
     object.insert("schema_version".to_string(), json!(9));
     Ok(value)
 }
+
+pub(super) fn migrate_v9_to_v10(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+    object.insert("schema_version".to_string(), json!(10));
+    Ok(value)
+}

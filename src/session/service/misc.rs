@@ -31,6 +31,7 @@ pub(crate) fn agent_status_label(status: AgentStatus) -> &'static str {
     match status {
         AgentStatus::Active => "active",
         AgentStatus::Idle => "idle",
+        AgentStatus::AwaitingReview => "awaiting review",
         AgentStatus::Disconnected => "disconnected",
         AgentStatus::Removed => "removed",
     }
@@ -40,6 +41,7 @@ pub(crate) fn task_status_label(status: TaskStatus) -> &'static str {
     match status {
         TaskStatus::Open => "open",
         TaskStatus::InProgress => "in progress",
+        TaskStatus::AwaitingReview => "awaiting review",
         TaskStatus::InReview => "in review",
         TaskStatus::Done => "done",
         TaskStatus::Blocked => "blocked",

@@ -20,9 +20,10 @@ pub const fn agent_role_priority(role: SessionRole) -> u8 {
 pub const fn agent_status_priority(status: AgentStatus) -> u8 {
     match status {
         AgentStatus::Active => 0,
-        AgentStatus::Idle => 1,
-        AgentStatus::Disconnected => 2,
-        AgentStatus::Removed => 3,
+        AgentStatus::AwaitingReview => 1,
+        AgentStatus::Idle => 2,
+        AgentStatus::Disconnected => 3,
+        AgentStatus::Removed => 4,
     }
 }
 
@@ -165,6 +166,12 @@ mod tests {
             blocked_reason: None,
             completed_at: None,
             checkpoint_summary: None,
+            awaiting_review: None,
+            review_claim: None,
+            consensus: None,
+            review_round: 0,
+            arbitration: None,
+            suggested_persona: None,
         }
     }
 
