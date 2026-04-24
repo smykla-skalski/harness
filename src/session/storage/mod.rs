@@ -23,6 +23,9 @@ pub(crate) use files::{
 pub(crate) use journal::{
     append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
 };
+#[cfg(test)]
+#[allow(unused_imports, reason = "consumed by apply_submit_review landing in Slice 2 T05")]
+pub(crate) use journal::{append_review, load_reviews};
 pub(crate) use registry::{
     ActiveRegistry, ProjectOriginRecord, deregister_active, load_active_registry_for,
     load_active_registry_for_context_root, load_project_origin, record_adopted_session_root,

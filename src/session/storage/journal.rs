@@ -3,7 +3,7 @@ use std::path::Path;
 use fs_err as fs;
 
 use crate::errors::CliError;
-use crate::session::types::{SessionLogEntry, SessionTransition, TaskCheckpoint};
+use crate::session::types::{Review, SessionLogEntry, SessionTransition, TaskCheckpoint};
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::utc_now;
 
@@ -64,6 +64,47 @@ pub(crate) fn append_task_checkpoint(
         }
         files::append_json_line(&path, checkpoint)
     })
+}
+
+/// Append a review record for a task. Idempotent on `review_id`: if a
+/// review with the same id already exists in `reviews.jsonl`, the call is
+/// a no-op.
+///
+/// # Errors
+/// Returns `CliError` on parse, serialization, or I/O failures.
+#[allow(dead_code, reason = "consumed by apply_submit_review in the next slice")]
+pub(crate) fn append_review(
+    layout: &SessionLayout,
+    task_id: &str,
+    review: &Review,
+) -> Result<(), CliError> {
+    let lock_name = format!("review-{}-{task_id}", layout.session_id);
+    files::with_lock(layout, &lock_name, || {
+        let path = files::reviews_path(layout, task_id);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| files::io_err(&error))?;
+        }
+        let existing: Vec<Review> = files::read_json_lines(&path, "task reviews")?;
+        if existing
+            .iter()
+            .any(|entry| entry.review_id == review.review_id)
+        {
+            return Ok(());
+        }
+        files::append_json_line(&path, review)
+    })
+}
+
+/// Load all review records for a task (chronological append order).
+///
+/// # Errors
+/// Returns `CliError` on parse or I/O failure.
+#[allow(dead_code, reason = "consumed by try_close_quorum in the next slice")]
+pub(crate) fn load_reviews(
+    layout: &SessionLayout,
+    task_id: &str,
+) -> Result<Vec<Review>, CliError> {
+    files::read_json_lines(&files::reviews_path(layout, task_id), "task reviews")
 }
 
 /// Load checkpoints for a single task.

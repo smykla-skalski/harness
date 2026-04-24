@@ -35,6 +35,12 @@ pub(super) fn checkpoints_path(layout: &SessionLayout, task_id: &str) -> PathBuf
     layout.tasks_dir().join(task_id).join("checkpoints.jsonl")
 }
 
+/// Path to the reviews JSONL file for a task inside a session.
+#[allow(dead_code, reason = "consumed by apply_submit_review in the next slice")]
+pub(super) fn reviews_path(layout: &SessionLayout, task_id: &str) -> PathBuf {
+    layout.tasks_dir().join(task_id).join("reviews.jsonl")
+}
+
 /// Path to the per-project active-session registry.
 pub(super) fn active_registry_path(layout: &SessionLayout) -> PathBuf {
     layout.active_registry()

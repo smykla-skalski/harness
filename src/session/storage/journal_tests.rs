@@ -1,8 +1,9 @@
-use crate::session::types::{SessionTransition, TaskCheckpoint};
+use crate::session::types::{Review, ReviewVerdict, SessionTransition, TaskCheckpoint};
 use crate::workspace::layout::SessionLayout;
 
 use super::journal::{
-    append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
+    append_log_entry, append_review, append_task_checkpoint, load_log_entries, load_reviews,
+    load_task_checkpoints,
 };
 
 fn layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
@@ -60,4 +61,44 @@ fn checkpoint_round_trip_is_append_only() {
     let checkpoints = load_task_checkpoints(&layout, "task-1").expect("load");
     assert_eq!(checkpoints.len(), 1);
     assert_eq!(checkpoints[0].progress, 40);
+}
+
+#[test]
+fn append_review_is_idempotent_on_review_id() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = layout(tmp.path(), "sess-rev");
+    fs_err::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let review = Review {
+        review_id: "rev-1".into(),
+        round: 1,
+        reviewer_agent_id: "rev-claude".into(),
+        reviewer_runtime: "claude".into(),
+        verdict: ReviewVerdict::Approve,
+        summary: "LGTM".into(),
+        points: Vec::new(),
+        recorded_at: "2026-04-24T10:00:00Z".into(),
+    };
+
+    append_review(&layout, "task-1", &review).expect("first append");
+    append_review(&layout, "task-1", &review).expect("idempotent replay");
+
+    let loaded = load_reviews(&layout, "task-1").expect("load reviews");
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].review_id, "rev-1");
+
+    let review2 = Review {
+        review_id: "rev-2".into(),
+        round: 1,
+        reviewer_agent_id: "rev-codex".into(),
+        reviewer_runtime: "codex".into(),
+        verdict: ReviewVerdict::RequestChanges,
+        summary: "fix tests".into(),
+        points: Vec::new(),
+        recorded_at: "2026-04-24T10:05:00Z".into(),
+    };
+    append_review(&layout, "task-1", &review2).expect("second review");
+    let loaded = load_reviews(&layout, "task-1").expect("load reviews");
+    assert_eq!(loaded.len(), 2);
+    assert_eq!(loaded[1].review_id, "rev-2");
 }
