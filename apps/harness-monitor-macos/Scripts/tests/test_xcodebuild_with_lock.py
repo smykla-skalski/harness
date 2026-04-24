@@ -77,6 +77,51 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         self.assertIn("-scheme HarnessMonitor build", log)
         self.assertNotIn("RTK=", log)
 
+    def test_injects_default_derived_data_path_when_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "canonical-derived"
+            tool_log = temp_root / "tool.log"
+
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            log = tool_log.read_text() if tool_log.exists() else ""
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn(f"XCODEBUILD=-derivedDataPath {derived_data_path}", log)
+            self.assertIn("-scheme HarnessMonitor build", log)
+
     def test_runner_uses_absolute_xcodebuild_by_default(self) -> None:
         rtk_shell = RTK_SHELL_PATH.read_text()
 
