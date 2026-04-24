@@ -2,13 +2,14 @@ use super::{
     CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
     TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
     apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
-    apply_claim_review, apply_record_checkpoint, apply_submit_for_review, apply_update_task,
-    apply_update_task_queue_policy, ensure_valid_progress, generate_checkpoint_id,
-    load_state_or_err, log_checkpoint_recorded, log_task_assigned, log_task_created,
-    log_task_status_changed, protocol, reconcile_expired_pending_signals, refresh_session,
-    sort_session_tasks, started_task_signals, storage, utc_now,
-    write_prepared_task_start_signals,
+    apply_claim_review, apply_record_checkpoint, apply_submit_for_review, apply_submit_review,
+    apply_update_task, apply_update_task_queue_policy, ensure_valid_progress,
+    generate_checkpoint_id, generate_review_id, load_state_or_err, log_checkpoint_recorded,
+    log_task_assigned, log_task_created, log_task_status_changed, protocol,
+    reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
+    storage, utc_now, write_prepared_task_start_signals,
 };
+use crate::session::types::{Review, ReviewPoint, ReviewVerdict};
 
 /// Create a work item in the session.
 ///
@@ -332,6 +333,71 @@ pub fn claim_review(
         Some(actor_id),
         None,
     )?;
+    Ok(())
+}
+
+/// Submit a reviewer's verdict on a task that is `InReview`.
+///
+/// Appends the record to `tasks/<task_id>/reviews.jsonl` (idempotent on
+/// `review_id`), stamps the reviewer's `submitted_at`, and closes quorum
+/// if the distinct-runtime submission count meets `required_consensus`.
+///
+/// # Errors
+/// Returns `CliError` if the session is not active, the reviewer lacks
+/// `SubmitReview` permission or has no claim on the task, the task is
+/// not `InReview`, or storage fails.
+pub fn submit_review(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    verdict: ReviewVerdict,
+    summary: &str,
+    points: Vec<ReviewPoint>,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+
+    let state_before = load_state_or_err(session_id, project_dir)?;
+    let round = state_before
+        .tasks
+        .get(task_id)
+        .map_or(1, |task| task.review_round.saturating_add(1));
+    let reviewer_runtime = state_before
+        .agents
+        .get(actor_id)
+        .map(|agent| agent.runtime.clone())
+        .unwrap_or_default();
+    let review = Review {
+        review_id: generate_review_id(task_id),
+        round,
+        reviewer_agent_id: actor_id.to_string(),
+        reviewer_runtime,
+        verdict,
+        summary: summary.to_string(),
+        points,
+        recorded_at: now.clone(),
+    };
+
+    storage::append_review(&layout, task_id, &review)?;
+    let all_reviews = storage::load_reviews(&layout, task_id)?;
+
+    let prev_status = state_before.tasks.get(task_id).map(|task| task.status);
+    let new_state = storage::update_state(&layout, |state| {
+        apply_submit_review(state, task_id, &review, &all_reviews, &now)
+    })?;
+    let new_status = new_state.tasks.get(task_id).map(|task| task.status);
+
+    if let (Some(prev), Some(new)) = (prev_status, new_status)
+        && prev != new
+    {
+        storage::append_log_entry(
+            &layout,
+            log_task_status_changed(task_id, prev, new),
+            Some(actor_id),
+            None,
+        )?;
+    }
     Ok(())
 }
 
