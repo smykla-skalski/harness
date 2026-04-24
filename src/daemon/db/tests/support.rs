@@ -139,6 +139,12 @@ pub(super) fn sample_session_state() -> SessionState {
             blocked_reason: None,
             completed_at: None,
             checkpoint_summary: None,
+            awaiting_review: None,
+            review_claim: None,
+            consensus: None,
+            review_round: 0,
+            arbitration: None,
+            suggested_persona: None,
         },
     );
 
@@ -320,6 +326,12 @@ pub(super) fn performance_session_state(
             blocked_reason: None,
             completed_at: None,
             checkpoint_summary: None,
+            awaiting_review: None,
+            review_claim: None,
+            consensus: None,
+            review_round: 0,
+            arbitration: None,
+            suggested_persona: None,
         },
     );
 
@@ -355,8 +367,12 @@ pub(super) fn performance_session_state(
             agent_count: 1,
             active_agent_count: 1,
             idle_agent_count: 0,
+            awaiting_review_agent_count: 0,
             open_task_count: 1,
             in_progress_task_count: (token % 3) as u32,
+            awaiting_review_task_count: 0,
+            in_review_task_count: 0,
+            arbitration_task_count: 0,
             blocked_task_count: (token % 2) as u32,
             completed_task_count: (token % 4) as u32,
         },

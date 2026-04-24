@@ -16,6 +16,11 @@ pub enum SessionAction {
     SendSignal,
     ObserveSession,
     ViewStatus,
+    ClaimReview,
+    SubmitReview,
+    RespondReview,
+    Arbitrate,
+    ImproverApply,
 }
 
 /// All defined session actions.
@@ -31,25 +36,47 @@ const ALL_ACTIONS: &[SessionAction] = &[
     SessionAction::SendSignal,
     SessionAction::ObserveSession,
     SessionAction::ViewStatus,
+    SessionAction::ClaimReview,
+    SessionAction::SubmitReview,
+    SessionAction::RespondReview,
+    SessionAction::Arbitrate,
+    SessionAction::ImproverApply,
 ];
 
 /// Return the set of actions permitted for a given role.
 #[must_use]
 pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
     use SessionAction::{
-        CreateTask, ObserveSession, SendSignal, TransferLeader, UpdateTaskStatus, ViewStatus,
+        ClaimReview, CreateTask, ImproverApply, ObserveSession, RespondReview, SendSignal,
+        SubmitReview, TransferLeader, UpdateTaskStatus, ViewStatus,
     };
 
     let actions: &[SessionAction] = match role {
         SessionRole::Leader => ALL_ACTIONS,
         SessionRole::Observer => &[ObserveSession, ViewStatus, CreateTask, TransferLeader],
-        SessionRole::Worker => &[CreateTask, UpdateTaskStatus, ObserveSession, ViewStatus],
-        SessionRole::Reviewer | SessionRole::Improver => &[
+        SessionRole::Worker => &[
+            CreateTask,
+            UpdateTaskStatus,
+            ObserveSession,
+            ViewStatus,
+            RespondReview,
+        ],
+        SessionRole::Reviewer => &[
             CreateTask,
             UpdateTaskStatus,
             SendSignal,
             ObserveSession,
             ViewStatus,
+            ClaimReview,
+            SubmitReview,
+        ],
+        SessionRole::Improver => &[
+            CreateTask,
+            UpdateTaskStatus,
+            SendSignal,
+            ObserveSession,
+            ViewStatus,
+            ImproverApply,
         ],
     };
     actions.iter().copied().collect()

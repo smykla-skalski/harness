@@ -24,6 +24,7 @@ pub use state::{
     CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus,
 };
 pub use tasks::{
-    TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskQueuePolicy, TaskSeverity, TaskSource,
-    TaskStatus, WorkItem,
+    ArbitrationOutcome, AwaitingReview, Review, ReviewClaim, ReviewConsensus, ReviewPoint,
+    ReviewPointState, ReviewVerdict, ReviewerEntry, TaskCheckpoint, TaskCheckpointSummary,
+    TaskNote, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
