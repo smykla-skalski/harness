@@ -751,7 +751,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"}[2m]))) or on() vector(0)",
+                        "expr": "count(count by (session_id) (claude_code_active_time_seconds_total{organization_id=~\"${organization_id:regex}\",user_email=~\"${user_email:regex}\",terminal_type=~\"${terminal_type:regex}\"})) or on() vector(0)",
                         "legendFormat": "claude"
                       }
                     },
@@ -764,12 +764,15 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "loki",
+                      "group": "prometheus",
                       "version": "v0",
+                      "datasource": {
+                        "name": "prometheus"
+                      },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(sum by (conversation_id) (rate({service_name=\"codex\"}[2m])))",
-                        "queryType": "range"
+                        "expr": "sum(increase(codex_thread_started_total{deployment_environment=~\"${deployment_environment:regex}\",model=~\"${codex_model:regex}\",auth_mode=~\"${auth_mode:regex}\",session_source=~\"${session_source:regex}\"}[$__rate_interval]))",
+                        "legendFormat": "codex"
                       }
                     },
                     "refId": "B",
@@ -788,7 +791,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)",
+                        "expr": "sum(increase(github_copilot_agent_turn_count_sum[5m])) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -808,7 +811,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[2m]))) or on() vector(0)",
+                        "expr": "sum(increase(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[$__rate_interval])) or on() vector(0)",
                         "legendFormat": "gemini"
                       }
                     },
@@ -821,10 +824,10 @@
               "transformations": []
             }
           },
-          "description": "Claude, Codex, Copilot, and Gemini active sessions shown together as each agent's live session/activity signal.",
+          "description": "Claude sessions, Codex thread starts, Copilot agent turns, and Gemini API requests shown together as each agent's primary activity signal.",
           "id": 209,
           "links": [],
-          "title": "Active Sessions by Agent",
+          "title": "Primary Activity by Agent",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -973,7 +976,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval])) or on() vector(0)",
+                        "expr": "sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[5m])) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -1343,7 +1346,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[5m]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
                         "legendFormat": "copilot :: {{pretty_model}}"
                       }
                     },
@@ -7075,67 +7078,6 @@
             "version": ""
           }
         }
-      },
-      "agent-pulse": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum(rate(gemini_cli_api_request_count_total{service_name=~\"gemini|gemini-cli\"}[5m])) or on() vector(0)"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Agent activity pulse with custom SVG background and trend sparkline.",
-          "id": 501,
-          "links": [],
-          "title": "Agent Pulse",
-          "vizConfig": {
-            "group": "marcusolsson-dynamictext-panel",
-            "kind": "VizConfig",
-            "spec": {
-              "options": {
-                "content": "<div class=\"pulse-container\"><div class=\"pulse-label\">Agent Requests</div><div class=\"pulse-value\">{{#if data.length}}{{data.0.Value}}{{else}}0{{/if}}</div><div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div></div>",
-                "defaultContent": "<div class=\"pulse-container\"><div class=\"pulse-label\">Agent Requests</div><div class=\"pulse-value\">0</div></div>",
-                "renderMode": "allRows",
-                "editor": {
-                  "format": "auto",
-                  "language": "handlebars"
-                },
-                "editors": [],
-                "helpers": "",
-                "status": "",
-                "externalStyles": [],
-                "contentPartials": [],
-                "wrap": true,
-                "styles": ":host, .pulse-container { height: 100%; }\n.pulse-container {\n  width: 100%; min-height: 160px; height: 100%;\n  background: linear-gradient(135deg, rgba(0,211,255,0.18), rgba(0,128,255,0.08));\n  background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\"><defs><linearGradient id=\"g\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"rgb(0,211,255)\" stop-opacity=\"0.25\"/><stop offset=\"100%\" stop-color=\"rgb(0,80,200)\" stop-opacity=\"0.5\"/></linearGradient></defs><rect width=\"100\" height=\"100\" fill=\"url(%23g)\"/><circle cx=\"50\" cy=\"50\" r=\"42\" stroke=\"rgba(0,211,255,0.45)\" stroke-width=\"0.8\" fill=\"none\"/><circle cx=\"50\" cy=\"50\" r=\"28\" stroke=\"rgba(0,211,255,0.35)\" stroke-width=\"0.6\" fill=\"none\"/><circle cx=\"50\" cy=\"50\" r=\"14\" stroke=\"rgba(0,211,255,0.6)\" stroke-width=\"0.6\" fill=\"none\"/></svg>');\n  background-size: 100% 100%; background-repeat: no-repeat;\n  display: flex; flex-direction: column; justify-content: center; align-items: center;\n  position: relative; color: #00d3ff; border-radius: 6px;\n}\n.pulse-label { font-size: 1em; opacity: 0.85; margin-bottom: 6px; letter-spacing: 0.04em; }\n.pulse-value { font-size: 3em; font-weight: 700; text-shadow: 0 0 12px rgba(0,211,255,0.6); color: #00d3ff; }\n.pulse-sparkline { position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; opacity: 0.55; pointer-events: none; }\n#pulse-sparkline-canvas { width: 100%; height: 100%; display: block; }\n",
-                "afterRender": "const { data, element } = context;\nconst canvas = element && element.querySelector('#pulse-sparkline-canvas');\nif (!canvas || !Array.isArray(data)) { return; }\nconst ctx = canvas.getContext('2d');\nconst width = canvas.offsetWidth || canvas.parentElement.offsetWidth;\nconst height = canvas.offsetHeight || 40;\ncanvas.width = width; canvas.height = height;\nconst values = data.map(r => Number(r.Value)).filter(v => !Number.isNaN(v));\nctx.clearRect(0, 0, width, height);\nif (values.length < 2) { return; }\nconst max = Math.max(...values), min = Math.min(...values), range = max - min || 1;\nctx.beginPath(); ctx.strokeStyle = '#00d3ff'; ctx.lineWidth = 2;\nvalues.forEach((v, i) => { const x = (i/(values.length-1))*width; const y = height-((v-min)/range)*height; if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });\nctx.stroke();\nctx.lineTo(width, height); ctx.lineTo(0, height); ctx.closePath();\nctx.fillStyle = 'rgba(0, 211, 255, 0.1)'; ctx.fill();\n"
-              }
-            },
-            "version": ""
-          }
-        }
       }
     },
     "layout": {
@@ -7155,7 +7097,7 @@
                       "spec": {
                         "x": 0,
                         "y": 0,
-                        "width": 4,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7166,9 +7108,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 4,
+                        "x": 6,
                         "y": 0,
-                        "width": 4,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7179,9 +7121,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 8,
+                        "x": 12,
                         "y": 0,
-                        "width": 4,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -7192,26 +7134,13 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
+                        "x": 18,
                         "y": 0,
-                        "width": 4,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
                           "name": "active-sessions-gemini"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 16,
-                        "y": 0,
-                        "width": 8,
-                        "height": 4,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "agent-pulse"
                         }
                       }
                     },
