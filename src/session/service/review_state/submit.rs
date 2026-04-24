@@ -178,19 +178,6 @@ pub(crate) fn apply_claim_review(
     Ok(())
 }
 
-/// Record a reviewer's submitted review on the task and close quorum if
-/// the distinct-runtime submission count meets `required_consensus`.
-///
-/// The reviewer must already hold a claim; calling this before
-/// `apply_claim_review` is rejected. Submitting twice from the same
-/// reviewer updates `submitted_at` to the latest timestamp and rebuilds
-/// consensus from the supplied `all_reviews` slice; file-level
-/// idempotency on `review_id` lives in `storage::journal::append_review`.
-///
-/// # Errors
-/// - session is not active
-/// - actor lacks [`SessionAction::SubmitReview`]
-/// - task missing, not in `InReview`, or reviewer has no claim on it
 /// Read-only guardrail for [`apply_submit_review`].
 ///
 /// Callers must invoke this BEFORE writing the review record to disk,
@@ -198,7 +185,9 @@ pub(crate) fn apply_claim_review(
 /// journal entry in `tasks/<task_id>/reviews.jsonl`.
 ///
 /// # Errors
-/// Same error set as [`apply_submit_review`].
+/// - session is not active
+/// - actor lacks [`SessionAction::SubmitReview`]
+/// - task missing, not in `InReview`, or reviewer has no claim on it
 pub(crate) fn validate_submit_review(
     state: &SessionState,
     task_id: &str,
@@ -238,6 +227,17 @@ pub(crate) fn validate_submit_review(
     Ok(())
 }
 
+/// Record a reviewer's submitted review on the task and close quorum if
+/// the distinct-runtime submission count meets `required_consensus`.
+///
+/// The reviewer must already hold a claim; calling this before
+/// [`apply_claim_review`] is rejected. Submitting twice from the same
+/// reviewer updates `submitted_at` and rebuilds consensus from the
+/// supplied `all_reviews` slice; file-level idempotency on `review_id`
+/// lives in [`crate::session::storage::files::append_review`].
+///
+/// # Errors
+/// Same error set as [`validate_submit_review`].
 pub(crate) fn apply_submit_review(
     state: &mut SessionState,
     task_id: &str,
