@@ -127,7 +127,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-harness}
       GF_USERS_DEFAULT_THEME: ${GF_USERS_DEFAULT_THEME:-light}
       GF_ALERTING_EMAIL_ADDRESSES: ${GF_ALERTING_EMAIL_ADDRESSES:-admin@localhost}
-      GF_PLUGINS_PREINSTALL_SYNC: grafana-llm-app@1.0.8@https://grafana.com/api/plugins/grafana-llm-app/versions/1.0.8/download,frser-sqlite-datasource@4.0.2,bsull-console-datasource
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-llm-app@1.0.8@https://grafana.com/api/plugins/grafana-llm-app/versions/1.0.8/download,frser-sqlite-datasource@4.0.2,bsull-console-datasource,marcusolsson-dynamictext-panel@6.2.0
     volumes:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
