@@ -147,7 +147,7 @@ struct InspectorTaskActionsSection: View {
       }
       .harnessNativeFormControl()
       Picker("Status", selection: $taskStatus) {
-        ForEach(TaskStatus.allCases, id: \.self) { status in
+        ForEach(TaskStatus.genericStatusChoices, id: \.self) { status in
           Text(status.title).tag(status)
         }
       }
