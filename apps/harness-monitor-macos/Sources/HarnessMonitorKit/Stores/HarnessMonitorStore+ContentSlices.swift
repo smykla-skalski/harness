@@ -116,6 +116,11 @@ extension HarnessMonitorStore {
     public var presentedSessionDetail: SessionDetail?
     public var presentedTimeline: [TimelineEntry] = []
     public var presentedTimelineWindow: TimelineWindowResponse?
+    /// Filtered subset of tasks that currently require the arbitration banner.
+    /// Recomputed once per apply() tick instead of per body render so content
+    /// chrome readers avoid scanning the full task list on every `@Observable`
+    /// invalidation.
+    public private(set) var arbitrationBannerTasks: [WorkItem] = []
     private var retainedSessionDetail: SessionDetail?
     private var retainedTimeline: [TimelineEntry] = []
     private var retainedTimelineWindow: TimelineWindowResponse?
@@ -286,6 +291,11 @@ extension HarnessMonitorStore {
       if presentedTimelineWindowIdentity != nextTimelineWindowIdentity {
         presentedTimelineWindow = timelineWindow
         presentedTimelineWindowIdentity = nextTimelineWindowIdentity
+      }
+      let nextArbitrationTasks =
+        sessionDetail?.tasks.filter(\.requiresArbitrationBanner) ?? []
+      if arbitrationBannerTasks != nextArbitrationTasks {
+        arbitrationBannerTasks = nextArbitrationTasks
       }
     }
   }

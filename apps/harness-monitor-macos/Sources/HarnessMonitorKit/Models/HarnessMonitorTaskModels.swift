@@ -101,6 +101,13 @@ extension WorkItem {
     isQueuedForWorker && queuePolicy == .reassignWhenFree
   }
 
+  /// Whether the task should surface the arbitration banner in content chrome.
+  /// Matches either an emitted arbitration decision or a task that has burned
+  /// through the three review rounds without consensus.
+  public var requiresArbitrationBanner: Bool {
+    arbitration != nil || reviewRound >= 3
+  }
+
   public var assignmentSummary: String {
     guard let assignedTo else {
       return "Unassigned"
