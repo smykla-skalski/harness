@@ -1,5 +1,5 @@
 use harness::session::service;
-use harness::session::types::{ReviewVerdict, TaskStatus};
+use harness::session::types::{AgentStatus, ReviewVerdict, TaskStatus};
 
 use super::swarm_review_helpers::{prepare_in_progress_task, setup_two_reviewers_on_claimed_task};
 use super::with_session_test_env;
@@ -99,6 +99,101 @@ fn arbitrate_rejects_non_leader() {
             &project,
         );
         assert!(result.is_err(), "non-leader cannot arbitrate");
+    });
+}
+
+#[test]
+fn third_round_dispute_transitions_task_to_blocked_awaiting_arbitration() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-arb-blocked", || {
+        let project = tmp.path().join("project");
+        let (_leader, _worker, task_id) =
+            drive_to_round_three_dispute("arb-blocked", &project);
+
+        let state = service::session_status("arb-blocked", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(
+            task.status,
+            TaskStatus::Blocked,
+            "unresolved third-round dispute must move task to Blocked"
+        );
+        assert_eq!(
+            task.blocked_reason.as_deref(),
+            Some("awaiting_arbitration"),
+            "Blocked reason must marker awaiting_arbitration"
+        );
+        assert_eq!(task.review_round, 3);
+    });
+}
+
+#[test]
+fn arbitrate_rework_returns_task_to_in_progress_with_worker_reassigned() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-arb-rework", || {
+        let project = tmp.path().join("project");
+        let (leader_id, worker_id, task_id) = drive_to_round_three_dispute("arb-rw", &project);
+
+        service::arbitrate(
+            "arb-rw",
+            &task_id,
+            &leader_id,
+            ReviewVerdict::RequestChanges,
+            "worker must implement reviewer changes",
+            &project,
+        )
+        .expect("arbitrate rework");
+
+        let state = service::session_status("arb-rw", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::InProgress);
+        assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
+        assert!(task.consensus.is_none(), "consensus cleared on rework");
+        assert!(task.review_claim.is_none(), "reviewer claim cleared on rework");
+        assert!(
+            task.awaiting_review.is_none(),
+            "awaiting_review cleared on rework"
+        );
+        let outcome = task.arbitration.as_ref().expect("arbitration recorded");
+        assert_eq!(outcome.verdict, ReviewVerdict::RequestChanges);
+        let worker = state.agents.get(&worker_id).unwrap();
+        assert_eq!(worker.status, AgentStatus::Active);
+        assert_eq!(worker.current_task_id.as_deref(), Some(task_id.as_str()));
+    });
+}
+
+#[test]
+fn arbitrate_rejects_task_not_awaiting_arbitration() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-arb-notblocked", || {
+        let project = tmp.path().join("project");
+        // InReview task at round 0 never reached arbitration state.
+        let (_worker, task_id, _gemini, _claude) =
+            super::swarm_review_helpers::setup_two_reviewers_on_claimed_task("arb-nb", &project);
+        let leader_id = service::session_status("arb-nb", &project)
+            .unwrap()
+            .leader_id
+            .unwrap();
+
+        // Even manually bumping rounds via submit_review isn't possible without
+        // disputes; here verify that the task (which has round=0, status=InReview)
+        // cannot be arbitrated.
+        let err = service::arbitrate(
+            "arb-nb",
+            &task_id,
+            &leader_id,
+            ReviewVerdict::Approve,
+            "",
+            &project,
+        )
+        .expect_err("arbitrate must reject non-arbitration-state task");
+        assert!(
+            err.to_string().contains("arbitration")
+                || err.to_string().contains("Blocked")
+                || err.to_string().contains("awaiting_arbitration")
+                || err.to_string().contains("review_round")
+                || err.to_string().contains("rounds"),
+            "error should mention arbitration state, got: {err}"
+        );
     });
 }
 

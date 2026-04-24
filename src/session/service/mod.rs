@@ -127,7 +127,8 @@ pub use signals::{
     resolve_session_agent_for_runtime_session, send_signal,
 };
 pub use review_tasks::{
-    arbitrate, claim_review, respond_review, submit_for_review, submit_review,
+    arbitrate, claim_review, respond_review, submit_for_review, submit_for_review_with_persona,
+    submit_review,
 };
 pub use tasks::{
     assign_task, create_task, create_task_with_source, drop_task, list_tasks,

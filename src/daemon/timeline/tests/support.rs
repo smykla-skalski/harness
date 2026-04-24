@@ -231,6 +231,7 @@ fn sample_state_for_runtime(
             awaiting_review: None,
             review_claim: None,
             consensus: None,
+            review_history: Vec::new(),
             review_round: 0,
             arbitration: None,
             suggested_persona: None,

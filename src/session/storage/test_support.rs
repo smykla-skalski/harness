@@ -65,6 +65,7 @@ pub(super) fn sample_state(session_id: &str) -> SessionState {
                 awaiting_review: None,
                 review_claim: None,
                 consensus: None,
+                review_history: Vec::new(),
                 review_round: 0,
                 arbitration: None,
                 suggested_persona: None,

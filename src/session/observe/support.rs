@@ -35,6 +35,7 @@ fn map_issue_severity(severity: IssueSeverity) -> TaskSeverity {
 /// observe_persistence`). High-impact non-critical issue codes surface
 /// as [`TaskSeverity::High`] or [`TaskSeverity::Critical`] regardless
 /// of the classifier's own [`IssueSeverity`] tier.
+#[must_use]
 pub fn task_severity_for_issue(issue: &Issue) -> TaskSeverity {
     match issue.code {
         IssueCode::PythonTracebackOutput

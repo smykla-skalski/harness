@@ -15,12 +15,14 @@ use crate::daemon::protocol::{
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use crate::errors::CliError;
+use crate::agents::runtime::runtime_for_name;
 use crate::session::service::{
     self as session_service, ImproverApplyOutcome, apply_arbitrate, apply_claim_review,
     apply_respond_review, apply_submit_for_review, apply_submit_review, arbitrate as svc_arbitrate,
-    claim_review as svc_claim_review, generate_review_id, respond_review as svc_respond_review,
-    submit_for_review as svc_submit_for_review, submit_review as svc_submit_review,
-    validate_submit_review,
+    claim_review as svc_claim_review, generate_review_id, maybe_emit_spawn_reviewer,
+    respond_review as svc_respond_review,
+    submit_for_review_with_persona as svc_submit_for_review_with_persona,
+    submit_review as svc_submit_review, validate_submit_review,
 };
 use crate::session::storage as session_storage;
 use crate::session::types::{Review, TaskStatus};
@@ -66,11 +68,12 @@ pub fn submit_for_review(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
-    svc_submit_for_review(
+    svc_submit_for_review_with_persona(
         session_id,
         task_id,
         &request.actor,
         request.summary.as_deref(),
+        request.suggested_persona.as_deref(),
         &project_dir,
     )?;
     bump_and_refresh(db, session_id)?;
@@ -236,16 +239,43 @@ pub(crate) async fn submit_for_review_async(
 ) -> Result<SessionDetail, CliError> {
     let mut resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
+    apply_submit_for_review_to_resolved(&mut resolved, task_id, request, &now)?;
+    async_db
+        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .await?;
+    append_submit_for_review_log(async_db, session_id, task_id, &request.actor).await?;
+    maybe_materialize_spawn_reviewer_async(session_id, task_id, &resolved, &now, async_db).await?;
+    bump_async(async_db, session_id).await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+fn apply_submit_for_review_to_resolved(
+    resolved: &mut daemon_index::ResolvedSession,
+    task_id: &str,
+    request: &TaskSubmitForReviewRequest,
+    now: &str,
+) -> Result<(), CliError> {
     apply_submit_for_review(
         &mut resolved.state,
         task_id,
         &request.actor,
         request.summary.as_deref(),
-        &now,
+        now,
     )?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
+    if let Some(persona) = request.suggested_persona.as_deref()
+        && let Some(task) = resolved.state.tasks.get_mut(task_id)
+    {
+        task.suggested_persona = Some(persona.to_string());
+    }
+    Ok(())
+}
+
+async fn append_submit_for_review_log(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+) -> Result<(), CliError> {
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
@@ -254,12 +284,46 @@ pub(crate) async fn submit_for_review_async(
                 TaskStatus::InProgress,
                 TaskStatus::AwaitingReview,
             ),
-            Some(&request.actor),
+            Some(actor_id),
+            None,
+        ))
+        .await
+}
+
+async fn maybe_materialize_spawn_reviewer_async(
+    session_id: &str,
+    task_id: &str,
+    resolved: &daemon_index::ResolvedSession,
+    now: &str,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<(), CliError> {
+    let Some(record) = maybe_emit_spawn_reviewer(&resolved.state, task_id, now) else {
+        return Ok(());
+    };
+    let Some(runtime) = runtime_for_name(&record.runtime) else {
+        return Ok(());
+    };
+    let project_dir = effective_project_dir(resolved).to_path_buf();
+    let target_session_id = resolved
+        .state
+        .agents
+        .get(&record.agent_id)
+        .and_then(|agent| agent.agent_session_id.clone())
+        .unwrap_or_else(|| record.session_id.clone());
+    runtime.write_signal(&project_dir, &target_session_id, &record.signal)?;
+    async_db
+        .append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_signal_sent(
+                &record.signal.signal_id,
+                &record.agent_id,
+                &record.signal.command,
+            ),
+            None,
             None,
         ))
         .await?;
-    bump_async(async_db, session_id).await?;
-    session_detail_from_async_daemon_db(session_id, async_db).await
+    Ok(())
 }
 
 /// Claim a review slot (async path).

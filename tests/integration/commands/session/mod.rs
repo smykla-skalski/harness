@@ -14,6 +14,8 @@ mod recovery;
 mod swarm_auto_spawn;
 mod swarm_contract;
 mod swarm_improver;
+mod swarm_observer_routing;
+mod swarm_persona_routing;
 mod swarm_review_arbitrate;
 mod swarm_review_flow;
 mod swarm_review_helpers;
