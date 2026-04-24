@@ -398,8 +398,13 @@ extension SessionMetrics {
     self.init(
       agentCount: agents.count,
       activeAgentCount: agents.filter { $0.status == .active }.count,
+      idleAgentCount: agents.filter { $0.status == .idle }.count,
+      awaitingReviewAgentCount: agents.filter { $0.status == .awaitingReview }.count,
       openTaskCount: tasks.filter { $0.status == .open }.count,
       inProgressTaskCount: tasks.filter { $0.status == .inProgress }.count,
+      awaitingReviewTaskCount: tasks.filter { $0.status == .awaitingReview }.count,
+      inReviewTaskCount: tasks.filter { $0.status == .inReview }.count,
+      arbitrationTaskCount: tasks.filter { $0.arbitration != nil }.count,
       blockedTaskCount: tasks.filter { $0.status == .blocked }.count,
       completedTaskCount: tasks.filter { $0.status == .done }.count
     )
