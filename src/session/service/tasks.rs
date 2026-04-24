@@ -2,11 +2,12 @@ use super::{
     CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
     TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
     apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
-    apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
-    ensure_valid_progress, generate_checkpoint_id, load_state_or_err, log_checkpoint_recorded,
-    log_task_assigned, log_task_created, log_task_status_changed, protocol,
-    reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
-    storage, utc_now, write_prepared_task_start_signals,
+    apply_record_checkpoint, apply_submit_for_review, apply_update_task,
+    apply_update_task_queue_policy, ensure_valid_progress, generate_checkpoint_id,
+    load_state_or_err, log_checkpoint_recorded, log_task_assigned, log_task_created,
+    log_task_status_changed, protocol, reconcile_expired_pending_signals, refresh_session,
+    sort_session_tasks, started_task_signals, storage, utc_now,
+    write_prepared_task_start_signals,
 };
 
 /// Create a work item in the session.
@@ -267,6 +268,38 @@ pub fn update_task(
     )?;
     append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
 
+    Ok(())
+}
+
+/// Submit a task for review.
+///
+/// Transitions the task from `InProgress` to `AwaitingReview`, unassigns it,
+/// and flips the submitting worker's agent status to
+/// `AgentStatus::AwaitingReview`.
+///
+/// # Errors
+/// Returns `CliError` if the session is not active, the task is not
+/// `InProgress`, the task is not assigned to the actor, or storage fails.
+pub fn submit_for_review(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    summary: Option<&str>,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+
+    storage::update_state(&layout, |state| {
+        apply_submit_for_review(state, task_id, actor_id, summary, &now)
+    })?;
+
+    storage::append_log_entry(
+        &layout,
+        log_task_status_changed(task_id, TaskStatus::InProgress, TaskStatus::AwaitingReview),
+        Some(actor_id),
+        None,
+    )?;
     Ok(())
 }
 

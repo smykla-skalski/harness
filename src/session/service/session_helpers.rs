@@ -302,5 +302,12 @@ pub(crate) fn require_active_worker_target_agent(
         ))
         .into());
     }
+    if !agent.status.accepts_assignment() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is {} and cannot accept a new assignment",
+            agent_status_label(agent.status)
+        ))
+        .into());
+    }
     Ok(())
 }

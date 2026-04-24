@@ -12,6 +12,7 @@ use super::super::helpers::*;
 mod persona;
 mod recovery;
 mod swarm_contract;
+mod swarm_review_flow;
 
 fn session_cmd(command: SessionCommand) -> Command {
     Command::Session { command }
