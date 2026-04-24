@@ -2,6 +2,7 @@ mod backend;
 mod input_worker;
 mod live_refresh;
 mod manager;
+mod process_exit;
 mod sandboxed;
 mod spawn;
 mod support;
