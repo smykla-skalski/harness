@@ -6,128 +6,67 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
+STALE_SCAN_ROOT="$ROOT"
+export STALE_SCAN_ROOT
+# shellcheck source=scripts/lib/stale-scan.sh
+source "$ROOT/scripts/lib/stale-scan.sh"
+
 readonly RESET_HINT="run 'mise run clean:stale' to reset"
-readonly APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
-readonly GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$APP_GROUP_ID/harness/daemon"
-readonly APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/harness/daemon"
 
-stale=()
+stale_lines=()
 
-matching_process_pids() {
-  local process_kind="$1"
-
-  ps -Ao pid=,command= | awk -v process_kind="$process_kind" '
-    {
-      pid = $1
-      $1 = ""
-      sub(/^ +/, "", $0)
-      matched = 0
-      if (process_kind == "debug" && $0 ~ /target\/(debug|dev\/.*\/debug)\/harness (daemon|bridge)/) {
-        matched = 1
-      }
-      if (process_kind == "live" && $0 ~ /(^|\/)harness (daemon serve|bridge start)( |$)/) {
-        matched = 1
-      }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run test(:| |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|test|test:scripts|test:agents-e2e|audit|audit:from-ref)( |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /(^| )bash \.\/scripts\/check(\.sh|-scripts\.sh)( |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|test|run --quiet -- setup agents generate --check)( |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|test-swift|test-agents-e2e|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) { matched = 1 }
-      if (process_kind == "gate" && $0 ~ /python3 -m unittest discover -s .*apps\/harness-monitor-macos\/Scripts\/tests/) { matched = 1 }
-      if (matched == 1) {
-        print pid
-      }
-    }
-  '
+append_pid_block() {
+  local label="$1"
+  local pids="$2"
+  [[ -n "$pids" ]] || return 0
+  stale_lines+=("$label:")
+  local pid desc
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    desc="$(stale_scan_pid_describe "$pid")"
+    [[ -n "$desc" ]] || desc="$pid  ?  (no ps entry)"
+    stale_lines+=("  - $desc")
+  done <<<"$pids"
 }
 
-parent_pid() {
-  local pid="$1"
-  ps -p "$pid" -o ppid= 2>/dev/null | tr -d ' '
-}
-
-ancestor_pids() {
-  local pid="$1"
-  local ppid
-
-  while [[ -n "$pid" ]]; do
-    echo "$pid"
-    [[ "$pid" == "1" ]] && break
-    ppid="$(parent_pid "$pid")"
-    [[ -n "$ppid" && "$ppid" != "$pid" ]] || break
-    pid="$ppid"
+append_path_block() {
+  local label="$1"
+  shift
+  (( $# > 0 )) || return 0
+  stale_lines+=("$label:")
+  local path
+  for path in "$@"; do
+    stale_lines+=("  - $path")
   done
 }
 
-root_lock_holder_pids() {
-  local root="$1"
-  local lock_path
+# 1. Orphan cargo-built harness daemon/bridge processes from any target dir
+#    (covers debug, release, and dev/<triple>/{debug,release}).
+orphans="$(stale_scan_matching_pids build)"
+append_pid_block "orphan local cargo-built harness processes" "$orphans"
 
-  [[ -d "$root" ]] || return 0
+# 2. Repo-local gate workers still rooted in this checkout.
+repo_gate_workers="$(stale_scan_repo_gate_pids "$$")"
+append_pid_block "repo-local gate helpers still running" "$repo_gate_workers"
 
-  for lock_path in "$root/daemon.lock" "$root/bridge.lock"; do
-    [[ -e "$lock_path" ]] || continue
-    lsof -t "$lock_path" 2>/dev/null || true
-  done | sort -u
-}
+# 3. Live installed harness daemon/bridge processes only count as stale when
+#    they still hold the well-known locks under the real Harness roots.
+group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
+append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
 
-process_cwd() {
-  local pid="$1"
-  lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
-}
+app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
+append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
 
-repo_gate_pids() {
-  local pid
-  local cwd
-  local current_lineage
-
-  current_lineage="$(ancestor_pids "$$")"
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    if printf '%s\n' "$current_lineage" | grep -Fx -- "$pid" >/dev/null; then
-      continue
-    fi
-    cwd="$(process_cwd "$pid")"
-    if [[ "$cwd" == "$ROOT" || "$cwd" == "$ROOT/"* ]]; then
-      echo "$pid"
-    fi
-  done < <(matching_process_pids gate)
-}
-
-# 1. Orphan local debug harness daemon or bridge processes (leak vector for
-#    perf audits or integration tests that crashed mid-run before cleanup ran).
-orphans="$(matching_process_pids debug)"
-if [[ -n "$orphans" ]]; then
-  stale+=("orphan local debug harness processes: $(echo "$orphans" | tr '\n' ' ')")
-fi
-
-repo_gate_workers="$(repo_gate_pids)"
-if [[ -n "$repo_gate_workers" ]]; then
-  stale+=("repo-local gate helpers still running: $(echo "$repo_gate_workers" | tr '\n' ' ')")
-fi
-
-# 1b. Live installed/manual harness bridge or daemon processes are stale only
-#     when they still hold the well-known daemon/bridge locks for the user's
-#     real Harness roots.
-group_lock_holders="$(root_lock_holder_pids "$GROUP_CONTAINER_ROOT")"
-if [[ -n "$group_lock_holders" ]]; then
-  stale+=("live harness lock holders in $GROUP_CONTAINER_ROOT: $(echo "$group_lock_holders" | tr '\n' ' ')")
-fi
-
-app_support_lock_holders="$(root_lock_holder_pids "$APPLICATION_SUPPORT_ROOT")"
-if [[ -n "$app_support_lock_holders" ]]; then
-  stale+=("live harness lock holders in $APPLICATION_SUPPORT_ROOT: $(echo "$app_support_lock_holders" | tr '\n' ' ')")
-fi
-
-# 2. Stale /tmp bridge sockets. The sandboxed daemon now uses a Group
-#    Container fallback, so anything under /tmp is from before the fix or
-#    from an unsandboxed bridge that did not unlink on shutdown.
-shopt -s nullglob
-tmp_sockets=(/tmp/h-bridge-*.sock)
-shopt -u nullglob
-if (( ${#tmp_sockets[@]} > 0 )); then
-  stale+=("stale /tmp bridge sockets: ${tmp_sockets[*]}")
+# 4. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
+#    anything in /tmp is from before the sandbox fix or from an unsandboxed
+#    bridge that did not unlink on shutdown. Sweep .sock, .pid, and .lock.
+tmp_artifacts=()
+while IFS= read -r artifact; do
+  [[ -n "$artifact" ]] || continue
+  tmp_artifacts+=("$artifact")
+done < <(stale_scan_tmp_bridge_artifacts)
+if (( ${#tmp_artifacts[@]} > 0 )); then
+  append_path_block "stale /tmp bridge artifacts" "${tmp_artifacts[@]}"
 fi
 
 # Xcode UI silently recreates its default DerivedData HarnessMonitor bundle
@@ -137,11 +76,11 @@ fi
 # workflow hazard. `mise run clean:stale` still scrubs it on demand, and
 # `Scripts/generate-project.sh` still scrubs it on every project regen.
 
-if (( ${#stale[@]} > 0 )); then
+if (( ${#stale_lines[@]} > 0 )); then
   {
     echo "error: dev state is stale"
-    for item in "${stale[@]}"; do
-      echo "  - $item"
+    for line in "${stale_lines[@]}"; do
+      echo "  $line"
     done
     echo "$RESET_HINT"
   } >&2
