@@ -8,6 +8,7 @@ use crate::hooks::protocol::context::{
 };
 use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
+use crate::workspace::canonical_checkout_root;
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct HydratedHookState {
@@ -87,7 +88,7 @@ pub(crate) fn prepare_normalized_context(
     if normalized.event.is_unspecified() {
         normalized.event = default_event;
     }
-    normalized
+    hydrate_normalized_context(normalized)
 }
 
 pub(super) fn hydrate_normalized_context(
@@ -98,8 +99,10 @@ pub(super) fn hydrate_normalized_context(
 }
 
 fn hydrate_session(mut session: SessionContext) -> SessionContext {
-    if session.cwd.is_none() {
-        session.cwd = Some(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    }
+    let cwd = session
+        .cwd
+        .take()
+        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    session.cwd = Some(canonical_checkout_root(&cwd));
     session
 }

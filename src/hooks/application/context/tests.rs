@@ -32,6 +32,29 @@ fn from_normalized_hydrates_missing_session_cwd() {
 }
 
 #[test]
+fn from_normalized_canonicalizes_relative_session_cwd() {
+    let expected = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    let context = GuardContext::from_normalized(NormalizedHookContext {
+        event: NormalizedEvent::Notification,
+        session: SessionContext {
+            session_id: String::new(),
+            cwd: Some(PathBuf::from(".")),
+            transcript_path: None,
+        },
+        tool: None,
+        agent: None,
+        skill: SkillContext::inactive(),
+        raw: RawPayload::new(Value::Null),
+    });
+
+    assert_eq!(
+        context.session.cwd,
+        Some(expected.canonicalize().unwrap_or(expected))
+    );
+}
+
+#[test]
 fn skill_active_false_when_no_session_run_context() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg");

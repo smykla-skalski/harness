@@ -1,4 +1,7 @@
+use std::env;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 
 use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
@@ -23,6 +26,21 @@ fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     });
 }
 
+fn with_locked_current_dir<F: FnOnce()>(dir: &Path, test_fn: F) {
+    static CWD_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+    let _guard = CWD_MUTEX
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .expect("cwd mutex");
+    let old_dir = env::current_dir().expect("current dir");
+    env::set_current_dir(dir).expect("set current dir");
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(test_fn));
+    env::set_current_dir(old_dir).expect("restore current dir");
+    if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+    }
+}
+
 fn start_active_session(project: &Path, session_id: &str, context: &str) -> SessionState {
     let state = session_service::start_session(context, "", project, Some(session_id))
         .expect("start session");
@@ -36,6 +54,84 @@ fn start_active_session(project: &Path, session_id: &str, context: &str) -> Sess
         None,
     )
     .expect("join leader")
+}
+
+#[test]
+fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
+    with_temp_project(|project| {
+        let state = start_active_session(project, "hook-runtime-sess", "signal runtime test");
+        let leader_id = state.leader_id.expect("leader id");
+        let joined =
+            temp_env::with_vars([("CODEX_SESSION_ID", Some("runtime-worker-session"))], || {
+                session_service::join_session(
+                    "hook-runtime-sess",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker")
+            });
+        let worker_id = joined
+            .agents
+            .keys()
+            .find(|agent_id| agent_id.starts_with("codex-"))
+            .expect("worker id")
+            .clone();
+
+        session_service::send_signal(
+            "hook-runtime-sess",
+            &worker_id,
+            "inject_context",
+            "runtime path should receive queued context",
+            Some("review task-1"),
+            &leader_id,
+            project,
+        )
+        .expect("send signal");
+
+        with_locked_current_dir(project, || {
+            let hook = HookCommand::ToolGuard;
+            let span = tracing::info_span!("hook_runtime_test");
+            let metadata = observation::HookRunMetadata {
+                agent: HookAgent::Codex,
+                skill: "",
+                hook: &hook,
+                hook_impl: hook.hook(),
+                hook_name: hook.name(),
+                span: &span,
+                started_at: Instant::now(),
+            };
+            let raw = br#"{
+                "session_id":"runtime-worker-session",
+                "cwd":".",
+                "hook_event_name":"PreToolUse",
+                "tool_name":"Read",
+                "tool_input":{"file_path":"Cargo.toml"}
+            }"#;
+
+            let execution = observation::prepare_hook_execution(
+                &metadata,
+                NormalizedEvent::BeforeToolUse,
+                raw,
+            )
+            .expect("hook execution");
+
+            assert_eq!(
+                execution.normalized_for_record.session.cwd,
+                Some(project.canonicalize().unwrap_or_else(|_| project.to_path_buf()))
+            );
+            assert!(
+                execution
+                    .result
+                    .additional_context
+                    .as_deref()
+                    .is_some_and(|text| text.contains("runtime path should receive queued context"))
+            );
+        });
+    });
 }
 
 #[test]
