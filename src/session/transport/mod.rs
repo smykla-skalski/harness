@@ -10,6 +10,8 @@ mod session_commands;
 mod signal;
 mod support;
 mod task;
+#[cfg(test)]
+mod task_daemon_routing_tests;
 
 pub use improver::SessionImproverApplyArgs;
 pub use managed_agents::{
