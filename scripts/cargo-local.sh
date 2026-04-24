@@ -3,6 +3,8 @@ set -euo pipefail
 unalias -a 2>/dev/null || true
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/run-step.sh
+source "$ROOT/scripts/lib/run-step.sh"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
@@ -206,4 +208,4 @@ if ! cargo_bin_usable "$cargo_bin" && [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
   cargo_bin="${HOME}/.cargo/bin/cargo"
 fi
 
-exec "$cargo_bin" "$@"
+harness_run_step "cargo-local command" "$cargo_bin" "$@"
