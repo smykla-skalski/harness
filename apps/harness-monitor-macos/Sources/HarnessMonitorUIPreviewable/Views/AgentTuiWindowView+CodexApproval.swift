@@ -41,9 +41,7 @@ extension AgentTuiWindowView {
         requestsByApprovalID: requestsByApprovalID
       )
     }
-    let decisionItemByApprovalID = Dictionary(
-      uniqueKeysWithValues: decisionItems.map { ($0.approvalID, $0) }
-    )
+    let decisionItemByApprovalID = Self.firstCodexApprovalItemByApprovalID(decisionItems)
 
     var items = run.pendingApprovals.map { approval in
       decisionItemByApprovalID[approval.approvalId]
@@ -52,7 +50,32 @@ extension AgentTuiWindowView {
     if run.pendingApprovals.isEmpty {
       items.append(contentsOf: decisionItems)
     }
-    return items
+    return Self.uniqueCodexApprovalItemsByVisibleContent(items)
+  }
+
+  private static func firstCodexApprovalItemByApprovalID(
+    _ items: [CodexApprovalItem]
+  ) -> [String: CodexApprovalItem] {
+    var result: [String: CodexApprovalItem] = [:]
+    for item in items where result[item.approvalID] == nil {
+      result[item.approvalID] = item
+    }
+    return result
+  }
+
+  private static func uniqueCodexApprovalItemsByVisibleContent(
+    _ items: [CodexApprovalItem]
+  ) -> [CodexApprovalItem] {
+    var seen: Set<String> = []
+    var unique: [CodexApprovalItem] = []
+    for item in items {
+      let key = item.visibleContentKey
+      guard seen.insert(key).inserted else {
+        continue
+      }
+      unique.append(item)
+    }
+    return unique
   }
 
   private static func codexApprovalItem(
@@ -106,6 +129,11 @@ struct CodexApprovalItem: Identifiable, Equatable {
   let actions: [CodexApprovalActionButtonModel]
 
   var id: String { approvalID }
+
+  var visibleContentKey: String {
+    let actionsKey = actions.map { "\($0.id)=\($0.title)" }.joined(separator: "\u{1F}")
+    return [title, detail, actionsKey].joined(separator: "\u{1E}")
+  }
 
   static func fallback(from approval: CodexApprovalRequest) -> Self {
     Self(
