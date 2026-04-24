@@ -26,10 +26,10 @@ use crate::workspace::{project_context_dir, utc_now};
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
 use super::types::{
-    AgentRegistration, AgentStatus, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, PendingLeaderTransfer,
-    SessionMetrics, SessionRole, SessionSignalRecord, SessionSignalStatus, SessionState,
-    SessionStatus, SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote,
-    TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
+    AgentRegistration, AgentStatus, AwaitingReview, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION,
+    PendingLeaderTransfer, SessionMetrics, SessionRole, SessionSignalRecord, SessionSignalStatus,
+    SessionState, SessionStatus, SessionTransition, TaskCheckpoint, TaskCheckpointSummary,
+    TaskNote, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
@@ -93,6 +93,7 @@ mod liveness;
 mod logging;
 mod misc;
 mod queries;
+mod review_state;
 mod runtime_registration;
 mod runtime_support;
 mod session_helpers;
@@ -123,7 +124,7 @@ pub use signals::{
 };
 pub use tasks::{
     assign_task, create_task, create_task_with_source, drop_task, list_tasks,
-    record_task_checkpoint, update_task, update_task_queue_policy,
+    record_task_checkpoint, submit_for_review, update_task, update_task_queue_policy,
 };
 
 #[allow(unused_imports)]
@@ -144,6 +145,8 @@ pub(crate) use session_helpers::*;
 pub(crate) use session_state::*;
 #[allow(unused_imports)]
 pub(crate) use signal_support::*;
+#[allow(unused_imports)]
+pub(crate) use review_state::*;
 #[allow(unused_imports)]
 pub(crate) use task_queue::*;
 #[allow(unused_imports)]
