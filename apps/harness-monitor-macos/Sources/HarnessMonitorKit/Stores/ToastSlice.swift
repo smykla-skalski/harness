@@ -61,10 +61,22 @@ public final class ToastSlice {
 
   @discardableResult
   public func present(message: String, severity: ActionFeedback.Severity) -> UUID {
+    present(message: message, severity: severity, accessibilityIdentifier: nil)
+  }
+
+  @discardableResult
+  public func present(
+    message: String,
+    severity: ActionFeedback.Severity,
+    accessibilityIdentifier: String?
+  ) -> UUID {
     let now = clock.now
     let window = dedupeWindow
     let existingIndex = activeFeedback.firstIndex { feedback -> Bool in
-      guard feedback.severity == severity, feedback.message == message else {
+      guard feedback.severity == severity,
+        feedback.message == message,
+        feedback.accessibilityIdentifier == accessibilityIdentifier
+      else {
         return false
       }
       let elapsed: Duration = now - feedback.issuedAt
@@ -84,6 +96,7 @@ public final class ToastSlice {
     let feedback = ActionFeedback(
       message: message,
       severity: severity,
+      accessibilityIdentifier: accessibilityIdentifier,
       issuedAt: now
     )
     activeFeedback.insert(feedback, at: 0)

@@ -64,6 +64,78 @@ struct ReviewStreamingTests {
     #expect(slice.selectedSessionSession?.updatedAt == summaryB.updatedAt)
   }
 
+  @Test("Narrow push observes task and metric diffs even when summary updatedAt is stable")
+  func narrowPushObservesTaskDiffsWithoutUpdatedAtBump() {
+    let slice = HarnessMonitorStore.ContentSessionDetailSlice()
+    let summary = PreviewFixtures.summary
+    let updatedSummary = replacingMetrics(
+      summary,
+      with: SessionMetrics(
+        agentCount: summary.metrics.agentCount,
+        activeAgentCount: summary.metrics.activeAgentCount,
+        idleAgentCount: summary.metrics.idleAgentCount,
+        awaitingReviewAgentCount: summary.metrics.awaitingReviewAgentCount,
+        openTaskCount: summary.metrics.openTaskCount + 1,
+        inProgressTaskCount: summary.metrics.inProgressTaskCount,
+        awaitingReviewTaskCount: summary.metrics.awaitingReviewTaskCount + 1,
+        inReviewTaskCount: summary.metrics.inReviewTaskCount,
+        arbitrationTaskCount: summary.metrics.arbitrationTaskCount,
+        blockedTaskCount: summary.metrics.blockedTaskCount,
+        completedTaskCount: summary.metrics.completedTaskCount
+      )
+    )
+    let tasks =
+      PreviewFixtures.tasks
+      + [
+        WorkItem(
+          taskId: "task-awaiting-review",
+          title: "Awaiting review",
+          context: "Task-only push with a stable summary timestamp.",
+          severity: .medium,
+          status: .awaitingReview,
+          assignedTo: nil,
+          createdAt: "2026-03-28T14:21:00Z",
+          updatedAt: "2026-03-28T14:21:00Z",
+          createdBy: "leader-claude",
+          notes: [],
+          suggestedFix: nil,
+          source: .manual,
+          blockedReason: nil,
+          completedAt: nil,
+          checkpointSummary: nil
+        )
+      ]
+    let initialDetail = SessionDetail(
+      session: summary,
+      agents: PreviewFixtures.agents,
+      tasks: PreviewFixtures.tasks,
+      signals: PreviewFixtures.signals,
+      observer: PreviewFixtures.observer,
+      agentActivity: PreviewFixtures.agentActivity
+    )
+    let updatedDetail = SessionDetail(
+      session: updatedSummary,
+      agents: PreviewFixtures.agents,
+      tasks: tasks,
+      signals: PreviewFixtures.signals,
+      observer: PreviewFixtures.observer,
+      agentActivity: PreviewFixtures.agentActivity
+    )
+
+    slice.apply(
+      HarnessMonitorStore.ContentSessionDetailState(selectedSessionDetail: initialDetail),
+      selectedSessionSummary: summary
+    )
+    slice.apply(
+      HarnessMonitorStore.ContentSessionDetailState(selectedSessionDetail: updatedDetail),
+      selectedSessionSummary: updatedSummary
+    )
+
+    #expect(summary.updatedAt == updatedSummary.updatedAt)
+    #expect(slice.selectedSessionTasks == tasks)
+    #expect(slice.selectedSessionSession?.metrics == updatedSummary.metrics)
+  }
+
   @Test("Arbitration banner tasks recompute as session detail rotates")
   func arbitrationBannerTasksRecomputeOnDetailSwap() {
     let slice = HarnessMonitorStore.ContentSessionDetailSlice()
@@ -138,6 +210,35 @@ struct ReviewStreamingTests {
       externalOrigin: summary.externalOrigin,
       adoptedAt: summary.adoptedAt,
       metrics: summary.metrics
+    )
+  }
+
+  private func replacingMetrics(
+    _ summary: SessionSummary,
+    with metrics: SessionMetrics
+  ) -> SessionSummary {
+    SessionSummary(
+      projectId: summary.projectId,
+      projectName: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      sessionId: summary.sessionId,
+      worktreePath: summary.worktreePath,
+      sharedPath: summary.sharedPath,
+      originPath: summary.originPath,
+      branchRef: summary.branchRef,
+      title: summary.title,
+      context: summary.context,
+      status: summary.status,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      lastActivityAt: summary.lastActivityAt,
+      leaderId: summary.leaderId,
+      observeId: summary.observeId,
+      pendingLeaderTransfer: summary.pendingLeaderTransfer,
+      externalOrigin: summary.externalOrigin,
+      adoptedAt: summary.adoptedAt,
+      metrics: metrics
     )
   }
 }

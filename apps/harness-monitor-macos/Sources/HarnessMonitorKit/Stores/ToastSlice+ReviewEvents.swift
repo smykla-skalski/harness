@@ -1,6 +1,11 @@
 import Foundation
 
 extension ToastSlice {
+  public enum ReviewAccessibilityIdentifier {
+    public static let workerRefusalToast = "harness.toast.worker-refusal"
+    public static let signalCollisionToast = "harness.toast.signal-collision"
+  }
+
   /// Daemon rejected a worker claim because the agent is currently parked in
   /// `AwaitingReview`. Corresponds to the `session_agent_busy_awaiting_review`
   /// failure surface.
@@ -10,7 +15,11 @@ extension ToastSlice {
     taskID: String
   ) -> UUID {
     let message = "Agent \(agentID) is awaiting review. Task \(taskID) stays queued."
-    return presentFailure(message)
+    return present(
+      message: message,
+      severity: .failure,
+      accessibilityIdentifier: ReviewAccessibilityIdentifier.workerRefusalToast
+    )
   }
 
   /// Two or more agents tried to claim the same signal or review slot in the
@@ -23,6 +32,10 @@ extension ToastSlice {
   ) -> UUID {
     let message =
       "Signal \(signalID) collided with a concurrent claim by \(actorID). Retry once the other actor settles."
-    return presentFailure(message)
+    return present(
+      message: message,
+      severity: .failure,
+      accessibilityIdentifier: ReviewAccessibilityIdentifier.signalCollisionToast
+    )
   }
 }

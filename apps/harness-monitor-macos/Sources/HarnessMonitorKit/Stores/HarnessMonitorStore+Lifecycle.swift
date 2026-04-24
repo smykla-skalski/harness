@@ -349,7 +349,10 @@ extension HarnessMonitorStore {
     }
 
     withUISyncBatch {
-      selectedSession = detail
+      selection.applySelectedSession(
+        detail,
+        change: selectedSessionChange(for: selectedSession, next: detail)
+      )
       self.timeline = timeline
       self.timelineWindow = normalizedTimelineWindow(
         timelineWindow,
@@ -403,10 +406,4 @@ extension HarnessMonitorStore {
     )
   }
 
-}
-
-extension TimelineEntry {
-  fileprivate var timelineCursor: TimelineCursor {
-    TimelineCursor(recordedAt: recordedAt, entryId: entryId)
-  }
 }

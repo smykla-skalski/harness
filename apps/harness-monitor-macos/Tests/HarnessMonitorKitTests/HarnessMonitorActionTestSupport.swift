@@ -21,6 +21,47 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       progress: Int,
       actor: String
     )
+    case submitTaskForReview(
+      sessionID: String,
+      taskID: String,
+      actor: String,
+      summary: String?,
+      suggestedPersona: String?
+    )
+    case claimTaskReview(sessionID: String, taskID: String, actor: String)
+    case submitTaskReview(
+      sessionID: String,
+      taskID: String,
+      actor: String,
+      verdict: ReviewVerdict,
+      summary: String,
+      points: [ReviewPoint]
+    )
+    case respondTaskReview(
+      sessionID: String,
+      taskID: String,
+      actor: String,
+      agreed: [String],
+      disputed: [String],
+      note: String?
+    )
+    case arbitrateTask(
+      sessionID: String,
+      taskID: String,
+      actor: String,
+      verdict: ReviewVerdict,
+      summary: String
+    )
+    case applyImproverPatch(
+      sessionID: String,
+      actor: String,
+      issueID: String,
+      target: ImproverTarget,
+      relPath: String,
+      newContents: String,
+      projectDir: String,
+      dryRun: Bool
+    )
     case reconfigureHostBridge(enable: [String], disable: [String], force: Bool)
     case createTask(
       sessionID: String,

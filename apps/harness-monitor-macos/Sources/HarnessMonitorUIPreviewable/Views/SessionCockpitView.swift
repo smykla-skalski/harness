@@ -43,6 +43,9 @@ struct SessionCockpitView: View {
             inspectObserver: store.inspectObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
+          if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
+            SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
+          }
           HarnessMonitorAdaptiveGridLayout(
             minimumColumnWidth: 340,
             maximumColumns: 2,

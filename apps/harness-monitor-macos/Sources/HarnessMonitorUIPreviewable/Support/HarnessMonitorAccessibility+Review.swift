@@ -28,8 +28,11 @@ extension HarnessMonitorAccessibility {
   }
 
   public static func heuristicIssueCard(_ code: String) -> String {
-    "harness.cockpit.heuristic-issue.\(slug(code))"
+    "heuristicIssueCard.\(code)"
   }
+
+  public static let workerRefusalToast = "harness.toast.worker-refusal"
+  public static let signalCollisionToast = "harness.toast.signal-collision"
 
   public static let metricAwaitingReviewAgent = "harness.metrics.awaiting-review-agent"
   public static let metricAwaitingReviewTask = "harness.metrics.awaiting-review-task"
