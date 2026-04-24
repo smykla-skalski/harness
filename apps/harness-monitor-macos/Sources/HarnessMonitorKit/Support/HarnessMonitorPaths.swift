@@ -24,6 +24,14 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
     )
   }
 
+  public var isXCTestProcess: Bool {
+    values["XCTestConfigurationFilePath"] != nil
+      || values["HARNESS_MONITOR_UI_TESTS"] == "1"
+      || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+      || ProcessInfo.processInfo.processName == "xctest"
+  }
+
   private static func currentProcessValues() -> [String: String] {
     var values = ProcessInfo.processInfo.environment
     for key in liveEnvironmentOverrideKeys {
@@ -102,14 +110,18 @@ public enum HarnessMonitorPaths {
     }
 
     if let appGroupIdentifier = normalizedAppGroupIdentifier(using: environment) {
-      if let containerURL = nativeAppGroupContainerURL(identifier: appGroupIdentifier) {
+      if let containerURL = nativeAppGroupContainerURL(
+        identifier: appGroupIdentifier,
+        using: environment
+      ) {
         return containerURL
       }
       return appGroupContainerURL(identifier: appGroupIdentifier, using: environment)
     }
 
     if let containerURL = nativeAppGroupContainerURL(
-      identifier: HarnessMonitorAppGroup.identifier
+      identifier: HarnessMonitorAppGroup.identifier,
+      using: environment
     ) {
       return containerURL
     }
@@ -136,8 +148,14 @@ public enum HarnessMonitorPaths {
     return value
   }
 
-  private static func nativeAppGroupContainerURL(identifier: String) -> URL? {
-    FileManager.default.containerURL(
+  private static func nativeAppGroupContainerURL(
+    identifier: String,
+    using environment: HarnessMonitorEnvironment
+  ) -> URL? {
+    guard !environment.isXCTestProcess else {
+      return nil
+    }
+    return FileManager.default.containerURL(
       forSecurityApplicationGroupIdentifier: identifier
     )
   }
@@ -366,8 +384,7 @@ extension HarnessMonitorPaths {
 
   public static func socketDirectory(using env: HarnessMonitorEnvironment = .current) -> URL {
     let groupID = HarnessMonitorAppGroup.identifier
-    let container = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: groupID)
+    let container = nativeAppGroupContainerURL(identifier: groupID, using: env)
     guard let group = container else {
       return harnessRoot(using: env).appendingPathComponent("sock", isDirectory: true)
     }
