@@ -5,10 +5,6 @@
 //! helpers in this module canonicalize and guard the target path, back up
 //! the original before writing, skip no-op rewrites, and atomically
 //! replace the file on success.
-#![allow(
-    dead_code,
-    reason = "review_mutations + improver HTTP handler consume these in Slice 3/4"
-)]
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -156,7 +152,20 @@ pub fn apply_improver_apply(
     fs::write(&backup_path, &existing)
         .map_err(|e| CliError::from(io_for("write backup", &backup_path, &e)))?;
 
-    write_text(&canonical, new_contents)?;
+    // Atomic write with rollback: if write_text fails, restore the original
+    // contents from the in-memory pre-write bytes so the on-disk file never
+    // ends up truncated or partially written. The backup stays in place so
+    // a human can re-replay if the rollback itself fails.
+    if let Err(error) = write_text(&canonical, new_contents) {
+        if let Err(restore_err) = fs::write(&canonical, &existing) {
+            return Err(CliError::from(io_for(
+                "rollback improver write",
+                &canonical,
+                &restore_err,
+            )));
+        }
+        return Err(error);
+    }
 
     Ok(ImproverApplyOutcome {
         canonical_path: canonical,
