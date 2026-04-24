@@ -127,4 +127,55 @@ impl AsyncDaemonDb {
         .await
         .map_err(|error| db_error(format!("count async task_reviews: {error}")))
     }
+
+    /// Read the v10 denormalized task columns directly from `SQLite`.
+    /// Tests use this to prove each review mutation updates the columns
+    /// in place rather than relying only on the serialized state blob.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures. Returns [`Ok(None)`] when the
+    /// task row is missing.
+    #[cfg(test)]
+    pub(crate) async fn fetch_task_v10_columns(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Option<TaskV10Columns>, CliError> {
+        sqlx::query_as::<_, TaskV10Columns>(
+            "SELECT
+                 awaiting_review_queued_at,
+                 awaiting_review_submitter_agent_id,
+                 awaiting_review_required_consensus,
+                 review_round,
+                 review_claim_json,
+                 consensus_json,
+                 arbitration_json,
+                 suggested_persona,
+                 status
+             FROM tasks
+             WHERE session_id = ?1 AND task_id = ?2",
+        )
+        .bind(session_id)
+        .bind(task_id)
+        .fetch_optional(self.pool())
+        .await
+        .map_err(|error| db_error(format!("fetch v10 task columns: {error}")))
+    }
+}
+
+/// Raw read-back of the v10 denormalized `tasks` columns. Test-only helper
+/// used by Slice 3 persistence tests to assert review mutations update each
+/// column in place on the async SQLite path.
+#[cfg(test)]
+#[derive(Debug, sqlx::FromRow)]
+pub(crate) struct TaskV10Columns {
+    pub awaiting_review_queued_at: Option<String>,
+    pub awaiting_review_submitter_agent_id: Option<String>,
+    pub awaiting_review_required_consensus: i64,
+    pub review_round: i64,
+    pub review_claim_json: Option<String>,
+    pub consensus_json: Option<String>,
+    pub arbitration_json: Option<String>,
+    pub suggested_persona: Option<String>,
+    pub status: String,
 }
