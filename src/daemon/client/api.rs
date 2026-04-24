@@ -2,15 +2,17 @@ use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, Agen
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
-    CodexSteerRequest, LeaderTransferRequest, ManagedAgentListResponse, ManagedAgentSnapshot,
-    RoleChangeRequest, RuntimeSessionResolutionResponse, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    SessionSummary, SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    CodexSteerRequest, ImproverApplyRequest, LeaderTransferRequest, ManagedAgentListResponse,
+    ManagedAgentSnapshot, RoleChangeRequest, RuntimeSessionResolutionResponse, SessionDetail,
+    SessionEndRequest, SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse,
+    SessionStartRequest, SessionSummary, SessionTitleRequest, SignalAckRequest,
+    SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest,
+    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
     TaskUpdateRequest,
 };
 use crate::errors::CliError;
-use crate::session::service::ResolvedRuntimeSessionAgent;
+use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
 use crate::session::types::SessionState;
 
 use super::DaemonClient;
@@ -208,6 +210,74 @@ impl DaemonClient {
             &format!("/v1/sessions/{session_id}/tasks/{task_id}/checkpoint"),
             request,
         )
+    }
+
+    pub fn submit_task_for_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskSubmitForReviewRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/submit-for-review"),
+            request,
+        )
+    }
+
+    pub fn claim_task_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskClaimReviewRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/claim-review"),
+            request,
+        )
+    }
+
+    pub fn submit_task_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskSubmitReviewRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/submit-review"),
+            request,
+        )
+    }
+
+    pub fn respond_task_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskRespondReviewRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/respond-review"),
+            request,
+        )
+    }
+
+    pub fn arbitrate_task(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskArbitrateRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}/arbitrate"),
+            request,
+        )
+    }
+
+    pub fn improver_apply(
+        &self,
+        session_id: &str,
+        request: &ImproverApplyRequest,
+    ) -> Result<ImproverApplyOutcome, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/improver/apply"), request)
     }
 
     pub fn send_signal(

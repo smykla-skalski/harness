@@ -3,6 +3,8 @@ mod connection;
 mod http;
 
 #[cfg(test)]
+mod api_tests;
+#[cfg(test)]
 mod basic_tests;
 #[cfg(test)]
 mod discovery_tests;

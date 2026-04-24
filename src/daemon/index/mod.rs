@@ -7,6 +7,7 @@ mod contexts;
 mod io;
 mod paths;
 mod projects;
+mod reviews;
 mod sessions;
 #[cfg(test)]
 mod tests;
@@ -16,6 +17,7 @@ pub use projects::{
     discover_projects, discovered_project_for_checkout, discovered_project_for_context_root,
     fast_counts, projects_root,
 };
+pub use reviews::load_task_reviews;
 pub use sessions::{
     discover_sessions, discover_sessions_for, load_conversation_events, load_log_entries,
     load_session_state, load_task_checkpoints, resolve_session,

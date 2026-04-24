@@ -213,6 +213,19 @@ impl DaemonDb {
             }
         }
 
+        for task_id in prepared.resolved.state.tasks.keys() {
+            let reviews = daemon_index::load_task_reviews(
+                &prepared.resolved.project,
+                &prepared.resolved.state.session_id,
+                task_id,
+            )?;
+            self.rebuild_task_reviews(
+                &prepared.resolved.state.session_id,
+                task_id,
+                &reviews,
+            )?;
+        }
+
         self.sync_signal_index(&prepared.resolved.state.session_id, &prepared.signals)?;
         self.sync_agent_activity(&prepared.resolved.state.session_id, &prepared.activities)?;
 
