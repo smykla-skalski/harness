@@ -104,7 +104,7 @@ fn load_state_migrates_v3_state_and_persists_current_schema() {
 #[test]
 fn state_defaults_external_origin_none() {
     let state = sample_state("abc12345");
-    assert_eq!(state.schema_version, 9);
+    assert_eq!(state.schema_version, 10);
     assert!(state.external_origin.is_none());
     assert!(state.adopted_at.is_none());
 }
