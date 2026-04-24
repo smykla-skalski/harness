@@ -5,10 +5,16 @@
 //! helpers in this module canonicalize and guard the target path, back up
 //! the original before writing, skip no-op rewrites, and atomically
 //! replace the file on success.
+#![allow(
+    dead_code,
+    reason = "review_mutations + improver HTTP handler consume these in Slice 3/4"
+)]
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use similar::TextDiff;
 
@@ -16,9 +22,10 @@ use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_text;
 
 /// Canonical writeable targets for improver patches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code, reason = "consumed by improver CLI handler in Slice 4")]
-pub(crate) enum ImproverTarget {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "snake_case")]
+#[value(rename_all = "snake_case")]
+pub enum ImproverTarget {
     Skill,
     Plugin,
     LocalSkillClaude,
@@ -35,15 +42,14 @@ impl ImproverTarget {
 }
 
 /// Result of [`apply_improver_apply`].
-#[derive(Debug, Clone)]
-#[allow(dead_code, reason = "consumed by improver CLI handler in Slice 4")]
-pub(crate) struct ImproverApplyOutcome {
-    pub(crate) canonical_path: PathBuf,
-    pub(crate) before_sha256: String,
-    pub(crate) after_sha256: String,
-    pub(crate) applied: bool,
-    pub(crate) backup_path: Option<PathBuf>,
-    pub(crate) unified_diff: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImproverApplyOutcome {
+    pub canonical_path: PathBuf,
+    pub before_sha256: String,
+    pub after_sha256: String,
+    pub applied: bool,
+    pub backup_path: Option<PathBuf>,
+    pub unified_diff: String,
 }
 
 /// Canonicalize `rel` under `repo_root/<target-subdir>` and reject any
@@ -56,8 +62,7 @@ pub(crate) struct ImproverApplyOutcome {
 /// # Errors
 /// Returns [`CliError`] when the path is absolute, escapes the root,
 /// points outside the target subdirectory, or cannot be canonicalized.
-#[allow(dead_code, reason = "consumed by improver CLI handler in Slice 4")]
-pub(crate) fn validate_skill_patch_path(
+pub fn validate_skill_patch_path(
     repo_root: &Path,
     target: ImproverTarget,
     rel: &Path,
@@ -111,8 +116,7 @@ pub(crate) fn validate_skill_patch_path(
 /// # Errors
 /// Returns [`CliError`] when the path fails validation, the target file
 /// is missing, the backup write fails, or the atomic rename fails.
-#[allow(dead_code, reason = "consumed by improver CLI handler in Slice 4")]
-pub(crate) fn apply_improver_apply(
+pub fn apply_improver_apply(
     repo_root: &Path,
     target: ImproverTarget,
     rel: &Path,

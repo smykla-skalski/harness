@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::agents::runtime::signal::AckResult;
-use crate::session::types::{SessionRole, SessionState, TaskQueuePolicy, TaskSeverity, TaskStatus};
+use crate::session::service::ImproverTarget;
+use crate::session::types::{
+    ReviewPoint, ReviewVerdict, SessionRole, SessionState, TaskQueuePolicy, TaskSeverity,
+    TaskStatus,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleChangeRequest {
@@ -143,6 +147,59 @@ pub struct SignalCancelRequest {
     pub actor: String,
     pub agent_id: String,
     pub signal_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskSubmitForReviewRequest {
+    pub actor: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggested_persona: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskClaimReviewRequest {
+    pub actor: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskSubmitReviewRequest {
+    pub actor: String,
+    pub verdict: ReviewVerdict,
+    pub summary: String,
+    #[serde(default)]
+    pub points: Vec<ReviewPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskRespondReviewRequest {
+    pub actor: String,
+    #[serde(default)]
+    pub agreed: Vec<String>,
+    #[serde(default)]
+    pub disputed: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskArbitrateRequest {
+    pub actor: String,
+    pub verdict: ReviewVerdict,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImproverApplyRequest {
+    pub actor: String,
+    pub issue_id: String,
+    pub target: ImproverTarget,
+    pub rel_path: String,
+    pub new_contents: String,
+    pub project_dir: String,
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
