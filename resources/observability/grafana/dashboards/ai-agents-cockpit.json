@@ -269,6 +269,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -2025,7 +2026,7 @@
           }
         }
       },
-      "copilot-agent-runs": {
+      "copilot-tokens": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2044,7 +2045,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(github_copilot_agent_turn_count_count[$__range])) or on() vector(0)"
+                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__range]))) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2056,10 +2057,10 @@
               "transformations": []
             }
           },
-          "description": "Observed GitHub Copilot agent invocations over the selected range.",
+          "description": "Total Copilot LLM tokens over the selected range.",
           "id": 216,
           "links": [],
-          "title": "Copilot Agent Runs",
+          "title": "Copilot Tokens",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2078,11 +2079,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 500000
                       },
                       {
                         "color": "red",
-                        "value": 20
+                        "value": 2000000
                       }
                     ]
                   },
@@ -2109,7 +2110,7 @@
           }
         }
       },
-      "copilot-agent-turns": {
+      "copilot-sessions": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2128,7 +2129,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(github_copilot_agent_turn_count_sum[$__range])) or on() vector(0)"
+                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)"
                       }
                     },
                     "refId": "A",
@@ -2140,10 +2141,10 @@
               "transformations": []
             }
           },
-          "description": "Observed GitHub Copilot turns over the selected range.",
+          "description": "Distinct Copilot session_id values with activity in the last 2 minutes.",
           "id": 217,
           "links": [],
-          "title": "Copilot Agent Turns",
+          "title": "Copilot Sessions",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2162,11 +2163,11 @@
                       },
                       {
                         "color": "orange",
-                        "value": 10
+                        "value": 5
                       },
                       {
                         "color": "red",
-                        "value": 50
+                        "value": 15
                       }
                     ]
                   },
@@ -2193,7 +2194,7 @@
           }
         }
       },
-      "copilot-tool-calls": {
+      "copilot-tool-success": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -2212,7 +2213,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(github_copilot_tool_call_count_total[$__range])) or on() vector(0)"
+                        "expr": "100 * ((sum(increase(github_copilot_tool_call_count_total{success=\"true\"}[$__range])) or on() vector(0)) / clamp_min((sum(increase(github_copilot_tool_call_count_total[$__range])) or on() vector(0)), 1))"
                       }
                     },
                     "refId": "A",
@@ -2224,10 +2225,10 @@
               "transformations": []
             }
           },
-          "description": "Observed GitHub Copilot tool calls over the selected range.",
+          "description": "Percent of Copilot tool calls that completed successfully.",
           "id": 218,
           "links": [],
-          "title": "Copilot Tool Calls",
+          "title": "Copilot Tool Success Rate",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2237,24 +2238,26 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "max": 100,
+                  "min": 0,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "red",
                         "value": 0
                       },
                       {
                         "color": "orange",
-                        "value": 5
+                        "value": 90
                       },
                       {
-                        "color": "red",
-                        "value": 20
+                        "color": "green",
+                        "value": 98
                       }
                     ]
                   },
-                  "unit": "short"
+                  "unit": "percent"
                 },
                 "overrides": []
               },
@@ -2296,7 +2299,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "(1000 * (((histogram_quantile(0.95, sum by (le) (last_over_time(github_copilot_tool_call_duration_seconds_bucket[$__range])))) and on() (sum(last_over_time(github_copilot_tool_call_duration_seconds_count[$__range])) > 0)) or on() vector(0)))"
+                        "expr": "(1000 * (((histogram_quantile(0.95, sum by (le) (rate(github_copilot_tool_call_duration_seconds_bucket[5m])))) and on() (sum(rate(github_copilot_tool_call_duration_seconds_count[5m])) > 0)) or on() vector(0)))"
                       }
                     },
                     "refId": "A",
@@ -2308,7 +2311,7 @@
               "transformations": []
             }
           },
-          "description": "p95 Copilot tool-call latency from the Copilot duration histogram family.",
+          "description": "p95 Copilot tool-call latency over the last 5 minutes.",
           "id": 219,
           "links": [],
           "title": "Copilot Tool p95",
@@ -7110,15 +7113,24 @@
           "links": [],
           "options": {
             "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.A}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
-            "renderTemplate": "allRows",
+            "everyRow": false,
+            "useHandlebars": true,
+            "useMarkdown": false,
             "styles": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
-            "javascript": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && context.panelData.series.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const series = context.panelData.series[0];\n  const values = series.fields.find(f => f.name === 'Value' || f.name === 'A')?.values.buffer || series.fields[1].values.buffer || series.fields[1].values;\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n  \n  ctx.clearRect(0, 0, width, height);\n  ctx.beginPath();\n  ctx.strokeStyle = '#00d3ff';\n  ctx.lineWidth = 2;\n  \n  const validValues = Array.from(values).filter(v => v !== null && !isNaN(v));\n  if (validValues.length > 1) {\n    const max = Math.max(...validValues);\n    const min = Math.min(...validValues);\n    const range = max - min || 1;\n    \n    validValues.forEach((v, i) => {\n      const x = (i / (validValues.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    // Add area fill\n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
+            "onRender": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && data.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n\n  // Business Text v6 passes 'data' which contains the rows directly when everyRow is false\n  // We need to find the series values. In Business Text, 'data' is the joined rows.\n  const values = data.map(row => row.A).filter(v => v !== null && !isNaN(v));\n  \n  ctx.clearRect(0, 0, width, height);\n  if (values.length > 1) {\n    ctx.beginPath();\n    ctx.strokeStyle = '#00d3ff';\n    ctx.lineWidth = 2;\n    \n    const max = Math.max(...values);\n    const min = Math.min(...values);\n    const range = max - min || 1;\n    \n    values.forEach((v, i) => {\n      const x = (i / (values.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
           },
           "title": "Agent Pulse",
           "vizConfig": {
             "group": "marcusolsson-dynamictext-panel",
             "kind": "VizConfig",
-            "spec": {},
+            "spec": {
+              "content": "<div class=\"pulse-container\">\n  <div class=\"pulse-label\">Agent Requests</div>\n  <div class=\"pulse-value\">{{data.0.Value}}</div>\n  <div class=\"pulse-sparkline\"><canvas id=\"pulse-sparkline-canvas\"></canvas></div>\n</div>",
+              "everyRow": false,
+              "useHandlebars": true,
+              "useMarkdown": false,
+              "styles": ".pulse-container {\n  width: 100%;\n  height: 100%;\n  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQxIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMjExLDI1NSk7c3RvcC1vcGFjaXR5OjAuMDUiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6cmdiKDAsMTI4LDI1NSk7c3RvcC1vcGFjaXR5OjAuMTUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkMSkiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIHN0cm9rZT0icmdiYSgwLDIxMSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGZpbGw9Im5vbmUiIC8+Cjwvc3ZnPg==');\n  background-size: cover;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  color: #00d3ff;\n}\n.pulse-label {\n  font-size: 1em;\n  opacity: 0.7;\n  margin-bottom: 5px;\n}\n.pulse-value {\n  font-size: 3em;\n  font-weight: bold;\n  text-shadow: 0 0 10px rgba(0, 211, 255, 0.5);\n}\n.pulse-sparkline {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  height: 40%;\n  opacity: 0.4;\n}\n#pulse-sparkline-canvas {\n  width: 100%;\n  height: 100%;\n}",
+              "onRender": "const canvas = document.getElementById('pulse-sparkline-canvas');\nif (canvas && data.length > 0) {\n  const ctx = canvas.getContext('2d');\n  const width = canvas.offsetWidth;\n  const height = canvas.offsetHeight;\n  canvas.width = width;\n  canvas.height = height;\n\n  const values = data.map(row => row.Value).filter(v => v !== null && !isNaN(v));\n  \n  ctx.clearRect(0, 0, width, height);\n  if (values.length > 1) {\n    ctx.beginPath();\n    ctx.strokeStyle = '#00d3ff';\n    ctx.lineWidth = 2;\n    \n    const max = Math.max(...values);\n    const min = Math.min(...values);\n    const range = max - min || 1;\n    \n    values.forEach((v, i) => {\n      const x = (i / (values.length - 1)) * width;\n      const y = height - ((v - min) / range) * height;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    });\n    ctx.stroke();\n    \n    // Add area fill\n    ctx.lineTo(width, height);\n    ctx.lineTo(0, height);\n    ctx.closePath();\n    ctx.fillStyle = 'rgba(0, 211, 255, 0.1)';\n    ctx.fill();\n  }\n}"
+            },
             "version": ""
           }
         }
@@ -7204,7 +7216,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 6,
+                        "x": 12,
                         "y": 4,
                         "width": 6,
                         "height": 4,
@@ -7217,7 +7229,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
+                        "x": 6,
                         "y": 4,
                         "width": 6,
                         "height": 4,
@@ -7314,7 +7326,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "copilot-agent-runs"
+                          "name": "copilot-tokens"
                         }
                       }
                     },
@@ -7327,7 +7339,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "copilot-agent-turns"
+                          "name": "copilot-sessions"
                         }
                       }
                     },
@@ -7340,7 +7352,7 @@
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
-                          "name": "copilot-tool-calls"
+                          "name": "copilot-tool-success"
                         }
                       }
                     },
