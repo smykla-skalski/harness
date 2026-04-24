@@ -3,7 +3,7 @@ import HarnessMonitorKit
 
 /// Constants and helpers that back the "Custom..." escape hatch and the
 /// reasoning-effort picker in the agent startup form. Split from
-/// `AgentTuiWindowView+Panes.swift` to keep each view file focused.
+/// `AgentsWindowView+Panes.swift` to keep each view file focused.
 enum RuntimeCustomModel {
   /// Tag value used on the "Custom..." picker option. Chosen so it cannot
   /// collide with any real provider model id (those never start with a
@@ -11,7 +11,7 @@ enum RuntimeCustomModel {
   static let tag = "__custom__"
 }
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   /// The union of effort levels the system exposes, in low → high order. Used
   /// by the "Custom..." option where there is no catalog entry to consult.
   static let allEffortLevels: [String] = ["off", "low", "medium", "high", "xhigh"]

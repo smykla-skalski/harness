@@ -14,9 +14,9 @@ struct ClickableSwitchStyle: ToggleStyle {
   }
 }
 
-public struct AgentTuiWindowView: View {
+public struct AgentsWindowView: View {
   let store: HarnessMonitorStore
-  let navigationBridge: AgentTuiWindowNavigationBridge
+  let navigationBridge: AgentsWindowNavigationBridge
   @State private var stateViewModel: ViewModel
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
@@ -27,7 +27,7 @@ public struct AgentTuiWindowView: View {
   @MainActor
   public init(
     store: HarnessMonitorStore,
-    navigationBridge: AgentTuiWindowNavigationBridge = AgentTuiWindowNavigationBridge()
+    navigationBridge: AgentsWindowNavigationBridge = AgentsWindowNavigationBridge()
   ) {
     self.store = store
     self.navigationBridge = navigationBridge
@@ -258,7 +258,7 @@ public struct AgentTuiWindowView: View {
     @Bindable var viewModel = viewModel
     let displayState = displayState
     return NavigationSplitView {
-      AgentTuiSidebar(
+      AgentsSidebar(
         selection: $viewModel.selection,
         agentTuis: displayState.sortedAgentTuis,
         sessionTitlesByID: displayState.sessionTitlesByID,

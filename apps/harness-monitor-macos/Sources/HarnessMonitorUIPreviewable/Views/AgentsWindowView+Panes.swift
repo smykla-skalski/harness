@@ -2,7 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   @ViewBuilder var detailColumnContent: some View {
     if usesLiveViewportSplitLayout, let selectedSessionTui {
       sessionPane(selectedSessionTui)

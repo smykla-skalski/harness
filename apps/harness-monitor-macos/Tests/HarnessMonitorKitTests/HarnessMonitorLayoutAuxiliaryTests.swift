@@ -235,7 +235,7 @@ struct ContentWindowToolbarModelTests {
 struct AgentTuiViewportAutoResizeStabilizationTests {
   @Test("Minor viewport jitter preserves the current terminal size")
   func minorViewportJitterPreservesCurrentTerminalSize() {
-    let stabilized = AgentTuiWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+    let stabilized = AgentsWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
       measured: AgentTuiSize(rows: 49, cols: 122),
       baseline: AgentTuiSize(rows: 48, cols: 120)
     )
@@ -245,7 +245,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
 
   @Test("Meaningful viewport changes still auto-resize the terminal")
   func meaningfulViewportChangesStillAutoResizeTheTerminal() {
-    let stabilized = AgentTuiWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+    let stabilized = AgentsWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
       measured: AgentTuiSize(rows: 52, cols: 126),
       baseline: AgentTuiSize(rows: 48, cols: 120)
     )
@@ -256,7 +256,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Zero-size viewports do not auto-resize to the row/col minimum")
   func zeroSizeViewportsDoNotAutoResizeToMinimum() {
-    let collapsed = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+    let collapsed = AgentsWindowView.TerminalViewportSizing.terminalSize(
       for: CGSize(width: 0, height: 0),
       fontScale: 1
     )
@@ -267,7 +267,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Tiny transient viewports bail out instead of snapping to 9x20")
   func tinyTransientViewportsBailOut() {
-    let tiny = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+    let tiny = AgentsWindowView.TerminalViewportSizing.terminalSize(
       for: CGSize(width: 40, height: 30),
       fontScale: 1
     )
@@ -278,7 +278,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("A usable viewport still produces a measured terminal size")
   func usableViewportProducesMeasuredSize() {
-    let measured = AgentTuiWindowView.TerminalViewportSizing.terminalSize(
+    let measured = AgentsWindowView.TerminalViewportSizing.terminalSize(
       for: CGSize(width: 900, height: 600),
       fontScale: 1
     )

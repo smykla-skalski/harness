@@ -13,7 +13,7 @@ extension PreviewHarnessClient.Fixtures {
       itemId: "item-preview-1",
       cwd: PreviewFixtures.summary.projectDir,
       command: "apply_patch",
-      filePath: "Sources/HarnessMonitorUIPreviewable/Views/AgentTuiWindowView+Panes.swift"
+      filePath: "Sources/HarnessMonitorUIPreviewable/Views/AgentsWindowView+Panes.swift"
     )
     let run = CodexRunSnapshot(
       runId: "preview-codex-approval-run",

@@ -17,7 +17,7 @@ struct HarnessMonitorAppCommands: Commands {
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
-  let agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  let agentsNavigationBridge: AgentsWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -43,7 +43,7 @@ struct HarnessMonitorAppCommands: Commands {
   private var canNavigateBack: Bool {
     switch activeWindowNavigationScope {
     case .agents:
-      agentTuiNavigationBridge.state.canGoBack
+      agentsNavigationBridge.state.canGoBack
     case .main:
       displayState.canNavigateBack
     }
@@ -52,7 +52,7 @@ struct HarnessMonitorAppCommands: Commands {
   private var canNavigateForward: Bool {
     switch activeWindowNavigationScope {
     case .agents:
-      agentTuiNavigationBridge.state.canGoForward
+      agentsNavigationBridge.state.canGoForward
     case .main:
       displayState.canNavigateForward
     }
@@ -175,7 +175,7 @@ struct HarnessMonitorAppCommands: Commands {
     Task {
       switch scope {
       case .agents:
-        await agentTuiNavigationBridge.navigateBack()
+        await agentsNavigationBridge.navigateBack()
       case .main:
         await store.navigateBack()
       }
@@ -187,7 +187,7 @@ struct HarnessMonitorAppCommands: Commands {
     Task {
       switch scope {
       case .agents:
-        await agentTuiNavigationBridge.navigateForward()
+        await agentsNavigationBridge.navigateForward()
       case .main:
         await store.navigateForward()
       }

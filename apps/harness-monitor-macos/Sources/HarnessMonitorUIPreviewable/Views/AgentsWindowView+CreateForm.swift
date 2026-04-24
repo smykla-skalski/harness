@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   var createPane: some View {
     Form {
       createPaneBanners
@@ -95,13 +95,13 @@ extension AgentTuiWindowView {
     let effortValues =
       catalog
       .map {
-        AgentTuiWindowView.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue)
-      } ?? AgentTuiWindowView.allEffortLevels
+        AgentsWindowView.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue)
+      } ?? AgentsWindowView.allEffortLevels
     let effortBinding = Binding<String>(
       get: {
         guard let current = formModel.selectedTerminalEffortByRuntime[formModel.runtime],
           effortValues.contains(current)
-        else { return AgentTuiWindowView.defaultEffortLevel(from: effortValues) }
+        else { return AgentsWindowView.defaultEffortLevel(from: effortValues) }
         return current
       },
       set: { formModel.selectedTerminalEffortByRuntime[formModel.runtime] = $0 }
@@ -288,13 +288,13 @@ extension AgentTuiWindowView {
     let effortValues =
       catalog
       .map {
-        AgentTuiWindowView.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue)
-      } ?? AgentTuiWindowView.allEffortLevels
+        AgentsWindowView.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue)
+      } ?? AgentsWindowView.allEffortLevels
     let effortBinding = Binding<String>(
       get: {
         guard let current = formModel.selectedCodexEffort,
           effortValues.contains(current)
-        else { return AgentTuiWindowView.defaultEffortLevel(from: effortValues) }
+        else { return AgentsWindowView.defaultEffortLevel(from: effortValues) }
         return current
       },
       set: { formModel.selectedCodexEffort = $0 }

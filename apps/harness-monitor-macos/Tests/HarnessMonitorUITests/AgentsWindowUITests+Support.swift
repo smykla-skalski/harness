@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-extension AgentTuiWindowUITests {
+extension AgentsWindowUITests {
   func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
@@ -17,7 +17,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  func openAgentTuiWindow(in app: XCUIApplication) {
+  func openAgentsWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
     XCTAssertTrue(
       waitForElement(
@@ -27,7 +27,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  func reopenAgentTuiWindow(in app: XCUIApplication) {
+  func reopenAgentsWindow(in app: XCUIApplication) {
     tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
@@ -37,7 +37,7 @@ extension AgentTuiWindowUITests {
     )
   }
 
-  func closeAgentTuiWindow(in app: XCUIApplication) {
+  func closeAgentsWindow(in app: XCUIApplication) {
     app.typeKey("w", modifierFlags: .command)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {

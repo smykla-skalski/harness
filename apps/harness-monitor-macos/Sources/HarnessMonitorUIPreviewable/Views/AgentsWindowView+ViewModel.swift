@@ -2,7 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import Observation
 import SwiftUI
-extension AgentTuiWindowView {
+extension AgentsWindowView {
   protocol KeySequenceClock: AnyObject, Sendable {
     @MainActor var now: ContinuousClock.Instant { get }
     func sleep(until deadline: ContinuousClock.Instant) async throws
@@ -245,7 +245,7 @@ extension AgentTuiWindowView {
       sessionTitlesByID.reserveCapacity(sortedAgentTuis.count)
       for tui in sortedAgentTuis {
         sessionTitlesByID[tui.tuiId] =
-          agentNames[tui.agentId] ?? AgentTuiWindowView.runtimeTitle(for: tui)
+          agentNames[tui.agentId] ?? AgentsWindowView.runtimeTitle(for: tui)
       }
       let externalAgents = (store.selectedSession?.agents ?? [])
         .sorted { left, right in

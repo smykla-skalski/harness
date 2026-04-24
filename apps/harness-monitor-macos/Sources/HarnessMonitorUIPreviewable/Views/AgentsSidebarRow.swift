@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct AgentTuiSidebarRow: View {
+struct AgentsSidebarRow: View {
   let snapshot: AgentTuiSnapshot
   let title: String
   @Environment(\.fontScale)

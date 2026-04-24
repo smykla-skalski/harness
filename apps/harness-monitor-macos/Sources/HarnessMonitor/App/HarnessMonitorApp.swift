@@ -17,7 +17,7 @@ struct HarnessMonitorApp: App {
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
   @State private var showOpenFolder = false
-  @State private var agentTuiNavigationBridge: AgentTuiWindowNavigationBridge
+  @State private var agentsNavigationBridge: AgentsWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
@@ -63,7 +63,7 @@ struct HarnessMonitorApp: App {
     let store = configuration.store
     store.bindSupervisorNotifications(notificationController)
     _store = State(initialValue: store)
-    _agentTuiNavigationBridge = State(initialValue: AgentTuiWindowNavigationBridge())
+    _agentsNavigationBridge = State(initialValue: AgentsWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
   }
@@ -81,7 +81,7 @@ struct HarnessMonitorApp: App {
     .commands {
       HarnessMonitorAppCommands(
         store: store,
-        agentTuiNavigationBridge: agentTuiNavigationBridge,
+        agentsNavigationBridge: agentsNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         displayState: store.commandsDisplayState,
         textSizeIndex: textSizeIndex,
@@ -116,9 +116,9 @@ struct HarnessMonitorApp: App {
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
 
     Window("Agents", id: HarnessMonitorWindowID.agents) {
-      AgentTuiWindowRootView(
+      AgentsWindowRootView(
         store: store,
-        navigationBridge: agentTuiNavigationBridge,
+        navigationBridge: agentsNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode
       )
