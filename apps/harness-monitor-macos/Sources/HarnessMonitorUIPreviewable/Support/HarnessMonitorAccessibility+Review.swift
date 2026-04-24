@@ -22,4 +22,17 @@ extension HarnessMonitorAccessibility {
   public static func improverTaskCard(_ taskID: String) -> String {
     "harness.inspector.task.improver-card.\(slug(taskID))"
   }
+
+  public static func arbitrationBanner(_ taskID: String) -> String {
+    "harness.banner.arbitration.\(slug(taskID))"
+  }
+
+  public static func heuristicIssueCard(_ code: String) -> String {
+    "harness.cockpit.heuristic-issue.\(slug(code))"
+  }
+
+  public static let metricAwaitingReviewAgent = "harness.metrics.awaiting-review-agent"
+  public static let metricAwaitingReviewTask = "harness.metrics.awaiting-review-task"
+  public static let metricInReviewTask = "harness.metrics.in-review-task"
+  public static let metricArbitrationTask = "harness.metrics.arbitration-task"
 }
