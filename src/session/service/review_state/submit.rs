@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use super::super::{
     AgentStatus, AwaitingReview, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
-    clear_agent_current_task, refresh_session, require_active, require_permission,
-    task_not_found, task_status_label, touch_agent,
+    clear_agent_current_task, refresh_session, require_active, require_permission, task_not_found,
+    task_status_label, touch_agent,
 };
 use crate::session::types::{
     Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry, WorkItem,

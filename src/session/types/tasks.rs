@@ -224,6 +224,7 @@ pub struct Review {
 pub enum ReviewVerdict {
     Approve,
     #[value(name = "request_changes", alias = "request-changes")]
+    #[serde(alias = "request-changes")]
     RequestChanges,
     Reject,
 }
@@ -262,6 +263,11 @@ pub struct ReviewConsensus {
     #[serde(default)]
     pub reviewer_agent_ids: Vec<String>,
 }
+
+/// `blocked_reason` string written on tasks that exhausted the three-round
+/// review cycle and await leader arbitration. Stored with an underscore so
+/// filters and metrics can match on one stable slug.
+pub const ARBITRATION_BLOCKED_REASON: &str = "awaiting_arbitration";
 
 /// Leader arbitration result for a task that exhausted the three-round
 /// review cycle with outstanding disputed points.

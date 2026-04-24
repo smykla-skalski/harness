@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::observe::types::Issue;
 #[cfg(test)]
 use crate::observe::types::IssueCode;
-use crate::observe::types::Issue;
 use crate::session::types::{TaskSeverity, TaskSource};
 
 use super::{
@@ -78,17 +78,28 @@ fn apply_task_specs(
     let Some(actor_id) = actor_id.filter(|value| !value.trim().is_empty()) else {
         return Ok(Vec::new());
     };
-    let mut known_titles: HashSet<String> = resolved
+    let mut known_issue_ids: HashSet<String> = resolved
         .state
         .tasks
         .values()
+        .filter_map(|task| task.observe_issue_id.clone())
+        .collect();
+    let mut known_titles_without_issue: HashSet<String> = resolved
+        .state
+        .tasks
+        .values()
+        .filter(|task| task.observe_issue_id.is_none())
         .map(|task| task.title.clone())
         .collect();
     let now = utc_now();
     let mut created_logs = Vec::new();
 
     for task_spec in task_specs {
-        if !known_titles.insert(task_spec.title.clone()) {
+        if let Some(issue_id) = task_spec.observe_issue_id.as_deref() {
+            if !known_issue_ids.insert(issue_id.to_string()) {
+                continue;
+            }
+        } else if !known_titles_without_issue.insert(task_spec.title.clone()) {
             continue;
         }
         let spec = session_service::TaskSpec {
@@ -191,7 +202,6 @@ fn heuristic_gap_task_spec(issue: &Issue) -> ObserveTaskSpec {
     }
 }
 
-
 /// Inject a synthetic classifier issue and auto-file it as a task using
 /// the same code path as production observer persistence. Crate-test
 /// only; returns the resulting [`WorkItem`] for assertion.
@@ -202,9 +212,7 @@ pub(crate) fn test_inject_issue(
     code: IssueCode,
     now: &str,
 ) -> Result<crate::session::types::WorkItem, CliError> {
-    use crate::observe::types::{
-        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole,
-    };
+    use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole};
 
     let issue = Issue {
         id: format!("{code}/{agent_id}/1"),
@@ -238,9 +246,7 @@ pub(crate) fn test_inject_issue(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::observe::types::{
-        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole,
-    };
+    use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole};
     use crate::session::types::{
         AgentRegistration, AgentStatus, SessionMetrics, SessionPolicy, SessionRole, SessionState,
         SessionStatus,
@@ -354,6 +360,74 @@ mod tests {
         .expect("inject");
         assert_eq!(task.severity, TaskSeverity::High);
         assert_eq!(task.source, TaskSource::Observe);
-        assert!(task.observe_issue_id.as_deref().unwrap().starts_with("python_traceback_output/"));
+        assert!(
+            task.observe_issue_id
+                .as_deref()
+                .unwrap()
+                .starts_with("python_traceback_output/")
+        );
+    }
+
+    #[test]
+    fn apply_task_specs_dedupes_by_observe_issue_id_not_title() {
+        let mut resolved = ResolvedSession {
+            project: crate::daemon::index::DiscoveredProject {
+                project_id: "observe-project".into(),
+                name: "observe".into(),
+                project_dir: None,
+                repository_root: None,
+                checkout_id: "checkout".into(),
+                checkout_name: "main".into(),
+                context_root: PathBuf::new(),
+                is_worktree: false,
+                worktree_name: None,
+            },
+            state: base_state(),
+        };
+        let first = ObserveTaskSpec {
+            title: "[forbidden_claim] same".into(),
+            context: None,
+            severity: TaskSeverity::High,
+            suggested_fix: None,
+            observe_issue_id: Some("issue-a".into()),
+        };
+        let changed_summary = ObserveTaskSpec {
+            title: "[forbidden_claim] changed".into(),
+            context: None,
+            severity: TaskSeverity::High,
+            suggested_fix: None,
+            observe_issue_id: Some("issue-a".into()),
+        };
+        let same_title_distinct_issue = ObserveTaskSpec {
+            title: "[forbidden_claim] same".into(),
+            context: None,
+            severity: TaskSeverity::High,
+            suggested_fix: None,
+            observe_issue_id: Some("issue-b".into()),
+        };
+
+        let created =
+            apply_task_specs(&mut resolved, Some("leader"), &[first]).expect("first create");
+        assert_eq!(created.len(), 1);
+        let created = apply_task_specs(
+            &mut resolved,
+            Some("leader"),
+            &[changed_summary, same_title_distinct_issue],
+        )
+        .expect("second create");
+
+        assert_eq!(
+            created.len(),
+            1,
+            "same issue id must dedupe even when summary changes; same title with distinct issue id must create"
+        );
+        let issue_ids: HashSet<_> = resolved
+            .state
+            .tasks
+            .values()
+            .filter_map(|task| task.observe_issue_id.as_deref())
+            .collect();
+        assert!(issue_ids.contains("issue-a"));
+        assert!(issue_ids.contains("issue-b"));
     }
 }

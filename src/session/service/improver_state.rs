@@ -64,7 +64,9 @@ pub fn validate_skill_patch_path(
     rel: &Path,
 ) -> Result<PathBuf, CliError> {
     if rel.as_os_str().is_empty() {
-        return Err(CliErrorKind::usage_error("improver path must not be empty".to_string()).into());
+        return Err(
+            CliErrorKind::usage_error("improver path must not be empty".to_string()).into(),
+        );
     }
     if rel.is_absolute() {
         return Err(CliErrorKind::usage_error(format!(
@@ -120,9 +122,65 @@ pub fn apply_improver_apply(
     issue_id: &str,
     now: &str,
 ) -> Result<ImproverApplyOutcome, CliError> {
+    let planned = plan_improver_apply(repo_root, target, rel, new_contents)?;
+    if planned.before_sha256 == planned.after_sha256 {
+        return Ok(planned);
+    }
+
+    let backup_dir = repo_root.join(".harness-cache").join("improver-backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|e| CliError::from(io_for("create_dir_all", &backup_dir, &e)))?;
+    let backup_name = format!("{}.{}.bak", sanitize(issue_id), sanitize(now));
+    let backup_path = backup_dir.join(backup_name);
+    let existing = fs::read(&planned.canonical_path)
+        .map_err(|e| CliError::from(io_for("read", &planned.canonical_path, &e)))?;
+    fs::write(&backup_path, &existing)
+        .map_err(|e| CliError::from(io_for("write backup", &backup_path, &e)))?;
+
+    // Atomic write with rollback: if write_text fails, restore the original
+    // contents from the in-memory pre-write bytes so the on-disk file never
+    // ends up truncated or partially written. The backup stays in place so
+    // a human can re-replay if the rollback itself fails.
+    if let Err(error) = write_text(&planned.canonical_path, new_contents) {
+        if let Err(restore_err) = fs::write(&planned.canonical_path, &existing) {
+            return Err(CliError::from(io_for(
+                "rollback improver write",
+                &planned.canonical_path,
+                &restore_err,
+            )));
+        }
+        return Err(error);
+    }
+
+    Ok(ImproverApplyOutcome {
+        applied: true,
+        backup_path: Some(backup_path),
+        ..planned
+    })
+}
+
+/// Validate and diff an improver apply request without writing files.
+///
+/// # Errors
+/// Returns [`CliError`] when validation or target reads fail.
+pub fn preview_improver_apply(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    plan_improver_apply(repo_root, target, rel, new_contents)
+}
+
+fn plan_improver_apply(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
     let canonical = validate_skill_patch_path(repo_root, target, rel)?;
-    let existing = fs::read(&canonical)
-        .map_err(|e| CliError::from(io_for("read", &canonical, &e)))?;
+    let existing =
+        fs::read(&canonical).map_err(|e| CliError::from(io_for("read", &canonical, &e)))?;
     let existing_text: String = String::from_utf8_lossy(&existing).into_owned();
     let new_contents_owned: String = new_contents.to_string();
     let before = sha256_hex(&existing);
@@ -133,46 +191,12 @@ pub fn apply_improver_apply(
         .header(&rel_display, &rel_display)
         .to_string();
 
-    if before == after {
-        return Ok(ImproverApplyOutcome {
-            canonical_path: canonical,
-            before_sha256: before,
-            after_sha256: after,
-            applied: false,
-            backup_path: None,
-            unified_diff,
-        });
-    }
-
-    let backup_dir = repo_root.join(".harness-cache").join("improver-backups");
-    fs::create_dir_all(&backup_dir)
-        .map_err(|e| CliError::from(io_for("create_dir_all", &backup_dir, &e)))?;
-    let backup_name = format!("{}.{}.bak", sanitize(issue_id), sanitize(now));
-    let backup_path = backup_dir.join(backup_name);
-    fs::write(&backup_path, &existing)
-        .map_err(|e| CliError::from(io_for("write backup", &backup_path, &e)))?;
-
-    // Atomic write with rollback: if write_text fails, restore the original
-    // contents from the in-memory pre-write bytes so the on-disk file never
-    // ends up truncated or partially written. The backup stays in place so
-    // a human can re-replay if the rollback itself fails.
-    if let Err(error) = write_text(&canonical, new_contents) {
-        if let Err(restore_err) = fs::write(&canonical, &existing) {
-            return Err(CliError::from(io_for(
-                "rollback improver write",
-                &canonical,
-                &restore_err,
-            )));
-        }
-        return Err(error);
-    }
-
     Ok(ImproverApplyOutcome {
         canonical_path: canonical,
         before_sha256: before,
         after_sha256: after,
-        applied: true,
-        backup_path: Some(backup_path),
+        applied: false,
+        backup_path: None,
         unified_diff,
     })
 }
@@ -317,10 +341,29 @@ mod tests {
         assert!(outcome.backup_path.is_none());
         let backups = repo.path().join(".harness-cache").join("improver-backups");
         assert!(
-            !backups.exists()
-                || fs::read_dir(&backups).unwrap().next().is_none(),
+            !backups.exists() || fs::read_dir(&backups).unwrap().next().is_none(),
             "no backup should be created on no-op apply"
         );
+    }
+
+    #[test]
+    fn dry_run_reports_hashes_and_diff_without_writing() {
+        let (repo, sub) = seed_repo(ImproverTarget::Skill);
+        let file = sub.join("SKILL.md");
+        write_file(&file, "old\n");
+        let outcome = preview_improver_apply(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("SKILL.md"),
+            "new\n",
+        )
+        .expect("preview");
+        assert!(!outcome.applied);
+        assert_ne!(outcome.before_sha256, outcome.after_sha256);
+        assert!(outcome.backup_path.is_none());
+        assert!(outcome.unified_diff.contains("-old"));
+        assert!(outcome.unified_diff.contains("+new"));
+        assert_eq!(fs::read_to_string(file).expect("read"), "old\n");
     }
 
     #[test]

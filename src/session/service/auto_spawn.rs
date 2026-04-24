@@ -56,8 +56,8 @@ pub(crate) fn maybe_emit_spawn_reviewer(
 mod tests {
     use super::*;
     use crate::session::types::{
-        AgentRegistration, AgentStatus, AwaitingReview, SessionMetrics, SessionPolicy,
-        SessionRole, SessionState, SessionStatus, TaskSeverity, TaskSource, TaskStatus, WorkItem,
+        AgentRegistration, AgentStatus, AwaitingReview, SessionMetrics, SessionPolicy, SessionRole,
+        SessionState, SessionStatus, TaskSeverity, TaskSource, TaskStatus, WorkItem,
     };
     use std::collections::BTreeMap;
     use std::path::PathBuf;
@@ -183,11 +183,7 @@ mod tests {
         let mut state = base_state();
         leader(&mut state);
         awaiting_review_task(&mut state);
-        state
-            .tasks
-            .get_mut("task-1")
-            .unwrap()
-            .status = TaskStatus::InProgress;
+        state.tasks.get_mut("task-1").unwrap().status = TaskStatus::InProgress;
         assert!(maybe_emit_spawn_reviewer(&state, "task-1", "now").is_none());
     }
 }

@@ -270,7 +270,6 @@ pub fn update_task(
     Ok(())
 }
 
-
 /// Record an append-only task checkpoint.
 ///
 /// # Errors

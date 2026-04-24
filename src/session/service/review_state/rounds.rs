@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 
 use super::super::{
-    AgentStatus, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
-    refresh_session, require_active, require_permission, task_not_found, task_status_label,
-    touch_agent,
+    AgentStatus, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus, refresh_session,
+    require_active, require_permission, task_not_found, task_status_label, touch_agent,
 };
-use crate::session::types::{ArbitrationOutcome, ReviewPointState, ReviewVerdict, WorkItem};
+use crate::session::types::{
+    ARBITRATION_BLOCKED_REASON, ArbitrationOutcome, ReviewPointState, ReviewVerdict, WorkItem,
+};
 
 pub(crate) fn apply_respond_review(
     state: &mut SessionState,
@@ -170,7 +171,6 @@ fn merge_points(task: &mut WorkItem, agreed: &[String], disputed: &[String], not
 }
 
 const ARBITRATION_ROUND_GATE: u8 = 3;
-pub(crate) const ARBITRATION_BLOCKED_REASON: &str = "awaiting_arbitration";
 
 /// Leader arbitrates a task that exhausted the three-round review cycle.
 ///

@@ -86,15 +86,15 @@ pub(crate) struct TaskStartSignalRecord {
 
 use crate::session::persona;
 
+mod auto_spawn;
 mod conversions;
+mod improver_state;
 mod leader_transfer;
 mod lifecycle;
 mod liveness;
 mod logging;
 mod misc;
 mod queries;
-mod auto_spawn;
-mod improver_state;
 mod review_state;
 mod review_tasks;
 mod routing;
@@ -121,14 +121,14 @@ pub use queries::{
     build_recovery_tui_request, list_sessions, list_sessions_global, resolve_session_project_dir,
     session_status,
 };
+pub use review_tasks::{
+    arbitrate, claim_review, respond_review, submit_for_review, submit_for_review_with_persona,
+    submit_review,
+};
 pub use runtime_registration::register_agent_runtime_session;
 pub use signals::{
     cancel_signal, list_signals, record_signal_acknowledgment,
     resolve_session_agent_for_runtime_session, send_signal,
-};
-pub use review_tasks::{
-    arbitrate, claim_review, respond_review, submit_for_review, submit_for_review_with_persona,
-    submit_review,
 };
 pub use tasks::{
     assign_task, create_task, create_task_with_source, drop_task, list_tasks,
@@ -136,7 +136,13 @@ pub use tasks::{
 };
 
 #[allow(unused_imports)]
+pub(crate) use auto_spawn::*;
+#[allow(unused_imports)]
 pub(crate) use conversions::*;
+pub use improver_state::{
+    ImproverApplyOutcome, ImproverTarget, apply_improver_apply, preview_improver_apply,
+    validate_skill_patch_path,
+};
 #[allow(unused_imports)]
 pub(crate) use leader_transfer::*;
 #[allow(unused_imports)]
@@ -146,6 +152,10 @@ pub(crate) use logging::*;
 #[allow(unused_imports)]
 pub(crate) use misc::*;
 #[allow(unused_imports)]
+pub(crate) use review_state::*;
+#[allow(unused_imports)]
+pub(crate) use routing::*;
+#[allow(unused_imports)]
 pub(crate) use runtime_support::*;
 #[allow(unused_imports)]
 pub(crate) use session_helpers::*;
@@ -153,15 +163,6 @@ pub(crate) use session_helpers::*;
 pub(crate) use session_state::*;
 #[allow(unused_imports)]
 pub(crate) use signal_support::*;
-#[allow(unused_imports)]
-pub(crate) use auto_spawn::*;
-pub use improver_state::{
-    ImproverApplyOutcome, ImproverTarget, apply_improver_apply, validate_skill_patch_path,
-};
-#[allow(unused_imports)]
-pub(crate) use review_state::*;
-#[allow(unused_imports)]
-pub(crate) use routing::*;
 #[allow(unused_imports)]
 pub(crate) use task_queue::*;
 #[allow(unused_imports)]
