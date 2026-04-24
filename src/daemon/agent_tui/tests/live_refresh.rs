@@ -210,14 +210,26 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
         worktree_name: None,
     };
     db.sync_project(&project).expect("sync project");
+    let now = utc_now();
     let mut state = session_service::build_new_session(
         "ordering test",
         "ordering",
         "sess-tui-ordering",
         "claude",
         None,
-        &utc_now(),
+        &now,
     );
+    let leader_id = session_service::apply_join_session(
+        &mut state,
+        "Leader",
+        "claude",
+        SessionRole::Leader,
+        &[],
+        Some("claude-leader-session"),
+        &now,
+        None,
+    )
+    .expect("join leader");
     let worker_id = "codex-worker".to_string();
     state.agents.insert(
         worker_id.clone(),
@@ -240,7 +252,6 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
     db.sync_session(&project.project_id, &state)
         .expect("sync session");
 
-    let leader_id = state.leader_id.expect("leader id");
     db.save_agent_tui(&sample_snapshot(
         "leader-tui",
         &state.session_id,
