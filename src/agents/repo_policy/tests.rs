@@ -122,6 +122,28 @@ fn allows_existing_mise_commands() {
 }
 
 #[test]
+fn allows_rtk_env_wrapped_mise_command() {
+    assert!(
+        manual_command_denial_reason(
+            "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:macos:test",
+        )
+        .is_none(),
+        "rtk env is a transparent cache wrapper when the nested command is already mise"
+    );
+}
+
+#[test]
+fn allows_env_wrapped_mise_command() {
+    assert!(
+        manual_command_denial_reason(
+            "env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:macos:test",
+        )
+        .is_none(),
+        "plain env wrapper is transparent when the nested command is already mise"
+    );
+}
+
+#[test]
 fn renders_codex_pre_tool_use_denial_output() {
     let output = pre_tool_use_output(
         HookAgent::Codex,

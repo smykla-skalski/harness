@@ -81,6 +81,9 @@ fn wrapper_command_after_assignments(words: &[String]) -> Option<(Vec<String>, S
     if command_words.is_empty() {
         return None;
     }
+    if normalized_binary_name(&command_words[0]) == "mise" {
+        return None;
+    }
     Some((
         words[..assignment_len].to_vec(),
         shell_words::join(command_words.iter().map(String::as_str)),
