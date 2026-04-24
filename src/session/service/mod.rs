@@ -154,8 +154,9 @@ pub(crate) use session_state::*;
 pub(crate) use signal_support::*;
 #[allow(unused_imports)]
 pub(crate) use auto_spawn::*;
-#[allow(unused_imports)]
-pub(crate) use improver_state::*;
+pub use improver_state::{
+    ImproverApplyOutcome, ImproverTarget, apply_improver_apply, validate_skill_patch_path,
+};
 #[allow(unused_imports)]
 pub(crate) use review_state::*;
 #[allow(unused_imports)]
