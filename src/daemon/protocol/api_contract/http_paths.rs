@@ -26,6 +26,16 @@ pub const SESSION_TASK_QUEUE_POLICY: &str =
     "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy";
 pub const SESSION_TASK_UPDATE: &str = "/v1/sessions/{session_id}/tasks/{task_id}/status";
 pub const SESSION_TASK_CHECKPOINT: &str = "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint";
+pub const SESSION_TASK_SUBMIT_FOR_REVIEW: &str =
+    "/v1/sessions/{session_id}/tasks/{task_id}/submit-for-review";
+pub const SESSION_TASK_CLAIM_REVIEW: &str =
+    "/v1/sessions/{session_id}/tasks/{task_id}/claim-review";
+pub const SESSION_TASK_SUBMIT_REVIEW: &str =
+    "/v1/sessions/{session_id}/tasks/{task_id}/submit-review";
+pub const SESSION_TASK_RESPOND_REVIEW: &str =
+    "/v1/sessions/{session_id}/tasks/{task_id}/respond-review";
+pub const SESSION_TASK_ARBITRATE: &str = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate";
+pub const SESSION_IMPROVER_APPLY: &str = "/v1/sessions/{session_id}/improver/apply";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";

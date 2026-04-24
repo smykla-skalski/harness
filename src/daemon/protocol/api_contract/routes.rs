@@ -243,6 +243,54 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_SUBMIT_FOR_REVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_SUBMIT_FOR_REVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_CLAIM_REVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_CLAIM_REVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_SUBMIT_REVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_SUBMIT_REVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_RESPOND_REVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_RESPOND_REVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_ARBITRATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_ARBITRATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_IMPROVER_APPLY,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::IMPROVER_APPLY,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::SESSION_AGENT_ROLE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::AGENT_CHANGE_ROLE,
