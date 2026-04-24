@@ -1,15 +1,11 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
-    TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
-    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service;
 use crate::session::types::{ReviewPoint, ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
 
-use super::support::{daemon_client, print_json, resolve_project_dir};
+use super::support::{print_json, resolve_project_dir};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskCreateArgs {
@@ -226,14 +222,17 @@ pub struct TaskSubmitForReviewArgs {
 
 impl Execute for TaskSubmitForReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let request = TaskSubmitForReviewRequest {
-            actor: self.actor.clone(),
-            summary: self.summary.clone(),
-            suggested_persona: self.suggested_persona.clone(),
-        };
-        let detail =
-            daemon_client()?.submit_task_for_review(&self.session_id, &self.task_id, &request)?;
-        print_json(&detail)?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::submit_for_review_with_persona(
+            &self.session_id,
+            &self.task_id,
+            &self.actor,
+            self.summary.as_deref(),
+            self.suggested_persona.as_deref(),
+            &project,
+        )?;
         Ok(0)
     }
 }
@@ -254,12 +253,10 @@ pub struct TaskClaimReviewArgs {
 
 impl Execute for TaskClaimReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let request = TaskClaimReviewRequest {
-            actor: self.actor.clone(),
-        };
-        let detail =
-            daemon_client()?.claim_task_review(&self.session_id, &self.task_id, &request)?;
-        print_json(&detail)?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::claim_review(&self.session_id, &self.task_id, &self.actor, &project)?;
         Ok(0)
     }
 }
@@ -290,15 +287,18 @@ pub struct TaskSubmitReviewArgs {
 impl Execute for TaskSubmitReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let points = parse_review_points(self.points.as_deref())?;
-        let request = TaskSubmitReviewRequest {
-            actor: self.actor.clone(),
-            verdict: self.verdict,
-            summary: self.summary.clone(),
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::submit_review(
+            &self.session_id,
+            &self.task_id,
+            &self.actor,
+            self.verdict,
+            &self.summary,
             points,
-        };
-        let detail =
-            daemon_client()?.submit_task_review(&self.session_id, &self.task_id, &request)?;
-        print_json(&detail)?;
+            &project,
+        )?;
         Ok(0)
     }
 }
@@ -328,15 +328,18 @@ pub struct TaskRespondReviewArgs {
 
 impl Execute for TaskRespondReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let request = TaskRespondReviewRequest {
-            actor: self.actor.clone(),
-            agreed: self.agreed.clone(),
-            disputed: self.disputed.clone(),
-            note: self.note.clone(),
-        };
-        let detail =
-            daemon_client()?.respond_task_review(&self.session_id, &self.task_id, &request)?;
-        print_json(&detail)?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::respond_review(
+            &self.session_id,
+            &self.task_id,
+            &self.actor,
+            &self.agreed,
+            &self.disputed,
+            self.note.as_deref(),
+            &project,
+        )?;
         Ok(0)
     }
 }
@@ -363,13 +366,17 @@ pub struct TaskArbitrateArgs {
 
 impl Execute for TaskArbitrateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let request = TaskArbitrateRequest {
-            actor: self.actor.clone(),
-            verdict: self.verdict,
-            summary: self.summary.clone(),
-        };
-        let detail = daemon_client()?.arbitrate_task(&self.session_id, &self.task_id, &request)?;
-        print_json(&detail)?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::arbitrate(
+            &self.session_id,
+            &self.task_id,
+            &self.actor,
+            self.verdict,
+            &self.summary,
+            &project,
+        )?;
         Ok(0)
     }
 }

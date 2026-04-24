@@ -1,14 +1,14 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::ImproverApplyRequest;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_text;
-use crate::session::service::ImproverTarget;
+use crate::session::service::{self, ImproverTarget};
+use crate::workspace::utc_now;
 
-use super::support::{daemon_client, print_json, resolve_project_dir};
+use super::support::{print_json, resolve_project_dir};
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionImproverApplyArgs {
@@ -39,23 +39,27 @@ pub struct SessionImproverApplyArgs {
 
 impl Execute for SessionImproverApplyArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project_dir = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let repo_root = PathBuf::from(&local_project);
         let new_contents = read_text(Path::new(&self.new_contents_file)).map_err(|error| {
             CliError::from(CliErrorKind::usage_error(format!(
                 "failed to read --new-contents-file {}: {error}",
                 self.new_contents_file
             )))
         })?;
-        let request = ImproverApplyRequest {
-            actor: self.actor.clone(),
-            issue_id: self.issue_id.clone(),
-            target: self.target,
-            rel_path: self.rel_path.clone(),
-            new_contents,
-            project_dir,
-            dry_run: self.dry_run,
+        let rel = Path::new(&self.rel_path);
+        let outcome = if self.dry_run {
+            service::preview_improver_apply(&repo_root, self.target, rel, &new_contents)?
+        } else {
+            service::apply_improver_apply(
+                &repo_root,
+                self.target,
+                rel,
+                &new_contents,
+                &self.issue_id,
+                &utc_now(),
+            )?
         };
-        let outcome = daemon_client()?.improver_apply(&self.session_id, &request)?;
         print_json(&outcome)?;
         Ok(0)
     }
