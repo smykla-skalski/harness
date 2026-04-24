@@ -109,9 +109,9 @@ struct ApprovalTemplate<'a> {
 
 fn command_approval_from_request(request_id: String, params: &Value) -> CodexApprovalRequest {
     let approval_id = params
-        .get("approvalId")
+        .get("itemId")
         .and_then(Value::as_str)
-        .or_else(|| params.get("itemId").and_then(Value::as_str))
+        .or_else(|| params.get("approvalId").and_then(Value::as_str))
         .unwrap_or(request_id.as_str())
         .to_string();
     approval_request(
