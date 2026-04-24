@@ -64,6 +64,57 @@ struct ReviewStreamingTests {
     #expect(slice.selectedSessionSession?.updatedAt == summaryB.updatedAt)
   }
 
+  @Test("Arbitration banner tasks recompute as session detail rotates")
+  func arbitrationBannerTasksRecomputeOnDetailSwap() {
+    let slice = HarnessMonitorStore.ContentSessionDetailSlice()
+    let summary = PreviewFixtures.summary
+
+    let plainDetail = PreviewFixtures.sessionDetail(session: summary)
+    var plainState = HarnessMonitorStore.ContentSessionDetailState()
+    plainState.selectedSessionDetail = plainDetail
+    slice.apply(plainState, selectedSessionSummary: summary)
+
+    #expect(slice.arbitrationBannerTasks.isEmpty)
+
+    let arbitrationCandidate = WorkItem(
+      taskId: "task-arbitration-round",
+      title: "Needs arbitration",
+      context: nil,
+      severity: .high,
+      status: .inReview,
+      assignedTo: nil,
+      createdAt: "2026-04-24T10:00:00Z",
+      updatedAt: "2026-04-24T10:45:00Z",
+      createdBy: "leader-claude",
+      notes: [],
+      suggestedFix: nil,
+      source: .manual,
+      blockedReason: nil,
+      completedAt: nil,
+      checkpointSummary: nil,
+      reviewRound: 3
+    )
+    let expandedTasks = PreviewFixtures.tasks + [arbitrationCandidate]
+    let expandedSummary = bumpingUpdatedAt(summary, to: "2026-04-24T10:46:00Z")
+    let expandedDetail = PreviewFixtures.sessionDetail(
+      session: expandedSummary,
+      tasks: expandedTasks
+    )
+    var expandedState = HarnessMonitorStore.ContentSessionDetailState()
+    expandedState.selectedSessionDetail = expandedDetail
+    slice.apply(expandedState, selectedSessionSummary: expandedSummary)
+
+    #expect(slice.arbitrationBannerTasks == [arbitrationCandidate])
+
+    let restoredSummary = bumpingUpdatedAt(summary, to: "2026-04-24T10:47:00Z")
+    let restoredDetail = PreviewFixtures.sessionDetail(session: restoredSummary)
+    var restoredState = HarnessMonitorStore.ContentSessionDetailState()
+    restoredState.selectedSessionDetail = restoredDetail
+    slice.apply(restoredState, selectedSessionSummary: restoredSummary)
+
+    #expect(slice.arbitrationBannerTasks.isEmpty)
+  }
+
   private func bumpingUpdatedAt(_ summary: SessionSummary, to updatedAt: String) -> SessionSummary {
     SessionSummary(
       projectId: summary.projectId,
