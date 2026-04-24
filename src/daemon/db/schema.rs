@@ -80,24 +80,27 @@ impl DaemonDb {
 
     fn run_migrations(&self) -> Result<(), CliError> {
         let version = self.schema_version()?;
-        let needs_ledger_backfill =
-            matches!(version.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7");
-        let needs_session_repair = matches!(
-            version.as_str(),
-            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8"
-        );
         let should_reclaim_space = run_pre_v7_migrations(&self.conn, version.as_str())?;
-        if needs_ledger_backfill {
-            self.migrate_v7_to_v8()?;
-        }
-        if needs_session_repair {
-            self.migrate_v8_to_v9()?;
-        }
-        if version.as_str() != "10" {
-            super::schema_v10::run(&self.conn)?;
-        }
+        self.run_post_v7_migrations(version.as_str())?;
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
+        }
+        Ok(())
+    }
+
+    fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
+        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7") {
+            self.migrate_v7_to_v8()?;
+        }
+        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8") {
+            self.migrate_v8_to_v9()?;
+        }
+        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9") {
+            self.migrate_v9_to_v10()?;
+        } else if version != "10" {
+            return Err(db_error(format!(
+                "daemon database schema version '{version}' is newer than expected '10'; downgrade is not supported"
+            )));
         }
         Ok(())
     }
@@ -128,6 +131,9 @@ impl DaemonDb {
         Ok(())
     }
 
+    fn migrate_v9_to_v10(&self) -> Result<(), CliError> {
+        super::schema_v10::run(&self.conn)
+    }
 }
 
 fn run_pre_v7_migrations(conn: &Connection, version: &str) -> Result<bool, CliError> {
@@ -488,4 +494,3 @@ fn pragma_error_is_retryable(error: &rusqlite::Error) -> bool {
         Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
     )
 }
-
