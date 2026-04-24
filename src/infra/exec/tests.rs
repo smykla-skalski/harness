@@ -60,7 +60,13 @@ fn run_command_streaming_captures_stdout_and_stderr() {
 
 #[test]
 fn run_command_streaming_preserves_stdout_without_trailing_newline() {
-    let result = run_command_streaming(&["sh", "-c", "printf 'hello'"], None, None, &[0]).unwrap();
+    let result = run_command_streaming(
+        &["sh", "-c", "printf 'hello'"],
+        Some(Path::new("/tmp")),
+        None,
+        &[0],
+    )
+    .unwrap();
     assert_eq!(result.stdout, "hello");
     assert!(result.stderr.is_empty());
 }
