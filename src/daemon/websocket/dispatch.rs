@@ -1,8 +1,10 @@
 use self::mutation_handlers::{
-    dispatch_agent_change_role, dispatch_agent_remove, dispatch_leader_transfer,
-    dispatch_session_end, dispatch_session_observe, dispatch_signal_cancel, dispatch_signal_send,
-    dispatch_task_assign, dispatch_task_checkpoint, dispatch_task_create, dispatch_task_drop,
-    dispatch_task_queue_policy, dispatch_task_update,
+    dispatch_agent_change_role, dispatch_agent_remove, dispatch_improver_apply,
+    dispatch_leader_transfer, dispatch_session_end, dispatch_session_observe,
+    dispatch_signal_cancel, dispatch_signal_send, dispatch_task_arbitrate, dispatch_task_assign,
+    dispatch_task_checkpoint, dispatch_task_claim_review, dispatch_task_create, dispatch_task_drop,
+    dispatch_task_queue_policy, dispatch_task_respond_review, dispatch_task_submit_for_review,
+    dispatch_task_submit_review, dispatch_task_update,
 };
 use super::connection::ConnectionState;
 use super::frames::{
@@ -240,7 +242,46 @@ async fn dispatch_task_mutation(
     if let Some(response) = dispatch_task_work_mutation(request, state).await {
         return Some(response);
     }
+    if let Some(response) = dispatch_task_review_mutation(request, state).await {
+        return Some(response);
+    }
     dispatch_task_lifecycle_mutation(request, state).await
+}
+
+async fn dispatch_task_review_mutation(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    if let Some(response) = dispatch_task_review_primary(request, state).await {
+        return Some(response);
+    }
+    dispatch_task_review_terminal(request, state).await
+}
+
+async fn dispatch_task_review_primary(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_SUBMIT_FOR_REVIEW => {
+            Some(dispatch_task_submit_for_review(request, state).await)
+        }
+        ws_methods::TASK_CLAIM_REVIEW => Some(dispatch_task_claim_review(request, state).await),
+        ws_methods::TASK_SUBMIT_REVIEW => Some(dispatch_task_submit_review(request, state).await),
+        _ => None,
+    }
+}
+
+async fn dispatch_task_review_terminal(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_RESPOND_REVIEW => Some(dispatch_task_respond_review(request, state).await),
+        ws_methods::TASK_ARBITRATE => Some(dispatch_task_arbitrate(request, state).await),
+        ws_methods::IMPROVER_APPLY => Some(dispatch_improver_apply(request, state).await),
+        _ => None,
+    }
 }
 
 async fn dispatch_task_work_mutation(
