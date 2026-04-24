@@ -43,6 +43,12 @@ pub struct WorkItem {
     /// Closed quorum consensus, set once `required_consensus` reviewers agree.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consensus: Option<ReviewConsensus>,
+    /// Per-round consensus history: each entry is the merged-and-responded
+    /// consensus from one completed round, pushed here before
+    /// `task.consensus` is cleared so per-point agree/dispute state and
+    /// worker notes survive across rounds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_history: Vec<ReviewConsensus>,
     /// Review round counter; increments each time a reworked task goes back to review.
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub review_round: u8,

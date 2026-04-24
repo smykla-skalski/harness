@@ -10,7 +10,7 @@ mod scan;
 pub(crate) mod session;
 mod text;
 pub(crate) mod transport;
-pub(crate) mod types;
+pub mod types;
 mod watch;
 
 #[cfg(test)]

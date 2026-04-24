@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use super::super::{
     AgentStatus, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
     refresh_session, require_active, require_permission, task_not_found, task_status_label,
@@ -29,12 +31,19 @@ pub(crate) fn apply_respond_review(
         ))
         .into());
     }
-    if task.consensus.is_none() {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' has no consensus to respond to"
-        ))
-        .into());
-    }
+    let consensus_points: Vec<String> = task
+        .consensus
+        .as_ref()
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "task '{task_id}' has no consensus to respond to"
+            )))
+        })?
+        .points
+        .iter()
+        .map(|point| point.point_id.clone())
+        .collect();
+    validate_respond_coverage(task_id, &consensus_points, agreed, disputed)?;
     let submitter = task
         .awaiting_review
         .as_ref()
@@ -60,10 +69,15 @@ pub(crate) fn apply_respond_review(
     task.updated_at = now.to_string();
     task.review_round = task.review_round.saturating_add(1);
     merge_points(task, agreed, disputed, note);
-    task.consensus = None;
+    if let Some(closed) = task.consensus.take() {
+        task.review_history.push(closed);
+    }
 
     if has_disputed {
-        if let Some(claim) = task.review_claim.as_mut() {
+        if task.review_round >= ARBITRATION_ROUND_GATE {
+            task.status = TaskStatus::Blocked;
+            task.blocked_reason = Some(ARBITRATION_BLOCKED_REASON.to_string());
+        } else if let Some(claim) = task.review_claim.as_mut() {
             for entry in &mut claim.reviewers {
                 entry.submitted_at = None;
             }
@@ -83,6 +97,49 @@ pub(crate) fn apply_respond_review(
 
     touch_agent(state, actor_id, now);
     refresh_session(state, now);
+    Ok(())
+}
+
+fn validate_respond_coverage(
+    task_id: &str,
+    consensus_points: &[String],
+    agreed: &[String],
+    disputed: &[String],
+) -> Result<(), CliError> {
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    for id in agreed {
+        if !seen.insert(id.as_str()) {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "task '{task_id}': duplicate point_id '{id}' in response"
+            ))
+            .into());
+        }
+    }
+    for id in disputed {
+        if !seen.insert(id.as_str()) {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "task '{task_id}': point_id '{id}' appears in agreed and disputed (or duplicated)"
+            ))
+            .into());
+        }
+    }
+    let known: BTreeSet<&str> = consensus_points.iter().map(String::as_str).collect();
+    for id in agreed.iter().chain(disputed.iter()) {
+        if !known.contains(id.as_str()) {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "task '{task_id}': unknown point_id '{id}'"
+            ))
+            .into());
+        }
+    }
+    for required in consensus_points {
+        if !seen.contains(required.as_str()) {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "task '{task_id}': response must cover consensus point '{required}'"
+            ))
+            .into());
+        }
+    }
     Ok(())
 }
 
@@ -113,6 +170,7 @@ fn merge_points(task: &mut WorkItem, agreed: &[String], disputed: &[String], not
 }
 
 const ARBITRATION_ROUND_GATE: u8 = 3;
+pub(crate) const ARBITRATION_BLOCKED_REASON: &str = "awaiting_arbitration";
 
 /// Leader arbitrates a task that exhausted the three-round review cycle.
 ///
@@ -155,6 +213,14 @@ pub(crate) fn apply_arbitrate(
         ))
         .into());
     }
+    if task.status != TaskStatus::Blocked
+        || task.blocked_reason.as_deref() != Some(ARBITRATION_BLOCKED_REASON)
+    {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' is not awaiting_arbitration; arbitration requires an unresolved third-round dispute"
+        ))
+        .into());
+    }
 
     let submitter = state
         .tasks
@@ -172,20 +238,40 @@ pub(crate) fn apply_arbitrate(
         summary: summary.to_string(),
         recorded_at: now.to_string(),
     });
-    if verdict == ReviewVerdict::Approve {
-        task.status = TaskStatus::Done;
-        task.completed_at = Some(now.to_string());
-        task.assigned_to = None;
-        task.review_claim = None;
-        task.awaiting_review = None;
-        task.consensus = None;
-        if let Some(submitter_id) = submitter
-            && let Some(agent) = state.agents.get_mut(&submitter_id)
-        {
-            agent.status = AgentStatus::Idle;
-            agent.current_task_id = None;
-            agent.updated_at = now.to_string();
-            agent.last_activity_at = Some(now.to_string());
+    match verdict {
+        ReviewVerdict::Approve => {
+            task.status = TaskStatus::Done;
+            task.completed_at = Some(now.to_string());
+            task.assigned_to = None;
+            task.review_claim = None;
+            task.awaiting_review = None;
+            task.blocked_reason = None;
+            task.consensus = None;
+            if let Some(submitter_id) = submitter
+                && let Some(agent) = state.agents.get_mut(&submitter_id)
+            {
+                agent.status = AgentStatus::Idle;
+                agent.current_task_id = None;
+                agent.updated_at = now.to_string();
+                agent.last_activity_at = Some(now.to_string());
+            }
+        }
+        ReviewVerdict::RequestChanges | ReviewVerdict::Reject => {
+            task.status = TaskStatus::InProgress;
+            task.assigned_to.clone_from(&submitter);
+            task.review_claim = None;
+            task.awaiting_review = None;
+            task.consensus = None;
+            task.blocked_reason = None;
+            task.completed_at = None;
+            if let Some(submitter_id) = submitter
+                && let Some(agent) = state.agents.get_mut(&submitter_id)
+            {
+                agent.status = AgentStatus::Active;
+                agent.current_task_id = Some(task_id.to_string());
+                agent.updated_at = now.to_string();
+                agent.last_activity_at = Some(now.to_string());
+            }
         }
     }
 

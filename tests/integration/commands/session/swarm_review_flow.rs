@@ -272,6 +272,136 @@ fn update_task_rejects_generic_status_on_awaiting_review_task() {
 }
 
 #[test]
+fn submit_for_review_stores_suggested_persona_on_task() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-persona-hint", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("persona-hint-1", &project);
+
+        service::submit_for_review_with_persona(
+            "persona-hint-1",
+            &task_id,
+            &worker_id,
+            Some("ready"),
+            Some("test-writer"),
+            &project,
+        )
+        .expect("submit with persona");
+
+        let state = service::session_status("persona-hint-1", &project).unwrap();
+        let task = state.tasks.get(&task_id).expect("task present");
+        assert_eq!(task.suggested_persona.as_deref(), Some("test-writer"));
+    });
+}
+
+#[test]
+fn claim_review_second_claim_does_not_emit_false_status_change_log() {
+    use harness::session::storage::layout_from_project_dir;
+    use std::fs;
+
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-claim-log", || {
+        let project = tmp.path().join("project");
+        let (_, worker_id, task_id) = prepare_in_progress_task("claim-log-1", &project);
+        service::submit_for_review("claim-log-1", &task_id, &worker_id, None, &project).unwrap();
+
+        let first = super::swarm_review_helpers::join_reviewer(
+            "claim-log-1",
+            "gemini",
+            "GEMINI_SESSION_ID",
+            &project,
+        );
+        let second = super::swarm_review_helpers::join_reviewer(
+            "claim-log-1",
+            "claude",
+            "CLAUDE_SESSION_ID",
+            &project,
+        );
+        service::claim_review("claim-log-1", &task_id, &first, &project).unwrap();
+        service::claim_review("claim-log-1", &task_id, &second, &project).unwrap();
+
+        let layout = layout_from_project_dir(&project, "claim-log-1").unwrap();
+        let log = fs::read_to_string(layout.log_file()).unwrap_or_default();
+        let transitions: Vec<_> = log
+            .lines()
+            .filter(|line| line.contains("task_status_changed") && line.contains(&task_id))
+            .collect();
+        // Each AwaitingReview→InReview entry should appear at most once; the
+        // second claim stayed in `InReview` and must not emit a fake
+        // transition.
+        let aw_to_ir = transitions
+            .iter()
+            .filter(|line| line.contains("awaiting_review") && line.contains("in_review"))
+            .count();
+        assert_eq!(
+            aw_to_ir, 1,
+            "second claim must not emit a spurious AwaitingReview→InReview log entry; got log: {log}"
+        );
+    });
+}
+
+#[test]
+fn drop_task_rejects_review_state_task() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-drop-no-bypass", || {
+        let project = tmp.path().join("project");
+        let (leader_id, worker_id, task_id) =
+            prepare_in_progress_task("drop-no-bypass", &project);
+        service::submit_for_review("drop-no-bypass", &task_id, &worker_id, None, &project).unwrap();
+
+        // Second fresh worker so drop target is valid for non-review guard.
+        let second = temp_env::with_var("GEMINI_SESSION_ID", Some("drop-fresh"), || {
+            service::join_session(
+                "drop-no-bypass",
+                harness::session::types::SessionRole::Worker,
+                "gemini",
+                &[],
+                None,
+                &project,
+                None,
+            )
+            .unwrap()
+        });
+        let fresh_id = second
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "gemini")
+            .unwrap()
+            .agent_id
+            .clone();
+
+        let err = service::drop_task(
+            "drop-no-bypass",
+            &task_id,
+            &harness::daemon::protocol::TaskDropTarget::Agent {
+                agent_id: fresh_id.clone(),
+            },
+            harness::session::types::TaskQueuePolicy::Locked,
+            &leader_id,
+            &project,
+        )
+        .expect_err("drop_task on AwaitingReview must fail");
+        assert!(
+            err.to_string().contains("respond_review")
+                || err.to_string().contains("arbitrate")
+                || err.to_string().contains("reassigned"),
+            "error should steer caller to review primitives, got: {err}"
+        );
+
+        // Task metadata and status must remain intact.
+        let state = service::session_status("drop-no-bypass", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::AwaitingReview);
+        assert!(task.awaiting_review.is_some());
+        assert!(task.assigned_to.is_none());
+        assert_eq!(
+            state.agents.get(&worker_id).unwrap().status,
+            AgentStatus::AwaitingReview
+        );
+    });
+}
+
+#[test]
 fn assign_task_rejects_awaiting_review_task() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-assign-no-bypass", || {

@@ -111,6 +111,147 @@ fn respond_review_with_disputed_points_bumps_round_and_reopens_review() {
 }
 
 #[test]
+fn respond_review_records_per_point_history_across_rounds() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-respond-history", || {
+        let project = tmp.path().join("project");
+        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-hist", &project);
+
+        // Round 1: agree p1, dispute p2.
+        service::respond_review(
+            "resp-hist",
+            &task_id,
+            &worker_id,
+            &["p1".to_string()],
+            &["p2".to_string()],
+            Some("partial"),
+            &project,
+        )
+        .unwrap();
+
+        let state = service::session_status("resp-hist", &project).unwrap();
+        let task = state.tasks.get(&task_id).unwrap();
+        assert_eq!(
+            task.review_history.len(),
+            1,
+            "one round of history recorded"
+        );
+        let history = &task.review_history[0];
+        let p1 = history
+            .points
+            .iter()
+            .find(|p| p.point_id == "p1")
+            .expect("p1 preserved");
+        assert_eq!(p1.state, ReviewPointState::Resolved, "p1 agreed → resolved");
+        assert_eq!(p1.worker_note.as_deref(), Some("partial"));
+        let p2 = history
+            .points
+            .iter()
+            .find(|p| p.point_id == "p2")
+            .expect("p2 preserved");
+        assert_eq!(p2.state, ReviewPointState::Disputed, "p2 disputed");
+        assert_eq!(p2.worker_note.as_deref(), Some("partial"));
+    });
+}
+
+#[test]
+fn respond_review_rejects_unknown_point_id() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-respond-unknown", || {
+        let project = tmp.path().join("project");
+        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-unk", &project);
+
+        let err = service::respond_review(
+            "resp-unk",
+            &task_id,
+            &worker_id,
+            &["p1".to_string()],
+            &["p999".to_string()],
+            None,
+            &project,
+        )
+        .expect_err("unknown point id must be rejected");
+        assert!(
+            err.to_string().contains("p999"),
+            "error should name the unknown point id, got: {err}"
+        );
+    });
+}
+
+#[test]
+fn respond_review_rejects_duplicate_point_across_lists() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-respond-dup", || {
+        let project = tmp.path().join("project");
+        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-dup", &project);
+
+        let err = service::respond_review(
+            "resp-dup",
+            &task_id,
+            &worker_id,
+            &["p1".to_string()],
+            &["p1".to_string(), "p2".to_string()],
+            None,
+            &project,
+        )
+        .expect_err("same point_id in agreed AND disputed must be rejected");
+        assert!(
+            err.to_string().contains("p1"),
+            "error should name overlapping id, got: {err}"
+        );
+    });
+}
+
+#[test]
+fn respond_review_rejects_partial_coverage() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-respond-partial", || {
+        let project = tmp.path().join("project");
+        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-part", &project);
+
+        // Consensus has p1 and p2 — worker must address both.
+        let err = service::respond_review(
+            "resp-part",
+            &task_id,
+            &worker_id,
+            &["p1".to_string()],
+            &[],
+            None,
+            &project,
+        )
+        .expect_err("partial coverage of consensus points must be rejected");
+        assert!(
+            err.to_string().contains("p2"),
+            "error should cite the uncovered point id, got: {err}"
+        );
+    });
+}
+
+#[test]
+fn respond_review_rejects_duplicate_within_single_list() {
+    let tmp = tempfile::tempdir().unwrap();
+    with_session_test_env(tmp.path(), "integ-respond-dup-agreed", || {
+        let project = tmp.path().join("project");
+        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-dup-ag", &project);
+
+        let err = service::respond_review(
+            "resp-dup-ag",
+            &task_id,
+            &worker_id,
+            &["p1".to_string(), "p1".to_string(), "p2".to_string()],
+            &[],
+            None,
+            &project,
+        )
+        .expect_err("duplicate id inside agreed must be rejected");
+        assert!(
+            err.to_string().contains("p1"),
+            "error should cite duplicate id, got: {err}"
+        );
+    });
+}
+
+#[test]
 fn respond_review_rejects_non_submitter() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-other", || {

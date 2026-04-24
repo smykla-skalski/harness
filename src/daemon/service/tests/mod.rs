@@ -33,6 +33,7 @@ mod direct_session_start;
 mod direct_sessions;
 mod leave;
 mod observe;
+mod review_mutations;
 mod session_liveness;
 mod session_reads;
 mod session_title;

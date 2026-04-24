@@ -28,11 +28,36 @@ pub fn submit_for_review(
     summary: Option<&str>,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    submit_for_review_with_persona(session_id, task_id, actor_id, summary, None, project_dir)
+}
+
+/// Submit a task for review with an explicit `suggested_persona` hint.
+///
+/// The hint is persisted on `WorkItem::suggested_persona` so the queue
+/// reassignment path can bias worker selection when the task re-enters
+/// the queue.
+///
+/// # Errors
+/// Same error surface as `submit_for_review`.
+pub fn submit_for_review_with_persona(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    summary: Option<&str>,
+    suggested_persona: Option<&str>,
+    project_dir: &Path,
+) -> Result<(), CliError> {
     let now = utc_now();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
     storage::update_state(&layout, |state| {
-        apply_submit_for_review(state, task_id, actor_id, summary, &now)
+        apply_submit_for_review(state, task_id, actor_id, summary, &now)?;
+        if let Some(persona) = suggested_persona
+            && let Some(task) = state.tasks.get_mut(task_id)
+        {
+            task.suggested_persona = Some(persona.to_string());
+        }
+        Ok(())
     })?;
 
     storage::append_log_entry(
@@ -82,16 +107,25 @@ pub fn claim_review(
     let now = utc_now();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
-    storage::update_state(&layout, |state| {
+    let prev_status = load_state_or_err(session_id, project_dir)?
+        .tasks
+        .get(task_id)
+        .map(|task| task.status);
+    let new_state = storage::update_state(&layout, |state| {
         apply_claim_review(state, task_id, actor_id, &now)
     })?;
+    let new_status = new_state.tasks.get(task_id).map(|task| task.status);
 
-    storage::append_log_entry(
-        &layout,
-        log_task_status_changed(task_id, TaskStatus::AwaitingReview, TaskStatus::InReview),
-        Some(actor_id),
-        None,
-    )?;
+    if let (Some(prev), Some(new)) = (prev_status, new_status)
+        && prev != new
+    {
+        storage::append_log_entry(
+            &layout,
+            log_task_status_changed(task_id, prev, new),
+            Some(actor_id),
+            None,
+        )?;
+    }
     Ok(())
 }
 

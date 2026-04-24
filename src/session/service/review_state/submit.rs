@@ -304,6 +304,9 @@ fn try_close_quorum(
         (submitted_ids, submitter, current_round)
     };
     let relevant = filter_reviews_for_round(all_reviews, &submitted_ids, current_round);
+    if u8::try_from(distinct_runtimes(&relevant)).unwrap_or(u8::MAX) < required {
+        return;
+    }
     let verdict = aggregate_verdict(&relevant);
     if let Some(task) = state.tasks.get_mut(task_id) {
         stamp_consensus(task, &submitted_ids, &relevant, verdict, now);
@@ -311,6 +314,16 @@ fn try_close_quorum(
     if verdict == ReviewVerdict::Approve {
         close_task_as_done(state, task_id, submitter_id, now);
     }
+}
+
+fn distinct_runtimes(reviews: &[&Review]) -> usize {
+    let mut runtimes: Vec<&str> = reviews
+        .iter()
+        .map(|review| review.reviewer_runtime.as_str())
+        .collect();
+    runtimes.sort_unstable();
+    runtimes.dedup();
+    runtimes.len()
 }
 
 fn quorum_submitted_entries(task: &WorkItem, required: u8) -> Option<Vec<&ReviewerEntry>> {
@@ -405,6 +418,9 @@ fn close_task_as_done(
 }
 
 fn aggregate_verdict(reviews: &[&Review]) -> ReviewVerdict {
+    if reviews.is_empty() {
+        return ReviewVerdict::RequestChanges;
+    }
     if reviews.iter().all(|r| r.verdict == ReviewVerdict::Approve) {
         ReviewVerdict::Approve
     } else if reviews.iter().any(|r| r.verdict == ReviewVerdict::Reject) {
@@ -427,4 +443,37 @@ fn collect_consensus_points(reviews: &[&Review]) -> Vec<ReviewPoint> {
         }
     }
     aggregated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{aggregate_verdict, distinct_runtimes};
+    use crate::session::types::{Review, ReviewVerdict};
+
+    fn review(runtime: &str, verdict: ReviewVerdict) -> Review {
+        Review {
+            review_id: format!("r-{runtime}"),
+            round: 1,
+            reviewer_agent_id: format!("{runtime}-1"),
+            reviewer_runtime: runtime.to_string(),
+            verdict,
+            summary: String::new(),
+            points: Vec::new(),
+            recorded_at: "t".to_string(),
+        }
+    }
+
+    #[test]
+    fn aggregate_verdict_empty_is_request_changes_not_approve() {
+        let empty: Vec<&Review> = Vec::new();
+        assert_eq!(aggregate_verdict(&empty), ReviewVerdict::RequestChanges);
+    }
+
+    #[test]
+    fn distinct_runtimes_counts_unique_runtimes() {
+        let a = review("gemini", ReviewVerdict::Approve);
+        let b = review("gemini", ReviewVerdict::Approve);
+        let c = review("claude", ReviewVerdict::Approve);
+        assert_eq!(distinct_runtimes(&[&a, &b, &c]), 2);
+    }
 }
