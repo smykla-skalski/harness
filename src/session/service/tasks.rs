@@ -2,8 +2,8 @@ use super::{
     CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
     TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
     apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
-    apply_claim_review, apply_record_checkpoint, apply_submit_for_review, apply_submit_review,
-    apply_update_task, apply_update_task_queue_policy, ensure_valid_progress,
+    apply_claim_review, apply_record_checkpoint, apply_respond_review, apply_submit_for_review,
+    apply_submit_review, apply_update_task, apply_update_task_queue_policy, ensure_valid_progress,
     generate_checkpoint_id, generate_review_id, load_state_or_err, log_checkpoint_recorded,
     log_task_assigned, log_task_created, log_task_status_changed, protocol,
     reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
@@ -385,6 +385,51 @@ pub fn submit_review(
     let prev_status = state_before.tasks.get(task_id).map(|task| task.status);
     let new_state = storage::update_state(&layout, |state| {
         apply_submit_review(state, task_id, &review, &all_reviews, &now)
+    })?;
+    let new_status = new_state.tasks.get(task_id).map(|task| task.status);
+
+    if let (Some(prev), Some(new)) = (prev_status, new_status)
+        && prev != new
+    {
+        storage::append_log_entry(
+            &layout,
+            log_task_status_changed(task_id, prev, new),
+            Some(actor_id),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+/// Worker response to a request-changes consensus.
+///
+/// Increments `review_round`, folds agreed/disputed points into the
+/// stored consensus, then either returns the task to `InProgress` with
+/// the worker reassigned (all points agreed) or clears reviewer
+/// `submitted_at` so the next round can re-form (any point disputed).
+///
+/// # Errors
+/// Returns `CliError` if the session is not active, the actor is not
+/// the original submitter, the task is not `InReview`, or no consensus
+/// has been recorded.
+pub fn respond_review(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    agreed: &[String],
+    disputed: &[String],
+    note: Option<&str>,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+
+    let prev_status = load_state_or_err(session_id, project_dir)?
+        .tasks
+        .get(task_id)
+        .map(|task| task.status);
+    let new_state = storage::update_state(&layout, |state| {
+        apply_respond_review(state, task_id, actor_id, agreed, disputed, note, &now)
     })?;
     let new_status = new_state.tasks.get(task_id).map(|task| task.status);
 

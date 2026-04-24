@@ -124,7 +124,7 @@ pub use signals::{
 };
 pub use tasks::{
     assign_task, claim_review, create_task, create_task_with_source, drop_task, list_tasks,
-    record_task_checkpoint, submit_for_review, submit_review, update_task,
+    record_task_checkpoint, respond_review, submit_for_review, submit_review, update_task,
     update_task_queue_policy,
 };
 

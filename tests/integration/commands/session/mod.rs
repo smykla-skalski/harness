@@ -14,6 +14,7 @@ mod recovery;
 mod swarm_contract;
 mod swarm_review_flow;
 mod swarm_review_helpers;
+mod swarm_review_respond;
 mod swarm_review_submit;
 
 fn session_cmd(command: SessionCommand) -> Command {
