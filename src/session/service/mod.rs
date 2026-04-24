@@ -96,6 +96,7 @@ mod queries;
 mod auto_spawn;
 mod review_state;
 mod review_tasks;
+mod routing;
 mod runtime_registration;
 mod runtime_support;
 mod session_helpers;
@@ -154,6 +155,8 @@ pub(crate) use signal_support::*;
 pub(crate) use auto_spawn::*;
 #[allow(unused_imports)]
 pub(crate) use review_state::*;
+#[allow(unused_imports)]
+pub(crate) use routing::*;
 #[allow(unused_imports)]
 pub(crate) use task_queue::*;
 #[allow(unused_imports)]
