@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::workspace::{dirs_home, harness_data_root, host_home_dir, normalized_env_value};
+use crate::workspace::{
+    dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
+};
 
 use super::{
     APP_GROUP_ID_ENV, CURRENT_LAUNCH_AGENT_PLIST, DAEMON_DATA_HOME_ENV, DAEMON_LOCK_FILE,
@@ -98,5 +100,8 @@ fn launch_agents_dir() -> PathBuf {
 pub fn ensure_daemon_dirs() -> Result<(), CliError> {
     fs_err::create_dir_all(daemon_root())
         .map_err(|error| CliErrorKind::workflow_io(format!("create daemon root: {error}")))?;
+    ensure_non_indexable(&harness_data_root()).map_err(|error| {
+        CliErrorKind::workflow_io(format!("mark harness data root non-indexable: {error}"))
+    })?;
     Ok(())
 }

@@ -15,7 +15,10 @@ pub use crate::git::identity::{
 };
 #[cfg(target_os = "macos")]
 pub use paths::legacy_macos_root;
-pub use paths::{HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path, utc_now};
+pub use paths::{
+    HARNESS_PREFIX, NON_INDEXABLE_MARKER_NAME, dirs_home, ensure_non_indexable, harness_data_root,
+    shorten_path, utc_now,
+};
 pub(crate) use paths::{host_home_dir, normalized_env_value};
 pub(crate) use remote_kubernetes::{
     RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState, cleanup_remote_install_state,
