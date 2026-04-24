@@ -142,6 +142,13 @@ pub(crate) fn compute_agent_transition(
     if !agent.status.is_alive() {
         return None;
     }
+    // Agents that submitted work for review must stay AwaitingReview
+    // until the reviewer flow closes; timer-driven liveness transitions
+    // would otherwise drop them back to Active/Idle or Disconnected and
+    // let them re-enter the work queue.
+    if agent.status == AgentStatus::AwaitingReview {
+        return None;
+    }
 
     let effective_activity = most_recent_activity([
         record.last_activity.as_deref(),
@@ -349,5 +356,84 @@ pub(crate) fn cleanup_dead_agent_signals(
         }
         let signal_dir = agent_runtime.signal_dir(&context_root, session_id);
         let _ = cleanup_pending_signals(&signal_dir, &record.agent_id, session_id);
+    }
+}
+
+#[cfg(test)]
+mod inline_tests {
+    use super::*;
+    use crate::agents::runtime::liveness::LivenessConfig;
+    use crate::session::types::{
+        AgentRegistration, SessionMetrics, SessionPolicy, SessionRole, SessionState, SessionStatus,
+    };
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    fn state_with_awaiting_review_worker() -> SessionState {
+        let mut state = SessionState {
+            schema_version: 10,
+            state_version: 1,
+            session_id: "sess-live".to_string(),
+            project_name: String::new(),
+            worktree_path: PathBuf::new(),
+            shared_path: PathBuf::new(),
+            origin_path: PathBuf::new(),
+            branch_ref: "harness/sess-live".to_string(),
+            title: "t".into(),
+            context: "c".into(),
+            status: SessionStatus::Active,
+            policy: SessionPolicy::default(),
+            created_at: "2026-04-24T00:00:00Z".into(),
+            updated_at: "2026-04-24T00:00:00Z".into(),
+            agents: BTreeMap::new(),
+            tasks: BTreeMap::new(),
+            leader_id: Some("leader".into()),
+            archived_at: None,
+            last_activity_at: None,
+            observe_id: None,
+            pending_leader_transfer: None,
+            external_origin: None,
+            adopted_at: None,
+            metrics: SessionMetrics::default(),
+        };
+        state.agents.insert(
+            "worker".into(),
+            AgentRegistration {
+                agent_id: "worker".into(),
+                name: "worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: Vec::new(),
+                joined_at: "2026-04-24T00:00:00Z".into(),
+                updated_at: "2026-04-24T00:00:00Z".into(),
+                status: AgentStatus::AwaitingReview,
+                agent_session_id: None,
+                last_activity_at: Some("2026-04-24T00:00:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: Default::default(),
+                persona: None,
+            },
+        );
+        state
+    }
+
+    #[test]
+    fn compute_agent_transition_keeps_awaiting_review_alive_despite_stale_activity() {
+        let state = state_with_awaiting_review_worker();
+        // Record a very old activity timestamp that would normally
+        // transition the agent to Disconnected for the codex runtime.
+        let record = AgentActivityRecord {
+            agent_id: "worker".into(),
+            last_activity: Some("2000-01-01T00:00:00Z".into()),
+            state_last_activity: Some("2000-01-01T00:00:00Z".into()),
+            runtime_name: "codex".into(),
+            agent_session_id: None,
+            has_pending_signals: false,
+        };
+        let config = LivenessConfig::for_runtime_name("codex");
+        assert!(
+            compute_agent_transition(&state, &record, &config).is_none(),
+            "AwaitingReview agents must not be transitioned by liveness sync"
+        );
     }
 }
