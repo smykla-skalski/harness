@@ -94,6 +94,7 @@ mod logging;
 mod misc;
 mod queries;
 mod review_state;
+mod review_tasks;
 mod runtime_registration;
 mod runtime_support;
 mod session_helpers;
@@ -122,10 +123,12 @@ pub use signals::{
     cancel_signal, list_signals, record_signal_acknowledgment,
     resolve_session_agent_for_runtime_session, send_signal,
 };
+pub use review_tasks::{
+    arbitrate, claim_review, respond_review, submit_for_review, submit_review,
+};
 pub use tasks::{
-    assign_task, claim_review, create_task, create_task_with_source, drop_task, list_tasks,
-    record_task_checkpoint, respond_review, submit_for_review, submit_review, update_task,
-    update_task_queue_policy,
+    assign_task, create_task, create_task_with_source, drop_task, list_tasks,
+    record_task_checkpoint, update_task, update_task_queue_policy,
 };
 
 #[allow(unused_imports)]
