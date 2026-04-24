@@ -16,6 +16,7 @@ use similar::TextDiff;
 
 use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_text;
+use crate::session::roles::SessionAction;
 
 /// Canonical writeable targets for improver patches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
@@ -157,6 +158,44 @@ pub fn apply_improver_apply(
         backup_path: Some(backup_path),
         ..planned
     })
+}
+
+/// Session-aware improver apply facade used by the CLI transport and any
+/// other caller that only has a `session_id`, `actor`, and local project
+/// hint. Resolves the session's own project directory, requires the actor
+/// holds `SessionAction::ImproverApply`, and runs the diff/write against
+/// the session-resolved project — not the `local_project_dir` arg. The
+/// `local_project_dir` is used solely to help locate the session on disk
+/// (the resolver also falls back to the daemon / file index), so a bogus
+/// CLI `--project-dir` cannot escape the session's own repo root.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved, the actor
+/// lacks permission, or the apply/preview fails.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "CLI-facing facade passes every improver arg through; collapsing into a struct would only shift the shape"
+)]
+pub fn improver_apply(
+    session_id: &str,
+    actor: &str,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+    issue_id: &str,
+    dry_run: bool,
+    local_project_dir: &Path,
+    now: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    let session_project =
+        super::queries::resolve_session_project_dir(session_id, local_project_dir)?;
+    let state = super::queries::session_status(session_id, &session_project)?;
+    super::session_helpers::require_permission(&state, actor, SessionAction::ImproverApply)?;
+    if dry_run {
+        preview_improver_apply(&session_project, target, rel, new_contents)
+    } else {
+        apply_improver_apply(&session_project, target, rel, new_contents, issue_id, now)
+    }
 }
 
 /// Validate and diff an improver apply request without writing files.

@@ -140,8 +140,8 @@ pub(crate) use auto_spawn::*;
 #[allow(unused_imports)]
 pub(crate) use conversions::*;
 pub use improver_state::{
-    ImproverApplyOutcome, ImproverTarget, apply_improver_apply, preview_improver_apply,
-    validate_skill_patch_path,
+    ImproverApplyOutcome, ImproverTarget, apply_improver_apply, improver_apply,
+    preview_improver_apply, validate_skill_patch_path,
 };
 #[allow(unused_imports)]
 pub(crate) use leader_transfer::*;
