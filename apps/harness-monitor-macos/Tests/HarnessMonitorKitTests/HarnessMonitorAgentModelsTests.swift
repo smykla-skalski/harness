@@ -44,4 +44,48 @@ struct HarnessMonitorAgentModelsTests {
     let status = try decoder.decode(AgentStatus.self, from: data)
     #expect(status == .awaitingReview)
   }
+
+  @Test("AgentRegistration.isAutoSpawned true when capability present")
+  func agentRegistrationIsAutoSpawnedFromCapabilities() {
+    let capabilities = RuntimeCapabilities(
+      runtime: "claude",
+      supportsNativeTranscript: true,
+      supportsSignalDelivery: true,
+      supportsContextInjection: true,
+      typicalSignalLatencySeconds: 1,
+      hookPoints: []
+    )
+    let auto = AgentRegistration(
+      agentId: "rev-1",
+      name: "Reviewer",
+      runtime: "claude",
+      role: .reviewer,
+      capabilities: [AgentRegistration.autoSpawnedCapability],
+      joinedAt: "2026-04-24T00:00:00Z",
+      updatedAt: "2026-04-24T00:00:00Z",
+      status: .active,
+      agentSessionId: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: capabilities,
+      persona: nil
+    )
+    let manual = AgentRegistration(
+      agentId: "rev-2",
+      name: "Reviewer",
+      runtime: "claude",
+      role: .reviewer,
+      capabilities: ["general"],
+      joinedAt: "2026-04-24T00:00:00Z",
+      updatedAt: "2026-04-24T00:00:00Z",
+      status: .active,
+      agentSessionId: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: capabilities,
+      persona: nil
+    )
+    #expect(auto.isAutoSpawned)
+    #expect(!manual.isAutoSpawned)
+  }
 }
