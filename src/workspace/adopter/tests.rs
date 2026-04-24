@@ -78,7 +78,7 @@ fn probe_rejects_schema_mismatch() {
         err,
         AdoptionError::UnsupportedSchemaVersion {
             found: 7,
-            supported: 9
+            supported: CURRENT_VERSION
         }
     ));
 }

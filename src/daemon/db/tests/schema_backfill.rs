@@ -291,7 +291,7 @@ fn migrates_v8_schema_repairs_active_sessions_without_leader() {
         serde_json::from_str(&stored_state_json).expect("parse repaired state");
     assert_eq!(stored_status, "leaderless_degraded");
     assert!(stored_leader_id.is_none());
-    assert_eq!(is_active, 0);
+    assert_eq!(is_active, 1);
     assert_eq!(repaired_state.status, SessionStatus::LeaderlessDegraded);
     assert!(repaired_state.leader_id.is_none());
     assert_eq!(repaired_state.schema_version, CURRENT_VERSION);
