@@ -12,7 +12,8 @@ use crate::session::types::{SessionState, SessionStatus, TaskSeverity, TaskSourc
 
 use super::scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
 use super::support::{
-    create_work_items_for_issues, emit_watch_issues, map_severity, persist_observer_snapshot,
+    create_work_items_for_issues, emit_watch_issues, persist_observer_snapshot,
+    task_severity_for_issue,
 };
 
 /// How many polling cycles between periodic sweeps.
@@ -182,7 +183,7 @@ fn run_periodic_sweep(
         let spec = TaskSpec {
             title: &title,
             context: Some(&issue.details),
-            severity: map_severity(issue.severity),
+            severity: task_severity_for_issue(issue),
             suggested_fix: issue.fix_hint.as_deref(),
             source: TaskSource::Observe,
             observe_issue_id: Some(&issue.id),

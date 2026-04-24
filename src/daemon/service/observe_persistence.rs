@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::observe::types::{Issue, IssueCode, IssueSeverity};
+use crate::observe::types::Issue;
 use crate::session::types::{TaskSeverity, TaskSource};
 
 use super::{
@@ -168,22 +168,8 @@ fn issue_task_spec(issue: &Issue) -> ObserveTaskSpec {
     }
 }
 
-/// Issue-aware severity bridge for observer-authored tasks.
-///
-/// Overrides the base severity mapping for high-impact heuristics that
-/// should surface as [`TaskSeverity::High`] or [`TaskSeverity::Critical`]
-/// regardless of the classifier's own [`IssueSeverity`].
-pub(crate) fn task_severity_for_issue(issue: &Issue) -> TaskSeverity {
-    match issue.code {
-        IssueCode::PythonTracebackOutput
-        | IssueCode::PythonUsedInBashToolUse
-        | IssueCode::HookDeniedToolCall
-        | IssueCode::CrossAgentFileConflict => TaskSeverity::High,
-        IssueCode::UnauthorizedGitCommitDuringRun
-        | IssueCode::UnverifiedRecursiveRemove => TaskSeverity::Critical,
-        _ => map_issue_severity(issue.severity),
-    }
-}
+// Shared implementation lives in `session::observe::task_severity_for_issue`.
+pub(crate) use crate::session::observe::task_severity_for_issue;
 
 fn heuristic_gap_task_spec(issue: &Issue) -> ObserveTaskSpec {
     ObserveTaskSpec {
@@ -203,13 +189,6 @@ fn heuristic_gap_task_spec(issue: &Issue) -> ObserveTaskSpec {
     }
 }
 
-fn map_issue_severity(severity: IssueSeverity) -> TaskSeverity {
-    match severity {
-        IssueSeverity::Critical => TaskSeverity::Critical,
-        IssueSeverity::Medium => TaskSeverity::Medium,
-        IssueSeverity::Low => TaskSeverity::Low,
-    }
-}
 
 /// Inject a synthetic classifier issue and auto-file it as a task using
 /// the same code path as production observer persistence. Crate-test
