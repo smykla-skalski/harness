@@ -48,6 +48,23 @@ struct RegistryListenerIntegrationTests {
     }
   }
 
+  @Test("stop removes the unix socket path")
+  func stopRemovesSocketPath() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let dispatcher = RegistryRequestDispatcher(registry: registry) {
+        PingResult(protocolVersion: 1, appVersion: "test", bundleIdentifier: "io.test")
+      }
+      let listener = RegistryListener(dispatcher: dispatcher)
+      try await listener.start(at: socketPath)
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      await listener.stop()
+
+      #expect(FileManager.default.fileExists(atPath: socketPath) == false)
+    }
+  }
+
   // MARK: - Helpers
 
   private func withTempSocket<T>(_ body: (String) async throws -> T) async throws -> T {

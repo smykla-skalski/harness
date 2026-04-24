@@ -21,11 +21,16 @@ TRANSIENT_DB_STATUS=200
 
 derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
 args=("$@")
+has_derived_data_path=0
 for ((index = 0; index < ${#args[@]}; index += 1)); do
   if [[ "${args[index]}" == "-derivedDataPath" ]] && (( index + 1 < ${#args[@]} )); then
     derive_data_path="${args[index + 1]}"
+    has_derived_data_path=1
   fi
 done
+if (( has_derived_data_path == 0 )); then
+  args=("-derivedDataPath" "$derive_data_path" "${args[@]}")
+fi
 
 lock_dir="$derive_data_path/.xcodebuild.lock"
 lock_pid_file="$lock_dir/pid"
