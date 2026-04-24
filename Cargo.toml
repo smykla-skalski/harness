@@ -65,6 +65,7 @@ gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"]
 tar = "0.4.44"
 user_dirs = "0.2.0"
 walkdir = "2.5.0"
+similar = "2.6"
 serde-sarif = "0.8.0"
 k8s-openapi = { version = "0.27.1", features = ["v1_31"] }
 kube = { version = "3.1.0", features = ["runtime", "ws"] }
