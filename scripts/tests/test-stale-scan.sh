@@ -96,6 +96,25 @@ wait_for_pid_registered() {
   return 1
 }
 
+# Wait until the argv of `pid` contains the given substring. Needed because
+# our spawn pattern is `nohup bash -c 'exec -a $label sleep 300'`, and ps may
+# still show the interim bash argv for a handful of ms after the pid becomes
+# visible but before exec completes. Without this, the per-triple spawn
+# scenarios occasionally race the stale_scan_matching_pids regex.
+wait_for_pid_argv_contains() {
+  local pid="$1"
+  local needle="$2"
+  local attempts=0
+  while (( attempts < 40 )); do
+    if ps -p "$pid" -o command= 2>/dev/null | grep -Fq -- "$needle"; then
+      return 0
+    fi
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  return 1
+}
+
 # Spawn a background process whose argv[0] is the requested label, writing
 # the resulting pid to the global LAST_SPAWN_PID and appending it to
 # SPAWNED_PIDS so the EXIT trap cleans it up.
@@ -113,6 +132,9 @@ spawn_labelled() {
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  # Wait for the exec -a argv rewrite to land before letting the caller
+  # snapshot ps. Otherwise the regex sees the transient bash argv.
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
 # Spawn a background process whose ps line contains a synthesized target-dir
