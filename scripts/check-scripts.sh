@@ -49,4 +49,5 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
   python3 -m unittest discover -s "$ROOT/apps/harness-monitor-macos/Scripts/tests" -p 'test_*.py'
 fi
 
+"$ROOT/scripts/tests/test-run-step.sh"
 "$ROOT/scripts/tests/test-stale-scan.sh"
