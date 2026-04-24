@@ -277,10 +277,10 @@ mod tests {
         let thinking = catalog
             .models
             .iter()
-            .find(|m| m.id == "gpt-5-codex")
-            .expect("gpt-5-codex present");
+            .find(|m| m.id == "gpt-5.5")
+            .expect("gpt-5.5 present");
         assert_eq!(thinking.effort_kind, EffortKind::ReasoningEffort);
-        assert!(thinking.effort_values.iter().any(|v| v == "minimal"));
+        assert!(thinking.effort_values.iter().any(|v| v == "xhigh"));
     }
 
     #[test]

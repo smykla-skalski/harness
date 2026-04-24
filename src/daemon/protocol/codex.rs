@@ -41,8 +41,8 @@ pub struct CodexRunRequest {
     /// means use the runtime default selected by the codex app-server.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    /// Optional reasoning effort level (e.g. `minimal`, `low`, `medium`,
-    /// `high`). Forwarded to the codex app-server as `reasoning_effort` and
+    /// Optional reasoning effort level (e.g. `low`, `medium`, `high`,
+    /// `xhigh`). Forwarded to the codex app-server as `reasoning_effort` and
     /// ignored when the selected model does not support reasoning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,

@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn launch_profile_injects_effort_flag_for_codex() {
         let mut request = base_request("codex");
-        request.model = Some("gpt-5-codex".into());
+        request.model = Some("gpt-5.5".into());
         request.effort = Some("medium".into());
         let profile = request.launch_profile().expect("profile");
         assert_eq!(
@@ -121,7 +121,7 @@ mod tests {
             vec![
                 "codex".to_string(),
                 "--model".to_string(),
-                "gpt-5-codex".to_string(),
+                "gpt-5.5".to_string(),
                 "--reasoning-effort".to_string(),
                 "medium".to_string(),
             ]
@@ -145,22 +145,27 @@ mod tests {
     }
 
     #[test]
-    fn launch_profile_rejects_effort_for_non_reasoning_model() {
+    fn launch_profile_accepts_effort_for_fast_codex_model() {
         let mut request = base_request("codex");
         request.model = Some("gpt-5.4-mini".into());
         request.effort = Some("medium".into());
-        let error = request.launch_profile().expect_err("should reject");
-        let message = error.to_string();
-        assert!(
-            message.contains("does not support"),
-            "error should call out unsupported effort: {message}"
+        let profile = request.launch_profile().expect("profile");
+        assert_eq!(
+            profile.argv,
+            vec![
+                "codex".to_string(),
+                "--model".to_string(),
+                "gpt-5.4-mini".to_string(),
+                "--reasoning-effort".to_string(),
+                "medium".to_string(),
+            ]
         );
     }
 
     #[test]
     fn launch_profile_rejects_unknown_effort_value() {
         let mut request = base_request("codex");
-        request.model = Some("gpt-5-codex".into());
+        request.model = Some("gpt-5.5".into());
         request.effort = Some("extreme".into());
         let error = request.launch_profile().expect_err("should reject");
         let message = error.to_string();
@@ -188,7 +193,7 @@ mod tests {
     #[test]
     fn empty_effort_string_is_treated_as_none() {
         let mut request = base_request("codex");
-        request.model = Some("gpt-5-codex".into());
+        request.model = Some("gpt-5.5".into());
         request.effort = Some(String::new());
         let profile = request.launch_profile().expect("profile");
         assert_eq!(
@@ -196,7 +201,7 @@ mod tests {
             vec![
                 "codex".to_string(),
                 "--model".to_string(),
-                "gpt-5-codex".to_string(),
+                "gpt-5.5".to_string(),
             ]
         );
     }
