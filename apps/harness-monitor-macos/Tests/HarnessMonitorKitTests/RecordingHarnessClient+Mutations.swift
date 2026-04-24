@@ -238,4 +238,127 @@ extension RecordingHarnessClient {
     }
     return detail
   }
+
+  func submitTaskForReview(
+    sessionID: String,
+    taskID: String,
+    request: TaskSubmitForReviewRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .submitTaskForReview(
+        sessionID: sessionID,
+        taskID: taskID,
+        actor: request.actor,
+        summary: request.summary,
+        suggestedPersona: request.suggestedPersona
+      )
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  func claimTaskReview(
+    sessionID: String,
+    taskID: String,
+    request: TaskClaimReviewRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .claimTaskReview(sessionID: sessionID, taskID: taskID, actor: request.actor)
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  func submitTaskReview(
+    sessionID: String,
+    taskID: String,
+    request: TaskSubmitReviewRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .submitTaskReview(
+        sessionID: sessionID,
+        taskID: taskID,
+        actor: request.actor,
+        verdict: request.verdict,
+        summary: request.summary,
+        points: request.points
+      )
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  func respondTaskReview(
+    sessionID: String,
+    taskID: String,
+    request: TaskRespondReviewRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .respondTaskReview(
+        sessionID: sessionID,
+        taskID: taskID,
+        actor: request.actor,
+        agreed: request.agreed,
+        disputed: request.disputed,
+        note: request.note
+      )
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  func arbitrateTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskArbitrateRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .arbitrateTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        actor: request.actor,
+        verdict: request.verdict,
+        summary: request.summary
+      )
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  func applyImproverPatch(
+    sessionID: String,
+    request: ImproverApplyRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .applyImproverPatch(
+        sessionID: sessionID,
+        actor: request.actor,
+        issueID: request.issueId,
+        target: request.target,
+        relPath: request.relPath,
+        newContents: request.newContents,
+        projectDir: request.projectDir,
+        dryRun: request.dryRun
+      )
+    )
+    detail = touchingDetail()
+    return detail
+  }
+
+  private func touchingDetail() -> SessionDetail {
+    SessionDetail(
+      session: updatedSession(),
+      agents: detail.agents,
+      tasks: detail.tasks,
+      signals: detail.signals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
+    )
+  }
 }

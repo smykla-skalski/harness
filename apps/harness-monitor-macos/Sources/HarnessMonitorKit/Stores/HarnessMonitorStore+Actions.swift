@@ -364,9 +364,14 @@ extension HarnessMonitorStore {
           sessionID: sessionID,
           detail: measuredMutation.value
         )
-        selectedSession = detail
-        applySessionSummaryUpdate(detail.session)
-        synchronizeActionActor()
+        applySelectedSessionSnapshot(
+          sessionID: sessionID,
+          detail: detail,
+          timeline: timeline,
+          timelineWindow: timelineWindow,
+          showingCachedData: isShowingCachedData,
+          cancelPendingTimelineRefresh: false
+        )
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
         presentSuccessFeedback(actionName)
         return true
@@ -375,8 +380,9 @@ extension HarnessMonitorStore {
       span.status = .error(description: error.localizedDescription)
       HarnessMonitorTelemetry.shared.recordError(error, on: span)
       reportSelectedSessionActionFailure(actionName, sessionID: sessionID, error: error)
-      presentFailureFeedback(error.localizedDescription)
+      presentSelectedSessionMutationFailure(error, actionID: actionID)
       return false
     }
   }
+
 }
