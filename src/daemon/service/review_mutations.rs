@@ -32,7 +32,7 @@ use super::review_submit_txn::{apply_submit_review_in_txn, prepare_submit_review
 use super::sessions::session_detail_from_async_daemon_db;
 use super::{
     build_log_entry, effective_project_dir, index, project_dir_for_db_session, session_detail,
-    session_not_found,
+    session_not_found, sync_file_state_from_async_db,
 };
 
 fn project_dir_from_db_or_index(
@@ -198,57 +198,41 @@ pub(crate) async fn submit_for_review_async(
     request: &TaskSubmitForReviewRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
-    apply_submit_for_review_to_resolved(&mut resolved, task_id, request, &now)?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            state.state_version += 1;
+            apply_submit_for_review(
+                state,
+                task_id,
+                &request.actor,
+                request.summary.as_deref(),
+                &now,
+            )?;
+            if let Some(persona) = request.suggested_persona.as_deref()
+                && let Some(task) = state.tasks.get_mut(task_id)
+            {
+                task.suggested_persona = Some(persona.to_string());
+            }
+            let new_status = state.tasks.get(task_id).map(|task| task.status);
+            Ok((prev_status, new_status))
+        })
         .await?;
-    append_submit_for_review_log(async_db, session_id, task_id, &request.actor).await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
+    append_task_status_change_log(
+        async_db,
+        session_id,
+        task_id,
+        &request.actor,
+        prev_status,
+        new_status,
+    )
+    .await?;
+    let resolved = resolve_async(async_db, session_id).await?;
     maybe_materialize_spawn_reviewer_async(session_id, task_id, &resolved, &now, async_db).await?;
     bump_async(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
-}
-
-fn apply_submit_for_review_to_resolved(
-    resolved: &mut daemon_index::ResolvedSession,
-    task_id: &str,
-    request: &TaskSubmitForReviewRequest,
-    now: &str,
-) -> Result<(), CliError> {
-    apply_submit_for_review(
-        &mut resolved.state,
-        task_id,
-        &request.actor,
-        request.summary.as_deref(),
-        now,
-    )?;
-    if let Some(persona) = request.suggested_persona.as_deref()
-        && let Some(task) = resolved.state.tasks.get_mut(task_id)
-    {
-        task.suggested_persona = Some(persona.to_string());
-    }
-    Ok(())
-}
-
-async fn append_submit_for_review_log(
-    async_db: &super::db::AsyncDaemonDb,
-    session_id: &str,
-    task_id: &str,
-    actor_id: &str,
-) -> Result<(), CliError> {
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_task_status_changed(
-                task_id,
-                TaskStatus::InProgress,
-                TaskStatus::AwaitingReview,
-            ),
-            Some(actor_id),
-            None,
-        ))
-        .await
 }
 
 async fn maybe_materialize_spawn_reviewer_async(
@@ -301,11 +285,13 @@ pub(crate) async fn claim_review_async(
     let (prev_status, new_status) = async_db
         .update_session_state_immediate(session_id, |state| {
             let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            state.state_version += 1;
             apply_claim_review(state, task_id, &request.actor, &now)?;
             let new_status = state.tasks.get(task_id).map(|task| task.status);
             Ok((prev_status, new_status))
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     if let (Some(prev), Some(new)) = (prev_status, new_status)
         && prev != new
     {
@@ -357,12 +343,14 @@ pub(crate) async fn submit_review_async(
     )?;
     let (prev_status, new_status) = async_db
         .update_session_state_immediate(session_id, |state| {
+            state.state_version += 1;
             apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)
         })
         .await?;
     async_db
         .insert_task_review(session_id, task_id, &prepared.review)
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     append_task_status_change_log(
         async_db,
         session_id,
@@ -409,22 +397,25 @@ pub(crate) async fn respond_review_async(
     request: &TaskRespondReviewRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
-    let prev_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-    apply_respond_review(
-        &mut resolved.state,
-        task_id,
-        &request.actor,
-        &request.agreed,
-        &request.disputed,
-        request.note.as_deref(),
-        &now,
-    )?;
-    let new_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            state.state_version += 1;
+            apply_respond_review(
+                state,
+                task_id,
+                &request.actor,
+                &request.agreed,
+                &request.disputed,
+                request.note.as_deref(),
+                &now,
+            )?;
+            let new_status = state.tasks.get(task_id).map(|task| task.status);
+            Ok((prev_status, new_status))
+        })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     if let (Some(prev), Some(new)) = (prev_status, new_status)
         && prev != new
     {
@@ -451,21 +442,24 @@ pub(crate) async fn arbitrate_async(
     request: &TaskArbitrateRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
-    let prev_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-    apply_arbitrate(
-        &mut resolved.state,
-        task_id,
-        &request.actor,
-        request.verdict,
-        &request.summary,
-        &now,
-    )?;
-    let new_status = resolved.state.tasks.get(task_id).map(|task| task.status);
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let prev_status = state.tasks.get(task_id).map(|task| task.status);
+            state.state_version += 1;
+            apply_arbitrate(
+                state,
+                task_id,
+                &request.actor,
+                request.verdict,
+                &request.summary,
+                &now,
+            )?;
+            let new_status = state.tasks.get(task_id).map(|task| task.status);
+            Ok((prev_status, new_status))
+        })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     if let (Some(prev), Some(new)) = (prev_status, new_status)
         && prev != new
     {
