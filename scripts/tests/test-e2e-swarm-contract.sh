@@ -51,6 +51,11 @@ require_file "scripts/e2e/swarm-full-flow.sh"
 require_file "scripts/e2e/triage-run.sh"
 require_file "docs/e2e/swarm-gaps.md"
 require_file "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh"
+require_file "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift"
+require_file "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmHeuristicInjection.swift"
+require_file "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRuntimeProbe.swift"
+require_file "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmSeedState.swift"
+require_file "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift"
 require_file "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift"
 require_file "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestAccessibility.swift"
 require_file "tests/integration/commands/session/swarm_full_flow.rs"
@@ -62,42 +67,50 @@ require_mise_task "e2e:swarm:probe-runtimes"
 require_mise_task "e2e:swarm:gaps-open"
 require_mise_task "monitor:macos:test:swarm-e2e"
 
+require_text ".mise.toml" 'harness-monitor-e2e swarm-full-flow --assert'
+require_text ".mise.toml" 'harness-monitor-e2e inject-heuristic'
+require_text ".mise.toml" 'harness-monitor-e2e seed-session-state'
+require_text ".mise.toml" 'harness-monitor-e2e probe-runtimes'
 require_text "scripts/e2e/lib.sh" "portable_timeout()"
-require_text "scripts/e2e/probe-runtimes.sh" '"required_missing"'
-require_text "scripts/e2e/probe-runtimes.sh" '"claude"'
-require_text "scripts/e2e/probe-runtimes.sh" '"codex"'
-require_text "scripts/e2e/probe-runtimes.sh" "claude auth status"
-require_text "scripts/e2e/swarm-full-flow.sh" ".agent_id"
-require_text "scripts/e2e/swarm-full-flow.sh" ".task_id"
-require_text "scripts/e2e/swarm-full-flow.sh" "act_ready"
-require_text "scripts/e2e/swarm-full-flow.sh" "act_ack"
-require_text "scripts/e2e/swarm-full-flow.sh" "sess-e2e-swarm-\$RUN_ID"
-require_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
-require_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
-require_text "scripts/e2e/swarm-full-flow.sh" "run_harness_ignore_failure()"
-require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
-require_text "scripts/e2e/swarm-full-flow.sh" "-workspace \"\$APP_ROOT/HarnessMonitor.xcworkspace\""
-require_text "scripts/e2e/swarm-full-flow.sh" "-resultBundlePath \"\$RESULT_BUNDLE_PATH\""
-require_text "scripts/e2e/swarm-full-flow.sh" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
-require_text "scripts/e2e/swarm-full-flow.sh" "UI_SNAPSHOTS_SOURCE=\"\$SYNC_ROOT/ui-snapshots\""
-require_text "scripts/e2e/swarm-full-flow.sh" "SCREEN_RECORDING_MANIFEST_PATH=\"\$STATE_ROOT/screen-recording.json\""
-require_text "scripts/e2e/swarm-full-flow.sh" '"$APP_E2E_TOOL_BINARY" start-recording'
-require_text "scripts/e2e/swarm-full-flow.sh" '"$APP_E2E_TOOL_BINARY" stop-recording'
-require_text "scripts/e2e/swarm-full-flow.sh" '--manifest "$SCREEN_RECORDING_MANIFEST_PATH"'
-require_text "scripts/e2e/swarm-full-flow.sh" 'triage-run.sh'
-require_text "scripts/e2e/swarm-full-flow.sh" "--ui-snapshots-source \"\$UI_SNAPSHOTS_SOURCE\""
-require_text "scripts/e2e/swarm-full-flow.sh" 'Swarm e2e artifacts recorded at'
-require_text "scripts/e2e/swarm-full-flow.sh" 'io.harnessmonitor.agents-e2e-tests'
-require_text "scripts/e2e/swarm-full-flow.sh" 'AGENTS_E2E_RUNNER_CONTAINER_ROOT'
-require_no_text "scripts/e2e/swarm-full-flow.sh" "UI_SNAPSHOTS_DIR"
-require_no_text "scripts/e2e/swarm-full-flow.sh" "-project \"\$APP_ROOT/HarnessMonitor.xcodeproj\""
-require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
-require_no_text "scripts/e2e/swarm-full-flow.sh" "SYNC_DIR=\"\$DATA_HOME/e2e-sync\""
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'wait_for_pid_exit'
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGTERM'
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGKILL'
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'SCREEN_RECORD_PID'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/harness-monitor-e2e/main.swift" "SwarmFullFlow.self"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/harness-monitor-e2e/main.swift" "SeedSessionState.self"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/harness-monitor-e2e/main.swift" "ProbeRuntimes.self"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRuntimeProbe.swift" '"required_missing"'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRuntimeProbe.swift" '"claude"'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRuntimeProbe.swift" '"codex"'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRuntimeProbe.swift" "claude auth status"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmHeuristicInjection.swift" ".agent_id"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmHeuristicInjection.swift" "raw.jsonl"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "actReady"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "actAck"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "sess-e2e-swarm-"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "session task arbitrate"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "observe doctor --json"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'Scripts/generate.sh'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "HarnessMonitor.xcworkspace"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'start-recording'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'ScreenRecordingStopper'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'triage-run.sh'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'Swarm e2e artifacts recorded at'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" 'io.harnessmonitor.agents-e2e-tests'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" 'AGENTS_E2E_RUNNER_CONTAINER_ROOT'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "swarm-full-flow.xcresult"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "ui-snapshots"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "recording-control"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "screen-recording.json"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_TEST_RETRY_ITERATIONS'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR'
+require_text "scripts/e2e/swarm-full-flow.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow "$@"'
+require_text "scripts/e2e/inject-heuristic-log.sh" 'exec "$APP_E2E_TOOL_BINARY" inject-heuristic "$@"'
+require_text "scripts/e2e/seed-session-state.sh" 'exec "$APP_E2E_TOOL_BINARY" seed-session-state "$@"'
+require_text "scripts/e2e/probe-runtimes.sh" 'exec "$APP_E2E_TOOL_BINARY" probe-runtimes "$@"'
+require_no_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
+require_no_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
+require_no_text "scripts/e2e/swarm-full-flow.sh" "screencapture -v -k -D1 -V 1800"
+require_no_text "scripts/e2e/inject-heuristic-log.sh" 'raw.jsonl'
+require_no_text "scripts/e2e/seed-session-state.sh" 'jq -nc'
+require_no_text "scripts/e2e/probe-runtimes.sh" 'claude auth status'
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
 require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
 require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
@@ -118,7 +131,7 @@ require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/Harne
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests.swift" "selectFastModelForTerminal(in: app, runtime: \"codex\")"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"GPT-5.3 Codex Spark\""
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"Low\""
-require_text "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh" "scripts/e2e/swarm-full-flow.sh"
+require_text "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow --assert "$@"'
 require_text "tests/integration/commands/session/swarm_full_flow.rs" "#[ignore"
 require_text "tests/integration/commands/session/mod.rs" "mod swarm_full_flow;"
 
@@ -148,28 +161,6 @@ jq -s -e '
   and .[1].message.content[0].type == "tool_result"
   and (.[1].message.content[0].content[0].text | contains("Traceback"))
 ' "$log_path" >/dev/null || fail "injector must emit canonical transcript JSONL"
-
-python3 - "$ROOT/scripts/e2e/swarm-full-flow.sh" <<'PY' || fail "swarm-full-flow must guard every may-fail harness call under set -e"
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-violations = []
-for line_no, line in enumerate(path.read_text().splitlines(), start=1):
-    if "run_harness_may_fail" not in line:
-        continue
-    stripped = line.lstrip()
-    if stripped.startswith("run_harness_may_fail()"):
-        continue
-    if stripped.startswith('run_harness_may_fail "$@" || true'):
-        continue
-    if stripped.startswith("if run_harness_may_fail"):
-        continue
-    violations.append(f"{line_no}: {line.rstrip()}")
-
-if violations:
-    raise SystemExit("\n".join(violations))
-PY
 
 open_count="$("$ROOT/scripts/e2e/gaps-open-count.sh")"
 [[ "$open_count" == "0" ]] || fail "expected zero open e2e gaps, got $open_count"
