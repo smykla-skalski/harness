@@ -66,7 +66,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     stopBackgroundCompaction()
 
     guard runInBackgroundEnabled else {
-      HarnessMonitorLogger.supervisorInfo(
+      HarnessMonitorLogger.supervisorTrace(
         "supervisor.audit_retention.background_skipped reason=preference_disabled"
       )
       return
@@ -108,7 +108,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     scheduler = activity
     isBackgroundActivityScheduled = true
     let intervalValue = interval
-    HarnessMonitorLogger.supervisorInfo(
+    HarnessMonitorLogger.supervisorTrace(
       "supervisor.audit_retention.background_started interval=\(intervalValue)"
     )
   }
@@ -121,7 +121,7 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
     activity.invalidate()
     scheduler = nil
     isBackgroundActivityScheduled = false
-    HarnessMonitorLogger.supervisorInfo("supervisor.audit_retention.background_stopped")
+    HarnessMonitorLogger.supervisorTrace("supervisor.audit_retention.background_stopped")
   }
 
   public func forceCompaction() async throws -> CompactionResult {
