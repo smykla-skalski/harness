@@ -60,9 +60,31 @@ struct AuditFromRef: ParsableCommand {
 struct Compare: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "compare",
-        abstract: "Compare two completed audit runs (not yet implemented)."
+        abstract: "Compare two summary.json files and emit comparison.{json,md}."
     )
-    func run() throws { throw ExitCode(2) }
+
+    @Option(name: .long, help: "Path to current run directory or summary.json")
+    var current: String
+
+    @Option(name: .long, help: "Path to baseline run directory or summary.json")
+    var baseline: String
+
+    @Option(name: [.long, .customLong("output-dir")], help: "Output directory for comparison.{json,md}")
+    var outputDir: String
+
+    func run() throws {
+        let inputs = HarnessMonitorPerfCore.Comparator.Inputs(
+            current: URL(fileURLWithPath: current),
+            baseline: URL(fileURLWithPath: baseline),
+            outputDir: URL(fileURLWithPath: outputDir)
+        )
+        do {
+            _ = try HarnessMonitorPerfCore.Comparator.compare(inputs)
+        } catch let failure as HarnessMonitorPerfCore.Comparator.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
 }
 
 struct Summarize: ParsableCommand {
