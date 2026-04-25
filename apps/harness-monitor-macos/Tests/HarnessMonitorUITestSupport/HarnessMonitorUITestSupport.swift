@@ -6,6 +6,8 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
   nonisolated static let daemonDataHomeKey = "HARNESS_DAEMON_DATA_HOME"
   nonisolated static let artifactsDirectoryKey = "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
+  nonisolated static let recordingControlDirectoryKey =
+    "HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR"
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
@@ -28,6 +30,7 @@ class HarnessMonitorUITestCase: XCTestCase {
       @unknown default:
         break
       }
+      Self.signalRecordingStopIfConfigured()
     }
   }
 
@@ -58,6 +61,9 @@ extension HarnessMonitorUITestCase {
       return app
     }
     app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
+    guard prepareRecordingStartIfConfigured() else {
+      return app
+    }
     app.launch()
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
@@ -79,6 +85,84 @@ extension HarnessMonitorUITestCase {
       }
     )
     return app
+  }
+
+  func prepareRecordingStartIfConfigured(
+    context: String = "",
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
+    guard let controlDirectory = Self.recordingControlDirectory() else {
+      return true
+    }
+
+    let startRequest = controlDirectory.appendingPathComponent("start.request")
+    let startAck = controlDirectory.appendingPathComponent("start.ready")
+    let stopRequest = controlDirectory.appendingPathComponent("stop.request")
+
+    do {
+      try FileManager.default.createDirectory(
+        at: controlDirectory,
+        withIntermediateDirectories: true
+      )
+      for marker in [startRequest, startAck, stopRequest] {
+        try? FileManager.default.removeItem(at: marker)
+      }
+      try Data().write(to: startRequest, options: .atomic)
+    } catch {
+      let suffix = context.isEmpty ? "" : "\n\(context)"
+      XCTFail(
+        "Failed to arm recording start markers in \(controlDirectory.path): \(error)\(suffix)",
+        file: file,
+        line: line
+      )
+      return false
+    }
+
+    if waitUntil(
+      timeout: Self.uiTimeout,
+      condition: {
+        FileManager.default.fileExists(atPath: startAck.path)
+      }
+    ) {
+      return true
+    }
+
+    let suffix = context.isEmpty ? "" : "\n\(context)"
+    XCTFail(
+      "Timed out waiting for recording start ack at \(startAck.path)\(suffix)",
+      file: file,
+      line: line
+    )
+    return false
+  }
+
+  private static func signalRecordingStopIfConfigured() {
+    guard let controlDirectory = recordingControlDirectory() else {
+      return
+    }
+
+    let stopRequest = controlDirectory.appendingPathComponent("stop.request")
+    do {
+      try FileManager.default.createDirectory(
+        at: controlDirectory,
+        withIntermediateDirectories: true
+      )
+      try Data().write(to: stopRequest, options: .atomic)
+    } catch {
+      XCTFail("Failed to signal recording stop at \(stopRequest.path): \(error)")
+    }
+  }
+
+  private static func recordingControlDirectory() -> URL? {
+    guard
+      let rawValue = ProcessInfo.processInfo.environment[Self.recordingControlDirectoryKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      rawValue.isEmpty == false
+    else {
+      return nil
+    }
+    return URL(fileURLWithPath: rawValue, isDirectory: true)
   }
 
   @discardableResult

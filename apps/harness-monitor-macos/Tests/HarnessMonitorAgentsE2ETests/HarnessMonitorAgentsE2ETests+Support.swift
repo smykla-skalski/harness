@@ -135,6 +135,9 @@ extension HarnessMonitorAgentsE2ETests {
     app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment = harness.appLaunchEnvironment
       .merging(additionalEnvironment) { _, new in new }
+    guard prepareRecordingStartIfConfigured(context: harness.diagnosticsSummary()) else {
+      return app
+    }
     app.launch()
 
     XCTAssertTrue(
