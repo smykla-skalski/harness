@@ -146,7 +146,7 @@ final class SwarmFixture {
       """
       Expected swarm task card \(taskID) to become hittable.
       taskFrame=\(task.frame)
-      scrollFrame=\(scrollTarget().frame)
+      scrollFrame=\(scrollTarget(for: task).frame)
       \(diagnosticsSummary())
       """
     )
@@ -244,7 +244,7 @@ final class SwarmFixture {
   }
 
   private func scrollToward(_ element: XCUIElement) {
-    let target = scrollTarget()
+    let target = scrollTarget(for: element)
     let window = testCase.mainWindow(in: app)
     if element.exists,
       !element.frame.isEmpty,
@@ -258,8 +258,15 @@ final class SwarmFixture {
     testCase.dragUp(in: app, element: target, distanceRatio: 0.18)
   }
 
-  private func scrollTarget() -> XCUIElement {
+  private func scrollTarget(for element: XCUIElement) -> XCUIElement {
     let window = testCase.mainWindow(in: app)
+    if let scrollView = matchingScrollTarget(in: window.scrollViews, for: element) {
+      return scrollView
+    }
+    if let scrollView = matchingScrollTarget(in: app.scrollViews, for: element) {
+      return scrollView
+    }
+
     let windowScrollView = window.scrollViews.firstMatch
     if windowScrollView.exists {
       return windowScrollView
@@ -267,6 +274,38 @@ final class SwarmFixture {
 
     let appScrollView = app.scrollViews.firstMatch
     return appScrollView.exists ? appScrollView : window
+  }
+
+  private func matchingScrollTarget(
+    in query: XCUIElementQuery,
+    for element: XCUIElement
+  ) -> XCUIElement? {
+    guard element.exists, !element.frame.isEmpty else { return nil }
+
+    let elementFrame = element.frame
+    let elementMidX = elementFrame.midX
+    let searchCount = min(query.count, 12)
+    var bestOverlap: CGFloat = 0
+    var bestMatch: XCUIElement?
+
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+
+      let candidateFrame = candidate.frame
+      if candidateFrame.minX <= elementMidX, elementMidX <= candidateFrame.maxX {
+        return candidate
+      }
+
+      let horizontalOverlap =
+        min(candidateFrame.maxX, elementFrame.maxX) - max(candidateFrame.minX, elementFrame.minX)
+      if horizontalOverlap > bestOverlap {
+        bestOverlap = horizontalOverlap
+        bestMatch = candidate
+      }
+    }
+
+    return bestMatch
   }
 }
 
