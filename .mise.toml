@@ -1,6 +1,7 @@
 [tools]
 rust = "nightly"
 shellcheck = "0.11.0"
+tuist = "4.186.2"
 
 [env]
 HARNESS_APP_GROUP_ID = "Q498EB36N4.io.harnessmonitor"
