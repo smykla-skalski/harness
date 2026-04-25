@@ -19,15 +19,22 @@ enum ScreenRecorderWindowSelector {
     static func captureWindow(
         from candidates: [ScreenRecorderWindowCandidate]
     ) throws -> ScreenRecorderWindowCandidate {
+        guard let selectedWindow = try captureWindowIfAvailable(from: candidates) else {
+            throw ScreenRecorder.Failure.monitorWindowNotFound
+        }
+        return selectedWindow
+    }
+
+    static func captureWindowIfAvailable(
+        from candidates: [ScreenRecorderWindowCandidate]
+    ) throws -> ScreenRecorderWindowCandidate? {
         let matchingCandidates = candidates.filter {
             $0.isOnScreen
                 && allowedBundleIdentifiers.contains($0.bundleIdentifier ?? "")
                 && $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == mainWindowTitle
         }
 
-        guard !matchingCandidates.isEmpty else {
-            throw ScreenRecorder.Failure.monitorWindowNotFound
-        }
+        guard !matchingCandidates.isEmpty else { return nil }
         guard matchingCandidates.count == 1 else {
             throw ScreenRecorder.Failure.ambiguousMonitorWindows(matchingCandidates.count)
         }
