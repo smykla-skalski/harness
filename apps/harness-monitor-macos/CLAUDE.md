@@ -4,6 +4,8 @@ This file provides guidance to Claude Code when working in the Harness Monitor m
 
 ## Build and test
 
+Optional features (Lottie dancing-llama, future OTel/observability slices, etc.) are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at project-generation time. Tracked `project.pbxproj` reflects the all-features-OFF state. See `features/README.md` for the convention and the list of supported flags.
+
 The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `mise run monitor:macos:generate`. That task also refreshes the repo-root and app-local `buildServer.json` SourceKit configs. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
 
 Validation expectations (run from repo root):
