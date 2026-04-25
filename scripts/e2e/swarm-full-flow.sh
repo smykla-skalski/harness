@@ -492,7 +492,7 @@ if [[ "$(jq '.required_missing | length' "$STATE_ROOT/probe.json")" != "0" ]]; t
   exit 1
 fi
 
-"$APP_ROOT/Scripts/generate-project.sh"
+"$APP_ROOT/Scripts/generate.sh"
 "$ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
