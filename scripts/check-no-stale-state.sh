@@ -96,13 +96,34 @@ collect_stale_lines() {
     append_path_block "orphan SQLite sidecars (harness.db is gone)" "${wal_orphans[@]}"
   fi
 
-  # 6. Foreign listener on the Codex WS port.
+  # 6. Stale swarm e2e worktrees and branches. Failed full-flow runs preserve
+  #    state for debugging; the harness/sess-e2e-swarm-* refs are owned by that
+  #    lane and must not poison future runs.
+  local swarm_worktrees=()
+  local swarm_entry
+  while IFS= read -r swarm_entry; do
+    [[ -n "$swarm_entry" ]] && swarm_worktrees+=("$swarm_entry")
+  done < <(stale_scan_swarm_e2e_worktrees)
+  if (( ${#swarm_worktrees[@]} > 0 )); then
+    append_path_block "stale swarm e2e worktrees" "${swarm_worktrees[@]}"
+  fi
+
+  local swarm_branches=()
+  local swarm_branch
+  while IFS= read -r swarm_branch; do
+    [[ -n "$swarm_branch" ]] && swarm_branches+=("$swarm_branch")
+  done < <(stale_scan_swarm_e2e_branches)
+  if (( ${#swarm_branches[@]} > 0 )); then
+    append_path_block "stale swarm e2e branches" "${swarm_branches[@]}"
+  fi
+
+  # 7. Foreign listener on the Codex WS port.
   local port foreign_ws
   port="$(stale_scan_codex_ws_port)"
   foreign_ws="$(stale_scan_foreign_tcp_listeners "$port")"
   append_pid_block "non-harness processes listening on Codex WS port $port" "$foreign_ws"
 
-  # 7. launchd agent drift (program path gone but service still loaded).
+  # 8. launchd agent drift (program path gone but service still loaded).
   local drift_line
   while IFS= read -r drift_line; do
     [[ -n "$drift_line" ]] || continue

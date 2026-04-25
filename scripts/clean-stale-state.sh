@@ -194,6 +194,38 @@ remove_orphan_sqlite_sidecars() {
   remove_orphan_sqlite_sidecars_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
 }
 
+remove_stale_swarm_e2e_worktrees() {
+  local entries=()
+  local entry
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && entries+=("$entry")
+  done < <(stale_scan_swarm_e2e_worktrees)
+
+  local path branch
+  for entry in "${entries[@]}"; do
+    path="${entry%%$'\t'*}"
+    branch="${entry#*$'\t'}"
+    if [[ "$path" == "$entry" || -z "$path" || -z "$branch" ]]; then
+      continue
+    fi
+    echo "removing stale swarm e2e worktree $branch..."
+    git -C "$ROOT" worktree remove --force "$path" >/dev/null 2>&1 || true
+  done
+
+  git -C "$ROOT" worktree prune >/dev/null 2>&1 || true
+
+  local branches=()
+  while IFS= read -r branch; do
+    [[ -n "$branch" ]] && branches+=("$branch")
+  done < <(stale_scan_swarm_e2e_branches)
+
+  for branch in "${branches[@]}"; do
+    stale_scan_is_swarm_e2e_branch "$branch" || continue
+    echo "deleting stale swarm e2e branch $branch..."
+    git -C "$ROOT" branch -D "$branch" >/dev/null 2>&1 || true
+  done
+}
+
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
@@ -204,5 +236,6 @@ kill_orphan_codex_app_servers
 remove_tmp_bridge_artifacts
 wipe_stale_bridge_state
 remove_orphan_sqlite_sidecars
+remove_stale_swarm_e2e_worktrees
 
 echo "clean:stale complete"

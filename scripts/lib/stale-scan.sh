@@ -164,6 +164,41 @@ stale_scan_orphan_sqlite_sidecars() {
   return 0
 }
 
+stale_scan_is_swarm_e2e_branch() {
+  local branch="$1"
+  [[ "$branch" == harness/sess-e2e-swarm-* ]]
+}
+
+stale_scan_swarm_e2e_worktrees_from_porcelain() {
+  awk '
+    /^worktree / {
+      path = substr($0, 10)
+      next
+    }
+    /^branch refs\/heads\/harness\/sess-e2e-swarm-/ {
+      branch = $0
+      sub(/^branch refs\/heads\//, "", branch)
+      if (path != "") {
+        print path "\t" branch
+      }
+      next
+    }
+    /^$/ {
+      path = ""
+    }
+  '
+}
+
+stale_scan_swarm_e2e_worktrees() {
+  git -C "$STALE_SCAN_ROOT" worktree list --porcelain 2>/dev/null \
+    | stale_scan_swarm_e2e_worktrees_from_porcelain
+}
+
+stale_scan_swarm_e2e_branches() {
+  git -C "$STALE_SCAN_ROOT" branch --list 'harness/sess-e2e-swarm-*' \
+    --format='%(refname:short)' 2>/dev/null
+}
+
 # Resolve the Codex WS port the daemon is expected to bind.
 # HARNESS_CODEX_WS_PORT mirrors src/daemon/bridge/types.rs::CODEX_BRIDGE_PORT_ENV.
 stale_scan_codex_ws_port() {
