@@ -21,7 +21,7 @@ pub(super) fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<Doctor
     let mut checks = Vec::new();
 
     for agent in agents {
-        for (path, expected) in planned_agent_bootstrap_files(project_dir, agent) {
+        for (path, expected) in planned_agent_bootstrap_files(project_dir, agent, &[]) {
             let code = runtime_bootstrap_code(agent, &path);
             let summary_name = runtime_bootstrap_label(agent, &path);
             if !path.exists() {
