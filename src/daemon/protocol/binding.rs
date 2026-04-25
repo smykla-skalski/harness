@@ -36,6 +36,8 @@ fn bind_optional_control_plane_actor(actor: &mut Option<String>) {
     *actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
 }
 
+fn preserve_required_actor(_actor: &mut String) {}
+
 impl ControlPlaneActorRequest for CodexRunRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_optional_control_plane_actor(&mut self.actor);
@@ -146,31 +148,31 @@ impl ControlPlaneActorRequest for VoiceSessionFinishRequest {
 
 impl ControlPlaneActorRequest for TaskSubmitForReviewRequest {
     fn bind_control_plane_actor(&mut self) {
-        bind_required_control_plane_actor(&mut self.actor);
+        preserve_required_actor(&mut self.actor);
     }
 }
 
 impl ControlPlaneActorRequest for TaskClaimReviewRequest {
     fn bind_control_plane_actor(&mut self) {
-        bind_required_control_plane_actor(&mut self.actor);
+        preserve_required_actor(&mut self.actor);
     }
 }
 
 impl ControlPlaneActorRequest for TaskSubmitReviewRequest {
     fn bind_control_plane_actor(&mut self) {
-        bind_required_control_plane_actor(&mut self.actor);
+        preserve_required_actor(&mut self.actor);
     }
 }
 
 impl ControlPlaneActorRequest for TaskRespondReviewRequest {
     fn bind_control_plane_actor(&mut self) {
-        bind_required_control_plane_actor(&mut self.actor);
+        preserve_required_actor(&mut self.actor);
     }
 }
 
 impl ControlPlaneActorRequest for TaskArbitrateRequest {
     fn bind_control_plane_actor(&mut self) {
-        bind_required_control_plane_actor(&mut self.actor);
+        preserve_required_actor(&mut self.actor);
     }
 }
 
