@@ -10,6 +10,8 @@ public struct SwarmActDriverInputs: Sendable {
   public let sessionID: String
   public let harnessBinary: URL
   public let probeJSON: URL
+  public let stepTimeoutOverrides: [String: TimeInterval]
+  public let progressLog: URL?
 
   public init(
     repoRoot: URL,
@@ -19,7 +21,9 @@ public struct SwarmActDriverInputs: Sendable {
     syncDir: URL,
     sessionID: String,
     harnessBinary: URL,
-    probeJSON: URL
+    probeJSON: URL,
+    stepTimeoutOverrides: [String: TimeInterval] = [:],
+    progressLog: URL? = nil
   ) {
     self.repoRoot = repoRoot
     self.stateRoot = stateRoot
@@ -29,6 +33,8 @@ public struct SwarmActDriverInputs: Sendable {
     self.sessionID = sessionID
     self.harnessBinary = harnessBinary
     self.probeJSON = probeJSON
+    self.stepTimeoutOverrides = stepTimeoutOverrides
+    self.progressLog = progressLog
   }
 }
 
@@ -672,6 +678,7 @@ private final class SwarmActDriverRunner {
   private let probeReport: SwarmRuntimeProbe.Report
   private let appendGapScript: URL
   private let improverSource: URL
+  private let progressHandle: FileHandle?
 
   init(inputs: SwarmActDriverInputs) throws {
     self.inputs = inputs
@@ -681,11 +688,24 @@ private final class SwarmActDriverRunner {
     self.appendGapScript = inputs.repoRoot.appendingPathComponent("scripts/e2e/append-gap.sh")
     self.improverSource = inputs.repoRoot
       .appendingPathComponent("agents/plugins/harness/skills/harness/body.md")
+    if let progressLog = inputs.progressLog {
+      try FileManager.default.createDirectory(
+        at: progressLog.deletingLastPathComponent(), withIntermediateDirectories: true)
+      if !FileManager.default.fileExists(atPath: progressLog.path) {
+        FileManager.default.createFile(atPath: progressLog.path, contents: nil)
+      }
+      let handle = try FileHandle(forWritingTo: progressLog)
+      try? handle.seekToEnd()
+      self.progressHandle = handle
+    } else {
+      self.progressHandle = nil
+    }
   }
 
   func run() throws {
-    print("act driver started")
+    logProgress("started")
 
+    logProgress("step=session-start session=\(inputs.sessionID)")
     try runHarness([
       "session", "start",
       "--project-dir", inputs.projectDir.path,
@@ -1202,9 +1222,11 @@ private final class SwarmActDriverRunner {
       at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
     var body = "act=\(act)\n"
     for key in values.keys.sorted() {
-      body.append("\(key)=\(values[key]!)\n")
+      guard let value = values[key] else { continue }
+      body.append("\(key)=\(value)\n")
     }
     try Data(body.utf8).write(to: marker, options: .atomic)
+    logProgress("step=ready act=\(act) marker=\(marker.path)")
   }
 
   private func actAck(_ act: String, timeout: TimeInterval? = nil) throws {
@@ -1212,16 +1234,50 @@ private final class SwarmActDriverRunner {
     let stopMarker = inputs.syncDir
       .deletingLastPathComponent()
       .appendingPathComponent("recording-control/stop.request")
-    switch try SwarmAckWait.waitForAck(
-      ackExists: { FileManager.default.fileExists(atPath: marker.path) },
-      stopRequested: { FileManager.default.fileExists(atPath: stopMarker.path) },
-      timeout: timeout ?? SwarmStepTimeouts.timeout(for: act)
-    ) {
+    let resolvedTimeout =
+      timeout
+      ?? inputs.stepTimeoutOverrides[act]
+      ?? SwarmStepTimeouts.timeout(for: act)
+    logProgress("step=await-ack act=\(act) timeout=\(resolvedTimeout)s")
+    let outcome: SwarmAckWait.Outcome
+    do {
+      outcome = try SwarmAckWait.waitForAck(
+        ackExists: { FileManager.default.fileExists(atPath: marker.path) },
+        stopRequested: { FileManager.default.fileExists(atPath: stopMarker.path) },
+        timeout: resolvedTimeout
+      )
+    } catch SwarmAckWait.Failure.timedOut {
+      logProgress("step=ack-timeout act=\(act) timeout=\(resolvedTimeout)s")
+      throw Failure(
+        status: 1,
+        message: "\(act).ack timed out after \(Int(resolvedTimeout))s waiting at \(marker.path)"
+      )
+    }
+    switch outcome {
     case .acknowledged:
-      return
+      logProgress("step=ack act=\(act)")
     case .stopped:
       throw Failure(status: 1, message: "UI test ended before \(act).ack")
     }
+  }
+
+  private func logProgress(_ message: String) {
+    let timestamp = Self.progressTimestamp(date: Date())
+    let line = "[swarm-act-driver] \(timestamp) \(message)\n"
+    guard let data = line.data(using: .utf8) else { return }
+    FileHandle.standardError.write(data)
+    if let progressHandle {
+      try? progressHandle.write(contentsOf: data)
+    }
+  }
+
+  private static func progressTimestamp(date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    return formatter.string(from: date)
   }
 
   @discardableResult
