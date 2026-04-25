@@ -10,11 +10,12 @@ use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::active_runs::CodexControlMessage;
 use super::approvals::{
     approval_from_request, approval_policy, approval_result, mode_instructions, thread_sandbox,
     trim_summary, turn_sandbox_policy,
 };
-use super::handle::{CodexControlMessage, CodexControllerHandle};
+use super::handle::CodexControllerHandle;
 use super::rpc::CodexJsonRpc;
 
 pub(super) struct CodexRunWorker {

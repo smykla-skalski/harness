@@ -115,6 +115,21 @@ wait_for_pid_argv_contains() {
   return 1
 }
 
+wait_for_pid_in_bucket() {
+  local pid="$1"
+  local bucket="$2"
+  local attempts=0
+  while (( attempts < 80 )); do
+    stale_scan_refresh_ps
+    if grep -Fxq -- "$pid" <<<"$(stale_scan_matching_pids "$bucket")"; then
+      return 0
+    fi
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  return 1
+}
+
 # Spawn a background process whose argv[0] is the requested label, writing
 # the resulting pid to the global LAST_SPAWN_PID and appending it to
 # SPAWNED_PIDS so the EXIT trap cleans it up.
@@ -147,6 +162,7 @@ spawn_target_harness() {
   local dir="$SANDBOX/$subpath"
   mkdir -p "$dir"
   spawn_labelled "$dir/harness $subcommand"
+  wait_for_pid_in_bucket "$LAST_SPAWN_PID" build || return 1
 }
 
 start_test() {

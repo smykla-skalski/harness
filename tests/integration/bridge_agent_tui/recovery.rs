@@ -6,6 +6,7 @@ use std::time::Duration;
 use harness::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::db::DaemonDb;
 use harness::session::service;
+use harness::session::types::SessionRole;
 use tokio::sync::broadcast;
 
 use super::support::{create_mock_codex, unused_local_port};
@@ -50,7 +51,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     let _state = wait_for_bridge_state(tmp.path());
 
     let request = with_bridge_env(tmp.path(), &host_home, || {
-        let state = service::start_session_with_policy(
+        let _state = service::start_session_with_policy(
             "",
             "bridge recovery",
             &project,
@@ -58,6 +59,16 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             Some("swarm-default"),
         )
         .expect("start session");
+        let state = service::join_session(
+            "bridge-recovery",
+            SessionRole::Leader,
+            "claude",
+            &[],
+            None,
+            &project,
+            None,
+        )
+        .expect("join leader");
         let leader_id = state.leader_id.clone().expect("leader id");
         service::leave_session("bridge-recovery", &leader_id, &project).expect("leave leader");
         service::build_recovery_tui_request("bridge-recovery", "swarm-default", "codex", &project)
