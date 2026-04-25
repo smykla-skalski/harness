@@ -18,6 +18,7 @@ use super::render_skills::render_skill_outputs;
 pub(super) fn plan_outputs(
     repo_root: &Path,
     selection: AgentAssetTarget,
+    skip_runtime_hooks: &[HookAgent],
 ) -> Result<Vec<PlannedOutput>, CliError> {
     let targets = selected_targets(selection);
     let skills = load_skill_sources(repo_root)?;
@@ -53,7 +54,7 @@ pub(super) fn plan_outputs(
                     .insert(path, content);
             }
         }
-        for (path, content) in render_runtime_outputs(repo_root, *target) {
+        for (path, content) in render_runtime_outputs(repo_root, *target, skip_runtime_hooks) {
             let managed_root = managed_root_for_path(repo_root, &path)?;
             outputs
                 .entry(managed_root.clone())
@@ -123,9 +124,15 @@ fn rebase_output_path(
     Ok(output_root.join(relative))
 }
 
-fn render_runtime_outputs(repo_root: &Path, target: RenderTarget) -> Vec<(PathBuf, String)> {
+fn render_runtime_outputs(
+    repo_root: &Path,
+    target: RenderTarget,
+    skip_runtime_hooks: &[HookAgent],
+) -> Vec<(PathBuf, String)> {
     match target {
-        RenderTarget::Copilot => planned_agent_bootstrap_files(repo_root, HookAgent::Copilot),
+        RenderTarget::Copilot => {
+            planned_agent_bootstrap_files(repo_root, HookAgent::Copilot, skip_runtime_hooks)
+        }
         RenderTarget::Claude
         | RenderTarget::Codex
         | RenderTarget::Gemini

@@ -202,10 +202,10 @@ fn render_skill_alias_outputs(
             continue;
         };
         let alias_dir = skill_alias_dir(alias_name)?;
-        let alias_base = repo_root.join(host_dir).join("skills").join(alias_dir);
+        let alias_base = repo_root.join(host_dir).join("skills").join(&alias_dir);
         files.insert(
             alias_base.join("SKILL.md"),
-            render_skill_markdown(target, skill, Some(alias_name))?,
+            render_skill_markdown(target, skill, Some(alias_dir.as_str()))?,
         );
         copy_extra_text_files(
             &skill.root,
