@@ -6,7 +6,8 @@ use super::{
     TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
     append_transfer_logs_to_async_db, build_log_entry, effective_project_dir,
     session_detail_from_async_daemon_db, session_not_found, session_service, slice, snapshot,
-    task_drop_effect_signal_records, utc_now, write_task_start_signals,
+    sync_file_state_for_resolved, sync_file_state_from_async_db, task_drop_effect_signal_records,
+    utc_now, write_task_start_signals,
 };
 
 async fn resolved_session_for_mutation(
@@ -98,6 +99,7 @@ async fn persist_task_signal_effects(
     extra_transition: Option<SessionTransition>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
+    sync_file_state_for_resolved(resolved)?;
     write_task_start_signals(&project_dir, effects)?;
     if let Some(transition) = extra_transition {
         async_db
@@ -127,6 +129,7 @@ async fn persist_leave_signal_mutation(
     leave_signals: &[session_service::LeaveSignalRecord],
     transition: SessionTransition,
 ) -> Result<(), CliError> {
+    sync_file_state_for_resolved(resolved)?;
     append_leave_signal_logs_async(async_db, session_id, actor_id, leave_signals).await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -163,6 +166,7 @@ pub(crate) async fn create_task_async(
             session_service::apply_create_task(state, &spec, &request.actor, &now)
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
@@ -197,6 +201,7 @@ pub(crate) async fn assign_task_async(
             )
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
@@ -232,6 +237,7 @@ pub(crate) async fn checkpoint_task_async(
             )
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db.append_checkpoint(session_id, &checkpoint).await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -380,6 +386,7 @@ pub(crate) async fn change_role_async(
             session_service::apply_assign_role(state, agent_id, request.role, &request.actor, &now)
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
@@ -418,6 +425,7 @@ pub(crate) async fn remove_agent_async(
             Ok(leave_signal)
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     if let Some(ref signal) = leave_signal {
         session_service::write_prepared_leave_signals(
             &project_dir,
@@ -462,6 +470,7 @@ pub(crate) async fn transfer_leader_async(
             )
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     append_transfer_logs_to_async_db(async_db, session_id, &request.actor, &plan).await?;
     bump_session(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
@@ -488,6 +497,7 @@ pub(crate) async fn end_session_async(
             Ok(leave_signals)
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     session_service::write_prepared_leave_signals(&project_dir, &leave_signals, "end session")?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
