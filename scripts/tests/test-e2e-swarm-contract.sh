@@ -56,6 +56,7 @@ require_text "scripts/e2e/swarm-full-flow.sh" "act_ack"
 require_text "scripts/e2e/swarm-full-flow.sh" "sess-e2e-swarm-\$RUN_ID"
 require_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
 require_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
+require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "func act16"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "sessionAgentListState"
