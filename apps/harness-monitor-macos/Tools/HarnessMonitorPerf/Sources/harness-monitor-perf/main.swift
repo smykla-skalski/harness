@@ -13,6 +13,7 @@ struct HarnessMonitorPerf: ParsableCommand {
             AuditFromRef.self,
             Compare.self,
             Summarize.self,
+            Extract.self,
             MeasurePreviewLatency.self,
         ],
         defaultSubcommand: nil
@@ -101,6 +102,38 @@ struct Summarize: ParsableCommand {
         do {
             _ = try Summarizer.summarize(runDir: url)
         } catch let failure as Summarizer.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+}
+
+struct Extract: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "extract",
+        abstract: "Export xctrace XML, parse all schemas, and write metrics + summary."
+    )
+
+    @Option(name: .long, help: "Run directory (must contain manifest.json and traces/).")
+    var runDir: String
+
+    @Option(name: .long, help: "xctrace launcher executable. Default: /usr/bin/xcrun")
+    var xctrace: String = "/usr/bin/xcrun"
+
+    @Option(name: [.long, .customLong("xctrace-args")], help: "Comma-separated args before `export ...`.")
+    var xctraceArgs: String = "xctrace"
+
+    func run() throws {
+        let url = URL(fileURLWithPath: runDir)
+        let tempRoot = url.appendingPathComponent("xctrace-tmp", isDirectory: true)
+        let exporter = ExtractorOrchestrator.ProcessXctrace(
+            command: xctrace,
+            arguments: xctraceArgs.split(separator: ",").map(String.init),
+            tempRoot: tempRoot
+        )
+        do {
+            _ = try ExtractorOrchestrator.extract(runDir: url, exporter: exporter)
+        } catch let failure as ExtractorOrchestrator.Failure {
             FileHandle.standardError.write(Data((failure.message + "\n").utf8))
             throw ExitCode(1)
         }
