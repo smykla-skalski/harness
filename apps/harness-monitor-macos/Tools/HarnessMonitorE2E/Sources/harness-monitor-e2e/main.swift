@@ -13,6 +13,8 @@ struct HarnessMonitorE2E: ParsableCommand {
             BridgeReady.self,
             Prepare.self,
             Teardown.self,
+            StartRecording.self,
+            StopRecording.self,
             InjectHeuristic.self,
         ]
     )
@@ -175,6 +177,51 @@ struct Teardown: ParsableCommand {
             manifestPath: URL(fileURLWithPath: manifest),
             keepState: keepState
         )
+    }
+}
+
+struct StartRecording: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "start-recording",
+        abstract: "Start native screen recording for monitor e2e and keep running until signaled to stop."
+    )
+
+    @Option(name: .long, help: "Output .mov path.")
+    var output: String
+    @Option(name: .long, help: "Log file path.")
+    var log: String
+    @Option(name: .long, help: "Manifest JSON path written after recording is active.")
+    var manifest: String
+
+    func run() throws {
+        guard #available(macOS 15.0, *) else {
+            throw ValidationError("start-recording requires macOS 15 or newer")
+        }
+        try ScreenRecorder.run(
+            outputURL: URL(fileURLWithPath: output),
+            logURL: URL(fileURLWithPath: log),
+            manifestURL: URL(fileURLWithPath: manifest)
+        )
+    }
+}
+
+struct StopRecording: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "stop-recording",
+        abstract: "Stop a native screen recording started by start-recording."
+    )
+
+    @Option(name: .long, help: "Manifest JSON path emitted by start-recording.")
+    var manifest: String
+
+    func run() throws {
+        let manifestURL = URL(fileURLWithPath: manifest)
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+            return
+        }
+        let recordingManifest = try ScreenRecordingManifest.load(from: manifestURL)
+        ScreenRecordingStopper.stop(manifest: recordingManifest)
+        try? FileManager.default.removeItem(at: manifestURL)
     }
 }
 
