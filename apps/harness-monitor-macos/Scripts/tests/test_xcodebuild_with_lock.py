@@ -20,7 +20,11 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class XcodebuildWithLockTests(unittest.TestCase):
-    def run_script(self, *args: str) -> tuple[subprocess.CompletedProcess[str], str]:
+    def run_script(
+        self,
+        *args: str,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             fake_bin = temp_root / "bin"
@@ -52,6 +56,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
                     "TMPDIR": str(temp_root),
                 }
             )
+            env.update(extra_env or {})
 
             completed = subprocess.run(
                 [
@@ -142,6 +147,22 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-showBuildSettings -scheme HarnessMonitor", log)
+
+    def test_test_actions_do_not_require_mapfile(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitorAgentsE2E",
+            "test-without-building",
+            "-only-testing:HarnessMonitorAgentsE2ETests/SwarmFullFlowTests/testSwarmFullFlow",
+            extra_env={"HARNESS_MONITOR_USE_TUIST_TEST": "0"},
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("XCODEBUILD=-derivedDataPath", log)
+        self.assertIn("-scheme HarnessMonitorAgentsE2E", log)
+        self.assertIn("test-without-building", log)
+        self.assertIn("-retry-tests-on-failure -test-iterations 2", log)
+        self.assertNotIn("mapfile", completed.stderr)
 
     def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
