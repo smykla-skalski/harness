@@ -47,7 +47,7 @@ class RunQualityGatesTests(unittest.TestCase):
             derived_data_path = temp_root / "derived"
             runner_args_log = temp_root / "xcodebuild-args.log"
             rtk_calls_log = temp_root / "rtk-args.log"
-            generate_project = scripts_root / "generate-project.sh"
+            generate_project = scripts_root / "generate.sh"
             fake_log = temp_root / "log"
 
             write_executable(generate_project, "#!/bin/bash\nset -euo pipefail\n")

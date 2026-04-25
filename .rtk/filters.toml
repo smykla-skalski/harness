@@ -119,9 +119,9 @@ name = "keeps sync mismatch bullets"
 input = """
 version sync check failed:
   - testkit/Cargo.toml version 0.3.0 != Cargo.toml version 0.3.1
-  - apps/harness-monitor-macos/project.yml MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1
+  - apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1
 """
-expected = "version sync check failed:\n  - testkit/Cargo.toml version 0.3.0 != Cargo.toml version 0.3.1\n  - apps/harness-monitor-macos/project.yml MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1"
+expected = "version sync check failed:\n  - testkit/Cargo.toml version 0.3.0 != Cargo.toml version 0.3.1\n  - apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION 0.3.0 != Cargo.toml version 0.3.1"
 
 [[tests.harness-mise-version]]
 name = "empty returns on_empty"

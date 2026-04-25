@@ -58,10 +58,10 @@ recover_build_db() {
 }
 
 normalize_shared_schemes_after_xcodebuild() {
+  # Tuist owns scheme XML; regenerate it from the manifests after xcodebuild
+  # touches xcshareddata. Quiet because schemes are not tracked.
   HARNESS_MONITOR_APP_ROOT="$ROOT" \
-  HARNESS_MONITOR_NORMALIZE_ONLY=1 \
-  HARNESS_MONITOR_SKIP_VERSION_SYNC=1 \
-    "$ROOT/Scripts/generate-project.sh" >/dev/null
+    "$ROOT/Scripts/generate.sh" >/dev/null
 }
 
 create_temp_log_path() {

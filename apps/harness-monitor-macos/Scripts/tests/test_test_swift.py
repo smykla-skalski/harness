@@ -30,7 +30,7 @@ class TestSwiftScriptTests(unittest.TestCase):
             scripts_root = app_root / "Scripts"
             scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
-            generate_project = scripts_root / "generate-project.sh"
+            generate_project = scripts_root / "generate.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
             rtk_calls = temp_root / "rtk-calls.log"
