@@ -21,12 +21,6 @@
       "index": 0
     },
     {
-      "id": "ToolbarCenterpiece",
-      "description": "Toolbar metrics + status ticker",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/ToolbarCenterpiecePreviews.swift",
-      "index": 0
-    },
-    {
       "id": "SessionsBoardView",
       "description": "Dashboard with sessions grid",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionsBoardView.swift",
@@ -102,12 +96,6 @@
       "id": "SidebarFooterAccessory",
       "description": "Sidebar footer status bar",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarFooterAccessory.swift",
-      "index": 0
-    },
-    {
-      "id": "ToolbarStatusTickerView",
-      "description": "Toolbar status ticker rotating messages",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/ToolbarStatusTickerView.swift",
       "index": 0
     },
     {
