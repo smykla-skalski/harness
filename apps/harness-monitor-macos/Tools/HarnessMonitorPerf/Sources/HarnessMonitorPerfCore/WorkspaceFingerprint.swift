@@ -7,6 +7,10 @@ public enum WorkspaceFingerprint {
     public enum Variant: String {
         case monitorApp = "monitor-app"
         case uiTestHost = "ui-test-host"
+        /// Variant baked into `run-instruments-audit.sh:776` - includes the audit script
+        /// itself and `Sources/HarnessMonitorUITestHost`. Used as the audit run's "did
+        /// anything change since the build" canary.
+        case audit
 
         var includes: [String] {
             switch self {
@@ -35,8 +39,37 @@ public enum WorkspaceFingerprint {
                     "Sources/HarnessMonitorKit",
                     "Sources/HarnessMonitorUIPreviewable",
                 ]
+            case .audit:
+                return [
+                    "HarnessMonitor.entitlements",
+                    "HarnessMonitorUITestHost.entitlements",
+                    "HarnessMonitorDaemon.entitlements",
+                    "HarnessMonitor.xcodeproj/project.pbxproj",
+                    "Resources",
+                    "Scripts/bundle-daemon-agent.sh",
+                    "Scripts/run-instruments-audit.sh",
+                    "Sources/HarnessMonitor",
+                    "Sources/HarnessMonitorKit",
+                    "Sources/HarnessMonitorUIPreviewable",
+                    "Sources/HarnessMonitorUITestHost",
+                ]
             }
         }
+    }
+
+    /// Hashes a single directory tree using the same `{relative}\\0{bytes}\\0` framing the
+    /// workspace fingerprint uses. Mirrors `bundle_sha256` in run-instruments-audit.sh:752.
+    public static func directorySHA256(_ root: URL) throws -> String {
+        var hasher = SHA256()
+        let files = try collectFiles(under: root)
+        for file in files {
+            let relativePath = relativeFilePath(from: root, to: file)
+            hasher.update(data: Data(relativePath.utf8))
+            hasher.update(data: Data([0]))
+            for chunk in try chunkedRead(file) { hasher.update(data: chunk) }
+            hasher.update(data: Data([0]))
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     public struct Failure: Error, CustomStringConvertible {
