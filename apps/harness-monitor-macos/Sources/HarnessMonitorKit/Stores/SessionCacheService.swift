@@ -61,10 +61,14 @@ public actor SessionCacheService {
     descriptor.fetchLimit = 1
 
     guard let cached = try? context.fetch(descriptor).first else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "load_session_detail", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_session_detail", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return nil
     }
 
@@ -84,10 +88,14 @@ public actor SessionCacheService {
         },
       timelineWindow: cached.decodedTimelineWindow()
     )
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_detail", hit: true, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_detail", hit: true, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return result
   }
 
@@ -96,10 +104,14 @@ public actor SessionCacheService {
   ) -> [String: CachedSessionSnapshot] {
     let startedAt = ContinuousClock.now
     guard !sessionIDs.isEmpty else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "load_session_details", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_session_details", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return [:]
     }
 
@@ -108,10 +120,14 @@ public actor SessionCacheService {
       predicate: #Predicate { sessionIDs.contains($0.sessionId) }
     )
     guard let cached = try? context.fetch(descriptor), !cached.isEmpty else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "load_session_details", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_session_details", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return [:]
     }
 
@@ -138,10 +154,14 @@ public actor SessionCacheService {
         )
       }
     )
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_details", hit: true, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_details", hit: true, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return snapshots
   }
 
@@ -163,10 +183,14 @@ public actor SessionCacheService {
       let projects = try? context.fetch(projectDescriptor),
       !sessions.isEmpty
     else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "load_session_list", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "load_session_list", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return nil
     }
 
@@ -174,10 +198,14 @@ public actor SessionCacheService {
       sessions: sessions.map { $0.toSessionSummary() },
       projects: projects.map { $0.toProjectSummary() }
     )
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_list", hit: true, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "load_session_list", hit: true, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return result
   }
 
@@ -190,10 +218,14 @@ public actor SessionCacheService {
     )
     descriptor.fetchLimit = limit
     let ids = ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "recently_viewed_session_ids", hit: !ids.isEmpty, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "recently_viewed_session_ids", hit: !ids.isEmpty, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return ids
   }
 
@@ -207,20 +239,28 @@ public actor SessionCacheService {
     latestDescriptor.fetchLimit = 1
     let latest = try? context.fetch(latestDescriptor).first
     let result = SessionMetadata(count: count, lastCachedAt: latest?.lastCachedAt)
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "session_metadata", hit: count > 0, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "session_metadata", hit: count > 0, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return result
   }
 
   func hydrationQueue(for summaries: [SessionSummary]) -> [SessionSummary] {
     let startedAt = ContinuousClock.now
     guard !summaries.isEmpty else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "hydration_queue", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "hydration_queue", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return []
     }
 
@@ -230,10 +270,14 @@ public actor SessionCacheService {
       predicate: #Predicate { summaryIds.contains($0.sessionId) }
     )
     guard let cached = try? context.fetch(descriptor) else {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordCacheRead(
-        operation: "hydration_queue", hit: false, durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordCacheRead(
+          operation: "hydration_queue", hit: false, durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+      #endif
       return summaries
     }
     let timelineDescriptor = FetchDescriptor<CachedTimelineEntry>(
@@ -254,10 +298,14 @@ public actor SessionCacheService {
       }
       return !hasTimeline
     }
-    let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-    HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "hydration_queue", hit: !cached.isEmpty, durationMs: durationMs
-    )
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "hydration_queue", hit: !cached.isEmpty, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
     return result
   }
 

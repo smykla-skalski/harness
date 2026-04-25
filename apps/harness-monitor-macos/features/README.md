@@ -21,6 +21,7 @@ environment variable is set at project-generation time.
 | Flag | Effect when ON |
 |------|----------------|
 | `HARNESS_FEATURE_LOTTIE` | Pulls in `lottie-ios`, compiles `Sources/{HarnessMonitor,HarnessMonitorUIPreviewable}/Features/Lottie/`, exposes the dancing-llama corner animation + Preferences toggle, bundles `DancingLlama.json`. |
+| `HARNESS_FEATURE_OTEL` | Pulls in `opentelemetry-swift`, `opentelemetry-swift-core`, and `grpc-swift`; compiles `Sources/HarnessMonitorKit/Features/Otel/` and `Tests/HarnessMonitorKitTests/Features/Otel/`; activates `HarnessMonitorTelemetry` bootstrap, span/metric instrumentation, and shutdown hooks across the app. |
 
 ## Tracked project state
 

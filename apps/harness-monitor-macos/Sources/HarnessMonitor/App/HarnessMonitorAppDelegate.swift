@@ -100,10 +100,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidResignActive(_ notification: Notification) {
-    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
-      event: "resign_active",
-      launchMode: launchMode.rawValue
-    ) {
+    let body: () -> Void = { [self] in
       guard launchMode == .live, let store else {
         return
       }
@@ -118,13 +115,19 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
         await store.suspendLiveConnectionForAppInactivity()
       }
     }
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
+        event: "resign_active",
+        launchMode: launchMode.rawValue,
+        body
+      )
+    #else
+      body()
+    #endif
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
-    HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
-      event: "become_active",
-      launchMode: launchMode.rawValue
-    ) {
+    let body: () -> Void = { [self] in
       guard launchMode == .live, let store else {
         return
       }
@@ -136,6 +139,15 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
         await store.resumeLiveConnectionAfterAppActivation()
       }
     }
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.withAppLifecycleTransition(
+        event: "become_active",
+        launchMode: launchMode.rawValue,
+        body
+      )
+    #else
+      body()
+    #endif
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -143,7 +155,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return .terminateLater
     }
     guard let store else {
-      HarnessMonitorTelemetry.shared.shutdown()
+      #if HARNESS_FEATURE_OTEL
+        HarnessMonitorTelemetry.shared.shutdown()
+      #endif
       return .terminateNow
     }
 
@@ -183,7 +197,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       if let self {
         await self.prepareForTermination(using: self.store)
       } else {
-        HarnessMonitorTelemetry.shared.shutdown()
+        #if HARNESS_FEATURE_OTEL
+          HarnessMonitorTelemetry.shared.shutdown()
+        #endif
       }
       self?.terminationTask = nil
       self?.terminateProcess(for: handledSignal)
@@ -194,7 +210,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     if let store {
       await store.prepareForTermination()
     }
-    HarnessMonitorTelemetry.shared.shutdown()
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.shutdown()
+    #endif
   }
 
   private func terminateProcess(for handledSignal: Int32) {

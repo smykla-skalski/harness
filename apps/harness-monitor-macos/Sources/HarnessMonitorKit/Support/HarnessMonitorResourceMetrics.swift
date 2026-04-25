@@ -49,10 +49,14 @@ public final class HarnessMonitorResourceMetrics: @unchecked Sendable {
       return
     }
 
-    HarnessMonitorTelemetry.shared.recordResourceMetrics(
-      residentMemoryBytes: Int64(info.phys_footprint),
-      virtualMemoryBytes: Int64(info.virtual_size)
-    )
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.recordResourceMetrics(
+        residentMemoryBytes: Int64(info.phys_footprint),
+        virtualMemoryBytes: Int64(info.virtual_size)
+      )
+    #else
+      _ = info
+    #endif
   }
 }
 

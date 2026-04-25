@@ -13,11 +13,6 @@ enum HarnessMonitorTelemetryConstants {
   static let logScheduleDelaySeconds: TimeInterval = 1
 }
 
-func harnessMonitorDurationMilliseconds(_ duration: Duration) -> Double {
-  Double(duration.components.seconds) * 1_000
-    + Double(duration.components.attoseconds) / 1_000_000_000_000_000
-}
-
 struct HarnessMonitorTelemetryExportControl {
   let forceFlush: () -> Void
   let shutdown: () -> Void

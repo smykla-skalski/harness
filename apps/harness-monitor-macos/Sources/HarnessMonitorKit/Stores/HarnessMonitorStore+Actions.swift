@@ -1,5 +1,8 @@
 import Foundation
-import OpenTelemetryApi
+
+#if HARNESS_FEATURE_OTEL
+  import OpenTelemetryApi
+#endif
 
 extension HarnessMonitorStore {
   var readOnlySessionAccessMessage: String {
@@ -329,11 +332,13 @@ extension HarnessMonitorStore {
   ) async -> Bool {
     let startedAt = ContinuousClock.now
     let interactionType = actionName.lowercased().replacingOccurrences(of: " ", with: "_")
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "user.action.\(interactionType)",
-      kind: .internal,
-      attributes: ["user.action.name": .string(actionName), "session.id": .string(sessionID)]
-    )
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "user.action.\(interactionType)",
+        kind: .internal,
+        attributes: ["user.action.name": .string(actionName), "session.id": .string(sessionID)]
+      )
+    #endif
 
     isSessionActionInFlight = true
     inFlightActionID = actionID
@@ -342,19 +347,23 @@ extension HarnessMonitorStore {
       if inFlightActionID == actionID {
         inFlightActionID = nil
       }
-      span.end()
-      let elapsed = startedAt.duration(to: ContinuousClock.now)
-      let durationMs = harnessMonitorDurationMilliseconds(elapsed)
-      HarnessMonitorTelemetry.shared.recordUserInteraction(
-        interaction: interactionType,
-        sessionID: sessionID,
-        durationMs: durationMs
-      )
+      #if HARNESS_FEATURE_OTEL
+        span.end()
+        let elapsed = startedAt.duration(to: ContinuousClock.now)
+        let durationMs = harnessMonitorDurationMilliseconds(elapsed)
+        HarnessMonitorTelemetry.shared.recordUserInteraction(
+          interaction: interactionType,
+          sessionID: sessionID,
+          durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+        _ = interactionType
+      #endif
     }
 
     do {
-      return try await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context)
-      {
+      let body: () async throws -> Bool = { [self] in
         let measuredMutation = try await Self.measureOperation { try await mutation() }
         recordRequestSuccess()
         guard selectedSessionID == sessionID else {
@@ -376,9 +385,19 @@ extension HarnessMonitorStore {
         presentSuccessFeedback(actionName)
         return true
       }
+      #if HARNESS_FEATURE_OTEL
+        return try await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(
+          span.context,
+          operation: body
+        )
+      #else
+        return try await body()
+      #endif
     } catch {
-      span.status = .error(description: error.localizedDescription)
-      HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      #if HARNESS_FEATURE_OTEL
+        span.status = .error(description: error.localizedDescription)
+        HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      #endif
       reportSelectedSessionActionFailure(actionName, sessionID: sessionID, error: error)
       presentSelectedSessionMutationFailure(error, actionID: actionID)
       return false
