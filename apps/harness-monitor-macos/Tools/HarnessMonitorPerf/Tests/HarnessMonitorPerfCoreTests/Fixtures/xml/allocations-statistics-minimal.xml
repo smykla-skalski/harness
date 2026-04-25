@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<trace-toc>
+  <run number="1">
+    <tracks>
+      <track name="Allocations">
+        <details>
+          <detail name="Statistics">
+            <row category="All Heap &amp; Anonymous VM" persistent_bytes="500000000" total_bytes="800000000" count_events="120000"/>
+            <row category="All Heap Allocations" persistent_bytes="350000000" total_bytes="600000000" count_events="80000"/>
+            <row category="All Anonymous VM" persistent_bytes="150000000" total_bytes="200000000" count_events="40000"/>
+            <row category="All VM Regions" persistent_bytes="50000000" total_bytes="120000000" count_events="3000"/>
+            <row category="Malloc 16 Bytes" persistent_bytes="800000" total_bytes="1200000" count_events="50000"/>
+            <row category="" persistent_bytes="0" total_bytes="0" count_events="0"/>
+          </detail>
+        </details>
+      </track>
+    </tracks>
+  </run>
+</trace-toc>
