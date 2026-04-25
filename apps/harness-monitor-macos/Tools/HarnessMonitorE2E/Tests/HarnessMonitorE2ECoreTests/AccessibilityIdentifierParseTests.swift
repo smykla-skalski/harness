@@ -33,6 +33,33 @@ final class AccessibilityIdentifierParseTests: XCTestCase {
     XCTAssertNil(records[0].label)
   }
 
+  func testCaptureValueSelectedAttribute() {
+    // Real XCUITest dumps emit the AXSelected status as `value: selected` on
+    // Buttons/Cells (no `Selected` modifier on the same line; the modifier
+    // sits on a parent Outline/Cell wrapper). The parser must treat both
+    // forms as `isSelected = true`.
+    let unquoted =
+      "Button, 0x1, {{432.0, 479.0}, {41.5, 16.0}}, "
+      + "identifier: 'harness.sidebar.session.sess-foo', label: 'row', value: selected, interact..."
+    let quoted =
+      "Button, 0x2, {{432.0, 479.0}, {41.5, 16.0}}, "
+      + "identifier: 'harness.sidebar.session.sess-bar', label: 'row', value: 'selected'"
+    let records = RecordingTriage.parseAccessibilityIdentifiers(
+      from: unquoted + "\n" + quoted)
+    XCTAssertEqual(records.count, 2)
+    XCTAssertTrue(records[0].isSelected)
+    XCTAssertTrue(records[1].isSelected)
+  }
+
+  func testValueOtherThanSelectedDoesNotMarkSelected() {
+    let line =
+      "Splitter, 0x9, {{656.0, 326.0}, {0.0, 768.0}}, "
+      + "identifier: 'splitter.handle', value: 268, Disabled"
+    let records = RecordingTriage.parseAccessibilityIdentifiers(from: line)
+    XCTAssertEqual(records.count, 1)
+    XCTAssertFalse(records[0].isSelected)
+  }
+
   func testSkipsLineWithoutIdentifier() {
     let line =
       "                  Splitter, 0x8b99b7200, {{656.0, 326.0}, {0.0, 768.0}}, value: 268, Disabled"
