@@ -20,6 +20,7 @@ struct HarnessMonitorE2E: ParsableCommand {
             InjectHeuristic.self,
             SwarmFullFlow.self,
             SwarmActDriver.self,
+            RecordingTriageCommand.self,
         ]
     )
 }
