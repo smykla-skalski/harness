@@ -48,26 +48,14 @@ extension HarnessMonitorUITestCase {
 
       let button = button(in: app, identifier: identifier)
       if waitForElement(button, timeout: Self.fastPollInterval) {
-        if let coordinate = centerCoordinate(in: app, for: button) {
-          coordinate.tap()
-          return
-        }
-
-        if button.isHittable {
-          button.tap()
+        if tapElementReliably(in: app, element: button) {
           return
         }
       }
 
       let genericTarget = element(in: app, identifier: identifier)
       if waitForElement(genericTarget, timeout: Self.fastPollInterval) {
-        if genericTarget.isHittable {
-          genericTarget.tap()
-          return
-        }
-
-        if let coordinate = centerCoordinate(in: app, for: genericTarget) {
-          coordinate.tap()
+        if tapElementReliably(in: app, element: genericTarget) {
           return
         }
       }
@@ -96,13 +84,7 @@ extension HarnessMonitorUITestCase {
 
       let buttonTarget = button(in: app, title: title)
       if waitForElement(buttonTarget, timeout: Self.fastPollInterval) {
-        if let coordinate = centerCoordinate(in: app, for: buttonTarget) {
-          coordinate.tap()
-          return
-        }
-
-        if buttonTarget.isHittable {
-          buttonTarget.tap()
+        if tapElementReliably(in: app, element: buttonTarget) {
           return
         }
 
@@ -110,13 +92,7 @@ extension HarnessMonitorUITestCase {
 
       let presentedTarget = element(in: app, title: title)
       if waitForElement(presentedTarget, timeout: Self.fastPollInterval) {
-        if presentedTarget.isHittable {
-          presentedTarget.tap()
-          return
-        }
-
-        if let coordinate = centerCoordinate(in: app, for: presentedTarget) {
-          coordinate.tap()
+        if tapElementReliably(in: app, element: presentedTarget) {
           return
         }
       }
@@ -137,13 +113,7 @@ extension HarnessMonitorUITestCase {
 
       let target = element(in: app, identifier: identifier)
       if waitForElement(target, timeout: Self.fastPollInterval) {
-        if target.isHittable {
-          target.tap()
-          return
-        }
-
-        if let coordinate = centerCoordinate(in: app, for: target) {
-          coordinate.tap()
+        if tapElementReliably(in: app, element: target) {
           return
         }
       }
@@ -156,34 +126,34 @@ extension HarnessMonitorUITestCase {
 
   func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
     let scrollDistance = max(120, element.frame.height * distanceRatio)
+    if let start = centerCoordinate(in: app, for: element) {
+      let end = start.withOffset(CGVector(dx: 0, dy: -scrollDistance))
+      start.press(forDuration: 0.01, thenDragTo: end)
+      return
+    }
+
     if element.isHittable {
       element.scroll(byDeltaX: 0, deltaY: -scrollDistance)
       return
     }
 
-    guard let start = centerCoordinate(in: app, for: element) else {
-      XCTFail("Failed to resolve drag origin for \(element)")
-      return
-    }
-
-    let end = start.withOffset(CGVector(dx: 0, dy: -scrollDistance))
-    start.press(forDuration: 0.01, thenDragTo: end)
+    XCTFail("Failed to resolve drag origin for \(element)")
   }
 
   func dragDown(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
     let scrollDistance = max(120, element.frame.height * distanceRatio)
+    if let start = centerCoordinate(in: app, for: element) {
+      let end = start.withOffset(CGVector(dx: 0, dy: scrollDistance))
+      start.press(forDuration: 0.01, thenDragTo: end)
+      return
+    }
+
     if element.isHittable {
       element.scroll(byDeltaX: 0, deltaY: scrollDistance)
       return
     }
 
-    guard let start = centerCoordinate(in: app, for: element) else {
-      XCTFail("Failed to resolve drag origin for \(element)")
-      return
-    }
-
-    let end = start.withOffset(CGVector(dx: 0, dy: scrollDistance))
-    start.press(forDuration: 0.01, thenDragTo: end)
+    XCTFail("Failed to resolve drag origin for \(element)")
   }
 
   func waitUntil(
@@ -216,6 +186,21 @@ extension HarnessMonitorUITestCase {
     element.exists || element.waitForExistence(timeout: timeout)
   }
 
+  @discardableResult
+  func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.tap()
+      return true
+    }
+
+    if element.isHittable {
+      element.tap()
+      return true
+    }
+
+    return false
+  }
+
   func sessionRowIsSelected(_ sessionRow: XCUIElement) -> Bool {
     guard sessionRow.exists else { return false }
 
@@ -244,5 +229,20 @@ extension HarnessMonitorUITestCase {
       return nil
     }
     return element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+  }
+
+  private func preferredTapCoordinate(
+    in app: XCUIApplication,
+    for element: XCUIElement
+  ) -> XCUICoordinate? {
+    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !identifier.isEmpty {
+      let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
+      if let coordinate = centerCoordinate(in: app, for: frameMarker) {
+        return coordinate
+      }
+    }
+
+    return centerCoordinate(in: app, for: element)
   }
 }

@@ -108,14 +108,9 @@ extension HarnessMonitorSettingsDatabaseUITests {
   /// Tap an element via its center coordinate. Avoids the hittability check
   /// that can fail for elements inside custom layouts like WrapLayout.
   fileprivate func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
-    if element.isHittable {
-      element.tap()
-      return
-    }
-    guard let coordinate = centerCoordinate(in: app, for: element) else {
+    guard tapElementReliably(in: app, element: element) else {
       XCTFail("Cannot resolve coordinate for \(element)")
       return
     }
-    coordinate.tap()
   }
 }
