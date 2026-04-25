@@ -1,7 +1,8 @@
 import Foundation
 
 /// Builds and runs `xcrun xctrace record` per scenario, mirroring the audit script's capture
-/// loop. Returns a populated `ManifestBuilder.CaptureRecord` for each scenario.
+/// loop including TMPDIR scoping, --env propagation, --launch -- bundle args, and TOC export
+/// for end-reason / launched-process verification.
 public enum TraceRecorder {
     public struct Failure: Error, CustomStringConvertible {
         public let message: String
@@ -13,89 +14,155 @@ public enum TraceRecorder {
         public var template: String
         public var previewScenario: String
         public var durationSeconds: Int
-        public var hostBinary: URL
+        public var hostAppPath: URL
+        public var hostBinaryPath: URL
         public var launchArguments: [String]
         public var environment: [String: String]
         public var traceURL: URL
+        public var tocURL: URL
         public var logURL: URL
         public var daemonDataHome: URL
+        public var xctraceTempRoot: URL
 
         public init(
             scenario: String, template: String, previewScenario: String,
-            durationSeconds: Int, hostBinary: URL, launchArguments: [String],
-            environment: [String: String], traceURL: URL, logURL: URL, daemonDataHome: URL
+            durationSeconds: Int, hostAppPath: URL, hostBinaryPath: URL,
+            launchArguments: [String], environment: [String: String],
+            traceURL: URL, tocURL: URL, logURL: URL, daemonDataHome: URL,
+            xctraceTempRoot: URL
         ) {
             self.scenario = scenario
             self.template = template
             self.previewScenario = previewScenario
             self.durationSeconds = durationSeconds
-            self.hostBinary = hostBinary
+            self.hostAppPath = hostAppPath
+            self.hostBinaryPath = hostBinaryPath
             self.launchArguments = launchArguments
             self.environment = environment
             self.traceURL = traceURL
+            self.tocURL = tocURL
             self.logURL = logURL
             self.daemonDataHome = daemonDataHome
+            self.xctraceTempRoot = xctraceTempRoot
         }
     }
 
     /// Returns the `xcrun xctrace record ...` command + args without launching the process,
-    /// for unit tests and dry-run mode.
+    /// for unit tests and dry-run mode. Args order matches run-instruments-audit.sh:886.
     public static func recordCommand(_ inputs: ScenarioInputs) -> (command: String, arguments: [String]) {
         var arguments: [String] = ["xctrace", "record"]
         arguments += ["--template", inputs.template]
         arguments += ["--time-limit", "\(inputs.durationSeconds)s"]
-        arguments += ["--launch", inputs.hostBinary.path]
         arguments += ["--output", inputs.traceURL.path]
-        for argument in inputs.launchArguments {
-            arguments += ["--", argument]
+        for (key, value) in inputs.environment.sorted(by: { $0.key < $1.key }) {
+            arguments += ["--env", "\(key)=\(value)"]
         }
+        arguments += ["--launch", "--", inputs.hostAppPath.path]
+        arguments += inputs.launchArguments
         return ("/usr/bin/xcrun", arguments)
     }
 
-    /// Records a trace by invoking xctrace and streaming stdout/stderr into `inputs.logURL`.
-    /// Returns the capture record for ManifestBuilder.
-    public static func record(_ inputs: ScenarioInputs) throws -> ManifestBuilder.CaptureRecord {
-        try FileManager.default.createDirectory(
-            at: inputs.traceURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: inputs.logURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        if !FileManager.default.fileExists(atPath: inputs.logURL.path) {
-            FileManager.default.createFile(atPath: inputs.logURL.path, contents: nil)
+    public static func exportTOCCommand(traceURL: URL, tocURL: URL) -> (command: String, arguments: [String]) {
+        ("/usr/bin/xcrun", ["xctrace", "export", "--input", traceURL.path, "--toc"])
+    }
+
+    public struct Capture {
+        public var record: ManifestBuilder.CaptureRecord
+        public var endReason: String
+        public var launchedProcessPath: String
+    }
+
+    /// Records one scenario, exports TOC, validates launched-process, and returns a populated
+    /// CaptureRecord. Throws on hard failures (missing trace bundle, unexpected launch path,
+    /// xctrace exit non-zero with non-time-limit end reason).
+    public static func record(
+        _ inputs: ScenarioInputs,
+        afterRecordHook: (() throws -> Void)? = nil
+    ) throws -> Capture {
+        let fm = FileManager.default
+        try fm.createDirectory(at: inputs.traceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createDirectory(at: inputs.logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createDirectory(at: inputs.xctraceTempRoot, withIntermediateDirectories: true)
+        try fm.createDirectory(at: inputs.daemonDataHome, withIntermediateDirectories: true)
+        if !fm.fileExists(atPath: inputs.logURL.path) {
+            fm.createFile(atPath: inputs.logURL.path, contents: nil)
         }
 
         let (command, arguments) = recordCommand(inputs)
-        let started = Date()
-        let result = try ProcessRunner.run(
+        let recordResult = try ProcessRunner.run(
             command, arguments: arguments,
-            environmentOverrides: inputs.environment
+            environmentOverrides: ["TMPDIR": inputs.xctraceTempRoot.path + "/"]
         )
-        let duration = Date().timeIntervalSince(started)
 
-        let log = inputs.logURL
-        try? Data(result.stdout).write(to: log, options: .atomic)
-        if let handle = try? FileHandle(forWritingTo: log) {
-            try? handle.seekToEnd()
-            try? handle.write(contentsOf: Data("\n[stderr]\n".utf8))
-            try? handle.write(contentsOf: result.stderr)
-            try? handle.close()
+        try? appendLog(inputs.logURL, label: "[record stdout]", data: recordResult.stdout)
+        try? appendLog(inputs.logURL, label: "[record stderr]", data: recordResult.stderr)
+
+        guard fm.fileExists(atPath: inputs.traceURL.path) else {
+            throw Failure(message: "Trace bundle missing for \(inputs.template) / \(inputs.scenario)")
         }
 
-        let endReason: String = result.exitStatus == 0 ? "completed" : "failed"
-        let traceRelpath = inputs.traceURL.lastPathComponent
-        return ManifestBuilder.CaptureRecord(
+        let (exportCommand, exportArgs) = exportTOCCommand(traceURL: inputs.traceURL, tocURL: inputs.tocURL)
+        let exportResult = try ProcessRunner.run(
+            exportCommand, arguments: exportArgs,
+            environmentOverrides: ["TMPDIR": inputs.xctraceTempRoot.path + "/"]
+        )
+        try exportResult.stdout.write(to: inputs.tocURL, options: .atomic)
+        try? appendLog(inputs.logURL, label: "[toc stderr]", data: exportResult.stderr)
+
+        let toc = try XctraceTOC(path: inputs.tocURL)
+        let endReason = toc.endReason()
+        let launchedProcessPath = toc.launchedProcessPath()
+
+        if recordResult.exitStatus != 0 && endReason != "Time limit reached" {
+            throw Failure(
+                message: "xctrace record failed for \(inputs.template) / \(inputs.scenario) "
+                    + "with exit \(recordResult.exitStatus) and end reason \"\(endReason)\""
+            )
+        }
+
+        let acceptable: Set<String> = [inputs.hostAppPath.path, inputs.hostBinaryPath.path]
+        if !acceptable.contains(launchedProcessPath) {
+            throw Failure(
+                message: "xctrace launched unexpected app for \(inputs.template) / \(inputs.scenario): "
+                    + "expected \(inputs.hostAppPath.path) or \(inputs.hostBinaryPath.path) "
+                    + "but trace recorded \(launchedProcessPath.isEmpty ? "<missing>" : launchedProcessPath)"
+            )
+        }
+
+        try afterRecordHook?()
+
+        let runDirAnchor = inputs.traceURL.deletingLastPathComponent().deletingLastPathComponent()
+        let traceRel = relativePath(from: runDirAnchor, to: inputs.traceURL)
+        let captureRecord = ManifestBuilder.CaptureRecord(
             scenario: inputs.scenario,
             template: inputs.template,
-            durationSeconds: Int(duration.rounded()),
-            traceRelpath: traceRelpath,
-            exitStatus: Int(result.exitStatus),
+            durationSeconds: inputs.durationSeconds,
+            traceRelpath: traceRel,
+            exitStatus: Int(recordResult.exitStatus),
             endReason: endReason,
             previewScenario: inputs.previewScenario,
-            launchedProcessPath: inputs.hostBinary.path,
+            launchedProcessPath: launchedProcessPath,
             daemonDataHome: inputs.daemonDataHome.path
         )
+        return Capture(record: captureRecord, endReason: endReason, launchedProcessPath: launchedProcessPath)
+    }
+
+    private static func appendLog(_ url: URL, label: String, data: Data) throws {
+        if data.isEmpty { return }
+        guard let handle = try? FileHandle(forWritingTo: url) else { return }
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((label + "\n").utf8))
+        try handle.write(contentsOf: data)
+        try handle.write(contentsOf: Data("\n".utf8))
+    }
+
+    private static func relativePath(from base: URL, to file: URL) -> String {
+        let basePath = base.standardizedFileURL.path
+        let filePath = file.standardizedFileURL.path
+        if filePath.hasPrefix(basePath + "/") {
+            return String(filePath.dropFirst(basePath.count + 1))
+        }
+        return filePath
     }
 }

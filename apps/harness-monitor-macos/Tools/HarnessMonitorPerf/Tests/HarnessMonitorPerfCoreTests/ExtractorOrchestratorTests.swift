@@ -172,12 +172,15 @@ final class TraceRecorderTests: XCTestCase {
             template: "SwiftUI",
             previewScenario: "DashboardPreview",
             durationSeconds: 6,
-            hostBinary: URL(fileURLWithPath: "/staged/Bin"),
+            hostAppPath: URL(fileURLWithPath: "/staged/App.app"),
+            hostBinaryPath: URL(fileURLWithPath: "/staged/App.app/Contents/MacOS/App"),
             launchArguments: ["-ApplePersistenceIgnoreState", "YES"],
             environment: ["HARNESS_MONITOR_PERF_SCENARIO": "launch-dashboard"],
             traceURL: URL(fileURLWithPath: "/run/traces/launch.trace"),
+            tocURL: URL(fileURLWithPath: "/run/traces/launch.toc.xml"),
             logURL: URL(fileURLWithPath: "/run/logs/launch.log"),
-            daemonDataHome: URL(fileURLWithPath: "/run/dh")
+            daemonDataHome: URL(fileURLWithPath: "/run/dh"),
+            xctraceTempRoot: URL(fileURLWithPath: "/run/xctrace-tmp")
         )
         let (command, arguments) = TraceRecorder.recordCommand(inputs)
         XCTAssertEqual(command, "/usr/bin/xcrun")
@@ -185,9 +188,11 @@ final class TraceRecorderTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--time-limit"))
         XCTAssertTrue(arguments.contains("6s"))
         XCTAssertTrue(arguments.contains("--launch"))
-        XCTAssertTrue(arguments.contains("/staged/Bin"))
+        XCTAssertTrue(arguments.contains("/staged/App.app"))
         XCTAssertTrue(arguments.contains("--output"))
         XCTAssertTrue(arguments.contains("/run/traces/launch.trace"))
+        XCTAssertTrue(arguments.contains("--env"))
+        XCTAssertTrue(arguments.contains("HARNESS_MONITOR_PERF_SCENARIO=launch-dashboard"))
         // Launch args appear after `--`.
         XCTAssertTrue(arguments.contains("-ApplePersistenceIgnoreState"))
         XCTAssertTrue(arguments.contains("YES"))
