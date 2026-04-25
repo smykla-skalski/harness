@@ -202,15 +202,17 @@ remove_stale_swarm_e2e_worktrees() {
   done < <(stale_scan_swarm_e2e_worktrees)
 
   local path branch
-  for entry in "${entries[@]}"; do
-    path="${entry%%$'\t'*}"
-    branch="${entry#*$'\t'}"
-    if [[ "$path" == "$entry" || -z "$path" || -z "$branch" ]]; then
-      continue
-    fi
-    echo "removing stale swarm e2e worktree $branch..."
-    git -C "$ROOT" worktree remove --force "$path" >/dev/null 2>&1 || true
-  done
+  if (( ${#entries[@]} > 0 )); then
+    for entry in "${entries[@]}"; do
+      path="${entry%%$'\t'*}"
+      branch="${entry#*$'\t'}"
+      if [[ "$path" == "$entry" || -z "$path" || -z "$branch" ]]; then
+        continue
+      fi
+      echo "removing stale swarm e2e worktree $branch..."
+      git -C "$ROOT" worktree remove --force "$path" >/dev/null 2>&1 || true
+    done
+  fi
 
   git -C "$ROOT" worktree prune >/dev/null 2>&1 || true
 
@@ -219,11 +221,13 @@ remove_stale_swarm_e2e_worktrees() {
     [[ -n "$branch" ]] && branches+=("$branch")
   done < <(stale_scan_swarm_e2e_branches)
 
-  for branch in "${branches[@]}"; do
-    stale_scan_is_swarm_e2e_branch "$branch" || continue
-    echo "deleting stale swarm e2e branch $branch..."
-    git -C "$ROOT" branch -D "$branch" >/dev/null 2>&1 || true
-  done
+  if (( ${#branches[@]} > 0 )); then
+    for branch in "${branches[@]}"; do
+      stale_scan_is_swarm_e2e_branch "$branch" || continue
+      echo "deleting stale swarm e2e branch $branch..."
+      git -C "$ROOT" branch -D "$branch" >/dev/null 2>&1 || true
+    done
+  fi
 }
 
 quit_monitor_app
