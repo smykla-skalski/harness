@@ -17,6 +17,7 @@ DEFAULT_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xco
 LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
 LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
 MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
+REGENERATE_AFTER_SUCCESS="${HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD:-0}"
 TRANSIENT_DB_STATUS=200
 
 derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
@@ -58,8 +59,13 @@ recover_build_db() {
 }
 
 normalize_shared_schemes_after_xcodebuild() {
-  # Tuist owns scheme XML; regenerate it from the manifests after xcodebuild
-  # touches xcshareddata. Quiet because schemes are not tracked.
+  case "$REGENERATE_AFTER_SUCCESS" in
+    1|true|TRUE|yes|YES|on|ON) ;;
+    *) return 0 ;;
+  esac
+
+  # Tuist owns scheme XML; callers can opt in to regenerating it after
+  # xcodebuild mutates xcshareddata. Quiet because schemes are not tracked.
   HARNESS_MONITOR_APP_ROOT="$ROOT" \
     "$ROOT/Scripts/generate.sh" >/dev/null
 }

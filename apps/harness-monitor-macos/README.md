@@ -22,12 +22,20 @@ mise run monitor:macos:audit -- --label baseline
 mise run monitor:macos:test:scripts
 ```
 
-Focused task entrypoints:
+Focused task entrypoints (run `mise run monitor:macos:generate` first if the workspace is not materialized):
 
 ```bash
-mise run monitor:macos:xcodebuild -- -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj ...
+mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...
 mise run monitor:macos:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
 mise run monitor:macos:audit:from-ref -- --ref <sha-or-ref> --label baseline
+```
+
+When you only need part of the graph, use the manifest tags for focused generation, for example:
+
+```bash
+tuist generate tag:feature:monitor
+tuist generate tag:feature:previews
+tuist generate tag:feature:ui-testing
 ```
 
 When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `xcode-derived` build database:
@@ -36,14 +44,20 @@ When you need a raw local build command, prefer the lock-aware wrapper so concur
 mise run monitor:macos:build
 ```
 
-The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one DerivedData tree instead of bloating each checkout.
+The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one DerivedData tree instead of bloating each checkout. The wrapper no longer re-runs Tuist after every successful `xcodebuild`; set `HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD=1` only when you explicitly need to rewrite generated shared scheme metadata after a CLI lane.
 
 `monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against the shared `xcode-derived`.
 
 `monitor:macos:test` runs the same quality gates first, then executes:
 
 ```bash
-xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -destination platform=macOS -derivedDataPath xcode-derived test-without-building
+mise run monitor:macos:xcodebuild -- \
+  -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace \
+  -scheme HarnessMonitor \
+  -destination "platform=macOS,arch=$(uname -m),name=My Mac" \
+  -derivedDataPath xcode-derived \
+  CODE_SIGNING_ALLOWED=NO \
+  test-without-building
 ```
 
 For routine work, prefer the smallest targeted command instead of the full `monitor:macos:test` lane. Stay on the `mise` path and pass the selector through `XCODE_ONLY_TESTING`, for example:
