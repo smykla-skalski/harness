@@ -105,6 +105,43 @@ final class RecordingTriageCommandTests: XCTestCase {
     XCTAssertEqual(report.acts[0].durationSeconds ?? -1, 1.0, accuracy: 1e-3)
   }
 
+  func testActIdentifiersScansAndEmitsJson() throws {
+    let binary = try resolveBinary()
+    let work = makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: work) }
+    let markers = work.appendingPathComponent("markers", isDirectory: true)
+    let snapshots = work.appendingPathComponent("snapshots", isDirectory: true)
+    try FileManager.default.createDirectory(at: markers, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
+    try """
+    act=act1
+    session_id=sess-foo
+    leader_id=claude-1
+    """.write(
+      to: markers.appendingPathComponent("act1.ready"), atomically: true, encoding: .utf8)
+    try """
+    Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.toolbar.chrome.state', label: 'windowTitle=Cockpit'
+    Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.sess-foo', Selected
+    """.write(
+      to: snapshots.appendingPathComponent("swarm-act1.txt"), atomically: true, encoding: .utf8)
+
+    let result = try run(
+      binary,
+      arguments: [
+        "recording-triage", "act-identifiers",
+        "--marker-dir", markers.path,
+        "--ui-snapshots-dir", snapshots.path,
+      ])
+    XCTAssertEqual(result.status, 0, result.stderr)
+    let report = try JSONDecoder().decode(
+      RecordingTriage.ActSurfaceReport.self,
+      from: Data(result.stdout.utf8)
+    )
+    XCTAssertEqual(report.perAct.count, 1)
+    XCTAssertEqual(report.perAct[0].act, "act1")
+    XCTAssertTrue(report.perAct[0].findings.contains { $0.id == "swarm.act1.cockpit" })
+  }
+
   private func writeMarker(_ url: URL, body: String, mtime: Date) throws {
     try body.write(to: url, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes(
