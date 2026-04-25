@@ -33,6 +33,7 @@ TERMINAL_SESSION_ID="sess-agents-e2e-terminal-${RUN_ID}"
 CODEX_SESSION_ID="sess-agents-e2e-codex-${RUN_ID}"
 DAEMON_LOG="$LOG_ROOT/daemon.log"
 BRIDGE_LOG="$LOG_ROOT/bridge.log"
+MANIFEST_PATH="$STATE_ROOT/prepare-manifest.json"
 E2E_PROJECT_DIR="${HARNESS_MONITOR_E2E_PROJECT_DIR:-$CHECKOUT_ROOT}"
 CODEX_WORKSPACE=""
 APPROVAL_FILE=""
@@ -59,9 +60,6 @@ HARNESS_BINARY="${HARNESS_MONITOR_E2E_HARNESS_BINARY:-$(resolve_harness_binary_p
 KEEP_STATE_ROOT="${HARNESS_MONITOR_E2E_KEEP_STATE_ROOT:-0}"
 CODEX_PORT_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_PORT:-}"
 
-DAEMON_PID=""
-BRIDGE_PID=""
-
 if [[ -z "$CODEX_BINARY" ]]; then
   echo "codex binary not found in PATH; set HARNESS_MONITOR_E2E_CODEX_BINARY to run Agents e2e" >&2
   exit 1
@@ -69,18 +67,30 @@ fi
 
 mkdir -p "$DATA_HOME" "$LOG_ROOT"
 
+ensure_e2e_tool_binary() {
+  if [[ -x "$E2E_TOOL_BINARY" ]]; then
+    return 0
+  fi
+  echo "Building harness-monitor-e2e helper at $E2E_TOOL_BINARY" >&2
+  swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
+  if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
+    echo "harness-monitor-e2e binary missing after build at $E2E_TOOL_BINARY" >&2
+    exit 1
+  fi
+}
+
 cleanup() {
   local status="$1"
+  local keep_flag=()
+  if [[ "$status" -ne 0 ]] || [[ "$KEEP_STATE_ROOT" == "1" ]]; then
+    keep_flag=(--keep-state)
+  fi
 
-  stop_bridge_process
-  stop_process_tree "$DAEMON_PID"
-  DAEMON_PID=""
+  if [[ -f "$MANIFEST_PATH" ]]; then
+    "$E2E_TOOL_BINARY" teardown --manifest "$MANIFEST_PATH" "${keep_flag[@]}" || true
+  fi
 
   if [[ "$status" -eq 0 ]] && [[ "$KEEP_STATE_ROOT" != "1" ]]; then
-    rm -rf "$STATE_ROOT"
-    if [[ "$DATA_ROOT" != "$STATE_ROOT" ]] && [[ "$DATA_ROOT" != "$STATE_ROOT"/* ]]; then
-      rm -rf "$DATA_ROOT"
-    fi
     return
   fi
 
@@ -100,67 +110,6 @@ cleanup() {
 
 trap 'status=$?; cleanup "$status"; exit "$status"' EXIT
 
-stop_bridge_process() {
-  if [[ -n "$BRIDGE_PID" ]]; then
-    stop_process_tree "$BRIDGE_PID"
-  fi
-  BRIDGE_PID=""
-}
-
-stop_child_processes_recursive() {
-  local parent_pid="$1"
-  local child_pid=""
-
-  while IFS= read -r child_pid; do
-    if [[ -n "$child_pid" ]]; then
-      stop_process_tree "$child_pid"
-    fi
-  done < <(pgrep -P "$parent_pid" 2>/dev/null || true)
-}
-
-stop_process_tree() {
-  local root_pid="$1"
-  if [[ -z "$root_pid" ]]; then
-    return
-  fi
-  if ! kill -0 "$root_pid" 2>/dev/null; then
-    wait "$root_pid" 2>/dev/null || true
-    return
-  fi
-
-  stop_child_processes_recursive "$root_pid"
-  kill -TERM "$root_pid" 2>/dev/null || true
-
-  local deadline=$((SECONDS + 5))
-  while (( SECONDS < deadline )); do
-    if ! kill -0 "$root_pid" 2>/dev/null; then
-      wait "$root_pid" 2>/dev/null || true
-      return
-    fi
-    sleep 0.2
-  done
-
-  stop_child_processes_recursive "$root_pid"
-  kill -KILL "$root_pid" 2>/dev/null || true
-  wait "$root_pid" 2>/dev/null || true
-}
-
-ensure_e2e_tool_binary() {
-  if [[ -x "$E2E_TOOL_BINARY" ]]; then
-    return 0
-  fi
-  echo "Building harness-monitor-e2e helper at $E2E_TOOL_BINARY" >&2
-  swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
-  if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
-    echo "harness-monitor-e2e binary missing after build at $E2E_TOOL_BINARY" >&2
-    exit 1
-  fi
-}
-
-allocate_unused_local_port() {
-  "$E2E_TOOL_BINARY" allocate-port
-}
-
 resolve_supported_codex_launch() {
   if [[ -n "$CODEX_MODEL_OVERRIDE" ]]; then
     return 0
@@ -177,141 +126,6 @@ resolve_supported_codex_launch() {
 
   CODEX_MODEL_OVERRIDE="$(printf '%s\n' "$resolved" | sed -n '1p')"
   CODEX_EFFORT_OVERRIDE="$(printf '%s\n' "$resolved" | sed -n '2p')"
-}
-
-bridge_failed_with_port_conflict() {
-  [[ -f "$BRIDGE_LOG" ]] && grep -Fq "Address already in use" "$BRIDGE_LOG"
-}
-
-seed_observability_config() {
-  local config_path="$DATA_HOME/harness/observability/config.json"
-  mkdir -p "$(dirname "$config_path")"
-  cat >"$config_path" <<'EOF'
-{
-  "enabled": true,
-  "grpc_endpoint": "http://127.0.0.1:4317",
-  "http_endpoint": "http://127.0.0.1:4318",
-  "grafana_url": "http://127.0.0.1:3000",
-  "tempo_url": "http://127.0.0.1:3200",
-  "loki_url": "http://127.0.0.1:3100",
-  "prometheus_url": "http://127.0.0.1:9090",
-  "pyroscope_url": "http://127.0.0.1:4040",
-  "monitor_smoke_enabled": false,
-  "headers": {}
-}
-EOF
-}
-
-run_harness() {
-  XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" "$@"
-}
-
-wait_for_daemon() {
-  local deadline=$((SECONDS + 30))
-  while (( SECONDS < deadline )); do
-    if run_harness daemon status >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 0.2
-  done
-  echo "Timed out waiting for daemon readiness" >&2
-  return 1
-}
-
-bridge_is_ready() {
-  local status_json
-  if ! status_json="$(run_harness bridge status 2>/dev/null)"; then
-    return 1
-  fi
-  printf '%s' "$status_json" | "$E2E_TOOL_BINARY" bridge-ready
-}
-
-wait_for_bridge() {
-  local deadline=$((SECONDS + 60))
-  while (( SECONDS < deadline )); do
-    if bridge_is_ready; then
-      return 0
-    fi
-    if [[ -n "$BRIDGE_PID" ]] && ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
-      wait "$BRIDGE_PID" 2>/dev/null || true
-      return 2
-    fi
-    sleep 0.25
-  done
-  echo "Timed out waiting for bridge readiness" >&2
-  return 1
-}
-
-start_bridge() {
-  local max_attempts=1
-  if [[ -z "$CODEX_PORT_OVERRIDE" ]]; then
-    max_attempts=5
-  fi
-
-  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
-    local codex_port="$CODEX_PORT_OVERRIDE"
-    if [[ -z "$codex_port" ]]; then
-      codex_port="$(allocate_unused_local_port)"
-    fi
-
-    {
-      echo "=== bridge attempt $attempt codex_port=$codex_port ==="
-    } >>"$BRIDGE_LOG"
-
-    env XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" bridge start \
-      --capability codex \
-      --capability agent-tui \
-      --codex-port "$codex_port" \
-      --codex-path "$CODEX_BINARY" \
-      >>"$BRIDGE_LOG" 2>&1 &
-    BRIDGE_PID="$!"
-
-    if wait_for_bridge; then
-      return 0
-    fi
-
-    local wait_status=$?
-    stop_bridge_process
-
-    if (( wait_status == 2 )) && [[ -z "$CODEX_PORT_OVERRIDE" ]] && bridge_failed_with_port_conflict; then
-      continue
-    fi
-
-    if (( wait_status == 2 )); then
-      echo "Bridge exited before readiness" >&2
-    fi
-    return 1
-  done
-
-  echo "Bridge failed to start after $max_attempts attempts" >&2
-  return 1
-}
-
-create_session() {
-  local session_id="$1"
-  local title="$2"
-  local context="$3"
-
-  run_harness session start \
-    --context "$context" \
-    --title "$title" \
-    --project-dir "$E2E_PROJECT_DIR" \
-    --session-id "$session_id" \
-    >/dev/null
-}
-
-resolve_session_workspace() {
-  local session_id="$1"
-  local workspace
-  workspace="$(
-    run_harness session status "$session_id" --json --project-dir "$E2E_PROJECT_DIR" \
-      | jq -r '.worktree_path'
-  )"
-  if [[ -z "$workspace" ]]; then
-    echo "Failed to resolve workspace for session $session_id" >&2
-    return 1
-  fi
-  printf '%s\n' "$workspace"
 }
 
 verify_nonempty_file() {
@@ -364,7 +178,6 @@ configure_xctestrun() {
 }
 
 ensure_e2e_tool_binary
-seed_observability_config
 resolve_supported_codex_launch
 
 "$ROOT/Scripts/generate.sh"
@@ -398,23 +211,30 @@ fi
 CONFIGURED_XCTESTRUN="${GENERATED_XCTESTRUN%.xctestrun}.configured.xctestrun"
 configure_xctestrun "$GENERATED_XCTESTRUN" "$CONFIGURED_XCTESTRUN"
 
-env XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" daemon serve --sandboxed --host 127.0.0.1 --port 0 >"$DAEMON_LOG" 2>&1 &
-DAEMON_PID="$!"
-wait_for_daemon
+prepare_args=(
+  prepare
+  --state-root "$STATE_ROOT"
+  --data-root "$DATA_ROOT"
+  --data-home "$DATA_HOME"
+  --daemon-log "$DAEMON_LOG"
+  --bridge-log "$BRIDGE_LOG"
+  --harness-binary "$HARNESS_BINARY"
+  --codex-binary "$CODEX_BINARY"
+  --project-dir "$E2E_PROJECT_DIR"
+  --terminal-session-id "$TERMINAL_SESSION_ID"
+  --codex-session-id "$CODEX_SESSION_ID"
+  --manifest-output "$MANIFEST_PATH"
+)
+if [[ -n "$CODEX_PORT_OVERRIDE" ]]; then
+  prepare_args+=(--codex-port "$CODEX_PORT_OVERRIDE")
+fi
+"$E2E_TOOL_BINARY" "${prepare_args[@]}"
 
-: >"$BRIDGE_LOG"
-start_bridge
-
-create_session \
-  "$TERMINAL_SESSION_ID" \
-  "Agents E2E Terminal" \
-  "Run the explicit monitor Agents end-to-end smoke for terminal-backed agents."
-
-create_session \
-  "$CODEX_SESSION_ID" \
-  "Agents E2E Codex" \
-  "Run the explicit monitor Agents end-to-end smoke for Codex threads."
-CODEX_WORKSPACE="$(resolve_session_workspace "$CODEX_SESSION_ID")"
+CODEX_WORKSPACE="$(/usr/bin/awk -F'"' '/"codexWorkspace"/{print $4; exit}' "$MANIFEST_PATH")"
+if [[ -z "$CODEX_WORKSPACE" ]]; then
+  echo "Failed to read codexWorkspace from $MANIFEST_PATH" >&2
+  exit 1
+fi
 APPROVAL_FILE="$CODEX_WORKSPACE/approved.txt"
 
 if HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
