@@ -68,9 +68,21 @@ struct Compare: ParsableCommand {
 struct Summarize: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "summarize",
-        abstract: "Render summary.{json,csv} for a single run (not yet implemented)."
+        abstract: "Render summary.json + summary.csv from manifest.json and per-capture metrics."
     )
-    func run() throws { throw ExitCode(2) }
+
+    @Argument(help: "Path to the run directory (must contain manifest.json and metrics/).")
+    var runDir: String
+
+    func run() throws {
+        let url = URL(fileURLWithPath: runDir)
+        do {
+            _ = try Summarizer.summarize(runDir: url)
+        } catch let failure as Summarizer.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
 }
 
 struct MeasurePreviewLatency: ParsableCommand {
