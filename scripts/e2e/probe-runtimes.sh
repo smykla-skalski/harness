@@ -92,15 +92,24 @@ fi
 probe_versioned_binary "vibe" "false" "vibe" "true" "available"
 probe_versioned_binary "opencode" "false" "opencode" "true" "available"
 
-jq -Rs --indent 2 '
-  [
-    split("\n")[]
-    | select(length > 0)
-    | split("\t")
-    | { name: .[0], required: (.[1] == "true"), available: (.[2] == "true"), reason: .[3] }
-  ]
-  | {
-      runtimes: (map({ (.name): { available, required, reason } }) | add // {}),
-      required_missing: [ .[] | select(.required and (.available | not)) | .name ]
-    }
-' "$RESULTS_FILE"
+python3 - "$RESULTS_FILE" <<'PY'
+import json
+import sys
+
+runtimes = {}
+required_missing = []
+with open(sys.argv[1], encoding="utf-8") as handle:
+    for line in handle:
+        name, required_raw, available_raw, reason = line.rstrip("\n").split("\t", 3)
+        required = required_raw == "true"
+        available = available_raw == "true"
+        runtimes[name] = {
+            "available": available,
+            "required": required,
+            "reason": reason,
+        }
+        if required and not available:
+            required_missing.append(name)
+
+print(json.dumps({"runtimes": runtimes, "required_missing": required_missing}, indent=2, sort_keys=True))
+PY
