@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 
 mod files;
 mod loading;
@@ -29,8 +30,22 @@ use render_plugins::render_claude_plugin_outputs;
 /// Returns `CliError` when source assets cannot be loaded, rendered, written,
 /// or verified against the checked-in outputs.
 pub fn generate_agent_assets(target: AgentAssetTarget, check: bool) -> Result<i32, CliError> {
+    generate_agent_assets_with_skipped_runtime_hooks(target, check, &[])
+}
+
+/// Generate checked-in multi-agent skill and plugin assets while optionally
+/// omitting runtime hook config files for selected agents.
+///
+/// # Errors
+/// Returns `CliError` when source assets cannot be loaded, rendered, written,
+/// or verified against the checked-in outputs.
+pub(crate) fn generate_agent_assets_with_skipped_runtime_hooks(
+    target: AgentAssetTarget,
+    check: bool,
+    skip_runtime_hooks: &[HookAgent],
+) -> Result<i32, CliError> {
     let repo_root = repo_root();
-    let planned = plan_outputs(&repo_root, target)?;
+    let planned = plan_outputs(&repo_root, target, skip_runtime_hooks)?;
     if check {
         ensure_outputs_match(&planned)?;
     } else {
@@ -47,11 +62,24 @@ pub fn write_agent_target_outputs(
     project_root: &Path,
     target: AgentAssetTarget,
 ) -> Result<Vec<PathBuf>, CliError> {
+    write_agent_target_outputs_with_skipped_runtime_hooks(project_root, target, &[])
+}
+
+/// Materialize the generated target outputs into a project directory while
+/// optionally omitting runtime hook config files for selected agents.
+///
+/// # Errors
+/// Returns `CliError` when the source assets cannot be rendered or written.
+pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks(
+    project_root: &Path,
+    target: AgentAssetTarget,
+    skip_runtime_hooks: &[HookAgent],
+) -> Result<Vec<PathBuf>, CliError> {
     let source_root = repo_root();
     let planned = rebase_planned_outputs(
         &source_root,
         project_root,
-        plan_outputs(&source_root, target)?,
+        plan_outputs(&source_root, target, skip_runtime_hooks)?,
     )?;
     let written = planned
         .iter()

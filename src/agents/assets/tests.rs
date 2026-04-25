@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
+use crate::hooks::adapters::HookAgent;
 use crate::infra::io::read_text;
 use crate::setup::wrapper::PROJECT_PLUGIN_LAUNCHER;
 
@@ -168,7 +169,7 @@ fn portable_plugin_skill_omits_host_specific_hooks_and_question_tool() {
 #[test]
 fn copilot_generation_includes_repo_hook_config() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Copilot).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
     let hook_path = repo_root()
         .join(".github")
         .join("hooks")
@@ -189,7 +190,8 @@ fn copilot_generation_includes_repo_hook_config() {
 
 #[test]
 fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::All).expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::All, &[]).expect("assets plan succeeds");
     let shared_skill = repo_root()
         .join("plugins")
         .join("suite")
@@ -210,7 +212,7 @@ fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
 #[test]
 fn harness_plugin_is_in_codex_marketplace() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let marketplace = repo_root()
         .join(".agents")
         .join("plugins")
@@ -228,7 +230,7 @@ fn harness_plugin_is_in_codex_marketplace() {
 #[test]
 fn codex_harness_plugin_skill_is_planned() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -247,7 +249,7 @@ fn codex_harness_plugin_skill_is_planned() {
 #[test]
 fn claude_harness_plugin_skill_is_planned() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Claude).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join(".claude")
         .join("plugins")
@@ -267,7 +269,7 @@ fn claude_harness_plugin_skill_is_planned() {
 #[test]
 fn gemini_harness_plugin_command_is_namespaced_under_harness() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Gemini).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Gemini, &[]).expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")
         .join("commands")
@@ -285,7 +287,7 @@ fn gemini_harness_plugin_command_is_namespaced_under_harness() {
 #[test]
 fn copilot_harness_plugin_includes_cli_skill() {
     let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Copilot).expect("assets plan succeeds");
+        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -300,4 +302,73 @@ fn copilot_harness_plugin_includes_cli_skill() {
     assert!(rendered.contains("name: cli"));
     assert!(rendered.contains("# Harness CLI reference"));
     assert!(rendered.contains("references/top-level-and-hidden.md"));
+}
+
+#[test]
+fn claude_direct_skill_alias_uses_safe_frontmatter_name() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
+    let skill = repo_root()
+        .join(".claude")
+        .join("skills")
+        .join("harness-cli")
+        .join("SKILL.md");
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("claude alias skill should be planned");
+
+    assert!(rendered.contains("name: harness-cli"));
+    assert!(!rendered.contains("name: harness:cli"));
+}
+
+#[test]
+fn codex_direct_skill_alias_uses_safe_frontmatter_name() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let skill = repo_root()
+        .join(".agents")
+        .join("skills")
+        .join("harness-cli")
+        .join("SKILL.md");
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("codex alias skill should be planned");
+
+    assert!(rendered.contains("name: harness-cli"));
+    assert!(!rendered.contains("name: harness:cli"));
+}
+
+#[test]
+fn copilot_runtime_hook_config_can_be_skipped() {
+    let planned = plan_outputs(
+        &repo_root(),
+        AgentAssetTarget::Copilot,
+        &[HookAgent::Copilot],
+    )
+    .expect("assets plan succeeds");
+    let hook_path = repo_root()
+        .join(".github")
+        .join("hooks")
+        .join("harness.json");
+    let plugin_skill = repo_root()
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("harness")
+        .join("SKILL.md");
+
+    assert!(
+        planned
+            .iter()
+            .all(|output| !output.files.contains_key(&hook_path)),
+        "copilot hook config should be omitted when skipped"
+    );
+    assert!(
+        planned
+            .iter()
+            .any(|output| output.files.contains_key(&plugin_skill)),
+        "copilot plugin assets should still be generated"
+    );
 }

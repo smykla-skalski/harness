@@ -26,6 +26,54 @@ fn parse_bootstrap_agents_csv() {
 }
 
 #[test]
+fn parse_bootstrap_skip_runtime_hooks_csv() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "bootstrap",
+        "--skip-runtime-hooks",
+        "gemini,copilot",
+    ])
+    .unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert_eq!(
+        args.skip_runtime_hooks,
+        vec![HookAgent::Gemini, HookAgent::Copilot]
+    );
+}
+
+#[test]
+fn parse_agents_generate_skip_runtime_hooks_csv() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "agents",
+        "generate",
+        "--skip-runtime-hooks",
+        "gemini,copilot",
+    ])
+    .unwrap();
+    let Command::Setup {
+        command:
+            SetupCommand::Agents {
+                command: AgentsSetupCommand::Generate(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected agents generate command");
+    };
+    assert_eq!(
+        args.skip_runtime_hooks,
+        vec![HookAgent::Gemini, HookAgent::Copilot]
+    );
+}
+
+#[test]
 fn parse_cluster_with_extra_names() {
     let cli = Cli::try_parse_from([
         "harness",

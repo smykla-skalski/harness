@@ -4,9 +4,9 @@
 
 | Command | Purpose | Key surface |
 | --- | --- | --- |
-| `setup bootstrap` | Install or refresh the repo-aware harness wrapper and write agent bootstrap config | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...` |
+| `setup bootstrap` | Install or refresh the repo-aware harness wrapper and write agent bootstrap config | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` |
 | `setup agents` | Setup entrypoint for harness-managed agent asset commands | Subcommand: `generate` |
-| `setup agents generate` | Generate checked-in multi-agent skills and plugin assets | `--check`, `--target <TARGET>` |
+| `setup agents generate` | Generate checked-in multi-agent skills and plugin assets | `--check`, `--target <TARGET>`, `--skip-runtime-hooks <AGENTS>...` |
 | `setup kuma` | Kuma-specific setup entrypoint | Subcommand: `cluster` |
 | `setup gateway` | Check, install, or uninstall Gateway API CRDs | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` |
 | `setup capabilities` | Emit a structured capabilities/readiness report for planning | `--project-dir`, `--repo-root` |
@@ -17,9 +17,9 @@ Sources: `cargo run --quiet -- setup --help`; `cargo run --quiet -- setup agents
 
 | Command | Flags / arguments | Notes |
 | --- | --- | --- |
-| `harness setup bootstrap` | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...` | `--agents` defaults to all supported agents; valid values in help include `copilot` |
+| `harness setup bootstrap` | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` | `--agents` defaults to all supported agents; `--skip-runtime-hooks` leaves the rest of bootstrap intact while suppressing runtime hook configs for the listed runtimes |
 | `harness setup agents` | `<COMMAND>`, `--delay <DELAY>` | Direct entrypoint; help currently exposes `generate` |
-| `harness setup agents generate` | `--check`, `--target <TARGET>` | `--target` defaults to `all` |
+| `harness setup agents generate` | `--check`, `--target <TARGET>`, `--skip-runtime-hooks <AGENTS>...` | `--target` defaults to `all`; `--skip-runtime-hooks` omits generated runtime hook config files for the listed runtimes |
 | `harness setup kuma` | Subcommand `cluster` | Use `harness setup kuma cluster --help` for lifecycle flags |
 | `harness setup kuma cluster` | `<MODE> <CLUSTER_NAME> [EXTRA_CLUSTER_NAMES]...`, `--platform`, `--provider`, `--repo-root`, `--run-dir`, `--helm-setting`, `--remote`, `--push-prefix`, `--push-tag`, `--namespace`, `--release-name`, `--restart-namespace`, `--store`, `--image`, `--no-build`, `--no-load` | Modes in help: `single-up`, `single-down`, `global-zone-up`, `global-zone-down`, `global-two-zones-up`, `global-two-zones-down` |
 | `harness setup gateway` | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` | `--check-only` and `--uninstall` are mutually exclusive in source |
@@ -33,6 +33,8 @@ Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- se
 | --- | --- |
 | Copilot bootstrap path | `harness setup bootstrap --agents copilot` |
 | Asset sync / drift check | `harness setup agents generate --check` |
+| Bootstrap without Gemini/Copilot runtime hooks | `harness setup bootstrap --skip-runtime-hooks gemini,copilot` |
+| Generate assets without Copilot runtime hooks | `harness setup agents generate --skip-runtime-hooks copilot` |
 
 Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup agents generate --help`.
 

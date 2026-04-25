@@ -9,7 +9,11 @@ use crate::setup::wrapper;
 
 impl Execute for BootstrapArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        bootstrap(self.project_dir.as_deref(), &self.agents)
+        bootstrap_with_skipped_runtime_hooks(
+            self.project_dir.as_deref(),
+            &self.agents,
+            &self.skip_runtime_hooks,
+        )
     }
 }
 
@@ -22,6 +26,9 @@ pub struct BootstrapArgs {
     /// Agents to bootstrap. Defaults to every supported agent.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub agents: Vec<HookAgent>,
+    /// Skip runtime hook config files for the listed agents while bootstrapping.
+    #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
+    pub skip_runtime_hooks: Vec<HookAgent>,
 }
 
 const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
@@ -38,6 +45,14 @@ const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn bootstrap(project_dir: Option<&str>, agents: &[HookAgent]) -> Result<i32, CliError> {
+    bootstrap_with_skipped_runtime_hooks(project_dir, agents, &[])
+}
+
+fn bootstrap_with_skipped_runtime_hooks(
+    project_dir: Option<&str>,
+    agents: &[HookAgent],
+    skip_runtime_hooks: &[HookAgent],
+) -> Result<i32, CliError> {
     let dir = resolve_project_dir(project_dir);
     let path_env = env::var("PATH").unwrap_or_default();
     wrapper::main(&dir, &path_env)?;
@@ -49,7 +64,7 @@ pub fn bootstrap(project_dir: Option<&str>, agents: &[HookAgent]) -> Result<i32,
         .into());
     }
     for agent in selected_agents(agents) {
-        let _ = wrapper::write_agent_bootstrap(&dir, agent)?;
+        let _ = wrapper::write_agent_bootstrap(&dir, agent, skip_runtime_hooks)?;
     }
     Ok(0)
 }

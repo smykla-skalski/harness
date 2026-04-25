@@ -51,14 +51,14 @@ CARGO_PROFILE_DEV_DEBUG=2 CARGO_PROFILE_TEST_DEBUG=2 mise run test:unit
 ### setup - environment and cluster preparation
 
 ```
-harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>]
-harness setup agents generate [--check]
+harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>]
+harness setup agents generate [--check] [--target <all,claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>]
 harness setup kuma <topology> <name> [flags]
 harness setup gateway [--kubeconfig <path>] [--repo-root <path>]
 harness setup capabilities
 ```
 
-`bootstrap` wires agent runtimes into the project. Without `--agents`, it installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
+`bootstrap` wires agent runtimes into the project. Without `--agents`, it installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. Both commands accept `--skip-runtime-hooks` to omit runtime hook config outputs for the listed runtimes without changing the rest of the generated assets. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
 
 Generation and bootstrap expose the session entrypoints as `harness:session:start` and `harness:session:join` across the supported agent surfaces. Codex also gets direct mirrors under `.agents/skills/`, because repo-local plugin bundles alone are not enough for Codex skill discovery.
 
@@ -252,8 +252,10 @@ Each managed root contains an `AGENTS.md` marker emitted by the renderer. The so
 ```bash
 harness setup agents generate        # render agents/ into host directories
 harness setup agents generate --check  # verify they are in sync
+harness setup agents generate --skip-runtime-hooks copilot
 harness setup bootstrap                # wire every supported agent runtime
 harness setup bootstrap --agents codex # narrow to one runtime
+harness setup bootstrap --skip-runtime-hooks gemini,copilot
 ```
 
 ### Runtime

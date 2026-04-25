@@ -1,8 +1,11 @@
 use clap::{Args, Subcommand};
 
-use crate::agents::assets::{AgentAssetTarget, generate_agent_assets};
+use crate::agents::assets::{
+    AgentAssetTarget, generate_agent_assets, generate_agent_assets_with_skipped_runtime_hooks,
+};
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -27,10 +30,21 @@ pub struct GenerateAgentAssetsArgs {
     /// Limit generation to a single target.
     #[arg(long, value_enum, default_value_t = AgentAssetTarget::All)]
     pub target: AgentAssetTarget,
+    /// Skip runtime hook config files for the listed agents while generating.
+    #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
+    pub skip_runtime_hooks: Vec<HookAgent>,
 }
 
 impl Execute for GenerateAgentAssetsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        generate_agent_assets(self.target, self.check)
+        if self.skip_runtime_hooks.is_empty() {
+            generate_agent_assets(self.target, self.check)
+        } else {
+            generate_agent_assets_with_skipped_runtime_hooks(
+                self.target,
+                self.check,
+                &self.skip_runtime_hooks,
+            )
+        }
     }
 }
