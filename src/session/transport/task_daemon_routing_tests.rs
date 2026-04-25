@@ -21,8 +21,8 @@ use tempfile::tempdir;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::test_support::install_fake_running_xdg_daemon;
-use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource};
 use crate::session::service;
+use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource};
 
 use super::improver::SessionImproverApplyArgs;
 use super::task::{
@@ -96,18 +96,13 @@ fn read_request(stream: &mut TcpStream) -> String {
         }
         buffer.extend_from_slice(&chunk[..read]);
         if !headers_done
-            && let Some(pos) = buffer
-                .windows(4)
-                .position(|window| window == b"\r\n\r\n")
+            && let Some(pos) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
         {
             headers_done = true;
             header_end = pos + 4;
             let head = String::from_utf8_lossy(&buffer[..pos]);
             for line in head.split("\r\n") {
-                if let Some(value) = line
-                    .to_ascii_lowercase()
-                    .strip_prefix("content-length:")
-                {
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
                     content_length = value.trim().parse().unwrap_or(0);
                 }
             }
@@ -131,10 +126,7 @@ fn write_response(stream: &mut TcpStream, body: &str) {
 fn spawn_daemon_server(
     listener: TcpListener,
     response_body: String,
-) -> (
-    thread::JoinHandle<()>,
-    Arc<Mutex<Option<CapturedRequest>>>,
-) {
+) -> (thread::JoinHandle<()>, Arc<Mutex<Option<CapturedRequest>>>) {
     let captured = Arc::new(Mutex::new(None));
     let captured_inner = Arc::clone(&captured);
     let handle = thread::spawn(move || {
@@ -163,11 +155,7 @@ fn spawn_daemon_server(
                     .nth(1)
                     .unwrap_or("")
                     .to_string();
-                let body = request
-                    .split("\r\n\r\n")
-                    .nth(1)
-                    .unwrap_or("")
-                    .to_string();
+                let body = request.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
                 *captured_inner.lock().expect("lock") = Some(CapturedRequest { path, body });
                 write_response(&mut stream, &response_body);
                 return;
@@ -240,7 +228,9 @@ fn submit_for_review_args_routes_through_daemon_client() {
         captured.body
     );
     assert!(
-        captured.body.contains("\"suggested_persona\":\"code-reviewer\""),
+        captured
+            .body
+            .contains("\"suggested_persona\":\"code-reviewer\""),
         "body must carry persona hint: {}",
         captured.body
     );
@@ -274,9 +264,7 @@ fn submit_review_args_routes_through_daemon_client() {
             actor: "rev-1".into(),
             verdict: ReviewVerdict::RequestChanges,
             summary: "needs work".into(),
-            points: Some(
-                r#"[{"point_id":"p1","text":"fix","state":"open"}]"#.into(),
-            ),
+            points: Some(r#"[{"point_id":"p1","text":"fix","state":"open"}]"#.into()),
             project_dir: None,
         };
         let exit = args.execute(&AppContext::default()).expect("execute");
@@ -370,7 +358,9 @@ fn improver_apply_args_routes_through_daemon_client() {
     assert!(captured.body.contains("\"rel_path\":\"demo/SKILL.md\""));
     assert!(captured.body.contains("\"dry_run\":true"));
     assert!(
-        captured.body.contains("\"new_contents\":\"new contents\\n\""),
+        captured
+            .body
+            .contains("\"new_contents\":\"new contents\\n\""),
         "body must inline file contents: {}",
         captured.body
     );

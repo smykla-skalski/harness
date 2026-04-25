@@ -1,5 +1,7 @@
 use harness::session::service;
-use harness::session::types::{AgentStatus, ReviewPoint, ReviewPointState, ReviewVerdict, TaskStatus};
+use harness::session::types::{
+    AgentStatus, ReviewPoint, ReviewPointState, ReviewVerdict, TaskStatus,
+};
 
 use super::swarm_review_helpers::{
     join_reviewer, prepare_in_progress_task, setup_two_reviewers_on_claimed_task,
@@ -27,7 +29,11 @@ fn submit_review_stamps_reviewer_entry_and_persists_review() {
 
         let state = service::session_status("sub-rev-1", &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
-        assert_eq!(task.status, TaskStatus::InReview, "single submit stays in review");
+        assert_eq!(
+            task.status,
+            TaskStatus::InReview,
+            "single submit stays in review"
+        );
         assert!(task.consensus.is_none(), "quorum not yet reached");
         let claim = task.review_claim.as_ref().unwrap();
         let entry = claim

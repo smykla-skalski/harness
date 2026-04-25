@@ -4,9 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use harness::session::service::{
-    ImproverTarget, apply_improver_apply, validate_skill_patch_path,
-};
+use harness::session::service::{ImproverTarget, apply_improver_apply, validate_skill_patch_path};
 
 fn seed_skill(repo: &Path, rel: &str, contents: &str) -> std::path::PathBuf {
     let target = repo.join("agents/skills").join(rel);
@@ -21,12 +19,9 @@ fn seed_skill(repo: &Path, rel: &str, contents: &str) -> std::path::PathBuf {
 fn validate_rejects_absolute_path_even_under_skills_root() {
     let tmp = tempfile::tempdir().unwrap();
     seed_skill(tmp.path(), "placeholder.md", "x");
-    let err = validate_skill_patch_path(
-        tmp.path(),
-        ImproverTarget::Skill,
-        Path::new("/etc/passwd"),
-    )
-    .unwrap_err();
+    let err =
+        validate_skill_patch_path(tmp.path(), ImproverTarget::Skill, Path::new("/etc/passwd"))
+            .unwrap_err();
     assert!(err.to_string().contains("must be relative"));
 }
 
@@ -52,12 +47,8 @@ fn validate_rejects_symlink_escape() {
     let outside = tmp.path().join("secrets.md");
     fs::write(&outside, "secret").unwrap();
     symlink(&outside, tmp.path().join("agents/skills/leak.md")).unwrap();
-    let err = validate_skill_patch_path(
-        tmp.path(),
-        ImproverTarget::Skill,
-        Path::new("leak.md"),
-    )
-    .unwrap_err();
+    let err = validate_skill_patch_path(tmp.path(), ImproverTarget::Skill, Path::new("leak.md"))
+        .unwrap_err();
     assert!(err.to_string().contains("escapes allowed root"));
 }
 
@@ -78,8 +69,7 @@ fn apply_is_idempotent_on_same_contents() {
     assert!(outcome.backup_path.is_none(), "no backup on no-op");
     let backups_root = tmp.path().join(".harness-cache/improver-backups");
     assert!(
-        !backups_root.exists()
-            || fs::read_dir(&backups_root).unwrap().next().is_none(),
+        !backups_root.exists() || fs::read_dir(&backups_root).unwrap().next().is_none(),
         "no backup files written for idempotent apply"
     );
 }
