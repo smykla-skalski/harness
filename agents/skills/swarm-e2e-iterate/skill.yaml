@@ -1,0 +1,3 @@
+name: swarm-e2e-iterate
+description: Use when driving the Harness Monitor swarm full-flow e2e through repeated recording-first triage, TDD fixes, signed commits, and reruns until zero open findings remain.
+allowed-tools: Bash, Read, Edit, Write, Skill, Agent
