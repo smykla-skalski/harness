@@ -59,7 +59,7 @@ class PatchTuistPbxprojTests(unittest.TestCase):
             pbxproj_path = Path(tmp_dir) / "project.pbxproj"
             pbxproj_path.write_text(pbxproj)
 
-            module.patch_pbxproj(pbxproj_path, "2640", "Q498EB36N4")
+            module.patch_pbxproj(pbxproj_path, "2640", "2640", "Q498EB36N4", "55", "55")
 
             patched = pbxproj_path.read_text()
 
