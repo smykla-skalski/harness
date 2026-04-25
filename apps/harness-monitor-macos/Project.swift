@@ -149,7 +149,6 @@ private let monitorAppSettings: Settings = .settings(
         "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_NAME": "Harness Monitor",
-        "REGISTER_APP_GROUPS": "YES",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
 )
