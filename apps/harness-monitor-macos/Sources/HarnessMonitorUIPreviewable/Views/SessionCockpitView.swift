@@ -22,8 +22,11 @@ struct SessionCockpitView: View {
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
+        horizontalPadding: 24,
         verticalPadding: HarnessMonitorTheme.spacingXL,
-        constrainContentWidth: true
+        constrainContentWidth: true,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft
       ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(
