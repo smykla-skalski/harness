@@ -6,7 +6,7 @@ public enum BuildSettings {
         "CLANG_CXX_LANGUAGE_STANDARD": "gnu++20",
         "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION": "YES",
         "CODE_SIGNING_ALLOWED": "YES",
-        "CURRENT_PROJECT_VERSION": "30.4.0", // VERSION_MARKER_CURRENT
+        "CURRENT_PROJECT_VERSION": "30.4.1", // VERSION_MARKER_CURRENT
         "DEAD_CODE_STRIPPING": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
@@ -20,11 +20,10 @@ public enum BuildSettings {
         "SWIFT_STRICT_CONCURRENCY": "complete",
         "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
         "SWIFT_VERSION": "6.2",
-        "HARNESS_MONITOR_APP_BUNDLE_ID": "io.harnessmonitor.app",
         "HARNESS_MONITOR_BUILD_GIT_COMMIT": "local-dev",
         "HARNESS_MONITOR_BUILD_GIT_DIRTY": "false",
         "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT": "local-dev",
-        "MARKETING_VERSION": "30.4.0" // VERSION_MARKER_MARKETING
+        "MARKETING_VERSION": "30.4.1" // VERSION_MARKER_MARKETING
     ]
 
     public static let previewOverrides: SettingsDictionary = [

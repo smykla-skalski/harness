@@ -10,6 +10,13 @@ let packageSettings = PackageSettings(
         "Textual": .framework
     ],
     baseSettings: .settings(
+        base: [
+            "ENABLE_MODULE_VERIFIER": "YES",
+            "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+            "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
+            "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
+            "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"
+        ],
         configurations: [
             .debug(name: "Debug"),
             .debug(name: "Preview"),
