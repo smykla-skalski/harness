@@ -16,6 +16,7 @@ mod integration {
     pub mod helpers;
     mod install_workflow;
     mod mcp;
+    mod swarm_e2e_iterate;
 
     mod cluster;
     mod commands;
