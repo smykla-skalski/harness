@@ -111,7 +111,7 @@ public struct SwarmRunLayout {
     }
 
     public static func timestampSlugUTC(date: Date = Date()) -> String {
-        formatter(format: "yyyy-MM-dd'T'HH-mm-ss'Z'").string(from: date)
+        formatter(format: "yyMMddHHmmss").string(from: date)
     }
 
     private static func formatter(format: String) -> DateFormatter {
