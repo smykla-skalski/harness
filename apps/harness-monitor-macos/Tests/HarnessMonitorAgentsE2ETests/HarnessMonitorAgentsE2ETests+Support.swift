@@ -139,9 +139,6 @@ extension HarnessMonitorAgentsE2ETests {
       return app
     }
     app.launch()
-    guard waitForRecordingStartIfConfigured(context: harness.diagnosticsSummary()) else {
-      return app
-    }
 
     XCTAssertTrue(
       waitUntil(timeout: Self.liveStartupTimeout) {
@@ -152,6 +149,9 @@ extension HarnessMonitorAgentsE2ETests {
       },
       harness.diagnosticsSummary()
     )
+    guard waitForRecordingStartIfConfigured(context: harness.diagnosticsSummary()) else {
+      return app
+    }
     XCTAssertTrue(
       waitUntil(timeout: Self.liveStartupTimeout) {
         let window = self.mainWindow(in: app)

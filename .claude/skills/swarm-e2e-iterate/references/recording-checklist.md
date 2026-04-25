@@ -1,14 +1,10 @@
 # Recording Checklist
 
-Use this after the chronological `.mov` pass on every iteration. For each item below write one short line with:
+Use this after the chronological `.mov` pass. Write one short line per item with `checked`, `proof`, and `verdict`.
 
-- `checked`: what part of the recording or artifact proved it was reviewed,
-- `proof`: the timestamp, frame, or artifact reference (markdown-linked when it names a file or path),
-- `verdict`: `found`, `not found`, or `needs-verification`.
+If a check is unproven, mark it `needs-verification` and re-watch.
 
-If a check cannot be proven from the recording or a secondary artifact, mark it `needs-verification` and re-watch before promotion.
-
-The thresholds and detection recipes behind each item live in [recording-analysis.md](recording-analysis.md). Per-act expected surfaces live in [act-marker-matrix.md](act-marker-matrix.md). Use both as the source of truth when a verdict needs more than a glance.
+The thresholds live in [recording-analysis.md](recording-analysis.md). Per-act surfaces live in [act-marker-matrix.md](act-marker-matrix.md).
 
 ## Required items
 
@@ -107,13 +103,4 @@ Apply on every iteration. These are checklist items even when no individual `swa
 - `suite.delayedAssert`: no assertion that waits longer than required for the marker.
 - `suite.repeatedWait`: no repeated wait that could be collapsed.
 
-## Output shape
-
-Keep the proof pass terse and deterministic:
-
-- `lifecycle.ttff: checked frames 00:00.0-00:02.0 against [daemon.log](path); verdict: not found`
-- `idle.stable: checked 00:42.0-00:44.5 keyframe diff; verdict: found`
-- `swarm.act11.workerRefusal: checked 02:18.4 frame against [act11.png](ui-snapshots/act11.png); verdict: not found`
-- `suite.deadTail: checked 04:55.0-05:01.2 vs daemon exit line; verdict: found`
-
-When a line names a file or path, wrap it in markdown link format. Promote any `found` verdict to a ledger row using the schema in [iteration-protocol.md](iteration-protocol.md).
+Keep the proof pass terse and deterministic. Wrap named files or paths in markdown links. Promote any `found` verdict to a ledger row using [iteration-protocol.md](iteration-protocol.md).

@@ -254,8 +254,15 @@ private final class SwarmFullFlowRunner {
                 "HARNESS_MONITOR_TEST_RETRY_ITERATIONS": "0",
             ],
             logURL: layout.testXcodebuildLog,
-            allowFailure: true
+            allowFailure: true,
+            terminationTrigger: actDriverFailureReason
         )
+        if let actDriverProcess, !actDriverProcess.isRunning, actDriverProcess.terminationStatus != 0 {
+            throw CommandFailure(
+                status: actDriverProcess.terminationStatus,
+                message: "swarm act driver failed"
+            )
+        }
         if testStatus != 0 {
             throw CommandFailure(status: testStatus, message: "swarm full-flow xcodebuild failed")
         }
@@ -472,37 +479,24 @@ private final class SwarmFullFlowRunner {
         arguments: [String],
         environment extraEnvironment: [String: String] = [:],
         logURL: URL,
-        allowFailure: Bool = false
+        allowFailure: Bool = false,
+        terminationTrigger: (() -> String?)? = nil
     ) throws -> Int32 {
-        try FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        let logHandle = try FileHandle(forWritingTo: logURL)
-        defer { try? logHandle.close() }
-
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
-        var commandEnvironment = environment
-        for (key, value) in extraEnvironment { commandEnvironment[key] = value }
-        process.environment = commandEnvironment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        try process.run()
-        while true {
-            let data = pipe.fileHandleForReading.availableData
-            if data.isEmpty { break }
-            FileHandle.standardOutput.write(data)
-            try logHandle.write(contentsOf: data)
-        }
-        process.waitUntilExit()
-        if process.terminationStatus != 0, !allowFailure {
+        let result = try LoggedProcessRunner(environment: environment).run(
+            executable: executable,
+            arguments: arguments,
+            environment: extraEnvironment,
+            logURL: logURL,
+            terminationTrigger: terminationTrigger
+        )
+        if result.exitStatus != 0, !allowFailure {
             throw CommandFailure(
-                status: process.terminationStatus,
-                message: "\(executable.lastPathComponent) failed with status \(process.terminationStatus)"
+                status: result.exitStatus,
+                message: result.terminationReason
+                    ?? "\(executable.lastPathComponent) failed with status \(result.exitStatus)"
             )
         }
-        return process.terminationStatus
+        return result.exitStatus
     }
 
     private func runCapturedCommand(
@@ -536,6 +530,16 @@ private final class SwarmFullFlowRunner {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         let tail = lines.suffix(limit).joined(separator: "\n")
         fputs("--- \(label) ---\n\(tail)\n", stderr)
+    }
+
+    private func actDriverFailureReason() -> String? {
+        guard let actDriverProcess, !actDriverProcess.isRunning else {
+            return nil
+        }
+        guard actDriverProcess.terminationStatus != 0 else {
+            return nil
+        }
+        return "swarm act driver failed"
     }
 
     private static func resolveRepoRoot(startingAt currentDirectory: URL) throws -> URL {
@@ -1097,14 +1101,19 @@ private final class SwarmActDriverRunner {
 
     private func actAck(_ act: String, timeout: TimeInterval? = nil) throws {
         let marker = inputs.syncDir.appendingPathComponent("\(act).ack")
-        let deadline = Date.now.addingTimeInterval(timeout ?? SwarmStepTimeouts.timeout(for: act))
-        while Date.now < deadline {
-            if FileManager.default.fileExists(atPath: marker.path) {
-                return
-            }
-            Thread.sleep(forTimeInterval: 0.2)
+        let stopMarker = inputs.syncDir
+            .deletingLastPathComponent()
+            .appendingPathComponent("recording-control/stop.request")
+        switch try SwarmAckWait.waitForAck(
+            ackExists: { FileManager.default.fileExists(atPath: marker.path) },
+            stopRequested: { FileManager.default.fileExists(atPath: stopMarker.path) },
+            timeout: timeout ?? SwarmStepTimeouts.timeout(for: act)
+        ) {
+        case .acknowledged:
+            return
+        case .stopped:
+            throw Failure(status: 1, message: "UI test ended before \(act).ack")
         }
-        throw Failure(status: 1, message: "Timed out waiting for \(act).ack")
     }
 
     @discardableResult
