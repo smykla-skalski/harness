@@ -341,6 +341,85 @@ extension RecordingTriage {
     }
 }
 
+// MARK: - Accessibility identifiers
+
+extension RecordingTriage {
+    public struct AccessibilityIdentifier: Codable, Equatable, Sendable {
+        public let identifier: String
+        public let label: String?
+        public let frame: CGRect
+        public let isSelected: Bool
+
+        public init(identifier: String, label: String?, frame: CGRect, isSelected: Bool) {
+            self.identifier = identifier
+            self.label = label
+            self.frame = frame
+            self.isSelected = isSelected
+        }
+    }
+
+    /// Walk an XCUITest debug-description-style hierarchy dump and yield one
+    /// record per line that carries both an `identifier: '...'` clause and a
+    /// `{{x, y}, {w, h}}` frame. Captures the optional `label: '...'` payload
+    /// and the `Selected` modifier so downstream surface assertions can drive
+    /// per-act verdicts without re-walking the file.
+    public static func parseAccessibilityIdentifiers(from text: String) -> [AccessibilityIdentifier] {
+        var records: [AccessibilityIdentifier] = []
+        guard
+            let frameRegex = try? NSRegularExpression(
+                pattern: #"\{\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\},\s*\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\}\}"#,
+                options: []
+            ),
+            let identifierRegex = try? NSRegularExpression(
+                pattern: #"identifier:\s*'([^']*)'"#,
+                options: []
+            ),
+            let labelRegex = try? NSRegularExpression(
+                pattern: #"label:\s*'([^']*)'"#,
+                options: []
+            ),
+            let selectedRegex = try? NSRegularExpression(
+                pattern: #"(?:^|,\s)Selected(?:,|$)"#,
+                options: []
+            )
+        else {
+            return records
+        }
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let lineString = String(line)
+            let nsLine = lineString as NSString
+            let fullRange = NSRange(location: 0, length: nsLine.length)
+            guard
+                let frameMatch = frameRegex.firstMatch(in: lineString, options: [], range: fullRange),
+                frameMatch.numberOfRanges == 5,
+                let identifierMatch = identifierRegex.firstMatch(in: lineString, options: [], range: fullRange),
+                identifierMatch.numberOfRanges == 2,
+                let originX = Double(nsLine.substring(with: frameMatch.range(at: 1))),
+                let originY = Double(nsLine.substring(with: frameMatch.range(at: 2))),
+                let width = Double(nsLine.substring(with: frameMatch.range(at: 3))),
+                let height = Double(nsLine.substring(with: frameMatch.range(at: 4)))
+            else {
+                continue
+            }
+            let identifier = nsLine.substring(with: identifierMatch.range(at: 1))
+            let label = labelRegex
+                .firstMatch(in: lineString, options: [], range: fullRange)
+                .flatMap { match -> String? in
+                    guard match.numberOfRanges == 2 else { return nil }
+                    return nsLine.substring(with: match.range(at: 1))
+                }
+            let isSelected = selectedRegex.firstMatch(in: lineString, options: [], range: fullRange) != nil
+            records.append(AccessibilityIdentifier(
+                identifier: identifier,
+                label: label,
+                frame: CGRect(x: originX, y: originY, width: width, height: height),
+                isSelected: isSelected
+            ))
+        }
+        return records
+    }
+}
+
 // MARK: - Black / blank frames
 
 extension RecordingTriage {
