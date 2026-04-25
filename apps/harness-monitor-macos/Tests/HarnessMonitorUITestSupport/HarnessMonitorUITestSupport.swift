@@ -10,12 +10,6 @@ class HarnessMonitorUITestCase: XCTestCase {
     "HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR"
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
-  // ScreenCaptureKit bootstrap can spend several seconds on first launch
-  // (and hits an explicit 20s stall budget inside the recorder), so the
-  // host-side wait for `start.ready` needs a longer ceiling than the
-  // generic UI poll budget to let the recorder log a useful failure
-  // before tearDown.
-  nonisolated static let recordingStartTimeout: TimeInterval = 30
   nonisolated static let actionTimeout: TimeInterval = 2
   nonisolated static let fastActionTimeout: TimeInterval = 0.75
   nonisolated static let fastPollInterval: TimeInterval = 0.05
@@ -142,7 +136,7 @@ extension HarnessMonitorUITestCase {
 
     let startAck = controlDirectory.appendingPathComponent("start.ready")
     if waitUntil(
-      timeout: Self.recordingStartTimeout,
+      timeout: Self.uiTimeout,
       condition: {
         FileManager.default.fileExists(atPath: startAck.path)
       }
