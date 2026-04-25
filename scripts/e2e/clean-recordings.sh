@@ -101,7 +101,7 @@ if ! [[ "$BEFORE_HOURS" =~ ^[0-9]+$ ]] || [[ "$BEFORE_HOURS" -lt 1 ]]; then
 fi
 
 REPO_ROOT="$(e2e_repo_root)"
-RUNS_DIR="$REPO_ROOT/tmp/e2e-triage/runs"
+RUNS_DIR="$REPO_ROOT/_artifacts/runs"
 
 if [[ ! -d "$RUNS_DIR" ]]; then
   printf 'no runs directory found at %s\n' "$RUNS_DIR"
