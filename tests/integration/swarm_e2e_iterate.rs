@@ -33,6 +33,7 @@ fn skill_body_carries_hard_rules() {
         "Recording handling is mandatory.",
         "Recording triage is first, single-threaded, and never parallelized",
         "ledger row must cite a recording timestamp range",
+        "The iteration ledger lives at",
         "Reuse one recording per iteration.",
         "Real findings only.",
         "TDD is mandatory:",
@@ -41,6 +42,7 @@ fn skill_body_carries_hard_rules() {
         "Do not bump versions inside the loop.",
         "Do not run the full UI suite.",
         "All repo workflow commands go through `rtk mise run",
+        "Any file or path in generated notes, summaries, or handoffs must use markdown link format.",
         "Every commit uses `rtk git commit -sS`.",
     ];
     for phrase in required_phrases {
@@ -93,6 +95,7 @@ fn recording_reference_carries_per_launch_checklist() {
         "First-frame state:",
         "Transitions between acts:",
         "Idle behavior:",
+        "Suite speed and avoidable waiting:",
         "Animation and performance:",
         "Readability and accessibility:",
         "Interaction fidelity:",
@@ -140,6 +143,8 @@ fn recording_reference_carries_ux_heuristics_and_signatures() {
         "Cognitive load spike:",
         "Polish drift:",
         "Reliability smell:",
+        "Iteration drag: avoidable waiting that makes the recording or loop longer than necessary.",
+        "After the recording review, run the proof checklist",
     ];
     for heuristic in heuristics {
         assert!(
@@ -202,12 +207,14 @@ fn subagent_body_pins_recording_first_invariants() {
         "Ledger rows need recording timestamps plus one secondary artifact.",
         "Reuse one recording per iteration.",
         "Real findings only.",
+        "suite-speed findings",
         "TDD only:",
         "One ledger row per commit.",
         "No version bumps inside the loop.",
         "No full UI suite.",
         "rtk mise run",
         "rtk git commit -sS",
+        "markdown link format",
         "1Password unavailable for signing means hard stop and return control.",
         "Never push unless explicitly asked.",
     ];
@@ -233,6 +240,10 @@ fn subagent_body_loads_skill_and_references() {
     assert!(
         body.contains("references/iteration-protocol.md"),
         "agent.md must read iteration-protocol.md before lane execution"
+    );
+    assert!(
+        body.contains("_artifacts/ledger.md"),
+        "agent.md must point at the root _artifacts ledger"
     );
 }
 

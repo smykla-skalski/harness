@@ -8,6 +8,7 @@
 
 # Local scratch
 /tmp/
+/_artifacts/
 /output/
 /.playwright-cli/
 .envrc

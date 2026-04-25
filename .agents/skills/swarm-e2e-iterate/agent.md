@@ -37,9 +37,9 @@ The skill and references are source of truth. This agent file only pins delegati
 
 ## Per-Iteration Script
 
-1. Read or create [artifacts/ledger.md](../../../artifacts/ledger.md).
+1. Read or create [_artifacts/ledger.md](../../../_artifacts/ledger.md).
 2. Run `rtk mise run e2e:swarm:full`; capture status and run slug.
-3. Run `rtk mise run e2e:swarm:triage:recording -- artifacts/runs/<slug>`.
+3. Run `rtk mise run e2e:swarm:triage:recording -- _artifacts/runs/<slug>`.
 4. Walk the recording against `references/recording-analysis.md`.
 5. Run the checklist proof loop from `references/recording-checklist.md`. Emit one terse line per item with proof and verdict, including suite-speed items.
 6. Triage secondary artifacts only after the recording pass and checklist pass.
