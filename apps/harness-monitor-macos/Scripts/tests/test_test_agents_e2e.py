@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -213,6 +214,32 @@ exit 0
             line.split("=", 1)[1] for line in env_lines if line.startswith("XDG_DATA_HOME=")
         )
         self.assertEqual(xdg_home, daemon_home)
+
+    def test_ui_test_invocations_keep_code_signing_enabled(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIsNone(
+            re.search(r"CODE_SIGNING_ALLOWED=NO\s*\\\s*\n\s*build-for-testing", script),
+            "build-for-testing must not disable code signing for macOS UI tests",
+        )
+        self.assertIsNone(
+            re.search(r"CODE_SIGNING_ALLOWED=NO\s*\\\s*\n\s*test-without-building", script),
+            "test-without-building must not disable code signing for macOS UI tests",
+        )
+
+    def test_ui_test_targets_use_apple_development_signing(self) -> None:
+        project_swift = (APP_ROOT / "Project.swift").read_text(encoding="utf-8")
+
+        for block_name in ("uiTestsTarget", "agentsE2ETarget"):
+            marker = f"private let {block_name}: Target = .target("
+            _, separator, tail = project_swift.partition(marker)
+            self.assertTrue(separator, f"Missing {block_name} block in Project.swift")
+            block = tail.split("\nprivate let ", 1)[0]
+            self.assertIn(
+                '"CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development"',
+                block,
+                f"{block_name} must pin Apple Development signing for runnable UI tests",
+            )
 
 
 if __name__ == "__main__":

@@ -96,6 +96,10 @@ run_harness_may_fail() {
   return "$status"
 }
 
+run_harness_ignore_failure() {
+  run_harness_may_fail "$@" || true
+}
+
 wait_for_daemon() {
   local deadline=$((SECONDS + 30))
   while (( SECONDS < deadline )); do
@@ -191,10 +195,10 @@ submit_request_changes_round() {
     --project-dir "$PROJECT_DIR" \
     --actor "$worker_id" \
     --summary "ready for review"
-  run_harness_may_fail session task claim-review "$SESSION_ID" "$task_id" \
+  run_harness_ignore_failure session task claim-review "$SESSION_ID" "$task_id" \
     --project-dir "$PROJECT_DIR" \
     --actor "$reviewer_a" >/dev/null
-  run_harness_may_fail session task claim-review "$SESSION_ID" "$task_id" \
+  run_harness_ignore_failure session task claim-review "$SESSION_ID" "$task_id" \
     --project-dir "$PROJECT_DIR" \
     --actor "$reviewer_b" >/dev/null
   run_harness session task submit-review "$SESSION_ID" "$task_id" \
@@ -218,9 +222,9 @@ submit_request_changes_round() {
 }
 
 run_observe_commands() {
-  run_harness_may_fail observe scan "$SESSION_ID" --json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
-  run_harness_may_fail observe watch "$SESSION_ID" --timeout 5 --json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
-  run_harness_may_fail observe dump "$SESSION_ID" --raw-json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
+  run_harness_ignore_failure observe scan "$SESSION_ID" --json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
+  run_harness_ignore_failure observe watch "$SESSION_ID" --timeout 5 --json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
+  run_harness_ignore_failure observe dump "$SESSION_ID" --raw-json --project-hint "$(basename "$PROJECT_DIR")" >/dev/null
   run_harness observe doctor --json --project-dir "$PROJECT_DIR" >/dev/null
 }
 
@@ -303,7 +307,7 @@ run_act_driver() {
   do
     "$SCRIPT_DIR/inject-heuristic-log.sh" --agent "$OBSERVER_ID" --code "$code" >/dev/null
   done
-  run_harness_may_fail session observe "$SESSION_ID" --json --actor "$OBSERVER_ID" --project-dir "$PROJECT_DIR" >/dev/null
+  run_harness_ignore_failure session observe "$SESSION_ID" --json --actor "$OBSERVER_ID" --project-dir "$PROJECT_DIR" >/dev/null
   act_ready act5 "observer_id=$OBSERVER_ID" "heuristic_code=python_traceback_output"
   act_ack act5
 
@@ -322,7 +326,7 @@ run_act_driver() {
   act_ack act6
 
   if [[ -n "$VIBE_WORKER_ID" ]]; then
-    run_harness_may_fail session leave "$SESSION_ID" "$VIBE_WORKER_ID" --project-dir "$PROJECT_DIR" >/dev/null
+    run_harness_ignore_failure session leave "$SESSION_ID" "$VIBE_WORKER_ID" --project-dir "$PROJECT_DIR" >/dev/null
     VIBE_WORKER_ID="$(join_agent worker vibe "Swarm Worker Vibe Rejoined" generalist)"
   fi
   run_harness session sync "$SESSION_ID" --json --project-dir "$PROJECT_DIR" >/dev/null
@@ -364,9 +368,9 @@ run_act_driver() {
   act_ready act9 "task_review_id=$TASK_REVIEW_ID" "reviewer_runtime=claude"
   act_ack act9
 
-  run_harness_may_fail session remove "$SESSION_ID" "$REVIEWER_CLAUDE_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
-  run_harness_may_fail session remove "$SESSION_ID" "$REVIEWER_CODEX_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
-  run_harness_may_fail session remove "$SESSION_ID" "$REVIEWER_DUP_CLAUDE_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
+  run_harness_ignore_failure session remove "$SESSION_ID" "$REVIEWER_CLAUDE_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
+  run_harness_ignore_failure session remove "$SESSION_ID" "$REVIEWER_CODEX_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
+  run_harness_ignore_failure session remove "$SESSION_ID" "$REVIEWER_DUP_CLAUDE_ID" --project-dir "$PROJECT_DIR" --actor "$LEADER_ID" >/dev/null
   run_harness session task submit-for-review "$SESSION_ID" "$TASK_AUTOSPAWN_ID" \
     --project-dir "$PROJECT_DIR" \
     --actor "$WORKER_CLAUDE_ID" \
@@ -415,7 +419,7 @@ run_act_driver() {
     --command pause \
     --message "test" \
     --actor "$LEADER_ID" >/dev/null
-  run_harness_may_fail session signal send "$SESSION_ID" "$WORKER_CODEX_ID" \
+  run_harness_ignore_failure session signal send "$SESSION_ID" "$WORKER_CODEX_ID" \
     --project-dir "$PROJECT_DIR" \
     --command pause \
     --message "test" \
@@ -496,7 +500,7 @@ fi
 "$ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
-  -project "$APP_ROOT/HarnessMonitor.xcodeproj"
+  -workspace "$APP_ROOT/HarnessMonitor.xcworkspace"
   -scheme "HarnessMonitorAgentsE2E"
   -destination "$DESTINATION"
   -derivedDataPath "$DERIVED_DATA_PATH"
@@ -504,7 +508,7 @@ TEST_ARGS=(
 
 HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}" \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_ALLOWED=YES \
   build-for-testing
 
 GENERATED_XCTESTRUN="$(
@@ -535,7 +539,7 @@ ACT_DRIVER_PID="$!"
 HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   -xctestrun "$CONFIGURED_XCTESTRUN" \
   -destination "$DESTINATION" \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_ALLOWED=YES \
   test-without-building \
   "-only-testing:${ONLY_TESTING}"
 

@@ -19,6 +19,14 @@ require_text() {
   grep -Fq -- "$text" "$ROOT/$path" || fail "missing '$text' in $path"
 }
 
+require_no_text() {
+  local path="$1"
+  local text="$2"
+  if grep -Fq -- "$text" "$ROOT/$path"; then
+    fail "unexpected '$text' in $path"
+  fi
+}
+
 require_mise_task() {
   local task="$1"
   require_text ".mise.toml" "[tasks.\"$task\"]"
@@ -56,7 +64,11 @@ require_text "scripts/e2e/swarm-full-flow.sh" "act_ack"
 require_text "scripts/e2e/swarm-full-flow.sh" "sess-e2e-swarm-\$RUN_ID"
 require_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
 require_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
+require_text "scripts/e2e/swarm-full-flow.sh" "run_harness_ignore_failure()"
 require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
+require_text "scripts/e2e/swarm-full-flow.sh" '-workspace "$APP_ROOT/HarnessMonitor.xcworkspace"'
+require_no_text "scripts/e2e/swarm-full-flow.sh" '-project "$APP_ROOT/HarnessMonitor.xcodeproj"'
+require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "func act16"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "sessionAgentListState"
@@ -96,6 +108,28 @@ jq -s -e '
   and .[1].message.content[0].type == "tool_result"
   and (.[1].message.content[0].content[0].text | contains("Traceback"))
 ' "$log_path" >/dev/null || fail "injector must emit canonical transcript JSONL"
+
+python3 - "$ROOT/scripts/e2e/swarm-full-flow.sh" <<'PY' || fail "swarm-full-flow must guard every may-fail harness call under set -e"
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+violations = []
+for line_no, line in enumerate(path.read_text().splitlines(), start=1):
+    if "run_harness_may_fail" not in line:
+        continue
+    stripped = line.lstrip()
+    if stripped.startswith("run_harness_may_fail()"):
+        continue
+    if stripped.startswith('run_harness_may_fail "$@" || true'):
+        continue
+    if stripped.startswith("if run_harness_may_fail"):
+        continue
+    violations.append(f"{line_no}: {line.rstrip()}")
+
+if violations:
+    raise SystemExit("\n".join(violations))
+PY
 
 open_count="$("$ROOT/scripts/e2e/gaps-open-count.sh")"
 [[ "$open_count" == "0" ]] || fail "expected zero open e2e gaps, got $open_count"
