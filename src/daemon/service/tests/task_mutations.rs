@@ -199,6 +199,104 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
 }
 
 #[test]
+fn async_mutations_sync_file_backed_state() {
+    with_temp_project(|project| {
+        temp_env::with_var("CODEX_SESSION_ID", Some("async-file-state-worker"), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(async {
+                let db_path = project
+                    .parent()
+                    .expect("project parent")
+                    .join("daemon.sqlite");
+                let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db");
+
+                let state = start_direct_session_async(
+                    &async_db,
+                    project,
+                    "daemon-async-file-state",
+                    "async file state mutation",
+                    "async file state flow",
+                    None,
+                )
+                .await;
+                let leader_id = state.leader_id.clone().expect("leader id");
+                let joined = join_session_direct_async(
+                    "daemon-async-file-state",
+                    &crate::daemon::protocol::SessionJoinRequest {
+                        runtime: "codex".into(),
+                        role: SessionRole::Worker,
+                        fallback_role: None,
+                        capabilities: vec![],
+                        name: None,
+                        project_dir: project.to_string_lossy().into(),
+                        persona: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("join session");
+                let worker_id = joined
+                    .agents
+                    .keys()
+                    .find(|agent_id| agent_id.starts_with("codex-"))
+                    .expect("worker id")
+                    .to_string();
+
+                let created = create_task_async(
+                    "daemon-async-file-state",
+                    &TaskCreateRequest {
+                        actor: leader_id.clone(),
+                        title: "async file state task".into(),
+                        context: Some("persist canonical state to state.json".into()),
+                        severity: crate::session::types::TaskSeverity::Medium,
+                        suggested_fix: None,
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("create task");
+                let task_id = created.tasks[0].task_id.clone();
+
+                assign_task_async(
+                    "daemon-async-file-state",
+                    &task_id,
+                    &TaskAssignRequest {
+                        actor: leader_id.clone(),
+                        agent_id: worker_id.clone(),
+                    },
+                    &async_db,
+                )
+                .await
+                .expect("assign task");
+
+                let layout = crate::session::storage::layout_from_project_dir(
+                    project,
+                    "daemon-async-file-state",
+                )
+                .expect("layout");
+                let file_state = crate::session::storage::load_state(&layout)
+                    .expect("load file state")
+                    .expect("file state");
+
+                assert_eq!(file_state.leader_id.as_deref(), Some(leader_id.as_str()));
+                assert_eq!(file_state.agents.len(), 2);
+                assert!(file_state.agents.contains_key(&worker_id));
+                assert_eq!(file_state.tasks.len(), 1);
+                assert_eq!(
+                    file_state
+                        .tasks
+                        .get(&task_id)
+                        .and_then(|task| task.assigned_to.as_deref()),
+                    Some(worker_id.as_str())
+                );
+            });
+        });
+    });
+}
+
+#[test]
 fn concurrent_create_task_async_preserves_all_tasks_in_db() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");

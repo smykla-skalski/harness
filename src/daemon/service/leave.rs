@@ -1,7 +1,8 @@
 use super::{
     CliError, SessionDetail, SessionLeaveRequest, SessionTransition, build_log_entry,
     effective_project_dir, index, session_detail, session_detail_from_async_daemon_db,
-    session_detail_from_daemon_db, session_not_found, session_service, utc_now,
+    session_detail_from_daemon_db, session_not_found, session_service,
+    sync_file_state_from_async_db, utc_now,
 };
 
 /// Mark an agent as disconnected through the shared daemon session service.
@@ -55,6 +56,7 @@ pub(crate) async fn leave_session_async(
             session_service::apply_leave_session(state, &request.agent_id, &now)
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,

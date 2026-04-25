@@ -29,4 +29,6 @@ pub(crate) use registry::{
     load_active_registry_for_context_root, load_project_origin, record_adopted_session_root,
     record_project_origin, register_active,
 };
-pub(crate) use state_store::{create_state, load_state, update_state, update_state_if_changed};
+pub(crate) use state_store::{
+    create_state, load_state, save_state, update_state, update_state_if_changed,
+};

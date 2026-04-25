@@ -17,7 +17,8 @@ use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
     AgentTuiManagerHandle, CliError, ManagedTuiWake, SessionDetail, SessionLogEntry,
     SignalAckRequest, SignalSendRequest, build_log_entry, effective_project_dir,
-    pending_signal_record, session_detail_from_async_daemon_db, session_service, utc_now,
+    pending_signal_record, session_detail_from_async_daemon_db, session_service,
+    sync_file_state_from_async_db, utc_now,
 };
 
 struct PreparedAsyncSignalDelivery {
@@ -140,6 +141,7 @@ async fn prepare_signal_send(
     let now = utc_now();
     let (runtime_name, target_agent_session_id, target_tui_id) =
         persist_sent_signal_state(async_db, session_id, request, &now).await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     let runtime = runtime_for_agent(&runtime_name)?;
     let signal = build_runtime_signal(request, session_id, &request.agent_id, &now);
     let signal_session_id = target_agent_session_id.unwrap_or_else(|| session_id.to_string());

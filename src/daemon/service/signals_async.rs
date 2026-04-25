@@ -4,7 +4,8 @@ use super::{
     AgentRegistration, CliError, CliErrorKind, SessionDetail, SessionLogEntry, SessionTransition,
     SignalAck, SignalAckRequest, SignalCancelRequest, acknowledged_signal_record, build_log_entry,
     build_signal_ack, effective_project_dir, session_detail_from_async_daemon_db,
-    session_not_found, session_service, snapshot, utc_now, write_signal_ack,
+    session_not_found, session_service, snapshot, sync_file_state_from_async_db, utc_now,
+    write_signal_ack,
 };
 use crate::agents::runtime::signal::{AckResult, Signal, read_pending_signals};
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
@@ -210,6 +211,7 @@ async fn persist_signal_ack_state(
                 Ok(started_task)
             })
             .await?;
+        sync_file_state_from_async_db(async_db, &resolved.state.session_id).await?;
     }
 
     Ok(SignalAckOutcome {
