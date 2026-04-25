@@ -27,5 +27,8 @@ jobs:
       - name: Install Tuist
         run: brew install tuist
 
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
       - name: Run Harness Monitor quality gates and tests
         run: apps/harness-monitor-macos/Scripts/test-swift.sh
