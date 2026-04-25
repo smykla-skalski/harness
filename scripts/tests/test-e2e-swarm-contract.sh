@@ -67,8 +67,11 @@ require_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
 require_text "scripts/e2e/swarm-full-flow.sh" "run_harness_ignore_failure()"
 require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
 require_text "scripts/e2e/swarm-full-flow.sh" '-workspace "$APP_ROOT/HarnessMonitor.xcworkspace"'
+require_text "scripts/e2e/swarm-full-flow.sh" 'io.harnessmonitor.agents-e2e-tests'
+require_text "scripts/e2e/swarm-full-flow.sh" 'AGENTS_E2E_RUNNER_CONTAINER_ROOT'
 require_no_text "scripts/e2e/swarm-full-flow.sh" '-project "$APP_ROOT/HarnessMonitor.xcodeproj"'
 require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'SYNC_DIR="$DATA_HOME/e2e-sync"'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "func act16"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "sessionAgentListState"
