@@ -265,18 +265,6 @@ public struct PreferencesGeneralSection: View {
     }
   }
 
-  private static let logLevels = ["trace", "debug", "info", "warn", "error"]
-
-  private var daemonLogLevelBinding: Binding<String> {
-    Binding(
-      get: { store.daemonLogLevel ?? HarnessMonitorLogger.defaultDaemonLogLevel },
-      set: { newValue in
-        store.daemonLogLevel = newValue
-        Task { await store.setDaemonLogLevel(newValue) }
-      }
-    )
-  }
-
   private var isLoading: Bool {
     store.isDaemonActionInFlight
       || store.isDiagnosticsRefreshInFlight
@@ -329,21 +317,7 @@ public struct PreferencesGeneralSection: View {
           .accessibilityIdentifier("harness.preferences.footer.datetime")
       }
 
-      Section {
-        Picker("Log level", selection: daemonLogLevelBinding) {
-          ForEach(Self.logLevels, id: \.self) { level in
-            Text(level.uppercased()).tag(level)
-          }
-        }
-        .harnessNativeFormControl()
-        .disabled(store.connectionState != .online)
-        .accessibilityIdentifier("harness.preferences.daemon.logLevel")
-      } header: {
-        Text("Daemon")
-      } footer: {
-        Text("Changes apply immediately and reset when the daemon restarts")
-          .accessibilityIdentifier("harness.preferences.footer.daemon")
-      }
+      PreferencesLoggingSection(store: store)
 
       Section {
         PreferencesActionButtons(

@@ -52,12 +52,7 @@ extension HarnessMonitorStore {
     }
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
-    public var daemonLogLevel: String? {
-      didSet {
-        guard oldValue != daemonLogLevel else { return }
-        HarnessMonitorLogger.syncSupervisorLogLevel(from: daemonLogLevel)
-      }
-    }
+    public var daemonLogLevel: String?
     public var isShowingCachedCatalog = false {
       didSet {
         guard oldValue != isShowingCachedCatalog else { return }

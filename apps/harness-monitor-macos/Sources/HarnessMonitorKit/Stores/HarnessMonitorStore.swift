@@ -227,9 +227,6 @@ public final class HarnessMonitorStore {
     )
     self.hostBridgeCapabilityIssues = seeded
     self.forcedHostBridgeCapabilities = Set(seeded.keys)
-    HarnessMonitorLogger.syncSupervisorLogLevel(
-      from: HarnessMonitorLogger.defaultDaemonLogLevel
-    )
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()

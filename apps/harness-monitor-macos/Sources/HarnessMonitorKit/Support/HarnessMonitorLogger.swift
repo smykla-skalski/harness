@@ -1,12 +1,51 @@
 import Foundation
 import os
 
+public enum HarnessMonitorLoggerDefaults {
+  public static let supervisorLogLevelKey = "harnessSupervisorLogLevel"
+  public static let supervisorLogLevelDefault = "info"
+
+  public static func registrationDefaults() -> [String: Any] {
+    [supervisorLogLevelKey: supervisorLogLevelDefault]
+  }
+
+  public static func storedSupervisorLogLevel(
+    defaults: UserDefaults = .standard
+  ) -> String {
+    normalizedSupervisorLogLevel(
+      defaults.string(forKey: supervisorLogLevelKey)
+    )
+  }
+
+  public static func normalizedSupervisorLogLevel(_ rawValue: String?) -> String {
+    switch rawValue?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    {
+    case "trace":
+      "trace"
+    case "debug":
+      "debug"
+    case "info":
+      "info"
+    case "warn", "warning":
+      "warn"
+    case "error":
+      "error"
+    default:
+      supervisorLogLevelDefault
+    }
+  }
+}
+
 public enum HarnessMonitorLogger {
   public static let defaultDaemonLogLevel = "trace"
   public static let defaultDaemonFilter = "harness=trace"
+  public static let defaultSupervisorLogLevel =
+    HarnessMonitorLoggerDefaults.supervisorLogLevelDefault
   public static let defaultAppLogLevel = OSLogType.debug
   private static let supervisorLogGate = SupervisorLogGate(
-    daemonLevel: defaultDaemonLogLevel
+    logLevel: HarnessMonitorLoggerDefaults.storedSupervisorLogLevel()
   )
 
   public static let api = Logger(subsystem: "io.harnessmonitor", category: "api")
@@ -17,8 +56,12 @@ public enum HarnessMonitorLogger {
   public static let thumbnail = Logger(subsystem: "io.harnessmonitor", category: "thumbnail")
   public static let supervisor = Logger(subsystem: "io.harnessmonitor", category: "supervisor")
 
-  public static func syncSupervisorLogLevel(from daemonLevel: String?) {
-    supervisorLogGate.sync(daemonLevel: daemonLevel ?? defaultDaemonLogLevel)
+  public static func syncSupervisorLogLevel(from supervisorLevel: String?) {
+    supervisorLogGate.sync(
+      logLevel: HarnessMonitorLoggerDefaults.normalizedSupervisorLogLevel(
+        supervisorLevel
+      )
+    )
   }
 
   public static func supervisorTrace(_ message: @escaping @autoclosure () -> String) {
@@ -55,12 +98,12 @@ private final class SupervisorLogGate: @unchecked Sendable {
   private let lock = NSLock()
   private var threshold: SupervisorLogThreshold
 
-  init(daemonLevel: String) {
-    threshold = SupervisorLogThreshold(daemonLevel: daemonLevel)
+  init(logLevel: String) {
+    threshold = SupervisorLogThreshold(logLevel: logLevel)
   }
 
-  func sync(daemonLevel: String) {
-    let nextThreshold = SupervisorLogThreshold(daemonLevel: daemonLevel)
+  func sync(logLevel: String) {
+    let nextThreshold = SupervisorLogThreshold(logLevel: logLevel)
     lock.withLock {
       threshold = nextThreshold
     }
@@ -76,8 +119,8 @@ private final class SupervisorLogGate: @unchecked Sendable {
 private struct SupervisorLogThreshold {
   private let minimumSeverity: SupervisorLogSeverity
 
-  init(daemonLevel: String) {
-    switch daemonLevel.lowercased() {
+  init(logLevel: String) {
+    switch logLevel.lowercased() {
     case "trace":
       minimumSeverity = .trace
     case "debug":

@@ -305,6 +305,9 @@ enum HarnessMonitorUITestAccessibility {
     "harness.preferences.supervisor.\(slug(key))"
   }
 
+  static let preferencesDaemonLogLevelPicker = "harness.preferences.daemon.logLevel"
+  static let preferencesSupervisorLogLevelPicker = "harness.preferences.supervisor.logLevel"
+
   static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
     "harness.session.timeline.pagination.page.\(pageNumber)"
   }
