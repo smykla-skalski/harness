@@ -8,6 +8,7 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 BUILD_ROOT="${XCODE_BUILD_SERVER_BUILD_ROOT:-$COMMON_REPO_ROOT/xcode-derived}"
+SCHEME="${XCODE_BUILD_SERVER_SCHEME:-HarnessMonitor}"
 SERVER_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/harness-xcode-build-server.XXXXXX")"
 
 cleanup() {
@@ -34,7 +35,7 @@ fi
   cd "$SERVER_TMP_DIR"
   "$XCODE_BUILD_SERVER_BIN" config \
     -workspace "$APP_ROOT/HarnessMonitor.xcworkspace" \
-    -scheme "HarnessMonitor" \
+    -scheme "$SCHEME" \
     --build_root "$BUILD_ROOT" \
     --skip-validate-bin >/dev/null
   "$XCODE_BUILD_SERVER_BIN" serve "$@"

@@ -20,11 +20,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
   private static var readableMaxWidth: CGFloat { 680 }
 
   public init(
-    horizontalPadding: CGFloat = 24,
-    verticalPadding: CGFloat = 24,
-    constrainContentWidth: Bool = false,
-    readableWidth: Bool = false,
-    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    horizontalPadding: CGFloat,
+    verticalPadding: CGFloat,
+    constrainContentWidth: Bool,
+    readableWidth: Bool,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, Overlay == EmptyView {
     self.horizontalPadding = horizontalPadding
@@ -38,11 +38,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
   }
 
   public init(
-    horizontalPadding: CGFloat = 24,
-    verticalPadding: CGFloat = 24,
-    constrainContentWidth: Bool = false,
-    readableWidth: Bool = false,
-    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    horizontalPadding: CGFloat,
+    verticalPadding: CGFloat,
+    constrainContentWidth: Bool,
+    readableWidth: Bool,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder content: () -> Content
   ) where Overlay == EmptyView {
@@ -57,11 +57,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
   }
 
   public init(
-    horizontalPadding: CGFloat = 24,
-    verticalPadding: CGFloat = 24,
-    constrainContentWidth: Bool = false,
-    readableWidth: Bool = false,
-    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    horizontalPadding: CGFloat,
+    verticalPadding: CGFloat,
+    constrainContentWidth: Bool,
+    readableWidth: Bool,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView {
@@ -76,11 +76,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
   }
 
   public init(
-    horizontalPadding: CGFloat = 24,
-    verticalPadding: CGFloat = 24,
-    constrainContentWidth: Bool = false,
-    readableWidth: Bool = false,
-    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect = .soft,
+    horizontalPadding: CGFloat,
+    verticalPadding: CGFloat,
+    constrainContentWidth: Bool,
+    readableWidth: Bool,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content

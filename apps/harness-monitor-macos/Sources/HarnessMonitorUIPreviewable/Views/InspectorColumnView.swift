@@ -20,6 +20,8 @@ struct InspectorColumnView: View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: InspectorChromeMetrics.horizontalPadding,
       verticalPadding: InspectorChromeMetrics.verticalPadding,
+      constrainContentWidth: false,
+      readableWidth: false,
       topScrollEdgeEffect: .hard
     ) {
       VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
