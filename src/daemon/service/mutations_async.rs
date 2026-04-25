@@ -98,9 +98,6 @@ async fn persist_task_signal_effects(
     extra_transition: Option<SessionTransition>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
     write_task_start_signals(&project_dir, effects)?;
     if let Some(transition) = extra_transition {
         async_db
@@ -130,9 +127,6 @@ async fn persist_leave_signal_mutation(
     leave_signals: &[session_service::LeaveSignalRecord],
     transition: SessionTransition,
 ) -> Result<(), CliError> {
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
     append_leave_signal_logs_async(async_db, session_id, actor_id, leave_signals).await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -163,11 +157,11 @@ pub(crate) async fn create_task_async(
         source: TaskSource::Manual,
         observe_issue_id: None,
     };
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let item =
-        session_service::apply_create_task(&mut resolved.state, &spec, &request.actor, &utc_now())?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let now = utc_now();
+    let item = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_create_task(state, &spec, &request.actor, &now)
+        })
         .await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -191,16 +185,17 @@ pub(crate) async fn assign_task_async(
     request: &TaskAssignRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    session_service::apply_assign_task(
-        &mut resolved.state,
-        task_id,
-        &request.agent_id,
-        &request.actor,
-        &utc_now(),
-    )?;
+    let now = utc_now();
     async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_assign_task(
+                state,
+                task_id,
+                &request.agent_id,
+                &request.actor,
+                &now,
+            )
+        })
         .await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -224,17 +219,18 @@ pub(crate) async fn checkpoint_task_async(
     request: &TaskCheckpointRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let checkpoint = session_service::apply_record_checkpoint(
-        &mut resolved.state,
-        task_id,
-        &request.actor,
-        &request.summary,
-        request.progress,
-        &utc_now(),
-    )?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let now = utc_now();
+    let checkpoint = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_record_checkpoint(
+                state,
+                task_id,
+                &request.actor,
+                &request.summary,
+                request.progress,
+                &now,
+            )
+        })
         .await?;
     async_db.append_checkpoint(session_id, &checkpoint).await?;
     async_db
@@ -264,16 +260,20 @@ pub(crate) async fn drop_task_async(
     request: &TaskDropRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
     let now = utc_now();
-    let effects = session_service::apply_drop_task(
-        &mut resolved.state,
-        task_id,
-        &request.target,
-        request.queue_policy,
-        &request.actor,
-        &now,
-    )?;
+    let effects = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_drop_task(
+                state,
+                task_id,
+                &request.target,
+                request.queue_policy,
+                &request.actor,
+                &now,
+            )
+        })
+        .await?;
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_task_signal_effects(
         async_db,
         &resolved,
@@ -297,15 +297,19 @@ pub(crate) async fn update_task_queue_policy_async(
     request: &TaskQueuePolicyRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
     let now = utc_now();
-    let effects = session_service::apply_update_task_queue_policy(
-        &mut resolved.state,
-        task_id,
-        request.queue_policy,
-        &request.actor,
-        &now,
-    )?;
+    let effects = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_update_task_queue_policy(
+                state,
+                task_id,
+                request.queue_policy,
+                &request.actor,
+                &now,
+            )
+        })
+        .await?;
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_task_signal_effects(
         async_db,
         &resolved,
@@ -328,18 +332,22 @@ pub(crate) async fn update_task_async(
     request: &TaskUpdateRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
     let now = utc_now();
-    let from_status = session_service::apply_update_task(
-        &mut resolved.state,
-        task_id,
-        request.status,
-        request.note.as_deref(),
-        &request.actor,
-        &now,
-    )?;
-    let effects =
-        session_service::apply_advance_queued_tasks(&mut resolved.state, &request.actor, &now)?;
+    let (from_status, effects) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let from_status = session_service::apply_update_task(
+                state,
+                task_id,
+                request.status,
+                request.note.as_deref(),
+                &request.actor,
+                &now,
+            )?;
+            let effects = session_service::apply_advance_queued_tasks(state, &request.actor, &now)?;
+            Ok((from_status, effects))
+        })
+        .await?;
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_task_signal_effects(
         async_db,
         &resolved,
@@ -366,16 +374,11 @@ pub(crate) async fn change_role_async(
     request: &RoleChangeRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let from_role = session_service::apply_assign_role(
-        &mut resolved.state,
-        agent_id,
-        request.role,
-        &request.actor,
-        &utc_now(),
-    )?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let now = utc_now();
+    let from_role = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_assign_role(state, agent_id, request.role, &request.actor, &now)
+        })
         .await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -399,15 +402,22 @@ pub(crate) async fn remove_agent_async(
     request: &AgentRemoveRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let project_dir = effective_project_dir(&resolved).to_path_buf();
+    let project_dir =
+        effective_project_dir(&resolved_session_for_mutation(async_db, session_id).await?)
+            .to_path_buf();
     let now = utc_now();
-    let leave_signal = session_service::prepare_remove_agent_leave_signal(
-        &resolved.state,
-        agent_id,
-        &request.actor,
-        &now,
-    )?;
+    let leave_signal = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let leave_signal = session_service::prepare_remove_agent_leave_signal(
+                state,
+                agent_id,
+                &request.actor,
+                &now,
+            )?;
+            session_service::apply_remove_agent(state, agent_id, &request.actor, &now)?;
+            Ok(leave_signal)
+        })
+        .await?;
     if let Some(ref signal) = leave_signal {
         session_service::write_prepared_leave_signals(
             &project_dir,
@@ -415,10 +425,10 @@ pub(crate) async fn remove_agent_async(
             "remove agent",
         )?;
     }
-    session_service::apply_remove_agent(&mut resolved.state, agent_id, &request.actor, &now)?;
     let leave_signals = leave_signal
         .as_ref()
         .map_or_else(Vec::new, |signal| vec![signal.clone()]);
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
         async_db,
         &resolved,
@@ -440,16 +450,17 @@ pub(crate) async fn transfer_leader_async(
     request: &LeaderTransferRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let plan = session_service::apply_transfer_leader(
-        &mut resolved.state,
-        &request.new_leader_id,
-        &request.actor,
-        request.reason.as_deref(),
-        &utc_now(),
-    )?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let now = utc_now();
+    let plan = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_transfer_leader(
+                state,
+                &request.new_leader_id,
+                &request.actor,
+                request.reason.as_deref(),
+                &now,
+            )
+        })
         .await?;
     append_transfer_logs_to_async_db(async_db, session_id, &request.actor, &plan).await?;
     bump_session(async_db, session_id).await?;
@@ -465,13 +476,20 @@ pub(crate) async fn end_session_async(
     request: &SessionEndRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let project_dir = effective_project_dir(&resolved).to_path_buf();
+    let project_dir =
+        effective_project_dir(&resolved_session_for_mutation(async_db, session_id).await?)
+            .to_path_buf();
     let now = utc_now();
-    let leave_signals =
-        session_service::prepare_end_session_leave_signals(&resolved.state, &request.actor, &now)?;
+    let leave_signals = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let leave_signals =
+                session_service::prepare_end_session_leave_signals(state, &request.actor, &now)?;
+            session_service::apply_end_session(state, &request.actor, &now)?;
+            Ok(leave_signals)
+        })
+        .await?;
     session_service::write_prepared_leave_signals(&project_dir, &leave_signals, "end session")?;
-    session_service::apply_end_session(&mut resolved.state, &request.actor, &now)?;
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
         async_db,
         &resolved,

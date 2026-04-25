@@ -169,7 +169,7 @@ struct SignalAckOutcome {
 
 async fn persist_signal_ack_state(
     async_db: &super::db::AsyncDaemonDb,
-    resolved: &mut ResolvedSession,
+    resolved: &ResolvedSession,
     request: &SignalAckRequest,
     project_dir: &Path,
 ) -> Result<SignalAckOutcome, CliError> {
@@ -197,16 +197,18 @@ async fn persist_signal_ack_state(
 
     if let Some(signal) = signal.as_ref() {
         let now = utc_now();
-        started_task = session_service::apply_signal_ack_result(
-            &mut resolved.state,
-            &request.agent_id,
-            &signal.signal,
-            result,
-            &now,
-        );
-        session_service::refresh_session(&mut resolved.state, &now);
-        async_db
-            .save_session_state(&resolved.project.project_id, &resolved.state)
+        started_task = async_db
+            .update_session_state_immediate(&resolved.state.session_id, |state| {
+                let started_task = session_service::apply_signal_ack_result(
+                    state,
+                    &request.agent_id,
+                    &signal.signal,
+                    result,
+                    &now,
+                );
+                session_service::refresh_session(state, &now);
+                Ok(started_task)
+            })
             .await?;
     }
 
@@ -375,10 +377,10 @@ async fn record_signal_ack_direct_async_inner(
     request: &SignalAckRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<(), CliError> {
-    let mut resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
+    let resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
     let project_dir = Path::new(&request.project_dir);
     write_signal_ack_artifact(&resolved, session_id, request, project_dir)?;
-    let outcome = persist_signal_ack_state(async_db, &mut resolved, request, project_dir).await?;
+    let outcome = persist_signal_ack_state(async_db, &resolved, request, project_dir).await?;
 
     append_started_task_log(
         async_db,
@@ -395,6 +397,7 @@ async fn record_signal_ack_direct_async_inner(
             outcome.result,
         ))
         .await?;
+    let resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
     persist_acknowledged_signal_index(async_db, &resolved, session_id, request, &outcome).await?;
     bump_session(async_db, session_id).await
 }

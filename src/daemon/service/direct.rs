@@ -204,25 +204,23 @@ pub(crate) async fn join_session_direct_async(
         .and_then(|rt| agents_service::resolve_known_session_id(rt, project_dir, None).ok())
         .flatten();
 
-    let mut resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
     let now = utc_now();
-    let joined_role =
-        session_service::resolve_join_role(&resolved.state, request.role, request.fallback_role)?;
-    let agent_id = session_service::apply_join_session(
-        &mut resolved.state,
-        &display_name,
-        &request.runtime,
-        joined_role,
-        &request.capabilities,
-        agent_session_id.as_deref(),
-        &now,
-        request.persona.as_deref(),
-    )?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let (agent_id, joined_role, state) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let joined_role =
+                session_service::resolve_join_role(state, request.role, request.fallback_role)?;
+            let agent_id = session_service::apply_join_session(
+                state,
+                &display_name,
+                &request.runtime,
+                joined_role,
+                &request.capabilities,
+                agent_session_id.as_deref(),
+                &now,
+                request.persona.as_deref(),
+            )?;
+            Ok((agent_id, joined_role, state.clone()))
+        })
         .await?;
     async_db
         .append_log_entry(&build_log_entry(
@@ -234,7 +232,7 @@ pub(crate) async fn join_session_direct_async(
         .await?;
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
-    Ok(resolved.state)
+    Ok(state)
 }
 
 /// Register a managed agent's runtime session ID through the daemon mutation path.
@@ -283,23 +281,21 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
     request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<bool, CliError> {
-    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
-        return Ok(false);
-    };
     let now = utc_now();
-    let registered = session_service::apply_register_agent_runtime_session(
-        &mut resolved.state,
-        &request.runtime,
-        &request.tui_id,
-        &request.agent_session_id,
-        &now,
-    )?;
+    let registered = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_register_agent_runtime_session(
+                state,
+                &request.runtime,
+                &request.tui_id,
+                &request.agent_session_id,
+                &now,
+            )
+        })
+        .await?;
     if !registered {
         return Ok(false);
     }
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
     Ok(true)
@@ -338,18 +334,17 @@ pub(crate) async fn update_session_title_direct_async(
     request: &super::protocol::SessionTitleRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
-        return Err(session_not_found(session_id));
-    };
-
-    resolved.state.state_version += 1;
-    session_service::apply_update_session_title(&mut resolved.state, &request.title, &utc_now())?;
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+    let now = utc_now();
+    let state = async_db
+        .update_session_state_immediate(session_id, |state| {
+            state.state_version += 1;
+            session_service::apply_update_session_title(state, &request.title, &now)?;
+            Ok(state.clone())
+        })
         .await?;
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
-    Ok(resolved.state)
+    Ok(state)
 }
 
 /// Mark a session agent as disconnected, writing directly to `SQLite` when a
@@ -392,18 +387,18 @@ pub(crate) async fn disconnect_agent_direct_async(
     reason: &str,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<bool, CliError> {
-    let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
-        return Ok(false);
-    };
-
     let now = utc_now();
-    if !session_service::apply_agent_disconnected(&mut resolved.state, agent_id, &now) {
+    let disconnected = async_db
+        .update_session_state_immediate(session_id, |state| {
+            Ok(session_service::apply_agent_disconnected(
+                state, agent_id, &now,
+            ))
+        })
+        .await?;
+    if !disconnected {
         return Ok(false);
     }
 
-    async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
