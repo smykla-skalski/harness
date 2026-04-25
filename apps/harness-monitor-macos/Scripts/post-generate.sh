@@ -35,6 +35,27 @@ write_build_server_config() {
 EOF
 }
 
+write_workspace_settings() {
+  local settings_path="$1"
+  local derived_data_path="$2"
+
+  mkdir -p "$(dirname "$settings_path")"
+  cat > "$settings_path" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BuildLocationStyle</key>
+	<string>CustomLocation</string>
+	<key>DerivedDataCustomLocation</key>
+	<string>${derived_data_path}</string>
+	<key>IDEWorkspaceSharedSettings_AutocreateContextsIfNeeded</key>
+	<false/>
+</dict>
+</plist>
+EOF
+}
+
 write_build_server_config \
   "$ROOT/buildServer.json" \
   "./Scripts/run-xcode-build-server.sh" \
@@ -46,6 +67,10 @@ write_build_server_config \
   "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
   "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
   "xcode-derived"
+
+write_workspace_settings \
+  "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
+  "$REPO_ROOT/xcode-derived"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 DEVELOPMENT_TEAM_ID="${HARNESS_MONITOR_DEVELOPMENT_TEAM:-Q498EB36N4}"
