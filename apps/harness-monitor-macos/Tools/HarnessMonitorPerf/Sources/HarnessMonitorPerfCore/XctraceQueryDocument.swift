@@ -157,4 +157,28 @@ public struct XctraceTOC {
         }
         return Set(names.filter { !$0.isEmpty })
     }
+
+    /// Returns the first `<process pid != "0">` path - the actual launched-process binary
+    /// xctrace recorded. Mirrors `trace_launched_process_path` in
+    /// run-instruments-audit.sh:411.
+    public func launchedProcessPath() -> String {
+        let processes = (try? document.nodes(forXPath: ".//processes/process"))?
+            .compactMap { $0 as? XMLElement } ?? []
+        for process in processes {
+            let pid = process.attribute(forName: "pid")?.stringValue ?? ""
+            if pid != "0" {
+                return process.attribute(forName: "path")?.stringValue?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            }
+        }
+        return ""
+    }
+
+    /// Returns the first `<end-reason>` text node, used to disambiguate xctrace exit codes
+    /// vs the natural "Time limit reached" stop. Mirrors run-instruments-audit.sh:1125.
+    public func endReason() -> String {
+        let nodes = (try? document.nodes(forXPath: ".//end-reason"))?
+            .compactMap { $0 as? XMLElement } ?? []
+        return nodes.first?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
 }
