@@ -104,15 +104,15 @@ pub(super) fn codex_catalog() -> RuntimeModelCatalog {
     RuntimeModelCatalog {
         runtime: "codex".into(),
         models: vec![
-            reasoning("gpt-5.4-mini", "GPT-5.4 mini", Fast),
             reasoning("gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", Fast),
+            reasoning("gpt-5.4-mini", "GPT-5.4 mini", Fast),
             reasoning("gpt-5.5", "GPT-5.5", Balanced),
             reasoning("gpt-5.4", "GPT-5.4", Balanced),
             reasoning("gpt-5.3-codex", "GPT-5.3 Codex", Balanced),
             reasoning("gpt-5.2", "GPT-5.2", Balanced),
         ],
         default: "gpt-5.5".into(),
-        cheapest_fastest: "gpt-5.4-mini".into(),
+        cheapest_fastest: "gpt-5.3-codex-spark".into(),
     }
 }
 
@@ -194,8 +194,8 @@ pub(super) fn opencode_catalog() -> RuntimeModelCatalog {
         runtime: "opencode".into(),
         models: vec![
             thinking("anthropic/claude-haiku-4-5", "Claude Haiku 4.5", Fast),
-            reasoning("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
             reasoning("openai/gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", Fast),
+            reasoning("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
             thinking("google/gemini-2.5-flash", "Gemini 2.5 Flash", Fast),
             plain("mistral/mistral-small-4-0-26-03", "Mistral Small 4", Fast),
             thinking("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6", Balanced),

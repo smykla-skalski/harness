@@ -229,12 +229,12 @@ mod tests {
             "--runtime",
             "codex",
             "--model",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "--effort",
             "low",
         ])
         .expect("parse");
-        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.4-mini"));
+        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.3-codex-spark"));
         assert_eq!(parsed.args.effort.as_deref(), Some("low"));
         assert!(!parsed.args.allow_custom_model);
     }
@@ -266,12 +266,12 @@ mod tests {
             "--prompt",
             "explore the suite",
             "--model",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "--effort",
             "low",
         ])
         .expect("parse");
-        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.4-mini"));
+        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.3-codex-spark"));
         assert_eq!(parsed.args.effort.as_deref(), Some("low"));
         assert!(!parsed.args.allow_custom_model);
     }
