@@ -70,5 +70,32 @@ require_text "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh" "scripts/e2e
 require_text "tests/integration/commands/session/swarm_full_flow.rs" "#[ignore"
 require_text "tests/integration/commands/session/mod.rs" "mod swarm_full_flow;"
 
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+project_dir="$tmp_dir/project"
+data_home="$tmp_dir/data-home"
+mkdir -p "$project_dir"
+
+inject_output="$(
+  "$ROOT/scripts/e2e/inject-heuristic-log.sh" \
+    --agent "agent-1" \
+    --code "python_traceback_output" \
+    --runtime "codex" \
+    --runtime-session-id "runtime-session-1" \
+    --project-dir "$project_dir" \
+    --data-home "$data_home"
+)"
+log_path="$(printf '%s\n' "$inject_output" | jq -er '.log_path')"
+[[ -f "$log_path" ]] || fail "injector did not write log file: $log_path"
+jq -s -e '
+  length == 2
+  and .[0].timestamp != null
+  and .[0].message.role == "assistant"
+  and .[0].message.content[0].type == "tool_use"
+  and .[1].message.role == "user"
+  and .[1].message.content[0].type == "tool_result"
+  and (.[1].message.content[0].content[0].text | contains("Traceback"))
+' "$log_path" >/dev/null || fail "injector must emit canonical transcript JSONL"
+
 open_count="$("$ROOT/scripts/e2e/gaps-open-count.sh")"
 [[ "$open_count" == "0" ]] || fail "expected zero open e2e gaps, got $open_count"

@@ -64,37 +64,113 @@ import sys
 
 code, log_path = sys.argv[1:]
 
+def message(role, content, timestamp="2026-03-28T12:00:00Z"):
+    return {
+        "timestamp": timestamp,
+        "message": {
+            "role": role,
+            "content": content,
+        },
+    }
+
+def text_block(text):
+    return {"type": "text", "text": text}
+
+def tool_use(tool_id, name, input_data):
+    return message(
+        "assistant",
+        [{
+            "type": "tool_use",
+            "id": tool_id,
+            "name": name,
+            "input": input_data,
+        }],
+    )
+
+def tool_result(tool_use_id, text, *, is_error=False, tool_name=None):
+    block = {
+        "type": "tool_result",
+        "tool_use_id": tool_use_id,
+        "content": [text_block(text)],
+        "is_error": is_error,
+    }
+    if tool_name is not None:
+        block["tool_name"] = tool_name
+    return message("user", [block])
+
+def assistant_text(text):
+    return message("assistant", [text_block(text)])
+
 fixtures = {
     "python_traceback_output": [
-        {"kind": "tool_result", "stderr": "Traceback (most recent call last):\n  File \"foo.py\", line 1, in <module>\n  ValueError: bad"}
+        tool_use("heuristic-python-traceback", "Bash", {"command": "python foo.py"}),
+        tool_result(
+            "heuristic-python-traceback",
+            "Traceback (most recent call last):\n  File \"foo.py\", line 1, in <module>\n  ValueError: bad",
+            is_error=True,
+            tool_name="Bash",
+        ),
     ],
     "unauthorized_git_commit_during_run": [
-        {"kind": "tool_use", "tool": "Bash", "input": {"command": "git commit -m 'mid-run'"}}
+        tool_use(
+            "heuristic-git-commit",
+            "Bash",
+            {"command": "git commit -m 'mid-run'"},
+        ),
     ],
     "python_used_in_bash_tool_use": [
-        {"kind": "tool_use", "tool": "Bash", "input": {"command": "python -c 'import os; print(1)'"}}
+        tool_use(
+            "heuristic-python-bash",
+            "Bash",
+            {"command": "python -c 'import os; print(1)'"},
+        ),
     ],
     "absolute_manifest_path_used": [
-        {"kind": "tool_use", "tool": "Edit", "input": {"path": "/Users/bart/proj/manifest.json"}}
+        tool_use(
+            "heuristic-absolute-manifest",
+            "Bash",
+            {"command": "harness apply /Users/bart/proj/manifest.json"},
+        ),
     ],
     "jq_error_in_command_output": [
-        {"kind": "tool_result", "stderr": "jq: error (at <stdin>:1): Cannot index array"}
+        tool_use("heuristic-jq-error", "Bash", {"command": "jq '.foo' data.json"}),
+        tool_result(
+            "heuristic-jq-error",
+            "jq: error (at <stdin>:1): Cannot index array",
+            is_error=True,
+            tool_name="Bash",
+        ),
     ],
     "unverified_recursive_remove": [
-        {"kind": "tool_use", "tool": "Bash", "input": {"command": "rm -rf /tmp/some-dir"}}
+        tool_use(
+            "heuristic-unverified-rm",
+            "Bash",
+            {"command": "rm -rf /tmp/some-dir"},
+        ),
     ],
     "hook_denied_tool_call": [
-        {"kind": "hook_decision", "decision": "deny", "tool": "Write", "path": "/tmp/forbidden"}
+        assistant_text(
+            "The system denied this tool call because it was blocked by hook policy"
+        ),
     ],
     "agent_repeated_error": [
-        {"kind": "tool_result", "stderr": "E: same"},
-        {"kind": "tool_result", "stderr": "E: same"},
+        assistant_text("E: same"),
+        assistant_text("E: same"),
     ],
     "agent_stalled_progress": [
-        {"kind": "assistant", "message": "no observable progress for more than 301 seconds"}
+        assistant_text("no observable progress for more than 301 seconds"),
     ],
     "cross_agent_file_conflict": [
-        {"kind": "tool_use", "tool": "Edit", "input": {"path": "src/foo.rs"}}
+        tool_use(
+            "heuristic-cross-agent-file",
+            "Write",
+            {"file_path": "src/foo.rs", "content": "fn main() {}\n"},
+        ),
+        tool_result(
+            "heuristic-cross-agent-file",
+            "The file src/foo.rs has been updated successfully",
+            tool_name="Write",
+        ),
     ],
 }
 
