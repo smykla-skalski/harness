@@ -405,7 +405,8 @@ scenario_end_to_end_detection() {
   TMP_MARKERS+=("$marker")
 
   local output status=0
-  output="$("$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+  # Unset auto-clean so the planted artifact causes the script to fail, not self-heal.
+  output="$(env -u HARNESS_CHECK_AUTOCLEAN "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
     fail "expected exit 1 from check script, got $status (output: $output)"
