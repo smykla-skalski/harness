@@ -10,8 +10,10 @@ public struct PreferencesAppearanceSection: View {
     .storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
-  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-  private var cornerAnimationEnabled = false
+  #if HARNESS_FEATURE_LOTTIE
+    @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
+    private var cornerAnimationEnabled = false
+  #endif
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
   public init(themeMode: Binding<HarnessMonitorThemeMode>) {
@@ -52,19 +54,29 @@ public struct PreferencesAppearanceSection: View {
         .accessibilityHint("Controls where the background image renders")
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesBackdropModePicker)
 
-        Toggle("Corner animation", isOn: $cornerAnimationEnabled)
-          .harnessNativeFormControl()
-          .accessibilityHint("Shows a dancing llama during activity")
-          .accessibilityIdentifier("harness.preferences.appearance.cornerAnimation")
+        #if HARNESS_FEATURE_LOTTIE
+          Toggle("Corner animation", isOn: $cornerAnimationEnabled)
+            .harnessNativeFormControl()
+            .accessibilityHint("Shows a dancing llama during activity")
+            .accessibilityIdentifier("harness.preferences.appearance.cornerAnimation")
+        #endif
       } header: {
         Text("Appearance")
       } footer: {
-        Text(
-          "Theme mode and text size apply to every Harness Monitor window."
-            + " Backdrop controls where the softened background image renders,"
-            + " and choosing an image turns on the window backdrop if it is currently off."
-            + " Corner animation shows a dancing llama during activity."
-        )
+        #if HARNESS_FEATURE_LOTTIE
+          Text(
+            "Theme mode and text size apply to every Harness Monitor window."
+              + " Backdrop controls where the softened background image renders,"
+              + " and choosing an image turns on the window backdrop if it is currently off."
+              + " Corner animation shows a dancing llama during activity."
+          )
+        #else
+          Text(
+            "Theme mode and text size apply to every Harness Monitor window."
+              + " Backdrop controls where the softened background image renders,"
+              + " and choosing an image turns on the window backdrop if it is currently off."
+          )
+        #endif
       }
 
       backgroundImageSection

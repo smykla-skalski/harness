@@ -92,13 +92,17 @@ public struct ContentView<CornerContent: View>: View {
 
   public var body: some View {
     ViewBodySignposter.trace(Self.self, "ContentView", attributes: profilingAttributes) {
-      baseContent
-        .modifier(
-          ContentCornerOverlayModifier(
-            isPresented: showsCornerAnimation,
-            cornerAnimationContent: cornerAnimationContent
+      #if HARNESS_FEATURE_LOTTIE
+        baseContent
+          .modifier(
+            ContentCornerOverlayModifier(
+              isPresented: showsCornerAnimation,
+              cornerAnimationContent: cornerAnimationContent
+            )
           )
-        )
+      #else
+        baseContent
+      #endif
     }
   }
 
