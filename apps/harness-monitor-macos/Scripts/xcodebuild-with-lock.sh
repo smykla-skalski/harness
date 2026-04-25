@@ -234,8 +234,12 @@ run_inner() {
   local log_path="$1"
   local -a inner_args=("${args[@]}")
   local -a fmt_prefix=()
+  local line
   if xcodebuild_args_are_test_action "${args[@]}"; then
-    mapfile -t inner_args < <(build_test_action_args)
+    inner_args=()
+    while IFS= read -r line; do
+      inner_args+=("$line")
+    done < <(build_test_action_args)
     fmt_prefix=(--junit-path "$(junit_report_path_for_run)")
     if should_use_tuist_test; then
       fmt_prefix+=(--use-tuist)
