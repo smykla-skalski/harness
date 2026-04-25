@@ -132,3 +132,29 @@ fn monitor_app_uses_literal_bundle_identifier_for_capabilities_ui() {
         "BuildSettings.swift should not define HARNESS_MONITOR_APP_BUNDLE_ID once the app target stops routing its bundle identifier through an extra build-setting indirection"
     );
 }
+
+#[test]
+fn monitor_targets_keep_the_pre_tuist_unmanaged_app_group_flow() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+
+    let monitor_app = section_between(
+        &project,
+        "private let monitorAppSettings: Settings = .settings(",
+        "private let monitorAppTarget: Target = .target(",
+    );
+    assert!(
+        !monitor_app.contains("\"REGISTER_APP_GROUPS\":"),
+        "HarnessMonitor should keep the pre-Tuist TeamID-prefixed macOS app-group flow and must not ask Xcode to register portal-managed app groups"
+    );
+
+    let ui_test_host = section_between(
+        &project,
+        "private let uiTestHostSettings: Settings = .settings(",
+        "private let uiTestHostTarget: Target = .target(",
+    );
+    assert!(
+        !ui_test_host.contains("\"REGISTER_APP_GROUPS\":"),
+        "HarnessMonitorUITestHost should not request Xcode-managed app-group registration because it does not declare any app-group entitlement"
+    );
+}
