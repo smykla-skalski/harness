@@ -975,6 +975,26 @@ EOF
   fi
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 33: swarm e2e worktree parser only reports branches created by the
+# full-flow e2e harness. User/session worktrees under harness/* are preserved.
+# ---------------------------------------------------------------------------
+scenario_swarm_e2e_worktree_parser() {
+  start_test "swarm e2e worktree parser filters e2e-owned branches"
+  local fake_porcelain
+  fake_porcelain=$'worktree /tmp/one\nHEAD 111\nbranch refs/heads/harness/sess-e2e-swarm-abc\n\nworktree /tmp/two\nHEAD 222\nbranch refs/heads/harness/msiap1rl\n\nworktree /tmp/three\nHEAD 333\nbranch refs/heads/harness/sess-e2e-swarm-def\n'
+  local output
+  output="$(stale_scan_swarm_e2e_worktrees_from_porcelain <<<"$fake_porcelain")"
+  local ok=1
+  assert_in_list $'/tmp/one\tharness/sess-e2e-swarm-abc' "swarm e2e worktree" "$output" || ok=0
+  assert_in_list $'/tmp/three\tharness/sess-e2e-swarm-def' "swarm e2e worktree" "$output" || ok=0
+  if grep -Fq -- "msiap1rl" <<<"$output"; then
+    ok=0
+    fail "non-e2e harness branch leaked into output: $output"
+  fi
+  if (( ok )); then pass; fi
+}
+
 run_all() {
   scenario_debug_orphan
   scenario_release_orphan
@@ -1009,6 +1029,7 @@ run_all() {
   scenario_autoclean_clean_script_fails
   scenario_end_to_end_without_autoclean
   scenario_autoclean_congestion_partial
+  scenario_swarm_e2e_worktree_parser
 }
 
 run_all
