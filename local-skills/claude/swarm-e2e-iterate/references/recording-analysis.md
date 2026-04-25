@@ -2,6 +2,13 @@
 
 Load this before inspecting `swarm-full-flow.mov`, extracting keyframes, or promoting a UI/UX/performance finding. Recording evidence is primary; every promoted row needs a timestamp range and one secondary artifact.
 
+## Contents
+
+- [Detection Recipes](#detection-recipes)
+- [Per-Launch Checklist](#per-launch-checklist)
+- [UX Heuristics](#ux-heuristics)
+- [Right And Wrong Signatures](#right-and-wrong-signatures)
+
 ## Detection Recipes
 
 - Extract per-act keyframes with `ffmpeg -ss <ts> -i swarm-full-flow.mov -frames:v 1 -y <act>.png` at act start, act end, and 250 ms before each transition. Derive timestamps from `act-driver.log` `actReady` and acknowledgement anchors. Compare frames with `ui-snapshots/<actN>.png` using histogram or perceptual hash.
