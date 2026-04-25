@@ -1,4 +1,6 @@
 import AVFoundation
+import AppKit
+import CoreGraphics
 import Darwin
 import Foundation
 @preconcurrency import ScreenCaptureKit
@@ -62,11 +64,11 @@ public enum ScreenRecorder {
 private final class Runner: NSObject, SCRecordingOutputDelegate {
   private static let windowResolutionTimeout: TimeInterval = 15
   private static let windowResolutionPollInterval: TimeInterval = 0.2
-  // Hard upper bound for each ScreenCaptureKit bootstrap step. macOS 26 hits
-  // intermittent replayd / SCContentFilter deadlocks where the call never
-  // returns; surfacing the stall as an explicit failure beats blocking the
-  // recorder thread until the host-side fixture timeout fires.
-  private static let bootstrapStepTimeout: TimeInterval = 20
+  // Hard upper bound for each ScreenCaptureKit bootstrap step. After the
+  // recorder warms up CoreGraphics the real bootstrap completes in well
+  // under a second, so a tight 5s budget surfaces any genuine SCK stall
+  // fast without false-firing on a slow first-launch.
+  private static let bootstrapStepTimeout: TimeInterval = 5
 
   private enum StopReason {
     case requested
@@ -103,6 +105,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
 
   func run() throws {
     try prepareFilesystem()
+    try warmUpCoreGraphics()
     installSignalHandlers()
 
     let captureTarget: CaptureTarget
@@ -249,6 +252,21 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     FileManager.default.createFile(atPath: logURL.path, contents: nil)
   }
 
+  /// Establish a connection to the WindowServer before any
+  /// ScreenCaptureKit call. The recorder runs as a plain CLI helper that
+  /// never instantiates `NSApplication`, so the first CG entry point inside
+  /// `SCContentFilter(desktopIndependentWindow:)` traps with
+  /// `Assertion failed: (did_initialize), function CGS_REQUIRE_INIT,
+  /// file CGInitialization.c, line 44.` and aborts the process before
+  /// any further log line lands on disk. Touching `NSApplication.shared`
+  /// performs the WindowServer handshake; calling `CGMainDisplayID()`
+  /// guarantees CG is fully primed for the subsequent SCK calls.
+  private func warmUpCoreGraphics() throws {
+    _ = NSApplication.shared
+    let mainDisplay = CGMainDisplayID()
+    try appendLog("recording-cg-warmup main_display=\(mainDisplay)")
+  }
+
   private struct CaptureTarget {
     let display: SCDisplay
     let window: SCWindow
@@ -287,21 +305,39 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     else {
       throw ScreenRecorder.Failure.monitorWindowNotFound
     }
-    let selectedDisplay = try ScreenRecorderDisplaySelector.display(
-      forWindowFrame: captureWindow.frame,
-      from: content.displays.map { display in
-        ScreenRecorderDisplayCandidate(displayID: display.displayID, frame: display.frame)
-      }
+    let displayCandidates = content.displays.map { display in
+      ScreenRecorderDisplayCandidate(displayID: display.displayID, frame: display.frame)
+    }
+    let frameWidth = Int(ceil(captureWindow.frame.width))
+    let frameHeight = Int(ceil(captureWindow.frame.height))
+    let originX = Int(captureWindow.frame.origin.x)
+    let originY = Int(captureWindow.frame.origin.y)
+    try appendLog(
+      "selecting-window id=\(selectedWindow.windowID) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") title=\(selectedWindow.title) frame=\(frameWidth)x\(frameHeight)+\(originX)+\(originY)"
     )
+    let readiness = ScreenRecorderWindowReadiness.evaluate(
+      windowFrame: captureWindow.frame,
+      displays: displayCandidates
+    )
+    let selectedDisplayCandidate: ScreenRecorderDisplayCandidate
+    switch readiness {
+    case .notReady(let reason):
+      try? appendLog(
+        "window-not-ready id=\(selectedWindow.windowID) reason=\(reason) frame=\(frameWidth)x\(frameHeight)+\(originX)+\(originY)"
+      )
+      return nil
+    case .ready(let candidate):
+      selectedDisplayCandidate = candidate
+    }
     guard
       let captureDisplay = content.displays.first(where: {
-        $0.displayID == selectedDisplay.displayID
+        $0.displayID == selectedDisplayCandidate.displayID
       })
     else {
       throw ScreenRecorder.Failure.monitorDisplayNotFound
     }
     try appendLog(
-      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplay.displayID) size=\(Int(ceil(captureWindow.frame.width)))x\(Int(ceil(captureWindow.frame.height)))"
+      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight)"
     )
     return CaptureTarget(display: captureDisplay, window: captureWindow)
   }
