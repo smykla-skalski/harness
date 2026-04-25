@@ -93,6 +93,27 @@ final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testPreferencesGeneralSectionShowsSeparateLoggingPickers() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let daemonLogLevel = element(
+      in: app,
+      identifier: Accessibility.preferencesDaemonLogLevelPicker
+    )
+    let supervisorLogLevel = element(
+      in: app,
+      identifier: Accessibility.preferencesSupervisorLogLevelPicker
+    )
+
+    XCTAssertTrue(daemonLogLevel.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(supervisorLogLevel.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertLessThan(daemonLogLevel.frame.minY, supervisorLogLevel.frame.minY)
+  }
+
   func testPreferencesSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launch(mode: "preview")
 
