@@ -2,6 +2,14 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## Command execution
+
+**Always use `rtk`** - it is the token-optimized proxy for shell commands and saves 60-90% on dev operations. Prefix every shell command with `rtk` (e.g. `rtk git status`, `rtk cargo test`). The Claude Code hook auto-rewrites commands transparently; do not fight it.
+
+**`rtk proxy` is last resort only.** It bypasses all output filters and leaks raw command output (4000+ line dumps), burning the context window. Use it only when filtered output hides information you genuinely need to debug a specific issue, and switch back to plain `rtk` immediately after.
+
+Discover supported workflows with `rtk mise tasks ls` and run repo logic only through `rtk mise run <task>` or `rtk mise run <task> -- <args>`. Do not wrap `mise` in `bash -lc`, `zsh -lc`, `env`, or other shells. Do not run repo scripts, raw `cargo`, or raw `xcodebuild` when a `mise` task already covers the workflow.
+
 ## Build and test commands
 
 ```bash
@@ -27,6 +35,7 @@ Harness Monitor app validation expectations:
 
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
+- `tuist auth login` then `mise run monitor:macos:setup:cache` once per machine if you want the Xcode 26 compilation cache service wired in for the generated workspace
 - `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
 - All xcodebuild invocations must use `-derivedDataPath xcode-derived` so build artifacts land in a single, known location at the repo root (gitignored). Never create variant-named directories like `xcode-derived-foo` - one directory, reused across builds.
 - For macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'` because it matches both `My Mac` and `Any Mac` and triggers the multiple-matching-destinations warning. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64`. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless a more specific `id=...` selector is required.
@@ -91,6 +100,15 @@ Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
 - Hook messages use `HookMessage` enum with `into_result()` conversion
 - Commits: `{type}({scope}): {message}` — types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
 - Never create merge commits. Keep history flat with rebase/cherry-pick workflows only; if a merge commit appears locally, rewrite it out before pushing or handing off.
+
+## Commit signing (strict)
+
+Every commit **must** be created with `git commit -sS` - both the `-s` sign-off and `-S` GPG signature are required, no exceptions. After each commit, verify:
+
+- the commit signature is valid (`git log --show-signature -1`)
+- the sign-off trailer is exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`
+
+Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or by using a different key. If 1Password (signing key source) is unavailable, hard stop and wait for the user - do not commit unsigned and do not substitute another key.
 
 ## Versioning
 
