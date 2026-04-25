@@ -34,10 +34,20 @@ BINARY="$(recording_triage_resolve_binary "$REPO_ROOT")"
 MARKER_DIR="$RUN_DIR/context/sync-root/e2e-sync"
 SCREEN_LOG="$RUN_DIR/screen-recording.log"
 DAEMON_LOG="$RUN_DIR/logs/daemon.log"
+OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
+mkdir -p "$OUTPUT_DIR"
+REPORT="$OUTPUT_DIR/act-timing.json"
+
+emit_skipped() {
+  local reason="$1"
+  jq -nc --arg reason "$reason" '{status:"skipped", reason:$reason}' >"$REPORT"
+  printf 'act-timing: skipped (%s)\n' "$reason"
+  exit 0
+}
+
 for required in "$MARKER_DIR" "$SCREEN_LOG" "$DAEMON_LOG"; do
   if [[ ! -e "$required" ]]; then
-    printf 'error: missing input: %s\n' "$required" >&2
-    exit 1
+    emit_skipped "missing input: $required"
   fi
 done
 
@@ -79,24 +89,18 @@ PY
 
 REC_LINE="$(grep -m1 'recording-started' "$SCREEN_LOG" || true)"
 if [[ -z "$REC_LINE" ]]; then
-  printf 'error: no recording-started line in %s\n' "$SCREEN_LOG" >&2
-  exit 1
+  emit_skipped "no recording-started line in $SCREEN_LOG"
 fi
 REC_ISO="${REC_LINE%% *}"
 
 LAUNCH_LINE="$(strip_ansi <"$DAEMON_LOG" | grep -m1 -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' || true)"
 if [[ -z "$LAUNCH_LINE" ]]; then
-  printf 'error: no ISO timestamp in %s\n' "$DAEMON_LOG" >&2
-  exit 1
+  emit_skipped "no ISO timestamp in $DAEMON_LOG"
 fi
 LAUNCH_ISO="${LAUNCH_LINE%% *}"
 
 REC_EPOCH="$(iso_to_epoch "$REC_ISO")"
 LAUNCH_EPOCH="$(iso_to_epoch "$LAUNCH_ISO")"
-
-OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
-mkdir -p "$OUTPUT_DIR"
-REPORT="$OUTPUT_DIR/act-timing.json"
 
 "$BINARY" recording-triage act-timing \
   --marker-dir "$MARKER_DIR" \

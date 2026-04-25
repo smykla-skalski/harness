@@ -36,9 +36,13 @@ REPO_ROOT="$(recording_triage_repo_root)"
 BINARY="$(recording_triage_resolve_binary "$REPO_ROOT")"
 
 SNAPSHOT_DIR="$RUN_DIR/ui-snapshots"
+OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
+mkdir -p "$OUTPUT_DIR"
+REPORT="$OUTPUT_DIR/layout-drift.json"
 if [[ ! -d "$SNAPSHOT_DIR" ]]; then
-  printf 'error: ui-snapshots dir missing: %s\n' "$SNAPSHOT_DIR" >&2
-  exit 1
+  printf '{ "pairs": [] }\n' >"$REPORT"
+  printf 'compare-layout -> %s (ui-snapshots dir missing)\n' "$REPORT"
+  exit 0
 fi
 
 # Collect swarm-actN.txt sorted by N (numeric, not lexicographic).
@@ -52,10 +56,6 @@ done < <(
     | sort -n -k1,1 \
     | cut -f2
 )
-
-OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
-mkdir -p "$OUTPUT_DIR"
-REPORT="$OUTPUT_DIR/layout-drift.json"
 
 if (( ${#SNAPSHOTS[@]} < 2 )); then
   printf '{ "pairs": [] }\n' >"$REPORT"
