@@ -101,9 +101,10 @@ require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
 require_text "scripts/e2e/triage-run.sh" 'xcresulttool export attachments'
 require_text "scripts/e2e/triage-run.sh" 'missing or empty screen recording'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
-require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "func act16"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "captureCheckpoint"
-require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "sessionAgentListState"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmRunner.swift" "final class SwarmRunner"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmRunner.swift" "func act16"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmRunner.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestAccessibility.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFullFlowTests.swift" "func testSwarmFullFlow()"
