@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<trace-toc>
+  <run number="1">
+    <data>
+      <table schema="swiftui-updates"/>
+      <table schema="swiftui-update-groups"/>
+      <table schema="hitches"/>
+      <table schema="potential-hangs"/>
+      <table schema="time-profile"/>
+    </data>
+    <tracks>
+      <track name="Allocations">
+        <details>
+          <detail name="Statistics"/>
+        </details>
+      </track>
+    </tracks>
+  </run>
+</trace-toc>
