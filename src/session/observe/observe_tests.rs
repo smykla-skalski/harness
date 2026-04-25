@@ -1,4 +1,5 @@
 use crate::hooks::adapters::HookAgent;
+use crate::observe::types::IssueCode;
 use crate::session::service;
 use crate::session::types::{SessionRole, TaskSeverity};
 
@@ -7,6 +8,7 @@ use super::scan::scan_all_agents;
 use super::support::create_work_items_for_issues;
 use super::test_support::{
     infrastructure_issue, start_active_session, with_temp_project, write_agent_log,
+    write_agent_log_lines,
 };
 
 #[test]
@@ -126,6 +128,67 @@ fn observe_without_actor_stays_read_only() {
                 .expect("list tasks")
                 .is_empty(),
             "observe without --actor must not create tasks",
+        );
+    });
+}
+
+#[test]
+fn observe_scans_canonical_tool_result_tracebacks() {
+    with_temp_project(|project| {
+        let state = start_active_session(project, "sess-traceback", "observe test");
+        let leader_runtime_session_id = state
+            .agents
+            .values()
+            .find(|agent| agent.role == SessionRole::Leader)
+            .and_then(|agent| agent.agent_session_id.clone())
+            .expect("leader should have a runtime session id");
+
+        write_agent_log_lines(
+            project,
+            HookAgent::Claude,
+            &leader_runtime_session_id,
+            &[
+                serde_json::json!({
+                    "timestamp": "2026-03-28T12:00:00Z",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "tool_use",
+                            "id": "heuristic-python-traceback",
+                            "name": "Bash",
+                            "input": { "command": "python foo.py" }
+                        }]
+                    }
+                }),
+                serde_json::json!({
+                    "timestamp": "2026-03-28T12:00:00Z",
+                    "message": {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "heuristic-python-traceback",
+                            "tool_name": "Bash",
+                            "is_error": true,
+                            "content": [{
+                                "type": "text",
+                                "text": "Traceback (most recent call last):\n  File \"foo.py\", line 1, in <module>\n  ValueError: bad"
+                            }]
+                        }]
+                    }
+                }),
+            ],
+        );
+
+        let reloaded =
+            service::session_status(&state.session_id, project).expect("load session status");
+        let issues =
+            scan_all_agents(&reloaded, &state.session_id, project).expect("scan session logs");
+
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == IssueCode::PythonTracebackOutput),
+            "expected observe to find canonical tool_result traceback issues"
         );
     });
 }
