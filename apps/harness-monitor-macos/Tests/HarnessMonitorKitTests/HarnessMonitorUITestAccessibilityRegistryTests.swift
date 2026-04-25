@@ -73,6 +73,14 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.agentRowPersonaChip("worker-1")
         == "harness.session.agent.worker-1.persona"
     )
+    #expect(
+      HarnessMonitorAccessibility.sessionTaskListState
+        == "harness.session.tasks.state"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionAgentListState
+        == "harness.session.agents.state"
+    )
     #expect(HarnessMonitorAccessibility.observeScanButton == "observeScanButton")
     #expect(HarnessMonitorAccessibility.observeDoctorButton == "observeDoctorButton")
     #expect(
@@ -108,9 +116,11 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Review accessibility identifiers are attached by production views")
   func reviewAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let cockpitView = try sourceFile(named: "SessionCockpitView.swift")
+    let taskLaneView = try sourceFile(named: "SessionTaskLaneViews.swift")
     let toastView = try sourceFile(named: "HarnessMonitorFeedbackToastView.swift")
 
     #expect(cockpitView.contains("SessionCockpitHeuristicIssuesSection"))
+    #expect(taskLaneView.contains("sessionTaskListState"))
     #expect(toastView.contains("feedback.accessibilityIdentifier"))
   }
 

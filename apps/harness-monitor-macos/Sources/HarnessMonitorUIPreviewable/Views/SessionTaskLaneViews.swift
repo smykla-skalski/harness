@@ -22,8 +22,17 @@ struct SessionTaskListSection: View {
   let tasks: [WorkItem]
   let inspectTask: (String) -> Void
 
+  private var taskStateMarkerText: String {
+    let taskIDs = tasks.map(\.taskId).joined(separator: ",")
+    return "taskCount=\(tasks.count), taskIDs=\(taskIDs)"
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.sessionTaskListState,
+        text: taskStateMarkerText
+      )
       Text("Tasks")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
