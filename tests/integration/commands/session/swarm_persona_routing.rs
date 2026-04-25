@@ -124,8 +124,8 @@ fn persona_matching_worker_picks_up_reassignable_task_over_bare_agent() {
         // Stamp the persona hint directly on the queued task — in production
         // this arrives via submit_for_review_with_persona; for routing
         // coverage we bypass the review lifecycle and set the field.
-        let layout = harness::session::storage::layout_from_project_dir(&project, "persona-rt")
-            .unwrap();
+        let layout =
+            harness::session::storage::layout_from_project_dir(&project, "persona-rt").unwrap();
         let state_before = service::session_status("persona-rt", &project).unwrap();
         let mut patched = state_before.clone();
         patched

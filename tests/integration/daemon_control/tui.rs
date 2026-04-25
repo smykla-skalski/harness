@@ -318,12 +318,14 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
         "verify managed leader recovery prompt",
     );
 
-    let joined =
-        join_session_leader_via_http(&home, &xdg, project_arg, session.session_id.as_str(), "codex");
-    let leader_id = joined
-        .leader_id
-        .clone()
-        .expect("leader id after join");
+    let joined = join_session_leader_via_http(
+        &home,
+        &xdg,
+        project_arg,
+        session.session_id.as_str(),
+        "codex",
+    );
+    let leader_id = joined.leader_id.clone().expect("leader id after join");
 
     let leave_output = run_harness(
         &home,

@@ -437,8 +437,7 @@ async fn submit_review_response(
     request: &TaskSubmitReviewRequest,
 ) -> Result<SessionDetail, CliError> {
     if let Some(async_db) = state.async_db.get() {
-        return service::submit_review_async(session_id, task_id, request, async_db.as_ref())
-            .await;
+        return service::submit_review_async(session_id, task_id, request, async_db.as_ref()).await;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     service::submit_review(session_id, task_id, request, db_guard.as_deref())

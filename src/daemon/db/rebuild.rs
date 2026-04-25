@@ -30,10 +30,9 @@ impl DaemonDb {
         task_id: &str,
         reviews: &[Review],
     ) -> Result<(), CliError> {
-        let transaction = self
-            .conn
-            .unchecked_transaction()
-            .map_err(|error| db_error(format!("begin rebuild task_reviews transaction: {error}")))?;
+        let transaction = self.conn.unchecked_transaction().map_err(|error| {
+            db_error(format!("begin rebuild task_reviews transaction: {error}"))
+        })?;
         transaction
             .execute(
                 "DELETE FROM task_reviews WHERE session_id = ?1 AND task_id = ?2",
@@ -72,10 +71,7 @@ impl DaemonDb {
                     ],
                 )
                 .map_err(|error| {
-                    db_error(format!(
-                        "insert task review {}: {error}",
-                        review.review_id
-                    ))
+                    db_error(format!("insert task review {}: {error}", review.review_id))
                 })?;
         }
         transaction
@@ -193,10 +189,7 @@ mod tests {
         let first = vec![review_fixture("r1", 1, ReviewVerdict::Approve)];
         db.rebuild_task_reviews("sess-1", "task-1", &first)
             .expect("rebuild once");
-        assert_eq!(
-            db.count_task_reviews("sess-1", "task-1").expect("count"),
-            1
-        );
+        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 1);
 
         let second = vec![
             review_fixture("r1", 1, ReviewVerdict::Approve),
@@ -226,16 +219,10 @@ mod tests {
             &[review_fixture("r1", 1, ReviewVerdict::Approve)],
         )
         .expect("seed rebuild");
-        assert_eq!(
-            db.count_task_reviews("sess-1", "task-1").expect("count"),
-            1
-        );
+        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 1);
         db.rebuild_task_reviews("sess-1", "task-1", &[])
             .expect("clear rebuild");
-        assert_eq!(
-            db.count_task_reviews("sess-1", "task-1").expect("count"),
-            0
-        );
+        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 0);
     }
 
     #[test]

@@ -19,10 +19,7 @@ fn run_cli(args: &[&str]) -> i32 {
     run_command(cli.command).expect("run cli")
 }
 
-fn bootstrap_improver_session(
-    session_id: &str,
-    project: &std::path::Path,
-) -> (String, String) {
+fn bootstrap_improver_session(session_id: &str, project: &std::path::Path) -> (String, String) {
     let _state =
         service::start_session_with_policy("", "improver cli", project, Some(session_id), None)
             .unwrap();

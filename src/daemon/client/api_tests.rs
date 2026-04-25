@@ -75,7 +75,12 @@ fn spawn_post_mock(
             .unwrap_or_default()
             .to_string();
         *captured_clone.lock().expect("capture") = Captured { path, body };
-        write_http_response(&mut stream, response_status, "application/json", &response_body);
+        write_http_response(
+            &mut stream,
+            response_status,
+            "application/json",
+            &response_body,
+        );
     });
     (endpoint, captured, handle)
 }
@@ -110,7 +115,11 @@ fn submit_task_for_review_posts_expected_path_and_body() {
     );
     assert!(captured.body.contains("\"actor\":\"worker-1\""));
     assert!(captured.body.contains("\"summary\":\"ready\""));
-    assert!(captured.body.contains("\"suggested_persona\":\"code-reviewer\""));
+    assert!(
+        captured
+            .body
+            .contains("\"suggested_persona\":\"code-reviewer\"")
+    );
 }
 
 #[test]

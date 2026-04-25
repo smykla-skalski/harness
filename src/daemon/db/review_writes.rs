@@ -62,12 +62,7 @@ impl DaemonDb {
                 ],
             )
             .map(|_| ())
-            .map_err(|error| {
-                db_error(format!(
-                    "insert task review {}: {error}",
-                    review.review_id
-                ))
-            })
+            .map_err(|error| db_error(format!("insert task review {}: {error}", review.review_id)))
     }
 }
 

@@ -8,8 +8,8 @@
 //! integration suite.
 
 use harness::daemon::protocol::{
-    HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, ImproverApplyRequest,
-    TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
+    HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity,
+    ImproverApplyRequest, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, http_paths, ws_methods,
 };
 use harness::session::service::ImproverTarget;

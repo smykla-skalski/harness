@@ -31,9 +31,8 @@ fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
             )
             .await;
             let leader_id = state.leader_id.clone().expect("leader id");
-            let improver_id = temp_env::async_with_vars(
-                [("CODEX_SESSION_ID", Some("async-improver"))],
-                async {
+            let improver_id =
+                temp_env::async_with_vars([("CODEX_SESSION_ID", Some("async-improver"))], async {
                     let joined = join_session_direct_async(
                         &state.session_id,
                         &crate::daemon::protocol::SessionJoinRequest {
@@ -56,9 +55,8 @@ fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
                         .expect("improver")
                         .agent_id
                         .clone()
-                },
-            )
-            .await;
+                })
+                .await;
 
             let outcome = crate::daemon::service::improver_apply_async(
                 &state.session_id,

@@ -160,7 +160,8 @@ fn awaiting_review_worker_refuses_new_assignment() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-awaiting-refuse", || {
         let project = tmp.path().join("project");
-        let (leader_id, worker_id, task_id) = prepare_in_progress_task("awaiting-refuse-1", &project);
+        let (leader_id, worker_id, task_id) =
+            prepare_in_progress_task("awaiting-refuse-1", &project);
 
         service::submit_for_review("awaiting-refuse-1", &task_id, &worker_id, None, &project)
             .expect("submit");
@@ -217,7 +218,8 @@ fn update_task_rejects_direct_in_review_transition() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-update-reject-ir", || {
         let project = tmp.path().join("project");
-        let (leader_id, _worker_id, task_id) = prepare_in_progress_task("update-reject-2", &project);
+        let (leader_id, _worker_id, task_id) =
+            prepare_in_progress_task("update-reject-2", &project);
 
         let result = service::update_task(
             "update-reject-2",
@@ -263,8 +265,7 @@ fn update_task_rejects_generic_status_on_awaiting_review_task() {
             )
             .expect_err("generic update on AwaitingReview must fail");
             assert!(
-                err.to_string().contains("respond_review")
-                    || err.to_string().contains("arbitrate"),
+                err.to_string().contains("respond_review") || err.to_string().contains("arbitrate"),
                 "error should steer caller to review primitives, got: {err}"
             );
         }
@@ -345,8 +346,7 @@ fn drop_task_rejects_review_state_task() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-drop-no-bypass", || {
         let project = tmp.path().join("project");
-        let (leader_id, worker_id, task_id) =
-            prepare_in_progress_task("drop-no-bypass", &project);
+        let (leader_id, worker_id, task_id) = prepare_in_progress_task("drop-no-bypass", &project);
         service::submit_for_review("drop-no-bypass", &task_id, &worker_id, None, &project).unwrap();
 
         // Second fresh worker so drop target is valid for non-review guard.
@@ -441,8 +441,7 @@ fn assign_task_rejects_awaiting_review_task() {
         )
         .expect_err("assign on AwaitingReview must fail");
         assert!(
-            err.to_string().contains("reassigned")
-                || err.to_string().contains("respond_review"),
+            err.to_string().contains("reassigned") || err.to_string().contains("respond_review"),
             "error should steer caller to review primitives, got: {err}"
         );
 

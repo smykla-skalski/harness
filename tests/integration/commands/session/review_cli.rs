@@ -153,10 +153,7 @@ fn submit_review_via_cli_accepts_snake_case_verdict_and_json_points() {
         let consensus = task.consensus.as_ref().expect("quorum recorded");
         assert_eq!(consensus.verdict, ReviewVerdict::RequestChanges);
         assert!(
-            consensus
-                .points
-                .iter()
-                .any(|point| point.point_id == "p1"),
+            consensus.points.iter().any(|point| point.point_id == "p1"),
             "point id from --points JSON folded into consensus"
         );
     });

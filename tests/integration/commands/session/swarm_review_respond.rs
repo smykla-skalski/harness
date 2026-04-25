@@ -1,5 +1,7 @@
 use harness::session::service;
-use harness::session::types::{AgentStatus, ReviewPoint, ReviewPointState, ReviewVerdict, TaskStatus};
+use harness::session::types::{
+    AgentStatus, ReviewPoint, ReviewPointState, ReviewVerdict, TaskStatus,
+};
 
 use super::swarm_review_helpers::setup_two_reviewers_on_claimed_task;
 use super::with_session_test_env;

@@ -364,7 +364,12 @@ pub(crate) async fn submit_review_async(
         .insert_task_review(session_id, task_id, &prepared.review)
         .await?;
     append_task_status_change_log(
-        async_db, session_id, task_id, &request.actor, prev_status, new_status,
+        async_db,
+        session_id,
+        task_id,
+        &request.actor,
+        prev_status,
+        new_status,
     )
     .await?;
     bump_async(async_db, session_id).await?;

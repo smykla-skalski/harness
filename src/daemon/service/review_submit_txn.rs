@@ -18,9 +18,7 @@
 use crate::errors::CliError;
 use crate::session::service::{apply_submit_review, generate_review_id, validate_submit_review};
 use crate::session::storage as session_storage;
-use crate::session::types::{
-    Review, ReviewPoint, ReviewVerdict, SessionState, TaskStatus,
-};
+use crate::session::types::{Review, ReviewPoint, ReviewVerdict, SessionState, TaskStatus};
 use crate::workspace::layout::SessionLayout;
 
 pub(super) struct PreparedSubmitReview {
@@ -63,7 +61,10 @@ pub(super) fn prepare_submit_review(
     };
     session_storage::append_review(layout, task_id, &review)?;
     let all_reviews = session_storage::load_reviews(layout, task_id)?;
-    Ok(PreparedSubmitReview { review, all_reviews })
+    Ok(PreparedSubmitReview {
+        review,
+        all_reviews,
+    })
 }
 
 pub(super) fn apply_submit_review_in_txn(

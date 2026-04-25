@@ -432,10 +432,6 @@ pub(super) async fn dispatch_improver_apply(
                 &format!("failed to serialize improver outcome: {error}"),
             ),
         },
-        Err(error) => error_response(
-            &request.id,
-            "IMPROVER_APPLY_FAILED",
-            &error.to_string(),
-        ),
+        Err(error) => error_response(&request.id, "IMPROVER_APPLY_FAILED", &error.to_string()),
     }
 }

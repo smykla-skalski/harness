@@ -16,7 +16,10 @@ use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
 pub(super) fn improver_routes() -> Router<DaemonHttpState> {
-    Router::new().route(http_paths::SESSION_IMPROVER_APPLY, post(post_improver_apply))
+    Router::new().route(
+        http_paths::SESSION_IMPROVER_APPLY,
+        post(post_improver_apply),
+    )
 }
 
 pub(super) async fn post_improver_apply(

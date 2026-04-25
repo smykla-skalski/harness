@@ -9,7 +9,9 @@ use crate::daemon::protocol::{
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
     TaskUpdateRequest,
 };
-use crate::session::types::{ReviewPoint, ReviewPointState, ReviewVerdict, SessionRole, TaskStatus};
+use crate::session::types::{
+    ReviewPoint, ReviewPointState, ReviewVerdict, SessionRole, TaskStatus,
+};
 
 use super::*;
 
@@ -36,9 +38,8 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
             )
             .await;
             let leader_id = state.leader_id.clone().expect("leader id");
-            let worker_id = temp_env::async_with_vars(
-                [("CODEX_SESSION_ID", Some("v10-col-worker"))],
-                async {
+            let worker_id =
+                temp_env::async_with_vars([("CODEX_SESSION_ID", Some("v10-col-worker"))], async {
                     let joined = join_session_direct_async(
                         &state.session_id,
                         &crate::daemon::protocol::SessionJoinRequest {
@@ -61,12 +62,10 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
                         .expect("worker")
                         .agent_id
                         .clone()
-                },
-            )
-            .await;
-            let reviewer_gemini = temp_env::async_with_vars(
-                [("GEMINI_SESSION_ID", Some("v10-col-gemini"))],
-                async {
+                })
+                .await;
+            let reviewer_gemini =
+                temp_env::async_with_vars([("GEMINI_SESSION_ID", Some("v10-col-gemini"))], async {
                     let joined = join_session_direct_async(
                         &state.session_id,
                         &crate::daemon::protocol::SessionJoinRequest {
@@ -91,12 +90,10 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
                         .expect("gemini reviewer")
                         .agent_id
                         .clone()
-                },
-            )
-            .await;
-            let reviewer_claude = temp_env::async_with_vars(
-                [("CLAUDE_SESSION_ID", Some("v10-col-claude"))],
-                async {
+                })
+                .await;
+            let reviewer_claude =
+                temp_env::async_with_vars([("CLAUDE_SESSION_ID", Some("v10-col-claude"))], async {
                     let joined = join_session_direct_async(
                         &state.session_id,
                         &crate::daemon::protocol::SessionJoinRequest {
@@ -121,9 +118,8 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
                         .expect("claude reviewer")
                         .agent_id
                         .clone()
-                },
-            )
-            .await;
+                })
+                .await;
 
             let created = create_task_async(
                 &state.session_id,

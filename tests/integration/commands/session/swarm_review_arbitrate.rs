@@ -107,8 +107,7 @@ fn third_round_dispute_transitions_task_to_blocked_awaiting_arbitration() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-blocked", || {
         let project = tmp.path().join("project");
-        let (_leader, _worker, task_id) =
-            drive_to_round_three_dispute("arb-blocked", &project);
+        let (_leader, _worker, task_id) = drive_to_round_three_dispute("arb-blocked", &project);
 
         let state = service::session_status("arb-blocked", &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
@@ -148,7 +147,10 @@ fn arbitrate_rework_returns_task_to_in_progress_with_worker_reassigned() {
         assert_eq!(task.status, TaskStatus::InProgress);
         assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
         assert!(task.consensus.is_none(), "consensus cleared on rework");
-        assert!(task.review_claim.is_none(), "reviewer claim cleared on rework");
+        assert!(
+            task.review_claim.is_none(),
+            "reviewer claim cleared on rework"
+        );
         assert!(
             task.awaiting_review.is_none(),
             "awaiting_review cleared on rework"

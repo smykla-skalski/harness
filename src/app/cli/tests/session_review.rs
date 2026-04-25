@@ -189,7 +189,12 @@ fn parse_session_task_submit_review_with_points_json() {
         panic!("expected SubmitReview");
     };
     assert_eq!(args.verdict, crate::session::types::ReviewVerdict::Approve);
-    assert!(args.points.as_deref().unwrap().contains(r#""point_id":"p1""#));
+    assert!(
+        args.points
+            .as_deref()
+            .unwrap()
+            .contains(r#""point_id":"p1""#)
+    );
 }
 
 #[test]

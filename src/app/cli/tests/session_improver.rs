@@ -35,10 +35,7 @@ fn parse_session_improver_apply() {
     };
     assert_eq!(args.session_id, "sess-imp");
     assert_eq!(args.issue_id, "python_traceback_output/abc");
-    assert_eq!(
-        args.target,
-        crate::session::service::ImproverTarget::Skill
-    );
+    assert_eq!(args.target, crate::session::service::ImproverTarget::Skill);
     assert_eq!(args.rel_path, "observe/SKILL.md");
     assert_eq!(args.new_contents_file, "/tmp/new.md");
     assert!(args.dry_run);
