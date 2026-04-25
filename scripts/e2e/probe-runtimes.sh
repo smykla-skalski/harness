@@ -38,9 +38,49 @@ probe_versioned_binary() {
   fi
 }
 
+claude_auth_available() {
+  if [[ -n "${ANTHROPIC_API_KEY:-}" || -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+    return 0
+  fi
+
+  local auth_status_file auth_status_result
+  auth_status_file="$(mktemp "${TMPDIR:-/tmp}/harness-claude-auth.XXXXXX")"
+  if portable_timeout 5 claude auth status >"$auth_status_file" 2>/dev/null; then
+    auth_status_result="$(
+      python3 - "$auth_status_file" <<'PY' || true
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    status = json.load(handle)
+logged_in = status.get("loggedIn")
+if logged_in is True:
+    print("true")
+elif logged_in is False:
+    print("false")
+PY
+    )"
+    rm -f "$auth_status_file"
+    case "$auth_status_result" in
+      true)
+        return 0
+        ;;
+      false)
+        return 1
+        ;;
+    esac
+  else
+    rm -f "$auth_status_file"
+  fi
+
+  [[ -s "$HOME/.config/claude-code/config.json" || -s "$HOME/.claude.json" ]]
+}
+
 CLAUDE_AUTH="false"
-[[ -s "$HOME/.config/claude-code/config.json" ]] && CLAUDE_AUTH="true"
-probe_versioned_binary "claude" "true" "claude" "$CLAUDE_AUTH" "missing ~/.config/claude-code/config.json"
+if command -v claude >/dev/null 2>&1 && claude_auth_available; then
+  CLAUDE_AUTH="true"
+fi
+probe_versioned_binary "claude" "true" "claude" "$CLAUDE_AUTH" "claude auth status is not logged in"
 
 CODEX_AUTH="false"
 [[ -s "$HOME/.codex/auth.json" ]] && CODEX_AUTH="true"
