@@ -34,7 +34,12 @@ PREVIEW_OVERRIDE_SETTINGS = (
 )
 
 PROJECT_MANIFEST_SETTINGS = (
-    '"REGISTER_APP_GROUPS": "YES"',
+    '"REGISTER_APP_GROUPS": "NO"',
+)
+
+PREVIEW_SCHEME_MACRO_EXPANSIONS = (
+    'expandVariableFromTarget: "HarnessMonitorUIPreviewable"',
+    'expandVariableFromTarget: "HarnessMonitorPreviewHost"',
 )
 
 
@@ -66,6 +71,9 @@ class TuistPackageSettingsTests(unittest.TestCase):
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
         for setting in PROJECT_MANIFEST_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, manifest)
+        for setting in PREVIEW_SCHEME_MACRO_EXPANSIONS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
         self.assertNotIn('"DEVELOPMENT_TEAM": "Q498EB36N4"', manifest)

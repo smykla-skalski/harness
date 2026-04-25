@@ -149,6 +149,7 @@ private let monitorAppSettings: Settings = .settings(
         "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_NAME": "Harness Monitor",
+        "REGISTER_APP_GROUPS": "NO",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
 )
@@ -378,7 +379,11 @@ private let uiPreviewableScheme: Scheme = .scheme(
     name: "HarnessMonitorUIPreviewable",
     shared: true,
     buildAction: .buildAction(targets: [.target("HarnessMonitorUIPreviewable")]),
-    testAction: .targets([], configuration: "Preview"),
+    testAction: .targets(
+        [],
+        configuration: "Preview",
+        expandVariableFromTarget: "HarnessMonitorUIPreviewable"
+    ),
     runAction: .runAction(configuration: "Preview"),
     analyzeAction: .analyzeAction(configuration: "Preview")
 )
@@ -391,7 +396,11 @@ private let uiPreviewsScheme: Scheme = .scheme(
         .target("HarnessMonitorUIPreviewable"),
         .target("HarnessMonitorKit")
     ]),
-    testAction: .targets([], configuration: "Preview"),
+    testAction: .targets(
+        [],
+        configuration: "Preview",
+        expandVariableFromTarget: "HarnessMonitorPreviewHost"
+    ),
     runAction: .runAction(
         configuration: "Preview",
         executable: .target("HarnessMonitorPreviewHost")

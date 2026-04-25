@@ -12,7 +12,7 @@ public enum BuildSettings {
         "CODE_SIGNING_ALLOWED": "YES",
         "COMPILATION_CACHE_ENABLE_CACHING": "YES",
         "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "YES",
-        "CURRENT_PROJECT_VERSION": "30.6.0", // VERSION_MARKER_CURRENT
+        "CURRENT_PROJECT_VERSION": "30.6.1", // VERSION_MARKER_CURRENT
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "DEAD_CODE_STRIPPING": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
@@ -35,11 +35,21 @@ public enum BuildSettings {
         "HARNESS_MONITOR_BUILD_GIT_COMMIT": "local-dev",
         "HARNESS_MONITOR_BUILD_GIT_DIRTY": "false",
         "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT": "local-dev",
-        "MARKETING_VERSION": "30.6.0" // VERSION_MARKER_MARKETING
+        "MARKETING_VERSION": "30.6.1" // VERSION_MARKER_MARKETING
     ]
 
     public static let previewOverrides: SettingsDictionary = [
+        // CAS compilation cache stable keys depend on SWIFT_ENABLE_PREFIX_MAPPING=YES.
+        // Preview dylib builds need prefix mapping off, so caching must go off too,
+        // otherwise XOJIT's preview-thunk + preview-thunk-launch resolve to stale CAS
+        // objects with duplicate symbols and the preview agent process is removed.
+        "COMPILATION_CACHE_ENABLE_CACHING": "NO",
+        "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "NO",
         "COMPILER_INDEX_STORE_ENABLE": "NO",
+        // Preview agent attaches to the host app via task port and loads
+        // dynamically generated preview-thunk dylibs. Hardened runtime blocks
+        // both, so the app launches but is killed before SwiftUI handshake.
+        "ENABLE_HARDENED_RUNTIME": "NO",
         "ENABLE_TESTABILITY": "NO",
         "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
         "ONLY_ACTIVE_ARCH": "YES",
