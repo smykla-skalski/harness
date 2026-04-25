@@ -61,10 +61,13 @@ extension HarnessMonitorUITestCase {
       return app
     }
     app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
-    guard prepareRecordingStartIfConfigured() else {
+    guard armRecordingStartIfConfigured() else {
       return app
     }
     app.launch()
+    guard waitForRecordingStartIfConfigured() else {
+      return app
+    }
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         if app.state != .runningForeground {
@@ -87,7 +90,7 @@ extension HarnessMonitorUITestCase {
     return app
   }
 
-  func prepareRecordingStartIfConfigured(
+  func armRecordingStartIfConfigured(
     context: String = "",
     file: StaticString = #filePath,
     line: UInt = #line
@@ -119,6 +122,19 @@ extension HarnessMonitorUITestCase {
       return false
     }
 
+    return true
+  }
+
+  func waitForRecordingStartIfConfigured(
+    context: String = "",
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
+    guard let controlDirectory = Self.recordingControlDirectory() else {
+      return true
+    }
+
+    let startAck = controlDirectory.appendingPathComponent("start.ready")
     if waitUntil(
       timeout: Self.uiTimeout,
       condition: {
