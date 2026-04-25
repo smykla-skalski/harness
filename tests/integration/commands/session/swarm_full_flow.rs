@@ -13,13 +13,13 @@ fn swarm_full_flow_mise_lane_passes() {
     let repo_root = std::env::current_dir().expect("current dir");
     let status = Command::new("mise")
         .arg("run")
-        .arg("e2e:swarm-full-flow")
+        .arg("e2e:swarm:full")
         .current_dir(&repo_root)
         .status()
         .expect("run mise swarm e2e lane");
 
     assert!(
         status.success(),
-        "mise run e2e:swarm-full-flow failed with status {status}"
+        "mise run e2e:swarm:full failed with status {status}"
     );
 }

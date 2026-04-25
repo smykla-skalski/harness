@@ -1,6 +1,6 @@
 # Swarm Full-Flow E2E Gap Ledger
 
-Rows marked `Open` are counted by `mise run e2e:swarm-gaps-open`.
+Rows marked `Open` are counted by `mise run e2e:swarm:gaps-open`.
 The Slice 6 orchestrator appends optional-runtime skips as `Closed` rows so missing optional tools are visible without making the lane fail.
 
 | ID | Status | Severity | Subsystem | Current behavior | Desired behavior | Closed by |
