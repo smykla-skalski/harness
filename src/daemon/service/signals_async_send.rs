@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use crate::agents::runtime::AgentRuntime;
 use crate::agents::runtime::signal::{Signal, SignalAck};
-use crate::daemon::index::ResolvedSession;
 use tokio::time::{Instant as TokioInstant, sleep};
 
 use super::signals::{
@@ -55,26 +54,26 @@ impl AsyncActiveSignalDelivery<'_> {
 
 async fn persist_sent_signal_state(
     async_db: &super::db::AsyncDaemonDb,
-    resolved: &mut ResolvedSession,
+    session_id: &str,
     request: &SignalSendRequest,
     now: &str,
 ) -> Result<(String, Option<String>, Option<String>), CliError> {
-    let (runtime_name, target_agent_session_id) = session_service::apply_send_signal_state(
-        &mut resolved.state,
-        &request.agent_id,
-        &request.actor,
-        now,
-    )?;
-    let target_tui_id = resolved
-        .state
-        .agents
-        .get(&request.agent_id)
-        .and_then(agent_tui_id_for_registration)
-        .map(ToString::to_string);
     async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
-        .await?;
-    Ok((runtime_name, target_agent_session_id, target_tui_id))
+        .update_session_state_immediate(session_id, |state| {
+            let (runtime_name, target_agent_session_id) = session_service::apply_send_signal_state(
+                state,
+                &request.agent_id,
+                &request.actor,
+                now,
+            )?;
+            let target_tui_id = state
+                .agents
+                .get(&request.agent_id)
+                .and_then(agent_tui_id_for_registration)
+                .map(ToString::to_string);
+            Ok((runtime_name, target_agent_session_id, target_tui_id))
+        })
+        .await
 }
 
 fn build_runtime_signal(
@@ -136,11 +135,11 @@ async fn prepare_signal_send(
     request: &SignalSendRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<PreparedAsyncSignalDelivery, CliError> {
-    let mut resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
+    let resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
     let project_dir = effective_project_dir(&resolved).to_path_buf();
     let now = utc_now();
     let (runtime_name, target_agent_session_id, target_tui_id) =
-        persist_sent_signal_state(async_db, &mut resolved, request, &now).await?;
+        persist_sent_signal_state(async_db, session_id, request, &now).await?;
     let runtime = runtime_for_agent(&runtime_name)?;
     let signal = build_runtime_signal(request, session_id, &request.agent_id, &now);
     let signal_session_id = target_agent_session_id.unwrap_or_else(|| session_id.to_string());

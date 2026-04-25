@@ -49,13 +49,11 @@ pub(crate) async fn leave_session_async(
     request: &SessionLeaveRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let mut resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    session_service::apply_leave_session(&mut resolved.state, &request.agent_id, &utc_now())?;
+    let now = utc_now();
     async_db
-        .save_session_state(&resolved.project.project_id, &resolved.state)
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_leave_session(state, &request.agent_id, &now)
+        })
         .await?;
     async_db
         .append_log_entry(&build_log_entry(

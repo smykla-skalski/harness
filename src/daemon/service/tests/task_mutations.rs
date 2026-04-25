@@ -199,6 +199,88 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
 }
 
 #[test]
+fn concurrent_create_task_async_preserves_all_tasks_in_db() {
+    with_temp_project(|project| {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let db_path = project
+                .parent()
+                .expect("project parent")
+                .join("daemon.sqlite");
+            let async_db = std::sync::Arc::new(
+                crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                    .await
+                    .expect("open async daemon db"),
+            );
+
+            let state = start_direct_session_async(
+                async_db.as_ref(),
+                project,
+                "daemon-async-task-race",
+                "async task race",
+                "async task race flow",
+                None,
+            )
+            .await;
+            let leader_id = state.leader_id.clone().expect("leader id");
+            let session_id = state.session_id.clone();
+            let task_count = 8usize;
+            let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(task_count));
+            let mut joins = tokio::task::JoinSet::new();
+
+            for index in 0..task_count {
+                let async_db = std::sync::Arc::clone(&async_db);
+                let barrier = std::sync::Arc::clone(&barrier);
+                let leader_id = leader_id.clone();
+                let session_id = session_id.clone();
+                joins.spawn(async move {
+                    let title = format!("async race task {index}");
+                    barrier.wait().await;
+                    create_task_async(
+                        &session_id,
+                        &TaskCreateRequest {
+                            actor: leader_id,
+                            title: title.clone(),
+                            context: Some(title),
+                            severity: crate::session::types::TaskSeverity::Medium,
+                            suggested_fix: None,
+                        },
+                        async_db.as_ref(),
+                    )
+                    .await
+                });
+            }
+
+            while let Some(result) = joins.join_next().await {
+                result.expect("join create task").expect("create task");
+            }
+
+            let resolved = async_db
+                .resolve_session(&session_id)
+                .await
+                .expect("resolve")
+                .expect("present");
+            assert_eq!(
+                resolved.state.tasks.len(),
+                task_count,
+                "concurrent async task creation must retain every task in canonical state"
+            );
+            for index in 0..task_count {
+                let title = format!("async race task {index}");
+                assert!(
+                    resolved
+                        .state
+                        .tasks
+                        .values()
+                        .any(|task| task.title == title),
+                    "missing '{title}' after concurrent async task creation"
+                );
+            }
+        });
+    });
+}
+
+#[test]
 fn change_role_and_transfer_leader_async_update_session_state() {
     with_temp_project(|project| {
         temp_env::with_var("CODEX_SESSION_ID", Some("async-role-worker"), || {
