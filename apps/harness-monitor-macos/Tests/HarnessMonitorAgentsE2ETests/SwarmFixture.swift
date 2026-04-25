@@ -12,6 +12,7 @@ final class SwarmFixture {
     static let daemonLog = "HARNESS_MONITOR_SWARM_E2E_DAEMON_LOG"
     static let sessionID = "HARNESS_MONITOR_SWARM_E2E_SESSION_ID"
     static let syncDir = "HARNESS_MONITOR_SWARM_E2E_SYNC_DIR"
+    static let stepTimeouts = "HARNESS_MONITOR_SWARM_E2E_STEP_TIMEOUTS"
   }
 
   let app: XCUIApplication
@@ -22,6 +23,7 @@ final class SwarmFixture {
   private let dataHomeURL: URL
   private let daemonLogPath: String
   private let syncDirURL: URL
+  private let stepTimeouts: [String: TimeInterval]
 
   init(testCase: HarnessMonitorUITestCase) throws {
     let environment = ProcessInfo.processInfo.environment
@@ -49,6 +51,7 @@ final class SwarmFixture {
       fileURLWithPath: try Self.required(EnvironmentKey.syncDir, from: environment),
       isDirectory: true
     )
+    self.stepTimeouts = Self.decodeStepTimeouts(from: environment[EnvironmentKey.stepTimeouts])
     self.app = XCUIApplication(
       bundleIdentifier: HarnessMonitorUITestCase.uiTestHostBundleIdentifier)
   }
@@ -87,13 +90,14 @@ final class SwarmFixture {
     )
   }
 
-  func waitForReady(_ act: String, timeout: TimeInterval = 120) throws -> [String: String] {
+  func waitForReady(_ act: String, timeout: TimeInterval? = nil) throws -> [String: String] {
     let url = syncDirURL.appendingPathComponent("\(act).ready")
+    let resolvedTimeout = timeout ?? stepTimeouts[act] ?? stepTimeouts["default"] ?? 30
     XCTAssertTrue(
-      testCase.waitUntil(timeout: timeout) {
+      testCase.waitUntil(timeout: resolvedTimeout) {
         FileManager.default.fileExists(atPath: url.path)
       },
-      "Timed out waiting for \(act).ready\n\(diagnosticsSummary())"
+      "Timed out waiting for \(act).ready after \(Int(resolvedTimeout))s\n\(diagnosticsSummary())"
     )
     return try Self.readKeyValueMarker(url)
   }
@@ -243,6 +247,24 @@ final class SwarmFixture {
       values[String(parts[0])] = String(parts[1])
     }
     return values
+  }
+
+  private static func decodeStepTimeouts(from rawValue: String?) -> [String: TimeInterval] {
+    guard
+      let rawValue,
+      let data = rawValue.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return [:]
+    }
+
+    var decoded: [String: TimeInterval] = [:]
+    for (key, value) in object {
+      if let number = value as? NSNumber {
+        decoded[key] = number.doubleValue
+      }
+    }
+    return decoded
   }
 
   private func scrollElementIntoView(

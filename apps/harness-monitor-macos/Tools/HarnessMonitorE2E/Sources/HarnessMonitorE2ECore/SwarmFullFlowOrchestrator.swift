@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-public struct SwarmActDriverInputs {
+public struct SwarmActDriverInputs: Sendable {
     public let repoRoot: URL
     public let stateRoot: URL
     public let dataHome: URL
@@ -227,6 +227,8 @@ private final class SwarmFullFlowRunner {
                 "HARNESS_MONITOR_SWARM_E2E_DAEMON_LOG": layout.daemonLog.path,
                 "HARNESS_MONITOR_SWARM_E2E_SESSION_ID": layout.sessionID,
                 "HARNESS_MONITOR_SWARM_E2E_SYNC_DIR": layout.syncDir.path,
+                SwarmStepTimeouts.environmentKey: SwarmStepTimeouts.encodedEnvironmentValue,
+                SwarmStepTimeouts.maxRecordingSecondsKey: String(Int(SwarmStepTimeouts.maxRecordingDuration)),
                 "HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR": layout.screenRecordingControlDirectory.path,
                 "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR": layout.uiSnapshotsSource.path,
             ]
@@ -356,6 +358,7 @@ private final class SwarmFullFlowRunner {
             "--log", layout.screenRecordingLog.path,
             "--manifest", layout.screenRecordingManifestPath.path,
             "--control-dir", layout.screenRecordingControlDirectory.path,
+            "--max-seconds", String(Int(SwarmStepTimeouts.maxRecordingDuration)),
         ]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
@@ -1092,9 +1095,9 @@ private final class SwarmActDriverRunner {
         try Data(body.utf8).write(to: marker, options: .atomic)
     }
 
-    private func actAck(_ act: String, timeout: TimeInterval = 120) throws {
+    private func actAck(_ act: String, timeout: TimeInterval? = nil) throws {
         let marker = inputs.syncDir.appendingPathComponent("\(act).ack")
-        let deadline = Date.now.addingTimeInterval(timeout)
+        let deadline = Date.now.addingTimeInterval(timeout ?? SwarmStepTimeouts.timeout(for: act))
         while Date.now < deadline {
             if FileManager.default.fileExists(atPath: marker.path) {
                 return
