@@ -37,6 +37,9 @@ struct HarnessMonitorAppConfiguration {
       "showInspector": false,
       "inspectorColumnWidth": 420.0,
     ]
+    registrationDefaults.merge(
+      HarnessMonitorLoggerDefaults.registrationDefaults()
+    ) { _, newValue in newValue }
     #if HARNESS_FEATURE_LOTTIE
       registrationDefaults[HarnessMonitorCornerAnimationDefaults.enabledKey] = false
     #endif
