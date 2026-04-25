@@ -4,7 +4,7 @@
 //! `TaskSeverity::Critical` regardless of the classifier's
 //! `IssueSeverity` tier.
 
-use harness::observe::types::{
+use harness::observe::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
 };
 use harness::session::observe::task_severity_for_issue;
