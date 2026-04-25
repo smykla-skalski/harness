@@ -14,13 +14,17 @@ extension DaemonController {
     var state = WarmUpLoopState(
       pendingBundleStampRefresh: pendingBundleStampRefresh
     )
+    var backoff = warmUpBackoff.makeIterator()
     while ContinuousClock.now < deadline {
-      let shouldBreak = try await warmUpIteration(state: &state)
-      if let client = shouldBreak.liveClient {
+      let outcome = try await warmUpIteration(state: &state)
+      if let client = outcome.liveClient {
         return client
       }
-      if shouldBreak.stop { break }
-      try await Task.sleep(for: .milliseconds(250))
+      if outcome.stop { break }
+      if outcome.progressed {
+        backoff.reset()
+      }
+      try await backoff.wait()
     }
     if let immediateError = state.immediateError {
       throw immediateError
@@ -56,9 +60,11 @@ extension DaemonController {
   struct WarmUpIterationOutcome {
     var liveClient: (any HarnessMonitorClientProtocol)?
     var stop: Bool
+    var progressed: Bool
 
-    static let continueLoop = Self(liveClient: nil, stop: false)
-    static let stopLoop = Self(liveClient: nil, stop: true)
+    static let continueLoop = Self(liveClient: nil, stop: false, progressed: false)
+    static let stopLoop = Self(liveClient: nil, stop: true, progressed: false)
+    static let progressedLoop = Self(liveClient: nil, stop: false, progressed: true)
   }
 
   func warmUpIteration(
@@ -102,7 +108,7 @@ extension DaemonController {
           await clearDeferredManagedLaunchAgentRefresh()
         }
         let client = try await bootstrap(connection: connection)
-        return WarmUpIterationOutcome(liveClient: client, stop: true)
+        return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
       }
       return try handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
     } catch let error as DaemonControlError {
@@ -111,7 +117,7 @@ extension DaemonController {
         state: &state
       ) {
         state.lastError = error
-        return .continueLoop
+        return .progressedLoop
       }
       state.managedStaleManifestTracker.reset()
       state.managedVersionMismatchTracker.reset()
@@ -186,11 +192,13 @@ extension DaemonController {
       )
       return .stopLoop
     }
-    if state.managedStaleManifestTracker.expired(
+    let observation = state.managedStaleManifestTracker.observe(
       signature: staleSignature,
       now: ContinuousClock.now,
       gracePeriod: managedStaleManifestGracePeriod
-    ) {
+    )
+    switch observation {
+    case .expired:
       let timeoutMessage = Self.warmUpManagedStaleManifestTimeoutMessage(
         path: path,
         gracePeriod: gracePeriod
@@ -199,11 +207,12 @@ extension DaemonController {
         "\(timeoutMessage, privacy: .public)"
       )
       return .stopLoop
+    case .freshSignature, .withinGrace:
+      HarnessMonitorLogger.lifecycle.trace(
+        "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
+      )
+      return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
-    HarnessMonitorLogger.lifecycle.trace(
-      "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
-    )
-    return .continueLoop
   }
 
   func handleManagedReplacementManifestWait(
@@ -212,11 +221,13 @@ extension DaemonController {
     gracePeriod: String,
     state: inout WarmUpLoopState
   ) -> WarmUpIterationOutcome {
-    if state.managedStaleManifestTracker.expired(
+    let observation = state.managedStaleManifestTracker.observe(
       signature: signature,
       now: ContinuousClock.now,
       gracePeriod: managedStaleManifestGracePeriod
-    ) {
+    )
+    switch observation {
+    case .expired:
       state.skipFinalBootstrapProbe = true
       state.immediateError = DaemonControlError.daemonDidNotStart
       let timeoutMessage = Self.warmUpManagedReplacementManifestTimeoutMessage(
@@ -227,12 +238,12 @@ extension DaemonController {
         "\(timeoutMessage, privacy: .public)"
       )
       return .stopLoop
+    case .freshSignature, .withinGrace:
+      HarnessMonitorLogger.lifecycle.trace(
+        "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
+      )
+      return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
-
-    HarnessMonitorLogger.lifecycle.trace(
-      "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
-    )
-    return .continueLoop
   }
 
   func handleManagedVersionMismatch(
@@ -266,11 +277,13 @@ extension DaemonController {
     let path = HarnessMonitorPaths.manifestURL(using: environment).path
     let signature = Self.managedVersionMismatchSignature(for: manifest)
     let gracePeriod = String(describing: managedStaleManifestGracePeriod)
-    if state.managedVersionMismatchTracker.expired(
+    let observation = state.managedVersionMismatchTracker.observe(
       signature: signature,
       now: ContinuousClock.now,
       gracePeriod: managedStaleManifestGracePeriod
-    ) {
+    )
+    switch observation {
+    case .expired:
       HarnessMonitorLogger.lifecycle.error(
         """
         \(Self.warmUpManagedVersionMismatchTimeoutMessage(
@@ -283,18 +296,18 @@ extension DaemonController {
       )
       state.immediateError = mismatch
       return .stopLoop
+    case .freshSignature, .withinGrace:
+      HarnessMonitorLogger.lifecycle.trace(
+        """
+        \(Self.warmUpManagedVersionMismatchWaitMessage(
+          path: path,
+          expected: expected,
+          actual: actual
+        ), privacy: .public)
+        """
+      )
+      return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
-
-    HarnessMonitorLogger.lifecycle.trace(
-      """
-      \(Self.warmUpManagedVersionMismatchWaitMessage(
-        path: path,
-        expected: expected,
-        actual: actual
-      ), privacy: .public)
-      """
-    )
-    return .continueLoop
   }
 
   func signalManagedRecoveryProcessIfNeeded(

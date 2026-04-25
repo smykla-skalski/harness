@@ -96,6 +96,12 @@ public enum TransportPreference: Sendable {
   case http
 }
 
+enum ManagedStaleManifestObservation {
+  case freshSignature
+  case withinGrace
+  case expired
+}
+
 struct ManagedStaleManifestTracker {
   private var signature: String?
   private var firstObservedAt: ContinuousClock.Instant?
@@ -105,23 +111,23 @@ struct ManagedStaleManifestTracker {
     firstObservedAt = nil
   }
 
-  mutating func expired(
+  mutating func observe(
     signature: String,
     now: ContinuousClock.Instant,
     gracePeriod: Duration
-  ) -> Bool {
+  ) -> ManagedStaleManifestObservation {
     if self.signature != signature {
       self.signature = signature
       firstObservedAt = now
-      return false
+      return .freshSignature
     }
 
     guard let firstObservedAt else {
       self.firstObservedAt = now
-      return false
+      return .freshSignature
     }
 
-    return now - firstObservedAt >= gracePeriod
+    return now - firstObservedAt >= gracePeriod ? .expired : .withinGrace
   }
 }
 
