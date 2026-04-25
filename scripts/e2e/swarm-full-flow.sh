@@ -554,7 +554,7 @@ configure_xctestrun() {
   local destination_path="$2"
 
   python3 - "$source_path" "$destination_path" \
-    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$SESSION_ID" "$SYNC_DIR" "$UI_SNAPSHOTS_DIR" <<'PY'
+    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$SESSION_ID" "$SYNC_DIR" "$UI_SNAPSHOTS_SOURCE" <<'PY'
 import plistlib
 import shutil
 import sys
