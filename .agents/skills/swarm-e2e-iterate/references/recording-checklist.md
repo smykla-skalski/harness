@@ -4,16 +4,16 @@ Use this after the chronological `.mov` pass. Write one short line per item with
 
 If a check is unproven, mark it `needs-verification` and re-watch.
 
-The thresholds live in [recording-analysis.md](recording-analysis.md). Per-act surfaces live in [act-marker-matrix.md](act-marker-matrix.md).
+Thresholds live in [recording-analysis.md](recording-analysis.md). Per-act surfaces live in [act-marker-matrix.md](act-marker-matrix.md).
 
 ## Required items
 
 ### A. Process and lifecycle
 
-- `lifecycle.ttff`: time-to-first-frame ≤ 2 s on M-series, ≥ 4 s is `found`.
-- `lifecycle.dashboard`: time to populated dashboard ≤ 1 s, ≥ 2 s is `found`.
-- `lifecycle.manifest`: daemon manifest pickup latency > 1 s when manifest already exists is `found`.
-- `lifecycle.warmstart`: warm relaunch must beat cold launch in the same iteration.
+- `lifecycle.ttff`: first frame ≤ 2 s on M-series, ≥ 4 s is `found`.
+- `lifecycle.dashboard`: populated dashboard ≤ 1 s, ≥ 2 s is `found`.
+- `lifecycle.manifest`: manifest pickup > 1 s when the manifest already exists is `found`.
+- `lifecycle.warmstart`: warm relaunch must beat cold launch.
 - `lifecycle.terminate`: orderly termination, no crash dialog, no hung window in the last 5 s.
 - `lifecycle.persistence`: `-ApplePersistenceIgnoreState YES` honored, no prior session window restored.
 
@@ -64,15 +64,15 @@ The thresholds live in [recording-analysis.md](recording-analysis.md). Per-act s
 
 ### H. Swarm-specific UI (cross-reference [act-marker-matrix.md](act-marker-matrix.md))
 
-- `swarm.act1.session`: selected sidebar row + cockpit window title at `act1` window.
-- `swarm.act2.roles`: all required runtime/role pairs visible; duplicate-runtime claim visibly rejected.
-- `swarm.act3.tasks`: five task cards visible at `act3` window.
+- `swarm.act1.session`: selected sidebar row + cockpit window title at `act1`.
+- `swarm.act2.roles`: required runtime/role pairs visible; duplicate claim visibly rejected.
+- `swarm.act3.tasks`: five task cards visible at `act3`.
 - `swarm.act4.selection`: `taskInspectorCard.value == task_review_id`.
 - `swarm.act5.heuristics`: ten distinct `heuristicIssueCard.<code>` cards present.
 - `swarm.act6.improver`: improver dry-run reflected in inspector.
 - `swarm.act7.roster`: agents card reflects current roster after the rejoin.
 - `swarm.act8.awaitingReview`: `awaitingReviewBadge(task_review_id)` present.
-- `swarm.act9.reviewers`: claim badge or quorum indicator with two distinct runtimes.
+- `swarm.act9.reviewers`: claim badge or quorum indicator with two runtimes.
 - `swarm.act10.autospawn`: auto-spawn-reviewer indicator present after removal cascade.
 - `swarm.act11.workerRefusal`: `harness.toast.worker-refusal` toast or inspector rejection visible.
 - `swarm.act12.round1`: `roundCounter(task_arbitration_id)` shows `1`; partial-agreement chip visible.
@@ -80,13 +80,13 @@ The thresholds live in [recording-analysis.md](recording-analysis.md). Per-act s
 - `swarm.act14.signalCollision`: `harness.toast.signal-collision` toast present, no overlap with the act11 toast.
 - `swarm.act15.observe`: one of `observeScanButton`/`observeDoctorButton`/observe summary visible; daemon-health green.
 - `swarm.act16.end`: `harness.session-status.corner` reaches closed/ended within 20 s of ack.
-- `swarm.invariant.transitions`: review-state badge progresses `Open -> AwaitingReview -> InReview -> Done` without skipping.
+- `swarm.invariant.transitions`: review-state badge progresses `Open -> AwaitingReview -> InReview -> Done`.
 - `swarm.invariant.daemonHealth`: daemon-health indicator green from `act1` through `act16`.
 
 ### I. Recording artifact integrity
 
-- `artifact.head`: `.mov` first frame within 5 s of process spawn.
-- `artifact.tail`: `.mov` last frame within 5 s of process exit.
+- `artifact.head`: `.mov` first frame within 5 s of spawn.
+- `artifact.tail`: `.mov` last frame within 5 s of exit.
 - `artifact.freezes`: no mid-run freeze > 2 s outside known waits.
 - `artifact.blanks`: no black or near-blank frames outside known transitions.
 - `artifact.size`: file size between 5 MB and 2 GB.
@@ -94,13 +94,13 @@ The thresholds live in [recording-analysis.md](recording-analysis.md). Per-act s
 
 ## Suite-speed prompts
 
-Apply on every iteration. These are checklist items even when no individual `swarm.*` row is `found`.
+Apply on every iteration, even when no `swarm.*` row is `found`.
 
-- `suite.deadHead`: no dead time at the start of the recording.
-- `suite.deadTail`: no dead time at the end of the recording.
-- `suite.relaunchGap`: no avoidable idle between consecutive launches in one iteration.
+- `suite.deadHead`: no dead time at the start.
+- `suite.deadTail`: no dead time at the end.
+- `suite.relaunchGap`: no avoidable idle between consecutive launches.
 - `suite.handoff`: no slow handoff that delays the next act.
-- `suite.delayedAssert`: no assertion that waits longer than required for the marker.
+- `suite.delayedAssert`: no assertion that waits longer than required.
 - `suite.repeatedWait`: no repeated wait that could be collapsed.
 
-Keep the proof pass terse and deterministic. Wrap named files or paths in markdown links. Promote any `found` verdict to a ledger row using [iteration-protocol.md](iteration-protocol.md).
+Keep the proof pass terse. Wrap named files or paths in markdown links. Promote any `found` verdict to a ledger row using [iteration-protocol.md](iteration-protocol.md).
