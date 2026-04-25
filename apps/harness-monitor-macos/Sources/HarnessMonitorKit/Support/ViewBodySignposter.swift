@@ -2,10 +2,17 @@ import OSLog
 import SwiftUI
 
 public enum ViewBodySignposter {
-  private static let bridge = HarnessMonitorSignpostBridge(
-    subsystem: "io.harnessmonitor",
-    category: "view"
-  )
+  #if HARNESS_FEATURE_OTEL
+    private static let bridge = HarnessMonitorSignpostBridge(
+      subsystem: "io.harnessmonitor",
+      category: "view"
+    )
+  #else
+    private static let signposter = OSSignposter(
+      subsystem: "io.harnessmonitor",
+      category: "view"
+    )
+  #endif
   private static let profileEnvKey = "HARNESS_MONITOR_PROFILE_VIEW_BODIES"
   private static let perfScenarioEnvKey = "HARNESS_MONITOR_PERF_SCENARIO"
   private static let updateLoggingEnvKey = "HARNESS_MONITOR_LOG_VIEW_UPDATES"
@@ -67,13 +74,21 @@ public enum ViewBodySignposter {
     attributes: [String: String] = [:],
     body: () -> T
   ) -> T {
-    let (state, span) = bridge.beginInterval(name: "view.body")
-    span.setAttribute(key: "harness.view.name", value: viewName)
-    for (key, value) in attributes {
-      span.setAttribute(key: key, value: value)
-    }
-    defer { bridge.endInterval(name: "view.body", state: state) }
-    return body()
+    #if HARNESS_FEATURE_OTEL
+      let (state, span) = bridge.beginInterval(name: "view.body")
+      span.setAttribute(key: "harness.view.name", value: viewName)
+      for (key, value) in attributes {
+        span.setAttribute(key: key, value: value)
+      }
+      defer { bridge.endInterval(name: "view.body", state: state) }
+      return body()
+    #else
+      _ = attributes
+      _ = viewName
+      let state = signposter.beginInterval("view.body", id: .exclusive)
+      defer { signposter.endInterval("view.body", state) }
+      return body()
+    #endif
   }
 
   public static func profile<T>(

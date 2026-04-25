@@ -76,54 +76,56 @@ struct WebSocketProtocolTests {
     #expect(request.traceContext == nil)
   }
 
-  @Test("Telemetry trace context produces a websocket traceparent")
-  func telemetryTraceContextProducesWebSocketTraceparent() throws {
-    HarnessMonitorTelemetry.shared.resetForTests()
-    defer { HarnessMonitorTelemetry.shared.resetForTests() }
+  #if HARNESS_FEATURE_OTEL
+    @Test("Telemetry trace context produces a websocket traceparent")
+    func telemetryTraceContextProducesWebSocketTraceparent() throws {
+      HarnessMonitorTelemetry.shared.resetForTests()
+      defer { HarnessMonitorTelemetry.shared.resetForTests() }
 
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "daemon.websocket.rpc",
-      kind: .client
-    )
-    defer { span.end() }
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "daemon.websocket.rpc",
+        kind: .client
+      )
+      defer { span.end() }
 
-    let traceContext = HarnessMonitorTelemetry.shared.traceContext(spanContext: span.context)
-    #expect(traceContext["traceparent"]?.isEmpty == false)
+      let traceContext = HarnessMonitorTelemetry.shared.traceContext(spanContext: span.context)
+      #expect(traceContext["traceparent"]?.isEmpty == false)
 
-    let request = WsRequest(
-      id: "trace-ctx",
-      method: "session.detail",
-      params: .object(["session_id": .string("sess-1")]),
-      traceContext: traceContext
-    )
-    let data = try encoder.encode(request)
-    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-    let encodedTraceContext = json?["trace_context"] as? [String: String]
+      let request = WsRequest(
+        id: "trace-ctx",
+        method: "session.detail",
+        params: .object(["session_id": .string("sess-1")]),
+        traceContext: traceContext
+      )
+      let data = try encoder.encode(request)
+      let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+      let encodedTraceContext = json?["trace_context"] as? [String: String]
 
-    #expect(encodedTraceContext?["traceparent"]?.isEmpty == false)
-  }
+      #expect(encodedTraceContext?["traceparent"]?.isEmpty == false)
+    }
 
-  @Test("WebSocket transport request carries trace_context from span context")
-  func transportRequestCarriesTraceContext() async {
-    HarnessMonitorTelemetry.shared.resetForTests()
-    defer { HarnessMonitorTelemetry.shared.resetForTests() }
+    @Test("WebSocket transport request carries trace_context from span context")
+    func transportRequestCarriesTraceContext() async {
+      HarnessMonitorTelemetry.shared.resetForTests()
+      defer { HarnessMonitorTelemetry.shared.resetForTests() }
 
-    let transport = makeTransport()
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "daemon.websocket.rpc",
-      kind: .client
-    )
-    defer { span.end() }
+      let transport = makeTransport()
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "daemon.websocket.rpc",
+        kind: .client
+      )
+      defer { span.end() }
 
-    let request = await transport.makeRequest(
-      id: "trace-rpc-1",
-      method: "session.detail",
-      params: .object(["session_id": .string("sess-1")]),
-      spanContext: span.context
-    )
+      let request = await transport.makeRequest(
+        id: "trace-rpc-1",
+        method: "session.detail",
+        params: .object(["session_id": .string("sess-1")]),
+        spanContext: span.context
+      )
 
-    #expect(request.traceContext?["traceparent"]?.isEmpty == false)
-  }
+      #expect(request.traceContext?["traceparent"]?.isEmpty == false)
+    }
+  #endif
 
   @Test("WsFrame decodes response with result")
   func responseDecoding() throws {

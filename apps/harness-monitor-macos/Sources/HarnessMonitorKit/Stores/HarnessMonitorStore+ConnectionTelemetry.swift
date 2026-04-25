@@ -24,7 +24,9 @@ extension HarnessMonitorStore {
       guard oldValue != newValue else {
         return
       }
-      recordWebSocketConnectionGauge()
+      #if HARNESS_FEATURE_OTEL
+        recordWebSocketConnectionGauge()
+      #endif
     }
   }
 
@@ -66,7 +68,9 @@ extension HarnessMonitorStore {
       guard oldValue != newValue else {
         return
       }
-      recordWebSocketConnectionGauge()
+      #if HARNESS_FEATURE_OTEL
+        recordWebSocketConnectionGauge()
+      #endif
     }
   }
 

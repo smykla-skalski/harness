@@ -48,7 +48,7 @@ PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH="../../mcp-servers/harness-monitor-registry"
 LOCAL_REGISTRY_PRODUCT_NAME="HarnessMonitorRegistry"
 
-SUPPORTED_FEATURES=("LOTTIE")
+SUPPORTED_FEATURES=("LOTTIE" "OTEL")
 MERGED_SPEC="$ROOT/.project.merged.yml"
 
 is_feature_enabled() {

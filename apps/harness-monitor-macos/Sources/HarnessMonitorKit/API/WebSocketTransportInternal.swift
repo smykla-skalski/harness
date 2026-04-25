@@ -1,5 +1,8 @@
 import Foundation
-import OpenTelemetryApi
+
+#if HARNESS_FEATURE_OTEL
+  import OpenTelemetryApi
+#endif
 // MARK: - Internal transport mechanics
 
 private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
@@ -55,27 +58,39 @@ extension WebSocketTransport {
     guard !isShutDown, let webSocketTask else {
       throw WebSocketTransportError.connectionClosed
     }
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "daemon.websocket.rpc",
-      kind: .client,
-      attributes: [
-        "transport.kind": .string("websocket"),
-        "rpc.system": .string("harness-daemon"),
-        "rpc.method": .string(method.rawValue),
-      ]
-    )
-    defer { span.end() }
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "daemon.websocket.rpc",
+        kind: .client,
+        attributes: [
+          "transport.kind": .string("websocket"),
+          "rpc.system": .string("harness-daemon"),
+          "rpc.method": .string(method.rawValue),
+        ]
+      )
+      defer { span.end() }
+    #endif
 
     let startedAt = ContinuousClock.now
     let id = UUID().uuidString
-    span.setAttribute(key: "rpc.request_id", value: id)
+    #if HARNESS_FEATURE_OTEL
+      span.setAttribute(key: "rpc.request_id", value: id)
+    #endif
     pendingRPCMethods[id] = method
-    let request = makeRequest(
-      id: id,
-      method: method.rawValue,
-      params: params,
-      spanContext: span.context
-    )
+    #if HARNESS_FEATURE_OTEL
+      let request = makeRequest(
+        id: id,
+        method: method.rawValue,
+        params: params,
+        spanContext: span.context
+      )
+    #else
+      let request = makeRequest(
+        id: id,
+        method: method.rawValue,
+        params: params
+      )
+    #endif
     let data = try encoder.encode(request)
     let text = String(data: data, encoding: .utf8) ?? "{}"
     let task = webSocketTask
@@ -101,37 +116,22 @@ extension WebSocketTransport {
           }
         }
       }
-      let durationMs = harnessMonitorDurationMilliseconds(
-        startedAt.duration(to: ContinuousClock.now)
-      )
-      HarnessMonitorTelemetry.shared.recordWebSocketRPC(
-        method: method.rawValue,
-        durationMs: durationMs,
-        failed: false
-      )
+      #if HARNESS_FEATURE_OTEL
+        recordRPCSuccess(method: method.rawValue, startedAt: startedAt)
+      #else
+        _ = startedAt
+      #endif
       return result
     } catch {
-      let durationMs = harnessMonitorDurationMilliseconds(
-        startedAt.duration(to: ContinuousClock.now)
-      )
-      span.status = .error(description: error.localizedDescription)
-      HarnessMonitorTelemetry.shared.recordError(error, on: span)
-      HarnessMonitorTelemetry.shared.recordWebSocketRPC(
-        method: method.rawValue,
-        durationMs: durationMs,
-        failed: true
-      )
-      HarnessMonitorTelemetry.shared.emitLog(
-        name: "daemon.websocket.rpc.failed",
-        severity: .error,
-        body: "WebSocket RPC failed",
-        attributes: [
-          "rpc.method": .string(method.rawValue),
-          "rpc.request_id": .string(id),
-          "request.duration_ms": .double(durationMs),
-          "error.message": .string(error.localizedDescription),
-        ]
-      )
+      #if HARNESS_FEATURE_OTEL
+        recordRPCFailure(
+          error: error,
+          method: method.rawValue,
+          requestID: id,
+          startedAt: startedAt,
+          span: span
+        )
+      #endif
       throw error
     }
   }
@@ -139,15 +139,13 @@ extension WebSocketTransport {
   func makeRequest(
     id: String,
     method: String,
-    params: JSONValue? = nil,
-    spanContext: SpanContext? = nil
+    params: JSONValue? = nil
   ) -> WsRequest {
-    let traceContext = HarnessMonitorTelemetry.shared.traceContext(spanContext: spanContext)
-    return WsRequest(
+    WsRequest(
       id: id,
       method: method,
       params: params,
-      traceContext: traceContext.isEmpty ? nil : traceContext
+      traceContext: nil
     )
   }
 
@@ -216,23 +214,27 @@ extension WebSocketTransport {
       "Bearer \(connection.token)",
       forHTTPHeaderField: "Authorization"
     )
-    let requestID = HarnessMonitorTelemetry.shared.decorate(&request)
+    #if HARNESS_FEATURE_OTEL
+      let requestID = HarnessMonitorTelemetry.shared.decorate(&request)
+    #endif
     let task = session.webSocketTask(with: request)
     webSocketTask = task
     task.resume()
     startHeartbeat()
     try await resubscribe()
     emitReconnectReadyEvents()
-    HarnessMonitorTelemetry.shared.recordWebSocketConnect(outcome: "reconnect")
-    HarnessMonitorTelemetry.shared.emitLog(
-      name: "daemon.websocket.reconnect",
-      severity: .info,
-      body: "WebSocket reconnect completed",
-      attributes: [
-        "request.id": .string(requestID),
-        "url.absolute": .string(wsURL.absoluteString),
-      ]
-    )
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.recordWebSocketConnect(outcome: "reconnect")
+      HarnessMonitorTelemetry.shared.emitLog(
+        name: "daemon.websocket.reconnect",
+        severity: .info,
+        body: "WebSocket reconnect completed",
+        attributes: [
+          "request.id": .string(requestID),
+          "url.absolute": .string(wsURL.absoluteString),
+        ]
+      )
+    #endif
   }
 
   func resubscribe() async throws {

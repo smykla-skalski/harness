@@ -1,6 +1,9 @@
 import Foundation
-import OpenTelemetryApi
 import SwiftData
+
+#if HARNESS_FEATURE_OTEL
+  import OpenTelemetryApi
+#endif
 
 public actor SupervisorService {
   private static let quarantineErrorThreshold = 5
@@ -111,16 +114,14 @@ public actor SupervisorService {
 
   private func tickBody() async {
     let tickStartedAt = Date()
-    let tracer = SupervisorTelemetry.tracer()
-    let span = tracer.spanBuilder(spanName: SupervisorTelemetry.tickSpanName).startSpan()
-    defer { span.end() }
-
+    #if HARNESS_FEATURE_OTEL
+      let tracer = SupervisorTelemetry.tracer()
+      let span = tracer.spanBuilder(spanName: SupervisorTelemetry.tickSpanName).startSpan()
+      defer { span.end() }
+    #endif
     let now = clock.now()
     let snapshot = await buildSnapshot(now: now)
-    HarnessMonitorLogger.supervisorDebug(
-      "supervisor.tick snapshot=\(snapshot.id)"
-    )
-
+    HarnessMonitorLogger.supervisorDebug("supervisor.tick snapshot=\(snapshot.id)")
     let rules = await registry.allRules
     let observers = await registry.observerList
     lastSnapshotID = snapshot.id
@@ -128,7 +129,6 @@ public actor SupervisorService {
     for observer in observers {
       await observer.willTick(snapshot)
     }
-
     let results = await evaluateRules(
       rules,
       snapshot: snapshot,

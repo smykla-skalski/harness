@@ -25,12 +25,7 @@ extension SessionCacheService {
   }
 
   func recordCounts() -> CacheCounts {
-    let counts = HarnessMonitorTelemetry.shared.withSQLiteOperation(
-      operation: "record_counts",
-      access: "read",
-      database: "monitor-cache",
-      databasePath: databaseURL?.path
-    ) {
+    let countsBody: () -> CacheCounts = { [self] in
       let ctx = makeContext()
       return CacheCounts(
         sessions: (try? ctx.fetchCount(FetchDescriptor<CachedSession>())) ?? 0,
@@ -43,42 +38,59 @@ extension SessionCacheService {
         activities: (try? ctx.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
       )
     }
-    HarnessMonitorTelemetry.shared.recordSQLiteRecordCounts(
-      database: "monitor-cache",
-      counts: [
-        "sessions": counts.sessions,
-        "projects": counts.projects,
-        "agents": counts.agents,
-        "tasks": counts.tasks,
-        "signals": counts.signals,
-        "timeline": counts.timeline,
-        "observers": counts.observers,
-        "activities": counts.activities,
-      ]
-    )
-    return counts
+    #if HARNESS_FEATURE_OTEL
+      let counts = HarnessMonitorTelemetry.shared.withSQLiteOperation(
+        operation: "record_counts",
+        access: "read",
+        database: "monitor-cache",
+        databasePath: databaseURL?.path,
+        countsBody
+      )
+      HarnessMonitorTelemetry.shared.recordSQLiteRecordCounts(
+        database: "monitor-cache",
+        counts: [
+          "sessions": counts.sessions,
+          "projects": counts.projects,
+          "agents": counts.agents,
+          "tasks": counts.tasks,
+          "signals": counts.signals,
+          "timeline": counts.timeline,
+          "observers": counts.observers,
+          "activities": counts.activities,
+        ]
+      )
+      return counts
+    #else
+      return countsBody()
+    #endif
   }
 
   func deleteAllCacheData() -> Bool {
-    do {
-      return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
-        operation: "delete_all_cache_data",
-        access: "write",
-        database: "monitor-cache",
-        databasePath: databaseURL?.path
-      ) {
-        let context = makeContext()
-        let sessions = try context.fetch(FetchDescriptor<CachedSession>())
-        for session in sessions {
-          context.delete(session)
-        }
-        let projects = try context.fetch(FetchDescriptor<CachedProject>())
-        for project in projects {
-          context.delete(project)
-        }
-        try context.save()
-        return true
+    let deleteBody: () throws -> Bool = { [self] in
+      let context = makeContext()
+      let sessions = try context.fetch(FetchDescriptor<CachedSession>())
+      for session in sessions {
+        context.delete(session)
       }
+      let projects = try context.fetch(FetchDescriptor<CachedProject>())
+      for project in projects {
+        context.delete(project)
+      }
+      try context.save()
+      return true
+    }
+    do {
+      #if HARNESS_FEATURE_OTEL
+        return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
+          operation: "delete_all_cache_data",
+          access: "write",
+          database: "monitor-cache",
+          databasePath: databaseURL?.path,
+          deleteBody
+        )
+      #else
+        return try deleteBody()
+      #endif
     } catch {
       return false
     }

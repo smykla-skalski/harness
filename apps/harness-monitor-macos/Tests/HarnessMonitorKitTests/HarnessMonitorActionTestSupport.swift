@@ -226,7 +226,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   }
 
   func recordActiveTraceContext(operation: String) {
-    let traceContext = HarnessMonitorTelemetry.shared.traceContext()
+    #if HARNESS_FEATURE_OTEL
+      let traceContext = HarnessMonitorTelemetry.shared.traceContext()
+    #else
+      let traceContext: [String: String] = [:]
+    #endif
     lock.withLock {
       recordedTraceContextsByOperation[operation, default: []].append(traceContext)
     }

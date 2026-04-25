@@ -288,45 +288,37 @@ public final class HarnessMonitorStore {
 
   public func bootstrap() async {
     let startedAt = ContinuousClock.now
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "app.lifecycle.bootstrap",
-      kind: .internal,
-      attributes: [
-        "daemon.ownership": .string(daemonOwnership == .external ? "external" : "managed")
-      ]
-    )
-    defer {
-      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-      HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
-        event: "bootstrap",
-        launchMode: "live",
-        durationMs: durationMs
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "app.lifecycle.bootstrap",
+        kind: .internal,
+        attributes: [
+          "daemon.ownership": .string(daemonOwnership == .external ? "external" : "managed")
+        ]
       )
-      span.end()
-    }
-
-    await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
-      connectionState = .connecting
-      startResourceMetricsSampling()
-      recordActiveTaskGauge()
-      await startSupervisor()
-
-      isBootstrapping = true
       defer {
-        isBootstrapping = false
-        replayQueuedReconnectAfterBootstrapIfNeeded()
+        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+        HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
+          event: "bootstrap",
+          launchMode: "live",
+          durationMs: durationMs
+        )
+        span.end()
       }
+    #else
+      _ = startedAt
+    #endif
 
-      switch daemonOwnership {
-      case .external:
-        await bootstrapExternalDaemon()
-      case .managed:
-        await bootstrapManagedDaemon()
+    #if HARNESS_FEATURE_OTEL
+      await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
+        await bootstrapBody()
       }
-    }
+    #else
+      await bootstrapBody()
+    #endif
   }
 
-  private func bootstrapManagedDaemon() async {
+  func bootstrapManagedDaemon() async {
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
       registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {
@@ -367,7 +359,7 @@ public final class HarnessMonitorStore {
     }
   }
 
-  private func bootstrapExternalDaemon() async {
+  func bootstrapExternalDaemon() async {
     // Conflict detection: warn if the SMAppService launch agent is still
     // registered. The Rust singleton lock prevents data corruption, but the
     // two daemons race for the manifest and the user sees confusing startup

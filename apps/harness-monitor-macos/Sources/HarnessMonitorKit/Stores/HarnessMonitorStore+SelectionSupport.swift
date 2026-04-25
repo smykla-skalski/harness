@@ -66,7 +66,9 @@ extension HarnessMonitorStore {
 
   func synchronizeSessionBaggage(for sessionID: String?) {
     guard let sessionID else {
-      HarnessMonitorTelemetry.shared.clearSessionBaggage()
+      #if HARNESS_FEATURE_OTEL
+        HarnessMonitorTelemetry.shared.clearSessionBaggage()
+      #endif
       return
     }
 
@@ -76,7 +78,11 @@ extension HarnessMonitorStore {
         session.session.sessionId == sessionID ? session.session.projectId : nil
       }
       ?? sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    HarnessMonitorTelemetry.shared.setSessionBaggage(sessionID: sessionID, projectID: projectID)
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.setSessionBaggage(sessionID: sessionID, projectID: projectID)
+    #else
+      _ = projectID
+    #endif
   }
 
   func beginSessionLoad() -> UInt64 {

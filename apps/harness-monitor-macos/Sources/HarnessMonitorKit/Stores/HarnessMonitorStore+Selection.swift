@@ -1,6 +1,9 @@
 import AppKit
 import Foundation
-import OpenTelemetryApi
+
+#if HARNESS_FEATURE_OTEL
+  import OpenTelemetryApi
+#endif
 
 extension HarnessMonitorStore {
   public var selectedSessionID: String? {
@@ -238,41 +241,48 @@ extension HarnessMonitorStore {
 
   func performSessionSelection(sessionID: String) async {
     let startedAt = ContinuousClock.now
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "user.interaction.select_session",
-      kind: .internal,
-      attributes: ["session.id": .string(sessionID)]
-    )
-    defer {
-      span.end()
-      let elapsed = startedAt.duration(to: ContinuousClock.now)
-      let durationMs = harnessMonitorDurationMilliseconds(elapsed)
-      HarnessMonitorTelemetry.shared.recordUserInteraction(
-        interaction: "select_session",
-        sessionID: sessionID,
-        durationMs: durationMs
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "user.interaction.select_session",
+        kind: .internal,
+        attributes: ["session.id": .string(sessionID)]
       )
-    }
+      defer {
+        span.end()
+        let elapsed = startedAt.duration(to: ContinuousClock.now)
+        let durationMs = harnessMonitorDurationMilliseconds(elapsed)
+        HarnessMonitorTelemetry.shared.recordUserInteraction(
+          interaction: "select_session",
+          sessionID: sessionID,
+          durationMs: durationMs
+        )
+      }
+    #else
+      _ = startedAt
+    #endif
 
     synchronizeSessionBaggage(for: sessionID)
 
-    await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
+    let body: () async -> Void = { [self] in
       await applyCachedSessionIfAvailable(sessionID: sessionID)
-
       guard !Task.isCancelled else { return }
-
       guard connectionState == .online, let client else {
         await restorePersistedSessionSelection(sessionID: sessionID)
         stopSessionStream()
         return
       }
-
       guard !Task.isCancelled else { return }
-
       let requestID = beginSessionLoad()
       let loadTask = startSessionLoad(using: client, sessionID: sessionID, requestID: requestID)
       await loadTask.value
     }
+    #if HARNESS_FEATURE_OTEL
+      await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
+        await body()
+      }
+    #else
+      await body()
+    #endif
   }
 
   public func loadSelectedTimelinePage(page: Int, pageSize: Int) async {

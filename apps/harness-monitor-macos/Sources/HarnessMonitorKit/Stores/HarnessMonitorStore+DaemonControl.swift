@@ -51,11 +51,16 @@ extension HarnessMonitorStore {
     _ phase: HarnessMonitorBootstrapTelemetryPhase,
     _ operation: () async throws -> T
   ) async rethrows -> T {
-    try await HarnessMonitorTelemetry.shared.withBootstrapPhase(
-      phase: phase.rawValue,
-      launchMode: HarnessMonitorLaunchMode.live.rawValue,
-      operation
-    )
+    #if HARNESS_FEATURE_OTEL
+      return try await HarnessMonitorTelemetry.shared.withBootstrapPhase(
+        phase: phase.rawValue,
+        launchMode: HarnessMonitorLaunchMode.live.rawValue,
+        operation
+      )
+    #else
+      _ = phase
+      return try await operation()
+    #endif
   }
 
   func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
@@ -373,7 +378,9 @@ extension HarnessMonitorStore {
     cancelPendingAppInactivitySuspend()
     stopAllStreams()
     stopManifestWatcher()
-    stopResourceMetricsSampling()
+    #if HARNESS_FEATURE_OTEL
+      stopResourceMetricsSampling()
+    #endif
     isAppLifecycleSuspended = false
 
     guard let client else {
