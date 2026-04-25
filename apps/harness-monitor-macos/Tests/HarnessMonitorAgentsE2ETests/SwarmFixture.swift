@@ -233,14 +233,26 @@ final class SwarmFixture {
       if app.state != .runningForeground {
         app.activate()
       }
-      if element.exists && element.isHittable {
+      if element.exists && (element.isHittable || elementIsVisibleInScrollTarget(element)) {
         return true
       }
 
       scrollToward(element)
       RunLoop.current.run(until: Date.now.addingTimeInterval(0.15))
     }
-    return element.exists && element.isHittable
+    return element.exists && (element.isHittable || elementIsVisibleInScrollTarget(element))
+  }
+
+  private func elementIsVisibleInScrollTarget(_ element: XCUIElement) -> Bool {
+    guard element.exists, !element.frame.isEmpty else { return false }
+
+    let targetFrame = scrollTarget(for: element).frame
+    let windowFrame = testCase.mainWindow(in: app).frame
+    let visibleFrame = targetFrame.intersection(windowFrame)
+    guard !visibleFrame.isNull, !visibleFrame.isEmpty else { return false }
+
+    return visibleFrame.insetBy(dx: -1, dy: -1)
+      .contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
   }
 
   private func scrollToward(_ element: XCUIElement) {
