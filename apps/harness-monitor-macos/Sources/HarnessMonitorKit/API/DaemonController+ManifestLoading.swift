@@ -9,13 +9,16 @@ extension DaemonController {
   private static let daemonListeningEventPrefix = "daemon listening on "
   private static let daemonEventTailBytes: UInt64 = 64 * 1024
 
-  func daemonConnection(from manifest: DaemonManifest) throws -> HarnessMonitorConnection {
+  func daemonConnection(
+    from manifest: DaemonManifest,
+    emitTrace: Bool = true
+  ) throws -> HarnessMonitorConnection {
     let endpoint = try endpointURL(from: manifest.endpoint)
-    let token = try loadToken(path: manifest.tokenPath)
+    let token = try loadToken(path: manifest.tokenPath, emitTrace: emitTrace)
     return HarnessMonitorConnection(endpoint: endpoint, token: token)
   }
 
-  func loadManifest() throws -> DaemonManifest {
+  func loadManifest(emitTrace: Bool = true) throws -> DaemonManifest {
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     guard FileManager.default.fileExists(atPath: manifestURL.path) else {
       throw DaemonControlError.manifestMissing
@@ -27,21 +30,25 @@ extension DaemonController {
 
     let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
     let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
-    let manifestFilePath = manifestURL.path
-    let pid = resolvedManifest.pid
-    HarnessMonitorLogger.lifecycle.trace(
-      "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
-    )
+    if emitTrace {
+      let manifestFilePath = manifestURL.path
+      let pid = resolvedManifest.pid
+      HarnessMonitorLogger.lifecycle.trace(
+        "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
+      )
+    }
     return resolvedManifest
   }
 
-  func loadToken(path: String) throws -> String {
+  func loadToken(path: String, emitTrace: Bool = true) throws -> String {
     let tokenURL = try validatedTokenURL(from: path)
     let token = try String(contentsOf: tokenURL, encoding: .utf8)
       .trimmingCharacters(in: .whitespacesAndNewlines)
-    HarnessMonitorLogger.lifecycle.trace(
-      "Loaded daemon auth token from \(tokenURL.path, privacy: .public)"
-    )
+    if emitTrace {
+      HarnessMonitorLogger.lifecycle.trace(
+        "Loaded daemon auth token from \(tokenURL.path, privacy: .public)"
+      )
+    }
     return token
   }
 
