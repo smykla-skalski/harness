@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node>
+    <schema>
+      <col><mnemonic>label</mnemonic></col>
+      <col><mnemonic>duration</mnemonic></col>
+    </schema>
+    <row>
+      <label id="1" fmt="Dashboard">Dashboard</label>
+      <duration id="2" fmt="1.0 ms">1000000</duration>
+    </row>
+    <row>
+      <label ref="1"/>
+      <duration id="3" fmt="3.0 ms">3000000</duration>
+    </row>
+    <row>
+      <label id="4" fmt="Sidebar">Sidebar</label>
+      <duration id="5" fmt="500 µs">500000</duration>
+    </row>
+  </node>
+</trace-query-result>
