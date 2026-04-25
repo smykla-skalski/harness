@@ -13,6 +13,7 @@ struct HarnessMonitorE2E: ParsableCommand {
             BridgeReady.self,
             Prepare.self,
             Teardown.self,
+            InjectHeuristic.self,
         ]
     )
 }
@@ -174,6 +175,29 @@ struct Teardown: ParsableCommand {
             manifestPath: URL(fileURLWithPath: manifest),
             keepState: keepState
         )
+    }
+}
+
+struct InjectHeuristic: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "inject-heuristic",
+        abstract: "Append a deterministic heuristic-trigger fixture to a runtime raw.jsonl. Prints {\"code\": ..., \"log_path\": ...}."
+    )
+
+    @Option(name: .long, help: "Heuristic code (matches src/observe/classifier).")
+    var code: String
+    @Option(name: .long, help: "Path to the runtime raw.jsonl log to append into.")
+    var logPath: String
+
+    func run() throws {
+        let url = URL(fileURLWithPath: logPath)
+        try HeuristicFixtures.append(code: code, to: url)
+        let payload: [String: String] = ["code": code, "log_path": logPath]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(payload)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
     }
 }
 

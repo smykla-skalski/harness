@@ -46,20 +46,11 @@ claude_auth_available() {
   local auth_status_file auth_status_result
   auth_status_file="$(mktemp "${TMPDIR:-/tmp}/harness-claude-auth.XXXXXX")"
   if portable_timeout 5 claude auth status >"$auth_status_file" 2>/dev/null; then
-    auth_status_result="$(
-      python3 - "$auth_status_file" <<'PY' || true
-import json
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as handle:
-    status = json.load(handle)
-logged_in = status.get("loggedIn")
-if logged_in is True:
-    print("true")
-elif logged_in is False:
-    print("false")
-PY
-    )"
+    auth_status_result="$(jq -r '
+      if .loggedIn == true then "true"
+      elif .loggedIn == false then "false"
+      else "" end
+    ' "$auth_status_file" 2>/dev/null || true)"
     rm -f "$auth_status_file"
     case "$auth_status_result" in
       true)
@@ -101,24 +92,15 @@ fi
 probe_versioned_binary "vibe" "false" "vibe" "true" "available"
 probe_versioned_binary "opencode" "false" "opencode" "true" "available"
 
-python3 - "$RESULTS_FILE" <<'PY'
-import json
-import sys
-
-runtimes = {}
-required_missing = []
-with open(sys.argv[1], encoding="utf-8") as handle:
-    for line in handle:
-        name, required_raw, available_raw, reason = line.rstrip("\n").split("\t", 3)
-        required = required_raw == "true"
-        available = available_raw == "true"
-        runtimes[name] = {
-            "available": available,
-            "required": required,
-            "reason": reason,
-        }
-        if required and not available:
-            required_missing.append(name)
-
-print(json.dumps({"runtimes": runtimes, "required_missing": required_missing}, indent=2, sort_keys=True))
-PY
+jq -Rs --indent 2 '
+  [
+    split("\n")[]
+    | select(length > 0)
+    | split("\t")
+    | { name: .[0], required: (.[1] == "true"), available: (.[2] == "true"), reason: .[3] }
+  ]
+  | {
+      runtimes: (map({ (.name): { available, required, reason } }) | add // {}),
+      required_missing: [ .[] | select(.required and (.available | not)) | .name ]
+    }
+' "$RESULTS_FILE"
