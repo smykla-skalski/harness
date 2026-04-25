@@ -156,6 +156,10 @@ run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
 run = "./scripts/e2e/gaps-open-count.sh"
 
+[tasks."e2e:swarm:clean:recordings"]
+description = "Remove stale e2e triage run dirs (pass --before-hours <N> to set the age threshold; default 24h)"
+run = "./scripts/e2e/clean-recordings.sh"
+
 [tasks."e2e:swarm:triage:recording"]
 description = "Run every universal recording-triage detector against a triage run dir (positional <run-dir>)"
 depends = ["monitor:macos:tools:build:e2e"]
