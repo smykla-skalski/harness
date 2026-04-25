@@ -420,6 +420,488 @@ extension RecordingTriage {
     }
 }
 
+// MARK: - Act surface assertions
+
+extension RecordingTriage {
+    public struct ChecklistFinding: Codable, Equatable, Sendable {
+        public enum Verdict: String, Codable, Sendable {
+            case found
+            case notFound = "not-found"
+            case needsVerification = "needs-verification"
+        }
+        public let id: String
+        public let verdict: Verdict
+        public let message: String
+
+        public init(id: String, verdict: Verdict, message: String) {
+            self.id = id
+            self.verdict = verdict
+            self.message = message
+        }
+    }
+
+    /// Assert that the per-act XCUITest hierarchy plus the marker payload
+    /// produced the surface listed in `references/act-marker-matrix.md`. Each
+    /// matrix row maps to one or two `ChecklistFinding`s with stable IDs so
+    /// the emitter can promote them straight into `recording-triage/checklist.md`.
+    public static func assertActSurface(
+        act: String,
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        switch act {
+        case "act1": return assertAct1(payload: payload, identifiers: identifiers)
+        case "act2": return assertAct2(payload: payload, identifiers: identifiers)
+        case "act3": return assertAct3(payload: payload, identifiers: identifiers)
+        case "act4": return assertAct4(payload: payload, identifiers: identifiers)
+        case "act5": return assertAct5(payload: payload, identifiers: identifiers)
+        case "act6": return assertAct6(payload: payload, identifiers: identifiers)
+        case "act7": return assertAct7(payload: payload, identifiers: identifiers)
+        case "act8": return assertAct8(payload: payload, identifiers: identifiers)
+        case "act9": return assertAct9(payload: payload, identifiers: identifiers)
+        case "act10": return assertAct10(payload: payload, identifiers: identifiers)
+        case "act11": return assertAct11(payload: payload, identifiers: identifiers)
+        case "act12": return assertAct12(payload: payload, identifiers: identifiers)
+        case "act13": return assertAct13(payload: payload, identifiers: identifiers)
+        case "act14": return assertAct14(payload: payload, identifiers: identifiers)
+        case "act15": return assertAct15(payload: payload, identifiers: identifiers)
+        case "act16": return assertAct16(payload: payload, identifiers: identifiers)
+        default:
+            return [ChecklistFinding(
+                id: "swarm.\(act).unknown",
+                verdict: .needsVerification,
+                message: "no surface assertions defined for \(act)"
+            )]
+        }
+    }
+
+    private static func assertAct1(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        var findings: [ChecklistFinding] = []
+        let cockpit = identifiers.first { $0.identifier == "harness.toolbar.chrome.state" }
+        if let cockpit, (cockpit.label ?? "").contains("windowTitle=Cockpit") {
+            findings.append(ChecklistFinding(
+                id: "swarm.act1.cockpit",
+                verdict: .found,
+                message: "windowTitle=Cockpit visible in toolbar chrome state"
+            ))
+        } else {
+            findings.append(ChecklistFinding(
+                id: "swarm.act1.cockpit",
+                verdict: .notFound,
+                message: "harness.toolbar.chrome.state missing windowTitle=Cockpit"
+            ))
+        }
+        guard let session = payload["session_id"], !session.isEmpty else {
+            findings.append(ChecklistFinding(
+                id: "swarm.act1.sidebarRow",
+                verdict: .needsVerification,
+                message: "act1 marker missing session_id payload"
+            ))
+            return findings
+        }
+        let sidebarID = "harness.sidebar.session.\(session)"
+        if identifiers.contains(where: { $0.identifier == sidebarID && $0.isSelected }) {
+            findings.append(ChecklistFinding(
+                id: "swarm.act1.sidebarRow",
+                verdict: .found,
+                message: "selected sidebar row matches \(session)"
+            ))
+        } else {
+            findings.append(ChecklistFinding(
+                id: "swarm.act1.sidebarRow",
+                verdict: .notFound,
+                message: "expected selected sidebar row \(sidebarID)"
+            ))
+        }
+        return findings
+    }
+
+    private static let act2RoleKeys = [
+        "worker_codex_id", "worker_claude_id",
+        "reviewer_claude_id", "reviewer_codex_id",
+        "observer_id", "improver_id",
+    ]
+
+    private static func assertAct2(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        var findings: [ChecklistFinding] = []
+        let label = identifiers.first { $0.identifier == "harness.session.agents.state" }?.label ?? ""
+        let expectedIDs = act2RoleKeys.compactMap { payload[$0] }.filter { !$0.isEmpty }
+        let missing = expectedIDs.filter { !label.contains($0) }
+        if missing.isEmpty, !expectedIDs.isEmpty {
+            findings.append(ChecklistFinding(
+                id: "swarm.act2.roles",
+                verdict: .found,
+                message: "agents.state contains every required role ID"
+            ))
+        } else {
+            findings.append(ChecklistFinding(
+                id: "swarm.act2.roles",
+                verdict: .notFound,
+                message: "agents.state missing IDs: \(missing.joined(separator: ","))"
+            ))
+        }
+        findings.append(ChecklistFinding(
+            id: "swarm.act2.duplicateRejected",
+            verdict: .needsVerification,
+            message: "duplicate-claim rejection is a transient toast; confirm in recording"
+        ))
+        return findings
+    }
+
+    private static let act3TaskKeys = [
+        "task_review_id", "task_autospawn_id", "task_arbitration_id",
+        "task_refusal_id", "task_signal_id",
+    ]
+
+    private static func assertAct3(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        let label = identifiers.first { $0.identifier == "harness.session.tasks.state" }?.label ?? ""
+        let expectedIDs = act3TaskKeys.compactMap { payload[$0] }.filter { !$0.isEmpty }
+        let missing = expectedIDs.filter { !label.contains($0) }
+        if missing.isEmpty, !expectedIDs.isEmpty {
+            return [ChecklistFinding(
+                id: "swarm.act3.tasks",
+                verdict: .found,
+                message: "tasks.state contains every act3 task ID"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act3.tasks",
+                verdict: .notFound,
+                message: "tasks.state missing IDs: \(missing.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct4(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        let label = identifiers.first { $0.identifier == "harness.session.tasks.state" }?.label ?? ""
+        let expected = ["task_review_id", "task_autospawn_id"].compactMap { payload[$0] }
+        let missing = expected.filter { !label.contains($0) }
+        if missing.isEmpty, !expected.isEmpty {
+            return [ChecklistFinding(
+                id: "swarm.act4.tasks",
+                verdict: .found,
+                message: "tasks.state still contains review and autospawn"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act4.tasks",
+            verdict: .notFound,
+            message: "tasks.state missing IDs: \(missing.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct5(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let code = payload["heuristic_code"], !code.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act5.heuristic",
+                verdict: .needsVerification,
+                message: "act5 marker missing heuristic_code"
+            )]
+        }
+        let cardID = "heuristicIssueCard.\(code)"
+        if identifiers.contains(where: { $0.identifier == cardID }) {
+            return [ChecklistFinding(
+                id: "swarm.act5.heuristic",
+                verdict: .found,
+                message: "\(cardID) visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act5.heuristic",
+            verdict: .notFound,
+            message: "expected \(cardID)"
+        )]
+    }
+
+    private static func assertAct6(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let improverID = payload["improver_id"], !improverID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act6.improver",
+                verdict: .needsVerification,
+                message: "act6 marker missing improver_id"
+            )]
+        }
+        let cardID = "harness.session.agent.\(improverID)"
+        if identifiers.contains(where: { $0.identifier == cardID }) {
+            return [ChecklistFinding(
+                id: "swarm.act6.improver",
+                verdict: .found,
+                message: "\(cardID) visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act6.improver",
+            verdict: .notFound,
+            message: "expected \(cardID)"
+        )]
+    }
+
+    private static func assertAct7(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let vibeID = payload["vibe_worker_id"], !vibeID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act7.vibeRoster",
+                verdict: .needsVerification,
+                message: "vibe runtime missing; rejoin not exercised"
+            )]
+        }
+        let cardID = "harness.session.agent.\(vibeID)"
+        if identifiers.contains(where: { $0.identifier == cardID }) {
+            return [ChecklistFinding(
+                id: "swarm.act7.vibeRoster",
+                verdict: .found,
+                message: "\(cardID) visible after rejoin"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act7.vibeRoster",
+            verdict: .notFound,
+            message: "expected \(cardID)"
+        )]
+    }
+
+    private static func assertAct8(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let taskID = payload["task_review_id"], !taskID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act8.awaitingReview",
+                verdict: .needsVerification,
+                message: "act8 marker missing task_review_id"
+            )]
+        }
+        let badgeID = "awaitingReviewBadge.\(taskID)"
+        if identifiers.contains(where: { $0.identifier == badgeID }) {
+            return [ChecklistFinding(
+                id: "swarm.act8.awaitingReview",
+                verdict: .found,
+                message: "\(badgeID) visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act8.awaitingReview",
+            verdict: .notFound,
+            message: "expected \(badgeID)"
+        )]
+    }
+
+    private static func assertAct9(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let taskID = payload["task_review_id"], !taskID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act9.reviewerClaim",
+                verdict: .needsVerification,
+                message: "act9 marker missing task_review_id"
+            )]
+        }
+        let runtime = payload["reviewer_runtime"] ?? "claude"
+        let candidates = [
+            "reviewerClaimBadge.\(taskID).\(runtime)",
+            "reviewerQuorumIndicator.\(taskID)",
+        ]
+        if identifiers.contains(where: { candidates.contains($0.identifier) }) {
+            return [ChecklistFinding(
+                id: "swarm.act9.reviewerClaim",
+                verdict: .found,
+                message: "reviewer claim or quorum surface present"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act9.reviewerClaim",
+            verdict: .notFound,
+            message: "expected one of \(candidates.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct10(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let taskID = payload["task_autospawn_id"], !taskID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act10.awaitingReview",
+                verdict: .needsVerification,
+                message: "act10 marker missing task_autospawn_id"
+            )]
+        }
+        let badgeID = "awaitingReviewBadge.\(taskID)"
+        if identifiers.contains(where: { $0.identifier == badgeID }) {
+            return [ChecklistFinding(
+                id: "swarm.act10.awaitingReview",
+                verdict: .found,
+                message: "\(badgeID) visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act10.awaitingReview",
+            verdict: .notFound,
+            message: "expected \(badgeID)"
+        )]
+    }
+
+    private static func assertAct11(
+        payload _: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        if identifiers.contains(where: { $0.identifier == "harness.toast.worker-refusal" }) {
+            return [ChecklistFinding(
+                id: "swarm.act11.refusal",
+                verdict: .found,
+                message: "harness.toast.worker-refusal visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act11.refusal",
+            verdict: .needsVerification,
+            message: "no refusal toast in hierarchy; transient toasts may have dismissed"
+        )]
+    }
+
+    private static func assertAct12(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let taskID = payload["task_arbitration_id"], !taskID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act12.roundOne",
+                verdict: .needsVerification,
+                message: "act12 marker missing task_arbitration_id"
+            )]
+        }
+        let pointID = payload["point_id"] ?? "p1"
+        let candidates = [
+            "partialAgreementChip.\(pointID)",
+            "reviewPointChip.\(pointID)",
+            "roundCounter.\(taskID)",
+        ]
+        if identifiers.contains(where: { candidates.contains($0.identifier) }) {
+            return [ChecklistFinding(
+                id: "swarm.act12.roundOne",
+                verdict: .found,
+                message: "round-one surface present"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act12.roundOne",
+            verdict: .notFound,
+            message: "expected one of \(candidates.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct13(
+        payload: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        guard let taskID = payload["task_arbitration_id"], !taskID.isEmpty else {
+            return [ChecklistFinding(
+                id: "swarm.act13.arbitration",
+                verdict: .needsVerification,
+                message: "act13 marker missing task_arbitration_id"
+            )]
+        }
+        let candidates = [
+            "arbitrationBanner.\(taskID)",
+            "roundCounter.\(taskID)",
+        ]
+        if identifiers.contains(where: { candidates.contains($0.identifier) }) {
+            return [ChecklistFinding(
+                id: "swarm.act13.arbitration",
+                verdict: .found,
+                message: "arbitration surface present"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act13.arbitration",
+            verdict: .notFound,
+            message: "expected one of \(candidates.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct14(
+        payload _: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        if identifiers.contains(where: { $0.identifier == "harness.toast.signal-collision" }) {
+            return [ChecklistFinding(
+                id: "swarm.act14.signalCollision",
+                verdict: .found,
+                message: "harness.toast.signal-collision visible"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act14.signalCollision",
+            verdict: .needsVerification,
+            message: "no collision toast in hierarchy; transient toasts may have dismissed"
+        )]
+    }
+
+    private static func assertAct15(
+        payload _: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        let candidates = [
+            "observeScanButton",
+            "observeDoctorButton",
+            "harness.session.action.observe",
+        ]
+        if identifiers.contains(where: { candidates.contains($0.identifier) }) {
+            return [ChecklistFinding(
+                id: "swarm.act15.observeAction",
+                verdict: .found,
+                message: "observe action surface present"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act15.observeAction",
+            verdict: .notFound,
+            message: "expected one of \(candidates.joined(separator: ","))"
+        )]
+    }
+
+    private static func assertAct16(
+        payload _: [String: String],
+        identifiers: [AccessibilityIdentifier]
+    ) -> [ChecklistFinding] {
+        let corner = identifiers.first { $0.identifier == "harness.session-status.corner" }
+        let label = corner?.label ?? ""
+        let closedTokens = ["closed", "ended"]
+        if closedTokens.contains(where: { label.lowercased().contains($0) }) {
+            return [ChecklistFinding(
+                id: "swarm.act16.sessionEnded",
+                verdict: .found,
+                message: "session-status.corner shows \(label)"
+            )]
+        }
+        return [ChecklistFinding(
+            id: "swarm.act16.sessionEnded",
+            verdict: .notFound,
+            message: "session-status.corner not in closed/ended state"
+        )]
+    }
+}
+
 // MARK: - Black / blank frames
 
 extension RecordingTriage {
