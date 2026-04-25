@@ -70,6 +70,49 @@ final class SwarmActDriverTests: XCTestCase {
     wait(for: [runnerFailed, runnerFinished], timeout: 10)
   }
 
+  func testRunActDriverActAckTimeoutErrorIdentifiesActName() throws {
+    let repoRoot = tempDir.appendingPathComponent("repo", isDirectory: true)
+    let projectDir = tempDir.appendingPathComponent("project", isDirectory: true)
+    let stateRoot = tempDir.appendingPathComponent("state-root", isDirectory: true)
+    let dataHome = tempDir.appendingPathComponent("data-home", isDirectory: true)
+    let syncDir = tempDir.appendingPathComponent("sync", isDirectory: true)
+    let probeJSON = tempDir.appendingPathComponent("probe.json")
+    let harnessBinary = tempDir.appendingPathComponent("fake-harness.sh")
+
+    for directory in [repoRoot, projectDir, stateRoot, dataHome, syncDir] {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+    try Data(#"{"required_missing":[],"runtimes":{}}"#.utf8).write(to: probeJSON)
+    try makeFakeHarness(at: harnessBinary)
+
+    let inputs = SwarmActDriverInputs(
+      repoRoot: repoRoot,
+      stateRoot: stateRoot,
+      dataHome: dataHome,
+      projectDir: projectDir,
+      syncDir: syncDir,
+      sessionID: "sess-test",
+      harnessBinary: harnessBinary,
+      probeJSON: probeJSON,
+      stepTimeoutOverrides: ["act1": 0.4]
+    )
+
+    do {
+      try SwarmFullFlowOrchestrator.runActDriver(inputs)
+      XCTFail("expected act1.ack timeout to throw")
+    } catch {
+      let description = String(describing: error)
+      XCTAssertTrue(
+        description.contains("act1"),
+        "expected act1 in error description, got: \(description)"
+      )
+      XCTAssertTrue(
+        description.lowercased().contains("ack"),
+        "expected ack in error description, got: \(description)"
+      )
+    }
+  }
+
   private func waitForFile(at url: URL, timeout: TimeInterval) -> Bool {
     let deadline = Date.now.addingTimeInterval(timeout)
     while Date.now < deadline {
