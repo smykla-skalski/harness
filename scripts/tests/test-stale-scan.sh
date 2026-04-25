@@ -995,6 +995,42 @@ scenario_swarm_e2e_worktree_parser() {
   if (( ok )); then pass; fi
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 34: clean-stale swarm cleanup must noop cleanly when no e2e-owned
+# worktrees or branches are present. The production script runs under `set -u`,
+# so empty arrays must be length-guarded before "${arr[@]}" iteration.
+# ---------------------------------------------------------------------------
+scenario_swarm_e2e_cleanup_empty_lists() {
+  start_test "swarm e2e cleanup tolerates empty lists under nounset"
+  local entries=()
+  local entry
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && entries+=("$entry")
+  done < <(stale_scan_swarm_e2e_worktrees_from_porcelain <<<"")
+
+  local path branch
+  if (( ${#entries[@]} > 0 )); then
+    for entry in "${entries[@]}"; do
+      path="${entry%%$'\t'*}"
+      branch="${entry#*$'\t'}"
+      [[ -n "$path" && -n "$branch" ]] || return 1
+    done
+  fi
+
+  local branches=()
+  while IFS= read -r branch; do
+    [[ -n "$branch" ]] && branches+=("$branch")
+  done < <(printf '')
+
+  if (( ${#branches[@]} > 0 )); then
+    for branch in "${branches[@]}"; do
+      stale_scan_is_swarm_e2e_branch "$branch" || return 1
+    done
+  fi
+
+  pass
+}
+
 run_all() {
   scenario_debug_orphan
   scenario_release_orphan
@@ -1030,6 +1066,7 @@ run_all() {
   scenario_end_to_end_without_autoclean
   scenario_autoclean_congestion_partial
   scenario_swarm_e2e_worktree_parser
+  scenario_swarm_e2e_cleanup_empty_lists
 }
 
 run_all
