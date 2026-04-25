@@ -35,7 +35,6 @@ Harness Monitor app validation expectations:
 
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
-- `tuist auth login` then `mise run monitor:macos:setup:cache` once per machine if you want the Xcode 26 compilation cache service wired in for the generated workspace
 - `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
 - All xcodebuild invocations must use `-derivedDataPath xcode-derived` so build artifacts land in a single, known location at the repo root (gitignored). Never create variant-named directories like `xcode-derived-foo` - one directory, reused across builds.
 - For macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'` because it matches both `My Mac` and `Any Mac` and triggers the multiple-matching-destinations warning. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64`. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless a more specific `id=...` selector is required.

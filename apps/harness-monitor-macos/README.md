@@ -38,6 +38,8 @@ tuist generate tag:feature:previews
 tuist generate tag:feature:ui-testing
 ```
 
+Native Xcode local compilation cache is enabled directly through the generated build settings with `COMPILATION_CACHE_ENABLE_CACHING=YES`. This gives the app local Xcode 26 compilation-cache reuse without requiring Tuist Cloud login or a remote cache service. The remote-plugin settings (`COMPILATION_CACHE_ENABLE_PLUGIN` / `COMPILATION_CACHE_REMOTE_SERVICE_PATH`) are intentionally not configured here.
+
 When you need a raw local build command, prefer the lock-aware wrapper so concurrent monitor lanes do not corrupt or lock the shared `xcode-derived` build database:
 
 ```bash
