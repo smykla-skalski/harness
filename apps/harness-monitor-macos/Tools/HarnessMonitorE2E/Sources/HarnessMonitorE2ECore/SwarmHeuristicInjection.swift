@@ -119,8 +119,16 @@ public enum SwarmHeuristicInjection {
             }
             // Match the prior shell contract: pick the agent object by `.agent_id`.
             let json = try JSONSerialization.jsonObject(with: result.stdout) as? [String: Any]
-            let agents = json?["agents"] as? [[String: Any]] ?? []
-            guard let agent = agents.last(where: { ($0["agent_id"] as? String) == agentID }) else {
+            let agent: [String: Any]
+            if let agentsByID = json?["agents"] as? [String: Any],
+               let resolved = agentsByID[agentID] as? [String: Any]
+            {
+                agent = resolved
+            } else if let agents = json?["agents"] as? [[String: Any]],
+                      let resolved = agents.last(where: { ($0["agent_id"] as? String) == agentID })
+            {
+                agent = resolved
+            } else {
                 throw Failure.agentNotFound(agentID)
             }
             runtime = runtime ?? (agent["runtime"] as? String)
