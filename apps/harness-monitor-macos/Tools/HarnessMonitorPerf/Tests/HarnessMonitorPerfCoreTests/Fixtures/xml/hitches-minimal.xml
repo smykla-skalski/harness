@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node>
+    <schema>
+      <col><mnemonic>duration</mnemonic></col>
+      <col><mnemonic>narrative-description</mnemonic></col>
+    </schema>
+    <row>
+      <duration id="1" fmt="100 ms">100000000</duration>
+      <narrative-description id="2" fmt="Frame drop on Dashboard">Frame drop on Dashboard</narrative-description>
+    </row>
+    <row>
+      <duration id="3" fmt="50 ms">50000000</duration>
+      <narrative-description ref="2"/>
+    </row>
+    <row>
+      <duration id="4" fmt="200 ms">200000000</duration>
+      <narrative-description id="5" fmt="Animation hitch">Animation hitch</narrative-description>
+    </row>
+  </node>
+</trace-query-result>

@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node>
+    <schema>
+      <col><mnemonic>label</mnemonic></col>
+      <col><mnemonic>source-node</mnemonic></col>
+      <col><mnemonic>destination-node</mnemonic></col>
+      <col><mnemonic>value-type</mnemonic></col>
+      <col><mnemonic>changed-properties</mnemonic></col>
+    </schema>
+    <row>
+      <label id="1" fmt="@State">@State</label>
+      <source-node id="2" fmt="DashboardView">DashboardView</source-node>
+      <destination-node id="3" fmt="SidebarRow">SidebarRow</destination-node>
+      <value-type id="4" fmt="Int">Int</value-type>
+      <changed-properties id="5" fmt="selectedID">selectedID</changed-properties>
+    </row>
+    <row>
+      <label ref="1"/>
+      <source-node ref="2"/>
+      <destination-node ref="3"/>
+      <value-type ref="4"/>
+      <changed-properties ref="5"/>
+    </row>
+    <row>
+      <label id="6" fmt="@Binding">@Binding</label>
+      <source-node id="7" fmt="ToolbarView">ToolbarView</source-node>
+      <destination-node ref="3"/>
+      <value-type/>
+      <changed-properties/>
+    </row>
+  </node>
+</trace-query-result>
