@@ -119,24 +119,25 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
       throw failure
     }
 
-    let streamConfiguration = SCStreamConfiguration()
-    streamConfiguration.showsCursor = true
-    streamConfiguration.capturesAudio = false
-    streamConfiguration.ignoreShadowsSingleWindow = true
-
-    streamConfiguration.width = max(1, Int(ceil(captureTarget.window.frame.width)))
-    streamConfiguration.height = max(1, Int(ceil(captureTarget.window.frame.height)))
-
     let recordingConfiguration = SCRecordingOutputConfiguration()
     recordingConfiguration.outputURL = outputURL
     recordingConfiguration.outputFileType = .mov
     recordingConfiguration.videoCodecType = .h264
 
     try appendLog("recording-create-filter-begin")
-    let captureDisplay = captureTarget.display
     let captureWindow = captureTarget.window
-    let filter = SCContentFilter(display: captureDisplay, including: [captureWindow])
+    let filter = SCContentFilter(desktopIndependentWindow: captureWindow)
     try appendLog("recording-create-filter-returned")
+
+    let streamConfiguration = SCStreamConfiguration()
+    streamConfiguration.showsCursor = true
+    streamConfiguration.capturesAudio = false
+    streamConfiguration.ignoreShadowsSingleWindow = true
+
+    let pixelScale = filter.pointPixelScale
+    let contentSize = filter.contentRect.size
+    streamConfiguration.width = max(1, Int(ceil(contentSize.width * CGFloat(pixelScale))))
+    streamConfiguration.height = max(1, Int(ceil(contentSize.height * CGFloat(pixelScale))))
     try appendLog("recording-create-stream-begin")
     let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: nil)
     try appendLog("recording-create-stream-returned")
