@@ -4,6 +4,7 @@ import ProjectDescription
 public enum FeatureFlag: String, CaseIterable, Sendable {
     case lottie = "HARNESS_FEATURE_LOTTIE"
     case otel = "HARNESS_FEATURE_OTEL"
+    case textual = "HARNESS_FEATURE_TEXTUAL"
 
     public var isEnabled: Bool {
         guard let raw = ProcessInfo.processInfo.environment[rawValue]?.lowercased() else {
@@ -32,7 +33,7 @@ public enum FeatureFlags {
             switch flag {
             case .lottie:
                 return [.glob("Sources/\(target)/Features/Lottie/**/*.swift")]
-            case .otel:
+            case .otel, .textual:
                 return []
             }
         }
@@ -45,6 +46,8 @@ public enum FeatureFlags {
                 return [.glob("Sources/HarnessMonitorUIPreviewable/Features/Lottie/**/*.swift")]
             case .otel:
                 return []
+            case .textual:
+                return [.glob("Sources/HarnessMonitorUIPreviewable/Features/Textual/**/*.swift")]
             }
         }
     }
@@ -52,7 +55,7 @@ public enum FeatureFlags {
     public static func kitAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .lottie:
+            case .lottie, .textual:
                 return []
             case .otel:
                 return [.glob("Sources/HarnessMonitorKit/Features/Otel/**/*.swift")]
@@ -63,7 +66,7 @@ public enum FeatureFlags {
     public static func kitTestsAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .lottie:
+            case .lottie, .textual:
                 return []
             case .otel:
                 return [.glob("Tests/HarnessMonitorKitTests/Features/Otel/**/*.swift")]
@@ -76,20 +79,27 @@ public enum FeatureFlags {
             switch flag {
             case .lottie:
                 return [.external(name: "Lottie")]
-            case .otel:
+            case .otel, .textual:
                 return []
             }
         }
     }
 
     public static func uiPreviewableAdditionalDependencies() -> [TargetDependency] {
-        []
+        enabled.flatMap { flag -> [TargetDependency] in
+            switch flag {
+            case .lottie, .otel:
+                return []
+            case .textual:
+                return [.external(name: "Textual")]
+            }
+        }
     }
 
     public static func kitAdditionalDependencies() -> [TargetDependency] {
         enabled.flatMap { flag -> [TargetDependency] in
             switch flag {
-            case .lottie:
+            case .lottie, .textual:
                 return []
             case .otel:
                 return [

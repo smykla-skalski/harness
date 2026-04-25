@@ -13,7 +13,7 @@
     "/bin/bash",
     "./Scripts/run-xcode-build-server.sh"
   ],
-  "workspace": "HarnessMonitor.xcodeproj/project.xcworkspace",
+  "workspace": "HarnessMonitor.xcworkspace",
   "build_root": "../../xcode-derived",
   "scheme": "HarnessMonitor",
   "kind": "xcode"
