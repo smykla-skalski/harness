@@ -41,6 +41,7 @@ public struct DaemonController: DaemonControlling {
   let ownership: DaemonOwnership
   let endpointProbe: @Sendable (URL) async -> Bool
   let managedStaleManifestGracePeriod: Duration
+  let warmUpBackoff: WarmUpBackoff
   let expectedManagedDaemonVersion: @Sendable () -> String?
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
@@ -73,6 +74,7 @@ public struct DaemonController: DaemonControlling {
       await Self.defaultEndpointProbe($0)
     },
     managedStaleManifestGracePeriod: Duration = .seconds(5),
+    warmUpBackoff: WarmUpBackoff = .default,
     expectedManagedDaemonVersion: @escaping @Sendable () -> String? = {
       guard
         let bundleIdentifier = Bundle.main.bundleIdentifier,
@@ -99,6 +101,7 @@ public struct DaemonController: DaemonControlling {
     self.webSocketBootstrapper = webSocketBootstrapper
     self.endpointProbe = endpointProbe
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
+    self.warmUpBackoff = warmUpBackoff
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
