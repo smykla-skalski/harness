@@ -82,6 +82,9 @@ public enum BuildPhases {
             /bin/bash "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"
             """,
             name: "Clear Gatekeeper Metadata",
+            inputPaths: [
+                "$(PROJECT_DIR)/Scripts/strip-test-xattrs.sh"
+            ],
             basedOnDependencyAnalysis: false
         )
     }
