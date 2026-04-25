@@ -121,6 +121,7 @@ require_no_text "scripts/e2e/inject-heuristic-log.sh" 'raw.jsonl'
 require_no_text "scripts/e2e/seed-session-state.sh" 'jq -nc'
 require_no_text "scripts/e2e/probe-runtimes.sh" 'claude auth status'
 require_no_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-display'
+require_no_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "prepareRecordingStartIfConfigured"
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
 require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
 require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
@@ -135,12 +136,18 @@ require_text "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Sup
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestAccessibility.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFullFlowTests.swift" "func testSwarmFullFlow()"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "armRecordingStartIfConfigured"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "waitForRecordingStartIfConfigured"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "failure-final"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestDiagnosticsSupport.swift" "recordDiagnosticsSnapshot"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestDiagnosticsSupport.swift" "XCUIScreen.main.screenshot()"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests.swift" "selectFastModelForTerminal(in: app, runtime: \"codex\")"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"GPT-5.3 Codex Spark\""
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"Low\""
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "armRecordingStartIfConfigured"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "waitForRecordingStartIfConfigured"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "armRecordingStartIfConfigured"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "waitForRecordingStartIfConfigured"
 # shellcheck disable=SC2016
 require_text "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow --assert "$@"'
 require_text "tests/integration/commands/session/swarm_full_flow.rs" "#[ignore"
