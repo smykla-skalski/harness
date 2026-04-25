@@ -18,6 +18,7 @@ struct RecordingTriageCommand: ParsableCommand {
             LayoutDriftCommand.self,
             BlackFramesCommand.self,
             ThrashCommand.self,
+            ActTimingCommand.self,
         ]
     )
 }
@@ -247,6 +248,44 @@ struct ThrashCommand: ParsableCommand {
             windowSeconds: window,
             distanceThreshold: distanceThreshold,
             changeThreshold: changeThreshold
+        )
+        try emit(report)
+    }
+}
+
+// MARK: - act-timing
+
+struct ActTimingCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "act-timing",
+        abstract: "Convert sync-dir act marker mtimes into recording-relative offsets."
+    )
+
+    @Option(name: .long, help: "Directory containing actN.ready / actN.ack marker files.")
+    var markerDir: String
+
+    @Option(name: .long, help: "Recording start epoch in seconds.")
+    var recordingStart: Double
+
+    @Option(name: .long, help: "App launch epoch in seconds.")
+    var appLaunch: Double
+
+    func run() throws {
+        let directory = URL(fileURLWithPath: markerDir, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            throw ValidationError("--marker-dir does not exist: \(directory.path)")
+        }
+        let entries = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        var markers: [RecordingTriage.ActMarker] = []
+        for url in entries {
+            let suffix = url.pathExtension
+            guard suffix == "ready" || suffix == "ack" else { continue }
+            markers.append(try RecordingTriage.parseActMarker(at: url))
+        }
+        let report = RecordingTriage.analyzeActTiming(
+            markers: markers,
+            recordingStart: Date(timeIntervalSince1970: recordingStart),
+            appLaunch: Date(timeIntervalSince1970: appLaunch)
         )
         try emit(report)
     }

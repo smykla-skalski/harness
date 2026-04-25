@@ -14,7 +14,12 @@ enum ScreenRecorderWindowSelector {
         "io.harnessmonitor.app",
         "io.harnessmonitor.app.ui-testing",
     ]
-    private static let mainWindowTitle = "Harness Monitor"
+    private static let mainWindowTitles: Set<String> = [
+        "Harness Monitor",
+        "Dashboard",
+        "Session Cockpit",
+        "Cockpit",
+    ]
 
     static func captureWindow(
         from candidates: [ScreenRecorderWindowCandidate]
@@ -31,7 +36,7 @@ enum ScreenRecorderWindowSelector {
         let matchingCandidates = candidates.filter {
             $0.isOnScreen
                 && allowedBundleIdentifiers.contains($0.bundleIdentifier ?? "")
-                && $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == mainWindowTitle
+                && mainWindowTitles.contains($0.title.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
         guard !matchingCandidates.isEmpty else { return nil }
