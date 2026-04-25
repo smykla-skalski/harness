@@ -156,6 +156,16 @@ run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
 run = "./scripts/e2e/gaps-open-count.sh"
 
+[tasks."e2e:swarm:triage:recording"]
+description = "Run every universal recording-triage detector against a triage run dir (positional <run-dir>)"
+depends = ["monitor:macos:tools:build:e2e"]
+run = "./scripts/e2e/recording-triage/run-all.sh"
+
+[tasks."e2e:swarm:triage:recording:test"]
+description = "Run the recording-triage shell-wrapper test suite"
+depends = ["monitor:macos:tools:build:e2e"]
+run = "./scripts/e2e/recording-triage/tests/run-all.sh"
+
 [tasks."monitor:macos:tools:build:perf"]
 description = "Build the harness-monitor-perf Swift CLI (release)"
 run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
