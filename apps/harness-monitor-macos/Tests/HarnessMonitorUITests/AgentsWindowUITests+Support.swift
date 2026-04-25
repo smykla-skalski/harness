@@ -118,11 +118,10 @@ extension AgentsWindowUITests {
   }
 
   func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
-    guard let coordinate = centerCoordinate(in: app, for: element) else {
+    guard tapElementReliably(in: app, element: element) else {
       XCTFail("Failed to resolve coordinate for \(element)")
       return
     }
-    coordinate.tap()
   }
 
   func agentTuiActionExists(
