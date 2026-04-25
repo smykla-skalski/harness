@@ -2,23 +2,25 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
-func makeTestEnvironment(
-  collector: GRPCCollectorServer
-) throws -> (URL, HarnessMonitorEnvironment) {
-  let temporaryHome = try temporaryDirectory()
-  try writeSharedConfig(
-    homeDirectory: temporaryHome,
-    grpcEndpoint: collector.endpoint.absoluteString
-  )
-  let environment = HarnessMonitorEnvironment(
-    values: [
-      "XDG_DATA_HOME": temporaryHome.path,
-      "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
-    ],
-    homeDirectory: temporaryHome
-  )
-  return (temporaryHome, environment)
-}
+#if HARNESS_FEATURE_OTEL
+  func makeTestEnvironment(
+    collector: GRPCCollectorServer
+  ) throws -> (URL, HarnessMonitorEnvironment) {
+    let temporaryHome = try temporaryDirectory()
+    try writeSharedConfig(
+      homeDirectory: temporaryHome,
+      grpcEndpoint: collector.endpoint.absoluteString
+    )
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        "XDG_DATA_HOME": temporaryHome.path,
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+      ],
+      homeDirectory: temporaryHome
+    )
+    return (temporaryHome, environment)
+  }
+#endif
 
 func writeSharedConfig(homeDirectory: URL, grpcEndpoint: String) throws {
   let configURL =

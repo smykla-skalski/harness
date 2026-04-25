@@ -39,15 +39,6 @@ settings:
       SWIFT_ENABLE_EAGER_LINKING: NO
       SWIFT_EMIT_LOC_STRINGS: NO
 packages:
-  OpenTelemetrySwift:
-    url: https://github.com/open-telemetry/opentelemetry-swift
-    exactVersion: 2.3.0
-  OpenTelemetrySwiftCore:
-    url: https://github.com/open-telemetry/opentelemetry-swift-core
-    exactVersion: 2.4.1
-  GRPCSwift:
-    url: https://github.com/grpc/grpc-swift
-    exactVersion: 1.27.0
   Textual:
     url: https://github.com/gonzalezreal/textual
     exactVersion: 0.3.1
@@ -59,9 +50,9 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - Sources/HarnessMonitorKit
-      - Sources/HarnessMonitorKit/Support/HarnessMonitorTelemetry+Registration.swift
-      - Sources/HarnessMonitorKit/Support/HarnessMonitorTelemetryRecorders.swift
+      - path: Sources/HarnessMonitorKit
+        excludes:
+          - "Features/**"
     dependencies:
       - sdk: AppKit.framework
       - sdk: ApplicationServices.framework
@@ -72,20 +63,6 @@ targets:
       - sdk: IOKit.framework
       - sdk: ServiceManagement.framework
       - sdk: UserNotifications.framework
-      - package: OpenTelemetrySwiftCore
-        product: OpenTelemetryApi
-      - package: OpenTelemetrySwiftCore
-        product: OpenTelemetryConcurrency
-      - package: OpenTelemetrySwiftCore
-        product: OpenTelemetrySdk
-      - package: OpenTelemetrySwift
-        product: PersistenceExporter
-      - package: OpenTelemetrySwift
-        product: OpenTelemetryProtocolExporter
-      - package: OpenTelemetrySwift
-        product: OpenTelemetryProtocolExporterHTTP
-      - package: GRPCSwift
-        product: GRPC
       - package: HarnessMonitorRegistry
         product: HarnessMonitorRegistry
     settings:
@@ -529,7 +506,9 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - Tests/HarnessMonitorKitTests
+      - path: Tests/HarnessMonitorKitTests
+        excludes:
+          - "Features/**"
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUIPreviewable

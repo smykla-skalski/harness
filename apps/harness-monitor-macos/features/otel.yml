@@ -1,0 +1,46 @@
+packages:
+  OpenTelemetrySwift:
+    url: https://github.com/open-telemetry/opentelemetry-swift
+    exactVersion: 2.3.0
+  OpenTelemetrySwiftCore:
+    url: https://github.com/open-telemetry/opentelemetry-swift-core
+    exactVersion: 2.4.1
+  GRPCSwift:
+    url: https://github.com/grpc/grpc-swift
+    exactVersion: 1.27.0
+targets:
+  HarnessMonitorKit:
+    sources:
+      - ../Sources/HarnessMonitorKit/Features/Otel
+    dependencies:
+      - package: OpenTelemetrySwiftCore
+        product: OpenTelemetryApi
+      - package: OpenTelemetrySwiftCore
+        product: OpenTelemetryConcurrency
+      - package: OpenTelemetrySwiftCore
+        product: OpenTelemetrySdk
+      - package: OpenTelemetrySwift
+        product: PersistenceExporter
+      - package: OpenTelemetrySwift
+        product: OpenTelemetryProtocolExporter
+      - package: OpenTelemetrySwift
+        product: OpenTelemetryProtocolExporterHTTP
+      - package: GRPCSwift
+        product: GRPC
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_OTEL
+  HarnessMonitor:
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_OTEL
+  HarnessMonitorUITestHost:
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_OTEL
+  HarnessMonitorKitTests:
+    sources:
+      - ../Tests/HarnessMonitorKitTests/Features/Otel
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_OTEL

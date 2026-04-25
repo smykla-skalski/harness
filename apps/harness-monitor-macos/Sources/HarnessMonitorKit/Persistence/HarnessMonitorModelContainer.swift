@@ -15,14 +15,18 @@ public enum HarnessMonitorModelContainer {
     let url = HarnessMonitorPaths.cacheStoreURL(using: environment)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
 
-    return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
-      operation: "open_cache_store",
-      access: "maintenance",
-      database: "monitor-cache",
-      databasePath: url.path
-    ) {
-      try makeContainer(schema: schema, config: config)
-    }
+    #if HARNESS_FEATURE_OTEL
+      return try HarnessMonitorTelemetry.shared.withSQLiteOperation(
+        operation: "open_cache_store",
+        access: "maintenance",
+        database: "monitor-cache",
+        databasePath: url.path
+      ) {
+        try makeContainer(schema: schema, config: config)
+      }
+    #else
+      return try makeContainer(schema: schema, config: config)
+    #endif
   }
 
   public static func preview() throws -> ModelContainer {

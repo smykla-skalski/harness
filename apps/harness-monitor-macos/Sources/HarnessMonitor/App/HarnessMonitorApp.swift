@@ -45,7 +45,9 @@ struct HarnessMonitorApp: App {
         "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
       )
     }
-    HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
+    #if HARNESS_FEATURE_OTEL
+      HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
+    #endif
     container = configuration.container
     isUITesting = configuration.isUITesting
     launchMode = configuration.launchMode
