@@ -18,6 +18,8 @@ struct HarnessMonitorPerf: ParsableCommand {
             DirectorySHA256.self,
             FingerprintWorkspace.self,
             TocInfo.self,
+            WriteManifest.self,
+            VerifyManifest.self,
             MeasurePreviewLatency.self,
         ],
         defaultSubcommand: nil
@@ -236,6 +238,70 @@ struct TocInfo: ParsableCommand {
         let data = try encoder.encode(payload)
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+}
+
+struct WriteManifest: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "write-manifest",
+        abstract: "Build manifest.json from an inputs JSON document and a captures TSV."
+    )
+
+    @Option(name: .long, help: "JSON document with label/run_id/git/system/targets/build_provenance/selected_scenarios.")
+    var inputs: String
+
+    @Option(name: [.long, .customLong("captures-tsv")], help: "TSV file written by the audit shell, one capture per row.")
+    var capturesTsv: String
+
+    @Option(name: [.long, .customLong("env")], parsing: .upToNextOption,
+            help: "Repeated KEY=VALUE pairs that populate default_environment.")
+    var env: [String] = []
+
+    @Option(name: [.long, .customLong("launch-arg")], parsing: .upToNextOption,
+            help: "Repeated launch arguments preserved in the manifest.")
+    var launchArg: [String] = []
+
+    @Option(name: .long, help: "Path where manifest.json should be written.")
+    var output: String
+
+    func run() throws {
+        do {
+            _ = try ManifestWriter.write(
+                inputsJSON: URL(fileURLWithPath: inputs),
+                capturesTSV: URL(fileURLWithPath: capturesTsv),
+                environmentPairs: env,
+                launchArguments: launchArg,
+                output: URL(fileURLWithPath: output)
+            )
+        } catch let failure as ManifestWriter.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+}
+
+struct VerifyManifest: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "verify-manifest",
+        abstract: "Verify manifest.json records a clean build for the expected git commit."
+    )
+
+    @Option(name: .long, help: "Path to manifest.json")
+    var manifest: String
+
+    @Option(name: [.long, .customLong("expected-commit")], help: "Expected git commit SHA.")
+    var expectedCommit: String
+
+    func run() throws {
+        do {
+            try ManifestVerifier.verify(
+                manifest: URL(fileURLWithPath: manifest),
+                expectedCommit: expectedCommit
+            )
+        } catch let failure as ManifestVerifier.Failure {
+            FileHandle.standardError.write(Data((failure.description + "\n").utf8))
+            throw ExitCode(1)
+        }
     }
 }
 

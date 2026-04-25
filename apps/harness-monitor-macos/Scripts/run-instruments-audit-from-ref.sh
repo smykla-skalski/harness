@@ -130,48 +130,9 @@ if [[ -z "$run_dir" ]]; then
   exit 1
 fi
 
-python3 - "$run_dir/manifest.json" "$resolved_commit" <<'PY'
-from __future__ import annotations
-
-import json
-import sys
-from pathlib import Path
-
-manifest_path = Path(sys.argv[1])
-expected_commit = sys.argv[2]
-
-if not manifest_path.exists():
-    raise SystemExit(f"manifest.json not found at {manifest_path}")
-
-manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-git_info = manifest.get("git", {})
-targets = manifest.get("targets", {})
-build_provenance = manifest.get("build_provenance", {})
-host = build_provenance.get("host", {})
-
-errors: list[str] = []
-
-if git_info.get("commit") != expected_commit:
-    errors.append(
-        f"manifest git.commit={git_info.get('commit')} does not match expected {expected_commit}"
-    )
-if git_info.get("dirty") is not False:
-    errors.append(f"manifest git.dirty must be false, got {git_info.get('dirty')!r}")
-if not git_info.get("workspace_fingerprint"):
-    errors.append("manifest git.workspace_fingerprint is missing")
-if host.get("embedded_commit") != expected_commit:
-    errors.append(
-        f"manifest host embedded_commit={host.get('embedded_commit')} does not match expected {expected_commit}"
-    )
-if host.get("embedded_dirty") not in ("false", False):
-    errors.append(f"manifest host embedded_dirty must be false, got {host.get('embedded_dirty')!r}")
-if not host.get("binary_sha256"):
-    errors.append("manifest host binary_sha256 is missing")
-if not targets.get("staged_host_bundle_id"):
-    errors.append("manifest staged_host_bundle_id is missing")
-
-if errors:
-    raise SystemExit("\n".join(errors))
-PY
+PERF_CLI_BINARY="$APP_ROOT/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf"
+"$PERF_CLI_BINARY" verify-manifest \
+  --manifest "$run_dir/manifest.json" \
+  --expected-commit "$resolved_commit"
 
 printf 'Verified manifest provenance for %s\n' "$resolved_commit"
