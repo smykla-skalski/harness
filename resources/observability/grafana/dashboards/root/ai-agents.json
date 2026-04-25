@@ -82,7 +82,22 @@
                 }
               ],
               "queryOptions": {},
-              "transformations": []
+              "transformations": [
+                {
+                  "id": "reduce",
+                  "options": {
+                    "fields": {
+                      "byName": [
+                        "traceDuration"
+                      ]
+                    },
+                    "includeTimeField": false,
+                    "reducers": [
+                      "count"
+                    ]
+                  }
+                }
+              ]
             }
           },
           "description": "",
@@ -1268,7 +1283,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[5m])) or on() vector(0)",
+                        "expr": "sum(ai_agents_copilot_token_usage_window{window=\"300s\",type=\"uncached_total\"}) or on() vector(0)",
                         "legendFormat": "copilot"
                       }
                     },
@@ -1623,7 +1638,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[5m]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(ai_agents_copilot_token_usage_window{window=\"300s\",type=\"uncached_total\"}, \"pretty_model\", \"$1\", \"model\", \"(.*)\"))",
                         "legendFormat": "copilot::{{pretty_model}}"
                       }
                     },
@@ -2399,7 +2414,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=\"input\"}[$__range]))) or on() vector(0)"
+                        "expr": "round(sum(ai_agents_copilot_token_usage_window{window=\"${__range_s}s\",type=\"uncached_input\"}) or on() vector(0))"
                       }
                     },
                     "refId": "A",
@@ -2495,7 +2510,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=\"output\"}[$__range]))) or on() vector(0)"
+                        "expr": "round(sum(ai_agents_copilot_token_usage_window{window=\"${__range_s}s\",type=\"output\"}) or on() vector(0))"
                       }
                     },
                     "refId": "A",
@@ -2584,14 +2599,16 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "prometheus",
+                      "group": "tempo",
                       "version": "v0",
                       "datasource": {
-                        "name": "prometheus"
+                        "name": "tempo"
                       },
                       "spec": {
-                        "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)"
+                        "queryType": "traceql",
+                        "query": "{ resource.service.name = \"copilot\" && span:name = \"invoke_agent\" } | count_over_time()",
+                        "metricsQueryType": "range",
+                        "step": "15m"
                       }
                     },
                     "refId": "A",
@@ -2606,7 +2623,7 @@
           "description": "",
           "id": 217,
           "links": [],
-          "title": "Copilot Sessions",
+          "title": "Copilot Agents",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -2645,9 +2662,9 @@
                 "orientation": "auto",
                 "reduceOptions": {
                   "calcs": [
-                    "lastNotNull"
+                    "max"
                   ],
-                  "fields": "",
+                  "fields": "count_over_time",
                   "values": false
                 },
                 "textMode": "value",
@@ -3485,14 +3502,16 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "prometheus",
+                      "group": "tempo",
                       "version": "v0",
                       "datasource": {
-                        "name": "prometheus"
+                        "name": "tempo"
                       },
                       "spec": {
-                        "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)"
+                        "queryType": "traceql",
+                        "query": "{ resource.service.name = \"copilot\" && span:name = \"invoke_agent\" } | count_over_time()",
+                        "metricsQueryType": "range",
+                        "step": "15m"
                       }
                     },
                     "refId": "A",
@@ -3530,9 +3549,9 @@
                 "orientation": "auto",
                 "reduceOptions": {
                   "calcs": [
-                    "lastNotNull"
+                    "max"
                   ],
-                  "fields": "",
+                  "fields": "count_over_time",
                   "values": false
                 },
                 "textMode": "value",
@@ -3716,13 +3735,15 @@
                     "hidden": false,
                     "query": {
                       "datasource": {
-                        "name": "prometheus"
+                        "name": "tempo"
                       },
-                      "group": "prometheus",
+                      "group": "tempo",
                       "kind": "DataQuery",
                       "spec": {
-                        "editorMode": "code",
-                        "expr": "count(count by (session_id) (last_over_time(github_copilot_agent_turn_count_count{service_name=~\"copilot|github-copilot-cli\"}[2m]))) or on() vector(0)"
+                        "queryType": "traceql",
+                        "query": "{ resource.service.name = \"copilot\" && span:name = \"invoke_agent\" } | count_over_time()",
+                        "metricsQueryType": "range",
+                        "step": "15m"
                       },
                       "version": "v0"
                     },
@@ -3737,7 +3758,7 @@
           "description": "",
           "id": 302,
           "links": [],
-          "title": "Active Sessions",
+          "title": "Active Agents",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -3775,9 +3796,9 @@
                 "orientation": "auto",
                 "reduceOptions": {
                   "calcs": [
-                    "lastNotNull"
+                    "max"
                   ],
-                  "fields": "",
+                  "fields": "count_over_time",
                   "values": false
                 },
                 "textMode": "value"
@@ -3890,7 +3911,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "round(sum(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__range]))) or on() vector(0)"
+                        "expr": "round(sum(ai_agents_copilot_token_usage_window{window=\"${__range_s}s\",type=\"uncached_total\"}) or on() vector(0))"
                       },
                       "version": "v0"
                     },
@@ -5989,7 +6010,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (pretty_model) (label_replace(increase(gen_ai_client_token_usage_sum{service_name=~\"copilot|github-copilot-cli\",gen_ai_token_type=~\"input|output\"}[$__rate_interval]), \"pretty_model\", \"$1\", \"gen_ai_request_model\", \"(.*)\"))",
+                        "expr": "sum by (pretty_model) (label_replace(ai_agents_copilot_token_usage_window{window=\"3600s\",type=\"uncached_total\"}, \"pretty_model\", \"$1\", \"model\", \"(.*)\"))",
                         "legendFormat": "copilot :: {{pretty_model}}"
                       },
                       "version": "v0"

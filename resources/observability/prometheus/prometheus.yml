@@ -47,6 +47,11 @@ scrape_configs:
       - targets:
           - sqlite-exporter:9560
 
+  - job_name: copilot-token-exporter
+    static_configs:
+      - targets:
+          - copilot-token-exporter:9561
+
   # macOS host metrics (darwin-exporter for battery, thermal, wifi).
   # host process metrics now arrive via OTLP push from the host Alloy OTel agent.
   - job_name: darwin-exporter
