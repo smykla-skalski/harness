@@ -14,6 +14,7 @@ struct HarnessMonitorPerf: ParsableCommand {
             Compare.self,
             Summarize.self,
             Extract.self,
+            Recap.self,
             MeasurePreviewLatency.self,
         ],
         defaultSubcommand: nil
@@ -102,6 +103,30 @@ struct Summarize: ParsableCommand {
         do {
             _ = try Summarizer.summarize(runDir: url)
         } catch let failure as Summarizer.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+}
+
+struct Recap: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "recap",
+        abstract: "Print a compact recap of an audit run from summary.json + comparison.json."
+    )
+
+    @Option(name: .long, help: "Run directory containing summary.json (and optional comparison.json).")
+    var runDir: String
+
+    @Option(name: [.long, .customLong("top-count")], help: "Top offenders to print per scenario. Default: 5")
+    var topCount: Int = 5
+
+    func run() throws {
+        let url = URL(fileURLWithPath: runDir)
+        do {
+            let text = try HarnessMonitorPerfCore.Recap.render(runDir: url, topCount: topCount)
+            print(text)
+        } catch let failure as HarnessMonitorPerfCore.Recap.Failure {
             FileHandle.standardError.write(Data((failure.message + "\n").utf8))
             throw ExitCode(1)
         }
