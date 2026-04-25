@@ -276,6 +276,53 @@ fn classify_line_correlates_tool_result() {
 }
 
 #[test]
+fn classify_line_detects_traceback_from_tool_result_blocks() {
+    let mut state = make_state();
+    let tool_use_line = serde_json::json!({
+        "message": {
+            "role": "assistant",
+            "content": [{
+                "type": "tool_use",
+                "id": "tool_traceback",
+                "name": "Bash",
+                "input": { "command": "python foo.py" }
+            }]
+        }
+    });
+    classify_line(
+        0,
+        &serde_json::to_string(&tool_use_line).unwrap(),
+        &mut state,
+    );
+
+    let tool_result_line = serde_json::json!({
+        "message": {
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "tool_traceback",
+                "tool_name": "Bash",
+                "is_error": true,
+                "content": [{
+                    "type": "text",
+                    "text": "Traceback (most recent call last):\n  File \"foo.py\", line 1, in <module>\n  ValueError: bad"
+                }]
+            }]
+        }
+    });
+    let issues = classify_line(
+        1,
+        &serde_json::to_string(&tool_result_line).unwrap(),
+        &mut state,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::PythonTracebackOutput)
+    );
+}
+
+#[test]
 fn classify_line_string_content() {
     let mut state = make_state();
     let line = serde_json::json!({
