@@ -6,6 +6,16 @@ use super::{
 };
 
 impl DaemonDb {
+    fn session_state_import_required(
+        &self,
+        session_id: &str,
+        file_state_version: u64,
+    ) -> Result<bool, CliError> {
+        let db_version = self.session_state_version(session_id)?;
+        let file_version = i64::try_from(file_state_version).unwrap_or(i64::MAX);
+        Ok(db_version.is_none_or(|version| version < file_version))
+    }
+
     /// Import all file-backed sessions and projects into the database.
     ///
     /// # Errors
@@ -57,10 +67,10 @@ impl DaemonDb {
         }
 
         for resolved in sessions {
-            let db_version = self.session_state_version(&resolved.state.session_id)?;
-            let file_version = i64::try_from(resolved.state.state_version).unwrap_or(i64::MAX);
-
-            if db_version.is_some_and(|version| version >= file_version) {
+            if !self.session_state_import_required(
+                &resolved.state.session_id,
+                resolved.state.state_version,
+            )? {
                 result.sessions_skipped += 1;
                 continue;
             }
@@ -199,6 +209,12 @@ impl DaemonDb {
         &self,
         prepared: &PreparedSessionResync,
     ) -> Result<(), CliError> {
+        if !self.session_state_import_required(
+            &prepared.resolved.state.session_id,
+            prepared.resolved.state.state_version,
+        )? {
+            return Ok(());
+        }
         self.sync_session(
             &prepared.resolved.project.project_id,
             &prepared.resolved.state,
