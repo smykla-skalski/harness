@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node>
+    <schema>
+      <col><mnemonic>sample-time</mnemonic></col>
+      <col><mnemonic>backtrace</mnemonic></col>
+    </schema>
+    <backtrace id="100" fmt="bt1">
+      <frame id="101" name="DashboardView.body">
+        <binary id="200" path="/Applications/Harness Monitor.app/Contents/MacOS/Harness Monitor"/>
+      </frame>
+      <frame id="102" name="0x12345"/>
+      <frame id="103" name="SwiftUI._render">
+        <binary id="201" path="/System/Library/SwiftUI.framework"/>
+      </frame>
+    </backtrace>
+    <backtrace id="110" fmt="bt2">
+      <frame id="111" name="SwiftUI._update">
+        <binary ref="201"/>
+      </frame>
+      <frame id="112" name="dispatch_call">
+        <binary id="202" path="/usr/lib/libdispatch.dylib"/>
+      </frame>
+    </backtrace>
+    <row>
+      <sample-time id="1" fmt="00:01.000">1000000000</sample-time>
+      <backtrace ref="100"/>
+    </row>
+    <row>
+      <sample-time id="2" fmt="00:01.001">1001000000</sample-time>
+      <backtrace ref="100"/>
+    </row>
+    <row>
+      <sample-time id="3" fmt="00:01.002">1002000000</sample-time>
+      <backtrace ref="110"/>
+    </row>
+  </node>
+</trace-query-result>
