@@ -80,12 +80,10 @@ require_text "scripts/e2e/swarm-full-flow.sh" "-workspace \"\$APP_ROOT/HarnessMo
 require_text "scripts/e2e/swarm-full-flow.sh" "-resultBundlePath \"\$RESULT_BUNDLE_PATH\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
 require_text "scripts/e2e/swarm-full-flow.sh" "UI_SNAPSHOTS_SOURCE=\"\$SYNC_ROOT/ui-snapshots\""
-require_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
-# shellcheck disable=SC2016
-require_text "scripts/e2e/swarm-full-flow.sh" 'wait_for_pid_exit "$pid" 10'
-require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGTERM'
-require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGKILL'
-require_count "scripts/e2e/swarm-full-flow.sh" "stop_screen_recording" 3
+require_text "scripts/e2e/swarm-full-flow.sh" "SCREEN_RECORDING_MANIFEST_PATH=\"\$STATE_ROOT/screen-recording.json\""
+require_text "scripts/e2e/swarm-full-flow.sh" '"$APP_E2E_TOOL_BINARY" start-recording'
+require_text "scripts/e2e/swarm-full-flow.sh" '"$APP_E2E_TOOL_BINARY" stop-recording'
+require_text "scripts/e2e/swarm-full-flow.sh" '--manifest "$SCREEN_RECORDING_MANIFEST_PATH"'
 require_text "scripts/e2e/swarm-full-flow.sh" 'triage-run.sh'
 require_text "scripts/e2e/swarm-full-flow.sh" "--ui-snapshots-source \"\$UI_SNAPSHOTS_SOURCE\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'Swarm e2e artifacts recorded at'
@@ -95,6 +93,11 @@ require_no_text "scripts/e2e/swarm-full-flow.sh" "UI_SNAPSHOTS_DIR"
 require_no_text "scripts/e2e/swarm-full-flow.sh" "-project \"\$APP_ROOT/HarnessMonitor.xcodeproj\""
 require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
 require_no_text "scripts/e2e/swarm-full-flow.sh" "SYNC_DIR=\"\$DATA_HOME/e2e-sync\""
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'wait_for_pid_exit'
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGTERM'
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGKILL'
+require_no_text "scripts/e2e/swarm-full-flow.sh" 'SCREEN_RECORD_PID'
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
 require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
 require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'

@@ -23,7 +23,6 @@ done
 
 e2e_require_command jq
 e2e_require_command shasum
-e2e_require_command screencapture
 APP_E2E_TOOL_PACKAGE="$APP_ROOT/Tools/HarnessMonitorE2E"
 APP_E2E_TOOL_BINARY="${HARNESS_MONITOR_E2E_TOOL_BINARY:-$APP_E2E_TOOL_PACKAGE/.build/release/harness-monitor-e2e}"
 
@@ -74,12 +73,12 @@ HARNESS_BUILD_LOG="$ARTIFACTS_DIR/harness-build.log"
 TEST_XCODEBUILD_LOG="$ARTIFACTS_DIR/test-without-building.log"
 SCREEN_RECORDING_PATH="$ARTIFACTS_DIR/swarm-full-flow.mov"
 SCREEN_RECORDING_LOG="$ARTIFACTS_DIR/screen-recording.log"
+SCREEN_RECORDING_MANIFEST_PATH="$STATE_ROOT/screen-recording.json"
 RESULT_BUNDLE_PATH="$ARTIFACTS_DIR/swarm-full-flow.xcresult"
 UI_SNAPSHOTS_SOURCE="$SYNC_ROOT/ui-snapshots"
 
 DAEMON_PID=""
 ACT_DRIVER_PID=""
-SCREEN_RECORD_PID=""
 
 mkdir -p "$DATA_HOME" "$SYNC_DIR" "$LOG_ROOT" "$UI_SNAPSHOTS_SOURCE" "$(dirname -- "$FINDINGS_FILE")"
 export HARNESS_DAEMON_DATA_HOME="$DATA_HOME"
@@ -92,49 +91,31 @@ export XDG_DATA_HOME="$DATA_HOME"
 
 start_screen_recording() {
   : >"$SCREEN_RECORDING_LOG"
-  screencapture -v -k -D1 -V 1800 "$SCREEN_RECORDING_PATH" \
-    >"$SCREEN_RECORDING_LOG" 2>&1 &
-  SCREEN_RECORD_PID="$!"
-}
+  "$APP_E2E_TOOL_BINARY" start-recording \
+    --output "$SCREEN_RECORDING_PATH" \
+    --log "$SCREEN_RECORDING_LOG" \
+    --manifest "$SCREEN_RECORDING_MANIFEST_PATH" &
 
-wait_for_pid_exit() {
-  local pid="$1"
-  local timeout_seconds="$2"
-  local deadline=$((SECONDS + timeout_seconds))
-
-  while kill -0 "$pid" 2>/dev/null; do
-    if (( SECONDS >= deadline )); then
+  local pid="$!"
+  local deadline=$((SECONDS + 10))
+  while (( SECONDS < deadline )); do
+    if [[ -f "$SCREEN_RECORDING_MANIFEST_PATH" ]]; then
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid"
       return 1
     fi
     sleep 0.2
   done
 
-  wait "$pid" 2>/dev/null || true
-  return 0
+  printf 'Timed out waiting for native screen recording readiness\n' >>"$SCREEN_RECORDING_LOG"
+  return 1
 }
 
 stop_screen_recording() {
-  [[ -n "$SCREEN_RECORD_PID" ]] || return 0
-
-  local pid="$SCREEN_RECORD_PID"
-  SCREEN_RECORD_PID=""
-
-  kill -INT "$pid" 2>/dev/null || true
-  if wait_for_pid_exit "$pid" 10; then
-    return 0
-  fi
-
-  printf '%s\n' 'warning: screencapture did not stop after SIGINT; escalating to SIGTERM' \
-    >>"$SCREEN_RECORDING_LOG"
-  kill -TERM "$pid" 2>/dev/null || true
-  if wait_for_pid_exit "$pid" 5; then
-    return 0
-  fi
-
-  printf '%s\n' 'warning: screencapture did not stop after SIGTERM; escalating to SIGKILL' \
-    >>"$SCREEN_RECORDING_LOG"
-  kill -KILL "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
+  "$APP_E2E_TOOL_BINARY" stop-recording \
+    --manifest "$SCREEN_RECORDING_MANIFEST_PATH" || true
 }
 
 cleanup() {
