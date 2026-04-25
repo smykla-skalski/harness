@@ -21,12 +21,13 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-monitor-macos`, treat `HarnessMonitor.xcodeproj` as tracked source. If you add, remove, or rename Swift files under the Harness Monitor app, update the Xcode project in the same change instead of relying on local-only project state.
+For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:macos:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
 
 Harness Monitor app validation expectations:
 
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
-- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath xcode-derived test CODE_SIGNING_ALLOWED=NO -destination "platform=macOS,arch=$(uname -m),name=My Mac" -skip-testing:HarnessMonitorUITests`
+- `mise run monitor:macos:build`
+- `mise run monitor:macos:test`
+- `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
 - All xcodebuild invocations must use `-derivedDataPath xcode-derived` so build artifacts land in a single, known location at the repo root (gitignored). Never create variant-named directories like `xcode-derived-foo` - one directory, reused across builds.
 - For macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'` because it matches both `My Mac` and `Any Mac` and triggers the multiple-matching-destinations warning. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64`. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless a more specific `id=...` selector is required.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.

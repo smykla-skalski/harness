@@ -46,7 +46,8 @@ private let kitTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: kitSources,
     dependencies: kitDependencies,
-    settings: kitSettings
+    settings: kitSettings,
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:core"])
 )
 
 private let uiPreviewableTarget: Target = {
@@ -85,7 +86,8 @@ private let uiPreviewableTarget: Target = {
                 ]),
                 .release(name: "Release")
             ]
-        )
+        ),
+        metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:previews", "tag:layer:ui"])
     )
 }()
 
@@ -123,7 +125,8 @@ private let previewHostTarget: Target = .target(
             ]),
             .release(name: "Release")
         ]
-    )
+    ),
+    metadata: .metadata(tags: ["tag:feature:previews", "tag:layer:app"])
 )
 
 private let monitorAppDependencies: [TargetDependency] = {
@@ -171,7 +174,8 @@ private let monitorAppTarget: Target = .target(
         BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
     ],
     dependencies: monitorAppDependencies,
-    settings: monitorAppSettings
+    settings: monitorAppSettings,
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
 )
 
 private let uiTestHostSettings: Settings = .settings(
@@ -211,7 +215,8 @@ private let uiTestHostTarget: Target = .target(
         BuildPhases.clearGatekeeperMetadata(variant: .uiTestHost)
     ],
     dependencies: monitorAppDependencies,
-    settings: uiTestHostSettings
+    settings: uiTestHostSettings,
+    metadata: .metadata(tags: ["tag:feature:ui-testing", "tag:layer:app"])
 )
 
 private let kitTestsSources: SourceFilesList = SourceFilesList(globs: [
@@ -234,7 +239,8 @@ private let kitTestsTarget: Target = .target(
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.kit-tests",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ])
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:test"])
 )
 
 private let uiTestsTarget: Target = .target(
@@ -252,11 +258,14 @@ private let uiTestsTarget: Target = .target(
         .target(name: "HarnessMonitorUITestHost")
     ],
     settings: .settings(base: [
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGNING_ALLOWED": "YES",
         "CODE_SIGN_STYLE": "Automatic",
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.ui-tests",
         "TEST_TARGET_NAME": "HarnessMonitorUITestHost"
-    ])
+    ]),
+    metadata: .metadata(tags: ["tag:feature:ui-testing", "tag:layer:test"])
 )
 
 private let agentsE2ETarget: Target = .target(
@@ -274,11 +283,14 @@ private let agentsE2ETarget: Target = .target(
         .target(name: "HarnessMonitorUITestHost")
     ],
     settings: .settings(base: [
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGNING_ALLOWED": "YES",
         "CODE_SIGN_STYLE": "Automatic",
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.agents-e2e-tests",
         "TEST_TARGET_NAME": "HarnessMonitorUITestHost"
-    ])
+    ]),
+    metadata: .metadata(tags: ["tag:feature:agents", "tag:layer:test"])
 )
 
 private let monitorRunEnv: [String: EnvironmentVariable] = [
