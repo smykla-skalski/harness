@@ -20,6 +20,7 @@ struct RecordingTriageCommand: ParsableCommand {
       ThrashCommand.self,
       ActTimingCommand.self,
       ActIdentifiersCommand.self,
+      EmitChecklistCommand.self,
     ]
   )
 }
@@ -326,5 +327,154 @@ struct ActIdentifiersCommand: ParsableCommand {
       taskReviewID: taskReviewID
     )
     try emit(report)
+  }
+}
+
+// MARK: - emit-checklist
+
+struct EmitChecklistCommand: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "emit-checklist",
+    abstract: "Aggregate detector JSONs in <run>/recording-triage/ into checklist.md."
+  )
+
+  @Option(name: .customLong("run"), help: "Triage run dir; reads recording-triage/*.json from it.")
+  var runDirPath: String
+
+  func run() throws {
+    let runDir = URL(fileURLWithPath: runDirPath, isDirectory: true)
+    guard FileManager.default.fileExists(atPath: runDir.path) else {
+      throw ValidationError("--run does not exist: \(runDir.path)")
+    }
+    let triageDir = runDir.appendingPathComponent("recording-triage", isDirectory: true)
+    let inputs = ChecklistInputLoader.load(triageDir: triageDir)
+    let report = RecordingTriage.emitChecklist(inputs: inputs)
+    let markdown = report.renderMarkdown()
+    FileHandle.standardOutput.write(Data(markdown.utf8))
+  }
+}
+
+// MARK: - checklist-input loader
+
+private enum ChecklistInputLoader {
+  static func load(triageDir: URL) -> RecordingTriage.ChecklistInputs {
+    var inputs = RecordingTriage.ChecklistInputs()
+    inputs.actTiming = decodeIfPresent(
+      triageDir.appendingPathComponent("act-timing.json"),
+      as: RecordingTriage.ActTimingReport.self
+    )
+    if let surface = decodeIfPresent(
+      triageDir.appendingPathComponent("act-identifiers.json"),
+      as: RecordingTriage.ActSurfaceReport.self
+    ) {
+      inputs.actIdentifiers = .init(
+        perAct: surface.perAct.map {
+          RecordingTriage.PerActFindings(act: $0.act, findings: $0.findings)
+        },
+        wholeRun: surface.wholeRun
+      )
+    }
+    inputs.frameGaps = decodeIfPresent(
+      triageDir.appendingPathComponent("frame-gaps.json"),
+      as: RecordingTriage.FrameGapReport.self
+    )
+    inputs.deadHeadTail = loadDeadHeadTail(
+      triageDir.appendingPathComponent("dead-head-tail.json")
+    )
+    inputs.thrash = decodeIfPresent(
+      triageDir.appendingPathComponent("thrash.json"),
+      as: RecordingTriage.ThrashReport.self
+    )
+    inputs.blackFrames =
+      decodeIfPresent(
+        triageDir.appendingPathComponent("black-frames.json"),
+        as: [RecordingTriage.BlackFrameReport].self
+      ) ?? []
+    if let bundle = decodeIfPresent(
+      triageDir.appendingPathComponent("layout-drift.json"),
+      as: LayoutDriftBundle.self
+    ) {
+      inputs.layoutDriftPairs = bundle.pairs.map {
+        RecordingTriage.LayoutDriftPair(before: $0.before, after: $0.after, drifts: $0.drifts)
+      }
+    }
+    inputs.compareKeyframes =
+      decodeIfPresent(
+        triageDir.appendingPathComponent("compare-keyframes.json"),
+        as: [RecordingTriage.PerceptualHashFinding].self
+      ) ?? []
+    inputs.launchArgs = decodeIfPresent(
+      triageDir.appendingPathComponent("launch-args.json"),
+      as: LaunchArgsFile.self
+    ).map { .init(allConfigured: $0.allConfigured) }
+    inputs.assertRecording = loadAssertRecording(
+      triageDir.appendingPathComponent("assert-recording.json")
+    )
+    if let auto = decodeIfPresent(
+      triageDir.appendingPathComponent("auto-keyframes.json"),
+      as: AutoKeyframesFile.self
+    ) {
+      inputs.autoKeyframes = .init(
+        acts: auto.acts.map { .init(name: $0.name, seconds: $0.seconds) }
+      )
+    }
+    return inputs
+  }
+
+  private static func decodeIfPresent<T: Decodable>(_ url: URL, as type: T.Type) -> T? {
+    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return try? JSONDecoder().decode(T.self, from: data)
+  }
+
+  private static func loadDeadHeadTail(_ url: URL) -> RecordingTriage.DeadHeadTailReport? {
+    guard FileManager.default.fileExists(atPath: url.path),
+      let data = try? Data(contentsOf: url),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { return nil }
+    if let status = object["status"] as? String, status == "skipped" || status == "failed" {
+      return nil
+    }
+    return try? JSONDecoder().decode(RecordingTriage.DeadHeadTailReport.self, from: data)
+  }
+
+  private static func loadAssertRecording(_ url: URL) -> RecordingTriage.AssertRecordingReport? {
+    guard FileManager.default.fileExists(atPath: url.path),
+      let data = try? Data(contentsOf: url),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { return nil }
+    let status = (object["status"] as? String) ?? "unknown"
+    let sizeBytes = object["size_bytes"] as? Int
+    let durationSeconds = object["duration_seconds"] as? Double
+    let reason = object["reason"] as? String
+    return .init(
+      status: status,
+      sizeBytes: sizeBytes,
+      durationSeconds: durationSeconds,
+      reason: reason
+    )
+  }
+
+  private struct LayoutDriftBundle: Decodable {
+    let pairs: [Pair]
+
+    struct Pair: Decodable {
+      let before: String
+      let after: String
+      let drifts: [RecordingTriage.LayoutDrift]
+    }
+  }
+
+  private struct LaunchArgsFile: Decodable {
+    let allConfigured: Bool
+  }
+
+  private struct AutoKeyframesFile: Decodable {
+    let acts: [Act]
+
+    struct Act: Decodable {
+      let name: String
+      let seconds: Double
+    }
   }
 }
