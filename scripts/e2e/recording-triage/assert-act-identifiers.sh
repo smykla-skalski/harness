@@ -33,18 +33,24 @@ BINARY="$(recording_triage_resolve_binary "$REPO_ROOT")"
 
 MARKER_DIR="$RUN_DIR/context/sync-root/e2e-sync"
 SNAPSHOT_DIR="$RUN_DIR/ui-snapshots"
-if [[ ! -d "$MARKER_DIR" ]]; then
-  printf 'error: marker dir missing: %s\n' "$MARKER_DIR" >&2
-  exit 1
-fi
-if [[ ! -d "$SNAPSHOT_DIR" ]]; then
-  printf 'error: ui-snapshots dir missing: %s\n' "$SNAPSHOT_DIR" >&2
-  exit 1
-fi
-
 OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
 mkdir -p "$OUTPUT_DIR"
 REPORT="$OUTPUT_DIR/act-identifiers.json"
+
+emit_skipped() {
+  local reason="$1"
+  jq -nc --arg reason "$reason" \
+    '{perAct:[], wholeRun:[], status:"skipped", reason:$reason}' >"$REPORT"
+  printf 'act-identifiers: skipped (%s)\n' "$reason"
+  exit 0
+}
+
+if [[ ! -d "$MARKER_DIR" ]]; then
+  emit_skipped "marker dir missing: $MARKER_DIR"
+fi
+if [[ ! -d "$SNAPSHOT_DIR" ]]; then
+  emit_skipped "ui-snapshots dir missing: $SNAPSHOT_DIR"
+fi
 
 "$BINARY" recording-triage act-identifiers \
   --marker-dir "$MARKER_DIR" \

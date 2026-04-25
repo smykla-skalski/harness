@@ -33,17 +33,27 @@ recording_triage_require_run_dir "$RUN_DIR"
 SCREEN_LOG="$RUN_DIR/screen-recording.log"
 MARKER_DIR="$RUN_DIR/context/sync-root/e2e-sync"
 RECORDING="$RUN_DIR/swarm-full-flow.mov"
+OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
+mkdir -p "$OUTPUT_DIR"
+SUMMARY="$OUTPUT_DIR/auto-keyframes.json"
+
+emit_skipped() {
+  local reason="$1"
+  jq -nc --arg reason "$reason" \
+    '{status:"skipped", reason:$reason, acts:[], keyframes:null, compare:null}' >"$SUMMARY"
+  printf 'auto-keyframes: skipped (%s)\n' "$reason"
+  exit 0
+}
+
 for required in "$SCREEN_LOG" "$MARKER_DIR" "$RECORDING"; do
   if [[ ! -e "$required" ]]; then
-    printf 'error: missing input: %s\n' "$required" >&2
-    exit 1
+    emit_skipped "missing input: $required"
   fi
 done
 
 REC_LINE="$(grep -m1 'recording-started' "$SCREEN_LOG" || true)"
 if [[ -z "$REC_LINE" ]]; then
-  printf 'error: no recording-started line in %s\n' "$SCREEN_LOG" >&2
-  exit 1
+  emit_skipped "no recording-started line in $SCREEN_LOG"
 fi
 REC_ISO="${REC_LINE%% *}"
 
@@ -77,10 +87,6 @@ for ready in "$MARKER_DIR"/act*.ready; do
   TIMESTAMP_PAIRS+=("--timestamp" "${name}=${offset}")
   SUMMARY_LINES+=("$(jq -nc --arg name "$name" --arg seconds "$offset" '{name:$name, seconds:($seconds|tonumber)}')")
 done
-
-OUTPUT_DIR="$(recording_triage_output_dir "$RUN_DIR")"
-mkdir -p "$OUTPUT_DIR"
-SUMMARY="$OUTPUT_DIR/auto-keyframes.json"
 
 if (( ${#TIMESTAMP_PAIRS[@]} == 0 )); then
   jq -n '{recordingStartIso: $start, acts: [], keyframes: null, compare: null}' \

@@ -38,12 +38,27 @@ run_step "assert-recording" "$SCRIPT_DIR/assert-recording.sh" --run "$RUN_DIR"
 run_step "frame-gaps" "$SCRIPT_DIR/frame-gaps.sh" --run "$RUN_DIR"
 run_step "dead-head-tail" "$SCRIPT_DIR/detect-dead-head-tail.sh" --run "$RUN_DIR"
 run_step "thrash" "$SCRIPT_DIR/detect-thrash.sh" --run "$RUN_DIR"
+run_step "auto-keyframes" "$SCRIPT_DIR/auto-keyframes.sh" --run "$RUN_DIR"
 run_step "black-frames" "$SCRIPT_DIR/detect-black-frames.sh" --run "$RUN_DIR"
+run_step "act-timing" "$SCRIPT_DIR/act-timing.sh" --run "$RUN_DIR"
+run_step "act-identifiers" "$SCRIPT_DIR/assert-act-identifiers.sh" --run "$RUN_DIR"
+run_step "compare-layout" "$SCRIPT_DIR/compare-layout.sh" --run "$RUN_DIR"
+run_step "launch-args" "$SCRIPT_DIR/assert-launch-args.sh" --run "$RUN_DIR"
+run_step "emit-checklist" "$SCRIPT_DIR/emit-checklist.sh" --run "$RUN_DIR"
 
 read_json() {
   local path="$1"
   if [[ -s "$path" ]]; then
     cat "$path"
+  else
+    printf 'null'
+  fi
+}
+
+read_text() {
+  local path="$1"
+  if [[ -s "$path" ]]; then
+    jq -Rs '.' <"$path"
   else
     printf 'null'
   fi
@@ -55,6 +70,12 @@ jq -n \
   --argjson dead_head_tail "$(read_json "$OUTPUT_DIR/dead-head-tail.json")" \
   --argjson thrash "$(read_json "$OUTPUT_DIR/thrash.json")" \
   --argjson black_frames "$(read_json "$OUTPUT_DIR/black-frames.json")" \
+  --argjson act_timing "$(read_json "$OUTPUT_DIR/act-timing.json")" \
+  --argjson act_identifiers "$(read_json "$OUTPUT_DIR/act-identifiers.json")" \
+  --argjson auto_keyframes "$(read_json "$OUTPUT_DIR/auto-keyframes.json")" \
+  --argjson layout_drift "$(read_json "$OUTPUT_DIR/layout-drift.json")" \
+  --argjson launch_args "$(read_json "$OUTPUT_DIR/launch-args.json")" \
+  --argjson checklist "$(read_text "$OUTPUT_DIR/checklist.md")" \
   --arg generated_at "$(e2e_timestamp_utc)" \
   '{
     generated_at: $generated_at,
@@ -62,7 +83,13 @@ jq -n \
     frame_gaps: $frame_gaps,
     dead_head_tail: $dead_head_tail,
     thrash: $thrash,
-    black_frames: $black_frames
+    black_frames: $black_frames,
+    act_timing: $act_timing,
+    act_identifiers: $act_identifiers,
+    auto_keyframes: $auto_keyframes,
+    layout_drift: $layout_drift,
+    launch_args: $launch_args,
+    checklist_markdown: $checklist
   }' >"$SUMMARY"
 
 printf 'recording-triage summary -> %s\n' "$SUMMARY"
