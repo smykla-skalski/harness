@@ -902,6 +902,131 @@ extension RecordingTriage {
     }
 }
 
+// MARK: - Whole-run invariants
+
+extension RecordingTriage {
+    public struct ActHierarchy: Codable, Equatable, Sendable {
+        public let act: String
+        public let identifiers: [AccessibilityIdentifier]
+
+        public init(act: String, identifiers: [AccessibilityIdentifier]) {
+            self.act = act
+            self.identifiers = identifiers
+        }
+    }
+
+    /// Walk every per-act hierarchy and emit the cross-act findings called
+    /// out under `## Whole-run invariants` in
+    /// `references/act-marker-matrix.md`. Mechanical checks (badge progression
+    /// for `task_review`, daemon-health proxy via the connection badge) emit
+    /// `found` / `not-found`; the rest are deferred to human verification so
+    /// the agent still re-watches the recording for them.
+    public static func assertWholeRunInvariants(
+        perActHierarchies: [ActHierarchy],
+        taskReviewID: String?
+    ) -> [ChecklistFinding] {
+        var findings: [ChecklistFinding] = []
+        findings.append(taskReviewProgressionFinding(
+            perActHierarchies: perActHierarchies,
+            taskReviewID: taskReviewID
+        ))
+        findings.append(daemonHealthFinding(perActHierarchies: perActHierarchies))
+        findings.append(ChecklistFinding(
+            id: "swarm.invariant.toastQueueAppendOnly",
+            verdict: .needsVerification,
+            message: "compare act11 and act14 toast frames in the recording"
+        ))
+        findings.append(ChecklistFinding(
+            id: "swarm.invariant.taskInspectorMatches",
+            verdict: .needsVerification,
+            message: "taskInspectorCard.value parsing not yet wired; verify in recording"
+        ))
+        findings.append(ChecklistFinding(
+            id: "swarm.invariant.heuristicCodesPersist",
+            verdict: .needsVerification,
+            message: "five act5 heuristic codes; only one carried in marker payload"
+        ))
+        return findings
+    }
+
+    private static func taskReviewProgressionFinding(
+        perActHierarchies: [ActHierarchy],
+        taskReviewID: String?
+    ) -> ChecklistFinding {
+        guard let taskID = taskReviewID, !taskID.isEmpty else {
+            return ChecklistFinding(
+                id: "swarm.invariant.taskReviewProgression",
+                verdict: .needsVerification,
+                message: "task_review_id missing; cannot prove badge progression mechanically"
+            )
+        }
+        let awaitingID = "awaitingReviewBadge.\(taskID)"
+        let inReviewID = "inReviewBadge.\(taskID)"
+        var awaitingActIndex: Int?
+        var inReviewActIndex: Int?
+        for (index, hierarchy) in perActHierarchies.enumerated() {
+            if awaitingActIndex == nil,
+               hierarchy.identifiers.contains(where: { $0.identifier == awaitingID }) {
+                awaitingActIndex = index
+            }
+            if hierarchy.identifiers.contains(where: { $0.identifier == inReviewID }) {
+                inReviewActIndex = index
+            }
+        }
+        if let awaiting = awaitingActIndex,
+           let inReview = inReviewActIndex,
+           inReview >= awaiting {
+            return ChecklistFinding(
+                id: "swarm.invariant.taskReviewProgression",
+                verdict: .found,
+                message: "task_review progressed AwaitingReview -> InReview"
+            )
+        }
+        let missing: [String] = {
+            var pieces: [String] = []
+            if awaitingActIndex == nil { pieces.append(awaitingID) }
+            if inReviewActIndex == nil { pieces.append(inReviewID) }
+            return pieces
+        }()
+        return ChecklistFinding(
+            id: "swarm.invariant.taskReviewProgression",
+            verdict: .notFound,
+            message: "missing badges: \(missing.joined(separator: ","))"
+        )
+    }
+
+    private static func daemonHealthFinding(perActHierarchies: [ActHierarchy]) -> ChecklistFinding {
+        guard !perActHierarchies.isEmpty else {
+            return ChecklistFinding(
+                id: "swarm.invariant.daemonHealth",
+                verdict: .needsVerification,
+                message: "no per-act hierarchies supplied"
+            )
+        }
+        var offendingActs: [String] = []
+        for hierarchy in perActHierarchies {
+            let badge = hierarchy.identifiers.first { $0.identifier == "harness.toolbar.connection-badge" }
+            let label = badge?.label ?? ""
+            let healthy = label.contains("Connection: WS")
+            if !healthy {
+                offendingActs.append(hierarchy.act)
+            }
+        }
+        if offendingActs.isEmpty {
+            return ChecklistFinding(
+                id: "swarm.invariant.daemonHealth",
+                verdict: .found,
+                message: "connection-badge stays on WS across every act"
+            )
+        }
+        return ChecklistFinding(
+            id: "swarm.invariant.daemonHealth",
+            verdict: .notFound,
+            message: "connection-badge not on WS in: \(offendingActs.joined(separator: ","))"
+        )
+    }
+}
+
 // MARK: - Black / blank frames
 
 extension RecordingTriage {
