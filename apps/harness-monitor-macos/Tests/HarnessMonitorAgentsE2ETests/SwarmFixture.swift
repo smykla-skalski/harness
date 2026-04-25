@@ -137,10 +137,16 @@ final class SwarmFixture {
   func selectTask(_ taskID: String) {
     let identifier = Accessibility.sessionTaskCard(taskID)
     let task = testCase.element(in: app, identifier: identifier)
+    if taskIsSelectedInInspector(task, taskID: taskID) {
+      return
+    }
     XCTAssertTrue(
       testCase.waitForElement(task, timeout: 15),
       "Expected swarm task card \(taskID)\n\(diagnosticsSummary())"
     )
+    if taskIsSelectedInInspector(task, taskID: taskID) {
+      return
+    }
     XCTAssertTrue(
       scrollElementIntoView(task),
       """
@@ -151,6 +157,17 @@ final class SwarmFixture {
       """
     )
     testCase.tapElement(in: app, identifier: identifier)
+    let inspector = testCase.element(in: app, identifier: Accessibility.taskInspectorCard)
+    XCTAssertTrue(
+      testCase.waitUntil(timeout: 5) { self.taskIsSelectedInInspector(task, taskID: taskID) },
+      """
+      Expected swarm task \(taskID) to become selected in the inspector.
+      taskLabel=\(task.label)
+      inspectorLabel=\(inspector.label)
+      inspectorValue=\(String(describing: inspector.value))
+      \(diagnosticsSummary())
+      """
+    )
   }
 
   func expectIdentifier(_ identifier: String, timeout: TimeInterval = 15) {
@@ -253,6 +270,23 @@ final class SwarmFixture {
 
     return visibleFrame.insetBy(dx: -1, dy: -1)
       .contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
+  }
+
+  private func taskIsSelectedInInspector(_ task: XCUIElement, taskID: String) -> Bool {
+    let inspector = testCase.element(in: app, identifier: Accessibility.taskInspectorCard)
+    guard inspector.exists else { return false }
+    if (inspector.value as? String) == taskID {
+      return true
+    }
+
+    let taskLabel = task.label.trimmingCharacters(in: .whitespacesAndNewlines)
+    let inspectorLabel = inspector.label.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !taskLabel.isEmpty, !inspectorLabel.isEmpty else { return false }
+
+    return
+      taskLabel == inspectorLabel
+      || taskLabel.contains(inspectorLabel)
+      || inspectorLabel.contains(taskLabel)
   }
 
   private func scrollToward(_ element: XCUIElement) {
