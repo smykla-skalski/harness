@@ -50,7 +50,6 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Resources",
                 "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/inject-build-provenance.sh",
-                "$(PROJECT_DIR)/Scripts/workspace-tree-fingerprint.py",
                 "$(PROJECT_DIR)/Scripts/run-xcode-build-server.sh",
                 "$(PROJECT_DIR)/Sources/HarnessMonitor",
                 "$(PROJECT_DIR)/Sources/HarnessMonitorKit"
