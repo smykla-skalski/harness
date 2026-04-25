@@ -35,59 +35,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Shared helpers keep path selection testable without executing the bundle flow.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
 source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-cargo-build.sh
+source "$SCRIPT_DIR/lib/daemon-cargo-build.sh"
 
 repo_root="$(resolve_repo_root)"
-cd "$repo_root"
-
-target_dir="$(resolve_cargo_target_dir)"
-configuration="${CONFIGURATION:-Debug}"
-profile_dir="debug"
-cargo_args=(rustc --bin harness)
-daemon_info_plist="$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
-
-if [ "$configuration" = "Release" ]; then
-  profile_dir="release"
-  cargo_args+=(--release)
-fi
-
-find_cargo() {
-  if [ -n "${CARGO_BIN:-}" ] && [ -x "$CARGO_BIN" ]; then
-    printf '%s\n' "$CARGO_BIN"
-    return
-  fi
-
-  if command -v cargo >/dev/null 2>&1; then
-    command -v cargo
-    return
-  fi
-
-  for candidate in \
-    "$HOME/.cargo/bin/cargo" \
-    /opt/homebrew/bin/cargo \
-    /usr/local/bin/cargo; do
-    if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return
-    fi
-  done
-
-  printf 'cargo is required to bundle the Harness daemon helper. Set CARGO_BIN or HARNESS_MONITOR_DAEMON_BINARY.\n' >&2
-  exit 1
-}
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
-  daemon_source="$target_dir/$profile_dir/harness"
-  cargo_bin="$(find_cargo)"
-  daemon_info_digest="$(/usr/bin/shasum -a 256 "$daemon_info_plist" | /usr/bin/awk '{print $1}')"
-  daemon_info_link_plist="$target_dir/daemon-info/io.harnessmonitor.daemon.$daemon_info_digest.Info.plist"
-  /bin/mkdir -p "$(dirname "$daemon_info_link_plist")"
-  /bin/cp "$daemon_info_plist" "$daemon_info_link_plist"
-  if [ -n "${MARKETING_VERSION:-}" ]; then
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VERSION}" "$daemon_info_link_plist"
-  fi
-  CARGO_TARGET_DIR="$target_dir" "$cargo_bin" "${cargo_args[@]}" -- \
-    -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
+  daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
 fi
 
 if [ ! -x "$daemon_source" ]; then

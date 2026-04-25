@@ -1,6 +1,17 @@
 import ProjectDescription
 
 public enum BuildPhases {
+    public static func daemonBuildPreAction() -> ExecutionAction {
+        .executionAction(
+            title: "Build harness daemon (parallel)",
+            scriptText: """
+            set -euo pipefail
+            "$SRCROOT/Scripts/build-daemon-agent.sh"
+            """,
+            target: .target("HarnessMonitor")
+        )
+    }
+
     public static func bundleDaemonAgent() -> TargetScript {
         .post(
             script: """
