@@ -1,0 +1,15 @@
+{
+  "captures": [
+    {
+      "scenario": "offline-cached-open",
+      "template": "Allocations",
+      "metrics": {
+        "allocations": {
+          "summary_rows": {
+            "All Heap Allocations": {"total_bytes": 400000000}
+          }
+        }
+      }
+    }
+  ]
+}

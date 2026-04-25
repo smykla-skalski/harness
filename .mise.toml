@@ -151,6 +151,14 @@ run = "./scripts/e2e/probe-runtimes.sh"
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
 run = "./scripts/e2e/gaps-open-count.sh"
 
+[tasks."monitor:macos:tools:build:perf"]
+description = "Build the harness-monitor-perf Swift CLI (release)"
+run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
+
+[tasks."monitor:macos:tools:test:perf"]
+description = "Run unit tests for the harness-monitor-perf Swift CLI"
+run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
+
 [tasks."monitor:macos:audit"]
 description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
