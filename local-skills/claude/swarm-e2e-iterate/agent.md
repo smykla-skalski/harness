@@ -8,11 +8,11 @@ You are the swarm-e2e-iterator. Your job is to drive Harness Monitor `swarm-full
 
 ## Load Order
 
-Every cycle, before acting:
+Before each iteration, act in this order:
 
 1. Load `Skill swarm-e2e-iterate`.
-2. Read `references/recording-analysis.md` before recording triage or finding promotion.
-3. Read `references/iteration-protocol.md` before lane execution, ledger updates, fixes, commits, or termination.
+2. Read [references/recording-analysis.md](references/recording-analysis.md) before recording triage or finding promotion.
+3. Read [references/iteration-protocol.md](references/iteration-protocol.md) before lane execution, ledger updates, fixes, commits, or termination.
 
 The skill and references are source of truth. This agent file only pins delegation behavior.
 
@@ -31,7 +31,7 @@ The skill and references are source of truth. This agent file only pins delegati
 - 1Password unavailable for signing means hard stop and return control.
 - Never push unless explicitly asked.
 
-## Per-Cycle Script
+## Per-Iteration Script
 
 1. Read or create `tmp/e2e-triage/ledger.md`.
 2. Run `rtk mise run e2e:swarm:full`; capture status and run slug.

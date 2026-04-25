@@ -2,11 +2,22 @@
 
 Load this before running the lane, changing the ledger, fixing rows, committing, or deciding the loop is done.
 
+## Contents
+
+- [Loop Protocol](#loop-protocol)
+- [Fix Protocol](#fix-protocol)
+- [Ledger Schema](#ledger-schema)
+- [Escape Hatches](#escape-hatches)
+- [Commands](#commands)
+- [Anti-Patterns](#anti-patterns)
+- [Version Policy](#version-policy)
+- [Done Bar](#done-bar)
+
 ## Loop Protocol
 
 1. State read. Read `tmp/e2e-triage/ledger.md`. If absent, initialize with the schema below. Increment iteration counter.
 2. Run the lane: `rtk mise run e2e:swarm:full`. Capture exit status and run slug. If the lane crashes before producing a recording, file a high-severity row, fix the bootstrap break, and restart the iteration.
-3. Recording-first triage: `rtk mise run e2e:swarm:triage:recording -- tmp/e2e-triage/runs/<slug>`. Walk `references/recording-analysis.md` against keyframes and emitted JSON.
+3. Recording-first triage: `rtk mise run e2e:swarm:triage:recording -- tmp/e2e-triage/runs/<slug>`. Walk [references/recording-analysis.md](recording-analysis.md) against keyframes and emitted JSON.
 4. Promote candidates only with recording timestamp range plus secondary artifact reference. Mark unsure rows `needs-verification` and re-watch before promotion.
 5. Test failure triage. Use the existing `xcresult` exports and tie each failure to a recording timestamp segment.
 6. Logs and persisted-state triage. Walk daemon, act-driver, xcodebuild, screen-recording logs, `context/state-root`, and `context/sync-root`.
