@@ -36,9 +36,11 @@ class RunInstrumentsAuditScriptTests(unittest.TestCase):
         self.assertIn("-name 'launch-host' \\", self.script)
         self.assertIn("purge_legacy_launch_hosts", self.script)
 
-    def test_workspace_fingerprint_tracks_previewable_ui_sources(self) -> None:
-        self.assertIn('root / "Sources" / "HarnessMonitorUIPreviewable"', self.script)
-        self.assertNotIn('root / "Sources" / "HarnessMonitorUI"', self.script)
+    def test_workspace_fingerprint_delegates_to_perf_cli(self) -> None:
+        self.assertIn(
+            '"$PERF_CLI_BINARY" workspace-fingerprint --variant audit --project-dir "$APP_ROOT"',
+            self.script,
+        )
 
     def test_audit_lock_does_not_depend_on_global_ps_scan(self) -> None:
         acquire_lock_body = self.script.split("acquire_audit_lock() {", maxsplit=1)[1].split(
@@ -49,9 +51,7 @@ class RunInstrumentsAuditScriptTests(unittest.TestCase):
         self.assertIn('kill -0 "$owner_pid"', acquire_lock_body)
 
     def test_metrics_budget_gate_runs_after_extraction(self) -> None:
-        self.assertIn('enforce_instruments_metric_budgets "$run_dir/summary.json"', self.script)
-        self.assertIn("assert_swiftui_budget", self.script)
-        self.assertIn("assert_allocations_budget", self.script)
+        self.assertIn('"$PERF_CLI_BINARY" enforce-budgets "$run_dir/summary.json"', self.script)
 
 
 if __name__ == "__main__":
