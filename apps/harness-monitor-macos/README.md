@@ -1,11 +1,11 @@
 # Harness Monitor macOS App
 
-Native SwiftUI control deck for live harness daemon sessions. `project.yml` is the generator input, and the generated `HarnessMonitor.xcodeproj` is checked in as tracked source.
+Native SwiftUI control deck for live harness daemon sessions. The Xcode project is generated from the Tuist manifests under `Project.swift` and `Tuist/`. The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked - run `mise run monitor:macos:generate` to materialize them.
 
 ## Prerequisites
 
 - Xcode with `xcodebuild`
-- `xcodegen`
+- `tuist` (pinned via mise)
 - `swiftlint`
 
 ## Workflows
@@ -54,7 +54,7 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:ma
 
 `XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
 
-Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `mise run version:set -- <version>` from the repo root when you bump a release. `mise run monitor:macos:generate` regenerates the Xcode project first, then resyncs `project.yml`, `HarnessMonitor.xcodeproj/project.pbxproj`, the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version so XcodeGen cannot reintroduce stale build numbers.
+Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `mise run version:set -- <version>` from the repo root when you bump a release. `mise run monitor:macos:generate` regenerates the Xcode project via Tuist, then `Scripts/post-generate.sh` resyncs the marker-anchored version literals in `Tuist/ProjectDescriptionHelpers/BuildSettings.swift` (the `// VERSION_MARKER_CURRENT` and `// VERSION_MARKER_MARKETING` lines), the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version.
 
 Do not pass `CODE_SIGNING_ALLOWED=NO` to `HarnessMonitorUITests`. macOS UI tests need Xcode to re-sign the generated `HarnessMonitorUITests-Runner.app`; otherwise Gatekeeper can reject the copied `com.apple.XCTRunner` runner before the test bundle bootstraps.
 

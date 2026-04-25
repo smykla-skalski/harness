@@ -4,9 +4,9 @@ This file provides guidance to Claude Code when working in the Harness Monitor m
 
 ## Build and test
 
-Optional features (Lottie dancing-llama, future OTel/observability slices, etc.) are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at project-generation time. Tracked `project.pbxproj` reflects the all-features-OFF state. See `features/README.md` for the convention and the list of supported flags.
+Optional features (Lottie dancing-llama, future OTel/observability slices, etc.) are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at project-generation time. The Tuist `FeatureFlags` helper (`Tuist/ProjectDescriptionHelpers/FeatureFlags.swift`) reads them and adds the matching Swift compilation conditions. The all-features-OFF graph is the canonical baseline.
 
-The Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `mise run monitor:macos:generate`. That task also refreshes the repo-root and app-local `buildServer.json` SourceKit configs. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
+The Xcode project is generated from `Project.swift` (and `Tuist/Package.swift`) via Tuist 4. Sources are declared as globs in `Project.swift`, so adding a Swift file in an existing source root needs no manifest edit, but new targets, dependencies, build phases, schemes, or compilation conditions land in the manifests. Regenerate with `mise run monitor:macos:generate` (`Scripts/generate.sh` under the hood: `tuist install` when needed, `tuist generate`, then `Scripts/post-generate.sh` for `buildServer.json` and version sync). The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked.
 
 Validation expectations (run from repo root):
 
