@@ -108,6 +108,32 @@ services:
     depends_on:
       - sqlite-snapshot
 
+  copilot-token-exporter:
+    image: python:3.14-alpine3.22
+    command:
+      - python3
+      - /app/exporter.py
+      - --tempo-url
+      - http://tempo:3200
+      - --listen-host
+      - 0.0.0.0
+      - --listen-port
+      - "9561"
+    restart: unless-stopped
+    volumes:
+      - ./copilot-token-exporter/exporter.py:/app/exporter.py:ro
+      - copilot-token-exporter-data:/var/lib/copilot-token-exporter
+    ports:
+      - "127.0.0.1:9561:9561"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "from urllib.request import urlopen; urlopen('http://localhost:9561/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - tempo
+
   pyroscope:
     image: grafana/pyroscope:2.0.1@sha256:704889ae04768d982a0a71935bb054948993ddc3fe80234611d20877ba8be4c9
     command:
@@ -177,6 +203,8 @@ volumes:
     name: harness-observability_loki-data
   prometheus-data:
     name: harness-observability_prometheus-data
+  copilot-token-exporter-data:
+    name: harness-observability_copilot-token-exporter-data
   pyroscope-v2-data:
     name: harness-observability_pyroscope-v2-data
   pyroscope-v2-compactor-data:
