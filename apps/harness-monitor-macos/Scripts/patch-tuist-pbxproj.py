@@ -2,13 +2,19 @@
 """Patch Tuist's openstep pbxproj so Xcode does not nag with the
 "Update to Recommended Settings" dialog.
 
-Inserts:
-- `LastUpgradeCheck = <value>;` on the PBXProject `attributes` block.
+Normalizes:
+- top-level `objectVersion = <value>;`.
+- remove the stale PBXProject `compatibilityVersion = "Xcode 14.0";`.
+- `preferredProjectObjectVersion = <value>;` on the PBXProject block.
+- `LastUpgradeCheck = <value>;` and `LastSwiftUpdateCheck = <value>;`
+  on the PBXProject `attributes` block.
 - `ProvisioningStyle = Automatic;` and `DevelopmentTeam = <id>;` for every
   PBXNativeTarget that owns signing-relevant settings (apps, app extensions,
   unit / UI test bundles).
 
-Tuist 4 does not expose these via its DSL. The text is edited in place so the
+Tuist 4 does not expose the project-format fields via its DSL, and its
+generator still hardcodes an Xcode 14-era object version. The text is edited
+in place so the
 file stays in the openstep ASCII format Xcode and SourceKit expect.
 """
 
@@ -35,6 +41,14 @@ NATIVE_TARGET_RE = re.compile(
     r"\t\t\};"
 )
 PRODUCT_TYPE_RE = re.compile(r'^\t\t\tproductType = ("[^"]+");$', re.MULTILINE)
+PROJECT_OBJECT_VERSION_RE = re.compile(r"^(\tobjectVersion = )\d+;$", re.MULTILINE)
+
+PBXPROJECT_BLOCK_RE = re.compile(
+    r"(\t\t[0-9A-F]{24} /\* Project object \*/ = \{\n"
+    r"\t\t\tisa = PBXProject;\n)"
+    r"((?:\t\t\t[^\n]*\n)*)"
+    r"(\t\t\};)"
+)
 
 ATTRIBUTES_BLOCK_RE = re.compile(
     r"(\t\t\tattributes = \{\n)((?:\t\t\t\t[^\n]*\n)*?)(\t\t\t\};)"
@@ -58,20 +72,63 @@ def find_signing_target_ids(text: str) -> list[str]:
     return target_ids
 
 
-def upsert_last_upgrade_check(text: str, value: str) -> str:
+def upsert_project_attribute(text: str, key: str, value: str) -> str:
     def replace(match: re.Match[str]) -> str:
         head, body, tail = match.group(1), match.group(2), match.group(3)
-        if "LastUpgradeCheck" in body:
+        if key in body:
             body = re.sub(
-                r"LastUpgradeCheck = [^;]+;",
-                f"LastUpgradeCheck = {value};",
+                rf"{key} = [^;]+;",
+                f"{key} = {value};",
                 body,
             )
             return head + body + tail
         body = body.rstrip("\n") + "\n" if body and not body.endswith("\n") else body
-        return head + body + f"\t\t\t\tLastUpgradeCheck = {value};\n" + tail
+        return head + body + f"\t\t\t\t{key} = {value};\n" + tail
 
     return ATTRIBUTES_BLOCK_RE.sub(replace, text, count=1)
+
+
+def remove_project_key(body: str, key: str) -> str:
+    return re.sub(rf"^\t\t\t{key} = [^;]+;\n", "", body, flags=re.MULTILINE)
+
+
+def upsert_project_key(body: str, key: str, value: str, *, insert_after: str) -> str:
+    line = f"\t\t\t{key} = {value};"
+    existing = re.compile(rf"^\t\t\t{key} = [^;]+;$", re.MULTILINE)
+    if existing.search(body):
+        return existing.sub(line, body, count=1)
+
+    anchor = re.compile(rf"^\t\t\t{insert_after} = [^;]+;$", re.MULTILINE)
+    match = anchor.search(body)
+    if match:
+        return body[: match.end()] + f"\n{line}" + body[match.end() :]
+    return body + line + "\n"
+
+
+def normalize_project_format(
+    text: str,
+    *,
+    object_version: str,
+    preferred_project_object_version: str,
+) -> str:
+    text, _ = PROJECT_OBJECT_VERSION_RE.subn(
+        rf"\g<1>{object_version};",
+        text,
+        count=1,
+    )
+
+    def replace(match: re.Match[str]) -> str:
+        head, body, tail = match.group(1), match.group(2), match.group(3)
+        body = remove_project_key(body, "compatibilityVersion")
+        body = upsert_project_key(
+            body,
+            "preferredProjectObjectVersion",
+            preferred_project_object_version,
+            insert_after="mainGroup",
+        )
+        return head + body + tail
+
+    return PBXPROJECT_BLOCK_RE.sub(replace, text, count=1)
 
 
 def upsert_target_entry(body: str, target_id: str, team: str) -> str:
@@ -128,10 +185,19 @@ def upsert_target_attributes(text: str, target_ids: list[str], team: str) -> str
 def patch_pbxproj(
     pbxproj_path: Path,
     last_upgrade: str,
+    last_swift_update: str,
     development_team: str | None,
+    object_version: str,
+    preferred_project_object_version: str,
 ) -> None:
     text = pbxproj_path.read_text()
-    text = upsert_last_upgrade_check(text, last_upgrade)
+    text = normalize_project_format(
+        text,
+        object_version=object_version,
+        preferred_project_object_version=preferred_project_object_version,
+    )
+    text = upsert_project_attribute(text, "LastSwiftUpdateCheck", last_swift_update)
+    text = upsert_project_attribute(text, "LastUpgradeCheck", last_upgrade)
     if development_team is not None:
         target_ids = find_signing_target_ids(text)
         if target_ids:
@@ -142,10 +208,20 @@ def patch_pbxproj(
 def main() -> int:
     main_pbxproj = Path(os.environ["HARNESS_MONITOR_PBXPROJ"])
     last_upgrade = os.environ["HARNESS_MONITOR_LAST_UPGRADE_CHECK"]
+    last_swift_update = os.environ["HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK"]
+    object_version = os.environ["HARNESS_MONITOR_PROJECT_OBJECT_VERSION"]
+    preferred_project_object_version = os.environ["HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION"]
     development_team = os.environ["HARNESS_MONITOR_DEVELOPMENT_TEAM"]
     repo_root = Path(os.environ["HARNESS_MONITOR_REPO_ROOT"])
 
-    patch_pbxproj(main_pbxproj, last_upgrade, development_team)
+    patch_pbxproj(
+        main_pbxproj,
+        last_upgrade,
+        last_swift_update,
+        development_team,
+        object_version,
+        preferred_project_object_version,
+    )
 
     # Tuist generates standalone xcodeprojs for external SPM packages it
     # materializes (HarnessMonitorRegistry under mcp-servers, opentelemetry,
@@ -173,7 +249,14 @@ def main() -> int:
             if resolved in seen:
                 continue
             seen.add(resolved)
-            patch_pbxproj(candidate, last_upgrade, development_team)
+            patch_pbxproj(
+                candidate,
+                last_upgrade,
+                last_swift_update,
+                development_team,
+                object_version,
+                preferred_project_object_version,
+            )
 
     return 0
 
