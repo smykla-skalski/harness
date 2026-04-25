@@ -181,6 +181,25 @@ final class RecordingTriageLayoutDriftTests: XCTestCase {
     XCTAssertEqual(boxes.last?.frame.origin.x ?? 0, 100, accuracy: 1e-6)
   }
 
+  func testParsesRealXCUITestDumpFormat() {
+    // Lines emitted by XCUIElement.debugDescription at runtime use
+    // `{{x, y}, {w, h}}, identifier: 'X'` (frame first, colon-quoted
+    // identifier). The parser must handle that variant alongside the
+    // legacy `identifier='X' frame: {{...}}` form.
+    let text = """
+      Window (Main), 0x8660a3e80, {{388.0, 274.0}, {1280.0, 820.0}}, identifier: 'main-AppWindow-1', title: 'Cockpit', Disabled
+        Other, 0x8660a12c0, {{396.0, 372.0}, {260.0, 714.0}}, identifier: 'harness.sidebar.search.state', label: 'presented=false'
+        Other, 0x8660a2e40, {{406.0, 412.0}, {240.0, 19.0}}, identifier: 'harness.sidebar.filter.state', label: 'status=all'
+      """
+    let boxes = RecordingTriage.parseLayoutBoundingBoxes(from: text)
+    XCTAssertEqual(boxes.count, 3)
+    XCTAssertEqual(boxes[0].identifier, "main-AppWindow-1")
+    XCTAssertEqual(boxes[0].frame.origin.x, 388.0, accuracy: 1e-6)
+    XCTAssertEqual(boxes[0].frame.size.width, 1280.0, accuracy: 1e-6)
+    XCTAssertEqual(boxes[1].identifier, "harness.sidebar.search.state")
+    XCTAssertEqual(boxes[2].identifier, "harness.sidebar.filter.state")
+  }
+
   func testDetectsDriftOverThreshold() {
     let before = [
       RecordingTriage.LayoutBoundingBox(

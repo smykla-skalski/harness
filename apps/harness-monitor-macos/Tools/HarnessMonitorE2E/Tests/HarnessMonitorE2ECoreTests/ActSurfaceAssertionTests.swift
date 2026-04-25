@@ -177,8 +177,11 @@ final class ActSurfaceAssertionTests: XCTestCase {
   }
 
   func testAct6FindsImproverAgentCard() {
+    // Real UI doesn't emit `harness.session.agent.<id>` per agent. The
+    // improver appears as a substring of the `harness.session.agents.state`
+    // label payload (`agentIDs=...,codex-improver,...`).
     let text = """
-      Button, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session.agent.codex-improver', label: 'Improver'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session.agents.state', label: 'agentCount=11, agentIDs=claude-1,codex-improver,gemini-1'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act6",
@@ -190,7 +193,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct7FindsVibeWorkerWhenPresent() {
     let text = """
-      Button, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session.agent.vibe-worker', label: 'Vibe Worker'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session.agents.state', label: 'agentCount=12, agentIDs=claude-1,codex-1,vibe-worker'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act7",
