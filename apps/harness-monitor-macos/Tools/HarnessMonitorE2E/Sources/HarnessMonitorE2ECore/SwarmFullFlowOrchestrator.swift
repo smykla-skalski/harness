@@ -199,7 +199,7 @@ private final class SwarmFullFlowRunner {
         let xcodebuildRunner = appRoot.appendingPathComponent("Scripts/xcodebuild-with-lock.sh")
         let testArgs = [
             "-workspace", appRoot.appendingPathComponent("HarnessMonitor.xcworkspace").path,
-            "-scheme", "HarnessMonitorAgentsE2ETests",
+            "-scheme", "HarnessMonitorAgentsE2E",
             "-destination", destination,
             "-derivedDataPath", layout.derivedDataPath.path,
             "CODE_SIGNING_ALLOWED=YES",
