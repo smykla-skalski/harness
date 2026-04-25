@@ -13,6 +13,8 @@ XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
+PERF_CLI_PACKAGE_DIR="$APP_ROOT/Tools/HarnessMonitorPerf"
+PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"
 SHIPPING_SCHEME="HarnessMonitor"
 HOST_SCHEME="HarnessMonitorUITestHost"
 HOST_BUNDLE_ID="io.harnessmonitor.app.ui-testing"
@@ -63,6 +65,15 @@ RETAINED_RUN_SIZE_BUDGET_KIB=10240
 
 if [[ "$XCODEBUILD_RUNNER" != "$CANONICAL_XCODEBUILD_RUNNER" ]]; then
   echo "XCODEBUILD_RUNNER override is unsupported; use $CANONICAL_XCODEBUILD_RUNNER" >&2
+  exit 1
+fi
+
+if [[ ! -x "$PERF_CLI_BINARY" ]]; then
+  echo "Building harness-monitor-perf Swift CLI..." >&2
+  swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR"
+fi
+if [[ ! -x "$PERF_CLI_BINARY" ]]; then
+  echo "harness-monitor-perf binary not found at $PERF_CLI_BINARY after build" >&2
   exit 1
 fi
 
@@ -1354,11 +1365,11 @@ manifest = {
 Path(manifest_path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 PY
 
-python3 "$SCRIPT_DIR/extract-instruments-metrics.py" --run-dir "$run_dir"
-enforce_instruments_metric_budgets "$run_dir/summary.json"
+"$PERF_CLI_BINARY" extract --run-dir "$run_dir" --xctrace /usr/bin/xcrun --xctrace-args xctrace
+"$PERF_CLI_BINARY" enforce-budgets "$run_dir/summary.json"
 
 if [[ -n "$compare_to" ]]; then
-  python3 "$SCRIPT_DIR/compare-instruments-runs.py" \
+  "$PERF_CLI_BINARY" compare \
     --current "$run_dir" \
     --baseline "$compare_to" \
     --output-dir "$run_dir"

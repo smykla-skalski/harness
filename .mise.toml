@@ -161,10 +161,12 @@ run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitor
 
 [tasks."monitor:macos:audit"]
 description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"
+depends = ["monitor:macos:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
 
 [tasks."monitor:macos:audit:from-ref"]
 description = "Run the Harness Monitor Instruments audit pipeline from a temporary detached worktree (pass args after --)"
+depends = ["monitor:macos:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
 
 [tasks."preview:render"]
