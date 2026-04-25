@@ -100,6 +100,10 @@ final class SwarmFixture {
     try "ack\n".write(to: url, atomically: true, encoding: .utf8)
   }
 
+  func captureCheckpoint(_ name: String) {
+    testCase.recordDiagnosticsSnapshot(in: app, named: "swarm-\(name)")
+  }
+
   func openSession(_ sessionID: String) {
     let identifier = Accessibility.sessionRow(sessionID)
     let row = testCase.sessionTrigger(in: app, identifier: identifier)
@@ -361,10 +365,15 @@ final class SwarmRunner {
     self.fixture = fixture
   }
 
+  private func acknowledge(_ act: String) throws {
+    fixture.captureCheckpoint(act)
+    try fixture.ack(act)
+  }
+
   func act1() throws {
     let marker = try fixture.waitForReady("act1")
     fixture.openSession(marker["session_id"] ?? fixture.sessionID)
-    try fixture.ack("act1")
+    try acknowledge("act1")
   }
 
   func act2() throws {
@@ -375,7 +384,7 @@ final class SwarmRunner {
     if let agentID = marker["worker_claude_id"] {
       fixture.expectIdentifier(Accessibility.sessionAgentListState, labelContains: agentID)
     }
-    try fixture.ack("act2")
+    try acknowledge("act2")
   }
 
   func act3() throws {
@@ -383,7 +392,7 @@ final class SwarmRunner {
     if let taskID = marker["task_review_id"] {
       fixture.expectIdentifier(Accessibility.sessionTaskCard(taskID))
     }
-    try fixture.ack("act3")
+    try acknowledge("act3")
   }
 
   func act4() throws {
@@ -391,24 +400,24 @@ final class SwarmRunner {
     if let taskID = marker["task_review_id"] {
       fixture.selectTask(taskID)
     }
-    try fixture.ack("act4")
+    try acknowledge("act4")
   }
 
   func act5() throws {
     let marker = try fixture.waitForReady("act5")
     fixture.expectIdentifier(
       Accessibility.heuristicIssueCard(marker["heuristic_code"] ?? "python_traceback_output"))
-    try fixture.ack("act5")
+    try acknowledge("act5")
   }
 
   func act6() throws {
     _ = try fixture.waitForReady("act6")
-    try fixture.ack("act6")
+    try acknowledge("act6")
   }
 
   func act7() throws {
     _ = try fixture.waitForReady("act7")
-    try fixture.ack("act7")
+    try acknowledge("act7")
   }
 
   func act8() throws {
@@ -417,7 +426,7 @@ final class SwarmRunner {
       fixture.selectTask(taskID)
       fixture.expectIdentifier(Accessibility.awaitingReviewBadge(taskID))
     }
-    try fixture.ack("act8")
+    try acknowledge("act8")
   }
 
   func act9() throws {
@@ -428,7 +437,7 @@ final class SwarmRunner {
         Accessibility.reviewerQuorumIndicator(taskID),
       ])
     }
-    try fixture.ack("act9")
+    try acknowledge("act9")
   }
 
   func act10() throws {
@@ -440,7 +449,7 @@ final class SwarmRunner {
       fixture.selectTask(taskID)
       fixture.expectIdentifier(Accessibility.awaitingReviewBadge(taskID))
     }
-    try fixture.ack("act10")
+    try acknowledge("act10")
   }
 
   func act11() throws {
@@ -449,7 +458,7 @@ final class SwarmRunner {
       Accessibility.workerRefusalToast,
       Accessibility.taskInspectorCard,
     ])
-    try fixture.ack("act11")
+    try acknowledge("act11")
   }
 
   func act12() throws {
@@ -462,7 +471,7 @@ final class SwarmRunner {
         Accessibility.roundCounter(taskID),
       ])
     }
-    try fixture.ack("act12")
+    try acknowledge("act12")
   }
 
   func act13() throws {
@@ -473,7 +482,7 @@ final class SwarmRunner {
         Accessibility.roundCounter(taskID),
       ])
     }
-    try fixture.ack("act13")
+    try acknowledge("act13")
   }
 
   func act14() throws {
@@ -482,7 +491,7 @@ final class SwarmRunner {
       Accessibility.signalCollisionToast,
       Accessibility.taskInspectorCard,
     ])
-    try fixture.ack("act14")
+    try acknowledge("act14")
   }
 
   func act15() throws {
@@ -493,12 +502,12 @@ final class SwarmRunner {
       Accessibility.observeSessionButton,
       Accessibility.observeSummaryButton,
     ])
-    try fixture.ack("act15")
+    try acknowledge("act15")
   }
 
   func act16() throws {
     _ = try fixture.waitForReady("act16")
     fixture.expectIdentifier(Accessibility.sessionStatusCorner, timeout: 20)
-    try fixture.ack("act16")
+    try acknowledge("act16")
   }
 }
