@@ -53,7 +53,7 @@ fi
 clear_gatekeeper_metadata
 
 TEST_ARGS=(
-  -project "$ROOT/HarnessMonitor.xcodeproj" \
+  -workspace "$ROOT/HarnessMonitor.xcworkspace" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \

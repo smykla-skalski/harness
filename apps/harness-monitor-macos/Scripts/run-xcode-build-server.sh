@@ -33,7 +33,7 @@ fi
 (
   cd "$SERVER_TMP_DIR"
   "$XCODE_BUILD_SERVER_BIN" config \
-    -project "$APP_ROOT/HarnessMonitor.xcodeproj" \
+    -workspace "$APP_ROOT/HarnessMonitor.xcworkspace" \
     -scheme "HarnessMonitor" \
     --build_root "$BUILD_ROOT" \
     --skip-validate-bin >/dev/null
