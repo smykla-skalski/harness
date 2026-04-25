@@ -13,6 +13,9 @@ if [ "${XCODE_RUNNING_FOR_PREVIEWS:-}" = "1" ] || [[ "${BUILD_DIR:-}" == *"/Prev
 fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+PERF_CLI_PACKAGE_DIR="$APP_ROOT/Tools/HarnessMonitorPerf"
+PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"
 
 resolve_repo_root() {
   local candidate="$PROJECT_DIR"
@@ -46,7 +49,11 @@ if [ -z "$build_workspace_fingerprint" ]; then
   if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" = "YES" ]; then
     build_workspace_fingerprint="unavailable-user-script-sandbox"
   else
-    build_workspace_fingerprint="$(/usr/bin/python3 "$SCRIPT_DIR/workspace-tree-fingerprint.py" "$VARIANT" "$PROJECT_DIR")"
+    if [ ! -x "$PERF_CLI_BINARY" ]; then
+      echo "Building harness-monitor-perf Swift CLI..." >&2
+      swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
+    fi
+    build_workspace_fingerprint="$("$PERF_CLI_BINARY" workspace-fingerprint --variant "$VARIANT" --project-dir "$PROJECT_DIR")"
   fi
 fi
 
