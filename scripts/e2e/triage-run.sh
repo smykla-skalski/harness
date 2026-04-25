@@ -17,6 +17,7 @@ DURATION_SECONDS=""
 SESSION_ID=""
 STATE_ROOT=""
 SYNC_ROOT=""
+UI_SNAPSHOTS_SOURCE=""
 RESULT_BUNDLE=""
 RECORDING_PATH=""
 declare -a LOG_PATHS=()
@@ -37,6 +38,7 @@ usage: triage-run.sh \
   [--session-id <id>] \
   [--state-root <path>] \
   [--sync-root <path>] \
+  [--ui-snapshots-source <path>] \
   [--result-bundle <path>] \
   [--recording <path>] \
   [--log <path>]...
@@ -96,6 +98,7 @@ while (($#)); do
     --session-id) SESSION_ID="$2"; shift 2 ;;
     --state-root) STATE_ROOT="$2"; shift 2 ;;
     --sync-root) SYNC_ROOT="$2"; shift 2 ;;
+    --ui-snapshots-source) UI_SNAPSHOTS_SOURCE="$2"; shift 2 ;;
     --result-bundle) RESULT_BUNDLE="$2"; shift 2 ;;
     --recording) RECORDING_PATH="$2"; shift 2 ;;
     --log) LOG_PATHS+=("$2"); shift 2 ;;
@@ -130,6 +133,16 @@ LOGS_DIR="$ARTIFACTS_DIR/logs"
 XCRESULT_EXPORT_DIR="$ARTIFACTS_DIR/xcresult-export"
 UI_SNAPSHOTS_DIR="$ARTIFACTS_DIR/ui-snapshots"
 mkdir -p "$CONTEXT_DIR" "$LOGS_DIR"
+
+if [[ -n "$UI_SNAPSHOTS_SOURCE" ]]; then
+  if [[ -e "$UI_SNAPSHOTS_SOURCE" ]]; then
+    if [[ "$UI_SNAPSHOTS_SOURCE" != "$UI_SNAPSHOTS_DIR" ]]; then
+      copy_path_if_exists "$UI_SNAPSHOTS_SOURCE" "$UI_SNAPSHOTS_DIR"
+    fi
+  else
+    note_warning "missing ui snapshots source: $UI_SNAPSHOTS_SOURCE"
+  fi
+fi
 
 declare -a COPIED_CONTEXT_PATHS=()
 declare -a LOCAL_LOG_PATHS=()

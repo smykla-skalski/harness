@@ -61,19 +61,19 @@ TEST_XCODEBUILD_LOG="$ARTIFACTS_DIR/test-without-building.log"
 SCREEN_RECORDING_PATH="$ARTIFACTS_DIR/swarm-full-flow.mov"
 SCREEN_RECORDING_LOG="$ARTIFACTS_DIR/screen-recording.log"
 RESULT_BUNDLE_PATH="$ARTIFACTS_DIR/swarm-full-flow.xcresult"
-UI_SNAPSHOTS_DIR="$ARTIFACTS_DIR/ui-snapshots"
+UI_SNAPSHOTS_SOURCE="$SYNC_ROOT/ui-snapshots"
 
 DAEMON_PID=""
 ACT_DRIVER_PID=""
 SCREEN_RECORD_PID=""
 
-mkdir -p "$DATA_HOME" "$SYNC_DIR" "$LOG_ROOT" "$UI_SNAPSHOTS_DIR" "$(dirname -- "$FINDINGS_FILE")"
+mkdir -p "$DATA_HOME" "$SYNC_DIR" "$LOG_ROOT" "$UI_SNAPSHOTS_SOURCE" "$(dirname -- "$FINDINGS_FILE")"
 export HARNESS_DAEMON_DATA_HOME="$DATA_HOME"
 export HARNESS_E2E_DATA_HOME="$DATA_HOME"
 export HARNESS_E2E_HARNESS_BINARY="$HARNESS_BINARY"
 export HARNESS_E2E_PROJECT_DIR="$PROJECT_DIR"
 export HARNESS_E2E_SESSION_ID="$SESSION_ID"
-export HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR="$UI_SNAPSHOTS_DIR"
+export HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR="$UI_SNAPSHOTS_SOURCE"
 export XDG_DATA_HOME="$DATA_HOME"
 
 start_screen_recording() {
@@ -148,10 +148,11 @@ cleanup() {
     --ended-at "$(e2e_timestamp_utc)" \
     --duration-seconds "$SECONDS" \
     --session-id "$SESSION_ID" \
-    --state-root "$STATE_ROOT" \
-    --sync-root "$SYNC_ROOT" \
-    --result-bundle "$RESULT_BUNDLE_PATH" \
-    --recording "$SCREEN_RECORDING_PATH" \
+      --state-root "$STATE_ROOT" \
+      --sync-root "$SYNC_ROOT" \
+      --ui-snapshots-source "$UI_SNAPSHOTS_SOURCE" \
+      --result-bundle "$RESULT_BUNDLE_PATH" \
+      --recording "$SCREEN_RECORDING_PATH" \
     --log "$DAEMON_LOG" \
     --log "$ACT_DRIVER_LOG" \
     --log "$BUILD_XCODEBUILD_LOG" \
