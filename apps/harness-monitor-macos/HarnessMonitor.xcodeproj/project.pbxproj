@@ -184,6 +184,7 @@
 		429761153C637C2A51BBE8DF /* HarnessVoiceInputButton+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB82E5CCE4166F4C26CE944 /* HarnessVoiceInputButton+Support.swift */; };
 		42B8314D530D929043E164B2 /* AgentsSidebarExternalSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25905A1CDD8FBBF30DD453B3 /* AgentsSidebarExternalSectionTests.swift */; };
 		42CBBC7D6B0C8A4A6BDB3689 /* PreferencesRecentEventsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2485BC63BCC3C1AD0B16EABC /* PreferencesRecentEventsCard.swift */; };
+		430009DDCC039615A2E508AD /* SwarmFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EA9A7328FE14FECCD36575A /* SwarmFixture.swift */; };
 		43E52722AB3B9198310FCA71 /* HarnessMonitorStore+SliceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81472CBBE3242FDCFE31C774 /* HarnessMonitorStore+SliceModels.swift */; };
 		440F804EBFD8F38EB2AA6CEB /* SessionDiscoveryProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5976841CFDCD6B4CDE1A0F61 /* SessionDiscoveryProbe.swift */; };
 		444DBC759EA418F438C69E78 /* SessionCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A81883C9DF21EFCEB319AD /* SessionCacheService.swift */; };
@@ -1269,6 +1270,7 @@
 		9DE1DA525C38667067DD3088 /* CopyableCommandBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyableCommandBox.swift; sourceTree = "<group>"; };
 		9DE2A2D22F9F61F5DE89366B /* HarnessMonitorStore+ReviewActionFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorStore+ReviewActionFeedback.swift"; sourceTree = "<group>"; };
 		9E406D35C0EC7B3F92FCE0A9 /* PreferencesNotificationsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesNotificationsSection.swift; sourceTree = "<group>"; };
+		9EA9A7328FE14FECCD36575A /* SwarmFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwarmFixture.swift; sourceTree = "<group>"; };
 		9EB4E4CC574B64C227B50911 /* DecisionContextPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionContextPanel.swift; sourceTree = "<group>"; };
 		9F4A9FC820839A4AD3436EFD /* AgentTuiPreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTuiPreviewSupport.swift; sourceTree = "<group>"; };
 		9F550BE2AB52566D67F3FF6A /* HarnessMonitorTelemetry+Context.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessMonitorTelemetry+Context.swift"; sourceTree = "<group>"; };
@@ -2535,6 +2537,7 @@
 				8C8FFD034E99156533192272 /* HarnessMonitorAgentsE2ETests+CodexFlow.swift */,
 				5DCBEE157DBF33561393C507 /* HarnessMonitorAgentsE2ETests+Support.swift */,
 				F7EC3619E53F2AF8734750A3 /* HarnessMonitorSwarmE2ELiveHarness.swift */,
+				9EA9A7328FE14FECCD36575A /* SwarmFixture.swift */,
 				FA4A8ACF1660BC90C5A17CB8 /* SwarmFullFlowTests.swift */,
 			);
 			path = HarnessMonitorAgentsE2ETests;
@@ -3761,6 +3764,7 @@
 				0AA3A4BF13D0C6C136A09BE2 /* HarnessMonitorUITestNativePresentationSupport.swift in Sources */,
 				5E0E72ED91A17FB10146D83B /* HarnessMonitorUITestQuerySupport.swift in Sources */,
 				82D292A832204855A5B60366 /* HarnessMonitorUITestSupport.swift in Sources */,
+				430009DDCC039615A2E508AD /* SwarmFixture.swift in Sources */,
 				A1FB631F22E8FF46A8DB30DD /* SwarmFullFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

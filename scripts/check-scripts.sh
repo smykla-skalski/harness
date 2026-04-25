@@ -17,6 +17,7 @@ shopt -s nullglob
 
 shell_scripts=(
   "$ROOT"/scripts/*.sh
+  "$ROOT"/scripts/e2e/*.sh
   "$ROOT"/scripts/lib/*.sh
   "$ROOT"/scripts/tests/*.sh
 )
@@ -52,3 +53,4 @@ fi
 "$ROOT/scripts/tests/test-run-step.sh"
 "$ROOT/scripts/tests/test-mcp-scripts.sh"
 "$ROOT/scripts/tests/test-stale-scan.sh"
+"$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
