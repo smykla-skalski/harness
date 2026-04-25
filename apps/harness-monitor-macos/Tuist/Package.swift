@@ -11,8 +11,16 @@ let packageSettings = PackageSettings(
     ],
     baseSettings: .settings(
         base: [
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS": "YES",
+            "CLANG_ENABLE_OBJC_WEAK": "YES",
+            "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
             "ENABLE_MODULE_VERIFIER": "YES",
+            "ENABLE_STRICT_OBJC_MSGSEND": "YES",
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+            "GCC_NO_COMMON_BLOCKS": "YES",
+            "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
+            "MTL_FAST_MATH": "YES",
             "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
             "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
             "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"
