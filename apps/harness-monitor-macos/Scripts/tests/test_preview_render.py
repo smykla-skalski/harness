@@ -48,7 +48,7 @@ class PreviewRenderScriptTests(unittest.TestCase):
                 fake_bin / "xcode-cli",
                 f"""#!/bin/bash
 set -euo pipefail
-printf '%s\\n' "$*" > "{tool_log}"
+printf 'scheme=%s\\nargs=%s\\n' "${{XCODE_BUILD_SERVER_SCHEME:-}}" "$*" > "{tool_log}"
 out=""
 args=("$@")
 for ((i=0; i<${{#args[@]}}; i++)); do
@@ -96,7 +96,11 @@ printf '{}\n'
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn(
-            "preview Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift",
+            "scheme=HarnessMonitorUIPreviews",
+            log,
+        )
+        self.assertIn(
+            "preview apps/HarnessMonitor/Project/Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift",
             log,
         )
 
@@ -105,7 +109,11 @@ printf '{}\n'
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn(
-            "preview Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift",
+            "scheme=HarnessMonitorUIPreviews",
+            log,
+        )
+        self.assertIn(
+            "preview apps/HarnessMonitor/Project/Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift",
             log,
         )
 

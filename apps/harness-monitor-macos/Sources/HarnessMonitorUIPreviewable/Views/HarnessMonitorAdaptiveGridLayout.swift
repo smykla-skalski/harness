@@ -1,9 +1,9 @@
 import SwiftUI
 
-struct HarnessMonitorAdaptiveGridLayout: Layout {
+public struct HarnessMonitorAdaptiveGridLayout: Layout {
   private static let cacheWidthQuantum: CGFloat = 4
 
-  struct Cache {
+  public struct Cache {
     var measurement: Measurement?
     var measurementKey: MeasurementKey?
   }
@@ -27,11 +27,11 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     }
   }
 
-  let minimumColumnWidth: CGFloat
-  let maximumColumns: Int
-  let spacing: CGFloat
+  public let minimumColumnWidth: CGFloat
+  public let maximumColumns: Int
+  public let spacing: CGFloat
 
-  init(
+  public init(
     minimumColumnWidth: CGFloat,
     maximumColumns: Int,
     spacing: CGFloat = 16
@@ -76,11 +76,11 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     return cachedSubviewCount != newSubviewCount
   }
 
-  func makeCache(subviews _: Subviews) -> Cache {
+  public func makeCache(subviews _: Subviews) -> Cache {
     Cache()
   }
 
-  func updateCache(_ cache: inout Cache, subviews: Subviews) {
+  public func updateCache(_ cache: inout Cache, subviews: Subviews) {
     let cachedSubviewCount = cache.measurementKey?.subviewCount
     guard
       Self.shouldInvalidateCache(
@@ -93,7 +93,7 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     cache = Cache()
   }
 
-  func sizeThatFits(
+  public func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: Subviews,
     cache: inout Cache
@@ -114,7 +114,7 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     return CGSize(width: width, height: height)
   }
 
-  func placeSubviews(
+  public func placeSubviews(
     in bounds: CGRect,
     proposal _: ProposedViewSize,
     subviews: Subviews,
@@ -146,7 +146,7 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     }
   }
 
-  func explicitAlignment(
+  public func explicitAlignment(
     of _: HorizontalAlignment,
     in _: CGRect,
     proposal _: ProposedViewSize,
@@ -156,7 +156,7 @@ struct HarnessMonitorAdaptiveGridLayout: Layout {
     nil
   }
 
-  func explicitAlignment(
+  public func explicitAlignment(
     of _: VerticalAlignment,
     in _: CGRect,
     proposal _: ProposedViewSize,

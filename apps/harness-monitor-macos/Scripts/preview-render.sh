@@ -19,6 +19,7 @@ REPO_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
 MANIFEST="$PROJECT_DIR/Previews.json"
 OUT_DIR="$PROJECT_DIR/tmp/previews"
 TIMEOUT="${PREVIEW_TIMEOUT_SECONDS:-120}"
+XCODE_PROJECT_PATH_PREFIX="apps/HarnessMonitor/Project/"
 
 require() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -35,6 +36,10 @@ require jq
 normalize_entry_file() {
   local candidate="$1"
   local app_prefix="apps/harness-monitor-macos/"
+
+  if [[ "$candidate" == "$XCODE_PROJECT_PATH_PREFIX"* ]]; then
+    candidate="${candidate#"$XCODE_PROJECT_PATH_PREFIX"}"
+  fi
 
   if [[ "$candidate" == /* ]]; then
     if [[ "$candidate" == "$PROJECT_DIR/"* ]]; then
@@ -58,6 +63,11 @@ normalize_entry_file() {
 
   echo "error: preview file '$candidate' must be app-relative, repo-root-relative, or absolute within this repo" >&2
   exit 1
+}
+
+xcode_project_file() {
+  local app_relative="$1"
+  printf '%s%s\n' "$XCODE_PROJECT_PATH_PREFIX" "$app_relative"
 }
 
 entry_id=""
@@ -120,8 +130,10 @@ run_once() {
   local rc=0
   local classification="unknown"
   local stderr_file="$OUT_DIR/$entry_id.stderr"
+  local xcode_entry_file
+  xcode_entry_file="$(xcode_project_file "$entry_file")"
   started=$(date +%s)
-  if (cd "$PROJECT_DIR" && xcode-cli preview "$entry_file" \
+  if (cd "$PROJECT_DIR" && XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews xcode-cli preview "$xcode_entry_file" \
       --index "$entry_index" \
       --render-timeout "$TIMEOUT" \
       --out "$png_path") \
@@ -136,7 +148,7 @@ run_once() {
     classification="ok"
   elif grep -q -i "timeout\|AppLaunchTimeoutError" "$stderr_file"; then
     classification="timeout"
-  elif grep -q -i "error:\|cannot find\|undeclared" "$stderr_file"; then
+  elif grep -q -i "error:\|cannot find\|undeclared\|CompileDylibError\|File not found in project structure" "$stderr_file"; then
     classification="compile"
   else
     classification="runtime"

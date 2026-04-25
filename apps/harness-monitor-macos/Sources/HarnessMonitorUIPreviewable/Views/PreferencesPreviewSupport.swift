@@ -20,10 +20,26 @@ public enum PreferencesPreviewSupport {
     ),
   ]
 
+  public static func makeStore() -> HarnessMonitorStore {
+    makeStore(
+      scenario: .cockpitLoaded,
+      events: Self.recentEvents,
+      previewFeedback: nil
+    )
+  }
+
+  public static func makeStore(previewFeedback: PreviewFeedback) -> HarnessMonitorStore {
+    makeStore(
+      scenario: .cockpitLoaded,
+      events: Self.recentEvents,
+      previewFeedback: previewFeedback
+    )
+  }
+
   public static func makeStore(
-    scenario: HarnessMonitorPreviewStoreFactory.Scenario = .cockpitLoaded,
-    events: [DaemonAuditEvent] = Self.recentEvents,
-    previewFeedback: PreviewFeedback? = nil
+    scenario: HarnessMonitorPreviewStoreFactory.Scenario,
+    events: [DaemonAuditEvent],
+    previewFeedback: PreviewFeedback?
   ) -> HarnessMonitorStore {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: scenario)
     let workspaceDiagnostics = makeWorkspaceDiagnostics(
