@@ -23,8 +23,10 @@ done
 
 e2e_require_command jq
 e2e_require_command python3
+e2e_require_command screencapture
 
 RUN_ID="${HARNESS_E2E_RUN_ID:-$(e2e_random_id)}"
+RUN_STARTED_AT="$(e2e_timestamp_utc)"
 STATE_ROOT_PARENT="${HARNESS_E2E_STATE_ROOT_PARENT:-${TMPDIR:-/tmp}/HarnessMonitorSwarmE2E}"
 STATE_ROOT="${HARNESS_E2E_STATE_ROOT:-$STATE_ROOT_PARENT/$RUN_ID}"
 DATA_ROOT="${HARNESS_E2E_DATA_ROOT:-$STATE_ROOT/data-root}"
@@ -48,20 +50,53 @@ XCODEBUILD_RUNNER="$APP_ROOT/Scripts/xcodebuild-with-lock.sh"
 ONLY_TESTING="${XCODE_ONLY_TESTING:-HarnessMonitorAgentsE2ETests/SwarmFullFlowTests/testSwarmFullFlow}"
 HARNESS_BINARY="${HARNESS_E2E_HARNESS_BINARY:-$(e2e_resolve_harness_binary "$ROOT")}"
 KEEP_DATA="${HARNESS_E2E_KEEP_DATA:-0}"
+TRIAGE_ROOT="${HARNESS_E2E_TRIAGE_ROOT:-$ROOT/tmp/e2e-triage}"
+TRIAGE_RUN_SLUG="$(printf '%s-swarm-full-flow-%s' "$(e2e_timestamp_slug_utc)" "$RUN_ID")"
+ARTIFACTS_DIR="$TRIAGE_ROOT/runs/$TRIAGE_RUN_SLUG"
+FINDINGS_FILE="$TRIAGE_ROOT/findings/$TRIAGE_RUN_SLUG.md"
+GENERATE_LOG="$ARTIFACTS_DIR/generate.log"
+BUILD_XCODEBUILD_LOG="$ARTIFACTS_DIR/build-for-testing.log"
+HARNESS_BUILD_LOG="$ARTIFACTS_DIR/harness-build.log"
+TEST_XCODEBUILD_LOG="$ARTIFACTS_DIR/test-without-building.log"
+SCREEN_RECORDING_PATH="$ARTIFACTS_DIR/swarm-full-flow.mov"
+SCREEN_RECORDING_LOG="$ARTIFACTS_DIR/screen-recording.log"
+RESULT_BUNDLE_PATH="$ARTIFACTS_DIR/swarm-full-flow.xcresult"
+UI_SNAPSHOTS_DIR="$ARTIFACTS_DIR/ui-snapshots"
 
 DAEMON_PID=""
 ACT_DRIVER_PID=""
+SCREEN_RECORD_PID=""
 
-mkdir -p "$DATA_HOME" "$SYNC_DIR" "$LOG_ROOT"
+mkdir -p "$DATA_HOME" "$SYNC_DIR" "$LOG_ROOT" "$UI_SNAPSHOTS_DIR" "$(dirname -- "$FINDINGS_FILE")"
 export HARNESS_DAEMON_DATA_HOME="$DATA_HOME"
 export HARNESS_E2E_DATA_HOME="$DATA_HOME"
 export HARNESS_E2E_HARNESS_BINARY="$HARNESS_BINARY"
 export HARNESS_E2E_PROJECT_DIR="$PROJECT_DIR"
 export HARNESS_E2E_SESSION_ID="$SESSION_ID"
+export HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR="$UI_SNAPSHOTS_DIR"
 export XDG_DATA_HOME="$DATA_HOME"
+
+start_screen_recording() {
+  : >"$SCREEN_RECORDING_LOG"
+  screencapture -v -k -D1 -V 1800 "$SCREEN_RECORDING_PATH" \
+    >"$SCREEN_RECORDING_LOG" 2>&1 &
+  SCREEN_RECORD_PID="$!"
+}
+
+stop_screen_recording() {
+  if [[ -n "$SCREEN_RECORD_PID" ]]; then
+    kill -INT "$SCREEN_RECORD_PID" 2>/dev/null || true
+    wait "$SCREEN_RECORD_PID" 2>/dev/null || true
+    SCREEN_RECORD_PID=""
+  fi
+}
 
 cleanup() {
   local status="$1"
+  local final_status="$status"
+  local triage_status=0
+
+  stop_screen_recording
   if [[ -n "$ACT_DRIVER_PID" ]]; then
     kill "$ACT_DRIVER_PID" 2>/dev/null || true
     wait "$ACT_DRIVER_PID" 2>/dev/null || true
@@ -71,15 +106,47 @@ cleanup() {
     wait "$DAEMON_PID" 2>/dev/null || true
   fi
 
-  if [[ "$status" -eq 0 && "$KEEP_DATA" != "1" ]]; then
+  if ! "$SCRIPT_DIR/triage-run.sh" \
+    --scenario swarm-full-flow \
+    --run-id "$RUN_ID" \
+    --artifacts-dir "$ARTIFACTS_DIR" \
+    --findings-file "$FINDINGS_FILE" \
+    --exit-code "$status" \
+    --started-at "$RUN_STARTED_AT" \
+    --ended-at "$(e2e_timestamp_utc)" \
+    --duration-seconds "$SECONDS" \
+    --session-id "$SESSION_ID" \
+    --state-root "$STATE_ROOT" \
+    --sync-root "$SYNC_ROOT" \
+    --result-bundle "$RESULT_BUNDLE_PATH" \
+    --recording "$SCREEN_RECORDING_PATH" \
+    --log "$DAEMON_LOG" \
+    --log "$ACT_DRIVER_LOG" \
+    --log "$BUILD_XCODEBUILD_LOG" \
+    --log "$TEST_XCODEBUILD_LOG" \
+    --log "$SCREEN_RECORDING_LOG"
+  then
+    triage_status=$?
+    if [[ "$final_status" -eq 0 ]]; then
+      final_status="$triage_status"
+    fi
+  fi
+
+  if [[ "$final_status" -eq 0 && "$KEEP_DATA" != "1" ]]; then
     rm -rf "$SYNC_ROOT"
     rm -rf "$STATE_ROOT"
-    return
   fi
 
   {
-    printf 'Swarm e2e state preserved at: %s\n' "$STATE_ROOT"
-    printf 'Swarm e2e sync preserved at: %s\n' "$SYNC_ROOT"
+    printf 'Swarm e2e artifacts recorded at: %s\n' "$ARTIFACTS_DIR"
+    printf 'Swarm e2e triage findings: %s\n' "$FINDINGS_FILE"
+    if [[ "$final_status" -eq 0 && "$KEEP_DATA" != "1" ]]; then
+      printf 'Swarm e2e temp state copied into artifacts and cleaned from: %s\n' "$STATE_ROOT"
+      printf 'Swarm e2e temp sync copied into artifacts and cleaned from: %s\n' "$SYNC_ROOT"
+    else
+      printf 'Swarm e2e state preserved at: %s\n' "$STATE_ROOT"
+      printf 'Swarm e2e sync preserved at: %s\n' "$SYNC_ROOT"
+    fi
     if [[ -f "$DAEMON_LOG" ]]; then
       printf '%s\n' '--- daemon log tail ---'
       tail -n 80 "$DAEMON_LOG"
@@ -89,9 +156,11 @@ cleanup() {
       tail -n 120 "$ACT_DRIVER_LOG"
     fi
   } >&2
+
+  return "$final_status"
 }
 
-trap 'status=$?; cleanup "$status"; exit "$status"' EXIT
+trap 'status=$?; cleanup "$status"; exit $?' EXIT
 
 run_harness() {
   XDG_DATA_HOME="$DATA_HOME" HARNESS_DAEMON_DATA_HOME="$DATA_HOME" "$HARNESS_BINARY" "$@"
@@ -452,12 +521,21 @@ configure_xctestrun() {
   local destination_path="$2"
 
   python3 - "$source_path" "$destination_path" \
-    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$SESSION_ID" "$SYNC_DIR" <<'PY'
+    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$SESSION_ID" "$SYNC_DIR" "$UI_SNAPSHOTS_DIR" <<'PY'
 import plistlib
 import shutil
 import sys
 
-source_path, destination_path, state_root, data_home, daemon_log, session_id, sync_dir = sys.argv[1:]
+(
+    source_path,
+    destination_path,
+    state_root,
+    data_home,
+    daemon_log,
+    session_id,
+    sync_dir,
+    ui_test_artifacts_dir,
+) = sys.argv[1:]
 
 shutil.copyfile(source_path, destination_path)
 with open(destination_path, "rb") as handle:
@@ -471,7 +549,8 @@ updates = {
     "HARNESS_MONITOR_SWARM_E2E_DAEMON_LOG": daemon_log,
     "HARNESS_MONITOR_SWARM_E2E_SESSION_ID": session_id,
     "HARNESS_MONITOR_SWARM_E2E_SYNC_DIR": sync_dir,
-}
+    "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR": ui_test_artifacts_dir,
+  }
 
 for key in ("EnvironmentVariables", "TestingEnvironmentVariables"):
     environment = target.setdefault(key, {})
@@ -505,8 +584,8 @@ if [[ "$(jq '.required_missing | length' "$STATE_ROOT/probe.json")" != "0" ]]; t
   exit 1
 fi
 
-"$APP_ROOT/Scripts/generate.sh"
-"$ROOT/scripts/cargo-local.sh" build --bin harness
+e2e_run_with_log "$GENERATE_LOG" "$APP_ROOT/Scripts/generate.sh"
+e2e_run_with_log "$HARNESS_BUILD_LOG" "$ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
   -workspace "$APP_ROOT/HarnessMonitor.xcworkspace"
@@ -515,7 +594,8 @@ TEST_ARGS=(
   -derivedDataPath "$DERIVED_DATA_PATH"
 )
 
-HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
+e2e_run_with_log "$BUILD_XCODEBUILD_LOG" \
+  env HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}" \
   CODE_SIGNING_ALLOWED=YES \
   build-for-testing
@@ -545,8 +625,11 @@ wait_for_daemon
 run_act_driver >"$ACT_DRIVER_LOG" 2>&1 &
 ACT_DRIVER_PID="$!"
 
-HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
+start_screen_recording
+e2e_run_with_log "$TEST_XCODEBUILD_LOG" \
+  env HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   -xctestrun "$CONFIGURED_XCTESTRUN" \
+  -resultBundlePath "$RESULT_BUNDLE_PATH" \
   -destination "$DESTINATION" \
   CODE_SIGNING_ALLOWED=YES \
   test-without-building \
