@@ -979,14 +979,26 @@ private final class SwarmActDriverRunner {
             "--name", name,
             "--persona", persona,
         ])
-        guard
-            let json = try JSONSerialization.jsonObject(with: output.stdout) as? [String: Any],
-            let agents = json["agents"] as? [[String: Any]],
-            let agentID = agents.reversed().first(where: { ($0["name"] as? String) == name })?["agent_id"] as? String
-        else {
-            throw Failure(status: 1, message: "failed to resolve joined agent \(name)")
+        guard let json = try JSONSerialization.jsonObject(with: output.stdout) as? [String: Any] else {
+            throw Failure(status: 1, message: "failed to decode joined agent state for \(name)")
         }
-        return agentID
+        if let agentsByID = json["agents"] as? [String: Any] {
+            for (agentID, rawAgent) in agentsByID {
+                guard let agent = rawAgent as? [String: Any], (agent["name"] as? String) == name else {
+                    continue
+                }
+                if let explicitID = agent["agent_id"] as? String, !explicitID.isEmpty {
+                    return explicitID
+                }
+                return agentID
+            }
+        }
+        if let agents = json["agents"] as? [[String: Any]],
+           let agentID = agents.reversed().first(where: { ($0["name"] as? String) == name })?["agent_id"] as? String
+        {
+            return agentID
+        }
+        throw Failure(status: 1, message: "failed to resolve joined agent \(name)")
     }
 
     private func createTask(title: String, severity: String, leaderID: String) throws -> String {
