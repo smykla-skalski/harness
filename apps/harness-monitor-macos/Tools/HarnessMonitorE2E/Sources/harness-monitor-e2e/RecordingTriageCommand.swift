@@ -123,14 +123,12 @@ struct CompareFramesCommand: ParsableCommand {
     )
 
     @Option(
-        name: [.long, .customLong("candidate")],
         parsing: .singleValue,
         help: "Repeatable NAME=PATH for an extracted keyframe."
     )
     var candidate: [String]
 
     @Option(
-        name: [.long, .customLong("ground-truth")],
         parsing: .singleValue,
         help: "Repeatable NAME=PATH for a ground-truth UI snapshot."
     )
@@ -216,7 +214,6 @@ struct ThrashCommand: ParsableCommand {
     )
 
     @Option(
-        name: [.long, .customLong("sample")],
         parsing: .singleValue,
         help: "Repeatable SECONDS=PATH for a sampled keyframe."
     )
