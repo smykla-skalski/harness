@@ -131,23 +131,23 @@ run = "apps/harness-monitor-macos/Scripts/test-agents-e2e.sh"
 description = "Run the single-scenario Harness Monitor swarm e2e lane"
 run = "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh"
 
-[tasks."e2e:swarm-full-flow"]
+[tasks."e2e:swarm:full"]
 description = "Real-runtime 16-act swarm full flow orchestrator"
 run = "./scripts/e2e/swarm-full-flow.sh --assert"
 
-[tasks."e2e:swarm-inject-heuristic"]
+[tasks."e2e:swarm:inject-heuristic"]
 description = "Append deterministic transcript lines to trigger observer heuristics"
 run = "./scripts/e2e/inject-heuristic-log.sh"
 
-[tasks."e2e:swarm-seed"]
+[tasks."e2e:swarm:seed"]
 description = "Pre-seed data home to bypass onboarding"
 run = "./scripts/e2e/seed-session-state.sh"
 
-[tasks."e2e:swarm-probe-runtimes"]
+[tasks."e2e:swarm:probe-runtimes"]
 description = "Probe availability of each runtime; emit JSON"
 run = "./scripts/e2e/probe-runtimes.sh"
 
-[tasks."e2e:swarm-gaps-open"]
+[tasks."e2e:swarm:gaps-open"]
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
 run = "./scripts/e2e/gaps-open-count.sh"
 
