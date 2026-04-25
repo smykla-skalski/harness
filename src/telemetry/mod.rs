@@ -1,6 +1,8 @@
 mod config;
+mod guard;
 mod metrics;
 mod profiler;
+mod providers;
 mod subscriber;
 
 #[cfg(test)]
@@ -20,7 +22,8 @@ pub use metrics::{
     record_hook_metrics, with_active_baggage,
 };
 pub use profiler::DaemonProfiler;
-pub use subscriber::{TelemetryGuard, init_tracing_subscriber};
+pub use guard::TelemetryGuard;
+pub use subscriber::init_tracing_subscriber;
 
 #[cfg(test)]
 pub(crate) fn telemetry_test_guard() -> MutexGuard<'static, ()> {
