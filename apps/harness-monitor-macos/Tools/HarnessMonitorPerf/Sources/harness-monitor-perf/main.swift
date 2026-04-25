@@ -51,17 +51,187 @@ struct EnforceBudgets: ParsableCommand {
 struct Audit: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "audit",
-        abstract: "Run the full Instruments audit pipeline (not yet implemented)."
+        abstract: "Run the full Instruments audit pipeline."
     )
-    func run() throws { throw ExitCode(2) }
+
+    @Option(name: .long, help: "Run label.")
+    var label: String
+
+    @Option(name: [.long, .customLong("compare-to")], help: "Optional baseline run dir or summary.json.")
+    var compareTo: String?
+
+    @Option(name: .long, help: "Scenario selection: all or comma list. Default: all")
+    var scenarios: String = "all"
+
+    @Flag(name: [.long, .customLong("keep-traces")], help: "Keep raw .trace bundles.")
+    var keepTraces: Bool = false
+
+    @Option(name: [.long, .customLong("checkout-root")], help: "Repo checkout root.")
+    var checkoutRoot: String
+
+    @Option(name: [.long, .customLong("common-repo-root")], help: "Common repo root for runs/staged-host.")
+    var commonRepoRoot: String
+
+    @Option(name: [.long, .customLong("app-root")], help: "apps/harness-monitor-macos absolute path.")
+    var appRoot: String
+
+    @Option(name: [.long, .customLong("xcodebuild-runner")], help: "Path to xcodebuild-with-lock.sh wrapper.")
+    var xcodebuildRunner: String
+
+    @Option(name: [.long, .customLong("destination")], help: "xcodebuild -destination string.")
+    var destination: String
+
+    @Option(name: [.long, .customLong("derived-data-path")], help: "DerivedData path for audit builds.")
+    var derivedDataPath: String
+
+    @Option(name: [.long, .customLong("runs-root")], help: "Runs root directory.")
+    var runsRoot: String
+
+    @Option(name: [.long, .customLong("staged-host-root")], help: "Staging directory for the launch host.")
+    var stagedHostRoot: String
+
+    @Option(name: [.long, .customLong("daemon-cargo-target-dir")], help: "Cargo target dir for the audit daemon helper.")
+    var daemonCargoTargetDir: String
+
+    @Option(name: .long, help: "Build arch.")
+    var arch: String = ProcessInfo.processInfo.environment["HARNESS_MONITOR_AUDIT_BUILD_ARCH"] ?? Self.unameMachine()
+
+    @Flag(name: [.long, .customLong("skip-build")], help: "Skip the Release build step.")
+    var skipBuild: Bool = false
+
+    @Flag(name: [.long, .customLong("skip-daemon-bundle")], help: "Skip rebundling the daemon helper.")
+    var skipDaemonBundle: Bool = false
+
+    @Flag(name: [.long, .customLong("force-clean")], help: "Force a clean rebuild.")
+    var forceClean: Bool = false
+
+    @Flag(name: [.long, .customLong("build-shipping")], help: "Also build the shipping app.")
+    var buildShipping: Bool = false
+
+    func run() throws {
+        let compareToURL = compareTo.map { URL(fileURLWithPath: $0) }
+        let inputs = AuditRunner.Inputs(
+            label: label, compareTo: compareToURL, scenarioSelection: scenarios, keepTraces: keepTraces,
+            checkoutRoot: URL(fileURLWithPath: checkoutRoot),
+            commonRepoRoot: URL(fileURLWithPath: commonRepoRoot),
+            appRoot: URL(fileURLWithPath: appRoot),
+            xcodebuildRunner: URL(fileURLWithPath: xcodebuildRunner),
+            derivedDataPath: URL(fileURLWithPath: derivedDataPath),
+            runsRoot: URL(fileURLWithPath: runsRoot),
+            stagedHostStageRoot: URL(fileURLWithPath: stagedHostRoot),
+            auditDaemonCargoTargetDir: URL(fileURLWithPath: daemonCargoTargetDir),
+            arch: arch, destination: destination,
+            skipBuild: skipBuild, skipDaemonBundle: skipDaemonBundle,
+            forceClean: forceClean, buildShipping: buildShipping
+        )
+        do {
+            let outcome = try AuditRunner.run(inputs)
+            print("Artifacts written to \(outcome.runDir.path)")
+            print("Summary: \(outcome.summaryPath.path)")
+            if let comparisonPath = outcome.comparisonPath {
+                print("Comparison: \(comparisonPath.path)")
+            }
+        } catch let failure as AuditRunner.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+
+    private static func unameMachine() -> String {
+        var sysinfo = utsname()
+        guard uname(&sysinfo) == 0 else { return "arm64" }
+        let capacity = MemoryLayout.size(ofValue: sysinfo.machine)
+        let machine = withUnsafePointer(to: &sysinfo.machine) { pointer -> String in
+            pointer.withMemoryRebound(to: CChar.self, capacity: capacity) { String(cString: $0) }
+        }
+        return machine.isEmpty ? "arm64" : machine
+    }
 }
 
 struct AuditFromRef: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "audit-from-ref",
-        abstract: "Run the audit pipeline against a checked-out git ref (not yet implemented)."
+        abstract: "Run the audit pipeline against a checked-out git ref via a temporary worktree."
     )
-    func run() throws { throw ExitCode(2) }
+
+    @Option(name: .long, help: "Git commit-ish to audit.")
+    var ref: String
+
+    @Option(name: .long, help: "Run label (forwarded to audit).")
+    var label: String
+
+    @Option(name: [.long, .customLong("checkout-root")], help: "Repo checkout root that owns the worktree.")
+    var checkoutRoot: String
+
+    @Option(name: [.long, .customLong("worktree-root")], help: "Parent dir for the temporary worktree.")
+    var worktreeRoot: String = "/private/tmp"
+
+    @Option(name: .long, parsing: .upToNextOption, help: "Extra arguments forwarded to the audit subcommand.")
+    var passthrough: [String] = []
+
+    func run() throws {
+        let checkout = URL(fileURLWithPath: checkoutRoot)
+        let resolved = try ProcessRunner.runChecked(
+            "/usr/bin/git",
+            arguments: ["-C", checkout.path, "rev-parse", "--verify", "\(ref)^{commit}"]
+        ).stdoutString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shortCommit = String(resolved.prefix(8))
+        let labelSlug = label.lowercased().replacingOccurrences(of: "[^a-z0-9._-]+", with: "-", options: .regularExpression)
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: "[^A-Za-z0-9]", with: "", options: .regularExpression)
+        let worktreeName = "harness-monitor-audit-\(shortCommit)-\(timestamp)-\(labelSlug.isEmpty ? "audit" : labelSlug)"
+        let worktreePath = URL(fileURLWithPath: worktreeRoot).appendingPathComponent(worktreeName, isDirectory: true)
+
+        try FileManager.default.createDirectory(at: URL(fileURLWithPath: worktreeRoot), withIntermediateDirectories: true)
+        defer {
+            _ = try? ProcessRunner.run(
+                "/usr/bin/git",
+                arguments: ["-C", checkout.path, "worktree", "remove", "--force", worktreePath.path]
+            )
+        }
+        let addResult = try ProcessRunner.run(
+            "/usr/bin/git",
+            arguments: ["-C", checkout.path, "worktree", "add", "--detach", worktreePath.path, resolved]
+        )
+        guard addResult.exitStatus == 0 else {
+            FileHandle.standardError.write(addResult.stderr)
+            throw ExitCode(1)
+        }
+        let auditScript = worktreePath
+            .appendingPathComponent("apps/harness-monitor-macos/Scripts/run-instruments-audit.sh")
+        guard FileManager.default.isExecutableFile(atPath: auditScript.path) else {
+            FileHandle.standardError.write(Data("Audit script not found in worktree: \(auditScript.path)\n".utf8))
+            throw ExitCode(1)
+        }
+        var auditArgs = ["--label", label]
+        auditArgs.append(contentsOf: passthrough)
+        let auditResult = try ProcessRunner.run(auditScript.path, arguments: auditArgs)
+        FileHandle.standardOutput.write(auditResult.stdout)
+        FileHandle.standardError.write(auditResult.stderr)
+        if auditResult.exitStatus != 0 { throw ExitCode(auditResult.exitStatus) }
+
+        let runDir = parseRunDir(stdout: String(data: auditResult.stdout, encoding: .utf8) ?? "")
+        guard !runDir.isEmpty else {
+            FileHandle.standardError.write(Data("Unable to determine audit run directory\n".utf8))
+            throw ExitCode(1)
+        }
+        try ManifestVerifier.verify(
+            manifest: URL(fileURLWithPath: runDir).appendingPathComponent("manifest.json"),
+            expectedCommit: resolved
+        )
+        print("Verified manifest provenance for \(resolved)")
+    }
+
+    private func parseRunDir(stdout: String) -> String {
+        var last = ""
+        for line in stdout.split(separator: "\n") {
+            let prefix = "Artifacts written to "
+            if line.hasPrefix(prefix) {
+                last = String(line.dropFirst(prefix.count))
+            }
+        }
+        return last
+    }
 }
 
 struct Compare: ParsableCommand {
