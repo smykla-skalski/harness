@@ -168,6 +168,7 @@ struct SessionAgentSummaryCard: View {
             }
             .foregroundStyle(personaTint)
             .accessibilityLabel("Persona: \(persona.name)")
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentRowPersonaChip(agent.agentId))
           }
           Text(metadataLine)
             .scaledFont(.caption.monospaced())

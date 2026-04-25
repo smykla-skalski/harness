@@ -34,6 +34,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.inspector.task.review-point.point-a"
     )
     #expect(
+      HarnessMonitorAccessibility.partialAgreementChip("point-a")
+        == "partialAgreementChip.point.point-a"
+    )
+    #expect(
       HarnessMonitorAccessibility.roundCounter("task-1")
         == "harness.inspector.task.round-counter.task-1"
     )
@@ -65,6 +69,12 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.signalCollisionToast
         == "harness.toast.signal-collision"
     )
+    #expect(
+      HarnessMonitorAccessibility.agentRowPersonaChip("worker-1")
+        == "harness.session.agent.worker-1.persona"
+    )
+    #expect(HarnessMonitorAccessibility.observeScanButton == "observeScanButton")
+    #expect(HarnessMonitorAccessibility.observeDoctorButton == "observeDoctorButton")
     #expect(
       HarnessMonitorAccessibility.metricAwaitingReviewAgent
         == "harness.metrics.awaiting-review-agent"
