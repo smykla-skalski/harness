@@ -80,7 +80,6 @@ private let uiPreviewableTarget: Target = {
                 .debug(name: "Debug"),
                 .debug(name: "Preview", settings: [
                     "COMPILER_INDEX_STORE_ENABLE": "NO",
-                    "ENABLE_MODULE_VERIFIER": "NO",
                     "ONLY_ACTIVE_ARCH": "YES",
                     "SWIFT_ENABLE_EAGER_LINKING": "NO"
                 ]),
@@ -119,7 +118,6 @@ private let previewHostTarget: Target = .target(
             .debug(name: "Debug"),
             .debug(name: "Preview", settings: [
                 "COMPILER_INDEX_STORE_ENABLE": "NO",
-                "ENABLE_MODULE_VERIFIER": "NO",
                 "ONLY_ACTIVE_ARCH": "YES",
                 "SWIFT_ENABLE_EAGER_LINKING": "NO"
             ]),

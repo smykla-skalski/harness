@@ -27,6 +27,7 @@ public enum BuildSettings {
         "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
         "SWIFT_EMIT_LOC_STRINGS": "YES",
         "SWIFT_ENABLE_EAGER_LINKING": "YES",
+        "SWIFT_ENABLE_PREFIX_MAPPING": "YES",
         "SWIFT_STRICT_CONCURRENCY": "complete",
         "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
         "SWIFT_VERSION": "6.2",
@@ -39,13 +40,18 @@ public enum BuildSettings {
     public static let previewOverrides: SettingsDictionary = [
         "COMPILER_INDEX_STORE_ENABLE": "NO",
         "ENABLE_TESTABILITY": "NO",
+        "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
         "ONLY_ACTIVE_ARCH": "YES",
         "SWIFT_ENABLE_EAGER_LINKING": "NO",
         "SWIFT_EMIT_LOC_STRINGS": "NO"
     ]
 
+    public static let debugOverrides: SettingsDictionary = [
+        "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE"
+    ]
+
     public static let configurations: [Configuration] = [
-        .debug(name: "Debug"),
+        .debug(name: "Debug", settings: debugOverrides),
         .debug(name: "Preview", settings: previewOverrides),
         .release(name: "Release")
     ]
@@ -59,9 +65,7 @@ public enum BuildSettings {
         previewIndexOff: Bool = true,
         extraBase: SettingsDictionary = [:]
     ) -> Settings {
-        var preview: SettingsDictionary = [
-            "ENABLE_MODULE_VERIFIER": "NO"
-        ]
+        var preview: SettingsDictionary = [:]
         if previewIndexOff {
             preview["COMPILER_INDEX_STORE_ENABLE"] = "NO"
             preview["ONLY_ACTIVE_ARCH"] = "YES"
