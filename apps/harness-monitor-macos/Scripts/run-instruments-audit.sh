@@ -410,18 +410,7 @@ stage_launch_host() {
 
 trace_launched_process_path() {
   local toc_path="$1"
-  python3 - "$toc_path" <<'PY'
-from __future__ import annotations
-
-import sys
-import xml.etree.ElementTree as ET
-
-root = ET.parse(sys.argv[1]).getroot()
-for process in root.findall(".//processes/process"):
-    if process.get("pid") != "0":
-        print(process.get("path", "").strip())
-        break
-PY
+  "$PERF_CLI_BINARY" toc-info "$toc_path" --launched-process
 }
 
 write_lock_info() {
@@ -749,77 +738,11 @@ binary_mtime_utc() {
 }
 
 bundle_sha256() {
-  python3 - "$1" <<'PY'
-from __future__ import annotations
-
-import hashlib
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-digest = hashlib.sha256()
-
-for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
-    relative_path = path.relative_to(root).as_posix()
-    digest.update(relative_path.encode("utf-8"))
-    digest.update(b"\0")
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    digest.update(b"\0")
-
-print(digest.hexdigest())
-PY
+  "$PERF_CLI_BINARY" directory-sha256 "$1"
 }
 
 workspace_tree_fingerprint() {
-  python3 - "$APP_ROOT" <<'PY'
-from __future__ import annotations
-
-import hashlib
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-include_paths = [
-    root / "HarnessMonitor.entitlements",
-    root / "HarnessMonitorUITestHost.entitlements",
-    root / "HarnessMonitorDaemon.entitlements",
-    root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
-    root / "Resources",
-    root / "Scripts" / "bundle-daemon-agent.sh",
-    root / "Scripts" / "run-instruments-audit.sh",
-    root / "Sources" / "HarnessMonitor",
-    root / "Sources" / "HarnessMonitorKit",
-    root / "Sources" / "HarnessMonitorUIPreviewable",
-    root / "Sources" / "HarnessMonitorUITestHost",
-]
-digest = hashlib.sha256()
-
-for include_path in include_paths:
-    if not include_path.exists():
-        continue
-
-    if include_path.is_file():
-        file_paths = [include_path]
-    else:
-        file_paths = sorted(
-            candidate
-            for candidate in include_path.rglob("*")
-            if candidate.is_file()
-        )
-
-    for file_path in file_paths:
-        relative_path = file_path.relative_to(root).as_posix()
-        digest.update(relative_path.encode("utf-8"))
-        digest.update(b"\0")
-        with file_path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-        digest.update(b"\0")
-
-print(digest.hexdigest())
-PY
+  "$PERF_CLI_BINARY" workspace-fingerprint --variant audit --project-dir "$APP_ROOT"
 }
 
 assert_audit_source_unchanged() {
@@ -1121,17 +1044,7 @@ record_capture() {
   TMPDIR="$xctrace_tmp_root/" xcrun xctrace export --input "$trace_path" --toc >"$toc_path" 2>>"$capture_log_path"
   launched_process_path="$(trace_launched_process_path "$toc_path")"
   local end_reason
-  end_reason="$(
-    python3 - "$toc_path" <<'PY'
-from __future__ import annotations
-import sys
-import xml.etree.ElementTree as ET
-
-root = ET.parse(sys.argv[1]).getroot()
-end_reason = root.findtext(".//end-reason", default="")
-print(end_reason.strip())
-PY
-  )"
+  end_reason="$("$PERF_CLI_BINARY" toc-info "$toc_path" --end-reason)"
 
   if [[ "$record_status" -ne 0 && "$end_reason" != "Time limit reached" ]]; then
     printf 'xctrace record failed for %s / %s with exit %s and end reason "%s"\n' \
@@ -1376,15 +1289,7 @@ if [[ -n "$compare_to" ]]; then
 fi
 
 if [[ "$keep_traces" -eq 0 ]]; then
-  python3 - "$traces_root" <<'PY'
-from __future__ import annotations
-import shutil
-import sys
-from pathlib import Path
-
-for trace in Path(sys.argv[1]).rglob("*.trace"):
-    shutil.rmtree(trace, ignore_errors=True)
-PY
+  find "$traces_root" -type d -name '*.trace' -prune -exec /bin/rm -rf {} +
 fi
 
 prune_run_artifacts "$keep_traces"

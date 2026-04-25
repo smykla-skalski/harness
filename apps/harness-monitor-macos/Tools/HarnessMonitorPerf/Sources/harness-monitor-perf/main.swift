@@ -15,6 +15,9 @@ struct HarnessMonitorPerf: ParsableCommand {
             Summarize.self,
             Extract.self,
             Recap.self,
+            DirectorySHA256.self,
+            FingerprintWorkspace.self,
+            TocInfo.self,
             MeasurePreviewLatency.self,
         ],
         defaultSubcommand: nil
@@ -162,6 +165,77 @@ struct Extract: ParsableCommand {
             FileHandle.standardError.write(Data((failure.message + "\n").utf8))
             throw ExitCode(1)
         }
+    }
+}
+
+struct DirectorySHA256: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "directory-sha256",
+        abstract: "Compute the {relative-path}\\0{bytes}\\0 SHA-256 hash of a directory tree."
+    )
+
+    @Argument(help: "Directory to hash.") var path: String
+
+    func run() throws {
+        let hash = try WorkspaceFingerprint.directorySHA256(URL(fileURLWithPath: path))
+        print(hash)
+    }
+}
+
+struct FingerprintWorkspace: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "workspace-fingerprint",
+        abstract: "SHA-256 fingerprint of the source surface for one of the known variants."
+    )
+
+    @Option(name: .long, help: "Variant: monitor-app | ui-test-host | audit")
+    var variant: String
+
+    @Option(name: [.long, .customLong("project-dir")], help: "Project root.")
+    var projectDir: String
+
+    func run() throws {
+        guard let v = WorkspaceFingerprint.Variant(rawValue: variant) else {
+            FileHandle.standardError.write(Data("unknown variant: \(variant)\n".utf8))
+            throw ExitCode(64)
+        }
+        let hash = try WorkspaceFingerprint.compute(
+            variant: v, projectDir: URL(fileURLWithPath: projectDir)
+        )
+        print(hash)
+    }
+}
+
+struct TocInfo: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "toc-info",
+        abstract: "Read launched-process path and end-reason from a xctrace TOC XML payload."
+    )
+
+    @Argument(help: "Path to a xctrace --toc XML export.")
+    var tocPath: String
+
+    @Flag(help: "Print only the launched process path.")
+    var launchedProcess: Bool = false
+
+    @Flag(help: "Print only the end reason.")
+    var endReason: Bool = false
+
+    func run() throws {
+        let toc = try XctraceTOC(path: URL(fileURLWithPath: tocPath))
+        let path = toc.launchedProcessPath()
+        let reason = toc.endReason()
+        if launchedProcess { print(path); return }
+        if endReason { print(reason); return }
+        let payload: [String: String] = [
+            "launched_process_path": path,
+            "end_reason": reason,
+        ]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(payload)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
     }
 }
 
