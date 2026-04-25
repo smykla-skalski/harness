@@ -145,9 +145,12 @@ fn monitor_project_generation_syncs_versions_after_xcodegen() {
         root,
         "apps/harness-monitor-macos/Scripts/generate-project.sh",
     );
+    let compose_index = script
+        .find("  compose_feature_spec")
+        .expect("generate-project.sh should compose the feature-aware XcodeGen spec");
     let xcodegen_index = script
-        .find("\"$XCODEGEN_BIN\" generate --spec \"$ROOT/project.yml\" --project \"$ROOT\"")
-        .expect("generate-project.sh should invoke xcodegen");
+        .find("\"$XCODEGEN_BIN\" generate --spec \"$MERGED_SPEC\" --project \"$ROOT\"")
+        .expect("generate-project.sh should invoke xcodegen with the composed feature spec");
     let sync_index = script
         .rfind("\"$REPO_ROOT/scripts/version.sh\" sync-monitor")
         .expect("generate-project.sh should sync monitor versions");
@@ -157,6 +160,10 @@ fn monitor_project_generation_syncs_versions_after_xcodegen() {
             "generate-project.sh should repair the local HarnessMonitorRegistry package link after xcodegen",
         );
 
+    assert!(
+        xcodegen_index > compose_index,
+        "generate-project.sh should compose the feature-aware XcodeGen spec before invoking xcodegen"
+    );
     assert!(
         sync_index > xcodegen_index,
         "generate-project.sh should sync monitor versions after xcodegen so regenerated project.pbxproj build versions do not drift"
