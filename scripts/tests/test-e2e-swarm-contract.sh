@@ -55,11 +55,11 @@ require_file "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/Swar
 require_file "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestAccessibility.swift"
 require_file "tests/integration/commands/session/swarm_full_flow.rs"
 
-require_mise_task "e2e:swarm-full-flow"
-require_mise_task "e2e:swarm-inject-heuristic"
-require_mise_task "e2e:swarm-seed"
-require_mise_task "e2e:swarm-probe-runtimes"
-require_mise_task "e2e:swarm-gaps-open"
+require_mise_task "e2e:swarm:full"
+require_mise_task "e2e:swarm:inject-heuristic"
+require_mise_task "e2e:swarm:seed"
+require_mise_task "e2e:swarm:probe-runtimes"
+require_mise_task "e2e:swarm:gaps-open"
 require_mise_task "monitor:macos:test:swarm-e2e"
 
 require_text "scripts/e2e/lib.sh" "portable_timeout()"
