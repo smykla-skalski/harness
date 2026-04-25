@@ -101,9 +101,14 @@ require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/Harness
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "screen-recording.json"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_TEST_RETRY_ITERATIONS'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR'
+# Single-quoted literals carry the contract text verbatim; SC2016 is not applicable.
+# shellcheck disable=SC2016
 require_text "scripts/e2e/swarm-full-flow.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow "$@"'
+# shellcheck disable=SC2016
 require_text "scripts/e2e/inject-heuristic-log.sh" 'exec "$APP_E2E_TOOL_BINARY" inject-heuristic "$@"'
+# shellcheck disable=SC2016
 require_text "scripts/e2e/seed-session-state.sh" 'exec "$APP_E2E_TOOL_BINARY" seed-session-state "$@"'
+# shellcheck disable=SC2016
 require_text "scripts/e2e/probe-runtimes.sh" 'exec "$APP_E2E_TOOL_BINARY" probe-runtimes "$@"'
 require_no_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
 require_no_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
@@ -131,6 +136,7 @@ require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/Harne
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests.swift" "selectFastModelForTerminal(in: app, runtime: \"codex\")"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"GPT-5.3 Codex Spark\""
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"Low\""
+# shellcheck disable=SC2016
 require_text "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow --assert "$@"'
 require_text "tests/integration/commands/session/swarm_full_flow.rs" "#[ignore"
 require_text "tests/integration/commands/session/mod.rs" "mod swarm_full_flow;"
