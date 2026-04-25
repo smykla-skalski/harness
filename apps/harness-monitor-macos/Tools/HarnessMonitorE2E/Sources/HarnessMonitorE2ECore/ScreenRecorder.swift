@@ -7,6 +7,7 @@ import Foundation
 public enum ScreenRecorder {
     public enum Failure: Error, CustomStringConvertible, Equatable {
         case monitorWindowNotFound
+        case monitorWindowStartTimedOut(TimeInterval)
         case ambiguousMonitorWindows(Int)
         case recordingStartTimedOut
         case recordingMaxDurationExceeded(TimeInterval)
@@ -16,6 +17,8 @@ public enum ScreenRecorder {
             switch self {
             case .monitorWindowNotFound:
                 return "Could not resolve a shareable Harness Monitor main window for recording"
+            case .monitorWindowStartTimedOut(let seconds):
+                return "Timed out waiting \(Int(seconds)) seconds for a shareable Harness Monitor main window"
             case .ambiguousMonitorWindows(let count):
                 return "Resolved \(count) shareable Harness Monitor main windows; recording requires exactly one"
             case .recordingStartTimedOut:
@@ -48,6 +51,9 @@ public enum ScreenRecorder {
 
 @available(macOS 15.0, *)
 private final class Runner: NSObject, SCRecordingOutputDelegate {
+    private static let windowResolutionTimeout: TimeInterval = 15
+    private static let windowResolutionPollInterval: TimeInterval = 0.2
+
     private enum StopReason {
         case requested
         case interrupted
@@ -85,12 +91,30 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try prepareFilesystem()
         installSignalHandlers()
 
+        let captureWindow: SCWindow
+        do {
+            guard let resolvedWindow = try ScreenRecorderStartGate.awaitStartThenResolve(
+                waitForStartRequest: waitForStartRequestIfNeeded,
+                resolveCapture: resolveWindowIfAvailable,
+                timeout: Self.windowResolutionTimeout,
+                pollInterval: Self.windowResolutionPollInterval
+            ) else {
+                try appendLog("recording-cancelled-before-start")
+                return
+            }
+            captureWindow = resolvedWindow
+        } catch let failure as ScreenRecorder.Failure {
+            if case .monitorWindowStartTimedOut(let seconds) = failure {
+                try? appendLog("recording-window-timeout seconds=\(Int(seconds))")
+            }
+            throw failure
+        }
+
         let streamConfiguration = SCStreamConfiguration()
         streamConfiguration.showsCursor = true
         streamConfiguration.capturesAudio = false
         streamConfiguration.ignoreShadowsSingleWindow = true
 
-        let captureWindow = try resolveWindow()
         streamConfiguration.width = max(1, Int(ceil(captureWindow.frame.width)))
         streamConfiguration.height = max(1, Int(ceil(captureWindow.frame.height)))
 
@@ -107,11 +131,6 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         )
         self.stream = stream
         self.recordingOutput = recordingOutput
-
-        if !waitForStartRequestIfNeeded() {
-            try appendLog("recording-cancelled-before-start")
-            return
-        }
 
         try stream.addRecordingOutput(recordingOutput)
         try runAsync { try await stream.startCapture() }
@@ -200,7 +219,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
     }
 
-    private func resolveWindow() throws -> SCWindow {
+    private func resolveWindowIfAvailable() throws -> SCWindow? {
         let content = try runAsync { try await SCShareableContent.current }
         let candidates = content.windows.map { window in
             ScreenRecorderWindowCandidate(
@@ -210,7 +229,9 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
                 isOnScreen: window.isOnScreen
             )
         }
-        let selectedWindow = try ScreenRecorderWindowSelector.captureWindow(from: candidates)
+        guard let selectedWindow = try ScreenRecorderWindowSelector.captureWindowIfAvailable(from: candidates) else {
+            return nil
+        }
         guard let captureWindow = content.windows.first(where: { $0.windowID == selectedWindow.windowID }) else {
             throw ScreenRecorder.Failure.monitorWindowNotFound
         }
