@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<trace-query-result>
+  <node>
+    <schema>
+      <col><mnemonic>duration</mnemonic></col>
+      <col><mnemonic>allocations</mnemonic></col>
+      <col><mnemonic>update-type</mnemonic></col>
+      <col><mnemonic>severity</mnemonic></col>
+      <col><mnemonic>category</mnemonic></col>
+      <col><mnemonic>description</mnemonic></col>
+      <col><mnemonic>module</mnemonic></col>
+      <col><mnemonic>view-name</mnemonic></col>
+    </schema>
+    <row>
+      <duration id="1" fmt="500 µs">500000</duration>
+      <allocations id="2" fmt="4">4</allocations>
+      <update-type id="3" fmt="body">body</update-type>
+      <severity id="4" fmt="info">info</severity>
+      <category id="5" fmt="render">render</category>
+      <description id="6" fmt="DashboardView body">DashboardView body</description>
+      <module id="7" fmt="HarnessMonitor">HarnessMonitor</module>
+      <view-name id="8" fmt="DashboardView">DashboardView</view-name>
+    </row>
+    <row>
+      <duration id="9" fmt="2.0 ms">2000000</duration>
+      <allocations ref="2"/>
+      <update-type ref="3"/>
+      <severity ref="4"/>
+      <category ref="5"/>
+      <description ref="6"/>
+      <module ref="7"/>
+      <view-name ref="8"/>
+    </row>
+    <row>
+      <duration id="10" fmt="100 µs">100000</duration>
+      <allocations id="11" fmt="0">0</allocations>
+      <update-type id="12" fmt="layout">layout</update-type>
+      <severity ref="4"/>
+      <category ref="5"/>
+      <description id="13" fmt="SidebarRow">SidebarRow</description>
+      <module ref="7"/>
+      <view-name id="14" fmt="SidebarRow">SidebarRow</view-name>
+    </row>
+    <row>
+      <duration id="15" fmt="50 µs">50000</duration>
+      <allocations id="16" fmt="1">1</allocations>
+      <update-type ref="12"/>
+      <severity id="17" fmt="warning">warning</severity>
+      <category id="18" fmt="layout">layout</category>
+      <description ref="13"/>
+      <module ref="7"/>
+      <view-name ref="14"/>
+    </row>
+  </node>
+</trace-query-result>
