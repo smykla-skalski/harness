@@ -107,8 +107,30 @@ final class SwarmFixture {
       testCase.waitForElement(row, timeout: 25),
       "Expected swarm session row \(identifier)\n\(diagnosticsSummary())"
     )
-    if !testCase.sessionRowIsSelected(row) {
-      row.firstMatch.tap()
+
+    let toolbarState = testCase.element(in: app, identifier: Accessibility.toolbarChromeState)
+    let sessionIsOpen = {
+      self.testCase.sessionRowIsSelected(row)
+        || toolbarState.label.contains("windowTitle=Cockpit")
+    }
+    let attemptSelection = {
+      self.testCase.tapSession(in: self.app, identifier: identifier)
+      return self.testCase.waitUntil(timeout: 1.5) {
+        sessionIsOpen()
+      }
+    }
+
+    if !sessionIsOpen() {
+      let selected = attemptSelection() || attemptSelection() || attemptSelection()
+      XCTAssertTrue(
+        selected,
+        """
+        Swarm session row never reported selection.
+        rowValue=\(String(describing: row.value))
+        toolbarState=\(toolbarState.label)
+        \(diagnosticsSummary())
+        """
+      )
     }
   }
 
@@ -126,6 +148,20 @@ final class SwarmFixture {
     XCTAssertTrue(
       testCase.waitForElement(element, timeout: timeout),
       "Expected identifier \(identifier)\n\(diagnosticsSummary())"
+    )
+  }
+
+  func expectIdentifier(_ identifier: String, labelContains expectedText: String) {
+    let element = testCase.element(in: app, identifier: identifier)
+    XCTAssertTrue(
+      testCase.waitUntil(timeout: 15) {
+        element.exists && element.label.contains(expectedText)
+      },
+      """
+      Expected identifier \(identifier) label to contain \(expectedText).
+      actualLabel=\(element.label)
+      \(diagnosticsSummary())
+      """
     )
   }
 
@@ -196,7 +232,10 @@ final class SwarmRunner {
   func act2() throws {
     let marker = try fixture.waitForReady("act2")
     if let agentID = marker["worker_codex_id"] {
-      fixture.expectIdentifier(Accessibility.agentRowPersonaChip(agentID))
+      fixture.expectIdentifier(Accessibility.sessionAgentListState, labelContains: agentID)
+    }
+    if let agentID = marker["worker_claude_id"] {
+      fixture.expectIdentifier(Accessibility.sessionAgentListState, labelContains: agentID)
     }
     try fixture.ack("act2")
   }

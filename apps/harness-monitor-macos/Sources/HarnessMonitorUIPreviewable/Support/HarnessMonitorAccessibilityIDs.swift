@@ -348,6 +348,8 @@ public enum HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID))"
   }
 
+  public static let sessionAgentListState = "harness.session.agents.state"
+
   public static func sessionAgentTaskDropFeedback(_ agentID: String) -> String {
     "\(sessionAgentCard(agentID)).task-drop-feedback"
   }
