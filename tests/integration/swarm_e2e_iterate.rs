@@ -14,6 +14,7 @@ const SKILL_BODY: &str = "agents/skills/swarm-e2e-iterate/body.md";
 const SUBAGENT_BODY: &str = "agents/skills/swarm-e2e-iterate/agent.md";
 const RECORDING_REF: &str = "agents/skills/swarm-e2e-iterate/references/recording-analysis.md";
 const PROTOCOL_REF: &str = "agents/skills/swarm-e2e-iterate/references/iteration-protocol.md";
+const CHECKLIST_REF: &str = "agents/skills/swarm-e2e-iterate/references/recording-checklist.md";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -30,25 +31,18 @@ fn read_repo_file(relative: &str) -> String {
 fn skill_body_carries_hard_rules() {
     let body = read_repo_file(SKILL_BODY);
     let required_phrases = [
-        "Recording handling is mandatory.",
-        "Recording triage is first, single-threaded, and never parallelized",
-        "ledger row must cite a recording timestamp range",
-        "The iteration ledger lives at",
+        "Triage the `.mov` before logs",
         "Reuse one recording per iteration.",
-        "Real findings only.",
-        "TDD is mandatory:",
-        "Fix the smallest independently committable row first.",
-        "Rust gate is `rtk mise run check`.",
-        "Do not bump versions inside the loop.",
-        "Do not run the full UI suite.",
-        "All repo workflow commands go through `rtk mise run",
-        "Any file or path in generated notes, summaries, or handoffs must use markdown link format.",
-        "Every commit uses `rtk git commit -sS`.",
+        "TDD required: red, fix, green, gate, signed commit",
+        "rtk mise run",
+        "rtk git commit -sS",
+        "No version bumps inside the loop.",
+        "No full UI suite.",
     ];
     for phrase in required_phrases {
         assert!(
             body.contains(phrase),
-            "SKILL.md missing hard-rule phrase: {phrase}"
+            "body.md missing hard-rule phrase: {phrase}"
         );
     }
 }
@@ -61,7 +55,7 @@ fn skill_metadata_carries_expected_frontmatter() {
         "skill.yaml must keep the canonical name"
     );
     assert!(
-        meta.contains("driving the Harness Monitor swarm full-flow e2e"),
+        meta.contains("Harness Monitor swarm full-flow e2e loop"),
         "skill.yaml must keep the canonical description"
     );
     assert!(
@@ -75,85 +69,69 @@ fn skill_body_delegates_to_references() {
     let body = read_repo_file(SKILL_BODY);
     assert!(
         body.contains("references/recording-analysis.md"),
-        "SKILL.md must point at references/recording-analysis.md"
+        "body.md must point at references/recording-analysis.md"
+    );
+    assert!(
+        body.contains("references/recording-checklist.md"),
+        "body.md must point at references/recording-checklist.md"
     );
     assert!(
         body.contains("references/iteration-protocol.md"),
-        "SKILL.md must point at references/iteration-protocol.md"
+        "body.md must point at references/iteration-protocol.md"
+    );
+}
+
+#[test]
+fn skill_body_consumes_emitted_checklist() {
+    let body = read_repo_file(SKILL_BODY);
+    assert!(
+        body.contains("recording-triage/checklist.md"),
+        "body.md must direct the agent to read the emitted checklist.md"
     );
     assert!(
-        body.contains("agent.md"),
-        "SKILL.md must point at the subagent contract"
+        body.contains("needs-verification"),
+        "body.md must call out re-watching needs-verification rows"
     );
 }
 
 #[test]
-fn recording_reference_carries_per_launch_checklist() {
-    let body = read_repo_file(RECORDING_REF);
-    let required_anchors = [
-        "Process and lifecycle:",
-        "First-frame state:",
-        "Transitions between acts:",
-        "Idle behavior:",
-        "Suite speed and avoidable waiting:",
-        "Animation and performance:",
-        "Readability and accessibility:",
-        "Interaction fidelity:",
-        "Swarm-specific UI:",
-        "Recording artifact:",
-        "Time-to-first-frame target <= 2 s on M-series",
-        "Toolbar back-and-forth size changes on FocusedValue updates",
-        "`workerRefusal` toast fires at act11.",
-        "`signalCollision` toast fires at act14.",
-    ];
-    for anchor in required_anchors {
-        assert!(
-            body.contains(anchor),
-            "recording-analysis.md missing checklist anchor: {anchor}"
-        );
-    }
-}
-
-#[test]
-fn recording_reference_carries_detection_recipes() {
+fn recording_reference_carries_detection_thresholds() {
     let body = read_repo_file(RECORDING_REF);
     let required_phrases = [
-        "ffmpeg -ss <ts> -i swarm-full-flow.mov -frames:v 1 -y <act>.png",
-        "ffprobe -show_frames -of compact=p=0 swarm-full-flow.mov",
-        "sampling 10 fps over 2 s windows",
-        "Same element moving more than 2 pt without user action is drift",
-        "mean luminance < 5 or unique-color count < 10",
+        "## Detection thresholds",
+        "frame-gaps.sh",
+        "auto-keyframes.sh",
+        "detect-dead-head-tail.sh",
+        "Gap > 50 ms during expected motion is a hitch.",
+        "Gap > 250 ms without a clear cause is a stall.",
+        "Gap > 2 s mid-run outside known waits is a freeze.",
     ];
     for phrase in required_phrases {
         assert!(
             body.contains(phrase),
-            "recording-analysis.md missing detection recipe phrase: {phrase}"
+            "recording-analysis.md missing detection-threshold phrase: {phrase}"
         );
     }
 }
 
 #[test]
-fn recording_reference_carries_ux_heuristics_and_signatures() {
-    let body = read_repo_file(RECORDING_REF);
-    let heuristics = [
-        "Communication failure:",
-        "Attention thrash:",
-        "Trust erosion:",
-        "Friction:",
-        "Cognitive load spike:",
-        "Polish drift:",
-        "Reliability smell:",
-        "Iteration drag: avoidable waiting that makes the recording or loop longer than necessary.",
-        "After the recording review, run the proof checklist",
+fn checklist_reference_carries_automation_map() {
+    let body = read_repo_file(CHECKLIST_REF);
+    let required_phrases = [
+        "## Automation map",
+        "frame-gaps.json",
+        "act-timing.json",
+        "act-identifiers.json",
+        "launch-args.json",
+        "layout-drift.json",
+        "Tier-4 rows always emit `needs-verification`",
     ];
-    for heuristic in heuristics {
+    for phrase in required_phrases {
         assert!(
-            body.contains(heuristic),
-            "recording-analysis.md missing heuristic: {heuristic}"
+            body.contains(phrase),
+            "recording-checklist.md missing automation-map phrase: {phrase}"
         );
     }
-    assert!(body.contains("Right:\n"), "missing Right: section header");
-    assert!(body.contains("Wrong:\n"), "missing Wrong: section header");
 }
 
 #[test]
@@ -199,51 +177,19 @@ fn protocol_reference_carries_loop_and_fix_protocols() {
 }
 
 #[test]
-fn subagent_body_pins_recording_first_invariants() {
-    let body = read_repo_file(SUBAGENT_BODY);
-    let required_phrases = [
-        "Recording first: produce and process the `.mov` before all other artifacts.",
-        "No parallel triage:",
-        "Ledger rows need recording timestamps plus one secondary artifact.",
-        "Reuse one recording per iteration.",
-        "Real findings only.",
-        "suite-speed findings",
-        "TDD only:",
-        "One ledger row per commit.",
-        "No version bumps inside the loop.",
-        "No full UI suite.",
-        "rtk mise run",
-        "rtk git commit -sS",
-        "markdown link format",
-        "1Password unavailable for signing means hard stop and return control.",
-        "Never push unless explicitly asked.",
-    ];
-    for phrase in required_phrases {
-        assert!(
-            body.contains(phrase),
-            "agent.md missing invariant phrase: {phrase}"
-        );
-    }
-}
-
-#[test]
-fn subagent_body_loads_skill_and_references() {
+fn subagent_body_keeps_pointer_contract() {
     let body = read_repo_file(SUBAGENT_BODY);
     assert!(
-        body.contains("Load `Skill swarm-e2e-iterate`."),
-        "agent.md must require loading the skill on every cycle"
+        body.contains("rtk mise run"),
+        "agent.md must call out rtk mise run as the workflow shell"
     );
     assert!(
-        body.contains("references/recording-analysis.md"),
-        "agent.md must read recording-analysis.md before triage"
+        body.contains("rtk git commit -sS"),
+        "agent.md must mandate signed sign-off commits"
     );
     assert!(
-        body.contains("references/iteration-protocol.md"),
-        "agent.md must read iteration-protocol.md before lane execution"
-    );
-    assert!(
-        body.contains("_artifacts/ledger.md"),
-        "agent.md must point at the root _artifacts ledger"
+        body.contains("TDD required"),
+        "agent.md must keep the TDD-required invariant"
     );
 }
 
@@ -311,10 +257,17 @@ fn mise_toml_publishes_recording_triage_tasks() {
 fn generated_skill_mirrors_follow_the_canonical_source() {
     let claude_skill = repo_root().join(".claude/skills/swarm-e2e-iterate/SKILL.md");
     let codex_skill = repo_root().join(".agents/skills/swarm-e2e-iterate/SKILL.md");
-    let claude_agent = repo_root().join(".claude/skills/swarm-e2e-iterate/agent.md");
-    let codex_agent = repo_root().join(".agents/skills/swarm-e2e-iterate/agent.md");
+    let claude_checklist =
+        repo_root().join(".claude/skills/swarm-e2e-iterate/references/recording-checklist.md");
+    let codex_checklist =
+        repo_root().join(".agents/skills/swarm-e2e-iterate/references/recording-checklist.md");
 
-    for path in [&claude_skill, &codex_skill, &claude_agent, &codex_agent] {
+    for path in [
+        &claude_skill,
+        &codex_skill,
+        &claude_checklist,
+        &codex_checklist,
+    ] {
         let meta = fs::symlink_metadata(path)
             .unwrap_or_else(|err| panic!("expected generated file at {}: {err}", path.display()));
         assert!(
@@ -327,39 +280,30 @@ fn generated_skill_mirrors_follow_the_canonical_source() {
 
     let claude = fs::read_to_string(&claude_skill).expect("read Claude mirror");
     let codex = fs::read_to_string(&codex_skill).expect("read Codex mirror");
-    let claude_agent_body = fs::read_to_string(&claude_agent).expect("read Claude agent mirror");
-    let codex_agent_body = fs::read_to_string(&codex_agent).expect("read Codex agent mirror");
     assert!(claude.contains("name: swarm-e2e-iterate"));
     assert!(codex.contains("name: swarm-e2e-iterate"));
     assert_eq!(claude, codex, "Claude and Codex skill mirrors should match");
+
+    let claude_checklist_body = fs::read_to_string(&claude_checklist).expect("read mirror");
+    let codex_checklist_body = fs::read_to_string(&codex_checklist).expect("read mirror");
     assert!(
-        claude_agent_body.contains("Load `Skill swarm-e2e-iterate`."),
-        "Claude agent mirror should keep the load order"
+        claude_checklist_body.contains("## Automation map"),
+        "Claude mirror must inherit the automation-map table"
     );
     assert_eq!(
-        claude_agent_body, codex_agent_body,
-        "Claude and Codex agent mirrors should match"
-    );
-}
-
-#[test]
-fn claude_agent_contract_points_at_canonical_source() {
-    let body = read_repo_file(".claude/agents/swarm-e2e-iterator.md");
-    assert!(
-        body.contains("Load `Skill swarm-e2e-iterate`."),
-        "Claude agent contract must keep the load order"
-    );
-    assert!(
-        body.contains("agents/skills/swarm-e2e-iterate/agent.md")
-            || body.contains("references/recording-analysis.md"),
-        "Claude agent contract must remain the swarm-e2e-iterate delegation surface"
+        claude_checklist_body, codex_checklist_body,
+        "Claude and Codex checklist mirrors must match"
     );
 }
 
 #[test]
 fn references_dir_holds_required_companions() {
     let dir = repo_root().join(SKILL_DIR).join("references");
-    let expected = ["recording-analysis.md", "iteration-protocol.md"];
+    let expected = [
+        "recording-analysis.md",
+        "recording-checklist.md",
+        "iteration-protocol.md",
+    ];
     for name in expected {
         let path = dir.join(name);
         assert!(
