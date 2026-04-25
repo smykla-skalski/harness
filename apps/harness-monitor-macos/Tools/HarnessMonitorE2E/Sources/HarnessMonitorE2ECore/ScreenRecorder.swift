@@ -13,6 +13,7 @@ public enum ScreenRecorder {
     case recordingStartTimedOut
     case recordingMaxDurationExceeded(TimeInterval)
     case recordingFailed(String)
+    case recordingBootstrapStalled(stage: String, seconds: TimeInterval)
 
     public var description: String {
       switch self {
@@ -32,6 +33,9 @@ public enum ScreenRecorder {
         return "Native screen recording exceeded the maximum duration of \(Int(seconds)) seconds"
       case .recordingFailed(let detail):
         return "Native screen recording failed: \(detail)"
+      case .recordingBootstrapStalled(let stage, let seconds):
+        return
+          "ScreenCaptureKit bootstrap stalled at stage=\(stage) after \(Int(seconds))s; replayd may need a kickstart"
       }
     }
   }
@@ -58,6 +62,11 @@ public enum ScreenRecorder {
 private final class Runner: NSObject, SCRecordingOutputDelegate {
   private static let windowResolutionTimeout: TimeInterval = 15
   private static let windowResolutionPollInterval: TimeInterval = 0.2
+  // Hard upper bound for each ScreenCaptureKit bootstrap step. macOS 26 hits
+  // intermittent replayd / SCContentFilter deadlocks where the call never
+  // returns; surfacing the stall as an explicit failure beats blocking the
+  // recorder thread until the host-side fixture timeout fires.
+  private static let bootstrapStepTimeout: TimeInterval = 20
 
   private enum StopReason {
     case requested
@@ -126,7 +135,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
 
     try appendLog("recording-create-filter-begin")
     let captureWindow = captureTarget.window
-    let filter = SCContentFilter(desktopIndependentWindow: captureWindow)
+    let filter = try boundedFilterCreate(window: captureWindow)
     try appendLog("recording-create-filter-returned")
 
     let streamConfiguration = SCStreamConfiguration()
@@ -153,7 +162,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     try appendLog("recording-add-output")
     try stream.addRecordingOutput(recordingOutput)
     try appendLog("recording-start-capture-begin")
-    try runAsync { try await stream.startCapture() }
+    try boundedStartCapture(stream: stream)
     try appendLog("recording-start-capture-returned")
 
     let startStatus = startSemaphore.wait(timeout: .now() + 5)
@@ -398,6 +407,44 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
       if stopSemaphore.wait(timeout: .now() + waitInterval) == .success {
         return .interrupted
       }
+    }
+  }
+
+  private func boundedFilterCreate(window: SCWindow) throws -> SCContentFilter {
+    let result: BoundedAsyncResult<SCContentFilter> = try runAsyncBounded(
+      timeout: Self.bootstrapStepTimeout
+    ) {
+      SCContentFilter(desktopIndependentWindow: window)
+    }
+    switch result {
+    case .completed(let filter):
+      return filter
+    case .timedOut:
+      try? appendLog(
+        "recording-stream-stalled stage=filter-init seconds=\(Int(Self.bootstrapStepTimeout))"
+      )
+      throw ScreenRecorder.Failure.recordingBootstrapStalled(
+        stage: "filter-init", seconds: Self.bootstrapStepTimeout
+      )
+    }
+  }
+
+  private func boundedStartCapture(stream: SCStream) throws {
+    let result: BoundedAsyncResult<Void> = try runAsyncBounded(
+      timeout: Self.bootstrapStepTimeout
+    ) {
+      try await stream.startCapture()
+    }
+    switch result {
+    case .completed:
+      return
+    case .timedOut:
+      try? appendLog(
+        "recording-stream-stalled stage=start-capture seconds=\(Int(Self.bootstrapStepTimeout))"
+      )
+      throw ScreenRecorder.Failure.recordingBootstrapStalled(
+        stage: "start-capture", seconds: Self.bootstrapStepTimeout
+      )
     }
   }
 
