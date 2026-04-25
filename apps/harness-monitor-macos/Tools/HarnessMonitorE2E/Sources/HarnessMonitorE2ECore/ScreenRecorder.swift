@@ -7,6 +7,7 @@ import Foundation
 public enum ScreenRecorder {
     public enum Failure: Error, CustomStringConvertible, Equatable {
         case monitorWindowNotFound
+        case monitorDisplayNotFound
         case monitorWindowStartTimedOut(TimeInterval)
         case ambiguousMonitorWindows(Int)
         case recordingStartTimedOut
@@ -17,6 +18,8 @@ public enum ScreenRecorder {
             switch self {
             case .monitorWindowNotFound:
                 return "Could not resolve a shareable Harness Monitor main window for recording"
+            case .monitorDisplayNotFound:
+                return "Could not resolve a shareable display containing the Harness Monitor window"
             case .monitorWindowStartTimedOut(let seconds):
                 return "Timed out waiting \(Int(seconds)) seconds for a shareable Harness Monitor main window"
             case .ambiguousMonitorWindows(let count):
@@ -91,9 +94,9 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try prepareFilesystem()
         installSignalHandlers()
 
-        let captureWindow: SCWindow
+        let captureTarget: CaptureTarget
         do {
-            guard let resolvedWindow = try ScreenRecorderStartGate.awaitStartThenResolve(
+            guard let resolvedTarget = try ScreenRecorderStartGate.awaitStartThenResolve(
                 waitForStartRequest: waitForStartRequestIfNeeded,
                 resolveCapture: resolveWindowIfAvailable,
                 timeout: Self.windowResolutionTimeout,
@@ -102,10 +105,12 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
                 try appendLog("recording-cancelled-before-start")
                 return
             }
-            captureWindow = resolvedWindow
+            captureTarget = resolvedTarget
         } catch let failure as ScreenRecorder.Failure {
             if case .monitorWindowStartTimedOut(let seconds) = failure {
-                try? appendLog("recording-window-timeout seconds=\(Int(seconds))")
+                try? appendLog(
+                    "recording-window-timeout seconds=\(Int(seconds)) summary=\(lastWindowProbeSummary())"
+                )
             }
             throw failure
         }
@@ -115,25 +120,36 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         streamConfiguration.capturesAudio = false
         streamConfiguration.ignoreShadowsSingleWindow = true
 
-        streamConfiguration.width = max(1, Int(ceil(captureWindow.frame.width)))
-        streamConfiguration.height = max(1, Int(ceil(captureWindow.frame.height)))
+        streamConfiguration.width = max(1, Int(ceil(captureTarget.window.frame.width)))
+        streamConfiguration.height = max(1, Int(ceil(captureTarget.window.frame.height)))
 
         let recordingConfiguration = SCRecordingOutputConfiguration()
         recordingConfiguration.outputURL = outputURL
         recordingConfiguration.outputFileType = .mov
         recordingConfiguration.videoCodecType = .h264
 
-        let filter = SCContentFilter(desktopIndependentWindow: captureWindow)
+        try appendLog("recording-create-filter-begin")
+        let captureDisplay = captureTarget.display
+        let captureWindow = captureTarget.window
+        let filter = SCContentFilter(display: captureDisplay, including: [captureWindow])
+        try appendLog("recording-create-filter-returned")
+        try appendLog("recording-create-stream-begin")
         let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: nil)
+        try appendLog("recording-create-stream-returned")
+        try appendLog("recording-create-output-begin")
         let recordingOutput = SCRecordingOutput(
             configuration: recordingConfiguration,
             delegate: self
         )
+        try appendLog("recording-create-output-returned")
         self.stream = stream
         self.recordingOutput = recordingOutput
 
+        try appendLog("recording-add-output")
         try stream.addRecordingOutput(recordingOutput)
+        try appendLog("recording-start-capture-begin")
         try runAsync { try await stream.startCapture() }
+        try appendLog("recording-start-capture-returned")
 
         let startStatus = startSemaphore.wait(timeout: .now() + 5)
         if let failure = consumeFailure() {
@@ -219,7 +235,12 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
     }
 
-    private func resolveWindowIfAvailable() throws -> SCWindow? {
+    private struct CaptureTarget {
+        let display: SCDisplay
+        let window: SCWindow
+    }
+
+    private func resolveWindowIfAvailable() throws -> CaptureTarget? {
         let content = try runAsync { try await SCShareableContent.current }
         let candidates = content.windows.map { window in
             ScreenRecorderWindowCandidate(
@@ -229,16 +250,36 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
                 isOnScreen: window.isOnScreen
             )
         }
+        let harnessWindowSummary = candidates
+            .filter { ($0.bundleIdentifier ?? "").contains("io.harnessmonitor") }
+            .map { candidate in
+                let title = candidate.title.isEmpty ? "<empty>" : candidate.title
+                return
+                    "id=\(candidate.windowID),bundle=\(candidate.bundleIdentifier ?? "?"),title=\(title),onScreen=\(candidate.isOnScreen)"
+            }
+            .joined(separator: " | ")
+        updateWindowProbeSummary(
+            harnessWindowSummary.isEmpty ? "no-harness-windows" : harnessWindowSummary
+        )
         guard let selectedWindow = try ScreenRecorderWindowSelector.captureWindowIfAvailable(from: candidates) else {
             return nil
         }
         guard let captureWindow = content.windows.first(where: { $0.windowID == selectedWindow.windowID }) else {
             throw ScreenRecorder.Failure.monitorWindowNotFound
         }
-        try appendLog(
-            "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") size=\(Int(ceil(captureWindow.frame.width)))x\(Int(ceil(captureWindow.frame.height)))"
+        let selectedDisplay = try ScreenRecorderDisplaySelector.display(
+            forWindowFrame: captureWindow.frame,
+            from: content.displays.map { display in
+                ScreenRecorderDisplayCandidate(displayID: display.displayID, frame: display.frame)
+            }
         )
-        return captureWindow
+        guard let captureDisplay = content.displays.first(where: { $0.displayID == selectedDisplay.displayID }) else {
+            throw ScreenRecorder.Failure.monitorDisplayNotFound
+        }
+        try appendLog(
+            "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplay.displayID) size=\(Int(ceil(captureWindow.frame.width)))x\(Int(ceil(captureWindow.frame.height)))"
+        )
+        return CaptureTarget(display: captureDisplay, window: captureWindow)
     }
 
     private func installSignalHandlers() {
@@ -275,6 +316,23 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         stateLock.lock()
         defer { stateLock.unlock() }
         return state.failure
+    }
+
+    private func updateWindowProbeSummary(_ summary: String) {
+        stateLock.lock()
+        let changed = state.lastWindowProbeSummary != summary
+        state.lastWindowProbeSummary = summary
+        stateLock.unlock()
+        guard changed else {
+            return
+        }
+        try? appendLog("recording-window-probe \(summary)")
+    }
+
+    private func lastWindowProbeSummary() -> String {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return state.lastWindowProbeSummary
     }
 
     private func waitForStartRequestIfNeeded() -> Bool {
@@ -347,6 +405,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
 @available(macOS 15.0, *)
 private struct RunnerState {
     var failure: ScreenRecorder.Failure?
+    var lastWindowProbeSummary = "uninitialized"
 }
 
 @available(macOS 15.0, *)

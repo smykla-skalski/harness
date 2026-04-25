@@ -28,6 +28,25 @@ final class ScreenRecorderWindowSelectorTests: XCTestCase {
         XCTAssertEqual(selected.windowID, 3)
     }
 
+    func testCaptureWindowSelectsDashboardWindowFromUITestHost() throws {
+        let selected = try ScreenRecorderWindowSelector.captureWindow(from: [
+            ScreenRecorderWindowCandidate(
+                windowID: 40,
+                title: "Agents",
+                bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+                isOnScreen: true
+            ),
+            ScreenRecorderWindowCandidate(
+                windowID: 41,
+                title: "Dashboard",
+                bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+                isOnScreen: true
+            ),
+        ])
+
+        XCTAssertEqual(selected.windowID, 41)
+    }
+
     func testCaptureWindowSelectsMainHarnessMonitorWindowFromShippingApp() throws {
         let selected = try ScreenRecorderWindowSelector.captureWindow(from: [
             ScreenRecorderWindowCandidate(

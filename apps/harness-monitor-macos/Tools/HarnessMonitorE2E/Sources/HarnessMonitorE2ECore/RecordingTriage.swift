@@ -424,6 +424,157 @@ extension RecordingTriage {
     }
 }
 
+// MARK: - Act markers
+
+extension RecordingTriage {
+    public enum ActMarkerKind: String, Codable, Sendable {
+        case ready
+        case ack
+    }
+
+    public struct ActMarker: Codable, Equatable, Sendable {
+        public let act: String
+        public let kind: ActMarkerKind
+        public let payload: [String: String]
+        public let mtime: Date
+    }
+
+    public enum ActMarkerError: Error, CustomStringConvertible {
+        case unknownSuffix(URL)
+        case missingFile(URL)
+        case missingMTime(URL)
+
+        public var description: String {
+            switch self {
+            case .unknownSuffix(let url):
+                "expected .ready or .ack suffix: \(url.lastPathComponent)"
+            case .missingFile(let url):
+                "marker file missing: \(url.path)"
+            case .missingMTime(let url):
+                "marker has no modificationDate: \(url.path)"
+            }
+        }
+    }
+
+    /// Parse an `<act>.ready` or `<act>.ack` marker file written atomically by
+    /// `SwarmFullFlowOrchestrator.actReady` / `actAck`. The act name is taken
+    /// from the filename, the kind from the extension, the payload from the
+    /// `key=value` lines (one per line; blank lines and `#`-prefixed comments
+    /// skipped; the literal `ack` token used by ack files contributes nothing
+    /// to the payload), and the wall-clock anchor from the file's mtime.
+    public static func parseActMarker(at url: URL) throws -> ActMarker {
+        let kind: ActMarkerKind
+        switch url.pathExtension {
+        case "ready": kind = .ready
+        case "ack": kind = .ack
+        default: throw ActMarkerError.unknownSuffix(url)
+        }
+        let act = url.deletingPathExtension().lastPathComponent
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ActMarkerError.missingFile(url)
+        }
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        guard let mtime = attrs[.modificationDate] as? Date else {
+            throw ActMarkerError.missingMTime(url)
+        }
+        let body = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        var payload: [String: String] = [:]
+        for rawLine in body.split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline }) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") || line == "ack" { continue }
+            guard let separator = line.firstIndex(of: "=") else { continue }
+            let key = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
+            let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
+            if key.isEmpty || key == "act" { continue }
+            payload[key] = value
+        }
+        return ActMarker(act: act, kind: kind, payload: payload, mtime: mtime)
+    }
+}
+
+// MARK: - Act timing
+
+extension RecordingTriage {
+    public struct ActWindow: Codable, Equatable, Sendable {
+        public let act: String
+        public let readySeconds: Double?
+        public let ackSeconds: Double?
+        public let durationSeconds: Double?
+        public let gapToNextSeconds: Double?
+    }
+
+    public struct ActTimingReport: Codable, Equatable, Sendable {
+        public let ttffSeconds: Double
+        public let dashboardLatencySeconds: Double?
+        public let acts: [ActWindow]
+    }
+
+    /// Convert marker mtimes into recording-relative offsets so the checklist
+    /// emitter can drive `lifecycle.ttff`, `lifecycle.dashboard`, and the
+    /// suite-speed handoff verdicts without re-reading the filesystem.
+    /// Per-act ack/duration/handoff fields stay nil when their input marker
+    /// is missing so callers can distinguish "not yet acked" from "0 seconds".
+    public static func analyzeActTiming(
+        markers: [ActMarker],
+        recordingStart: Date,
+        appLaunch: Date
+    ) -> ActTimingReport {
+        let recordingEpoch = recordingStart.timeIntervalSince1970
+        let ttff = max(0, recordingEpoch - appLaunch.timeIntervalSince1970)
+
+        var readyByAct: [String: Date] = [:]
+        var ackByAct: [String: Date] = [:]
+        var actNames: [String] = []
+        for marker in markers {
+            switch marker.kind {
+            case .ready:
+                if readyByAct[marker.act] == nil {
+                    readyByAct[marker.act] = marker.mtime
+                    actNames.append(marker.act)
+                }
+            case .ack:
+                ackByAct[marker.act] = marker.mtime
+            }
+        }
+
+        let orderedActs = actNames.sorted { lhs, rhs in
+            let lhsMtime = readyByAct[lhs] ?? .distantFuture
+            let rhsMtime = readyByAct[rhs] ?? .distantFuture
+            return lhsMtime < rhsMtime
+        }
+
+        var windows: [ActWindow] = []
+        for (index, act) in orderedActs.enumerated() {
+            let ready = readyByAct[act].map { $0.timeIntervalSince1970 - recordingEpoch }
+            let ack = ackByAct[act].map { $0.timeIntervalSince1970 - recordingEpoch }
+            let duration: Double? = {
+                guard let ready, let ack else { return nil }
+                return ack - ready
+            }()
+            let gap: Double? = {
+                guard index + 1 < orderedActs.count, let ack else { return nil }
+                let next = orderedActs[index + 1]
+                guard let nextReady = readyByAct[next].map({ $0.timeIntervalSince1970 - recordingEpoch }) else { return nil }
+                return nextReady - ack
+            }()
+            windows.append(ActWindow(
+                act: act,
+                readySeconds: ready,
+                ackSeconds: ack,
+                durationSeconds: duration,
+                gapToNextSeconds: gap
+            ))
+        }
+
+        let dashboard = readyByAct["act1"].map { $0.timeIntervalSince1970 - recordingEpoch }
+        return ActTimingReport(
+            ttffSeconds: ttff,
+            dashboardLatencySeconds: dashboard,
+            acts: windows
+        )
+    }
+}
+
 // MARK: - Animation thrash
 
 extension RecordingTriage {

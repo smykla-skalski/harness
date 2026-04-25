@@ -72,9 +72,6 @@ final class SwarmFixture {
       return
     }
     app.launch()
-    guard testCase.waitForRecordingStartIfConfigured(context: diagnosticsSummary()) else {
-      return
-    }
     XCTAssertTrue(
       testCase.waitUntil(timeout: 25) {
         if self.app.state != .runningForeground {
@@ -84,6 +81,9 @@ final class SwarmFixture {
       },
       diagnosticsSummary()
     )
+    guard testCase.waitForRecordingStartIfConfigured(context: diagnosticsSummary()) else {
+      return
+    }
     XCTAssertTrue(
       testCase.waitUntil(timeout: 25) {
         let window = self.testCase.mainWindow(in: self.app)

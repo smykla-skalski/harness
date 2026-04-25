@@ -62,6 +62,47 @@ final class RecordingTriageCommandTests: XCTestCase {
         )
     }
 
+    func testActTimingScansMarkerDirAndEmitsJson() throws {
+        let binary = try resolveBinary()
+        let work = makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: work) }
+        let markers = work.appendingPathComponent("e2e-sync", isDirectory: true)
+        try FileManager.default.createDirectory(at: markers, withIntermediateDirectories: true)
+
+        let recordingStart = Date(timeIntervalSince1970: 1_700_000_000)
+        let appLaunch = recordingStart.addingTimeInterval(-1.0)
+        try writeMarker(markers.appendingPathComponent("act1.ready"),
+            body: "act=act1\nleader_id=L\n",
+            mtime: recordingStart.addingTimeInterval(0.5))
+        try writeMarker(markers.appendingPathComponent("act1.ack"),
+            body: "ack\n",
+            mtime: recordingStart.addingTimeInterval(1.5))
+
+        let result = try run(binary, arguments: [
+            "recording-triage", "act-timing",
+            "--marker-dir", markers.path,
+            "--recording-start", String(recordingStart.timeIntervalSince1970),
+            "--app-launch", String(appLaunch.timeIntervalSince1970),
+        ])
+        XCTAssertEqual(result.status, 0, result.stderr)
+        let report = try JSONDecoder().decode(
+            RecordingTriage.ActTimingReport.self,
+            from: Data(result.stdout.utf8)
+        )
+        XCTAssertEqual(report.ttffSeconds, 1.0, accuracy: 1e-3)
+        XCTAssertEqual(report.acts.count, 1)
+        XCTAssertEqual(report.acts[0].act, "act1")
+        XCTAssertEqual(report.acts[0].durationSeconds ?? -1, 1.0, accuracy: 1e-3)
+    }
+
+    private func writeMarker(_ url: URL, body: String, mtime: Date) throws {
+        try body.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: mtime],
+            ofItemAtPath: url.path
+        )
+    }
+
     private func resolveBinary() throws -> URL {
         let candidate = packageRoot()
             .appendingPathComponent(".build", isDirectory: true)

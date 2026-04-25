@@ -65,9 +65,6 @@ extension HarnessMonitorUITestCase {
       return app
     }
     app.launch()
-    guard waitForRecordingStartIfConfigured() else {
-      return app
-    }
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         if app.state != .runningForeground {
@@ -77,6 +74,9 @@ extension HarnessMonitorUITestCase {
         return app.state == .runningForeground || self.mainWindow(in: app).exists
       }
     )
+    guard waitForRecordingStartIfConfigured() else {
+      return app
+    }
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         let window = self.mainWindow(in: app)
