@@ -18,26 +18,17 @@ For every act marker the lane already produces three pieces of truth at a known 
 
 If the frame disagrees with those artifacts, file a finding. See [act-marker-matrix.md](act-marker-matrix.md) for the per-act surface.
 
-## Detection recipes
+## Detection thresholds
 
-Bake these into [recording-triage scripts](../../../../scripts/e2e/recording-triage/) when they are run more than once. Run them ad-hoc when triaging a specific window.
+The wrappers under [scripts/e2e/recording-triage](../../../../scripts/e2e/recording-triage/) bake these in. Read the JSON the wrapper emitted; only fall back to ad-hoc commands when the wrapper output is missing or skipped.
 
 ### Per-act keyframes
 
-```
-ffmpeg -ss <ts> -i swarm-full-flow.mov -frames:v 1 -y <act>.png
-```
-
-Extract frames at `actReady`, `actAck`, and 250 ms before each transition. Compare each frame against `ui-snapshots/<actN>.png`; large visual distance is a render-mismatch finding.
+`auto-keyframes.sh` extracts one frame per `actN.ready` mtime and `compare-keyframes.sh` runs the perceptual-hash compare against `ui-snapshots/swarm-actN.png`. Inspect the JSON pair under `recording-triage/`.
 
 ### Frame freezes and stalls
 
-```
-ffprobe -show_frames -of compact=p=0 swarm-full-flow.mov \
-  | awk -F= '/pkt_pts_time=/ {print $NF}'
-```
-
-Compute inter-frame gaps:
+`frame-gaps.sh` writes `recording-triage/frame-gaps.json` with the same thresholds:
 
 - Gap > 50 ms during expected motion is a hitch.
 - Gap > 250 ms without a clear cause is a stall.
@@ -48,7 +39,7 @@ Three or more hitches in a single segment is a perf finding even when no individ
 
 ### Dead head and dead tail
 
-Compare the `.mov` first frame against the daemon app-launch line and the last frame against the test `terminate` line. Either side > 5 s is a recording-artifact finding.
+`detect-dead-head-tail.sh` compares the `.mov` bounds against the daemon app-launch / terminate lines and writes `recording-triage/dead-head-tail.json`. Either side > 5 s is a recording-artifact finding.
 
 ## Suite-speed lens
 

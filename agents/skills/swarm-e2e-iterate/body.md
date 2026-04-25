@@ -23,8 +23,8 @@ Drive `swarm-full-flow` to zero open findings. Keep the loop recording-first, TD
 
 1. Read or initialize [_artifacts/ledger.md](../../../_artifacts/ledger.md).
 2. Run `rtk mise run e2e:swarm:full` and capture the run slug.
-3. Run `rtk mise run e2e:swarm:triage:recording -- _artifacts/runs/<slug>`.
-4. Walk the recording chronologically, then run the checklist proof pass.
+3. Run `rtk mise run e2e:swarm:triage:recording -- _artifacts/runs/<slug>`. The aggregator writes `recording-triage/checklist.md` plus per-detector JSONs.
+4. Walk the recording chronologically, then read `_artifacts/runs/<slug>/recording-triage/checklist.md`. Promote `found` rows straight to ledger entries and only re-watch rows the emitter marked `needs-verification`.
 5. Triage secondary artifacts only after the recording pass and checklist pass.
 6. Append confirmed rows, fix open rows one at a time, and rerun until the ledger is clean.
 

@@ -1,10 +1,29 @@
 # Recording Checklist
 
-Use this after the chronological `.mov` pass. Write one short line per item with `checked`, `proof`, and `verdict`.
+Use this after the chronological `.mov` pass. The recording-triage pipeline pre-fills most rows in `recording-triage/checklist.md`; verify those verdicts and re-watch any row marked `needs-verification`.
 
 If a check is unproven, mark it `needs-verification` and re-watch.
 
 Thresholds live in [recording-analysis.md](recording-analysis.md). Per-act surfaces live in [act-marker-matrix.md](act-marker-matrix.md).
+
+## Automation map
+
+Tier 1 rows resolve from existing detectors, Tier 2 from new mechanical analysis, Tier 3 from frame-pair wrappers, Tier 4 are manual judgments the emitter always defaults to `needs-verification`.
+
+| Tier | Source JSON | Rows |
+|------|-------------|------|
+| 1 | `frame-gaps.json` | `perf.hitch`, `perf.stall`, `artifact.freezes` |
+| 1 | `dead-head-tail.json` | `lifecycle.terminate`, `artifact.head`, `artifact.tail`, `suite.deadHead`, `suite.deadTail` |
+| 1 | `thrash.json` | `idle.chrome` |
+| 1 | `black-frames.json` | `artifact.blanks` |
+| 1 | `assert-recording.json` | `artifact.size` |
+| 2 | `act-timing.json` | `lifecycle.ttff`, `lifecycle.dashboard`, `suite.handoff` |
+| 2 | `act-identifiers.json` | every `swarm.act{N}.*` row plus `swarm.invariant.transitions`, `swarm.invariant.daemonHealth`, `firstframe.selection` |
+| 2 | `launch-args.json` | `lifecycle.persistence` |
+| 3 | `layout-drift.json` | `perf.layoutThrash` |
+| 4 | (manual) | `lifecycle.manifest`, `lifecycle.warmstart`, `firstframe.states/enablement/glass`, `transition.*`, `idle.stable/rerender/cpu`, `perf.toolbarStutter`, `a11y.*`, `interaction.*`, `artifact.segments`, `suite.relaunchGap/delayedAssert/repeatedWait` |
+
+Tier-4 rows always emit `needs-verification` with a one-line rationale; the agent re-watches them but never silently skips them.
 
 ## Required items
 
