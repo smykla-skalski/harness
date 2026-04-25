@@ -63,19 +63,28 @@ final class ConfigureXctestrunTests: XCTestCase {
         )
     }
 
-    func testStandardUpdatesOmitsBlankCodexFields() {
-        let updates = XctestrunConfigurator.standardUpdates(
-            stateRoot: "/s",
-            dataHome: "/d",
-            daemonLog: "/dl",
-            bridgeLog: "/bl",
-            terminalSessionID: "t",
-            codexSessionID: "c",
-            codexModel: "",
-            codexEffort: nil
+    func testCustomTargetKeyIsRespected() throws {
+        let source = tempDir.appendingPathComponent("source.xctestrun")
+        let destination = tempDir.appendingPathComponent("dest.xctestrun")
+        let payload: [String: Any] = [
+            "OtherTarget": [
+                "EnvironmentVariables": [:] as [String: Any],
+                "TestingEnvironmentVariables": [:] as [String: Any],
+            ] as [String: Any]
+        ]
+        try PropertyListSerialization.data(fromPropertyList: payload, format: .xml, options: 0)
+            .write(to: source)
+
+        try XctestrunConfigurator.configure(
+            source: source, destination: destination,
+            targetKey: "OtherTarget", updates: ["X": "Y"]
         )
-        XCTAssertNil(updates["HARNESS_MONITOR_E2E_CODEX_MODEL"])
-        XCTAssertNil(updates["HARNESS_MONITOR_E2E_CODEX_EFFORT"])
-        XCTAssertEqual(updates["HARNESS_MONITOR_ENABLE_AGENTS_E2E"], "1")
+
+        let mutated = try PropertyListSerialization.propertyList(
+            from: try Data(contentsOf: destination), format: nil
+        ) as? [String: Any]
+        let target = try XCTUnwrap(mutated?["OtherTarget"] as? [String: Any])
+        let env = try XCTUnwrap(target["EnvironmentVariables"] as? [String: String])
+        XCTAssertEqual(env["X"], "Y")
     }
 }

@@ -68,32 +68,4 @@ public enum XctestrunConfigurator {
         }
     }
 
-    /// Standard env-var bundle the test-agents-e2e shell injects into the xctestrun.
-    public static func standardUpdates(
-        stateRoot: String,
-        dataHome: String,
-        daemonLog: String,
-        bridgeLog: String,
-        terminalSessionID: String,
-        codexSessionID: String,
-        codexModel: String?,
-        codexEffort: String?
-    ) -> [String: String] {
-        var updates: [String: String] = [
-            "HARNESS_MONITOR_E2E_STATE_ROOT": stateRoot,
-            "HARNESS_MONITOR_E2E_DATA_HOME": dataHome,
-            "HARNESS_MONITOR_E2E_DAEMON_LOG": daemonLog,
-            "HARNESS_MONITOR_E2E_BRIDGE_LOG": bridgeLog,
-            "HARNESS_MONITOR_E2E_TERMINAL_SESSION_ID": terminalSessionID,
-            "HARNESS_MONITOR_E2E_CODEX_SESSION_ID": codexSessionID,
-            "HARNESS_MONITOR_ENABLE_AGENTS_E2E": "1",
-        ]
-        if let codexModel, !codexModel.isEmpty {
-            updates["HARNESS_MONITOR_E2E_CODEX_MODEL"] = codexModel
-        }
-        if let codexEffort, !codexEffort.isEmpty {
-            updates["HARNESS_MONITOR_E2E_CODEX_EFFORT"] = codexEffort
-        }
-        return updates
-    }
 }
