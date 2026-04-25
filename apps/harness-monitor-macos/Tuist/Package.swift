@@ -33,7 +33,8 @@ let packageSettings = PackageSettings(
                 "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE"
             ]),
             .debug(name: "Preview", settings: [
-                "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE"
+                "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
+                "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
             ]),
             .release(name: "Release")
         ]

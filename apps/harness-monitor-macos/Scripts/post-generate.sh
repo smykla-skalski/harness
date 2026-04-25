@@ -73,7 +73,6 @@ write_workspace_settings \
   "$REPO_ROOT/xcode-derived"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
-DEVELOPMENT_TEAM_ID="${HARNESS_MONITOR_DEVELOPMENT_TEAM:-Q498EB36N4}"
 LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
 LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$LAST_UPGRADE_CHECK}"
 PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PROJECT_OBJECT_VERSION:-77}"
@@ -81,20 +80,16 @@ PREFERRED_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VER
 
 # Tuist 4 / XcodeProj still serializes an Xcode 14-era PBX project
 # (`objectVersion = 55;`, `compatibilityVersion = "Xcode 14.0";`) and omits
-# `LastUpgradeCheck`, `LastSwiftUpdateCheck`, and the per-target
-# `TargetAttributes` (`ProvisioningStyle = Automatic;`, `DevelopmentTeam = ...;`).
-# Without those fixes Xcode shows "Update to Recommended Settings" on every open,
-# and the proposed change rewrites CODE_SIGN_IDENTITY to the ad-hoc `-` which
-# fails the `com.apple.developer.*` and app-group entitlements declared by the
-# main app, the UI test host, and the preview host. Normalize the generated
-# pbxproj in one place after every `tuist generate`.
+# `LastUpgradeCheck`, `LastSwiftUpdateCheck`, and project-object metadata that
+# current Xcode expects. Normalize the generated pbxproj in one place after
+# every `tuist generate` so Xcode opens cleanly without the "Update to
+# Recommended Settings" banner.
 if [ -f "$PBXPROJ" ]; then
   HARNESS_MONITOR_PBXPROJ="$PBXPROJ" \
   HARNESS_MONITOR_LAST_UPGRADE_CHECK="$LAST_UPGRADE_CHECK" \
   HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK="$LAST_SWIFT_UPDATE_CHECK" \
   HARNESS_MONITOR_PROJECT_OBJECT_VERSION="$PROJECT_OBJECT_VERSION" \
   HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION="$PREFERRED_PROJECT_OBJECT_VERSION" \
-  HARNESS_MONITOR_DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM_ID" \
   HARNESS_MONITOR_APP_ROOT="$ROOT" \
   HARNESS_MONITOR_REPO_ROOT="$REPO_ROOT" \
     /usr/bin/python3 "$ROOT/Scripts/patch-tuist-pbxproj.py"

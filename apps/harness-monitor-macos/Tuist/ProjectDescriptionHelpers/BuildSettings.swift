@@ -13,6 +13,7 @@ public enum BuildSettings {
         "COMPILATION_CACHE_ENABLE_CACHING": "YES",
         "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "YES",
         "CURRENT_PROJECT_VERSION": "30.5.1", // VERSION_MARKER_CURRENT
+        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "DEAD_CODE_STRIPPING": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_STRICT_OBJC_MSGSEND": "YES",
@@ -43,6 +44,8 @@ public enum BuildSettings {
         "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
         "ONLY_ACTIVE_ARCH": "YES",
         "SWIFT_ENABLE_EAGER_LINKING": "NO",
+        // Preview dylib builds choke on prefix-mapped SDK overlay paths like `^sdk/...`.
+        "SWIFT_ENABLE_PREFIX_MAPPING": "NO",
         "SWIFT_EMIT_LOC_STRINGS": "NO"
     ]
 
@@ -71,10 +74,10 @@ public enum BuildSettings {
             preview["ONLY_ACTIVE_ARCH"] = "YES"
             preview["SWIFT_ENABLE_EAGER_LINKING"] = "NO"
         }
+        preview["SWIFT_ENABLE_PREFIX_MAPPING"] = "NO"
         var base: SettingsDictionary = [
             "CODE_SIGN_STYLE": "Automatic",
             "CODE_SIGNING_ALLOWED": "YES",
-            "DEVELOPMENT_TEAM": "Q498EB36N4",
             "ENABLE_MODULE_VERIFIER": "YES",
             "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
             "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",

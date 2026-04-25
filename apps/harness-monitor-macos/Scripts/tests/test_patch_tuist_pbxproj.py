@@ -19,7 +19,7 @@ def load_patcher_module():
 
 
 class PatchTuistPbxprojTests(unittest.TestCase):
-    def test_patches_generated_package_test_targets_with_team_attributes(self) -> None:
+    def test_strips_target_team_attributes_from_generated_project(self) -> None:
         module = load_patcher_module()
         pbxproj = """// !$*UTF8*$!
 {
@@ -47,6 +47,15 @@ class PatchTuistPbxprojTests(unittest.TestCase):
 \t\t\t\tBuildIndependentTargetsInParallel = YES;
 \t\t\t\tLastUpgradeCheck = 9999;
 \t\t\t\tTargetAttributes = {
+\t\t\t\t\tAAAAAAAAAAAAAAAAAAAAAAAA = {
+\t\t\t\t\t\tDevelopmentTeam = Q498EB36N4;
+\t\t\t\t\t\tProvisioningStyle = Automatic;
+\t\t\t\t\t};
+\t\t\t\t\tBBBBBBBBBBBBBBBBBBBBBBBB = {
+\t\t\t\t\t\tDevelopmentTeam = Q498EB36N4;
+\t\t\t\t\t\tProvisioningStyle = Automatic;
+\t\t\t\t\t\tTestTargetID = AAAAAAAAAAAAAAAAAAAAAAAA;
+\t\t\t\t\t};
 \t\t\t\t};
 \t\t\t};
 \t\t};
@@ -59,15 +68,15 @@ class PatchTuistPbxprojTests(unittest.TestCase):
             pbxproj_path = Path(tmp_dir) / "project.pbxproj"
             pbxproj_path.write_text(pbxproj)
 
-            module.patch_pbxproj(pbxproj_path, "2640", "2640", "Q498EB36N4", "55", "55")
+            module.patch_pbxproj(pbxproj_path, "2640", "2640", "55", "55")
 
             patched = pbxproj_path.read_text()
 
         self.assertIn("LastUpgradeCheck = 2640;", patched)
         self.assertIn("\t\t\t\t\tBBBBBBBBBBBBBBBBBBBBBBBB = {\n", patched)
-        self.assertIn("\t\t\t\t\t\tDevelopmentTeam = Q498EB36N4;\n", patched)
-        self.assertIn("\t\t\t\t\t\tProvisioningStyle = Automatic;\n", patched)
-        self.assertNotIn("\t\t\t\t\tAAAAAAAAAAAAAAAAAAAAAAAA = {\n", patched)
+        self.assertIn("\t\t\t\t\t\tTestTargetID = AAAAAAAAAAAAAAAAAAAAAAAA;\n", patched)
+        self.assertNotIn("DevelopmentTeam = Q498EB36N4;", patched)
+        self.assertNotIn("ProvisioningStyle = Automatic;", patched)
 
 
 if __name__ == "__main__":
