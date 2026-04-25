@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 @MainActor
@@ -31,12 +32,16 @@ class HarnessMonitorUITestCase: XCTestCase {
   }
 
   override func tearDownWithError() throws {
-    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     if testRun?.hasSucceeded == false {
-      recordDiagnosticsSnapshot(
-        in: app,
-        named: "\(sanitizedDiagnosticsComponent(name))-failure-final"
-      )
+      let snapshotName = "failure-final-\(UUID().uuidString.lowercased())"
+      MainActor.assumeIsolated {
+        let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+        recordStandaloneDiagnosticsSnapshot(
+          in: app,
+          named: snapshotName,
+          artifactsDirectoryKey: Self.artifactsDirectoryKey
+        )
+      }
     }
     try super.tearDownWithError()
   }
