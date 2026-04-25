@@ -1,0 +1,14 @@
+{
+  "captures": [
+    {
+      "scenario": "launch-dashboard",
+      "template": "SwiftUI",
+      "metrics": {
+        "swiftui_updates": {"total_count": 30000, "body_update_count": 4000},
+        "swiftui_update_groups": {"duration_ns_max": 75000000},
+        "hitches": {"count": 2},
+        "potential_hangs": {"count": 1}
+      }
+    }
+  ]
+}
