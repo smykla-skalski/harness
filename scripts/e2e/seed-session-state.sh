@@ -27,9 +27,4 @@ if [[ -n "$AGENT_ID" && -n "$STALL_SECONDS" ]]; then
     "stall_seconds=$STALL_SECONDS"
 fi
 
-python3 - "$DATA_HOME" <<'PY'
-import json
-import sys
-
-print(json.dumps({"data_home": sys.argv[1], "seeded": True}, sort_keys=True))
-PY
+jq -nc --arg dh "$DATA_HOME" '{data_home: $dh, seeded: true}'
