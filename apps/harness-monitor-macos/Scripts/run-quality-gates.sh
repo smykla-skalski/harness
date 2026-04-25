@@ -94,7 +94,9 @@ ensure_entitlement_absent() {
   "$ROOT/Tests/HarnessMonitorKitTests" \
   "$ROOT/Tests/HarnessMonitorUITestSupport" \
   "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
-  "$ROOT/Tests/HarnessMonitorUITests"
+  "$ROOT/Tests/HarnessMonitorUITests" \
+  "$ROOT/Tools/HarnessMonitorE2E/Sources" \
+  "$ROOT/Tools/HarnessMonitorE2E/Tests"
 
 mkdir -p "$SWIFTLINT_CACHE_PATH"
 
@@ -110,6 +112,16 @@ mkdir -p "$SWIFTLINT_CACHE_PATH"
   "$ROOT/Tests/HarnessMonitorUITestSupport" \
   "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
   "$ROOT/Tests/HarnessMonitorUITests"
+
+"$SWIFTLINT_BIN" lint \
+  --config "$ROOT/Tools/HarnessMonitorE2E/.swiftlint.yml" \
+  --working-directory "$ROOT/Tools/HarnessMonitorE2E" \
+  --cache-path "$SWIFTLINT_CACHE_PATH" \
+  --strict \
+  --force-exclude \
+  --quiet \
+  "$ROOT/Tools/HarnessMonitorE2E/Sources" \
+  "$ROOT/Tools/HarnessMonitorE2E/Tests"
 
 "$XCODEBUILD_RUNNER" \
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
