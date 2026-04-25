@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::daemon::index::ResolvedSession;
 
 use super::{
@@ -400,7 +402,6 @@ pub(crate) async fn change_role_async(
 }
 
 /// Remove an agent through the canonical async daemon DB.
-///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or the removal fails.
 pub(crate) async fn remove_agent_async(
@@ -415,27 +416,18 @@ pub(crate) async fn remove_agent_async(
     let now = utc_now();
     let leave_signal = async_db
         .update_session_state_immediate(session_id, |state| {
-            let leave_signal = session_service::prepare_remove_agent_leave_signal(
+            let signal = session_service::prepare_remove_agent_leave_signal(
                 state,
                 agent_id,
                 &request.actor,
                 &now,
             )?;
             session_service::apply_remove_agent(state, agent_id, &request.actor, &now)?;
-            Ok(leave_signal)
+            Ok(signal)
         })
         .await?;
     sync_file_state_from_async_db(async_db, session_id).await?;
-    if let Some(ref signal) = leave_signal {
-        session_service::write_prepared_leave_signals(
-            &project_dir,
-            slice::from_ref(signal),
-            "remove agent",
-        )?;
-    }
-    let leave_signals = leave_signal
-        .as_ref()
-        .map_or_else(Vec::new, |signal| vec![signal.clone()]);
+    let leave_signals = write_and_collect_leave_signal(leave_signal, &project_dir)?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_leave_signal_mutation(
         async_db,
@@ -447,6 +439,21 @@ pub(crate) async fn remove_agent_async(
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+fn write_and_collect_leave_signal(
+    signal: Option<session_service::LeaveSignalRecord>,
+    project_dir: &Path,
+) -> Result<Vec<session_service::LeaveSignalRecord>, CliError> {
+    let Some(signal) = signal else {
+        return Ok(vec![]);
+    };
+    session_service::write_prepared_leave_signals(
+        project_dir,
+        slice::from_ref(&signal),
+        "remove agent",
+    )?;
+    Ok(vec![signal])
 }
 
 /// Transfer session leadership through the canonical async daemon DB.
