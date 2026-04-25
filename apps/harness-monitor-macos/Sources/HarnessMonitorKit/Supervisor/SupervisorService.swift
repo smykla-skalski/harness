@@ -46,7 +46,7 @@ public actor SupervisorService {
   public func start() async {
     guard !running else { return }
     running = true
-    HarnessMonitorLogger.supervisorInfo(
+    HarnessMonitorLogger.supervisorTrace(
       "supervisor.start interval=\(self.interval)"
     )
     tickTask = Task { [weak self] in
@@ -63,7 +63,7 @@ public actor SupervisorService {
     }
     _ = await tickTask?.value
     tickTask = nil
-    HarnessMonitorLogger.supervisorInfo("supervisor.stop")
+    HarnessMonitorLogger.supervisorTrace("supervisor.stop")
   }
 
   public func runOneTick() async { await tickBody() }

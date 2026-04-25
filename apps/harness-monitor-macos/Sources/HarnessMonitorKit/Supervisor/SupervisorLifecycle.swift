@@ -59,7 +59,7 @@ public final class SupervisorLifecycle: @unchecked Sendable {
     }
 
     guard runInBackground else {
-      HarnessMonitorLogger.supervisorInfo(
+      HarnessMonitorLogger.supervisorTrace(
         "supervisor.lifecycle.background_skipped reason=preference_disabled"
       )
       return
@@ -86,7 +86,7 @@ public final class SupervisorLifecycle: @unchecked Sendable {
     scheduler = activity
     isBackgroundActivityScheduled = true
     let intervalValue = self.interval
-    HarnessMonitorLogger.supervisorInfo(
+    HarnessMonitorLogger.supervisorTrace(
       "supervisor.lifecycle.background_started interval=\(intervalValue)"
     )
   }
@@ -100,7 +100,7 @@ public final class SupervisorLifecycle: @unchecked Sendable {
     activity.invalidate()
     scheduler = nil
     isBackgroundActivityScheduled = false
-    HarnessMonitorLogger.supervisorInfo("supervisor.lifecycle.background_stopped")
+    HarnessMonitorLogger.supervisorTrace("supervisor.lifecycle.background_stopped")
   }
 
   // MARK: - Test hook
