@@ -143,7 +143,19 @@ struct Extract: ParsableCommand {
 struct MeasurePreviewLatency: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "measure-preview-latency",
-        abstract: "Measure SwiftUI preview compile latency (not yet implemented)."
+        abstract: "Measure SwiftUI preview JIT-link latency from `log show` markers."
     )
-    func run() throws { throw ExitCode(2) }
+
+    @Argument(help: "Window passed to `log show --last`. Default: 15m")
+    var window: String = "15m"
+
+    func run() throws {
+        do {
+            let report = try PreviewLatencyMeasurer.measure(window: window)
+            print(PreviewLatencyMeasurer.render(report))
+        } catch let failure as PreviewLatencyMeasurer.Failure {
+            FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
 }
