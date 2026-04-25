@@ -278,11 +278,14 @@ private let externalDaemonRunEnv: [String: EnvironmentVariable] = [
 private let monitorScheme: Scheme = .scheme(
     name: "HarnessMonitor",
     shared: true,
-    buildAction: .buildAction(targets: [
-        .target("HarnessMonitor"),
-        .target("HarnessMonitorKit"),
-        .target("HarnessMonitorUIPreviewable")
-    ]),
+    buildAction: .buildAction(
+        targets: [
+            .target("HarnessMonitor"),
+            .target("HarnessMonitorKit"),
+            .target("HarnessMonitorUIPreviewable")
+        ],
+        preActions: [BuildPhases.daemonBuildPreAction()]
+    ),
     testAction: .targets(
         [
             .testableTarget(target: .target("HarnessMonitorKitTests")),
@@ -329,11 +332,14 @@ private let externalDaemonScheme: Scheme = .scheme(
 private let agentsE2EScheme: Scheme = .scheme(
     name: "HarnessMonitorAgentsE2E",
     shared: true,
-    buildAction: .buildAction(targets: [
-        .target("HarnessMonitor"),
-        .target("HarnessMonitorKit"),
-        .target("HarnessMonitorUIPreviewable")
-    ]),
+    buildAction: .buildAction(
+        targets: [
+            .target("HarnessMonitor"),
+            .target("HarnessMonitorKit"),
+            .target("HarnessMonitorUIPreviewable")
+        ],
+        preActions: [BuildPhases.daemonBuildPreAction()]
+    ),
     testAction: .targets(
         [.testableTarget(target: .target("HarnessMonitorAgentsE2ETests"))],
         configuration: "Debug",
