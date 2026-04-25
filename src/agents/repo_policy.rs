@@ -177,7 +177,7 @@ fn suggestions_for_segment(
         "clean-stale-state.sh" => exact_task(&env_prefix, "clean:stale"),
         "check-scripts.sh" => exact_task(&env_prefix, "check:scripts"),
         "cargo-local.sh" => passthrough_task(&env_prefix, "cargo:local", &words[args_start..]),
-        "generate-project.sh" => exact_task(&env_prefix, "monitor:macos:generate"),
+        "post-generate.sh" => exact_task(&env_prefix, "monitor:macos:generate"),
         "xcodebuild-with-lock.sh" => passthrough_task(
             &env_prefix,
             "monitor:macos:xcodebuild",

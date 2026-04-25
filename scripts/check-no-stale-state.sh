@@ -147,8 +147,7 @@ report_stale() {
 # as part of indexing whenever the project is open, so checking that path
 # here would fail on every CLI run that follows an IDE session. CLI builds
 # always pass `-derivedDataPath` explicitly, so the Xcode UI cache is not a
-# workflow hazard. `mise run clean:stale` still scrubs it on demand, and
-# `Scripts/generate-project.sh` still scrubs it on every project regen.
+# workflow hazard. `mise run clean:stale` still scrubs it on demand.
 
 collect_stale_lines
 if (( ${#stale_lines[@]} == 0 )); then

@@ -45,7 +45,7 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
         )
 
         write_executable(
-            scripts_root / "generate-project.sh",
+            scripts_root / "generate.sh",
             "#!/bin/bash\nset -euo pipefail\n",
         )
         write_executable(

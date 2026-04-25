@@ -12,7 +12,7 @@ DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
-GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate-project.sh}"
+GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
 FORMAT_CONFIG="$ROOT/.swift-format"
 SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
 SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(command -v swiftlint || true)}"
@@ -42,7 +42,7 @@ if [ ! -x "${XCODEBUILD_RUNNER}" ]; then
 fi
 
 if [ ! -x "${GENERATE_PROJECT_SCRIPT}" ]; then
-  echo "generate-project script is not executable: ${GENERATE_PROJECT_SCRIPT}" >&2
+  echo "generate script is not executable: ${GENERATE_PROJECT_SCRIPT}" >&2
   exit 1
 fi
 

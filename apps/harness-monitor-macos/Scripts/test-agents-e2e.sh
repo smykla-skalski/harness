@@ -482,7 +482,7 @@ PY
 seed_observability_config
 resolve_supported_codex_launch
 
-"$ROOT/Scripts/generate-project.sh"
+"$ROOT/Scripts/generate.sh"
 "$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
