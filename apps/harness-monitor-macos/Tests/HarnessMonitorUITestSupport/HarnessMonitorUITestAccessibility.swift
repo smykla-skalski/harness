@@ -331,6 +331,7 @@ enum HarnessMonitorUITestAccessibility {
 
   static let leaderAgentTuiMarker = "harness.session.agent.leader-claude.tui-marker"
   static let workerAgentTuiMarker = "harness.session.agent.worker-codex.tui-marker"
+  static let sessionAgentListState = "harness.session.agents.state"
 
   static func sessionAgentTuiMarker(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID)).tui-marker"
