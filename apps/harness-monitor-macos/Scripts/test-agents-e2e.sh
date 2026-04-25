@@ -157,24 +157,18 @@ configure_xctestrun() {
   local source_path="$1"
   local destination_path="$2"
 
-  local -a args=(
-    configure-xctestrun
-    --source "$source_path"
-    --destination "$destination_path"
-    --state-root "$STATE_ROOT"
-    --data-home "$DATA_HOME"
-    --daemon-log "$DAEMON_LOG"
-    --bridge-log "$BRIDGE_LOG"
-    --terminal-session-id "$TERMINAL_SESSION_ID"
-    --codex-session-id "$CODEX_SESSION_ID"
-  )
-  if [[ -n "$CODEX_MODEL_OVERRIDE" ]]; then
-    args+=(--codex-model "$CODEX_MODEL_OVERRIDE")
-  fi
-  if [[ -n "$CODEX_EFFORT_OVERRIDE" ]]; then
-    args+=(--codex-effort "$CODEX_EFFORT_OVERRIDE")
-  fi
-  "$E2E_TOOL_BINARY" "${args[@]}"
+  "$E2E_TOOL_BINARY" configure-xctestrun \
+    --source "$source_path" \
+    --destination "$destination_path" \
+    --set "HARNESS_MONITOR_ENABLE_AGENTS_E2E=1" \
+    --set "HARNESS_MONITOR_E2E_STATE_ROOT=$STATE_ROOT" \
+    --set "HARNESS_MONITOR_E2E_DATA_HOME=$DATA_HOME" \
+    --set "HARNESS_MONITOR_E2E_DAEMON_LOG=$DAEMON_LOG" \
+    --set "HARNESS_MONITOR_E2E_BRIDGE_LOG=$BRIDGE_LOG" \
+    --set "HARNESS_MONITOR_E2E_TERMINAL_SESSION_ID=$TERMINAL_SESSION_ID" \
+    --set "HARNESS_MONITOR_E2E_CODEX_SESSION_ID=$CODEX_SESSION_ID" \
+    --set "HARNESS_MONITOR_E2E_CODEX_MODEL=$CODEX_MODEL_OVERRIDE" \
+    --set "HARNESS_MONITOR_E2E_CODEX_EFFORT=$CODEX_EFFORT_OVERRIDE"
 }
 
 ensure_e2e_tool_binary

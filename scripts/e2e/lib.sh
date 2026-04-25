@@ -38,16 +38,11 @@ e2e_require_command() {
 }
 
 e2e_random_id() {
-  if command -v uuidgen >/dev/null 2>&1; then
-    uuidgen | tr '[:upper:]' '[:lower:]'
-    return
+  if ! command -v uuidgen >/dev/null 2>&1; then
+    printf 'error: uuidgen is required for e2e_random_id\n' >&2
+    return 1
   fi
-
-  python3 - <<'PY'
-import uuid
-
-print(uuid.uuid4())
-PY
+  uuidgen | tr '[:upper:]' '[:lower:]'
 }
 
 e2e_resolve_harness_binary() {
@@ -67,16 +62,11 @@ e2e_resolve_harness_binary() {
 e2e_project_context_root() {
   local project_dir="$1"
   local data_home="$2"
-  python3 - "$project_dir" "$data_home" <<'PY'
-import hashlib
-import os
-import sys
-
-project_dir, data_home = sys.argv[1:]
-canonical = os.path.realpath(project_dir)
-digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
-print(os.path.join(data_home, "harness", "projects", f"project-{digest}"))
-PY
+  local canonical
+  canonical="$(CDPATH='' cd -- "$project_dir" && pwd -P)"
+  local digest
+  digest="$(printf '%s' "$canonical" | shasum -a 256 | awk '{print substr($1,1,16)}')"
+  printf '%s/harness/projects/project-%s\n' "$data_home" "$digest"
 }
 
 e2e_write_kv_marker() {

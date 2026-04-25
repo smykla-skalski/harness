@@ -65,36 +65,37 @@ struct ResolveCodexLaunch: ParsableCommand {
 struct ConfigureXctestrun: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "configure-xctestrun",
-        abstract: "Inject Agents e2e env vars into a generated .xctestrun and write the configured copy."
+        abstract: "Inject env vars into a generated .xctestrun and write the configured copy. Pass --set KEY=VALUE per env var; blank values are skipped."
     )
 
     @Option(name: .long, help: "Source .xctestrun produced by build-for-testing.")
     var source: String
     @Option(name: .long, help: "Destination .configured.xctestrun path.")
     var destination: String
-    @Option(name: .long) var stateRoot: String
-    @Option(name: .long) var dataHome: String
-    @Option(name: .long) var daemonLog: String
-    @Option(name: .long) var bridgeLog: String
-    @Option(name: .long) var terminalSessionId: String
-    @Option(name: .long) var codexSessionId: String
-    @Option(name: .long) var codexModel: String?
-    @Option(name: .long) var codexEffort: String?
+    @Option(name: .long, help: "Target dictionary key inside the xctestrun.")
+    var target: String = XctestrunConfigurator.agentsTargetKey
+    @Option(name: .long, parsing: .singleValue,
+            help: "Repeatable KEY=VALUE pair injected into both env dictionaries; ignored when VALUE is empty.")
+    var set: [String] = []
 
     func run() throws {
-        let updates = XctestrunConfigurator.standardUpdates(
-            stateRoot: stateRoot,
-            dataHome: dataHome,
-            daemonLog: daemonLog,
-            bridgeLog: bridgeLog,
-            terminalSessionID: terminalSessionId,
-            codexSessionID: codexSessionId,
-            codexModel: codexModel,
-            codexEffort: codexEffort
-        )
+        var updates: [String: String] = [:]
+        for entry in set {
+            guard let separator = entry.firstIndex(of: "=") else {
+                throw ValidationError("--set expected KEY=VALUE; got '\(entry)'")
+            }
+            let key = String(entry[..<separator])
+            let value = String(entry[entry.index(after: separator)...])
+            guard !key.isEmpty else {
+                throw ValidationError("--set KEY must not be empty")
+            }
+            if value.isEmpty { continue }
+            updates[key] = value
+        }
         try XctestrunConfigurator.configure(
             source: URL(fileURLWithPath: source),
             destination: URL(fileURLWithPath: destination),
+            targetKey: target,
             updates: updates
         )
     }

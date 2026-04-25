@@ -22,8 +22,22 @@ while (($#)); do
 done
 
 e2e_require_command jq
-e2e_require_command python3
+e2e_require_command shasum
 e2e_require_command screencapture
+APP_E2E_TOOL_PACKAGE="$APP_ROOT/Tools/HarnessMonitorE2E"
+APP_E2E_TOOL_BINARY="${HARNESS_MONITOR_E2E_TOOL_BINARY:-$APP_E2E_TOOL_PACKAGE/.build/release/harness-monitor-e2e}"
+
+ensure_e2e_tool_binary() {
+  if [[ -x "$APP_E2E_TOOL_BINARY" ]]; then
+    return 0
+  fi
+  printf 'Building harness-monitor-e2e helper at %s\n' "$APP_E2E_TOOL_BINARY" >&2
+  swift build -c release --package-path "$APP_E2E_TOOL_PACKAGE" >&2
+  if [[ ! -x "$APP_E2E_TOOL_BINARY" ]]; then
+    printf 'harness-monitor-e2e binary missing after build at %s\n' "$APP_E2E_TOOL_BINARY" >&2
+    exit 1
+  fi
+}
 
 RUN_ID="${HARNESS_E2E_RUN_ID:-$(e2e_random_id)}"
 RUN_STARTED_AT="$(e2e_timestamp_utc)"
@@ -553,45 +567,16 @@ configure_xctestrun() {
   local source_path="$1"
   local destination_path="$2"
 
-  python3 - "$source_path" "$destination_path" \
-    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$SESSION_ID" "$SYNC_DIR" "$UI_SNAPSHOTS_SOURCE" <<'PY'
-import plistlib
-import shutil
-import sys
-
-(
-    source_path,
-    destination_path,
-    state_root,
-    data_home,
-    daemon_log,
-    session_id,
-    sync_dir,
-    ui_test_artifacts_dir,
-) = sys.argv[1:]
-
-shutil.copyfile(source_path, destination_path)
-with open(destination_path, "rb") as handle:
-    payload = plistlib.load(handle)
-
-target = payload["HarnessMonitorAgentsE2ETests"]
-updates = {
-    "HARNESS_MONITOR_ENABLE_SWARM_E2E": "1",
-    "HARNESS_MONITOR_SWARM_E2E_STATE_ROOT": state_root,
-    "HARNESS_MONITOR_SWARM_E2E_DATA_HOME": data_home,
-    "HARNESS_MONITOR_SWARM_E2E_DAEMON_LOG": daemon_log,
-    "HARNESS_MONITOR_SWARM_E2E_SESSION_ID": session_id,
-    "HARNESS_MONITOR_SWARM_E2E_SYNC_DIR": sync_dir,
-    "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR": ui_test_artifacts_dir,
-  }
-
-for key in ("EnvironmentVariables", "TestingEnvironmentVariables"):
-    environment = target.setdefault(key, {})
-    environment.update(updates)
-
-with open(destination_path, "wb") as handle:
-    plistlib.dump(payload, handle, sort_keys=False)
-PY
+  "$APP_E2E_TOOL_BINARY" configure-xctestrun \
+    --source "$source_path" \
+    --destination "$destination_path" \
+    --set "HARNESS_MONITOR_ENABLE_SWARM_E2E=1" \
+    --set "HARNESS_MONITOR_SWARM_E2E_STATE_ROOT=$STATE_ROOT" \
+    --set "HARNESS_MONITOR_SWARM_E2E_DATA_HOME=$DATA_HOME" \
+    --set "HARNESS_MONITOR_SWARM_E2E_DAEMON_LOG=$DAEMON_LOG" \
+    --set "HARNESS_MONITOR_SWARM_E2E_SESSION_ID=$SESSION_ID" \
+    --set "HARNESS_MONITOR_SWARM_E2E_SYNC_DIR=$SYNC_DIR" \
+    --set "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR=$UI_SNAPSHOTS_SOURCE"
 }
 
 verify_final_state() {
@@ -608,6 +593,8 @@ verify_final_state() {
   open_gaps="$("$SCRIPT_DIR/gaps-open-count.sh")"
   [[ "$open_gaps" == "0" ]]
 }
+
+ensure_e2e_tool_binary
 
 "$SCRIPT_DIR/seed-session-state.sh" --data-home "$DATA_HOME" >/dev/null
 
