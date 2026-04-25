@@ -364,7 +364,7 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:ma
 ```
 
 The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:macos:generate` to materialize them before opening the project in Xcode.
-Its strict style gate runs `swift format` directly and uses `SwiftLintBuildToolPlugin` during `xcodebuild`, so local builds and CI share the same sandbox-safe lint path.
+Its strict style gate runs `swift format` directly, runs `swiftlint lint` outside the Xcode build graph with a shared cache, and validates the generated workspace through the shared wrapper so local builds and CI stay on the same Tuist path.
 
 When you need to bump the release version, update the canonical package version with `mise run version:set -- <version>` or `./scripts/version.sh set <version>`. That syncs the derived surfaces in `testkit/`, the marker-anchored version literals in `apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
 

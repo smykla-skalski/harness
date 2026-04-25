@@ -7,18 +7,20 @@ This file provides guidance to Claude Code when working in the Harness Monitor m
 Optional features (Lottie dancing-llama, future OTel/observability slices, etc.) are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at project-generation time. The Tuist `FeatureFlags` helper (`Tuist/ProjectDescriptionHelpers/FeatureFlags.swift`) reads them and adds the matching Swift compilation conditions. The all-features-OFF graph is the canonical baseline.
 
 The Xcode project is generated from `Project.swift` (and `Tuist/Package.swift`) via Tuist 4. Sources are declared as globs in `Project.swift`, so adding a Swift file in an existing source root needs no manifest edit, but new targets, dependencies, build phases, schemes, or compilation conditions land in the manifests. Regenerate with `mise run monitor:macos:generate` (`Scripts/generate.sh` under the hood: `tuist install` when needed, `tuist generate`, then `Scripts/post-generate.sh` for `buildServer.json` and version sync). The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked.
+The manifest tags targets for focused generation, so partial graphs can use selectors such as `tuist generate tag:feature:monitor`, `tuist generate tag:feature:previews`, or `tuist generate tag:feature:ui-testing`.
 
 Validation expectations (run from repo root):
 
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
-- `mise run monitor:macos:xcodebuild -- -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
+- `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
 - All xcodebuild invocations must use one of two approved `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
   The `mise run monitor:macos:xcodebuild` wrapper resolves those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout.
+  The wrapper does not re-run Tuist after every successful `xcodebuild` by default; set `HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD=1` only for lanes that explicitly need regenerated shared scheme metadata afterward.
 - For local macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'`. Xcode sees both `My Mac` and `Any Mac`, prints `Using the first of multiple matching destinations`, and silently picks one. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64` destinations. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless you intentionally need a stricter `id=...` selector.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
