@@ -39,9 +39,6 @@ settings:
       SWIFT_ENABLE_EAGER_LINKING: NO
       SWIFT_EMIT_LOC_STRINGS: NO
 packages:
-  Textual:
-    url: https://github.com/gonzalezreal/textual
-    exactVersion: 0.3.1
   HarnessMonitorRegistry:
     path: ../../mcp-servers/harness-monitor-registry
 targets:
@@ -87,7 +84,6 @@ targets:
           - "Features/**"
     dependencies:
       - target: HarnessMonitorKit
-      - package: Textual
       - sdk: SwiftData.framework
     settings:
       base:

@@ -1,0 +1,13 @@
+packages:
+  Textual:
+    url: https://github.com/gonzalezreal/textual
+    exactVersion: 0.3.1
+targets:
+  HarnessMonitorUIPreviewable:
+    sources:
+      - ../Sources/HarnessMonitorUIPreviewable/Features/Textual
+    dependencies:
+      - package: Textual
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_TEXTUAL
