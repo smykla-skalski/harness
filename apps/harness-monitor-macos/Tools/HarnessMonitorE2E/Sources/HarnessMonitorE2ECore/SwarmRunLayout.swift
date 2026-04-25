@@ -77,7 +77,7 @@ public struct SwarmRunLayout {
         self.derivedDataPath = commonRepoRoot.appendingPathComponent("xcode-derived", isDirectory: true)
 
         self.triageRoot = triageRootOverride
-            ?? repoRoot.appendingPathComponent("tmp/e2e-triage", isDirectory: true)
+            ?? repoRoot.appendingPathComponent("_artifacts", isDirectory: true)
         let slug = (timestampSlug ?? Self.timestampSlugUTC()) + "-swarm-full-flow-\(runID)"
         self.triageRunSlug = slug
         self.artifactsDir = triageRoot.appendingPathComponent("runs/\(slug)", isDirectory: true)

@@ -16,7 +16,7 @@ usage() {
   cat <<'EOF' >&2
 usage: run-all.sh <run-dir>
   <run-dir>   triage run dir produced by triage-run.sh
-              (e.g. tmp/e2e-triage/runs/<slug>)
+              (e.g. _artifacts/runs/<slug>)
 EOF
   exit 64
 }

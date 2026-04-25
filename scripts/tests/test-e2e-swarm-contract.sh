@@ -84,6 +84,7 @@ require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/Harness
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "actReady"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "actAck"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "sess-e2e-swarm-"
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmRunLayout.swift" "_artifacts"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "session task arbitrate"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" "observe doctor --json"
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'Scripts/generate.sh'
@@ -102,7 +103,7 @@ require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/Harness
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_TEST_RETRY_ITERATIONS'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'controlDirectoryURL'
-require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'desktopIndependentWindow'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'SCContentFilter(display: captureDisplay'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'ignoreShadowsSingleWindow = true'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-window id='
 # Single-quoted literals carry the contract text verbatim; SC2016 is not applicable.
@@ -121,12 +122,14 @@ require_no_text "scripts/e2e/inject-heuristic-log.sh" 'raw.jsonl'
 require_no_text "scripts/e2e/seed-session-state.sh" 'jq -nc'
 require_no_text "scripts/e2e/probe-runtimes.sh" 'claude auth status'
 require_no_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-display'
+require_no_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'desktopIndependentWindow'
 require_no_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "prepareRecordingStartIfConfigured"
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
 require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
 require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
 require_text "scripts/e2e/triage-run.sh" 'xcresulttool export attachments'
 require_text "scripts/e2e/triage-run.sh" 'missing or empty screen recording'
+require_text "scripts/e2e/clean-recordings.sh" '/_artifacts/runs'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "captureCheckpoint"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmRunner.swift" "final class SwarmRunner"

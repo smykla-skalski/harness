@@ -17,7 +17,7 @@ Drive `swarm-full-flow` to zero open findings. Each iteration runs one lane, rev
 
 Use Bash for repo commands, Read for artifacts and references, Agent only when handing the loop to the dedicated subagent, and Edit or Write only for the current ledger row and the smallest fix that closes it.
 
-The iteration ledger lives at [artifacts/ledger.md](../../../artifacts/ledger.md). Run output lives under [artifacts/runs/](../../../artifacts/runs/).
+The iteration ledger lives at [_artifacts/ledger.md](../../../_artifacts/ledger.md). Run output lives under [_artifacts/runs/](../../../_artifacts/runs/).
 
 ## Suite-Speed Lens
 
@@ -50,9 +50,9 @@ The iteration ledger lives at [artifacts/ledger.md](../../../artifacts/ledger.md
 
 ## Iteration Summary
 
-1. Read or initialize [artifacts/ledger.md](../../../artifacts/ledger.md).
+1. Read or initialize [_artifacts/ledger.md](../../../_artifacts/ledger.md).
 2. Run `rtk mise run e2e:swarm:full`; capture exit status and run slug.
-3. Run recording triage: `rtk mise run e2e:swarm:triage:recording -- artifacts/runs/<slug>`.
+3. Run recording triage: `rtk mise run e2e:swarm:triage:recording -- _artifacts/runs/<slug>`.
 4. Walk the recording chronologically against [references/recording-analysis.md](references/recording-analysis.md).
 5. Run the checklist proof loop from [references/recording-checklist.md](references/recording-checklist.md). Write one terse line per item with the proof artifact, the verdict, and whether it found a problem.
 6. Triage `xcresult`, logs, screenshots, hierarchy dumps, and persisted state only after the recording pass and checklist pass.
