@@ -99,7 +99,7 @@ e2e_timestamp_utc() {
 }
 
 e2e_timestamp_slug_utc() {
-  TZ=UTC date '+%Y-%m-%dT%H-%M-%SZ'
+  TZ=UTC date '+%y%m%d%H%M%S'
 }
 
 e2e_run_with_log() {
