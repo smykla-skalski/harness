@@ -209,17 +209,17 @@ use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
 mod direct;
+mod improver_apply;
 mod leave;
 mod mutations;
 mod mutations_async;
-mod improver_apply;
-mod review_mutations;
-mod review_submit_txn;
 mod observe_async;
 mod observe_loop;
 mod observe_persistence;
 mod observe_stream;
 mod read_reconciliation;
+mod review_mutations;
+mod review_submit_txn;
 mod serve;
 mod session_setup;
 mod session_teardown;
@@ -241,6 +241,8 @@ pub(crate) use direct::{
     register_agent_runtime_session_direct_async, start_session_direct_async,
     update_session_title_direct_async,
 };
+pub use improver_apply::improver_apply;
+pub(crate) use improver_apply::improver_apply_async;
 pub use leave::leave_session;
 pub(crate) use leave::leave_session_async;
 pub use mutations::{
@@ -252,20 +254,18 @@ pub(crate) use mutations_async::{
     drop_task_async, end_session_async, remove_agent_async, transfer_leader_async,
     update_task_async, update_task_queue_policy_async,
 };
-pub use improver_apply::improver_apply;
-pub(crate) use improver_apply::improver_apply_async;
+pub use observe_stream::{
+    broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,
+    broadcast_session_updated_core, broadcast_sessions_updated, global_stream_initial_events,
+    observe_session, ready_event, session_extensions_event, session_stream_initial_events,
+    session_updated_core_event, session_updated_event, sessions_updated_event,
+};
 pub use review_mutations::{
     arbitrate as arbitrate_review, claim_review, respond_review, submit_for_review, submit_review,
 };
 pub(crate) use review_mutations::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
-};
-pub use observe_stream::{
-    broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,
-    broadcast_session_updated_core, broadcast_sessions_updated, global_stream_initial_events,
-    observe_session, ready_event, session_extensions_event, session_stream_initial_events,
-    session_updated_core_event, session_updated_event, sessions_updated_event,
 };
 pub use serve::serve;
 pub use sessions::{

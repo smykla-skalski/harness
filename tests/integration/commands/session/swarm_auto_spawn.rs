@@ -18,9 +18,14 @@ fn submit_for_review_with_no_reviewer_emits_spawn_reviewer_signal() {
 
         let signals = service::list_signals("auto-1", None, &project).expect("list signals");
         assert!(
-            signals.iter().any(|rec| rec.signal.command == "spawn_reviewer"),
+            signals
+                .iter()
+                .any(|rec| rec.signal.command == "spawn_reviewer"),
             "expected spawn_reviewer signal, got {:?}",
-            signals.iter().map(|r| r.signal.command.clone()).collect::<Vec<_>>()
+            signals
+                .iter()
+                .map(|r| r.signal.command.clone())
+                .collect::<Vec<_>>()
         );
         let leader = signals
             .iter()
@@ -49,9 +54,14 @@ fn submit_for_review_with_reviewer_does_not_emit_spawn_reviewer() {
 
         let signals = service::list_signals("auto-2", None, &project).expect("list signals");
         assert!(
-            !signals.iter().any(|rec| rec.signal.command == "spawn_reviewer"),
+            !signals
+                .iter()
+                .any(|rec| rec.signal.command == "spawn_reviewer"),
             "spawn_reviewer must NOT fire when a reviewer is already present; got {:?}",
-            signals.iter().map(|r| r.signal.command.clone()).collect::<Vec<_>>()
+            signals
+                .iter()
+                .map(|r| r.signal.command.clone())
+                .collect::<Vec<_>>()
         );
     });
 }

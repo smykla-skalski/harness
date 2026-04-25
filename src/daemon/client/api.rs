@@ -277,7 +277,10 @@ impl DaemonClient {
         session_id: &str,
         request: &ImproverApplyRequest,
     ) -> Result<ImproverApplyOutcome, CliError> {
-        self.post(&format!("/v1/sessions/{session_id}/improver/apply"), request)
+        self.post(
+            &format!("/v1/sessions/{session_id}/improver/apply"),
+            request,
+        )
     }
 
     pub fn send_signal(

@@ -219,11 +219,7 @@ impl DaemonDb {
                 &prepared.resolved.state.session_id,
                 task_id,
             )?;
-            self.rebuild_task_reviews(
-                &prepared.resolved.state.session_id,
-                task_id,
-                &reviews,
-            )?;
+            self.rebuild_task_reviews(&prepared.resolved.state.session_id, task_id, &reviews)?;
         }
 
         self.sync_signal_index(&prepared.resolved.state.session_id, &prepared.signals)?;

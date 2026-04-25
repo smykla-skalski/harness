@@ -65,8 +65,9 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
     with_temp_project(|project| {
         let state = start_active_session(project, "hook-runtime-sess", "signal runtime test");
         let leader_id = state.leader_id.expect("leader id");
-        let joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("runtime-worker-session"))], || {
+        let joined = temp_env::with_vars(
+            [("CODEX_SESSION_ID", Some("runtime-worker-session"))],
+            || {
                 session_service::join_session(
                     "hook-runtime-sess",
                     SessionRole::Worker,
@@ -77,7 +78,8 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
                     None,
                 )
                 .expect("join worker")
-            });
+            },
+        );
         let worker_id = joined
             .agents
             .keys()
@@ -116,16 +118,17 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
                 "tool_input":{"file_path":"Cargo.toml"}
             }"#;
 
-            let execution = observation::prepare_hook_execution(
-                &metadata,
-                NormalizedEvent::BeforeToolUse,
-                raw,
-            )
-            .expect("hook execution");
+            let execution =
+                observation::prepare_hook_execution(&metadata, NormalizedEvent::BeforeToolUse, raw)
+                    .expect("hook execution");
 
             assert_eq!(
                 execution.normalized_for_record.session.cwd,
-                Some(project.canonicalize().unwrap_or_else(|_| project.to_path_buf()))
+                Some(
+                    project
+                        .canonicalize()
+                        .unwrap_or_else(|_| project.to_path_buf())
+                )
             );
             assert!(
                 execution

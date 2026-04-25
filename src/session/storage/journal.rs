@@ -98,10 +98,7 @@ pub(crate) fn append_review(
 ///
 /// # Errors
 /// Returns `CliError` on parse or I/O failure.
-pub(crate) fn load_reviews(
-    layout: &SessionLayout,
-    task_id: &str,
-) -> Result<Vec<Review>, CliError> {
+pub(crate) fn load_reviews(layout: &SessionLayout, task_id: &str) -> Result<Vec<Review>, CliError> {
     files::read_json_lines(&files::reviews_path(layout, task_id), "task reviews")
 }
 
