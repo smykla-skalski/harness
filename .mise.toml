@@ -91,10 +91,7 @@ run = "./scripts/cargo-local.sh --print-env"
 
 [tasks."monitor:macos:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
-run = [
-  "tuist generate --no-open --path apps/harness-monitor-macos",
-  "apps/harness-monitor-macos/Scripts/post-generate.sh",
-]
+run = "apps/harness-monitor-macos/Scripts/generate.sh"
 
 [tasks."monitor:macos:xcodebuild"]
 description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"

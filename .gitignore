@@ -6,9 +6,6 @@
 /xcode-derived/
 /xcode-derived-instruments/
 
-# Transient xcodegen merged spec (composed from project.yml + enabled feature fragments)
-/apps/harness-monitor-macos/.project.merged.yml
-
 # Local scratch
 /tmp/
 /output/
@@ -47,6 +44,9 @@ apps/harness-monitor-macos/DerivedData/
 apps/harness-monitor-macos/DerivedData*
 apps/harness-monitor-macos/xcode-derived/
 apps/harness-monitor-macos/xcode-derived*
-apps/harness-monitor-macos/*.xcodeproj/xcuserdata/
-apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
-apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+# Tuist generates these on demand from Project.swift / Tuist.swift; never tracked.
+apps/harness-monitor-macos/HarnessMonitor.xcodeproj/
+apps/harness-monitor-macos/HarnessMonitor.xcworkspace/
+apps/harness-monitor-macos/Derived/
+apps/harness-monitor-macos/Tuist/.build/
+mcp-servers/harness-monitor-registry/Derived/
