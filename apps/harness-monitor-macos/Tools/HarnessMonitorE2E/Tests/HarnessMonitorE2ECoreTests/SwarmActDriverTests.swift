@@ -44,7 +44,7 @@ final class SwarmActDriverTests: XCTestCase {
         let actReadyURL = syncDir.appendingPathComponent("act1.ready")
         let actAckURL = syncDir.appendingPathComponent("act1.ack")
         let runnerFinished = expectation(description: "act driver returned")
-        var runnerError: Error?
+        let runnerFailed = expectation(description: "act driver failed")
 
         DispatchQueue.global().async {
             defer { runnerFinished.fulfill() }
@@ -52,7 +52,7 @@ final class SwarmActDriverTests: XCTestCase {
                 try SwarmFullFlowOrchestrator.runActDriver(inputs)
                 XCTFail("expected fake harness to stop the run after act1")
             } catch {
-                runnerError = error
+                runnerFailed.fulfill()
             }
         }
 
@@ -66,8 +66,7 @@ final class SwarmActDriverTests: XCTestCase {
         XCTAssertTrue(marker.contains("session_id=sess-test"), "marker=\(marker)")
 
         try "ack\n".write(to: actAckURL, atomically: true, encoding: .utf8)
-        wait(for: [runnerFinished], timeout: 10)
-        XCTAssertNotNil(runnerError)
+        wait(for: [runnerFailed, runnerFinished], timeout: 10)
     }
 
     private func waitForFile(at url: URL, timeout: TimeInterval) -> Bool {
