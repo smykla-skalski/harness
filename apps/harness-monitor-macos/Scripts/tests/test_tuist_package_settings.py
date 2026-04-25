@@ -29,6 +29,14 @@ RECOMMENDED_FRAMEWORK_SETTINGS = (
     '"MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"',
 )
 
+PREVIEW_OVERRIDE_SETTINGS = (
+    '"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',
+)
+
+PROJECT_MANIFEST_SETTINGS = (
+    '"REGISTER_APP_GROUPS": "YES"',
+)
+
 
 class TuistPackageSettingsTests(unittest.TestCase):
     def test_main_project_uses_xcode_recommended_settings(self) -> None:
@@ -42,6 +50,10 @@ class TuistPackageSettingsTests(unittest.TestCase):
             with self.subTest(setting=setting):
                 self.assertIn(setting, helper)
 
+        for setting in PREVIEW_OVERRIDE_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, helper)
+
     def test_project_manifest_uses_recommended_framework_settings(self) -> None:
         manifest = PROJECT_MANIFEST.read_text()
 
@@ -50,6 +62,13 @@ class TuistPackageSettingsTests(unittest.TestCase):
                 self.assertIn(setting, manifest)
 
         self.assertNotIn('"ENABLE_MODULE_VERIFIER": "NO"', manifest)
+        for setting in PREVIEW_OVERRIDE_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, manifest)
+        for setting in PROJECT_MANIFEST_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, manifest)
+        self.assertNotIn('"DEVELOPMENT_TEAM": "Q498EB36N4"', manifest)
 
     def test_package_generated_projects_use_xcode_recommended_settings(self) -> None:
         manifest = PACKAGE_MANIFEST.read_text()
@@ -59,6 +78,10 @@ class TuistPackageSettingsTests(unittest.TestCase):
                 self.assertIn(setting, manifest)
 
         for setting in RECOMMENDED_FRAMEWORK_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, manifest)
+
+        for setting in PREVIEW_OVERRIDE_SETTINGS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
 

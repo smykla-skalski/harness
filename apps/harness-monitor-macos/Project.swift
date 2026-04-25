@@ -69,7 +69,6 @@ private let uiPreviewableTarget: Target = {
             base: [
                 "CODE_SIGN_STYLE": "Automatic",
                 "CODE_SIGNING_ALLOWED": "YES",
-                "DEVELOPMENT_TEAM": "Q498EB36N4",
                 "ENABLE_MODULE_VERIFIER": "YES",
                 "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
                 "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",
@@ -81,7 +80,8 @@ private let uiPreviewableTarget: Target = {
                 .debug(name: "Preview", settings: [
                     "COMPILER_INDEX_STORE_ENABLE": "NO",
                     "ONLY_ACTIVE_ARCH": "YES",
-                    "SWIFT_ENABLE_EAGER_LINKING": "NO"
+                    "SWIFT_ENABLE_EAGER_LINKING": "NO",
+                    "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
                 ]),
                 .release(name: "Release")
             ]
@@ -107,7 +107,6 @@ private let previewHostTarget: Target = .target(
             "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
             "CODE_SIGN_STYLE": "Automatic",
             "CODE_SIGNING_ALLOWED": "YES",
-            "DEVELOPMENT_TEAM": "Q498EB36N4",
             "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.previews",
             "PRODUCT_NAME": "HarnessMonitorPreviewHost",
             "INFOPLIST_KEY_NSPrincipalClass": "NSApplication",
@@ -119,7 +118,8 @@ private let previewHostTarget: Target = .target(
             .debug(name: "Preview", settings: [
                 "COMPILER_INDEX_STORE_ENABLE": "NO",
                 "ONLY_ACTIVE_ARCH": "YES",
-                "SWIFT_ENABLE_EAGER_LINKING": "NO"
+                "SWIFT_ENABLE_EAGER_LINKING": "NO",
+                "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
             ]),
             .release(name: "Release")
         ]
@@ -141,7 +141,6 @@ private let monitorAppSettings: Settings = .settings(
         "CODE_SIGN_ENTITLEMENTS": "HarnessMonitor.entitlements",
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_STYLE": "Automatic",
-        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
@@ -150,6 +149,7 @@ private let monitorAppSettings: Settings = .settings(
         "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_NAME": "Harness Monitor",
+        "REGISTER_APP_GROUPS": "YES",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
 )
@@ -182,7 +182,6 @@ private let uiTestHostSettings: Settings = .settings(
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_INJECT_BASE_ENTITLEMENTS": "NO",
         "CODE_SIGN_STYLE": "Automatic",
-        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
@@ -234,7 +233,6 @@ private let kitTestsTarget: Target = .target(
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
-        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.kit-tests",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]),
@@ -259,7 +257,6 @@ private let uiTestsTarget: Target = .target(
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGNING_ALLOWED": "YES",
         "CODE_SIGN_STYLE": "Automatic",
-        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.ui-tests",
         "TEST_TARGET_NAME": "HarnessMonitorUITestHost"
     ]),
@@ -284,7 +281,6 @@ private let agentsE2ETarget: Target = .target(
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGNING_ALLOWED": "YES",
         "CODE_SIGN_STYLE": "Automatic",
-        "DEVELOPMENT_TEAM": "Q498EB36N4",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.agents-e2e-tests",
         "TEST_TARGET_NAME": "HarnessMonitorUITestHost"
     ]),

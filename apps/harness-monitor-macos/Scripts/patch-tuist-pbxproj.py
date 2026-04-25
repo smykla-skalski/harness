@@ -8,9 +8,8 @@ Normalizes:
 - `preferredProjectObjectVersion = <value>;` on the PBXProject block.
 - `LastUpgradeCheck = <value>;` and `LastSwiftUpdateCheck = <value>;`
   on the PBXProject `attributes` block.
-- `ProvisioningStyle = Automatic;` and `DevelopmentTeam = <id>;` for every
-  PBXNativeTarget that owns signing-relevant settings (apps, app extensions,
-  unit / UI test bundles).
+- target-level `DevelopmentTeam` / `ProvisioningStyle` metadata from
+  `TargetAttributes`, so targets inherit signing cleanly from project settings.
 
 Tuist 4 does not expose the project-format fields via its DSL, and its
 generator still hardcodes an Xcode 14-era object version. The text is edited
@@ -25,22 +24,6 @@ import re
 import sys
 from pathlib import Path
 
-SIGNING_PRODUCT_TYPES = frozenset(
-    {
-        '"com.apple.product-type.application"',
-        '"com.apple.product-type.app-extension"',
-        '"com.apple.product-type.bundle.unit-test"',
-        '"com.apple.product-type.bundle.ui-testing"',
-    }
-)
-
-NATIVE_TARGET_RE = re.compile(
-    r"\t\t([0-9A-F]{24}) /\* [^*]*?\*/ = \{\n"
-    r"\t\t\tisa = PBXNativeTarget;\n"
-    r"((?:\t\t\t[^\n]*\n)*)"
-    r"\t\t\};"
-)
-PRODUCT_TYPE_RE = re.compile(r'^\t\t\tproductType = ("[^"]+");$', re.MULTILINE)
 PROJECT_OBJECT_VERSION_RE = re.compile(r"^(\tobjectVersion = )\d+;$", re.MULTILINE)
 
 PBXPROJECT_BLOCK_RE = re.compile(
@@ -57,19 +40,6 @@ ATTRIBUTES_BLOCK_RE = re.compile(
 TARGET_ATTRIBUTES_RE = re.compile(
     r"(\t\t\t\tTargetAttributes = \{\n)((?:\t{4,}[^\n]*\n)*?)(\t\t\t\t\};)"
 )
-
-TARGET_ENTRY_RE = re.compile(
-    r"\t{5}([0-9A-F]{24}) = \{\n((?:\t{6}[^\n]*\n)*?)\t{5}\};"
-)
-
-
-def find_signing_target_ids(text: str) -> list[str]:
-    target_ids: list[str] = []
-    for target_id, body in NATIVE_TARGET_RE.findall(text):
-        product_type_match = PRODUCT_TYPE_RE.search(body)
-        if product_type_match and product_type_match.group(1) in SIGNING_PRODUCT_TYPES:
-            target_ids.append(target_id)
-    return target_ids
 
 
 def upsert_project_attribute(text: str, key: str, value: str) -> str:
@@ -131,62 +101,20 @@ def normalize_project_format(
     return PBXPROJECT_BLOCK_RE.sub(replace, text, count=1)
 
 
-def upsert_target_entry(body: str, target_id: str, team: str) -> str:
-    pattern = re.compile(
-        rf"(\t{{5}}{target_id} = \{{\n)((?:\t{{6}}[^\n]*\n)*?)(\t{{5}}\}};)"
-    )
-
-    def add_lines(entry_body: str) -> str:
-        if "ProvisioningStyle" not in entry_body:
-            entry_body += "\t\t\t\t\tProvisioningStyle = Automatic;\n"
-        if "DevelopmentTeam" not in entry_body:
-            entry_body += f"\t\t\t\t\tDevelopmentTeam = {team};\n"
-        return entry_body
-
-    if pattern.search(body):
-        return pattern.sub(lambda match: match.group(1) + add_lines(match.group(2)) + match.group(3), body)
-
-    new_entry = (
-        f"\t\t\t\t\t{target_id} = {{\n"
-        f"\t\t\t\t\t\tDevelopmentTeam = {team};\n"
-        f"\t\t\t\t\t\tProvisioningStyle = Automatic;\n"
-        f"\t\t\t\t\t}};\n"
-    )
-    return body + new_entry
-
-
-def upsert_target_attributes(text: str, target_ids: list[str], team: str) -> str:
-    if TARGET_ATTRIBUTES_RE.search(text):
-        def replace(match: re.Match[str]) -> str:
-            head, body, tail = match.group(1), match.group(2), match.group(3)
-            for target_id in target_ids:
-                body = upsert_target_entry(body, target_id, team)
-            return head + body + tail
-
-        return TARGET_ATTRIBUTES_RE.sub(replace, text, count=1)
-
-    entries = []
-    for target_id in target_ids:
-        entries.append(
-            f"\t\t\t\t\t{target_id} = {{\n"
-            f"\t\t\t\t\t\tDevelopmentTeam = {team};\n"
-            f"\t\t\t\t\t\tProvisioningStyle = Automatic;\n"
-            f"\t\t\t\t\t}};\n"
-        )
-    block = "\t\t\t\tTargetAttributes = {\n" + "".join(entries) + "\t\t\t\t};\n"
-
-    def insert(match: re.Match[str]) -> str:
+def strip_target_attribute_signing_metadata(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
         head, body, tail = match.group(1), match.group(2), match.group(3)
-        return head + body + block + tail
+        body = re.sub(r"^\t{6}DevelopmentTeam = [^;]+;\n", "", body, flags=re.MULTILINE)
+        body = re.sub(r"^\t{6}ProvisioningStyle = [^;]+;\n", "", body, flags=re.MULTILINE)
+        return head + body + tail
 
-    return ATTRIBUTES_BLOCK_RE.sub(insert, text, count=1)
+    return TARGET_ATTRIBUTES_RE.sub(replace, text, count=1)
 
 
 def patch_pbxproj(
     pbxproj_path: Path,
     last_upgrade: str,
     last_swift_update: str,
-    development_team: str | None,
     object_version: str,
     preferred_project_object_version: str,
 ) -> None:
@@ -198,10 +126,7 @@ def patch_pbxproj(
     )
     text = upsert_project_attribute(text, "LastSwiftUpdateCheck", last_swift_update)
     text = upsert_project_attribute(text, "LastUpgradeCheck", last_upgrade)
-    if development_team is not None:
-        target_ids = find_signing_target_ids(text)
-        if target_ids:
-            text = upsert_target_attributes(text, target_ids, development_team)
+    text = strip_target_attribute_signing_metadata(text)
     pbxproj_path.write_text(text)
 
 
@@ -211,14 +136,12 @@ def main() -> int:
     last_swift_update = os.environ["HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK"]
     object_version = os.environ["HARNESS_MONITOR_PROJECT_OBJECT_VERSION"]
     preferred_project_object_version = os.environ["HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION"]
-    development_team = os.environ["HARNESS_MONITOR_DEVELOPMENT_TEAM"]
     repo_root = Path(os.environ["HARNESS_MONITOR_REPO_ROOT"])
 
     patch_pbxproj(
         main_pbxproj,
         last_upgrade,
         last_swift_update,
-        development_team,
         object_version,
         preferred_project_object_version,
     )
@@ -253,7 +176,6 @@ def main() -> int:
                 candidate,
                 last_upgrade,
                 last_swift_update,
-                development_team,
                 object_version,
                 preferred_project_object_version,
             )
