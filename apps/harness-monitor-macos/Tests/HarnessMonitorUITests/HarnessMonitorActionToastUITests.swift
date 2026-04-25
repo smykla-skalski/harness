@@ -234,14 +234,9 @@ extension HarnessMonitorActionToastUITests {
   }
 
   fileprivate func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
-    if element.isHittable {
-      element.tap()
-      return
-    }
-    guard let coordinate = centerCoordinate(in: app, for: element) else {
+    guard tapElementReliably(in: app, element: element) else {
       XCTFail("Cannot resolve coordinate for \(element)")
       return
     }
-    coordinate.tap()
   }
 }
