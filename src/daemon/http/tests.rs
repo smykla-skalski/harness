@@ -50,6 +50,7 @@ mod async_observe;
 mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
+mod task_review;
 mod telemetry;
 
 async fn response_body(result: Result<Value, crate::errors::CliError>) -> (StatusCode, Value) {
