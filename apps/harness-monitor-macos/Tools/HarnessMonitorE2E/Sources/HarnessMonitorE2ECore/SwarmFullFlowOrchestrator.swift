@@ -378,6 +378,17 @@ private final class SwarmFullFlowRunner {
 
   private func startScreenRecording() throws {
     FileManager.default.createFile(atPath: layout.screenRecordingLog.path, contents: nil)
+    let stderrLogPath = layout.screenRecordingLog.path + ".stderr"
+    FileManager.default.createFile(atPath: stderrLogPath, contents: nil)
+    guard
+      let stderrHandle = try? FileHandle(
+        forWritingTo: URL(fileURLWithPath: stderrLogPath))
+    else {
+      throw CommandFailure(
+        status: 1,
+        message: "start-recording failed to open stderr capture file"
+      )
+    }
     let process = Process()
     process.executableURL = helperBinary
     process.arguments = [
@@ -388,8 +399,8 @@ private final class SwarmFullFlowRunner {
       "--control-dir", layout.screenRecordingControlDirectory.path,
       "--max-seconds", String(Int(SwarmStepTimeouts.maxRecordingDuration)),
     ]
-    process.standardOutput = Pipe()
-    process.standardError = Pipe()
+    process.standardOutput = stderrHandle
+    process.standardError = stderrHandle
     try process.run()
     Thread.sleep(forTimeInterval: 0.2)
     guard process.isRunning else {
