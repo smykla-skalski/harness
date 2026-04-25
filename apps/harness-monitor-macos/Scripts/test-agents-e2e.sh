@@ -17,6 +17,8 @@ source "$ROOT/Scripts/lib/rtk-shell.sh"
 CODEX_BINARY="${HARNESS_MONITOR_E2E_CODEX_BINARY:-$(command -v codex || true)}"
 CODEX_MODEL_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_MODEL:-}"
 CODEX_EFFORT_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_EFFORT:-}"
+E2E_TOOL_PACKAGE="$ROOT/Tools/HarnessMonitorE2E"
+E2E_TOOL_BINARY="${HARNESS_MONITOR_E2E_TOOL_BINARY:-$E2E_TOOL_PACKAGE/.build/release/harness-monitor-e2e}"
 ONLY_TESTING="${XCODE_ONLY_TESTING:-HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests}"
 RUN_ID="${HARNESS_MONITOR_E2E_RUN_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 STATE_ROOT_PARENT="${HARNESS_MONITOR_E2E_STATE_ROOT_PARENT:-${TMPDIR:-/tmp}/HarnessMonitorAgentsE2E}"
@@ -143,14 +145,20 @@ stop_process_tree() {
   wait "$root_pid" 2>/dev/null || true
 }
 
-allocate_unused_local_port() {
-  python3 - <<'PY'
-import socket
+ensure_e2e_tool_binary() {
+  if [[ -x "$E2E_TOOL_BINARY" ]]; then
+    return 0
+  fi
+  echo "Building harness-monitor-e2e helper at $E2E_TOOL_BINARY" >&2
+  swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
+  if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
+    echo "harness-monitor-e2e binary missing after build at $E2E_TOOL_BINARY" >&2
+    exit 1
+  fi
+}
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-    sock.bind(("127.0.0.1", 0))
-    print(sock.getsockname()[1])
-PY
+allocate_unused_local_port() {
+  "$E2E_TOOL_BINARY" allocate-port
 }
 
 resolve_supported_codex_launch() {
@@ -158,87 +166,10 @@ resolve_supported_codex_launch() {
     return 0
   fi
 
-  local launch_json
-  if ! launch_json="$("$CODEX_BINARY" debug models 2>/dev/null)"; then
+  local resolved
+  if ! resolved="$("$E2E_TOOL_BINARY" resolve-codex-launch --codex-binary "$CODEX_BINARY" 2>/dev/null)"; then
     return 0
   fi
-
-  local resolved
-  resolved="$(
-    CODEX_DEBUG_MODELS_JSON="$launch_json" python3 - <<'PY'
-import json
-import os
-
-preferred = [
-    "gpt-5.3-codex-spark",
-    "gpt-5.4-mini",
-    "gpt-5.3-codex",
-    "gpt-5.2",
-    "gpt-5.4",
-    "gpt-5.5",
-]
-
-try:
-    payload = json.loads(os.environ["CODEX_DEBUG_MODELS_JSON"])
-except Exception:
-    raise SystemExit(0)
-
-models = payload.get("models") or []
-by_slug = {}
-for model in models:
-    slug = model.get("slug")
-    if isinstance(slug, str) and slug:
-        by_slug[slug] = model
-
-def resolve_effort(model):
-    levels = [
-        item.get("effort")
-        for item in (model.get("supported_reasoning_levels") or [])
-        if isinstance(item, dict)
-    ]
-    for candidate in ("low", "medium", "high", "xhigh"):
-        if candidate in levels:
-            return candidate
-    return None
-
-selected_slug = None
-selected_model = None
-for slug in preferred:
-    model = by_slug.get(slug)
-    if model is None:
-        continue
-    effort = resolve_effort(model)
-    if effort is None:
-        continue
-    selected_slug = slug
-    selected_model = model
-    break
-
-if selected_model is None:
-    for model in models:
-        if not isinstance(model, dict):
-            continue
-        slug = model.get("slug")
-        if not isinstance(slug, str) or not slug:
-            continue
-        effort = resolve_effort(model)
-        if effort is None:
-            continue
-        selected_slug = slug
-        selected_model = model
-        break
-
-if selected_model is None or selected_slug is None:
-    raise SystemExit(0)
-
-effort = resolve_effort(selected_model)
-if effort is None:
-    raise SystemExit(0)
-
-print(selected_slug)
-print(effort)
-PY
-  )"
 
   if [[ -z "$resolved" ]]; then
     return 0
@@ -292,25 +223,7 @@ bridge_is_ready() {
   if ! status_json="$(run_harness bridge status 2>/dev/null)"; then
     return 1
   fi
-  BRIDGE_STATUS_JSON="$status_json" python3 - <<'PY'
-import json
-import os
-import sys
-
-try:
-    payload = json.loads(os.environ["BRIDGE_STATUS_JSON"])
-except Exception:
-    sys.exit(1)
-
-if payload.get("running") is not True:
-    sys.exit(1)
-
-capabilities = payload.get("capabilities") or {}
-for name in ("codex", "agent-tui"):
-    capability = capabilities.get(name) or {}
-    if capability.get("healthy") is not True:
-        sys.exit(1)
-PY
+  printf '%s' "$status_json" | "$E2E_TOOL_BINARY" bridge-ready
 }
 
 wait_for_bridge() {
@@ -430,55 +343,27 @@ configure_xctestrun() {
   local source_path="$1"
   local destination_path="$2"
 
-  python3 - "$source_path" "$destination_path" \
-    "$STATE_ROOT" "$DATA_HOME" "$DAEMON_LOG" "$BRIDGE_LOG" \
-    "$TERMINAL_SESSION_ID" "$CODEX_SESSION_ID" \
-    "$CODEX_MODEL_OVERRIDE" "$CODEX_EFFORT_OVERRIDE" <<'PY'
-import plistlib
-import shutil
-import sys
-
-(
-    source_path,
-    destination_path,
-    state_root,
-    data_home,
-    daemon_log,
-    bridge_log,
-    terminal_session_id,
-    codex_session_id,
-    codex_model,
-    codex_effort,
-) = sys.argv[1:]
-
-shutil.copyfile(source_path, destination_path)
-with open(destination_path, "rb") as handle:
-    payload = plistlib.load(handle)
-
-target = payload["HarnessMonitorAgentsE2ETests"]
-updates = {
-    "HARNESS_MONITOR_E2E_STATE_ROOT": state_root,
-    "HARNESS_MONITOR_E2E_DATA_HOME": data_home,
-    "HARNESS_MONITOR_E2E_DAEMON_LOG": daemon_log,
-    "HARNESS_MONITOR_E2E_BRIDGE_LOG": bridge_log,
-    "HARNESS_MONITOR_E2E_TERMINAL_SESSION_ID": terminal_session_id,
-    "HARNESS_MONITOR_E2E_CODEX_SESSION_ID": codex_session_id,
-    "HARNESS_MONITOR_ENABLE_AGENTS_E2E": "1",
-}
-if codex_model:
-    updates["HARNESS_MONITOR_E2E_CODEX_MODEL"] = codex_model
-if codex_effort:
-    updates["HARNESS_MONITOR_E2E_CODEX_EFFORT"] = codex_effort
-
-for key in ("EnvironmentVariables", "TestingEnvironmentVariables"):
-    environment = target.setdefault(key, {})
-    environment.update(updates)
-
-with open(destination_path, "wb") as handle:
-    plistlib.dump(payload, handle, sort_keys=False)
-PY
+  local -a args=(
+    configure-xctestrun
+    --source "$source_path"
+    --destination "$destination_path"
+    --state-root "$STATE_ROOT"
+    --data-home "$DATA_HOME"
+    --daemon-log "$DAEMON_LOG"
+    --bridge-log "$BRIDGE_LOG"
+    --terminal-session-id "$TERMINAL_SESSION_ID"
+    --codex-session-id "$CODEX_SESSION_ID"
+  )
+  if [[ -n "$CODEX_MODEL_OVERRIDE" ]]; then
+    args+=(--codex-model "$CODEX_MODEL_OVERRIDE")
+  fi
+  if [[ -n "$CODEX_EFFORT_OVERRIDE" ]]; then
+    args+=(--codex-effort "$CODEX_EFFORT_OVERRIDE")
+  fi
+  "$E2E_TOOL_BINARY" "${args[@]}"
 }
 
+ensure_e2e_tool_binary
 seed_observability_config
 resolve_supported_codex_launch
 

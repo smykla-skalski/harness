@@ -1,0 +1,115 @@
+import ArgumentParser
+import Foundation
+import HarnessMonitorE2ECore
+
+struct HarnessMonitorE2E: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "harness-monitor-e2e",
+        abstract: "Compiled helpers for the Harness Monitor agents end-to-end lane.",
+        subcommands: [
+            AllocatePort.self,
+            ResolveCodexLaunch.self,
+            ConfigureXctestrun.self,
+            BridgeReady.self,
+        ]
+    )
+}
+
+struct AllocatePort: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "allocate-port",
+        abstract: "Print a free TCP port on 127.0.0.1."
+    )
+
+    func run() throws {
+        let port = try PortAllocator.allocateLocalTCPPort()
+        print(port)
+    }
+}
+
+struct ResolveCodexLaunch: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "resolve-codex-launch",
+        abstract: "Resolve a supported codex model + effort by inspecting `codex debug models`. Prints '<slug>\\n<effort>' or nothing when no model qualifies."
+    )
+
+    @Option(name: .long, help: "Path to the codex binary.")
+    var codexBinary: String
+
+    func run() throws {
+        let stdout = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: codexBinary)
+        process.arguments = ["debug", "models"]
+        process.standardOutput = stdout
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+        } catch {
+            // Mirror the python helper: silently exit 0 when codex is not invokable.
+            return
+        }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return }
+
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        guard let resolution = CodexLaunchResolver.resolve(fromJSON: data) else { return }
+        print(resolution.slug)
+        print(resolution.effort)
+    }
+}
+
+struct ConfigureXctestrun: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "configure-xctestrun",
+        abstract: "Inject Agents e2e env vars into a generated .xctestrun and write the configured copy."
+    )
+
+    @Option(name: .long, help: "Source .xctestrun produced by build-for-testing.")
+    var source: String
+    @Option(name: .long, help: "Destination .configured.xctestrun path.")
+    var destination: String
+    @Option(name: .long) var stateRoot: String
+    @Option(name: .long) var dataHome: String
+    @Option(name: .long) var daemonLog: String
+    @Option(name: .long) var bridgeLog: String
+    @Option(name: .long) var terminalSessionId: String
+    @Option(name: .long) var codexSessionId: String
+    @Option(name: .long) var codexModel: String?
+    @Option(name: .long) var codexEffort: String?
+
+    func run() throws {
+        let updates = XctestrunConfigurator.standardUpdates(
+            stateRoot: stateRoot,
+            dataHome: dataHome,
+            daemonLog: daemonLog,
+            bridgeLog: bridgeLog,
+            terminalSessionID: terminalSessionId,
+            codexSessionID: codexSessionId,
+            codexModel: codexModel,
+            codexEffort: codexEffort
+        )
+        try XctestrunConfigurator.configure(
+            source: URL(fileURLWithPath: source),
+            destination: URL(fileURLWithPath: destination),
+            updates: updates
+        )
+    }
+}
+
+struct BridgeReady: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "bridge-ready",
+        abstract: "Read `harness bridge status --json` from stdin; exit 0 when the bridge reports running with required capabilities healthy."
+    )
+
+    func run() throws {
+        let data = FileHandle.standardInput.readDataToEndOfFile()
+        if !BridgeReadiness.isReady(fromJSON: data) {
+            throw ExitCode(1)
+        }
+    }
+}
+
+HarnessMonitorE2E.main()

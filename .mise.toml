@@ -114,8 +114,17 @@ run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 description = "Run the Harness Monitor Instruments/parser Python regression tests"
 run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'"
 
+[tasks."monitor:macos:tools:build:e2e"]
+description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
+run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
+
+[tasks."monitor:macos:tools:test:e2e"]
+description = "Run unit tests for the agents e2e helper Swift CLI"
+run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
+
 [tasks."monitor:macos:test:agents-e2e"]
 description = "Run the explicit Harness Monitor Agents end-to-end UI lane"
+depends = ["monitor:macos:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Scripts/test-agents-e2e.sh"
 
 [tasks."monitor:macos:test:swarm-e2e"]
