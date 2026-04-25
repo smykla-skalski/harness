@@ -62,6 +62,7 @@ private let uiPreviewableTarget: Target = {
         bundleId: "io.harnessmonitor.ui.previewable",
         deploymentTargets: macOSDeploymentTargets,
         sources: uiPreviewableSources,
+        resources: ["Sources/HarnessMonitor/Assets.xcassets"],
         dependencies: deps,
         settings: .settings(
             base: [
@@ -102,6 +103,7 @@ private let previewHostTarget: Target = .target(
     ],
     settings: .settings(
         base: [
+            "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
             "CODE_SIGN_STYLE": "Automatic",
             "CODE_SIGNING_ALLOWED": "YES",
             "DEVELOPMENT_TEAM": "Q498EB36N4",
@@ -136,15 +138,17 @@ private let monitorAppDependencies: [TargetDependency] = {
 private let monitorAppSettings: Settings = .settings(
     base: [
         "CODE_SIGN_ENTITLEMENTS": "HarnessMonitor.entitlements",
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_STYLE": "Automatic",
         "DEVELOPMENT_TEAM": "Q498EB36N4",
+        "REGISTER_APP_GROUPS": "YES",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
         "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
         "GENERATE_INFOPLIST_FILE": "NO",
         "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
-        "PRODUCT_BUNDLE_IDENTIFIER": "$(HARNESS_MONITOR_APP_BUNDLE_ID)",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_NAME": "Harness Monitor",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
@@ -158,7 +162,10 @@ private let monitorAppTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
     sources: monitorAppSources,
-    resources: ["Resources/PrivacyInfo.xcprivacy"],
+    resources: [
+        "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/PrivacyInfo.xcprivacy",
+    ],
     entitlements: .file(path: "HarnessMonitor.entitlements"),
     scripts: [
         BuildPhases.bundleDaemonAgent(),
@@ -171,9 +178,11 @@ private let monitorAppTarget: Target = .target(
 private let uiTestHostSettings: Settings = .settings(
     base: [
         "CODE_SIGN_ENTITLEMENTS": "HarnessMonitorUITestHost.entitlements",
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_INJECT_BASE_ENTITLEMENTS": "NO",
         "CODE_SIGN_STYLE": "Automatic",
         "DEVELOPMENT_TEAM": "Q498EB36N4",
+        "REGISTER_APP_GROUPS": "YES",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
@@ -194,7 +203,10 @@ private let uiTestHostTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
     sources: monitorAppSources,
-    resources: ["Resources/PrivacyInfo.xcprivacy"],
+    resources: [
+        "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/PrivacyInfo.xcprivacy",
+    ],
     entitlements: .file(path: "HarnessMonitorUITestHost.entitlements"),
     scripts: [
         BuildPhases.bundleDaemonAgent(),

@@ -29,6 +29,11 @@ find_cargo() {
   exit 1
 }
 
+sanitize_xcode_tool_environment() {
+  unset SWIFT_DEBUG_INFORMATION_FORMAT
+  unset SWIFT_DEBUG_INFORMATION_VERSION
+}
+
 build_daemon_binary() {
   local repo_root
   repo_root="$(resolve_repo_root)"
@@ -60,6 +65,7 @@ build_daemon_binary() {
 
   (
     cd "$repo_root" || exit 1
+    sanitize_xcode_tool_environment
     CARGO_TARGET_DIR="$target_dir" "$cargo_bin" "${cargo_args[@]}" -- \
       -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
   )

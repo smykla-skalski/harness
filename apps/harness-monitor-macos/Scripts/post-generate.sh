@@ -47,6 +47,26 @@ write_build_server_config \
   "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
   "xcode-derived"
 
+PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
+DEVELOPMENT_TEAM_ID="${HARNESS_MONITOR_DEVELOPMENT_TEAM:-Q498EB36N4}"
+LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
+
+# Tuist 4 does not emit `LastUpgradeCheck` or per-target `TargetAttributes`
+# (`ProvisioningStyle = Automatic;`, `DevelopmentTeam = ...;`). Without them
+# Xcode shows "Update to Recommended Settings" on every open, and the proposed
+# change rewrites CODE_SIGN_IDENTITY to the ad-hoc `-` which fails the
+# `com.apple.developer.*` and app-group entitlements declared by the main app,
+# the UI test host, and the preview host. Inject the same attributes XcodeGen
+# used so the dialog stops appearing.
+if [ -f "$PBXPROJ" ]; then
+  HARNESS_MONITOR_PBXPROJ="$PBXPROJ" \
+  HARNESS_MONITOR_LAST_UPGRADE_CHECK="$LAST_UPGRADE_CHECK" \
+  HARNESS_MONITOR_DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM_ID" \
+  HARNESS_MONITOR_APP_ROOT="$ROOT" \
+  HARNESS_MONITOR_REPO_ROOT="$REPO_ROOT" \
+    /usr/bin/python3 "$ROOT/Scripts/patch-tuist-pbxproj.py"
+fi
+
 if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
   "$REPO_ROOT/scripts/version.sh" sync-monitor
 fi
