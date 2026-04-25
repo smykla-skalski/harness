@@ -9,9 +9,7 @@ public struct PreferencesDatabaseSection: View {
 
   @State private var databaseStats: DatabaseStatistics?
   @State private var isLoadingStats = false
-  @State private var isClearCacheConfirmationPresented = false
-  @State private var isClearUserDataConfirmationPresented = false
-  @State private var isClearAllConfirmationPresented = false
+  @State private var pendingConfirmation: DatabaseConfirmation?
   @State private var selectedStatisticsTab: StatisticsTab = .cache
 
   public var body: some View {
@@ -22,55 +20,6 @@ public struct PreferencesDatabaseSection: View {
     }
     .preferencesDetailFormStyle()
     .task { await refreshStatistics() }
-    .confirmationDialog(
-      "Clear Session Cache?",
-      isPresented: $isClearCacheConfirmationPresented,
-      titleVisibility: .visible
-    ) {
-      Button("Clear Session Cache", role: .destructive) {
-        Task {
-          await store.clearSessionCache()
-          await refreshStatistics()
-        }
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text(
-        "This removes all cached session and project data. "
-          + "Bookmarks, notes, and search history are preserved."
-      )
-    }
-    .confirmationDialog(
-      "Clear User Data?",
-      isPresented: $isClearUserDataConfirmationPresented,
-      titleVisibility: .visible
-    ) {
-      Button("Clear User Data", role: .destructive) {
-        store.clearAllUserData()
-        Task { await refreshStatistics() }
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text(
-        "This removes all bookmarks, notes, search history, and filter preferences. "
-          + "Cached session data is preserved."
-      )
-    }
-    .confirmationDialog(
-      "Clear All Data?",
-      isPresented: $isClearAllConfirmationPresented,
-      titleVisibility: .visible
-    ) {
-      Button("Clear All Data", role: .destructive) {
-        Task {
-          await store.clearAllDatabaseData()
-          await refreshStatistics()
-        }
-      }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text("This removes all cached data and user data. This cannot be undone.")
-    }
   }
 
   // MARK: - Statistics
@@ -219,7 +168,19 @@ public struct PreferencesDatabaseSection: View {
               "Clear Session Cache"
             )
           ) {
-            isClearCacheConfirmationPresented = true
+            pendingConfirmation = .clearSessionCache
+          }
+          .popover(
+            isPresented: isConfirmationPresented(.clearSessionCache),
+            arrowEdge: .top
+          ) {
+            DatabaseConfirmationPopover(
+              confirmation: .clearSessionCache,
+              store: store,
+              databaseStats: $databaseStats,
+              isLoadingStats: $isLoadingStats,
+              pendingConfirmation: $pendingConfirmation
+            )
           }
           HarnessMonitorAsyncActionButton(
             title: "Clear Search History",
@@ -242,7 +203,19 @@ public struct PreferencesDatabaseSection: View {
               "Clear User Data"
             )
           ) {
-            isClearUserDataConfirmationPresented = true
+            pendingConfirmation = .clearUserData
+          }
+          .popover(
+            isPresented: isConfirmationPresented(.clearUserData),
+            arrowEdge: .top
+          ) {
+            DatabaseConfirmationPopover(
+              confirmation: .clearUserData,
+              store: store,
+              databaseStats: $databaseStats,
+              isLoadingStats: $isLoadingStats,
+              pendingConfirmation: $pendingConfirmation
+            )
           }
           HarnessMonitorActionButton(
             title: "Clear All Data",
@@ -252,7 +225,19 @@ public struct PreferencesDatabaseSection: View {
               "Clear All Data"
             )
           ) {
-            isClearAllConfirmationPresented = true
+            pendingConfirmation = .clearAllData
+          }
+          .popover(
+            isPresented: isConfirmationPresented(.clearAllData),
+            arrowEdge: .top
+          ) {
+            DatabaseConfirmationPopover(
+              confirmation: .clearAllData,
+              store: store,
+              databaseStats: $databaseStats,
+              isLoadingStats: $isLoadingStats,
+              pendingConfirmation: $pendingConfirmation
+            )
           }
           HarnessMonitorActionButton(
             title: "Reveal in Finder",
@@ -270,7 +255,6 @@ public struct PreferencesDatabaseSection: View {
     } header: {
       Text("Operations")
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesDatabaseOperations)
   }
 
   // MARK: - Health
@@ -337,6 +321,122 @@ public struct PreferencesDatabaseSection: View {
   }
 
   // MARK: - Helpers
+
+  private func refreshStatistics() async {
+    isLoadingStats = true
+    databaseStats = await store.gatherDatabaseStatistics()
+    isLoadingStats = false
+  }
+
+  private func isConfirmationPresented(_ confirmation: DatabaseConfirmation) -> Binding<Bool> {
+    Binding(
+      get: { pendingConfirmation == confirmation },
+      set: { isPresented in
+        if !isPresented {
+          pendingConfirmation = nil
+        }
+      }
+    )
+  }
+}
+
+private enum DatabaseConfirmation: Equatable {
+  case clearSessionCache
+  case clearUserData
+  case clearAllData
+
+  var promptTitle: String {
+    switch self {
+    case .clearSessionCache:
+      "Clear Session Cache?"
+    case .clearUserData:
+      "Clear User Data?"
+    case .clearAllData:
+      "Clear All Data?"
+    }
+  }
+
+  var actionButtonTitle: String {
+    switch self {
+    case .clearSessionCache:
+      "Clear Session Cache Now"
+    case .clearUserData:
+      "Clear User Data Now"
+    case .clearAllData:
+      "Clear All Data Now"
+    }
+  }
+
+  var message: String {
+    switch self {
+    case .clearSessionCache:
+      "This removes all cached session and project data. Bookmarks, notes, and search history are preserved."
+    case .clearUserData:
+      "This removes all bookmarks, notes, search history, and filter preferences. Cached session data is preserved."
+    case .clearAllData:
+      "This removes all cached data and user data. This cannot be undone."
+    }
+  }
+}
+
+private struct DatabaseConfirmationPopover: View {
+  let confirmation: DatabaseConfirmation
+  let store: HarnessMonitorStore
+  @Binding var databaseStats: DatabaseStatistics?
+  @Binding var isLoadingStats: Bool
+  @Binding var pendingConfirmation: DatabaseConfirmation?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(confirmation.promptTitle)
+        .scaledFont(.headline)
+      Text(confirmation.message)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
+
+      HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+        HarnessMonitorActionButton(
+          title: confirmation.actionButtonTitle,
+          tint: .red,
+          variant: .prominent,
+          accessibilityIdentifier: HarnessMonitorAccessibility.preferencesActionButton(
+            confirmation.actionButtonTitle
+          )
+        ) {
+          confirm()
+        }
+        Button("Cancel", role: .cancel) {
+          pendingConfirmation = nil
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .keyboardShortcut(.cancelAction)
+      }
+    }
+    .padding(HarnessMonitorTheme.spacingSM)
+    .frame(width: 360, alignment: .leading)
+  }
+
+  private func confirm() {
+    let confirmation = confirmation
+    pendingConfirmation = nil
+
+    switch confirmation {
+    case .clearSessionCache:
+      Task {
+        await store.clearSessionCache()
+        await refreshStatistics()
+      }
+    case .clearUserData:
+      store.clearAllUserData()
+      Task { await refreshStatistics() }
+    case .clearAllData:
+      Task {
+        await store.clearAllDatabaseData()
+        await refreshStatistics()
+      }
+    }
+  }
 
   private func refreshStatistics() async {
     isLoadingStats = true
