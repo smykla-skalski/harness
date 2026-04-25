@@ -486,7 +486,7 @@ resolve_supported_codex_launch
 "$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
 
 TEST_ARGS=(
-  -project "$ROOT/HarnessMonitor.xcodeproj"
+  -workspace "$ROOT/HarnessMonitor.xcworkspace"
   -scheme "HarnessMonitorAgentsE2E"
   -destination "$DESTINATION"
   -derivedDataPath "$DERIVED_DATA_PATH"

@@ -99,7 +99,7 @@ run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
 
 [tasks."monitor:macos:build"]
 description = "Build the Harness Monitor macOS app (Debug) via the lock-aware shared xcodebuild wrapper"
-run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
 [tasks."monitor:macos:lint"]
 description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
@@ -250,7 +250,7 @@ run = "swift build -c release --package-path mcp-servers/harness-monitor-registr
 
 [tasks."mcp:build:monitor"]
 description = "Build the Harness Monitor macOS app (Debug) with the MCP registry host wired in"
-run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
+run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
 
 [tasks."mcp:launch:monitor"]
 description = "Open the Debug build of Harness Monitor.app"

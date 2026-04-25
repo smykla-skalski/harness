@@ -38,13 +38,13 @@ EOF
 write_build_server_config \
   "$ROOT/buildServer.json" \
   "./Scripts/run-xcode-build-server.sh" \
-  "HarnessMonitor.xcodeproj/project.xcworkspace" \
+  "HarnessMonitor.xcworkspace" \
   "../../xcode-derived"
 
 write_build_server_config \
   "$REPO_ROOT/buildServer.json" \
   "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
-  "apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.xcworkspace" \
+  "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
   "xcode-derived"
 
 if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then

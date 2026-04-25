@@ -112,7 +112,7 @@ mkdir -p "$SWIFTLINT_CACHE_PATH"
   "$ROOT/Tests/HarnessMonitorUITests"
 
 "$XCODEBUILD_RUNNER" \
-  -project "$ROOT/HarnessMonitor.xcodeproj" \
+  -workspace "$ROOT/HarnessMonitor.xcworkspace" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
