@@ -55,6 +55,8 @@ extension DaemonController {
     var pendingBundleStampRefresh: ManagedLaunchAgentBundleStamp?
     var refreshedManagedLaunchAgentDuringWarmUp = false
     var signaledManagedRecoveryManifestSignature: String?
+    var lastLoggedManifestSignature: String?
+    var lastLoggedRetryErrorDescription: String?
   }
 
   struct WarmUpIterationOutcome {
@@ -71,11 +73,26 @@ extension DaemonController {
     state: inout WarmUpLoopState
   ) async throws -> WarmUpIterationOutcome {
     do {
-      let manifest = try loadManifest()
+      let manifest = try loadManifest(emitTrace: false)
+      let staleSignature = Self.managedStaleManifestSignature(for: manifest)
+      let isFreshObservation = state.lastLoggedManifestSignature != staleSignature
+      if isFreshObservation {
+        let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+        let pid = manifest.pid
+        let tokenPath = manifest.tokenPath
+        HarnessMonitorLogger.lifecycle.trace(
+          "Loaded daemon manifest from \(manifestPath, privacy: .public) for pid \(pid, privacy: .public)"
+        )
+        HarnessMonitorLogger.lifecycle.trace(
+          "Loaded daemon auth token from \(tokenPath, privacy: .public)"
+        )
+      }
       if let mismatch = managedDaemonVersionMismatch(for: manifest) {
+        state.lastLoggedManifestSignature = staleSignature
         return try handleManagedVersionMismatch(
           manifest: manifest,
           mismatch: mismatch,
+          isFreshObservation: isFreshObservation,
           state: &state
         )
       }
@@ -85,12 +102,15 @@ extension DaemonController {
           for: manifest,
           state: &state
         )
-      let connection = try daemonConnection(from: manifest)
+      let connection = try daemonConnection(from: manifest, emitTrace: false)
       let endpoint = connection.endpoint.absoluteString
       let manifestPid = manifest.pid
-      HarnessMonitorLogger.lifecycle.trace(
-        "\(Self.warmUpObservedManifestMessage(pid: manifestPid, endpoint: endpoint), privacy: .public)"
-      )
+      if isFreshObservation {
+        HarnessMonitorLogger.lifecycle.trace(
+          "\(Self.warmUpObservedManifestMessage(pid: manifestPid, endpoint: endpoint), privacy: .public)"
+        )
+      }
+      state.lastLoggedManifestSignature = staleSignature
       if await endpointProbe(connection.endpoint) {
         HarnessMonitorLogger.lifecycle.trace(
           "Warm-up confirmed live daemon endpoint \(endpoint, privacy: .public)"
@@ -110,7 +130,12 @@ extension DaemonController {
         let client = try await bootstrap(connection: connection)
         return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
       }
-      return try handleStaleManifest(manifest: manifest, endpoint: endpoint, state: &state)
+      return try handleStaleManifest(
+        manifest: manifest,
+        endpoint: endpoint,
+        isFreshObservation: isFreshObservation,
+        state: &state
+      )
     } catch let error as DaemonControlError {
       if try refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
         error: error,
@@ -121,34 +146,49 @@ extension DaemonController {
       }
       state.managedStaleManifestTracker.reset()
       state.managedVersionMismatchTracker.reset()
+      state.lastLoggedManifestSignature = nil
       if case .invalidManifest = error, ownership == .external {
         state.immediateError = error
         return .stopLoop
       }
       state.lastError = error
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-      )
+      emitWarmUpRetryTraceIfChanged(error: error, state: &state)
     } catch {
       state.managedStaleManifestTracker.reset()
       state.managedVersionMismatchTracker.reset()
+      state.lastLoggedManifestSignature = nil
       state.lastError = error
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up retry after \(error.localizedDescription, privacy: .public)"
-      )
+      emitWarmUpRetryTraceIfChanged(error: error, state: &state)
     }
     return .continueLoop
+  }
+
+  func emitWarmUpRetryTraceIfChanged(
+    error: any Error,
+    state: inout WarmUpLoopState
+  ) {
+    let description = error.localizedDescription
+    guard state.lastLoggedRetryErrorDescription != description else {
+      return
+    }
+    state.lastLoggedRetryErrorDescription = description
+    HarnessMonitorLogger.lifecycle.trace(
+      "Warm-up retry after \(description, privacy: .public)"
+    )
   }
 
   func handleStaleManifest(
     manifest: DaemonManifest,
     endpoint: String,
+    isFreshObservation: Bool,
     state: inout WarmUpLoopState
   ) throws -> WarmUpIterationOutcome {
     let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
-    HarnessMonitorLogger.lifecycle.error(
-      "\(Self.warmUpStaleManifestMessage(path: manifestPath, endpoint: endpoint), privacy: .public)"
-    )
+    if isFreshObservation {
+      HarnessMonitorLogger.lifecycle.error(
+        "\(Self.warmUpStaleManifestMessage(path: manifestPath, endpoint: endpoint), privacy: .public)"
+      )
+    }
     state.sawUnreachableManifest = true
     if ownership == .external {
       state.immediateError = DaemonControlError.externalDaemonManifestStale(
@@ -156,12 +196,18 @@ extension DaemonController {
       )
       return .stopLoop
     }
-    return try handleManagedStaleManifest(manifest: manifest, path: manifestPath, state: &state)
+    return try handleManagedStaleManifest(
+      manifest: manifest,
+      path: manifestPath,
+      isFreshObservation: isFreshObservation,
+      state: &state
+    )
   }
 
   func handleManagedStaleManifest(
     manifest: DaemonManifest,
     path: String,
+    isFreshObservation: Bool,
     state: inout WarmUpLoopState
   ) throws -> WarmUpIterationOutcome {
     state.lastError = DaemonControlError.daemonDidNotStart
@@ -173,6 +219,7 @@ extension DaemonController {
           signature: staleSignature,
           path: path,
           gracePeriod: gracePeriod,
+          isFreshObservation: isFreshObservation,
           state: &state
         )
       }
@@ -181,6 +228,7 @@ extension DaemonController {
           signature: staleSignature,
           path: path,
           gracePeriod: gracePeriod,
+          isFreshObservation: isFreshObservation,
           state: &state
         )
       }
@@ -208,9 +256,11 @@ extension DaemonController {
       )
       return .stopLoop
     case .freshSignature, .withinGrace:
-      HarnessMonitorLogger.lifecycle.trace(
-        "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
-      )
+      if isFreshObservation {
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up waiting for managed daemon to rewrite stale manifest at \(path, privacy: .public)"
+        )
+      }
       return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
   }
@@ -219,6 +269,7 @@ extension DaemonController {
     signature: String,
     path: String,
     gracePeriod: String,
+    isFreshObservation: Bool,
     state: inout WarmUpLoopState
   ) -> WarmUpIterationOutcome {
     let observation = state.managedStaleManifestTracker.observe(
@@ -239,9 +290,11 @@ extension DaemonController {
       )
       return .stopLoop
     case .freshSignature, .withinGrace:
-      HarnessMonitorLogger.lifecycle.trace(
-        "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
-      )
+      if isFreshObservation {
+        HarnessMonitorLogger.lifecycle.trace(
+          "\(Self.warmUpManagedReplacementManifestWaitMessage(path: path), privacy: .public)"
+        )
+      }
       return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
   }
@@ -249,6 +302,7 @@ extension DaemonController {
   func handleManagedVersionMismatch(
     manifest: DaemonManifest,
     mismatch: DaemonControlError,
+    isFreshObservation: Bool,
     state: inout WarmUpLoopState
   ) throws -> WarmUpIterationOutcome {
     state.lastError = mismatch
@@ -297,15 +351,17 @@ extension DaemonController {
       state.immediateError = mismatch
       return .stopLoop
     case .freshSignature, .withinGrace:
-      HarnessMonitorLogger.lifecycle.trace(
-        """
-        \(Self.warmUpManagedVersionMismatchWaitMessage(
-          path: path,
-          expected: expected,
-          actual: actual
-        ), privacy: .public)
-        """
-      )
+      if isFreshObservation {
+        HarnessMonitorLogger.lifecycle.trace(
+          """
+          \(Self.warmUpManagedVersionMismatchWaitMessage(
+            path: path,
+            expected: expected,
+            actual: actual
+          ), privacy: .public)
+          """
+        )
+      }
       return observation == .freshSignature ? .progressedLoop : .continueLoop
     }
   }
