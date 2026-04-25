@@ -720,7 +720,61 @@ scenario_codex_ws_port_env() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 27: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
+# Scenario 27: bridge-spawned Codex app-server listener is detected for cleanup.
+# ---------------------------------------------------------------------------
+scenario_codex_app_server_listener_detected() {
+  start_test "codex app-server listener on Codex port is detected for cleanup"
+  local bin_dir="$SANDBOX/codex-bin-$RUN_ID"
+  mkdir -p "$bin_dir"
+  local script_path="$bin_dir/codex"
+  cat >"$script_path" <<'EOF'
+import socket, sys, time
+listen = sys.argv[sys.argv.index("--listen") + 1]
+port = int(listen.rsplit(":", 1)[1].split("/", 1)[0])
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+with open(sys.argv[-1], "w") as f:
+    f.write(str(port))
+sys.stdout.close()
+time.sleep(300)
+EOF
+
+  local port
+  port="$(python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+  local port_file="$SANDBOX/codex-$RUN_ID.port"
+  nohup python3 "$script_path" app-server --listen "ws://127.0.0.1:$port" "$port_file" >/dev/null 2>&1 &
+  local pid=$!
+  SPAWNED_PIDS+=("$pid")
+  wait_for_pid_registered "$pid" || { fail "codex app-server fixture never started"; return; }
+  wait_for_pid_argv_contains "$pid" "codex app-server" || {
+    fail "codex app-server fixture argv did not settle"
+    return
+  }
+  local attempts=0
+  while (( attempts < 60 )); do
+    [[ -s "$port_file" ]] && break
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  [[ -s "$port_file" ]] || { fail "codex app-server fixture never bound"; return; }
+
+  stale_scan_refresh_ps
+  local codex_pids
+  codex_pids="$(stale_scan_codex_app_server_listener_pids "$port")"
+  assert_in_list "$pid" "codex app-server listener pid" "$codex_pids" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 28: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
 # planted marker disappears. The "exit 0" happy-path end-state is only
 # reachable when no other pollution exists, which is not the case mid-suite;
 # we assert the invariants we control (marker gone, autoclean banner, fake
@@ -765,7 +819,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 28: HARNESS_CHECK_AUTOCLEAN=1 - pollution the stub clean cannot
+# Scenario 29: HARNESS_CHECK_AUTOCLEAN=1 - pollution the stub clean cannot
 # resolve still fails the gate with exit 1.
 # ---------------------------------------------------------------------------
 scenario_autoclean_unresolved_still_fails() {
@@ -802,7 +856,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 29: HARNESS_CHECK_AUTOCLEAN=1 when clean script exits nonzero.
+# Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 when clean script exits nonzero.
 # ---------------------------------------------------------------------------
 scenario_autoclean_clean_script_fails() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces clean-script failure"
@@ -834,7 +888,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 30: baseline e2e without HARNESS_CHECK_AUTOCLEAN - planted artifact
+# Scenario 31: baseline e2e without HARNESS_CHECK_AUTOCLEAN - planted artifact
 # still fails the gate (regression check after autoclean plumbing).
 # ---------------------------------------------------------------------------
 scenario_end_to_end_without_autoclean() {
@@ -858,7 +912,7 @@ scenario_end_to_end_without_autoclean() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 31: congestion + autoclean - plant multiple /tmp artifacts; fake
+# Scenario 32: congestion + autoclean - plant multiple /tmp artifacts; fake
 # clean removes one; final report must list the remaining two and NOT the
 # cleaned one.
 # ---------------------------------------------------------------------------
@@ -933,6 +987,7 @@ run_all() {
   scenario_foreign_ws_listener
   scenario_harness_ws_listener_not_flagged
   scenario_codex_ws_port_env
+  scenario_codex_app_server_listener_detected
   scenario_autoclean_success
   scenario_autoclean_unresolved_still_fails
   scenario_autoclean_clean_script_fails

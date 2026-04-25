@@ -204,6 +204,28 @@ stale_scan_foreign_tcp_listeners() {
   done <<<"$listeners"
 }
 
+# Emit pids for Codex app-server listeners on the given port. These are spawned
+# by the host bridge and can survive as parentless processes when the bridge is
+# terminated by a stale-state reset instead of a graceful shutdown.
+stale_scan_codex_app_server_listener_pids() {
+  local port="$1"
+  command -v lsof >/dev/null 2>&1 || return 0
+  stale_scan_ensure_ps
+
+  local listeners
+  listeners="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u || true)"
+  [[ -n "$listeners" ]] || return 0
+
+  local pid desc
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    desc="$(stale_scan_pid_describe "$pid")"
+    if [[ "$desc" == *"codex app-server"* ]]; then
+      echo "$pid"
+    fi
+  done <<<"$listeners"
+}
+
 # Pure parser for `launchctl print` text. Given a label and the command output,
 # emit a single drift line if the service's "program = <path>" target is
 # missing from disk. Split out so tests can cover drift reporting without

@@ -113,6 +113,32 @@ kill_live_harness_processes() {
   signal_pids KILL "${pids[@]}"
 }
 
+kill_orphan_codex_app_servers() {
+  local port
+  port="$(stale_scan_codex_ws_port)"
+  local pids=()
+  local pid
+  stale_scan_refresh_ps
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_codex_app_server_listener_pids "$port")
+  (( ${#pids[@]} > 0 )) || return 0
+
+  echo "stopping orphan codex app-server listener(s) on port $port..."
+  signal_pids TERM "${pids[@]}"
+  sleep 1
+
+  stale_scan_refresh_ps
+  pids=()
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(stale_scan_codex_app_server_listener_pids "$port")
+  (( ${#pids[@]} > 0 )) || return 0
+
+  echo "force-stopping stubborn codex app-server listener(s) on port $port..."
+  signal_pids KILL "${pids[@]}"
+}
+
 remove_tmp_bridge_artifacts() {
   local artifacts=()
   local artifact
@@ -174,6 +200,7 @@ kill_orphan_harness_processes
 kill_repo_gate_processes
 kill_live_harness_processes "$STALE_SCAN_GROUP_CONTAINER_ROOT"
 kill_live_harness_processes "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+kill_orphan_codex_app_servers
 remove_tmp_bridge_artifacts
 wipe_stale_bridge_state
 remove_orphan_sqlite_sidecars
