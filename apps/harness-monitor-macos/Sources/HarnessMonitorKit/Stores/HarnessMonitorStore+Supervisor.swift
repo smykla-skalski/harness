@@ -123,7 +123,7 @@ extension HarnessMonitorStore {
 
   public func startSupervisor() async {
     guard _stack == nil else {
-      HarnessMonitorLogger.supervisorInfo("supervisor.start skipped — already running")
+      HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
       return
     }
 
@@ -146,11 +146,11 @@ extension HarnessMonitorStore {
     defer { _supervisorStartTask = nil }
 
     guard _stack == nil else {
-      HarnessMonitorLogger.supervisorInfo("supervisor.start skipped — already running")
+      HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
       return
     }
 
-    HarnessMonitorLogger.supervisorInfo("supervisor.start")
+    HarnessMonitorLogger.supervisorTrace("supervisor.start")
 
     let decisionStore: DecisionStore
     if let container = modelContext?.container {
@@ -240,12 +240,12 @@ extension HarnessMonitorStore {
     lifecycle.startBackgroundActivity()
     auditRetention?.startBackgroundCompaction()
 
-    HarnessMonitorLogger.supervisorInfo("supervisor.started")
+    HarnessMonitorLogger.supervisorTrace("supervisor.started")
   }
 
   public func stopSupervisor() async {
     guard let stack = _stack else {
-      HarnessMonitorLogger.supervisorInfo("supervisor.stop skipped — not running")
+      HarnessMonitorLogger.supervisorTrace("supervisor.stop skipped — not running")
       return
     }
     _stack = nil
@@ -259,7 +259,7 @@ extension HarnessMonitorStore {
     supervisorSelectedDecisionID = nil
     supervisorDecisionRefreshTick &+= 1
 
-    HarnessMonitorLogger.supervisorInfo("supervisor.stopped")
+    HarnessMonitorLogger.supervisorTrace("supervisor.stopped")
   }
 
   public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {

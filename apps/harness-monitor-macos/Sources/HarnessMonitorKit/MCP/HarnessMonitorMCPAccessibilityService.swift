@@ -67,7 +67,7 @@ public final class HarnessMonitorMCPAccessibilityService {
     }
     self.listener = listener
     self.runningSocketURL = socket
-    logger.info(
+    logger.trace(
       "harness-monitor MCP: registry host started at \(socket.path, privacy: .public)"
     )
   }
@@ -77,7 +77,7 @@ public final class HarnessMonitorMCPAccessibilityService {
     await listener.stop()
     self.listener = nil
     if let socketURL = runningSocketURL {
-      logger.info(
+      logger.trace(
         "harness-monitor MCP: registry host stopped at \(socketURL.path, privacy: .public)"
       )
       self.runningSocketURL = nil
