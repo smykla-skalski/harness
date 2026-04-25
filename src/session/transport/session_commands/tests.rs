@@ -1,7 +1,11 @@
+use std::io::ErrorKind;
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
+use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
@@ -97,6 +101,153 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
         assert!(
             request.contains("\"title\":\"renamed title\""),
             "title must be forwarded in daemon request body: {request}"
+        );
+    });
+}
+
+fn session_observe_detail_response(state: &crate::session::types::SessionState) -> String {
+    json!({
+        "session": {
+            "project_id": "p",
+            "project_name": state.project_name,
+            "project_dir": null,
+            "context_root": "/",
+            "worktree_path": "/",
+            "shared_path": "/",
+            "origin_path": "/",
+            "branch_ref": state.branch_ref,
+            "session_id": state.session_id,
+            "title": state.title,
+            "context": state.context,
+            "status": "awaiting_leader",
+            "created_at": state.created_at,
+            "updated_at": state.updated_at,
+            "last_activity_at": null,
+            "leader_id": null,
+            "observe_id": state.observe_id,
+            "pending_leader_transfer": null,
+            "metrics": {}
+        },
+        "agents": [],
+        "tasks": [],
+        "signals": [],
+        "observer": null,
+        "agent_activity": []
+    })
+    .to_string()
+}
+
+#[test]
+fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let project = tmp.path().join("project");
+        init_git_repo_with_seed(&project);
+        let state = service::start_session_with_policy(
+            "daemon observe context",
+            "",
+            &project,
+            Some("sess-observe-daemon"),
+            None,
+        )
+        .expect("start session");
+        let response_body = session_observe_detail_response(&state);
+
+        let requests = Arc::new(Mutex::new(Vec::<String>::new()));
+        let requests_for_server = Arc::clone(&requests);
+        let running = Arc::new(AtomicBool::new(true));
+        let running_for_server = Arc::clone(&running);
+        let token = "session-observe-token";
+        let token_lower = token.to_ascii_lowercase();
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.set_nonblocking(true).expect("nonblocking listener");
+        let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+        let _lock_file = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
+        let server = thread::spawn(move || {
+            while running_for_server.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        let request = read_http_request(&mut stream);
+                        let request_lower = request.to_ascii_lowercase();
+                        assert!(
+                            request_lower
+                                .contains(&format!("authorization: bearer {token_lower}")),
+                            "missing bearer auth: {request}"
+                        );
+                        if request.starts_with("GET /v1/health ") {
+                            write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                            continue;
+                        }
+                        if request.starts_with("GET /v1/ready ") {
+                            write_http_response(
+                                &mut stream,
+                                "200 OK",
+                                "application/json",
+                                "{\"ready\":true,\"daemon_epoch\":\"test\"}",
+                            );
+                            continue;
+                        }
+                        if request.starts_with("GET /v1/sessions/sess-observe-daemon ") {
+                            write_http_response(
+                                &mut stream,
+                                "200 OK",
+                                "application/json",
+                                &response_body,
+                            );
+                            requests_for_server
+                                .lock()
+                                .expect("request capture")
+                                .push(request);
+                            continue;
+                        }
+                        if request.starts_with("POST /v1/sessions/sess-observe-daemon/observe ") {
+                            write_http_response(
+                                &mut stream,
+                                "200 OK",
+                                "application/json",
+                                &response_body,
+                            );
+                            requests_for_server
+                                .lock()
+                                .expect("request capture")
+                                .push(request);
+                            continue;
+                        }
+                        panic!("unexpected request: {request}");
+                    }
+                    Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("accept failed: {error}"),
+                }
+            }
+        });
+
+        let exit = SessionObserveArgs {
+            session_id: "sess-observe-daemon".into(),
+            poll_interval: 0,
+            json: true,
+            actor: Some("observer-1".into()),
+            project_dir: Some(project.to_string_lossy().into_owned()),
+        }
+        .execute(&AppContext::default())
+        .expect("session observe should route through daemon");
+
+        assert_eq!(exit, 0);
+
+        running.store(false, Ordering::SeqCst);
+        server.join().expect("server");
+
+        let requests = requests.lock().expect("request capture");
+        let observe_request = requests
+            .iter()
+            .find(|request| {
+                request.starts_with("POST /v1/sessions/sess-observe-daemon/observe ")
+            })
+            .expect("captured observe request");
+        assert!(
+            observe_request.contains("\"actor\":\"observer-1\""),
+            "observe actor must be forwarded in daemon request body: {observe_request}"
         );
     });
 }

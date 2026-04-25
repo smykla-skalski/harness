@@ -3,13 +3,13 @@ use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, ImproverApplyRequest, LeaderTransferRequest, ManagedAgentListResponse,
-    ManagedAgentSnapshot, RoleChangeRequest, RuntimeSessionResolutionResponse, SessionDetail,
-    SessionEndRequest, SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse,
-    SessionStartRequest, SessionSummary, SessionTitleRequest, SignalAckRequest,
-    SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
-    TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-    TaskUpdateRequest,
+    ManagedAgentSnapshot, ObserveSessionRequest, RoleChangeRequest,
+    RuntimeSessionResolutionResponse, SessionDetail, SessionEndRequest, SessionJoinRequest,
+    SessionLeaveRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
+    SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
+    TaskArbitrateRequest, TaskAssignRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
+    TaskCreateRequest, TaskDropRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
+    TaskSubmitReviewRequest, TaskUpdateRequest,
 };
 use crate::errors::CliError;
 use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
@@ -289,6 +289,14 @@ impl DaemonClient {
         request: &SignalSendRequest,
     ) -> Result<SessionDetail, CliError> {
         self.post(&format!("/v1/sessions/{session_id}/signal"), request)
+    }
+
+    pub fn observe_session(
+        &self,
+        session_id: &str,
+        request: &ObserveSessionRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/observe"), request)
     }
 
     pub fn record_signal_ack(

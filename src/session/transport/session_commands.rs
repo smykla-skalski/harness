@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::AdoptSessionRequest;
+use crate::daemon::client::DaemonClient;
+use crate::daemon::protocol::{AdoptSessionRequest, ObserveSessionRequest};
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
@@ -244,21 +245,27 @@ impl Execute for SessionObserveArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        let actor = self.actor.as_deref().filter(|value| !value.trim().is_empty());
         if self.poll_interval > 0 {
             observe::execute_session_watch(
                 &self.session_id,
                 &project,
                 self.poll_interval,
                 self.json,
-                self.actor.as_deref(),
+                actor,
             )
-        } else {
-            observe::execute_session_observe(
+        } else if let (Some(actor), Some(client)) = (actor, DaemonClient::try_connect()) {
+            // Daemon-backed observe tasks must go through the dedicated observe
+            // mutation so issue metadata survives canonical persistence.
+            let _ = client.observe_session(
                 &self.session_id,
-                &project,
-                self.json,
-                self.actor.as_deref(),
-            )
+                &ObserveSessionRequest {
+                    actor: Some(actor.to_string()),
+                },
+            )?;
+            observe::execute_session_observe(&self.session_id, &project, self.json, None)
+        } else {
+            observe::execute_session_observe(&self.session_id, &project, self.json, actor)
         }
     }
 }
