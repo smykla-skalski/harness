@@ -135,12 +135,22 @@ final class SwarmFixture {
   }
 
   func selectTask(_ taskID: String) {
-    let task = testCase.element(in: app, identifier: Accessibility.sessionTaskCard(taskID))
+    let identifier = Accessibility.sessionTaskCard(taskID)
+    let task = testCase.element(in: app, identifier: identifier)
     XCTAssertTrue(
       testCase.waitForElement(task, timeout: 15),
       "Expected swarm task card \(taskID)\n\(diagnosticsSummary())"
     )
-    task.firstMatch.tap()
+    XCTAssertTrue(
+      scrollElementIntoView(task),
+      """
+      Expected swarm task card \(taskID) to become hittable.
+      taskFrame=\(task.frame)
+      scrollFrame=\(scrollTarget().frame)
+      \(diagnosticsSummary())
+      """
+    )
+    testCase.tapElement(in: app, identifier: identifier)
   }
 
   func expectIdentifier(_ identifier: String, timeout: TimeInterval = 15) {
@@ -212,6 +222,51 @@ final class SwarmFixture {
       values[String(parts[0])] = String(parts[1])
     }
     return values
+  }
+
+  private func scrollElementIntoView(
+    _ element: XCUIElement,
+    timeout: TimeInterval = 8
+  ) -> Bool {
+    let deadline = Date.now.addingTimeInterval(timeout)
+    while Date.now < deadline {
+      if app.state != .runningForeground {
+        app.activate()
+      }
+      if element.exists && element.isHittable {
+        return true
+      }
+
+      scrollToward(element)
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.15))
+    }
+    return element.exists && element.isHittable
+  }
+
+  private func scrollToward(_ element: XCUIElement) {
+    let target = scrollTarget()
+    let window = testCase.mainWindow(in: app)
+    if element.exists,
+      !element.frame.isEmpty,
+      !window.frame.isEmpty,
+      element.frame.minY < window.frame.minY + 72
+    {
+      testCase.dragDown(in: app, element: target, distanceRatio: 0.18)
+      return
+    }
+
+    testCase.dragUp(in: app, element: target, distanceRatio: 0.18)
+  }
+
+  private func scrollTarget() -> XCUIElement {
+    let window = testCase.mainWindow(in: app)
+    let windowScrollView = window.scrollViews.firstMatch
+    if windowScrollView.exists {
+      return windowScrollView
+    }
+
+    let appScrollView = app.scrollViews.firstMatch
+    return appScrollView.exists ? appScrollView : window
   }
 }
 
