@@ -6,7 +6,7 @@ public enum BuildSettings {
         "CLANG_CXX_LANGUAGE_STANDARD": "gnu++20",
         "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION": "YES",
         "CODE_SIGNING_ALLOWED": "YES",
-        "CURRENT_PROJECT_VERSION": "30.0.4", // VERSION_MARKER_CURRENT
+        "CURRENT_PROJECT_VERSION": "30.1.0", // VERSION_MARKER_CURRENT
         "DEAD_CODE_STRIPPING": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
@@ -24,7 +24,7 @@ public enum BuildSettings {
         "HARNESS_MONITOR_BUILD_GIT_COMMIT": "local-dev",
         "HARNESS_MONITOR_BUILD_GIT_DIRTY": "false",
         "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT": "local-dev",
-        "MARKETING_VERSION": "30.0.4" // VERSION_MARKER_MARKETING
+        "MARKETING_VERSION": "30.1.0" // VERSION_MARKER_MARKETING
     ]
 
     public static let previewOverrides: SettingsDictionary = [
@@ -47,7 +47,8 @@ public enum BuildSettings {
 
     public static func frameworkSettings(
         bundleId: String,
-        previewIndexOff: Bool = true
+        previewIndexOff: Bool = true,
+        extraBase: SettingsDictionary = [:]
     ) -> Settings {
         var preview: SettingsDictionary = [
             "ENABLE_MODULE_VERIFIER": "NO"
@@ -57,16 +58,20 @@ public enum BuildSettings {
             preview["ONLY_ACTIVE_ARCH"] = "YES"
             preview["SWIFT_ENABLE_EAGER_LINKING"] = "NO"
         }
+        var base: SettingsDictionary = [
+            "CODE_SIGN_STYLE": "Automatic",
+            "CODE_SIGNING_ALLOWED": "YES",
+            "DEVELOPMENT_TEAM": "Q498EB36N4",
+            "ENABLE_MODULE_VERIFIER": "YES",
+            "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
+            "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",
+            "PRODUCT_BUNDLE_IDENTIFIER": .string(bundleId)
+        ]
+        for (key, value) in extraBase {
+            base[key] = value
+        }
         return .settings(
-            base: [
-                "CODE_SIGN_STYLE": "Automatic",
-                "CODE_SIGNING_ALLOWED": "YES",
-                "DEVELOPMENT_TEAM": "Q498EB36N4",
-                "ENABLE_MODULE_VERIFIER": "YES",
-                "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
-                "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",
-                "PRODUCT_BUNDLE_IDENTIFIER": .string(bundleId)
-            ],
+            base: base,
             configurations: [
                 .debug(name: "Debug"),
                 .debug(name: "Preview", settings: preview),

@@ -12,14 +12,12 @@ private let uiPreviewableSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorUIPreviewable/**/*.swift", excluding: ["Sources/HarnessMonitorUIPreviewable/Features/**"])
 ] + FeatureFlags.uiPreviewableAdditionalSourceGlobs())
 
-private let kitTarget: Target = .target(
-    name: "HarnessMonitorKit",
-    destinations: macOSDestinations,
-    product: .framework,
-    bundleId: "io.harnessmonitor.kit",
-    deploymentTargets: macOSDeploymentTargets,
-    sources: ["Sources/HarnessMonitorKit/**/*.swift"],
-    dependencies: [
+private let kitSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorKit/**/*.swift", excluding: ["Sources/HarnessMonitorKit/Features/**"])
+] + FeatureFlags.kitAdditionalSourceGlobs())
+
+private let kitDependencies: [TargetDependency] = {
+    var deps: [TargetDependency] = [
         .sdk(name: "AppKit", type: .framework),
         .sdk(name: "ApplicationServices", type: .framework),
         .sdk(name: "AVFAudio", type: .framework),
@@ -29,16 +27,26 @@ private let kitTarget: Target = .target(
         .sdk(name: "IOKit", type: .framework),
         .sdk(name: "ServiceManagement", type: .framework),
         .sdk(name: "UserNotifications", type: .framework),
-        .external(name: "OpenTelemetryApi"),
-        .external(name: "OpenTelemetryConcurrency"),
-        .external(name: "OpenTelemetrySdk"),
-        .external(name: "PersistenceExporter"),
-        .external(name: "OpenTelemetryProtocolExporter"),
-        .external(name: "OpenTelemetryProtocolExporterHTTP"),
-        .external(name: "GRPC"),
         .external(name: "HarnessMonitorRegistry")
-    ],
-    settings: BuildSettings.frameworkSettings(bundleId: "io.harnessmonitor.kit")
+    ]
+    deps.append(contentsOf: FeatureFlags.kitAdditionalDependencies())
+    return deps
+}()
+
+private let kitSettings: Settings = BuildSettings.frameworkSettings(
+    bundleId: "io.harnessmonitor.kit",
+    extraBase: ["SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()]
+)
+
+private let kitTarget: Target = .target(
+    name: "HarnessMonitorKit",
+    destinations: macOSDestinations,
+    product: .framework,
+    bundleId: "io.harnessmonitor.kit",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: kitSources,
+    dependencies: kitDependencies,
+    settings: kitSettings
 )
 
 private let uiPreviewableTarget: Target = {
@@ -197,13 +205,17 @@ private let uiTestHostTarget: Target = .target(
     settings: uiTestHostSettings
 )
 
+private let kitTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorKitTests/**/*.swift", excluding: ["Tests/HarnessMonitorKitTests/Features/**"])
+] + FeatureFlags.kitTestsAdditionalSourceGlobs())
+
 private let kitTestsTarget: Target = .target(
     name: "HarnessMonitorKitTests",
     destinations: macOSDestinations,
     product: .unitTests,
     bundleId: "io.harnessmonitor.kit-tests",
     deploymentTargets: macOSDeploymentTargets,
-    sources: ["Tests/HarnessMonitorKitTests/**/*.swift"],
+    sources: kitTestsSources,
     dependencies: [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorUIPreviewable")
@@ -211,7 +223,8 @@ private let kitTestsTarget: Target = .target(
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
         "DEVELOPMENT_TEAM": "Q498EB36N4",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.kit-tests"
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.kit-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ])
 )
 
