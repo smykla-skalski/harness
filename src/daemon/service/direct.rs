@@ -2,7 +2,8 @@ use super::session_setup::{PreparedSession, prepare_session, rollback_session_ar
 use super::session_teardown::destroy_session_artifacts;
 use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, index, record_signal_ack,
-    resolve_hook_agent, session_not_found, session_service, session_storage, utc_now,
+    resolve_hook_agent, session_not_found, session_service, session_storage,
+    sync_file_state_from_async_db, utc_now,
 };
 use crate::errors::CliErrorKind;
 
@@ -222,6 +223,7 @@ pub(crate) async fn join_session_direct_async(
             Ok((agent_id, joined_role, state.clone()))
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,
@@ -296,6 +298,7 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
     if !registered {
         return Ok(false);
     }
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
     Ok(true)
@@ -342,6 +345,7 @@ pub(crate) async fn update_session_title_direct_async(
             Ok(state.clone())
         })
         .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await?;
     Ok(state)
@@ -399,6 +403,7 @@ pub(crate) async fn disconnect_agent_direct_async(
         return Ok(false);
     }
 
+    sync_file_state_from_async_db(async_db, session_id).await?;
     async_db
         .append_log_entry(&build_log_entry(
             session_id,

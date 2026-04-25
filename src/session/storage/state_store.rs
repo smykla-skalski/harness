@@ -51,6 +51,25 @@ pub(crate) fn create_state(layout: &SessionLayout, state: &SessionState) -> Resu
     Ok(created)
 }
 
+/// Overwrite an existing session state atomically without mutating its version.
+///
+/// # Errors
+/// Returns `CliError` on I/O or serialization failures, or if state is missing.
+pub(crate) fn save_state(layout: &SessionLayout, state: &SessionState) -> Result<(), CliError> {
+    let session_id = layout.session_id.clone();
+    files::validate_session_id(&layout.session_id)?;
+    let _ = state_repository(layout).update(|current| {
+        if current.is_none() {
+            return Err(CliErrorKind::session_not_active(format!(
+                "session '{session_id}' not found"
+            ))
+            .into());
+        }
+        Ok(Some(state.clone()))
+    })?;
+    Ok(())
+}
+
 /// Load, modify, and save session state under an exclusive lock.
 ///
 /// # Errors
