@@ -103,3 +103,29 @@ e2e_wait_for_file() {
   printf 'error: timed out waiting for %s\n' "$path" >&2
   return 1
 }
+
+e2e_timestamp_utc() {
+  TZ=UTC date '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+e2e_timestamp_slug_utc() {
+  TZ=UTC date '+%Y-%m-%dT%H-%M-%SZ'
+}
+
+e2e_run_with_log() {
+  local log_path="$1"
+  shift
+
+  mkdir -p "$(dirname -- "$log_path")"
+  set +e
+  "$@" 2>&1 | tee "$log_path"
+  local statuses=("${PIPESTATUS[@]}")
+  set -e
+
+  local command_status="${statuses[0]:-0}"
+  local tee_status="${statuses[1]:-0}"
+  if [[ "$command_status" -ne 0 ]]; then
+    return "$command_status"
+  fi
+  return "$tee_status"
+}

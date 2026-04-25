@@ -39,6 +39,7 @@ require_file "scripts/e2e/inject-heuristic-log.sh"
 require_file "scripts/e2e/append-gap.sh"
 require_file "scripts/e2e/gaps-open-count.sh"
 require_file "scripts/e2e/swarm-full-flow.sh"
+require_file "scripts/e2e/triage-run.sh"
 require_file "docs/e2e/swarm-gaps.md"
 require_file "apps/harness-monitor-macos/Scripts/test-swarm-e2e.sh"
 require_file "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift"
@@ -66,18 +67,31 @@ require_text "scripts/e2e/swarm-full-flow.sh" "session task arbitrate"
 require_text "scripts/e2e/swarm-full-flow.sh" "observe doctor --json"
 require_text "scripts/e2e/swarm-full-flow.sh" "run_harness_ignore_failure()"
 require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
-require_text "scripts/e2e/swarm-full-flow.sh" '-workspace "$APP_ROOT/HarnessMonitor.xcworkspace"'
+require_text "scripts/e2e/swarm-full-flow.sh" "-workspace \"\$APP_ROOT/HarnessMonitor.xcworkspace\""
+require_text "scripts/e2e/swarm-full-flow.sh" "-resultBundlePath \"\$RESULT_BUNDLE_PATH\""
+require_text "scripts/e2e/swarm-full-flow.sh" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
+require_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
+require_text "scripts/e2e/swarm-full-flow.sh" 'triage-run.sh'
+require_text "scripts/e2e/swarm-full-flow.sh" 'Swarm e2e artifacts recorded at'
 require_text "scripts/e2e/swarm-full-flow.sh" 'io.harnessmonitor.agents-e2e-tests'
 require_text "scripts/e2e/swarm-full-flow.sh" 'AGENTS_E2E_RUNNER_CONTAINER_ROOT'
-require_no_text "scripts/e2e/swarm-full-flow.sh" '-project "$APP_ROOT/HarnessMonitor.xcodeproj"'
+require_no_text "scripts/e2e/swarm-full-flow.sh" "-project \"\$APP_ROOT/HarnessMonitor.xcodeproj\""
 require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
-require_no_text "scripts/e2e/swarm-full-flow.sh" 'SYNC_DIR="$DATA_HOME/e2e-sync"'
+require_no_text "scripts/e2e/swarm-full-flow.sh" "SYNC_DIR=\"\$DATA_HOME/e2e-sync\""
+require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
+require_text "scripts/e2e/triage-run.sh" 'xcresulttool export attachments'
+require_text "scripts/e2e/triage-run.sh" 'missing or empty screen recording'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "func act16"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "captureCheckpoint"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestAccessibility.swift" "sessionAgentListState"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFullFlowTests.swift" "func testSwarmFullFlow()"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestSupport.swift" "failure-final"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestDiagnosticsSupport.swift" "recordDiagnosticsSnapshot"
+require_text "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport/HarnessMonitorUITestDiagnosticsSupport.swift" "XCUIScreen.main.screenshot()"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests.swift" "selectFastModelForTerminal(in: app, runtime: \"codex\")"
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"GPT-5.3 Codex Spark\""
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/HarnessMonitorAgentsE2ETests+Support.swift" "\"codex\": \"Low\""

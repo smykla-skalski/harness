@@ -4,6 +4,7 @@ import XCTest
 class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
   nonisolated static let daemonDataHomeKey = "HARNESS_DAEMON_DATA_HOME"
+  nonisolated static let artifactsDirectoryKey = "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
@@ -27,6 +28,17 @@ class HarnessMonitorUITestCase: XCTestCase {
         break
       }
     }
+  }
+
+  override func tearDownWithError() throws {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    if testRun?.hasSucceeded == false {
+      recordDiagnosticsSnapshot(
+        in: app,
+        named: "\(sanitizedDiagnosticsComponent(name))-failure-final"
+      )
+    }
+    try super.tearDownWithError()
   }
 }
 
