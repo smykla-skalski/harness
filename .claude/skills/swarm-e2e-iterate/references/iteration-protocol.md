@@ -4,6 +4,7 @@
 
 - Recording-first triage: start from the `.mov` before any other artifact.
 - Read the ledger before any iteration.
+- After the recording pass, complete the checklist proof loop in `references/recording-checklist.md` with one terse verdict line per item.
 - Record the run slug and iteration count.
 - Append confirmed findings only.
 - Never delete history.
