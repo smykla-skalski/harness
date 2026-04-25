@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Command execution
+
+**Always use `rtk`** - it is the token-optimized proxy for shell commands and saves 60-90% on dev operations. Prefix every shell command with `rtk` (e.g. `rtk git status`, `rtk cargo test`). The Claude Code hook auto-rewrites commands transparently; do not fight it.
+
+**`rtk proxy` is last resort only.** It bypasses all output filters and leaks raw command output (4000+ line dumps), burning the context window. Use it only when filtered output hides information you genuinely need to debug a specific issue, and switch back to plain `rtk` immediately after.
+
+Discover supported workflows with `rtk mise tasks ls` and run repo logic only through `rtk mise run <task>` or `rtk mise run <task> -- <args>`. Do not wrap `mise` in `bash -lc`, `zsh -lc`, `env`, or other shells. Do not run repo scripts, raw `cargo`, or raw `xcodebuild` when a `mise` task already covers the workflow.
+
 ## Build and test commands
 
 ```bash
@@ -83,6 +91,15 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - Hook messages use `HookMessage` enum with `into_result()` conversion
 - Commits: `{type}({scope}): {message}` — types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
 - Never create merge commits. Keep history flat with rebase/cherry-pick workflows only; if a merge commit appears locally, rewrite it out before pushing or handing off.
+
+## Commit signing (strict)
+
+Every commit **must** be created with `git commit -sS` - both the `-s` sign-off and `-S` GPG signature are required, no exceptions. After each commit, verify:
+
+- the commit signature is valid (`git log --show-signature -1`)
+- the sign-off trailer is exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`
+
+Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or by using a different key. If 1Password (signing key source) is unavailable, hard stop and wait for the user - do not commit unsigned and do not substitute another key.
 
 ## Versioning
 
