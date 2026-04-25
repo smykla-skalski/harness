@@ -18,7 +18,12 @@ LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
 LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
 MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
 REGENERATE_AFTER_SUCCESS="${HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD:-0}"
+TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-2}"
+JUNIT_REPORT_DIR="${HARNESS_MONITOR_JUNIT_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
+USE_TUIST_TEST="${HARNESS_MONITOR_USE_TUIST_TEST:-1}"
 TRANSIENT_DB_STATUS=200
+
+export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
 derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
 args=("$@")
@@ -202,13 +207,52 @@ acquire_lock() {
   printf '%s\n' "$$" > "$lock_pid_file"
 }
 
+build_test_action_args() {
+  local -a out=("${args[@]}")
+  if (( TEST_RETRY_ITERATIONS > 0 )) \
+      && ! xcodebuild_args_have_flag "-retry-tests-on-failure" "${args[@]}" \
+      && ! xcodebuild_args_have_flag "-test-iterations" "${args[@]}"; then
+    out+=("-retry-tests-on-failure" "-test-iterations" "$TEST_RETRY_ITERATIONS")
+  fi
+  printf '%s\n' "${out[@]}"
+}
+
+junit_report_path_for_run() {
+  /bin/mkdir -p "$JUNIT_REPORT_DIR"
+  printf '%s/junit-%s-%s.xml\n' "$JUNIT_REPORT_DIR" "$$" "$(date +%s)"
+}
+
+should_use_tuist_test() {
+  case "$USE_TUIST_TEST" in
+    1|true|TRUE|yes|YES|on|ON) ;;
+    *) return 1 ;;
+  esac
+  command -v tuist >/dev/null 2>&1
+}
+
+run_inner() {
+  local log_path="$1"
+  local -a inner_args=("${args[@]}")
+  local -a fmt_prefix=()
+  if xcodebuild_args_are_test_action "${args[@]}"; then
+    mapfile -t inner_args < <(build_test_action_args)
+    fmt_prefix=(--junit-path "$(junit_report_path_for_run)")
+    if should_use_tuist_test; then
+      fmt_prefix+=(--use-tuist)
+    fi
+  fi
+  set +e
+  run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 | tee "$log_path"
+  local status="${PIPESTATUS[0]}"
+  set -e
+  return "$status"
+}
+
 run_once() {
   local log_path status
   log_path="$(create_temp_log_path)"
-  set +e
-  run_xcodebuild_command "${args[@]}" 2>&1 | tee "$log_path"
-  status="${PIPESTATUS[0]}"
-  set -e
+  run_inner "$log_path"
+  status=$?
 
   if (( status == 0 )); then
     normalize_shared_schemes_after_xcodebuild
