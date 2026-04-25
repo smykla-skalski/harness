@@ -24,15 +24,15 @@ extension PreviewHarnessClient {
         runtime: "codex",
         models: [
           RuntimeModel(
-            id: "gpt-5.4-mini",
-            displayName: "GPT-5.4 mini",
+            id: "gpt-5.3-codex-spark",
+            displayName: "GPT-5.3 Codex Spark",
             tier: .fast,
             effortKind: .reasoningEffort,
             effortValues: ["low", "medium", "high", "xhigh"]
           ),
           RuntimeModel(
-            id: "gpt-5.3-codex-spark",
-            displayName: "GPT-5.3 Codex Spark",
+            id: "gpt-5.4-mini",
+            displayName: "GPT-5.4 mini",
             tier: .fast,
             effortKind: .reasoningEffort,
             effortValues: ["low", "medium", "high", "xhigh"]
@@ -67,7 +67,7 @@ extension PreviewHarnessClient {
           ),
         ],
         default: "gpt-5.5",
-        cheapestFastest: "gpt-5.4-mini"
+        cheapestFastest: "gpt-5.3-codex-spark"
       ),
       RuntimeModelCatalog(
         runtime: "claude",

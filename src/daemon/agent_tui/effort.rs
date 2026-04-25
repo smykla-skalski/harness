@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn launch_profile_accepts_effort_for_fast_codex_model() {
         let mut request = base_request("codex");
-        request.model = Some("gpt-5.4-mini".into());
+        request.model = Some("gpt-5.3-codex-spark".into());
         request.effort = Some("medium".into());
         let profile = request.launch_profile().expect("profile");
         assert_eq!(
@@ -155,7 +155,7 @@ mod tests {
             vec![
                 "codex".to_string(),
                 "--model".to_string(),
-                "gpt-5.4-mini".to_string(),
+                "gpt-5.3-codex-spark".to_string(),
                 "--reasoning-effort".to_string(),
                 "medium".to_string(),
             ]

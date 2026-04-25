@@ -20,14 +20,20 @@ extension HarnessMonitorAgentsE2ETests {
 
   /// Display name of the cheapest/fastest model exposed by each runtime's
   /// catalog. E2E runs use these to keep token spend and turnaround low.
-  /// Keep in sync with `src/agents/runtime/models.rs::cheapest_fastest`.
+  /// Keep in sync with `src/agents/runtime/models/catalogs.rs::cheapest_fastest`.
   static let e2eFastModelDisplayName: [String: String] = [
-    "codex": "GPT-5.4 mini",
+    "codex": "GPT-5.3 Codex Spark",
     "claude": "Haiku 4.5",
     "gemini": "Gemini 2.5 Flash-Lite",
     "copilot": "GPT-5.4 mini",
     "vibe": "Mistral Small 4",
     "opencode": "Claude Haiku 4.5",
+  ]
+
+  static let e2eLowestEffortTitle: [String: String] = [
+    "codex": "Low",
+    "claude": "Off",
+    "opencode": "Off",
   ]
 
   func selectFastModelForTerminal(in app: XCUIApplication, runtime: String) {
@@ -43,6 +49,13 @@ extension HarnessMonitorAgentsE2ETests {
       controlIdentifier: Accessibility.agentsModelPicker,
       optionTitle: displayName
     )
+    if let effortTitle = Self.e2eLowestEffortTitle[runtime] {
+      selectSegment(
+        in: app,
+        controlIdentifier: Accessibility.agentsEffortPicker,
+        title: effortTitle
+      )
+    }
   }
 
   func selectFastModelForCodex(in app: XCUIApplication) {
@@ -101,6 +114,11 @@ extension HarnessMonitorAgentsE2ETests {
       in: app,
       controlIdentifier: Accessibility.agentsCodexModelPicker,
       optionTitle: displayName
+    )
+    selectSegment(
+      in: app,
+      controlIdentifier: Accessibility.agentsCodexEffortPicker,
+      title: Self.e2eLowestEffortTitle["codex"] ?? "Low"
     )
   }
 
