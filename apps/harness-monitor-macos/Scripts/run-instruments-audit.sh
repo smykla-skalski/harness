@@ -564,134 +564,6 @@ acquire_audit_lock() {
   write_lock_info "$run_id" "$run_label" "$started_at_utc" "$run_dir"
 }
 
-enforce_instruments_metric_budgets() {
-  local summary_path="$1"
-
-  python3 - "$summary_path" <<'PY'
-from __future__ import annotations
-
-import json
-import sys
-from pathlib import Path
-from typing import Any
-
-summary = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-
-SWIFTUI_BUDGETS: dict[str, dict[str, float]] = {
-    "launch-dashboard": {
-        "total_updates": 25_000,
-        "body_updates": 2_500,
-        "max_update_group_ms": 50,
-        "hitches": 0,
-        "potential_hangs": 0,
-    },
-    "select-session-cockpit": {
-        "total_updates": 35_000,
-        "body_updates": 3_500,
-        "max_update_group_ms": 50,
-        "hitches": 0,
-        "potential_hangs": 0,
-    },
-    "refresh-and-search": {
-        "total_updates": 30_000,
-        "body_updates": 3_000,
-        "max_update_group_ms": 50,
-        "hitches": 0,
-        "potential_hangs": 0,
-    },
-    "timeline-burst": {
-        "total_updates": 30_000,
-        "body_updates": 3_000,
-        "max_update_group_ms": 50,
-        "hitches": 0,
-        "potential_hangs": 0,
-    },
-}
-DEFAULT_SWIFTUI_BUDGET = {
-    "total_updates": 35_000,
-    "body_updates": 3_500,
-    "max_update_group_ms": 50,
-    "hitches": 0,
-    "potential_hangs": 0,
-}
-ALLOCATIONS_BUDGETS: dict[str, dict[str, float]] = {
-    "settings-background-cycle": {"heap_total_bytes": 350 * 1024 * 1024},
-    "settings-backdrop-cycle": {"heap_total_bytes": 350 * 1024 * 1024},
-    "offline-cached-open": {"heap_total_bytes": 300 * 1024 * 1024},
-}
-
-
-def metric(metrics: dict[str, Any], *path: str) -> float:
-    value: Any = metrics
-    for key in path:
-        if not isinstance(value, dict):
-            return 0
-        value = value.get(key, 0)
-    if isinstance(value, int | float):
-        return float(value)
-    return 0
-
-
-def assert_swiftui_budget(capture: dict[str, Any]) -> list[str]:
-    scenario = capture["scenario"]
-    metrics = capture.get("metrics", {})
-    budget = SWIFTUI_BUDGETS.get(scenario, DEFAULT_SWIFTUI_BUDGET)
-    failures: list[str] = []
-
-    checks = {
-        "total_updates": metric(metrics, "swiftui_updates", "total_count"),
-        "body_updates": metric(metrics, "swiftui_updates", "body_update_count"),
-        "max_update_group_ms": metric(metrics, "swiftui_update_groups", "duration_ns_max")
-        / 1_000_000,
-        "hitches": metric(metrics, "hitches", "count"),
-        "potential_hangs": metric(metrics, "potential_hangs", "count"),
-    }
-    for name, value in checks.items():
-        limit = budget[name]
-        if value > limit:
-            failures.append(
-                f"{scenario} SwiftUI {name} exceeded budget: {value:g} > {limit:g}"
-            )
-    return failures
-
-
-def assert_allocations_budget(capture: dict[str, Any]) -> list[str]:
-    scenario = capture["scenario"]
-    budget = ALLOCATIONS_BUDGETS.get(scenario)
-    if budget is None:
-        return []
-
-    summary_rows = (
-        capture.get("metrics", {})
-        .get("allocations", {})
-        .get("summary_rows", {})
-    )
-    heap = summary_rows.get("All Heap Allocations", {})
-    total_bytes = float(heap.get("total_bytes", 0) or 0)
-    limit = budget["heap_total_bytes"]
-    if total_bytes > limit:
-        return [
-            f"{scenario} Allocations heap_total_bytes exceeded budget: "
-            f"{total_bytes:g} > {limit:g}"
-        ]
-    return []
-
-
-failures: list[str] = []
-for capture in summary.get("captures", []):
-    if capture.get("template") == "SwiftUI":
-        failures.extend(assert_swiftui_budget(capture))
-    elif capture.get("template") == "Allocations":
-        failures.extend(assert_allocations_budget(capture))
-
-if failures:
-    print("Instruments metric budgets failed:", file=sys.stderr)
-    for failure in failures:
-        print(f"- {failure}", file=sys.stderr)
-    raise SystemExit(1)
-PY
-}
-
 plist_value() {
   local plist_path="$1"
   local key="$2"
@@ -1091,192 +963,95 @@ macos_version="$(sw_vers -productVersion)"
 macos_build="$(sw_vers -buildVersion)"
 host_arch="$(uname -m)"
 
-python3 - "$run_dir/manifest.json" "$label" "$run_id" "$timestamp" "$git_commit" "$git_dirty" "$workspace_fingerprint" "$build_started_at_utc" "$xcode_version" "$xctrace_version" "$macos_version" "$macos_build" "$host_arch" "$PROJECT_PATH" "$SHIPPING_SCHEME" "$HOST_SCHEME" "$SHIPPING_APP_PATH" "$HOST_APP_PATH" "$HOST_BUNDLE_ID" "$STAGED_HOST_APP_PATH" "$STAGED_HOST_BINARY_PATH" "$STAGED_HOST_BUNDLE_ID" "$host_embedded_commit" "$host_embedded_dirty" "$host_embedded_workspace_fingerprint" "$host_embedded_started_at_utc" "$host_binary_sha256" "$host_bundle_sha256" "$host_binary_mtime_utc" "$BUILD_SHIPPING" "$shipping_embedded_commit" "$shipping_embedded_dirty" "$shipping_embedded_workspace_fingerprint" "$shipping_embedded_started_at_utc" "$shipping_binary_sha256" "$shipping_bundle_sha256" "$shipping_binary_mtime_utc" "$SKIP_DAEMON_BUNDLE" "$AUDIT_DAEMON_BUNDLE_MODE" "$AUDIT_DAEMON_CARGO_TARGET_DIR" "$capture_records_file" "$UI_TESTS_ENV" "$UI_ACCESSIBILITY_MARKERS_ENV" "$KEEP_ANIMATIONS_ENV" "$LAUNCH_MODE_ENV" "$WINDOW_WIDTH_ENV" "$WINDOW_HEIGHT_ENV" "$HIDE_DOCK_ENV" "$audit_commit_env" "$audit_dirty_env" "$audit_run_id_env" "$audit_label_env" "$audit_workspace_fingerprint_env" "$audit_build_started_at_utc_env" "$PERSISTENCE_ARG_ONE" "$PERSISTENCE_ARG_TWO" "${selected_scenarios[@]}" <<'PY'
-from __future__ import annotations
+manifest_inputs_path="$run_dir/.manifest-inputs.json"
+selected_scenarios_json="$(jq -nc --args -- "${selected_scenarios[@]}" '$ARGS.positional')"
+git_dirty_json="false"
+[[ "$git_dirty" == "true" ]] && git_dirty_json="true"
+shipping_built_json="false"
+[[ "$BUILD_SHIPPING" == "1" ]] && shipping_built_json="true"
+audit_daemon_bundle_requested_skip_json="false"
+[[ "$SKIP_DAEMON_BUNDLE" == "1" ]] && audit_daemon_bundle_requested_skip_json="true"
 
-import json
-import sys
-from pathlib import Path
+jq -n \
+  --arg label "$label" \
+  --arg run_id "$run_id" \
+  --arg created_at_utc "$timestamp" \
+  --arg commit "$git_commit" \
+  --argjson dirty "$git_dirty_json" \
+  --arg workspace_fingerprint "$workspace_fingerprint" \
+  --arg build_started_at_utc "$build_started_at_utc" \
+  --arg xcode_version "$xcode_version" \
+  --arg xctrace_version "$xctrace_version" \
+  --arg macos_version "$macos_version" \
+  --arg macos_build "$macos_build" \
+  --arg arch "$host_arch" \
+  --arg project "$PROJECT_PATH" \
+  --arg shipping_scheme "$SHIPPING_SCHEME" \
+  --arg host_scheme "$HOST_SCHEME" \
+  --arg shipping_app_path "$SHIPPING_APP_PATH" \
+  --arg host_app_path "$HOST_APP_PATH" \
+  --arg host_bundle_id "$HOST_BUNDLE_ID" \
+  --arg staged_host_app_path "$STAGED_HOST_APP_PATH" \
+  --arg staged_host_binary_path "$STAGED_HOST_BINARY_PATH" \
+  --arg staged_host_bundle_id "$STAGED_HOST_BUNDLE_ID" \
+  --argjson audit_daemon_requested_skip "$audit_daemon_bundle_requested_skip_json" \
+  --arg audit_daemon_mode "$AUDIT_DAEMON_BUNDLE_MODE" \
+  --arg audit_daemon_cargo_target_dir "$AUDIT_DAEMON_CARGO_TARGET_DIR" \
+  --arg host_embedded_commit "$host_embedded_commit" \
+  --arg host_embedded_dirty "$host_embedded_dirty" \
+  --arg host_embedded_workspace_fingerprint "$host_embedded_workspace_fingerprint" \
+  --arg host_embedded_started_at_utc "$host_embedded_started_at_utc" \
+  --arg host_binary_sha256 "$host_binary_sha256" \
+  --arg host_bundle_sha256 "$host_bundle_sha256" \
+  --arg host_binary_mtime_utc "$host_binary_mtime_utc" \
+  --argjson shipping_built "$shipping_built_json" \
+  --arg shipping_embedded_commit "$shipping_embedded_commit" \
+  --arg shipping_embedded_dirty "$shipping_embedded_dirty" \
+  --arg shipping_embedded_workspace_fingerprint "$shipping_embedded_workspace_fingerprint" \
+  --arg shipping_embedded_started_at_utc "$shipping_embedded_started_at_utc" \
+  --arg shipping_binary_sha256 "$shipping_binary_sha256" \
+  --arg shipping_bundle_sha256 "$shipping_bundle_sha256" \
+  --arg shipping_binary_mtime_utc "$shipping_binary_mtime_utc" \
+  --argjson selected_scenarios "$selected_scenarios_json" \
+  '{
+    label: $label,
+    run_id: $run_id,
+    created_at_utc: $created_at_utc,
+    git: {commit: $commit, dirty: $dirty, workspace_fingerprint: $workspace_fingerprint, build_started_at_utc: $build_started_at_utc},
+    system: {xcode_version: $xcode_version, xctrace_version: $xctrace_version, macos_version: $macos_version, macos_build: $macos_build, arch: $arch},
+    targets: {
+      project: $project, shipping_scheme: $shipping_scheme, host_scheme: $host_scheme,
+      shipping_app_path: $shipping_app_path, host_app_path: $host_app_path, host_bundle_id: $host_bundle_id,
+      staged_host_app_path: $staged_host_app_path, staged_host_binary_path: $staged_host_binary_path, staged_host_bundle_id: $staged_host_bundle_id
+    },
+    build_provenance: {
+      audit_daemon_bundle: {requested_skip: $audit_daemon_requested_skip, mode: $audit_daemon_mode, cargo_target_dir: $audit_daemon_cargo_target_dir},
+      host: {embedded_commit: $host_embedded_commit, embedded_dirty: $host_embedded_dirty, embedded_workspace_fingerprint: $host_embedded_workspace_fingerprint, embedded_started_at_utc: $host_embedded_started_at_utc, binary_sha256: $host_binary_sha256, bundle_sha256: $host_bundle_sha256, binary_mtime_utc: $host_binary_mtime_utc},
+      shipping: {built: $shipping_built, embedded_commit: $shipping_embedded_commit, embedded_dirty: $shipping_embedded_dirty, embedded_workspace_fingerprint: $shipping_embedded_workspace_fingerprint, embedded_started_at_utc: $shipping_embedded_started_at_utc, binary_sha256: $shipping_binary_sha256, bundle_sha256: $shipping_bundle_sha256, binary_mtime_utc: $shipping_binary_mtime_utc}
+    },
+    selected_scenarios: $selected_scenarios
+  }' >"$manifest_inputs_path"
 
-(
-    manifest_path,
-    label,
-    run_id,
-    timestamp,
-    git_commit,
-    git_dirty,
-    workspace_fingerprint,
-    build_started_at_utc,
-    xcode_version,
-    xctrace_version,
-    macos_version,
-    macos_build,
-    host_arch,
-    project_path,
-    shipping_scheme,
-    host_scheme,
-    shipping_app_path,
-    host_app_path,
-    host_bundle_id,
-    staged_host_app_path,
-    staged_host_binary_path,
-    staged_host_bundle_id,
-    host_embedded_commit,
-    host_embedded_dirty,
-    host_embedded_workspace_fingerprint,
-    host_embedded_started_at_utc,
-    host_binary_sha256,
-    host_bundle_sha256,
-    host_binary_mtime_utc,
-    shipping_built,
-    shipping_embedded_commit,
-    shipping_embedded_dirty,
-    shipping_embedded_workspace_fingerprint,
-    shipping_embedded_started_at_utc,
-    shipping_binary_sha256,
-    shipping_bundle_sha256,
-    shipping_binary_mtime_utc,
-    audit_daemon_bundle_requested_skip,
-    audit_daemon_bundle_mode,
-    audit_daemon_cargo_target_dir,
-    capture_records_path,
-    ui_tests_env,
-    ui_accessibility_markers_env,
-    keep_animations_env,
-    launch_mode_env,
-    window_width_env,
-    window_height_env,
-    hide_dock_env,
-    audit_commit_env,
-    audit_dirty_env,
-    audit_run_id_env,
-    audit_label_env,
-    audit_workspace_fingerprint_env,
-    audit_build_started_at_utc_env,
-    launch_arg_one,
-    launch_arg_two,
-    *selected_scenarios,
-) = sys.argv[1:]
-
-environment_pairs = [
-    item.split("=", 1)
-    for item in [
-        ui_tests_env,
-        ui_accessibility_markers_env,
-        keep_animations_env,
-        launch_mode_env,
-        window_width_env,
-        window_height_env,
-        hide_dock_env,
-        audit_commit_env,
-        audit_dirty_env,
-        audit_run_id_env,
-        audit_label_env,
-        audit_workspace_fingerprint_env,
-        audit_build_started_at_utc_env,
-    ]
-]
-default_environment = {key: value for key, value in environment_pairs}
-captures = []
-for line in Path(capture_records_path).read_text(encoding="utf-8").splitlines():
-    if not line.strip():
-        continue
-    (
-        scenario,
-        template,
-        duration_seconds,
-        trace_relpath,
-        exit_status,
-        end_reason,
-        preview_scenario,
-        launched_process_path,
-        daemon_data_home,
-    ) = line.split("\t")
-    captures.append(
-        {
-            "scenario": scenario,
-            "template": template,
-            "duration_seconds": int(duration_seconds),
-            "trace_relpath": trace_relpath,
-            "exit_status": int(exit_status),
-            "end_reason": end_reason,
-            "preview_scenario": preview_scenario,
-            "launched_process_path": launched_process_path,
-            "environment": {
-                **default_environment,
-                "HARNESS_DAEMON_DATA_HOME": daemon_data_home,
-                "HARNESS_MONITOR_PREVIEW_SCENARIO": preview_scenario,
-                "HARNESS_MONITOR_PERF_SCENARIO": scenario,
-            },
-            "launch_arguments": [launch_arg_one, launch_arg_two],
-        }
-    )
-
-manifest = {
-    "label": label,
-    "run_id": run_id,
-    "created_at_utc": timestamp,
-    "git": {
-        "commit": git_commit,
-        "dirty": git_dirty == "true",
-        "workspace_fingerprint": workspace_fingerprint,
-        "build_started_at_utc": build_started_at_utc,
-    },
-    "system": {
-        "xcode_version": xcode_version,
-        "xctrace_version": xctrace_version,
-        "macos_version": macos_version,
-        "macos_build": macos_build,
-        "arch": host_arch,
-    },
-    "targets": {
-        "project": project_path,
-        "shipping_scheme": shipping_scheme,
-        "host_scheme": host_scheme,
-        "shipping_app_path": shipping_app_path,
-        "host_app_path": host_app_path,
-        "host_bundle_id": host_bundle_id,
-        "staged_host_app_path": staged_host_app_path,
-        "staged_host_binary_path": staged_host_binary_path,
-        "staged_host_bundle_id": staged_host_bundle_id,
-    },
-    "build_provenance": {
-        "audit_daemon_bundle": {
-            "requested_skip": audit_daemon_bundle_requested_skip == "1",
-            "mode": audit_daemon_bundle_mode,
-            "cargo_target_dir": audit_daemon_cargo_target_dir,
-        },
-        "host": {
-            "embedded_commit": host_embedded_commit,
-            "embedded_dirty": host_embedded_dirty,
-            "embedded_workspace_fingerprint": host_embedded_workspace_fingerprint,
-            "embedded_started_at_utc": host_embedded_started_at_utc,
-            "binary_sha256": host_binary_sha256,
-            "bundle_sha256": host_bundle_sha256,
-            "binary_mtime_utc": host_binary_mtime_utc,
-        },
-        "shipping": {
-            "built": shipping_built == "1",
-            "embedded_commit": shipping_embedded_commit,
-            "embedded_dirty": shipping_embedded_dirty,
-            "embedded_workspace_fingerprint": shipping_embedded_workspace_fingerprint,
-            "embedded_started_at_utc": shipping_embedded_started_at_utc,
-            "binary_sha256": shipping_binary_sha256,
-            "bundle_sha256": shipping_bundle_sha256,
-            "binary_mtime_utc": shipping_binary_mtime_utc,
-        },
-    },
-    "templates": {
-        "swiftui": ["launch-dashboard", "select-session-cockpit", "refresh-and-search", "sidebar-overflow-search", "timeline-burst", "toast-overlay-churn", "offline-cached-open"],
-        "allocations": ["settings-backdrop-cycle", "settings-background-cycle", "offline-cached-open"],
-    },
-    "default_environment": default_environment,
-    "launch_arguments": [launch_arg_one, launch_arg_two],
-    "selected_scenarios": selected_scenarios,
-    "captures": captures,
-}
-Path(manifest_path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-PY
+"$PERF_CLI_BINARY" write-manifest \
+  --inputs "$manifest_inputs_path" \
+  --captures-tsv "$capture_records_file" \
+  --env "$UI_TESTS_ENV" \
+  --env "$UI_ACCESSIBILITY_MARKERS_ENV" \
+  --env "$KEEP_ANIMATIONS_ENV" \
+  --env "$LAUNCH_MODE_ENV" \
+  --env "$WINDOW_WIDTH_ENV" \
+  --env "$WINDOW_HEIGHT_ENV" \
+  --env "$HIDE_DOCK_ENV" \
+  --env "$audit_commit_env" \
+  --env "$audit_dirty_env" \
+  --env "$audit_run_id_env" \
+  --env "$audit_label_env" \
+  --env "$audit_workspace_fingerprint_env" \
+  --env "$audit_build_started_at_utc_env" \
+  --launch-arg "$PERSISTENCE_ARG_ONE" \
+  --launch-arg "$PERSISTENCE_ARG_TWO" \
+  --output "$run_dir/manifest.json"
+rm -f "$manifest_inputs_path"
 
 "$PERF_CLI_BINARY" extract --run-dir "$run_dir" --xctrace /usr/bin/xcrun --xctrace-args xctrace
 "$PERF_CLI_BINARY" enforce-budgets "$run_dir/summary.json"
