@@ -45,6 +45,7 @@ mod signal_reconciliation;
 mod signals;
 mod startup_telemetry;
 mod stream_initial_events;
+mod task_lifecycle;
 mod task_mutations;
 mod timeline;
 
