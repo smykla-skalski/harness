@@ -5,16 +5,19 @@ import Foundation
 
 @available(macOS 15.0, *)
 public enum ScreenRecorder {
-    public enum Failure: Error, CustomStringConvertible {
-        case noDisplays
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        case monitorWindowNotFound
+        case ambiguousMonitorWindows(Int)
         case recordingStartTimedOut
         case recordingMaxDurationExceeded(TimeInterval)
         case recordingFailed(String)
 
         public var description: String {
             switch self {
-            case .noDisplays:
-                return "No shareable displays were available for screen recording"
+            case .monitorWindowNotFound:
+                return "Could not resolve a shareable Harness Monitor main window for recording"
+            case .ambiguousMonitorWindows(let count):
+                return "Resolved \(count) shareable Harness Monitor main windows; recording requires exactly one"
             case .recordingStartTimedOut:
                 return "Timed out waiting for native screen recording to start"
             case .recordingMaxDurationExceeded(let seconds):
@@ -82,23 +85,21 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try prepareFilesystem()
         installSignalHandlers()
 
-        let display = try resolveDisplay()
         let streamConfiguration = SCStreamConfiguration()
-        streamConfiguration.width = display.width
-        streamConfiguration.height = display.height
         streamConfiguration.showsCursor = true
         streamConfiguration.capturesAudio = false
+        streamConfiguration.ignoreShadowsSingleWindow = true
+
+        let captureWindow = try resolveWindow()
+        streamConfiguration.width = max(1, Int(ceil(captureWindow.frame.width)))
+        streamConfiguration.height = max(1, Int(ceil(captureWindow.frame.height)))
 
         let recordingConfiguration = SCRecordingOutputConfiguration()
         recordingConfiguration.outputURL = outputURL
         recordingConfiguration.outputFileType = .mov
         recordingConfiguration.videoCodecType = .h264
 
-        let filter = SCContentFilter(
-            display: display,
-            excludingApplications: [],
-            exceptingWindows: []
-        )
+        let filter = SCContentFilter(desktopIndependentWindow: captureWindow)
         let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: nil)
         let recordingOutput = SCRecordingOutput(
             configuration: recordingConfiguration,
@@ -199,13 +200,24 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
     }
 
-    private func resolveDisplay() throws -> SCDisplay {
+    private func resolveWindow() throws -> SCWindow {
         let content = try runAsync { try await SCShareableContent.current }
-        guard let display = content.displays.first else {
-            throw ScreenRecorder.Failure.noDisplays
+        let candidates = content.windows.map { window in
+            ScreenRecorderWindowCandidate(
+                windowID: window.windowID,
+                title: window.title ?? "",
+                bundleIdentifier: window.owningApplication?.bundleIdentifier,
+                isOnScreen: window.isOnScreen
+            )
         }
-        try appendLog("using-display id=\(display.displayID) size=\(display.width)x\(display.height)")
-        return display
+        let selectedWindow = try ScreenRecorderWindowSelector.captureWindow(from: candidates)
+        guard let captureWindow = content.windows.first(where: { $0.windowID == selectedWindow.windowID }) else {
+            throw ScreenRecorder.Failure.monitorWindowNotFound
+        }
+        try appendLog(
+            "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") size=\(Int(ceil(captureWindow.frame.width)))x\(Int(ceil(captureWindow.frame.height)))"
+        )
+        return captureWindow
     }
 
     private func installSignalHandlers() {
