@@ -24,7 +24,7 @@ use crate::session::service::{
     submit_review as svc_submit_review, validate_submit_review,
 };
 use crate::session::storage as session_storage;
-use crate::session::types::TaskStatus;
+use crate::session::types::{SessionState, TaskStatus};
 use crate::workspace::utc_now;
 
 use super::review_submit_txn::{apply_submit_review_in_txn, prepare_submit_review};
@@ -210,29 +210,49 @@ pub(crate) async fn submit_for_review_async(
                 request.summary.as_deref(),
                 &now,
             )?;
-            if let Some(persona) = request.suggested_persona.as_deref()
-                && let Some(task) = state.tasks.get_mut(task_id)
-            {
-                task.suggested_persona = Some(persona.to_string());
-            }
+            apply_suggested_persona(state, task_id, request.suggested_persona.as_deref());
             let new_status = state.tasks.get(task_id).map(|task| task.status);
             Ok((prev_status, new_status))
         })
         .await?;
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    append_task_status_change_log(
-        async_db,
+    finalize_submit_for_review_async(
         session_id,
         task_id,
         &request.actor,
         prev_status,
         new_status,
+        &now,
+        async_db,
     )
     .await?;
-    let resolved = resolve_async(async_db, session_id).await?;
-    maybe_materialize_spawn_reviewer_async(session_id, task_id, &resolved, &now, async_db).await?;
-    bump_async(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+async fn finalize_submit_for_review_async(
+    session_id: &str,
+    task_id: &str,
+    actor: &str,
+    prev_status: Option<TaskStatus>,
+    new_status: Option<TaskStatus>,
+    now: &str,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<(), CliError> {
+    sync_file_state_from_async_db(async_db, session_id).await?;
+    append_task_status_change_log(async_db, session_id, task_id, actor, prev_status, new_status)
+        .await?;
+    let resolved = resolve_async(async_db, session_id).await?;
+    maybe_materialize_spawn_reviewer_async(session_id, task_id, &resolved, now, async_db).await?;
+    bump_async(async_db, session_id).await
+}
+
+fn apply_suggested_persona(
+    state: &mut SessionState,
+    task_id: &str,
+    persona: Option<&str>,
+) {
+    let Some(persona) = persona else { return };
+    let Some(task) = state.tasks.get_mut(task_id) else { return };
+    task.suggested_persona = Some(persona.to_string());
 }
 
 async fn maybe_materialize_spawn_reviewer_async(
@@ -320,18 +340,62 @@ pub(crate) async fn submit_review_async(
 ) -> Result<SessionDetail, CliError> {
     let resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
+    // Append to reviews.jsonl + reload OUTSIDE the SQLite immediate txn so
+    // the writer lock is not held across disk I/O. Crash-recovery is via
+    // `rebuild_task_reviews` on daemon start.
+    let prepared = validate_and_prepare_review(&resolved, session_id, task_id, request, &now)?;
+    let (prev_status, new_status) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            state.state_version += 1;
+            apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)
+        })
+        .await?;
+    finalize_submit_review_async(
+        session_id,
+        task_id,
+        &request.actor,
+        prev_status,
+        new_status,
+        &prepared,
+        async_db,
+    )
+    .await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+async fn finalize_submit_review_async(
+    session_id: &str,
+    task_id: &str,
+    actor: &str,
+    prev_status: Option<TaskStatus>,
+    new_status: Option<TaskStatus>,
+    prepared: &super::review_submit_txn::PreparedSubmitReview,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<(), CliError> {
+    async_db
+        .insert_task_review(session_id, task_id, &prepared.review)
+        .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
+    append_task_status_change_log(async_db, session_id, task_id, actor, prev_status, new_status)
+        .await?;
+    bump_async(async_db, session_id).await
+}
+
+fn validate_and_prepare_review(
+    resolved: &daemon_index::ResolvedSession,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskSubmitReviewRequest,
+    now: &str,
+) -> Result<super::review_submit_txn::PreparedSubmitReview, CliError> {
     let project_dir = resolved
         .project
         .project_dir
         .clone()
         .ok_or_else(|| session_not_found(session_id))?;
     let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
-
     validate_submit_review(&resolved.state, task_id, &request.actor)?;
-    // Append to reviews.jsonl + reload OUTSIDE the SQLite immediate txn so
-    // the writer lock is not held across disk I/O. Crash-recovery is via
-    // `rebuild_task_reviews` on daemon start.
-    let prepared = prepare_submit_review(
+    prepare_submit_review(
         &resolved.state,
         task_id,
         &request.actor,
@@ -339,29 +403,8 @@ pub(crate) async fn submit_review_async(
         &request.summary,
         &request.points,
         &layout,
-        &now,
-    )?;
-    let (prev_status, new_status) = async_db
-        .update_session_state_immediate(session_id, |state| {
-            state.state_version += 1;
-            apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)
-        })
-        .await?;
-    async_db
-        .insert_task_review(session_id, task_id, &prepared.review)
-        .await?;
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    append_task_status_change_log(
-        async_db,
-        session_id,
-        task_id,
-        &request.actor,
-        prev_status,
-        new_status,
+        now,
     )
-    .await?;
-    bump_async(async_db, session_id).await?;
-    session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
 async fn append_task_status_change_log(

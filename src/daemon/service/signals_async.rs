@@ -383,7 +383,18 @@ async fn record_signal_ack_direct_async_inner(
     let project_dir = Path::new(&request.project_dir);
     write_signal_ack_artifact(&resolved, session_id, request, project_dir)?;
     let outcome = persist_signal_ack_state(async_db, &resolved, request, project_dir).await?;
+    append_signal_ack_log_entries(async_db, session_id, request, &outcome).await?;
+    let resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
+    persist_acknowledged_signal_index(async_db, &resolved, session_id, request, &outcome).await?;
+    bump_session(async_db, session_id).await
+}
 
+async fn append_signal_ack_log_entries(
+    async_db: &super::db::AsyncDaemonDb,
+    session_id: &str,
+    request: &SignalAckRequest,
+    outcome: &SignalAckOutcome,
+) -> Result<(), CliError> {
     append_started_task_log(
         async_db,
         session_id,
@@ -398,8 +409,5 @@ async fn record_signal_ack_direct_async_inner(
             &request.agent_id,
             outcome.result,
         ))
-        .await?;
-    let resolved = resolved_session_for_signal_mutation(async_db, session_id).await?;
-    persist_acknowledged_signal_index(async_db, &resolved, session_id, request, &outcome).await?;
-    bump_session(async_db, session_id).await
+        .await
 }
