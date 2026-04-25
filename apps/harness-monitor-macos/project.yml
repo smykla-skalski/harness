@@ -39,9 +39,6 @@ settings:
       SWIFT_ENABLE_EAGER_LINKING: NO
       SWIFT_EMIT_LOC_STRINGS: NO
 packages:
-  Lottie:
-    url: https://github.com/airbnb/lottie-ios
-    majorVersion: 4.6.0
   OpenTelemetrySwift:
     url: https://github.com/open-telemetry/opentelemetry-swift
     exactVersion: 2.3.0
@@ -108,7 +105,9 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - Sources/HarnessMonitorUIPreviewable
+      - path: Sources/HarnessMonitorUIPreviewable
+        excludes:
+          - "Features/**"
     dependencies:
       - target: HarnessMonitorKit
       - package: Textual
@@ -160,13 +159,14 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - Sources/HarnessMonitor
+      - path: Sources/HarnessMonitor
+        excludes:
+          - "Features/**"
     resources:
       - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUIPreviewable
-      - package: Lottie
     postBuildScripts:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false
@@ -342,13 +342,14 @@ targets:
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - Sources/HarnessMonitor
+      - path: Sources/HarnessMonitor
+        excludes:
+          - "Features/**"
     resources:
       - Resources/PrivacyInfo.xcprivacy
     dependencies:
       - target: HarnessMonitorKit
       - target: HarnessMonitorUIPreviewable
-      - package: Lottie
     postBuildScripts:
       - name: Bundle Daemon Agent
         basedOnDependencyAnalysis: false

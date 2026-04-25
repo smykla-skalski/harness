@@ -32,12 +32,14 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
       HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
-      HarnessMonitorCornerAnimationDefaults.enabledKey: false,
       HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
         HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
       "showInspector": false,
       "inspectorColumnWidth": 420.0,
     ]
+    #if HARNESS_FEATURE_LOTTIE
+      registrationDefaults[HarnessMonitorCornerAnimationDefaults.enabledKey] = false
+    #endif
     registrationDefaults.merge(
       HarnessMonitorVoicePreferences.registrationDefaults()
     ) { _, newValue in newValue }

@@ -17,8 +17,10 @@ struct HarnessMonitorWindowRootView: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
-  @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-  private var cornerAnimationEnabled = false
+  #if HARNESS_FEATURE_LOTTIE
+    @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
+    private var cornerAnimationEnabled = false
+  #endif
   @State private var handledSettingsOpenRequestID = 0
   @State private var handledDecisionRequestTick = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -29,11 +31,17 @@ struct HarnessMonitorWindowRootView: View {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
   var body: some View {
-    ContentView(
-      store: store,
-      showsCornerAnimation: cornerAnimationEnabled
-    ) {
-      HarnessMonitorAppLlamaAnimation()
+    Group {
+      #if HARNESS_FEATURE_LOTTIE
+        ContentView(
+          store: store,
+          showsCornerAnimation: cornerAnimationEnabled
+        ) {
+          HarnessMonitorAppLlamaAnimation()
+        }
+      #else
+        ContentView(store: store)
+      #endif
     }
     .writingToolsBehavior(.disabled)
     .modifier(
@@ -382,39 +390,5 @@ private struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
         )
       )
       .tint(HarnessMonitorTheme.accent)
-  }
-}
-
-private struct PinchToZoomTextSizeModifier: ViewModifier {
-  @AppStorage(HarnessMonitorTextSize.storageKey)
-  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
-
-  func body(content: Content) -> some View {
-    content.gesture(
-      MagnifyGesture(minimumScaleDelta: 0.05)
-        .onEnded { value in
-          let delta = HarnessMonitorTextSize.indexDelta(
-            forMagnification: value.magnification,
-            currentIndex: textSizeIndex
-          )
-          if delta != 0 {
-            textSizeIndex += delta
-          }
-        }
-    )
-  }
-}
-
-private struct OptionalPreferredColorSchemeModifier: ViewModifier {
-  let colorScheme: ColorScheme?
-  let isEnabled: Bool
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isEnabled {
-      content.preferredColorScheme(colorScheme)
-    } else {
-      content
-    }
   }
 }

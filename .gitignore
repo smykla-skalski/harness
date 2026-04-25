@@ -6,6 +6,9 @@
 /xcode-derived/
 /xcode-derived-instruments/
 
+# Transient xcodegen merged spec (composed from project.yml + enabled feature fragments)
+/apps/harness-monitor-macos/.project.merged.yml
+
 # Local scratch
 /tmp/
 /output/

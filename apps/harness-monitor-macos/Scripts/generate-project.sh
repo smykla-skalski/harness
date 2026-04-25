@@ -48,6 +48,45 @@ PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH="../../mcp-servers/harness-monitor-registry"
 LOCAL_REGISTRY_PRODUCT_NAME="HarnessMonitorRegistry"
 
+SUPPORTED_FEATURES=("LOTTIE")
+MERGED_SPEC="$ROOT/.project.merged.yml"
+
+is_feature_enabled() {
+  local feature_name="$1"
+  local env_var_name="HARNESS_FEATURE_${feature_name}"
+  local raw_value="${!env_var_name:-}"
+  case "$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+compose_feature_spec() {
+  local enabled=()
+  local feature_name fragment_name fragment_path
+  {
+    printf 'include:\n'
+    printf '  - path: project.yml\n'
+    for feature_name in "${SUPPORTED_FEATURES[@]}"; do
+      if is_feature_enabled "$feature_name"; then
+        fragment_name="$(printf '%s' "$feature_name" | tr '[:upper:]' '[:lower:]')"
+        fragment_path="$ROOT/features/${fragment_name}.yml"
+        if [ ! -f "$fragment_path" ]; then
+          echo "missing feature fragment: $fragment_path" >&2
+          exit 1
+        fi
+        printf '  - path: features/%s.yml\n' "$fragment_name"
+        enabled+=("$feature_name")
+      fi
+    done
+  } > "$MERGED_SPEC"
+  if (( ${#enabled[@]} > 0 )); then
+    printf 'monitor: feature flags enabled: %s\n' "${enabled[*]}" >&2
+  else
+    printf 'monitor: feature flags enabled: (none)\n' >&2
+  fi
+}
+
 repair_local_package_product_link() {
   local pbxproj_path="$1"
   HARNESS_MONITOR_LOCAL_PACKAGE_RELATIVE_PATH="$LOCAL_REGISTRY_PACKAGE_RELATIVE_PATH" \
@@ -307,11 +346,13 @@ if [ "$NORMALIZE_ONLY" != "1" ]; then
 
   enforce_supported_xcodegen_version
 
+  compose_feature_spec
+
   # XcodeGen preserves pre-existing shared scheme files instead of replacing them,
   # so stale XML can survive regeneration and keep showing up as dirty churn.
   rm -rf "$SCHEMES_DIR"
 
-  "$XCODEGEN_BIN" generate --spec "$ROOT/project.yml" --project "$ROOT"
+  "$XCODEGEN_BIN" generate --spec "$MERGED_SPEC" --project "$ROOT"
 
   # XcodeGen does not expose LastUpgradeCheck or product bundle file-reference names.
   # Apply these as post-generation patches so they survive regeneration.

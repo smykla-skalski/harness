@@ -1,0 +1,27 @@
+packages:
+  Lottie:
+    url: https://github.com/airbnb/lottie-ios
+    majorVersion: 4.6.0
+targets:
+  HarnessMonitor:
+    sources:
+      - ../Sources/HarnessMonitor/Features/Lottie
+    dependencies:
+      - package: Lottie
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_LOTTIE
+  HarnessMonitorUITestHost:
+    sources:
+      - ../Sources/HarnessMonitor/Features/Lottie
+    dependencies:
+      - package: Lottie
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_LOTTIE
+  HarnessMonitorUIPreviewable:
+    sources:
+      - ../Sources/HarnessMonitorUIPreviewable/Features/Lottie
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) HARNESS_FEATURE_LOTTIE
