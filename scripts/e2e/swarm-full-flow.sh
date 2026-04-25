@@ -83,12 +83,44 @@ start_screen_recording() {
   SCREEN_RECORD_PID="$!"
 }
 
+wait_for_pid_exit() {
+  local pid="$1"
+  local timeout_seconds="$2"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  while kill -0 "$pid" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      return 1
+    fi
+    sleep 0.2
+  done
+
+  wait "$pid" 2>/dev/null || true
+  return 0
+}
+
 stop_screen_recording() {
-  if [[ -n "$SCREEN_RECORD_PID" ]]; then
-    kill -INT "$SCREEN_RECORD_PID" 2>/dev/null || true
-    wait "$SCREEN_RECORD_PID" 2>/dev/null || true
-    SCREEN_RECORD_PID=""
+  [[ -n "$SCREEN_RECORD_PID" ]] || return 0
+
+  local pid="$SCREEN_RECORD_PID"
+  SCREEN_RECORD_PID=""
+
+  kill -INT "$pid" 2>/dev/null || true
+  if wait_for_pid_exit "$pid" 10; then
+    return 0
   fi
+
+  printf '%s\n' 'warning: screencapture did not stop after SIGINT; escalating to SIGTERM' \
+    >>"$SCREEN_RECORDING_LOG"
+  kill -TERM "$pid" 2>/dev/null || true
+  if wait_for_pid_exit "$pid" 5; then
+    return 0
+  fi
+
+  printf '%s\n' 'warning: screencapture did not stop after SIGTERM; escalating to SIGKILL' \
+    >>"$SCREEN_RECORDING_LOG"
+  kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
 }
 
 cleanup() {
@@ -634,6 +666,7 @@ e2e_run_with_log "$TEST_XCODEBUILD_LOG" \
   CODE_SIGNING_ALLOWED=YES \
   test-without-building \
   "-only-testing:${ONLY_TESTING}"
+stop_screen_recording
 
 wait "$ACT_DRIVER_PID"
 ACT_DRIVER_PID=""

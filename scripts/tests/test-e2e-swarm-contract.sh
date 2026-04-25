@@ -27,6 +27,15 @@ require_no_text() {
   fi
 }
 
+require_count() {
+  local path="$1"
+  local text="$2"
+  local expected="$3"
+  local actual
+  actual="$(grep -Fc -- "$text" "$ROOT/$path")"
+  [[ "$actual" == "$expected" ]] || fail "expected '$text' to appear $expected times in $path, found $actual"
+}
+
 require_mise_task() {
   local task="$1"
   require_text ".mise.toml" "[tasks.\"$task\"]"
@@ -71,6 +80,10 @@ require_text "scripts/e2e/swarm-full-flow.sh" "-workspace \"\$APP_ROOT/HarnessMo
 require_text "scripts/e2e/swarm-full-flow.sh" "-resultBundlePath \"\$RESULT_BUNDLE_PATH\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
 require_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
+require_text "scripts/e2e/swarm-full-flow.sh" 'wait_for_pid_exit "$pid" 10'
+require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGTERM'
+require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGKILL'
+require_count "scripts/e2e/swarm-full-flow.sh" "stop_screen_recording" 3
 require_text "scripts/e2e/swarm-full-flow.sh" 'triage-run.sh'
 require_text "scripts/e2e/swarm-full-flow.sh" 'Swarm e2e artifacts recorded at'
 require_text "scripts/e2e/swarm-full-flow.sh" 'io.harnessmonitor.agents-e2e-tests'
