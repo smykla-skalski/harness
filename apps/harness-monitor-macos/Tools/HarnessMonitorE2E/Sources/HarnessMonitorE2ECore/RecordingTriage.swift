@@ -288,26 +288,39 @@ extension RecordingTriage {
     public let dy: CGFloat
   }
 
-  /// Parse `XCUIElement.debugDescription` style hierarchy text. Looks for
-  /// lines that contain `identifier=<id>` and a `{x, y}, {w, h}` frame.
+  /// Parse `XCUIElement.debugDescription` style hierarchy text. Recognises
+  /// both forms emitted by XCUITest: the legacy `identifier='X' frame: {{x,
+  /// y}, {w, h}}` shape and the runtime `{{x, y}, {w, h}}, identifier: 'X'`
+  /// shape. Lines without both an identifier and a frame are skipped.
   public static func parseLayoutBoundingBoxes(from text: String) -> [LayoutBoundingBox] {
-    var boxes: [LayoutBoundingBox] = []
-    let pattern =
-      #"identifier=['\"]?([^,'\"\s]+)['\"]?[^\n]*?\{\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\},\s*\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\}\}"#
-    guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-      return boxes
+    let identifierPattern = #"identifier(?:\s*[:=])\s*['\"]?([A-Za-z0-9._\-]+)['\"]?"#
+    let framePattern =
+      #"\{\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\},\s*\{(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\}\}"#
+    guard
+      let identifierRegex = try? NSRegularExpression(pattern: identifierPattern, options: []),
+      let frameRegex = try? NSRegularExpression(pattern: framePattern, options: [])
+    else {
+      return []
     }
-    let nsText = text as NSString
-    let matches = regex.matches(
-      in: text, options: [], range: NSRange(location: 0, length: nsText.length))
-    for match in matches {
-      guard match.numberOfRanges == 6 else { continue }
-      let identifier = nsText.substring(with: match.range(at: 1))
+    var boxes: [LayoutBoundingBox] = []
+    for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+      let line = String(rawLine)
+      let nsLine = line as NSString
+      let lineRange = NSRange(location: 0, length: nsLine.length)
       guard
-        let originX = Double(nsText.substring(with: match.range(at: 2))),
-        let originY = Double(nsText.substring(with: match.range(at: 3))),
-        let width = Double(nsText.substring(with: match.range(at: 4))),
-        let height = Double(nsText.substring(with: match.range(at: 5)))
+        let identifierMatch = identifierRegex.firstMatch(in: line, options: [], range: lineRange),
+        identifierMatch.numberOfRanges >= 2,
+        let frameMatch = frameRegex.firstMatch(in: line, options: [], range: lineRange),
+        frameMatch.numberOfRanges >= 5
+      else {
+        continue
+      }
+      let identifier = nsLine.substring(with: identifierMatch.range(at: 1))
+      guard
+        let originX = Double(nsLine.substring(with: frameMatch.range(at: 1))),
+        let originY = Double(nsLine.substring(with: frameMatch.range(at: 2))),
+        let width = Double(nsLine.substring(with: frameMatch.range(at: 3))),
+        let height = Double(nsLine.substring(with: frameMatch.range(at: 4)))
       else {
         continue
       }
@@ -389,6 +402,10 @@ extension RecordingTriage {
       let selectedRegex = try? NSRegularExpression(
         pattern: #"(?:^|,\s)Selected(?:,|$)"#,
         options: []
+      ),
+      let valueSelectedRegex = try? NSRegularExpression(
+        pattern: #"value:\s*'?selected'?(?:,|$|\s)"#,
+        options: []
       )
     else {
       return records
@@ -420,6 +437,7 @@ extension RecordingTriage {
         }
       let isSelected =
         selectedRegex.firstMatch(in: lineString, options: [], range: fullRange) != nil
+        || valueSelectedRegex.firstMatch(in: lineString, options: [], range: fullRange) != nil
       records.append(
         AccessibilityIdentifier(
           identifier: identifier,
@@ -676,13 +694,13 @@ extension RecordingTriage {
         )
       ]
     }
-    let cardID = "harness.session.agent.\(improverID)"
-    if identifiers.contains(where: { $0.identifier == cardID }) {
+    let label = identifiers.first { $0.identifier == "harness.session.agents.state" }?.label ?? ""
+    if label.contains(improverID) {
       return [
         ChecklistFinding(
           id: "swarm.act6.improver",
           verdict: .found,
-          message: "\(cardID) visible"
+          message: "agents.state contains improver_id \(improverID)"
         )
       ]
     }
@@ -690,7 +708,7 @@ extension RecordingTriage {
       ChecklistFinding(
         id: "swarm.act6.improver",
         verdict: .notFound,
-        message: "expected \(cardID)"
+        message: "agents.state missing improver_id \(improverID)"
       )
     ]
   }
@@ -708,13 +726,13 @@ extension RecordingTriage {
         )
       ]
     }
-    let cardID = "harness.session.agent.\(vibeID)"
-    if identifiers.contains(where: { $0.identifier == cardID }) {
+    let label = identifiers.first { $0.identifier == "harness.session.agents.state" }?.label ?? ""
+    if label.contains(vibeID) {
       return [
         ChecklistFinding(
           id: "swarm.act7.vibeRoster",
           verdict: .found,
-          message: "\(cardID) visible after rejoin"
+          message: "agents.state contains vibe_worker_id \(vibeID)"
         )
       ]
     }
@@ -722,7 +740,7 @@ extension RecordingTriage {
       ChecklistFinding(
         id: "swarm.act7.vibeRoster",
         verdict: .notFound,
-        message: "expected \(cardID)"
+        message: "agents.state missing vibe_worker_id \(vibeID)"
       )
     ]
   }
