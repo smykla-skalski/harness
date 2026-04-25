@@ -11,6 +11,8 @@ struct HarnessMonitorE2E: ParsableCommand {
             ResolveCodexLaunch.self,
             ConfigureXctestrun.self,
             BridgeReady.self,
+            Prepare.self,
+            Teardown.self,
         ]
     )
 }
@@ -109,6 +111,68 @@ struct BridgeReady: ParsableCommand {
         if !BridgeReadiness.isReady(fromJSON: data) {
             throw ExitCode(1)
         }
+    }
+}
+
+struct Prepare: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "prepare",
+        abstract: "Spawn daemon + bridge, create both Agents e2e sessions, and emit the resulting manifest JSON."
+    )
+
+    @Option(name: .long) var stateRoot: String
+    @Option(name: .long) var dataRoot: String
+    @Option(name: .long) var dataHome: String
+    @Option(name: .long) var daemonLog: String
+    @Option(name: .long) var bridgeLog: String
+    @Option(name: .long) var harnessBinary: String
+    @Option(name: .long) var codexBinary: String
+    @Option(name: .long) var projectDir: String
+    @Option(name: .long) var terminalSessionId: String
+    @Option(name: .long) var codexSessionId: String
+    @Option(name: .long, help: "Optional fixed codex port; disables retry-on-conflict.") var codexPort: UInt16?
+    @Option(name: .long, help: "Optional path to write manifest JSON. Defaults to stdout.") var manifestOutput: String?
+
+    func run() throws {
+        let inputs = PrepareInputs(
+            stateRoot: URL(fileURLWithPath: stateRoot, isDirectory: true),
+            dataRoot: URL(fileURLWithPath: dataRoot, isDirectory: true),
+            dataHome: URL(fileURLWithPath: dataHome, isDirectory: true),
+            daemonLog: URL(fileURLWithPath: daemonLog),
+            bridgeLog: URL(fileURLWithPath: bridgeLog),
+            harnessBinary: URL(fileURLWithPath: harnessBinary),
+            codexBinary: URL(fileURLWithPath: codexBinary),
+            projectDir: URL(fileURLWithPath: projectDir, isDirectory: true),
+            terminalSessionID: terminalSessionId,
+            codexSessionID: codexSessionId,
+            codexPortOverride: codexPort
+        )
+
+        let manifest = try PrepareOrchestrator.run(inputs)
+        let payload = try manifest.encoded()
+        if let manifestOutput {
+            try payload.write(to: URL(fileURLWithPath: manifestOutput), options: .atomic)
+        } else {
+            FileHandle.standardOutput.write(payload)
+            FileHandle.standardOutput.write(Data("\n".utf8))
+        }
+    }
+}
+
+struct Teardown: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "teardown",
+        abstract: "Read a prepare manifest, terminate daemon + bridge process trees, and remove state unless --keep-state is set."
+    )
+
+    @Option(name: .long) var manifest: String
+    @Flag(name: .long) var keepState = false
+
+    func run() throws {
+        try TeardownOrchestrator.run(
+            manifestPath: URL(fileURLWithPath: manifest),
+            keepState: keepState
+        )
     }
 }
 
