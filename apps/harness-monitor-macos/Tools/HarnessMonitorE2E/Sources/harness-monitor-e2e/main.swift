@@ -225,13 +225,33 @@ struct StartRecording: ParsableCommand {
     guard #available(macOS 15.0, *) else {
       throw ValidationError("start-recording requires macOS 15 or newer")
     }
-    try ScreenRecorder.run(
-      outputURL: URL(fileURLWithPath: output),
-      logURL: URL(fileURLWithPath: log),
-      manifestURL: URL(fileURLWithPath: manifest),
-      controlDirectoryURL: controlDir.map { URL(fileURLWithPath: $0, isDirectory: true) },
-      maxDurationSeconds: maxSeconds
-    )
+    let logURL = URL(fileURLWithPath: log)
+    do {
+      try ScreenRecorder.run(
+        outputURL: URL(fileURLWithPath: output),
+        logURL: logURL,
+        manifestURL: URL(fileURLWithPath: manifest),
+        controlDirectoryURL: controlDir.map { URL(fileURLWithPath: $0, isDirectory: true) },
+        maxDurationSeconds: maxSeconds
+      )
+    } catch {
+      // Recorder process is spawned with an unattended stderr pipe by the
+      // orchestrator, so any thrown error vanishes silently. Append the
+      // failure to the recorder log so triage can find it next to the
+      // probe / using-window markers.
+      let timestamp = ISO8601DateFormatter().string(from: Date())
+      let line = "\(timestamp) recording-fatal-error \(String(describing: error))\n"
+      if let data = line.data(using: .utf8) {
+        if let handle = try? FileHandle(forWritingTo: logURL) {
+          try? handle.seekToEnd()
+          try? handle.write(contentsOf: data)
+          try? handle.close()
+        } else {
+          try? data.write(to: logURL, options: .atomic)
+        }
+      }
+      throw error
+    }
   }
 }
 
