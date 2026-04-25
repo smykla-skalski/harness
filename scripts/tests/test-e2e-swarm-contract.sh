@@ -102,6 +102,9 @@ require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/Harness
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_TEST_RETRY_ITERATIONS'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'controlDirectoryURL'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'desktopIndependentWindow'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'ignoreShadowsSingleWindow = true'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-window id='
 # Single-quoted literals carry the contract text verbatim; SC2016 is not applicable.
 # shellcheck disable=SC2016
 require_text "scripts/e2e/swarm-full-flow.sh" 'exec "$APP_E2E_TOOL_BINARY" swarm-full-flow "$@"'
@@ -117,6 +120,7 @@ require_no_text "scripts/e2e/swarm-full-flow.sh" "screencapture -v -k -D1 -V 180
 require_no_text "scripts/e2e/inject-heuristic-log.sh" 'raw.jsonl'
 require_no_text "scripts/e2e/seed-session-state.sh" 'jq -nc'
 require_no_text "scripts/e2e/probe-runtimes.sh" 'claude auth status'
+require_no_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-display'
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
 require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
 require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
