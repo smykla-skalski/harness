@@ -15,7 +15,11 @@ struct HarnessMonitorE2E: ParsableCommand {
             Teardown.self,
             StartRecording.self,
             StopRecording.self,
+            SeedSessionState.self,
+            ProbeRuntimes.self,
             InjectHeuristic.self,
+            SwarmFullFlow.self,
+            SwarmActDriver.self,
         ]
     )
 }
@@ -192,6 +196,11 @@ struct StartRecording: ParsableCommand {
     var log: String
     @Option(name: .long, help: "Manifest JSON path written after recording is active.")
     var manifest: String
+    @Option(
+        name: .long,
+        help: "Optional control dir. When set, wait for start.request, write start.ready once recording begins, and stop after stop.request."
+    )
+    var controlDir: String?
 
     func run() throws {
         guard #available(macOS 15.0, *) else {
@@ -200,7 +209,8 @@ struct StartRecording: ParsableCommand {
         try ScreenRecorder.run(
             outputURL: URL(fileURLWithPath: output),
             logURL: URL(fileURLWithPath: log),
-            manifestURL: URL(fileURLWithPath: manifest)
+            manifestURL: URL(fileURLWithPath: manifest),
+            controlDirectoryURL: controlDir.map { URL(fileURLWithPath: $0, isDirectory: true) }
         )
     }
 }
@@ -234,17 +244,132 @@ struct InjectHeuristic: ParsableCommand {
     @Option(name: .long, help: "Heuristic code (matches src/observe/classifier).")
     var code: String
     @Option(name: .long, help: "Path to the runtime raw.jsonl log to append into.")
-    var logPath: String
+    var logPath: String?
+    @Option(name: .long, help: "Agent ID whose runtime log should receive the heuristic fixture.")
+    var agent: String?
+    @Option(name: .long, help: "Swarm session ID used to resolve runtime data when --runtime is omitted.")
+    var sessionID: String?
+    @Option(name: .long, help: "Project directory for harness status lookups.")
+    var projectDir: String?
+    @Option(name: .long, help: "Optional runtime override.")
+    var runtime: String?
+    @Option(name: .long, help: "Optional runtime session ID override.")
+    var runtimeSessionID: String?
+    @Option(name: .long, help: "Data home root for the swarm session.")
+    var dataHome: String?
+    @Option(name: .long, help: "Optional harness binary path used when runtime lookup requires session status.")
+    var harnessBinary: String?
 
     func run() throws {
-        let url = URL(fileURLWithPath: logPath)
-        try HeuristicFixtures.append(code: code, to: url)
-        let payload: [String: String] = ["code": code, "log_path": logPath]
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(payload)
+        let environment = ProcessInfo.processInfo.environment
+        let output = try SwarmHeuristicInjection.append(.init(
+            code: code,
+            logPath: logPath.map { URL(fileURLWithPath: $0) },
+            agentID: agent,
+            sessionID: sessionID ?? environment["HARNESS_E2E_SESSION_ID"],
+            projectDir: (projectDir ?? environment["HARNESS_E2E_PROJECT_DIR"])
+                .map { URL(fileURLWithPath: $0, isDirectory: true) },
+            runtime: runtime,
+            runtimeSessionID: runtimeSessionID,
+            dataHome: (dataHome ?? environment["HARNESS_E2E_DATA_HOME"] ?? environment["XDG_DATA_HOME"])
+                .map { URL(fileURLWithPath: $0, isDirectory: true) },
+            harnessBinary: (harnessBinary ?? environment["HARNESS_E2E_HARNESS_BINARY"])
+                .map { URL(fileURLWithPath: $0) }
+        ))
+        let data = try SwarmHeuristicInjection.encoded(output)
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+}
+
+struct SeedSessionState: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "seed-session-state",
+        abstract: "Pre-seed the swarm data home with the expected e2e directories."
+    )
+
+    @Option(name: .long, help: "Data home root to seed.")
+    var dataHome: String?
+    @Option(name: .long, help: "Optional agent ID that should receive a stall ledger marker.")
+    var agent: String = ""
+    @Option(name: .long, help: "Optional stall duration written into the ledger marker.")
+    var stallSeconds: Int?
+
+    func run() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let resolvedDataHome = dataHome
+            ?? environment["HARNESS_E2E_DATA_HOME"]
+            ?? environment["XDG_DATA_HOME"]
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("harness-swarm-e2e-data", isDirectory: true).path
+        let output = try SwarmSeedState.seed(
+            dataHome: URL(fileURLWithPath: resolvedDataHome, isDirectory: true),
+            stalledAgentID: agent.isEmpty ? nil : agent,
+            stallSeconds: stallSeconds
+        )
+        let data = try SwarmSeedState.encoded(output)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+}
+
+struct ProbeRuntimes: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "probe-runtimes",
+        abstract: "Probe local AI runtime availability and emit JSON."
+    )
+
+    func run() throws {
+        let report = SwarmRuntimeProbe().run()
+        let data = try SwarmRuntimeProbe.encoded(report)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+}
+
+struct SwarmFullFlow: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "swarm-full-flow",
+        abstract: "Run the real-runtime swarm full-flow e2e lane through the Swift helper."
+    )
+
+    @Flag(name: .long, help: "Verify the final session state after the UI run finishes.")
+    var assert = false
+
+    func run() throws {
+        let status = try SwarmFullFlowOrchestrator.run(assertMode: assert)
+        guard status == 0 else {
+            throw ExitCode(status)
+        }
+    }
+}
+
+struct SwarmActDriver: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "swarm-act-driver",
+        abstract: "Internal helper that drives the swarm act markers for swarm-full-flow."
+    )
+
+    @Option(name: .long) var repoRoot: String
+    @Option(name: .long) var stateRoot: String
+    @Option(name: .long) var dataHome: String
+    @Option(name: .long) var projectDir: String
+    @Option(name: .long) var syncDir: String
+    @Option(name: .long) var sessionID: String
+    @Option(name: .long) var harnessBinary: String
+    @Option(name: .long) var probeJSON: String
+
+    func run() throws {
+        try SwarmFullFlowOrchestrator.runActDriver(.init(
+            repoRoot: URL(fileURLWithPath: repoRoot, isDirectory: true),
+            stateRoot: URL(fileURLWithPath: stateRoot, isDirectory: true),
+            dataHome: URL(fileURLWithPath: dataHome, isDirectory: true),
+            projectDir: URL(fileURLWithPath: projectDir, isDirectory: true),
+            syncDir: URL(fileURLWithPath: syncDir, isDirectory: true),
+            sessionID: sessionID,
+            harnessBinary: URL(fileURLWithPath: harnessBinary),
+            probeJSON: URL(fileURLWithPath: probeJSON)
+        ))
     }
 }
 
