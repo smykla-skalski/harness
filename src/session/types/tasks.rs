@@ -50,7 +50,7 @@ pub struct WorkItem {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_history: Vec<ReviewConsensus>,
     /// Review round counter; increments each time a reworked task goes back to review.
-    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    #[serde(default, skip_serializing_if = "is_default_value")]
     pub review_round: u8,
     /// Leader arbitration outcome once recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,9 +60,11 @@ pub struct WorkItem {
     pub suggested_persona: Option<String>,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_zero_u8(value: &u8) -> bool {
-    *value == 0
+fn is_default_value<T>(value: &T) -> bool
+where
+    T: Default + PartialEq,
+{
+    value == &T::default()
 }
 
 /// Severity level for a work item.

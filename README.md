@@ -364,6 +364,6 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:ma
 The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. `project.yml` is the generator input and the generated `HarnessMonitor.xcodeproj` is checked in; use `mise run monitor:macos:generate` if you need to refresh it for Xcode.
 Its strict style gate runs `swift format` directly and uses `SwiftLintBuildToolPlugin` during `xcodebuild`, so local builds and CI share the same sandbox-safe lint path.
 
-When you need to bump the release version, update the canonical package version with `mise run version:set -- <version>`. That syncs the derived surfaces in `testkit/`, the checked-in monitor project metadata, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
+When you need to bump the release version, update the canonical package version with `mise run version:set -- <version>` or `./scripts/version.sh set <version>`. That syncs the derived surfaces in `testkit/`, the checked-in monitor project metadata, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.

@@ -10,13 +10,18 @@ mod scan;
 pub(crate) mod session;
 mod text;
 pub(crate) mod transport;
-pub mod types;
+pub(crate) mod types;
 mod watch;
 
 #[cfg(test)]
 mod tests;
 
 pub use transport::{ObserveArgs, ObserveFilterArgs, ObserveMode, ObserveScanActionKind};
+pub use types::{
+    Confidence, CycleRecord, FOCUS_PRESETS, FixSafety, FocusPreset, Issue, IssueCategory,
+    IssueCode, IssueSeverity, MessageRole, ObserverState, OccurrenceTracker, OpenIssue, ScanState,
+    SourceTool, ToolUseRecord, compute_issue_id,
+};
 
 pub(crate) use application::maintenance::{
     is_observer_conflict, load_observer_state, save_observer_state,

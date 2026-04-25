@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::identity;
 use std::env::var;
 use std::future::Future;
@@ -8,7 +7,6 @@ use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
-use serde_json::Value;
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::block_in_place;
@@ -20,15 +18,17 @@ use crate::daemon::codex_transport::{self, CodexTransportKind};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::index;
 use crate::daemon::protocol::{
-    CodexApprovalDecision, CodexApprovalDecisionRequest, CodexApprovalRequest,
-    CodexApprovalRequestedPayload, CodexRunListResponse, CodexRunRequest, CodexRunSnapshot,
-    CodexRunStatus, CodexSteerRequest, StreamEvent,
+    CodexApprovalDecisionRequest, CodexApprovalRequest, CodexApprovalRequestedPayload,
+    CodexRunListResponse, CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
+    StreamEvent,
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::active_runs::{ActiveRun, ActiveRuns, CodexControlMessage};
 use super::effort::validate_codex_effort;
+use super::events::codex_event;
 use super::worker::CodexRunWorker;
 
 #[derive(Clone)]
@@ -41,20 +41,8 @@ struct CodexControllerState {
     db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
     runtime: Option<Handle>,
-    active_runs: Arc<Mutex<HashMap<String, ActiveRun>>>,
+    active_runs: ActiveRuns,
     sandboxed: bool,
-}
-
-#[derive(Clone)]
-struct ActiveRun {
-    control_tx: mpsc::UnboundedSender<CodexControlMessage>,
-}
-
-#[derive(Debug)]
-pub(super) enum CodexControlMessage {
-    Approval { approval_id: String, decision: CodexApprovalDecision },
-    Steer { prompt: String },
-    Interrupt,
 }
 
 impl CodexControllerHandle {
@@ -86,7 +74,7 @@ impl CodexControllerHandle {
                 db,
                 async_db,
                 runtime: Handle::try_current().ok(),
-                active_runs: Arc::default(),
+                active_runs: ActiveRuns::default(),
                 sandboxed,
             }),
         }
@@ -242,12 +230,16 @@ impl CodexControllerHandle {
         );
         state::append_event_best_effort(
             "info",
-            &format!("queued codex run {} for session {}", snapshot.run_id, snapshot.session_id),
+            &format!(
+                "queued codex run {} for session {}",
+                snapshot.run_id, snapshot.session_id
+            ),
         );
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-        self.active_runs()?
-            .insert(snapshot.run_id.clone(), ActiveRun { control_tx });
+        self.state
+            .active_runs
+            .insert(snapshot.run_id.clone(), control_tx)?;
 
         let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
         tokio::spawn(async move {
@@ -327,7 +319,9 @@ impl CodexControllerHandle {
         active
             .control_tx
             .send(CodexControlMessage::Interrupt)
-            .map_err(|error| CliErrorKind::workflow_io(format!("queue codex interrupt: {error}")))?;
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("queue codex interrupt: {error}"))
+            })?;
         self.run(run_id)
     }
 
@@ -353,9 +347,7 @@ impl CodexControllerHandle {
     }
 
     fn active_run(&self, run_id: &str) -> Result<ActiveRun, CliError> {
-        self.active_runs()?.get(run_id).cloned().ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("codex run '{run_id}' is not active")).into()
-        })
+        self.state.active_runs.get(run_id)
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<String, CliError> {
@@ -396,17 +388,8 @@ impl CodexControllerHandle {
         ensure_shared_db(&self.state.db)
     }
 
-    fn active_runs(&self) -> Result<MutexGuard<'_, HashMap<String, ActiveRun>>, CliError> {
-        self.state.active_runs.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("codex active run lock poisoned: {error}")).into()
-        })
-    }
-
     pub(super) fn remove_active_run(&self, run_id: &str) {
-        let Ok(mut active_runs) = self.state.active_runs.lock() else {
-            return;
-        };
-        active_runs.remove(run_id);
+        self.state.active_runs.remove(run_id);
     }
 
     pub(super) fn save_and_broadcast(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
@@ -436,16 +419,10 @@ impl CodexControllerHandle {
     }
 
     fn broadcast<T: Serialize>(&self, event: &str, snapshot: &CodexRunSnapshot, payload: &T) {
-        let Some(payload) = codex_event_payload(event, payload) else {
+        let Some(stream_event) = codex_event(event, snapshot, payload) else {
             return;
         };
-        let event = StreamEvent {
-            event: event.to_string(),
-            recorded_at: utc_now(),
-            session_id: Some(snapshot.session_id.clone()),
-            payload,
-        };
-        let _ = self.state.sender.send(event);
+        let _ = self.state.sender.send(stream_event);
     }
 
     fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
@@ -501,18 +478,4 @@ fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliErr
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn codex_event_payload<T: Serialize>(event: &str, payload: &T) -> Option<Value> {
-    match serde_json::to_value(payload) {
-        Ok(payload) => Some(payload),
-        Err(error) => {
-            tracing::warn!(%error, event, "failed to serialize codex controller event");
-            None
-        }
-    }
 }
