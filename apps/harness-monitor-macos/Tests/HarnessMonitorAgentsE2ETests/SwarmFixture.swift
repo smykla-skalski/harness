@@ -343,13 +343,29 @@ final class SwarmFixture {
       return scrollView
     }
 
-    let windowScrollView = window.scrollViews.firstMatch
-    if windowScrollView.exists {
-      return windowScrollView
+    if let largest = largestScrollTarget(in: window.scrollViews) {
+      return largest
     }
+    if let largest = largestScrollTarget(in: app.scrollViews) {
+      return largest
+    }
+    return window
+  }
 
-    let appScrollView = app.scrollViews.firstMatch
-    return appScrollView.exists ? appScrollView : window
+  private func largestScrollTarget(in query: XCUIElementQuery) -> XCUIElement? {
+    let searchCount = min(query.count, 12)
+    var bestArea: CGFloat = 0
+    var bestMatch: XCUIElement?
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+      let area = candidate.frame.width * candidate.frame.height
+      if area > bestArea {
+        bestArea = area
+        bestMatch = candidate
+      }
+    }
+    return bestMatch
   }
 
   private func matchingScrollTarget(
