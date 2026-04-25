@@ -1,6 +1,6 @@
 //! Integration tests that lock the swarm-e2e-iterate surface against drift.
-//! The skill is split across SKILL.md, agent.md, and references/*.md so each
-//! test points at the file that owns the asserted text.
+//! The canonical skill is split across skill.yaml, body.md, agent.md, and
+//! references/*.md so each test points at the file that owns the asserted text.
 
 use std::fs;
 use std::io::Write;
@@ -8,11 +8,12 @@ use std::path::{Path, PathBuf};
 
 use tempfile::tempdir;
 
-const SKILL_DIR: &str = "local-skills/claude/swarm-e2e-iterate";
-const SKILL_BODY: &str = "local-skills/claude/swarm-e2e-iterate/SKILL.md";
-const SUBAGENT_BODY: &str = "local-skills/claude/swarm-e2e-iterate/agent.md";
-const RECORDING_REF: &str = "local-skills/claude/swarm-e2e-iterate/references/recording-analysis.md";
-const PROTOCOL_REF: &str = "local-skills/claude/swarm-e2e-iterate/references/iteration-protocol.md";
+const SKILL_DIR: &str = "agents/skills/swarm-e2e-iterate";
+const SKILL_META: &str = "agents/skills/swarm-e2e-iterate/skill.yaml";
+const SKILL_BODY: &str = "agents/skills/swarm-e2e-iterate/body.md";
+const SUBAGENT_BODY: &str = "agents/skills/swarm-e2e-iterate/agent.md";
+const RECORDING_REF: &str = "agents/skills/swarm-e2e-iterate/references/recording-analysis.md";
+const PROTOCOL_REF: &str = "agents/skills/swarm-e2e-iterate/references/iteration-protocol.md";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -48,6 +49,23 @@ fn skill_body_carries_hard_rules() {
             "SKILL.md missing hard-rule phrase: {phrase}"
         );
     }
+}
+
+#[test]
+fn skill_metadata_carries_expected_frontmatter() {
+    let meta = read_repo_file(SKILL_META);
+    assert!(
+        meta.contains("name: swarm-e2e-iterate"),
+        "skill.yaml must keep the canonical name"
+    );
+    assert!(
+        meta.contains("driving the Harness Monitor swarm full-flow e2e"),
+        "skill.yaml must keep the canonical description"
+    );
+    assert!(
+        meta.contains("allowed-tools: Bash, Read, Edit, Write, Skill, Agent"),
+        "skill.yaml must keep the canonical tool list"
+    );
 }
 
 #[test]
@@ -279,26 +297,51 @@ fn mise_toml_publishes_recording_triage_tasks() {
 }
 
 #[test]
-fn skills_symlink_points_at_local_source() {
-    let symlink = repo_root().join(".claude/skills/swarm-e2e-iterate");
-    let target = fs::read_link(&symlink).unwrap_or_else(|err| {
-        panic!("expected symlink at {}: {err}", symlink.display());
-    });
+fn generated_skill_mirrors_follow_the_canonical_source() {
+    let claude_skill = repo_root().join(".claude/skills/swarm-e2e-iterate/SKILL.md");
+    let codex_skill = repo_root().join(".agents/skills/swarm-e2e-iterate/SKILL.md");
+    let claude_agent = repo_root().join(".claude/skills/swarm-e2e-iterate/agent.md");
+    let codex_agent = repo_root().join(".agents/skills/swarm-e2e-iterate/agent.md");
+
+    for path in [&claude_skill, &codex_skill, &claude_agent, &codex_agent] {
+        let meta = fs::symlink_metadata(path)
+            .unwrap_or_else(|err| panic!("expected generated file at {}: {err}", path.display()));
+        assert!(
+            !meta.file_type().is_symlink(),
+            "generated mirror must be a file tree, not a symlink: {}",
+            path.display()
+        );
+        assert!(path.is_file(), "expected generated file: {}", path.display());
+    }
+
+    let claude = fs::read_to_string(&claude_skill).expect("read Claude mirror");
+    let codex = fs::read_to_string(&codex_skill).expect("read Codex mirror");
+    let claude_agent_body = fs::read_to_string(&claude_agent).expect("read Claude agent mirror");
+    let codex_agent_body = fs::read_to_string(&codex_agent).expect("read Codex agent mirror");
+    assert!(claude.contains("name: swarm-e2e-iterate"));
+    assert!(codex.contains("name: swarm-e2e-iterate"));
+    assert_eq!(claude, codex, "Claude and Codex skill mirrors should match");
+    assert!(
+        claude_agent_body.contains("Load `Skill swarm-e2e-iterate`."),
+        "Claude agent mirror should keep the load order"
+    );
     assert_eq!(
-        target.to_string_lossy(),
-        "../../local-skills/claude/swarm-e2e-iterate"
+        claude_agent_body, codex_agent_body,
+        "Claude and Codex agent mirrors should match"
     );
 }
 
 #[test]
-fn agents_symlink_points_at_local_source() {
-    let symlink = repo_root().join(".claude/agents/swarm-e2e-iterator.md");
-    let target = fs::read_link(&symlink).unwrap_or_else(|err| {
-        panic!("expected symlink at {}: {err}", symlink.display());
-    });
-    assert_eq!(
-        target.to_string_lossy(),
-        "../../local-skills/claude/swarm-e2e-iterate/agent.md"
+fn claude_agent_contract_points_at_canonical_source() {
+    let body = read_repo_file(".claude/agents/swarm-e2e-iterator.md");
+    assert!(
+        body.contains("Load `Skill swarm-e2e-iterate`."),
+        "Claude agent contract must keep the load order"
+    );
+    assert!(
+        body.contains("agents/skills/swarm-e2e-iterate/agent.md")
+            || body.contains("references/recording-analysis.md"),
+        "Claude agent contract must remain the swarm-e2e-iterate delegation surface"
     );
 }
 
