@@ -19,6 +19,7 @@ struct RecordingTriageCommand: ParsableCommand {
       BlackFramesCommand.self,
       ThrashCommand.self,
       ActTimingCommand.self,
+      ActIdentifiersCommand.self,
     ]
   )
 }
@@ -288,6 +289,41 @@ struct ActTimingCommand: ParsableCommand {
       markers: markers,
       recordingStart: Date(timeIntervalSince1970: recordingStart),
       appLaunch: Date(timeIntervalSince1970: appLaunch)
+    )
+    try emit(report)
+  }
+}
+
+// MARK: - act-identifiers
+
+struct ActIdentifiersCommand: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "act-identifiers",
+    abstract: "Walk per-act XCUITest hierarchies + markers; assert surface findings."
+  )
+
+  @Option(name: .long, help: "Directory containing actN.ready marker files.")
+  var markerDir: String
+
+  @Option(name: .long, help: "Directory containing swarm-actN.txt hierarchy dumps.")
+  var uiSnapshotsDir: String
+
+  @Option(name: .long, help: "Optional task_review_id; otherwise auto-derived from markers.")
+  var taskReviewID: String?
+
+  func run() throws {
+    let markers = URL(fileURLWithPath: markerDir, isDirectory: true)
+    let snapshots = URL(fileURLWithPath: uiSnapshotsDir, isDirectory: true)
+    guard FileManager.default.fileExists(atPath: markers.path) else {
+      throw ValidationError("--marker-dir does not exist: \(markers.path)")
+    }
+    guard FileManager.default.fileExists(atPath: snapshots.path) else {
+      throw ValidationError("--ui-snapshots-dir does not exist: \(snapshots.path)")
+    }
+    let report = try RecordingTriage.walkRecordingActs(
+      markerDir: markers,
+      uiSnapshotsDir: snapshots,
+      taskReviewID: taskReviewID
     )
     try emit(report)
   }
