@@ -17,6 +17,12 @@ Swift package that exposes Harness Monitor's accessibility elements to the `harn
 
 Shipping as a local SPM package keeps the Rust-first `harness` repo free of `project.yml`/`pbxproj` churn and lets the MCP plumbing be tested in isolation. The package can be linked into `HarnessMonitorKit` as a local SPM dependency when the surrounding work-in-progress around XcodeGen settles.
 
+## Xcode workflow
+
+`Package.swift` is the source of truth for this module. The repo builds and tests it through SwiftPM, and any `.xcodeproj` that appears under this directory is a local ignored Xcode artifact rather than managed project metadata.
+
+If you want to inspect or edit the package in Xcode, open `Package.swift` (or the package directory) instead of relying on `HarnessMonitorRegistry.xcodeproj`. That local project can drift from the manifest and omit targets such as `HarnessMonitorRegistryHost` and `HarnessMonitorInputTool`.
+
 ## Build and test
 
 ```bash

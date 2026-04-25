@@ -1,5 +1,6 @@
 .build/
 .swiftpm/
 Package.resolved
+# Local Xcode package projects are ignored; Package.swift is the source of truth.
 *.xcodeproj/
 DerivedData/
