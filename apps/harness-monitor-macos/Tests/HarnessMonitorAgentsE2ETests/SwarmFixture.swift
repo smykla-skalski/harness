@@ -65,6 +65,9 @@ final class SwarmFixture {
       "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1280",
       "HARNESS_MONITOR_UI_TESTS": "1",
     ]
+    guard testCase.prepareRecordingStartIfConfigured(context: diagnosticsSummary()) else {
+      return
+    }
     app.launch()
     XCTAssertTrue(
       testCase.waitUntil(timeout: 25) {

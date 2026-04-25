@@ -22,8 +22,18 @@ public enum ScreenRecorder {
         }
     }
 
-    public static func run(outputURL: URL, logURL: URL, manifestURL: URL) throws {
-        let runner = Runner(outputURL: outputURL, logURL: logURL, manifestURL: manifestURL)
+    public static func run(
+        outputURL: URL,
+        logURL: URL,
+        manifestURL: URL,
+        controlDirectoryURL: URL? = nil
+    ) throws {
+        let runner = Runner(
+            outputURL: outputURL,
+            logURL: logURL,
+            manifestURL: manifestURL,
+            controlDirectoryURL: controlDirectoryURL
+        )
         try runner.run()
     }
 }
@@ -33,6 +43,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     private let outputURL: URL
     private let logURL: URL
     private let manifestURL: URL
+    private let controlDirectoryURL: URL?
     private let startSemaphore = DispatchSemaphore(value: 0)
     private let stopSemaphore = DispatchSemaphore(value: 0)
     private let stateLock = NSLock()
@@ -41,10 +52,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     private var stream: SCStream?
     private var recordingOutput: SCRecordingOutput?
 
-    init(outputURL: URL, logURL: URL, manifestURL: URL) {
+    init(outputURL: URL, logURL: URL, manifestURL: URL, controlDirectoryURL: URL?) {
         self.outputURL = outputURL
         self.logURL = logURL
         self.manifestURL = manifestURL
+        self.controlDirectoryURL = controlDirectoryURL
     }
 
     func run() throws {
@@ -75,6 +87,12 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         )
         self.stream = stream
         self.recordingOutput = recordingOutput
+
+        if !waitForStartRequestIfNeeded() {
+            try appendLog("recording-cancelled-before-start")
+            return
+        }
+
         try stream.addRecordingOutput(recordingOutput)
         try runAsync { try await stream.startCapture() }
 
@@ -94,7 +112,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try manifest.write(to: manifestURL)
         try appendLog("recording-ready output=\(outputURL.path)")
 
-        stopSemaphore.wait()
+        waitForStopSignal()
 
         if let failure = consumeFailure() {
             throw failure
@@ -110,6 +128,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
 
     func recordingOutputDidStartRecording(_: SCRecordingOutput) {
         try? appendLog("recording-started")
+        try? writeStartAcknowledgementIfNeeded()
         startSemaphore.signal()
     }
 
@@ -136,6 +155,19 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
             at: manifestURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        if let controlDirectoryURL {
+            try FileManager.default.createDirectory(
+                at: controlDirectoryURL,
+                withIntermediateDirectories: true
+            )
+            for marker in [
+                controlDirectoryURL.appendingPathComponent("start.request"),
+                controlDirectoryURL.appendingPathComponent("start.ready"),
+                controlDirectoryURL.appendingPathComponent("stop.request"),
+            ] {
+                try? FileManager.default.removeItem(at: marker)
+            }
+        }
         if FileManager.default.fileExists(atPath: outputURL.path) {
             try FileManager.default.removeItem(at: outputURL)
         }
@@ -188,6 +220,48 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         stateLock.lock()
         defer { stateLock.unlock() }
         return state.failure
+    }
+
+    private func waitForStartRequestIfNeeded() -> Bool {
+        guard let controlDirectoryURL else {
+            return true
+        }
+
+        let requestURL = controlDirectoryURL.appendingPathComponent("start.request")
+        while true {
+            if FileManager.default.fileExists(atPath: requestURL.path) {
+                return true
+            }
+            if stopSemaphore.wait(timeout: .now() + 0.2) == .success {
+                return false
+            }
+        }
+    }
+
+    private func writeStartAcknowledgementIfNeeded() throws {
+        guard let controlDirectoryURL else {
+            return
+        }
+
+        let ackURL = controlDirectoryURL.appendingPathComponent("start.ready")
+        try Data().write(to: ackURL, options: .atomic)
+    }
+
+    private func waitForStopSignal() {
+        guard let controlDirectoryURL else {
+            stopSemaphore.wait()
+            return
+        }
+
+        let stopRequestURL = controlDirectoryURL.appendingPathComponent("stop.request")
+        while true {
+            if FileManager.default.fileExists(atPath: stopRequestURL.path) {
+                return
+            }
+            if stopSemaphore.wait(timeout: .now() + 0.2) == .success {
+                return
+            }
+        }
     }
 
     private func runAsync<T: Sendable>(
