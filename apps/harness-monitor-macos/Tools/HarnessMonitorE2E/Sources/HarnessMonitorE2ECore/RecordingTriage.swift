@@ -99,19 +99,27 @@ extension RecordingTriage {
     }
 
     /// Parse ffprobe's `-show_frames -of compact=p=0` output into a list of
-    /// pkt_pts_time values. Lines without `pkt_pts_time=` are ignored.
+    /// frame timestamps in seconds. Modern ffprobe (>= 5.0) emits `pts_time=`;
+    /// older builds use `pkt_pts_time=`. Both spellings count as one timestamp
+    /// per frame, but never both — once a frame yields a timestamp we move on
+    /// so legacy builds emitting both fields don't double-count.
     public static func parseFrameTimestamps(fromFFprobe output: String) -> [Double] {
         var timestamps: [Double] = []
         for rawLine in output.split(separator: "\n") {
             let line = String(rawLine)
+            var captured: Double?
             for token in line.split(separator: "|") {
                 let parts = token.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-                guard parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces) == "pkt_pts_time" else {
-                    continue
-                }
+                guard parts.count == 2 else { continue }
+                let key = parts[0].trimmingCharacters(in: .whitespaces)
+                guard key == "pts_time" || key == "pkt_pts_time" else { continue }
                 if let value = Double(parts[1]) {
-                    timestamps.append(value)
+                    captured = value
+                    break
                 }
+            }
+            if let captured {
+                timestamps.append(captured)
             }
         }
         return timestamps
