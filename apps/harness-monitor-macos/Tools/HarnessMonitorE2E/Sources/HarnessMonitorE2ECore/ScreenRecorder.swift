@@ -8,6 +8,7 @@ public enum ScreenRecorder {
     public enum Failure: Error, CustomStringConvertible {
         case noDisplays
         case recordingStartTimedOut
+        case recordingMaxDurationExceeded(TimeInterval)
         case recordingFailed(String)
 
         public var description: String {
@@ -16,6 +17,8 @@ public enum ScreenRecorder {
                 return "No shareable displays were available for screen recording"
             case .recordingStartTimedOut:
                 return "Timed out waiting for native screen recording to start"
+            case .recordingMaxDurationExceeded(let seconds):
+                return "Native screen recording exceeded the maximum duration of \(Int(seconds)) seconds"
             case .recordingFailed(let detail):
                 return "Native screen recording failed: \(detail)"
             }
@@ -26,13 +29,15 @@ public enum ScreenRecorder {
         outputURL: URL,
         logURL: URL,
         manifestURL: URL,
-        controlDirectoryURL: URL? = nil
+        controlDirectoryURL: URL? = nil,
+        maxDurationSeconds: TimeInterval? = nil
     ) throws {
         let runner = Runner(
             outputURL: outputURL,
             logURL: logURL,
             manifestURL: manifestURL,
-            controlDirectoryURL: controlDirectoryURL
+            controlDirectoryURL: controlDirectoryURL,
+            maxDurationSeconds: maxDurationSeconds
         )
         try runner.run()
     }
@@ -40,10 +45,17 @@ public enum ScreenRecorder {
 
 @available(macOS 15.0, *)
 private final class Runner: NSObject, SCRecordingOutputDelegate {
+    private enum StopReason {
+        case requested
+        case interrupted
+        case maxDurationExceeded(TimeInterval)
+    }
+
     private let outputURL: URL
     private let logURL: URL
     private let manifestURL: URL
     private let controlDirectoryURL: URL?
+    private let maxDurationSeconds: TimeInterval?
     private let startSemaphore = DispatchSemaphore(value: 0)
     private let stopSemaphore = DispatchSemaphore(value: 0)
     private let stateLock = NSLock()
@@ -52,11 +64,18 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     private var stream: SCStream?
     private var recordingOutput: SCRecordingOutput?
 
-    init(outputURL: URL, logURL: URL, manifestURL: URL, controlDirectoryURL: URL?) {
+    init(
+        outputURL: URL,
+        logURL: URL,
+        manifestURL: URL,
+        controlDirectoryURL: URL?,
+        maxDurationSeconds: TimeInterval?
+    ) {
         self.outputURL = outputURL
         self.logURL = logURL
         self.manifestURL = manifestURL
         self.controlDirectoryURL = controlDirectoryURL
+        self.maxDurationSeconds = maxDurationSeconds
     }
 
     func run() throws {
@@ -112,7 +131,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try manifest.write(to: manifestURL)
         try appendLog("recording-ready output=\(outputURL.path)")
 
-        waitForStopSignal()
+        let stopReason = waitForStopSignal(recordingStartedAt: Date())
 
         if let failure = consumeFailure() {
             throw failure
@@ -124,6 +143,9 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
             throw failure
         }
         try appendLog("recording-finished output=\(outputURL.path)")
+        if case .maxDurationExceeded(let seconds) = stopReason {
+            throw ScreenRecorder.Failure.recordingMaxDurationExceeded(seconds)
+        }
     }
 
     func recordingOutputDidStartRecording(_: SCRecordingOutput) {
@@ -247,19 +269,26 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         try Data().write(to: ackURL, options: .atomic)
     }
 
-    private func waitForStopSignal() {
-        guard let controlDirectoryURL else {
-            stopSemaphore.wait()
-            return
-        }
-
-        let stopRequestURL = controlDirectoryURL.appendingPathComponent("stop.request")
+    private func waitForStopSignal(recordingStartedAt: Date) -> StopReason {
+        let durationBudget = RecordingDurationBudget(
+            maxDuration: maxDurationSeconds,
+            pollInterval: 0.2
+        )
+        let stopRequestURL = controlDirectoryURL?.appendingPathComponent("stop.request")
         while true {
-            if FileManager.default.fileExists(atPath: stopRequestURL.path) {
-                return
+            if let stopRequestURL, FileManager.default.fileExists(atPath: stopRequestURL.path) {
+                return .requested
             }
-            if stopSemaphore.wait(timeout: .now() + 0.2) == .success {
-                return
+            guard let waitInterval = durationBudget.nextWaitInterval(
+                startedAt: recordingStartedAt,
+                now: Date()
+            ) else {
+                let limit = maxDurationSeconds ?? 0
+                try? appendLog("recording-auto-stop reason=max-duration seconds=\(Int(limit))")
+                return .maxDurationExceeded(limit)
+            }
+            if stopSemaphore.wait(timeout: .now() + waitInterval) == .success {
+                return .interrupted
             }
         }
     }

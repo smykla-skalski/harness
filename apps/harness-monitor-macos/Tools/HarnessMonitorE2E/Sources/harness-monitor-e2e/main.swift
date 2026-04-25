@@ -203,6 +203,12 @@ struct StartRecording: ParsableCommand {
     )
     var controlDir: String?
 
+    @Option(
+        name: .long,
+        help: "Maximum recording duration in seconds before the recorder auto-stops and exits with an error."
+    )
+    var maxSeconds: Double?
+
     func run() throws {
         guard #available(macOS 15.0, *) else {
             throw ValidationError("start-recording requires macOS 15 or newer")
@@ -211,7 +217,8 @@ struct StartRecording: ParsableCommand {
             outputURL: URL(fileURLWithPath: output),
             logURL: URL(fileURLWithPath: log),
             manifestURL: URL(fileURLWithPath: manifest),
-            controlDirectoryURL: controlDir.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            controlDirectoryURL: controlDir.map { URL(fileURLWithPath: $0, isDirectory: true) },
+            maxDurationSeconds: maxSeconds
         )
     }
 }
