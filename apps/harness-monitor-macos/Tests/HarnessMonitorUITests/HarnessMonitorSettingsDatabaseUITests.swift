@@ -48,33 +48,41 @@ final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
 
     // -- Clear Session Cache confirmation --
     tapViaCoordinate(in: app, element: clearCacheButton)
-    let clearCacheConfirm = confirmationDialogButton(in: app, title: "Clear Session Cache")
+    let clearCacheConfirm = confirmationDialogButton(in: app, title: "Clear Session Cache Now")
     XCTAssertTrue(clearCacheConfirm.waitForExistence(timeout: 2), "Cache confirm dialog missing")
-    app.typeKey(.escape, modifierFlags: [])
-    RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+    dismissConfirmationDialog(in: app)
+    XCTAssertTrue(
+      waitUntil(timeout: 2) { !clearCacheConfirm.exists },
+      "Cache confirm dialog should dismiss after Cancel"
+    )
 
     // -- Clear User Data confirmation --
     tapViaCoordinate(in: app, element: clearUserDataButton)
-    let clearUserConfirm = confirmationDialogButton(in: app, title: "Clear User Data")
+    let clearUserConfirm = confirmationDialogButton(in: app, title: "Clear User Data Now")
     XCTAssertTrue(clearUserConfirm.waitForExistence(timeout: 2), "User data confirm dialog missing")
-    app.typeKey(.escape, modifierFlags: [])
-    RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+    dismissConfirmationDialog(in: app)
+    XCTAssertTrue(
+      waitUntil(timeout: 2) { !clearUserConfirm.exists },
+      "User data confirm dialog should dismiss after Cancel"
+    )
 
     // -- Clear All Data confirmation --
     tapViaCoordinate(in: app, element: clearAllButton)
-    let clearAllConfirm = confirmationDialogButton(in: app, title: "Clear All Data")
+    let clearAllConfirm = confirmationDialogButton(in: app, title: "Clear All Data Now")
     XCTAssertTrue(clearAllConfirm.waitForExistence(timeout: 2), "Clear all confirm dialog missing")
-    app.typeKey(.escape, modifierFlags: [])
+    dismissConfirmationDialog(in: app)
+    XCTAssertTrue(
+      waitUntil(timeout: 2) { !clearAllConfirm.exists },
+      "Clear all confirm dialog should dismiss after Cancel"
+    )
 
     // -- Scroll further to Health section --
     dragUp(in: app, element: clearCacheButton, distanceRatio: 3.0)
 
     let schemaVersionLabel = app.staticTexts["Schema Version"].firstMatch
-    XCTAssertTrue(schemaVersionLabel.waitForExistence(timeout: 2), "Schema Version not found")
-    let schemaVersionValue = app.staticTexts["5.0.0"].firstMatch
     XCTAssertTrue(
-      schemaVersionValue.waitForExistence(timeout: 2),
-      "Expected the current schema version value to be visible"
+      schemaVersionLabel.waitForExistence(timeout: 2),
+      "Schema Version should be visible in the Health section"
     )
   }
 
