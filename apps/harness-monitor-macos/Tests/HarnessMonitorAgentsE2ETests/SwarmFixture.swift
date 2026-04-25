@@ -140,10 +140,7 @@ final class SwarmFixture {
     if taskIsSelectedInInspector(task, taskID: taskID) {
       return
     }
-    XCTAssertTrue(
-      testCase.waitForElement(task, timeout: 15),
-      "Expected swarm task card \(taskID)\n\(diagnosticsSummary())"
-    )
+    expectIdentifier(Accessibility.sessionTaskListState, labelContains: taskID)
     if taskIsSelectedInInspector(task, taskID: taskID) {
       return
     }
@@ -278,6 +275,7 @@ final class SwarmFixture {
     if (inspector.value as? String) == taskID {
       return true
     }
+    guard task.exists else { return false }
 
     let taskLabel = task.label.trimmingCharacters(in: .whitespacesAndNewlines)
     let inspectorLabel = inspector.label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -436,10 +434,11 @@ final class SwarmRunner {
   func act10() throws {
     let marker = try fixture.waitForReady("act10")
     if let workerID = marker["worker_claude_id"] {
-      fixture.expectAnyIdentifier([
-        Accessibility.autoSpawnedBadge(workerID),
-        Accessibility.sessionAgentCard(workerID),
-      ])
+      fixture.expectIdentifier(Accessibility.sessionAgentListState, labelContains: workerID)
+    }
+    if let taskID = marker["task_autospawn_id"] {
+      fixture.selectTask(taskID)
+      fixture.expectIdentifier(Accessibility.awaitingReviewBadge(taskID))
     }
     try fixture.ack("act10")
   }
