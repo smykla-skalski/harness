@@ -38,6 +38,14 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
             "test-without-building must not disable code signing for macOS UI tests",
         )
 
+    def test_expensive_e2e_lane_disables_xcodebuild_retries(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            'HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0',
+            script,
+            "agents e2e must disable xcodebuild retry iterations so expensive UI runs do not relaunch automatically",
+        )
+
     def test_ui_test_targets_use_apple_development_signing(self) -> None:
         project_swift = (APP_ROOT / "Project.swift").read_text(encoding="utf-8")
 
