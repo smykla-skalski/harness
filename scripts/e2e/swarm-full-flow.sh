@@ -29,7 +29,14 @@ STATE_ROOT_PARENT="${HARNESS_E2E_STATE_ROOT_PARENT:-${TMPDIR:-/tmp}/HarnessMonit
 STATE_ROOT="${HARNESS_E2E_STATE_ROOT:-$STATE_ROOT_PARENT/$RUN_ID}"
 DATA_ROOT="${HARNESS_E2E_DATA_ROOT:-$STATE_ROOT/data-root}"
 DATA_HOME="${HARNESS_E2E_DATA_HOME:-$DATA_ROOT/data-home}"
-SYNC_DIR="$DATA_HOME/e2e-sync"
+AGENTS_E2E_TEST_BUNDLE_ID="io.harnessmonitor.agents-e2e-tests"
+AGENTS_E2E_RUNNER_BUNDLE_ID="${HARNESS_E2E_RUNNER_BUNDLE_ID:-$AGENTS_E2E_TEST_BUNDLE_ID.xctrunner}"
+AGENTS_E2E_RUNNER_CONTAINER_ROOT="${HARNESS_E2E_RUNNER_CONTAINER_ROOT:-$HOME/Library/Containers/$AGENTS_E2E_RUNNER_BUNDLE_ID/Data}"
+# The XCTest runner process writes the act acknowledgements and is sandboxed, so
+# the cross-process markers must live inside the runner container instead of the
+# external daemon data root or the tested app's container.
+SYNC_ROOT="${HARNESS_E2E_SYNC_ROOT:-$AGENTS_E2E_RUNNER_CONTAINER_ROOT/tmp/HarnessMonitorSwarmE2E/$RUN_ID}"
+SYNC_DIR="$SYNC_ROOT/e2e-sync"
 LOG_ROOT="$STATE_ROOT/logs"
 DAEMON_LOG="$LOG_ROOT/daemon.log"
 ACT_DRIVER_LOG="$LOG_ROOT/act-driver.log"
@@ -65,12 +72,14 @@ cleanup() {
   fi
 
   if [[ "$status" -eq 0 && "$KEEP_DATA" != "1" ]]; then
+    rm -rf "$SYNC_ROOT"
     rm -rf "$STATE_ROOT"
     return
   fi
 
   {
     printf 'Swarm e2e state preserved at: %s\n' "$STATE_ROOT"
+    printf 'Swarm e2e sync preserved at: %s\n' "$SYNC_ROOT"
     if [[ -f "$DAEMON_LOG" ]]; then
       printf '%s\n' '--- daemon log tail ---'
       tail -n 80 "$DAEMON_LOG"
