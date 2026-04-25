@@ -4,6 +4,7 @@ use super::helpers::{
     assert_file_lacks_needles, collect_hits_in_paths, collect_hits_in_tree, read_repo_file,
 };
 
+mod monitor_build_phases;
 mod policy_rules;
 mod version_sync;
 
