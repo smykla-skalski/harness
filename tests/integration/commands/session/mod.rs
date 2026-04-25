@@ -9,13 +9,14 @@ use harness_testkit::with_isolated_harness_env;
 
 use super::super::helpers::*;
 
+mod improver_cli;
 mod persona;
 mod recovery;
-mod improver_cli;
 mod review_cli;
 mod review_wire_contract;
 mod swarm_auto_spawn;
 mod swarm_contract;
+mod swarm_full_flow;
 mod swarm_improver;
 mod swarm_observer_routing;
 mod swarm_persona_routing;
@@ -65,9 +66,14 @@ pub(super) fn start_active_session_with_policy(
     session_id: &str,
     policy_preset: &str,
 ) -> SessionState {
-    let _state =
-        service::start_session_with_policy(context, title, project, Some(session_id), Some(policy_preset))
-            .unwrap();
+    let _state = service::start_session_with_policy(
+        context,
+        title,
+        project,
+        Some(session_id),
+        Some(policy_preset),
+    )
+    .unwrap();
     service::join_session(
         session_id,
         SessionRole::Leader,

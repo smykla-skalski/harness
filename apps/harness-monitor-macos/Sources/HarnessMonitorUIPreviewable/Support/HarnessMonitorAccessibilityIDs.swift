@@ -360,6 +360,10 @@ public enum HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID)).signal-trigger"
   }
 
+  public static func agentRowPersonaChip(_ agentID: String) -> String {
+    "\(sessionAgentCard(agentID)).persona"
+  }
+
   public static func sessionSignalCard(_ signalID: String) -> String {
     "harness.session.signal.\(slug(signalID))"
   }

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+e2e_repo_root() {
+  local script_dir
+  script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  CDPATH='' cd -- "$script_dir/../.." && pwd
+}
+
+portable_timeout() {
+  local seconds="$1"
+  shift
+  if [[ "$seconds" == "" || "$#" -eq 0 ]]; then
+    printf 'portable_timeout requires seconds and command\n' >&2
+    return 64
+  fi
+
+  "$@" &
+  local command_pid=$!
+  (
+    sleep "$seconds"
+    kill -TERM "$command_pid" 2>/dev/null || true
+  ) &
+  local timer_pid=$!
+
+  local status=0
+  wait "$command_pid" || status=$?
+  kill "$timer_pid" 2>/dev/null || true
+  wait "$timer_pid" 2>/dev/null || true
+  return "$status"
+}
+
+e2e_require_command() {
+  local command_name="$1"
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    printf 'error: required command not found: %s\n' "$command_name" >&2
+    return 1
+  fi
+}
+
+e2e_random_id() {
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+    return
+  fi
+
+  python3 - <<'PY'
+import uuid
+
+print(uuid.uuid4())
+PY
+}
+
+e2e_resolve_harness_binary() {
+  local root="$1"
+  local cargo_target_dir
+  cargo_target_dir="$(
+    "$root/scripts/cargo-local.sh" --print-env \
+      | awk -F= '/^CARGO_TARGET_DIR=/{print $2}'
+  )"
+  if [[ -z "$cargo_target_dir" ]]; then
+    printf 'error: failed to resolve CARGO_TARGET_DIR\n' >&2
+    return 1
+  fi
+  printf '%s/debug/harness\n' "$cargo_target_dir"
+}
+
+e2e_project_context_root() {
+  local project_dir="$1"
+  local data_home="$2"
+  python3 - "$project_dir" "$data_home" <<'PY'
+import hashlib
+import os
+import sys
+
+project_dir, data_home = sys.argv[1:]
+canonical = os.path.realpath(project_dir)
+digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+print(os.path.join(data_home, "harness", "projects", f"project-{digest}"))
+PY
+}
+
+e2e_write_kv_marker() {
+  local path="$1"
+  shift
+  mkdir -p "$(dirname -- "$path")"
+  : >"$path"
+  local line
+  for line in "$@"; do
+    printf '%s\n' "$line" >>"$path"
+  done
+}
+
+e2e_wait_for_file() {
+  local path="$1"
+  local timeout_seconds="${2:-90}"
+  local deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )); do
+    if [[ -f "$path" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  printf 'error: timed out waiting for %s\n' "$path" >&2
+  return 1
+}
