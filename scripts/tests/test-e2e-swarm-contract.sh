@@ -79,12 +79,15 @@ require_text "scripts/e2e/swarm-full-flow.sh" 'Scripts/generate.sh'
 require_text "scripts/e2e/swarm-full-flow.sh" "-workspace \"\$APP_ROOT/HarnessMonitor.xcworkspace\""
 require_text "scripts/e2e/swarm-full-flow.sh" "-resultBundlePath \"\$RESULT_BUNDLE_PATH\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR'
+require_text "scripts/e2e/swarm-full-flow.sh" "UI_SNAPSHOTS_SOURCE=\"\$SYNC_ROOT/ui-snapshots\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'screencapture -v -k -D1 -V 1800'
+# shellcheck disable=SC2016
 require_text "scripts/e2e/swarm-full-flow.sh" 'wait_for_pid_exit "$pid" 10'
 require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGTERM'
 require_text "scripts/e2e/swarm-full-flow.sh" 'escalating to SIGKILL'
 require_count "scripts/e2e/swarm-full-flow.sh" "stop_screen_recording" 3
 require_text "scripts/e2e/swarm-full-flow.sh" 'triage-run.sh'
+require_text "scripts/e2e/swarm-full-flow.sh" "--ui-snapshots-source \"\$UI_SNAPSHOTS_SOURCE\""
 require_text "scripts/e2e/swarm-full-flow.sh" 'Swarm e2e artifacts recorded at'
 require_text "scripts/e2e/swarm-full-flow.sh" 'io.harnessmonitor.agents-e2e-tests'
 require_text "scripts/e2e/swarm-full-flow.sh" 'AGENTS_E2E_RUNNER_CONTAINER_ROOT'
@@ -92,6 +95,8 @@ require_no_text "scripts/e2e/swarm-full-flow.sh" "-project \"\$APP_ROOT/HarnessM
 require_no_text "scripts/e2e/swarm-full-flow.sh" "CODE_SIGNING_ALLOWED=NO"
 require_no_text "scripts/e2e/swarm-full-flow.sh" "SYNC_DIR=\"\$DATA_HOME/e2e-sync\""
 require_text "scripts/e2e/triage-run.sh" '## Mandatory review checklist'
+require_text "scripts/e2e/triage-run.sh" '--ui-snapshots-source <path>'
+require_text "scripts/e2e/triage-run.sh" 'missing ui snapshots source'
 require_text "scripts/e2e/triage-run.sh" 'xcresulttool export attachments'
 require_text "scripts/e2e/triage-run.sh" 'missing or empty screen recording'
 require_text "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFixture.swift" "final class SwarmFixture"

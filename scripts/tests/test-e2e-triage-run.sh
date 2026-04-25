@@ -19,15 +19,16 @@ sync_root="$tmp_dir/sync-root"
 daemon_log="$tmp_dir/daemon.log"
 test_log="$tmp_dir/test.log"
 recording_path="$artifacts_dir/swarm-full-flow.mov"
+ui_snapshots_source="$tmp_dir/ui-snapshots-source"
 mkdir -p "$state_root/data-home" "$sync_root" "$artifacts_dir" "$(dirname -- "$findings_file")"
 printf 'state-root-ok\n' >"$state_root/state.txt"
 printf 'sync-root-ok\n' >"$sync_root/act1.ready"
 printf 'daemon-log\n' >"$daemon_log"
 printf 'test-log\n' >"$test_log"
 printf 'video-bytes\n' >"$recording_path"
-mkdir -p "$artifacts_dir/ui-snapshots"
-printf 'png-bytes\n' >"$artifacts_dir/ui-snapshots/act1.png"
-printf 'hierarchy\n' >"$artifacts_dir/ui-snapshots/act1.txt"
+mkdir -p "$ui_snapshots_source"
+printf 'png-bytes\n' >"$ui_snapshots_source/act1.png"
+printf 'hierarchy\n' >"$ui_snapshots_source/act1.txt"
 
 "$SCRIPT" \
   --scenario swarm-full-flow \
@@ -42,6 +43,7 @@ printf 'hierarchy\n' >"$artifacts_dir/ui-snapshots/act1.txt"
   --session-id sess-e2e-swarm-run-123 \
   --state-root "$state_root" \
   --sync-root "$sync_root" \
+  --ui-snapshots-source "$ui_snapshots_source" \
   --recording "$recording_path" \
   --log "$daemon_log" \
   --log "$test_log"
@@ -52,6 +54,8 @@ printf 'hierarchy\n' >"$artifacts_dir/ui-snapshots/act1.txt"
 [[ -f "$artifacts_dir/context/sync-root/act1.ready" ]] || fail "missing copied sync root"
 [[ -f "$artifacts_dir/logs/daemon.log" ]] || fail "missing copied daemon log"
 [[ -f "$artifacts_dir/logs/test.log" ]] || fail "missing copied test log"
+[[ -f "$artifacts_dir/ui-snapshots/act1.png" ]] || fail "missing copied png snapshot"
+[[ -f "$artifacts_dir/ui-snapshots/act1.txt" ]] || fail "missing copied hierarchy snapshot"
 grep -Fq 'Mandatory review checklist' "$findings_file" || fail "missing mandatory review checklist"
 grep -Fq 'Pending triage.' "$findings_file" || fail "missing pending triage placeholders"
 jq -e '
