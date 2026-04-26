@@ -1,4 +1,5 @@
 import SwiftData
+import UserNotifications
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -294,6 +295,43 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_badgeSyncReflectsInsertedAndDismissedDecision() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let center = RecordingNotificationCenter()
+    let notifications = HarnessMonitorUserNotificationController(center: center)
+    store.bindSupervisorNotifications(notifications)
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    let decisionID = "d-badge-sync"
+    try await store.insertDecisionForTesting(DecisionDraft.fixture(id: decisionID))
+    try await waitForBadgeCounts([1], center: center)
+    XCTAssertEqual(center.badgeCounts, [1])
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    try await decisionStore.dismiss(id: decisionID)
+    try await waitForBadgeCounts([1, 0], center: center)
+    XCTAssertEqual(center.badgeCounts, [1, 0])
+  }
+
+  @MainActor
+  func test_stopSupervisorClearsBadge() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let center = RecordingNotificationCenter()
+    let notifications = HarnessMonitorUserNotificationController(center: center)
+    store.bindSupervisorNotifications(notifications)
+    await store.startSupervisor()
+
+    try await store.insertDecisionForTesting(DecisionDraft.fixture(id: "d-badge-stop"))
+    try await waitForBadgeCounts([1], center: center)
+    XCTAssertEqual(center.badgeCounts, [1])
+
+    await store.stopSupervisor()
+
+    XCTAssertEqual(center.badgeCounts, [1, 0])
+  }
+
+  @MainActor
   func test_bootstrapIfNeededStartsSupervisor() async throws {
     let store = HarnessMonitorStore.fixture()
 
@@ -350,5 +388,50 @@ private actor TickRecorder {
 
   func recordTick() {
     count += 1
+  }
+}
+
+private final class RecordingNotificationCenter: HarnessMonitorUserNotificationCenter,
+  @unchecked Sendable
+{
+  var delegate: UNUserNotificationCenterDelegate?
+  private(set) var badgeCounts: [Int] = []
+
+  func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool { true }
+
+  func notificationSettings() async -> UNNotificationSettings {
+    fatalError("notificationSettings() is not used in these badge-sync tests")
+  }
+
+  func pendingNotificationRequests() async -> [UNNotificationRequest] { [] }
+
+  func deliveredNotifications() async -> [UNNotification] { [] }
+
+  func notificationCategories() async -> Set<UNNotificationCategory> { [] }
+
+  func add(_ request: UNNotificationRequest) async throws {}
+
+  func removeAllPendingNotificationRequests() {}
+
+  func removeAllDeliveredNotifications() {}
+
+  func setBadgeCount(_ newBadgeCount: Int) async throws { badgeCounts.append(newBadgeCount) }
+
+  func setNotificationCategories(_ categories: Set<UNNotificationCategory>) {}
+}
+
+private func waitForBadgeCounts(
+  _ expected: [Int],
+  center: RecordingNotificationCenter,
+  timeout: Duration = .seconds(1)
+) async throws {
+  let clock = ContinuousClock()
+  let deadline = clock.now + timeout
+  while center.badgeCounts != expected {
+    if clock.now >= deadline {
+      XCTFail("Timed out waiting for badge counts \(expected); got \(center.badgeCounts)")
+      return
+    }
+    try await Task.sleep(for: .milliseconds(10))
   }
 }
