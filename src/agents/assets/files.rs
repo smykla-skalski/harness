@@ -8,22 +8,10 @@ use walkdir::WalkDir;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_text};
 
-use super::model::PlannedOutput;
+use super::model::{MANAGED_ROOTS, PlannedOutput};
 
 pub(super) fn managed_root_for_path(repo_root: &Path, path: &Path) -> Result<PathBuf, CliError> {
-    for managed in [
-        ".claude/skills",
-        ".claude/plugins",
-        ".agents/skills",
-        ".agents/plugins",
-        ".gemini/commands",
-        ".github/hooks",
-        ".vibe/skills",
-        ".vibe/plugins",
-        ".opencode/skills",
-        ".opencode/plugins",
-        "plugins",
-    ] {
+    for managed in MANAGED_ROOTS {
         let root = repo_root.join(managed);
         if path.starts_with(&root) {
             return Ok(root);

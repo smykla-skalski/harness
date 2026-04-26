@@ -15,6 +15,7 @@ pub(super) const PLUGINS_ROOT: &str = "agents/plugins";
 
 /// Every directory managed exclusively by the renderer.  Order is stable.
 pub(super) const MANAGED_ROOTS: &[&str] = &[
+    ".claude-plugin",
     ".claude/skills",
     ".claude/plugins",
     ".agents/skills",
@@ -70,12 +71,25 @@ pub(super) struct SkillSource {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub(super) struct PluginAuthor {
+    pub(super) name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub(super) struct PluginSource {
     pub(super) name: String,
     pub(super) description: String,
     pub(super) version: String,
     #[serde(default)]
     pub(super) source_skill: Option<String>,
+    #[serde(default)]
+    pub(super) author: Option<PluginAuthor>,
+    #[serde(default)]
+    pub(super) license: Option<String>,
+    #[serde(default)]
+    pub(super) category: Option<String>,
+    #[serde(default)]
+    pub(super) tags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
