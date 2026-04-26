@@ -22,31 +22,13 @@ struct HarnessMonitorAppConfiguration {
   let environment: HarnessMonitorEnvironment
 
   @MainActor
-  static func resolve() -> Self {
-    var registrationDefaults: [String: Any] = [
-      HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
-      HarnessMonitorBackgroundDefaults.imageKey:
-        HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
-      HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,
-      HarnessMonitorDateTimeConfiguration.timeZoneModeKey:
-        HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
-      HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
-        HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
-      HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
-        HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
-    ]
-    registrationDefaults.merge(
-      HarnessMonitorLoggerDefaults.registrationDefaults()
-    ) { _, newValue in newValue }
-    #if HARNESS_FEATURE_LOTTIE
-      registrationDefaults[HarnessMonitorCornerAnimationDefaults.enabledKey] = false
-    #endif
-    registrationDefaults.merge(
-      HarnessMonitorVoicePreferences.registrationDefaults()
-    ) { _, newValue in newValue }
-    UserDefaults.standard.register(defaults: registrationDefaults)
+  static func resolve(
+    defaults: UserDefaults = .standard,
+    baseEnvironment: HarnessMonitorEnvironment = .current
+  ) -> Self {
+    HarnessMonitorStartupRegistrationDefaults.register(on: defaults)
 
-    let environment = uiTestSafeEnvironment()
+    let environment = uiTestSafeEnvironment(base: baseEnvironment)
     let perfScenario = HarnessMonitorPerfScenario(environment: environment)
     let resolvedEnvironment = perfScenario?.applyingDefaults(to: environment) ?? environment
     let isUITesting = resolvedEnvironment.values[uiTestsEnvironmentKey] == "1"
@@ -136,8 +118,10 @@ struct HarnessMonitorAppConfiguration {
     let resetBackgroundRecents: Bool
   }
 
-  private static func uiTestSafeEnvironment() -> HarnessMonitorEnvironment {
-    let environment = HarnessMonitorEnvironment.current
+  private static func uiTestSafeEnvironment(
+    base: HarnessMonitorEnvironment = .current
+  ) -> HarnessMonitorEnvironment {
+    let environment = base
     let isUITestHost = Bundle.main.bundleIdentifier == uiTestingBundleIdentifier
     let isUITesting = environment.values[uiTestsEnvironmentKey] == "1" || isUITestHost
     guard isUITesting else {

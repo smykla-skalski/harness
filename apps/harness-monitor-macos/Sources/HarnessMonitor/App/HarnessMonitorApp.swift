@@ -162,7 +162,6 @@ struct HarnessMonitorApp: App {
           perfScenario: perfScenario
         )
         .modelContainer(container)
-        .mcpAccessibilityServiceGate()
       } else {
         HarnessMonitorWindowRootView(
           delegate: delegate,
@@ -173,7 +172,6 @@ struct HarnessMonitorApp: App {
           preferencesSelectedSection: $preferencesSelectedSection,
           perfScenario: perfScenario
         )
-        .mcpAccessibilityServiceGate()
       }
     }
     .fileImporter(
