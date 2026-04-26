@@ -81,12 +81,6 @@
       "index": 0
     },
     {
-      "id": "InspectorColumnView",
-      "description": "Inspector column content",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/InspectorColumnView.swift",
-      "index": 0
-    },
-    {
       "id": "SidebarSessionRow",
       "description": "Sidebar session row variants",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SidebarSessionRow.swift",
