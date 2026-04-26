@@ -14,6 +14,8 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     case .attachExternal:
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
+    case .signalDetail:
+      Self(minWidth: 460, idealWidth: 560, minHeight: 420)
     }
   }
 }
@@ -49,6 +51,8 @@ struct HarnessMonitorSheetRouter: View {
       }
     case .attachExternal(let bookmarkID, let preview):
       AttachSessionSheetView(store: store, bookmarkID: bookmarkID, preview: preview)
+    case .signalDetail(let signalID):
+      SignalDetailSheet(store: store, signalID: signalID)
     }
   }
 

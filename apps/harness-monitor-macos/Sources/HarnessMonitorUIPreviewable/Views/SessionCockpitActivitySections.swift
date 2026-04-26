@@ -75,7 +75,7 @@ private struct SessionCockpitSignalCard: View {
   var body: some View {
     ZStack(alignment: .topTrailing) {
       Button {
-        store.inspect(signalID: signal.signal.signalId)
+        store.presentedSheet = .signalDetail(signalID: signal.signal.signalId)
       } label: {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -108,7 +108,7 @@ private struct SessionCockpitSignalCard: View {
       )
       .contextMenu {
         Button {
-          store.inspect(signalID: signal.signal.signalId)
+          store.presentedSheet = .signalDetail(signalID: signal.signal.signalId)
         } label: {
           Label("Inspect", systemImage: "info.circle")
         }
