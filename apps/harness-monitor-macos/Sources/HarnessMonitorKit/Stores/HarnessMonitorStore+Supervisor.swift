@@ -94,6 +94,10 @@ extension HarnessMonitorStore {
     _stack?.decisionStore
   }
 
+  public func requestObserverFocusInDecisions() {
+    supervisorObserverFocusTick &+= 1
+  }
+
   public var isSupervisorRunInBackgroundEnabled: Bool {
     let storedValue =
       UserDefaults.standard.object(
