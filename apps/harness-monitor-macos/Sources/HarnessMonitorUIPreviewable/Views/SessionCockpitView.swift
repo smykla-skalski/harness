@@ -19,6 +19,11 @@ struct SessionCockpitView: View {
     openWindow(id: HarnessMonitorWindowID.agents)
   }
 
+  private func focusObserver() {
+    store.requestObserverFocusInDecisions()
+    openWindow(id: HarnessMonitorWindowID.decisions)
+  }
+
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
@@ -35,7 +40,7 @@ struct SessionCockpitView: View {
             isSessionReadOnly: isSessionReadOnly,
             observeSelectedSession: { Task { await store.observeSelectedSession() } },
             requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-            inspectObserver: store.inspectObserver
+            inspectObserver: focusObserver
           )
           SessionMetricGrid(
             metrics: detail.session.metrics
@@ -43,7 +48,7 @@ struct SessionCockpitView: View {
           SessionActionDock(
             detail: detail,
             inspectTask: store.inspect(taskID:),
-            inspectObserver: store.inspectObserver,
+            inspectObserver: focusObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
           if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {

@@ -32,6 +32,8 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionBulkActions = "harness.decisions.bulk-actions"
   static let decisionBulkSnoozeCritical = "harness.decisions.bulk-actions.snooze-critical"
   static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
+  static let decisionsObserverPanel = "harness.decisions.observer.panel"
+  static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"
   static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
   }

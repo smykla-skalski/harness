@@ -17,6 +17,8 @@ extension HarnessMonitorAccessibility {
   public static let decisionBulkActions = "harness.decisions.bulk-actions"
   public static let decisionBulkSnoozeCritical = "harness.decisions.bulk-actions.snooze-critical"
   public static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
+  public static let decisionsObserverPanel = "harness.decisions.observer.panel"
+  public static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"
 
   public static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
