@@ -80,6 +80,9 @@ struct SessionCockpitHeaderCard: View {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             observeButton
+            if detail.agents.count > 1 {
+              transferLeadershipButton
+            }
             endSessionButton
           }
         }
@@ -118,6 +121,16 @@ struct SessionCockpitHeaderCard: View {
       help: unavailableActionHelp,
       action: { observeSelectedSession() }
     )
+  }
+
+  private var transferLeadershipButton: some View {
+    Button("Transfer Leadership") {
+      store.presentedSheet = .leaderTransfer(sessionID: detail.session.sessionId)
+    }
+    .harnessActionButtonStyle(variant: .bordered)
+    .help("Open the leadership transfer sheet")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.leaderTransferOpenButton)
+    .disabled(!store.areSelectedLeaderActionsAvailable)
   }
 
   private var endSessionButton: some View {

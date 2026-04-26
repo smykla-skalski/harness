@@ -24,6 +24,10 @@ struct SessionCockpitView: View {
     openWindow(id: HarnessMonitorWindowID.decisions)
   }
 
+  private func openCreateTaskSheet() {
+    store.presentedSheet = .createTask(sessionID: detail.session.sessionId)
+  }
+
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
@@ -47,7 +51,7 @@ struct SessionCockpitView: View {
           )
           SessionActionDock(
             detail: detail,
-            inspectTask: store.inspect(taskID:),
+            createTask: openCreateTaskSheet,
             inspectObserver: focusObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
