@@ -344,6 +344,10 @@ public enum HarnessMonitorAccessibility {
     "harness.session.task.\(slug(taskID))"
   }
 
+  public static func taskInspectorSelection(_ taskID: String) -> String {
+    "harness.inspector.task-card.selection.\(slug(taskID))"
+  }
+
   public static func sessionAgentCard(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID))"
   }
