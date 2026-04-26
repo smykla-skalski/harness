@@ -379,6 +379,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.agents.task.selection.\(slug(taskID))"
   }
 
+  static let signalDetailSheet = "harness.signal.detail.sheet"
+  static let signalDetailCard = "harness.signal.detail.card"
+  static let signalDetailDismissButton = "harness.signal.detail.dismiss"
+
   static func agentTuiTab(_ tuiID: String) -> String {
     "harness.sheet.agent-tui.tab.\(slug(tuiID))"
   }

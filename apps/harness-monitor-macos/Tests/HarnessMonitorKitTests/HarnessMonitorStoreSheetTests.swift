@@ -82,6 +82,7 @@ struct HarnessMonitorStoreSheetTests {
     case .sendSignal: break
     case .newSession: break
     case .attachExternal: break
+    case .signalDetail: break
     }
   }
 
