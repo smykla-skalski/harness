@@ -13,6 +13,7 @@ Before each iteration, act in this order:
 1. Load `Skill swarm-e2e-iterate`.
 2. Read [references/recording-analysis.md](references/recording-analysis.md) before recording triage or finding promotion.
 3. Read [references/iteration-protocol.md](references/iteration-protocol.md) before lane execution, `active.md`/`ledger.md` updates, fixes, commits, or termination.
+4. Read [references/council-review.md](references/council-review.md) before invoking the per-iteration council pass (Per-Iteration Script step 8).
 
 The skill and references are source of truth. This agent file only pins delegation behavior.
 
@@ -40,9 +41,10 @@ The skill and references are source of truth. This agent file only pins delegati
 5. Triage secondary artifacts only after the recording pass.
 6. Append confirmed rows to `active.md`. Never delete past rows in `ledger.md`.
 7. After the lane settles, refresh the `active.md` header (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`).
-8. Fix every Open row through the TDD and commit protocol; on close, move the row from `active.md` to `ledger.md` via `scripts/swarm-iterate/close-finding.sh <id> <commit-sha>`.
-9. Rerun if fixes landed or Open rows remain.
-10. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.
+8. Council review: if `active.md` carries at least one data row, spawn an Agent that follows `.claude/plugins/council/skills/council/SKILL.md`. Pick mode by row count and lens spread per [references/council-review.md](references/council-review.md). Save the synthesis to `_artifacts/runs/<slug>/council-review.md`. Skip on empty active.md.
+9. Fix every Open row through the TDD and commit protocol, ranked by the council's Convergence section against the smallest-row heuristic; on close, move the row from `active.md` to `ledger.md` via `scripts/swarm-iterate/close-finding.sh <id> <commit-sha>`.
+10. Rerun if fixes landed or Open rows remain.
+11. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.
 
 ## Parent Summary
 
