@@ -82,12 +82,6 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var fileAndEditCommands: some Commands {
-    CommandGroup(after: .newItem) {
-      Button("Attach External Session…") {
-        store.requestAttachExternalSession()
-      }
-      .keyboardShortcut("a", modifiers: [.command, .shift])
-    }
     CommandGroup(after: .pasteboard) {
       Button("Find in Sessions") {
         sidebarSearchFocus?.invoke()
