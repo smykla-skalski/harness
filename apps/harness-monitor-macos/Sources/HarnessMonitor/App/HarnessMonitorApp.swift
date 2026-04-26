@@ -100,6 +100,7 @@ struct HarnessMonitorApp: App {
       )
       NewSessionCommand(store: store)
       OpenFolderCommand(isPresented: $showOpenFolder)
+      AttachExternalSessionCommand(store: store)
     }
 
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {
