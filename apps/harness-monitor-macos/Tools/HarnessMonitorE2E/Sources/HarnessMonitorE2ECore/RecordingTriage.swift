@@ -758,7 +758,7 @@ extension RecordingTriage {
         )
       ]
     }
-    let badgeID = "awaitingReviewBadge.\(taskID)"
+    let badgeID = SwarmAccessibilityID.awaitingReviewBadge(taskID)
     if identifiers.contains(where: { $0.identifier == badgeID }) {
       return [
         ChecklistFinding(
@@ -792,8 +792,8 @@ extension RecordingTriage {
     }
     let runtime = payload["reviewer_runtime"] ?? "claude"
     let candidates = [
-      "reviewerClaimBadge.\(taskID).\(runtime)",
-      "reviewerQuorumIndicator.\(taskID)",
+      SwarmAccessibilityID.reviewerClaimBadge(taskID, runtime: runtime),
+      SwarmAccessibilityID.reviewerQuorumIndicator(taskID),
     ]
     if identifiers.contains(where: { candidates.contains($0.identifier) }) {
       return [
@@ -826,7 +826,7 @@ extension RecordingTriage {
         )
       ]
     }
-    let badgeID = "awaitingReviewBadge.\(taskID)"
+    let badgeID = SwarmAccessibilityID.awaitingReviewBadge(taskID)
     if identifiers.contains(where: { $0.identifier == badgeID }) {
       return [
         ChecklistFinding(
@@ -882,9 +882,9 @@ extension RecordingTriage {
     }
     let pointID = payload["point_id"] ?? "p1"
     let candidates = [
-      "partialAgreementChip.\(pointID)",
-      "reviewPointChip.\(pointID)",
-      "roundCounter.\(taskID)",
+      SwarmAccessibilityID.partialAgreementChip(pointID),
+      SwarmAccessibilityID.reviewPointChip(pointID),
+      SwarmAccessibilityID.roundCounter(taskID),
     ]
     if identifiers.contains(where: { candidates.contains($0.identifier) }) {
       return [
@@ -918,8 +918,8 @@ extension RecordingTriage {
       ]
     }
     let candidates = [
-      "arbitrationBanner.\(taskID)",
-      "roundCounter.\(taskID)",
+      SwarmAccessibilityID.arbitrationBanner(taskID),
+      SwarmAccessibilityID.roundCounter(taskID),
     ]
     if identifiers.contains(where: { candidates.contains($0.identifier) }) {
       return [
@@ -1076,8 +1076,14 @@ extension RecordingTriage {
         message: "task_review_id missing; cannot prove badge progression mechanically"
       )
     }
-    let awaitingID = "awaitingReviewBadge.\(taskID)"
-    let inReviewID = "inReviewBadge.\(taskID)"
+    let awaitingID = SwarmAccessibilityID.awaitingReviewBadge(taskID)
+    // Real UI does not render a per-task `inReviewBadge.<id>`. Use the
+    // reviewer-claim badge family or the quorum indicator as the in-review
+    // proxy: either signals at least one reviewer has attached, which is the
+    // exact transition we are trying to prove (AwaitingReview -> InReview).
+    let claimedTaskPrefix =
+      "harness.inspector.task.reviewer-claim-badge.\(SwarmAccessibilityID.slug(taskID))."
+    let quorumID = SwarmAccessibilityID.reviewerQuorumIndicator(taskID)
     var awaitingActIndex: Int?
     var inReviewActIndex: Int?
     for (index, hierarchy) in perActHierarchies.enumerated() {
@@ -1086,7 +1092,11 @@ extension RecordingTriage {
       {
         awaitingActIndex = index
       }
-      if hierarchy.identifiers.contains(where: { $0.identifier == inReviewID }) {
+      let claimed = hierarchy.identifiers.contains { identifier in
+        identifier.identifier == quorumID
+          || identifier.identifier.hasPrefix(claimedTaskPrefix)
+      }
+      if claimed {
         inReviewActIndex = index
       }
     }
@@ -1103,7 +1113,9 @@ extension RecordingTriage {
     let missing: [String] = {
       var pieces: [String] = []
       if awaitingActIndex == nil { pieces.append(awaitingID) }
-      if inReviewActIndex == nil { pieces.append(inReviewID) }
+      if inReviewActIndex == nil {
+        pieces.append("\(claimedTaskPrefix)<runtime> or \(quorumID)")
+      }
       return pieces
     }()
     return ChecklistFinding(
