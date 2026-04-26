@@ -115,6 +115,42 @@
       "description": "Decisions window with sidebar, detail, and inspector populated",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsWindowCrowdedPreview.swift",
       "index": 0
+    },
+    {
+      "id": "SignalDetailSheet",
+      "description": "Signal detail sheet card",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Signals/SignalDetailSheet.swift",
+      "index": 0
+    },
+    {
+      "id": "ObserverSummaryPanel",
+      "description": "Observer summary panel for the decisions surface",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/ObserverSummaryPanel.swift",
+      "index": 0
+    },
+    {
+      "id": "ReviewStatePanel",
+      "description": "Review state panel awaiting review",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Review/ReviewPanel.swift",
+      "index": 0
+    },
+    {
+      "id": "CreateTaskSheet",
+      "description": "Create task action sheet",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/CreateTaskSheet.swift",
+      "index": 0
+    },
+    {
+      "id": "TaskActionsSheet",
+      "description": "Manage task actions sheet",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/TaskActionsSheet.swift",
+      "index": 0
+    },
+    {
+      "id": "LeaderTransferSheet",
+      "description": "Leader transfer action sheet",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Actions/LeaderTransferSheet.swift",
+      "index": 0
     }
   ]
 }

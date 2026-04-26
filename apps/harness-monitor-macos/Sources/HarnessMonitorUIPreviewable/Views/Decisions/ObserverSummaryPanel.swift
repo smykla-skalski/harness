@@ -89,6 +89,18 @@ public struct ObserverSummaryEmptyState: View {
   }
 }
 
+#Preview("Observer summary panel") {
+  ObserverSummaryPanel(observer: PreviewFixtures.observer)
+    .padding()
+    .frame(width: 560)
+}
+
+#Preview("Observer empty state") {
+  ObserverSummaryEmptyState()
+    .padding()
+    .frame(width: 560)
+}
+
 private struct ObserverPanelOpenIssuesSection: View {
   let issues: [ObserverIssueSummary]
 
