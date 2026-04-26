@@ -22,16 +22,18 @@ Parse `$ARGUMENTS`. First word selects the council composition:
 | Mode     | Keyword  | Agents Summoned                  | Purpose |
 |----------|----------|----------------------------------|---------|
 | **Core** | `core`   | All 6 core personas              | Default. Best signal-to-noise for catching over-engineering, blind spots, premature abstraction, missing failure modes. |
-| **All**  | `all`    | Reserved for extended roster     | Currently identical to `core`. Reserved for when extended personas (type-system, DDD, formal-spec, PBT, etc.) ship. |
+| **All**  | `all`    | All 16 personas (6 core + 10 extended) | Full coverage. Use when the problem touches multiple domains (e.g. type design, deployment, observability, perf at scale all in one review) and you want every lens. Expensive in tokens; reserve for substantial designs. |
 | **Debate** | `debate` | 3-6 personas you select for the topic | Multi-round - personas read each other's positions and respond. Use for hard tradeoff calls where disagreement is the point. |
 
 If the first word is none of `core`, `all`, `debate`, treat the whole `$ARGUMENTS` as a problem description and default to `core` mode.
 
 The remainder of `$ARGUMENTS` is the problem statement. If it begins with `@`, treat as a file path - read it before dispatching to personas.
 
-## Core roster
+## Roster
 
 Located in [agents/](../../agents/). Each persona is a self-contained subagent with its own system prompt, voice, philosophy, and review questions. Read [references/personas.md](references/personas.md) for the registry summary.
+
+### Core (6) - bias-correction default
 
 | Persona | Lens |
 |---------|------|
@@ -42,12 +44,30 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 | [meadows-systems-advisor](../../agents/meadows-systems-advisor.md) | 12 leverage points, stocks/flows/loops, intervene at the right level |
 | [chin-strategy-advisor](../../agents/chin-strategy-advisor.md) | Tacit knowledge, NDM, anti-framework-cult, close the loop |
 
+### Extended (10) - domain-specific lenses for `all` mode and `debate` selection
+
+| Persona | Lens |
+|---------|------|
+| [king-type-reviewer](../../agents/king-type-reviewer.md) | Parse-don't-validate, totality, make illegal states unrepresentable, types as axioms |
+| [hughes-pbt-advisor](../../agents/hughes-pbt-advisor.md) | Property-based testing, generators not examples, shrinking is the value, stateful PBT |
+| [evans-ddd-reviewer](../../agents/evans-ddd-reviewer.md) | Ubiquitous language, bounded contexts, strategic design, distill the core domain |
+| [fp-structure-reviewer](../../agents/fp-structure-reviewer.md) | Impureim sandwich, dependency rejection, railway-oriented programming, code that fits in your head |
+| [wayne-spec-advisor](../../agents/wayne-spec-advisor.md) | Formal methods, TLA+, model-check the protocol, the spec is the design |
+| [iac-craft-reviewer](../../agents/iac-craft-reviewer.md) | Immutable infrastructure, drift detection, pipeline IS the change-management process, phoenix not snowflake |
+| [test-architect](../../agents/test-architect.md) | Functional core/imperative shell, values not objects, boundaries, tests as design pressure |
+| [gregg-perf-reviewer](../../agents/gregg-perf-reviewer.md) | USE method, methodology over tools, profile in production, off-CPU and BPF observability |
+| [ai-quality-advisor](../../agents/ai-quality-advisor.md) | Prompt injection, eval-driven LLM development, lethal trifecta, sandboxed tool use |
+| [cicd-build-advisor](../../agents/cicd-build-advisor.md) | Test in production, observability over monitoring, deploy small deploy often, oncall as cultural force |
+
 ## Workflow
 
 ### Core / All mode
 
 1. **Read input.** If `$ARGUMENTS` second segment begins with `@`, read that file. Otherwise treat the remainder as a free-form problem statement.
-2. **Brief each persona in parallel.** Spawn each persona via the Agent tool with `subagent_type` matching the persona's registered name (`antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`). Each call gets:
+2. **Brief each persona in parallel.** Spawn each persona via the Agent tool with `subagent_type` matching the persona's registered name. Use the right roster for the mode:
+   - **Core mode (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`
+   - **All mode (16)**: the 6 core above plus `king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor`
+   Each call gets:
    - The full problem context (file contents or problem statement)
    - Instruction to review through *their specific lens only*
    - Format expectation (see "Persona output contract" below)
@@ -65,8 +85,18 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
    - Code-style / refactor: antirez + tef + muratori
    - Reliability / failure / ops: hebert + meadows + tef
    - Strategy / learning / process: chin + meadows + hebert
-   - Performance / hot path: muratori + tef + antirez
+   - Performance / hot path (single-process): muratori + tef + antirez
    - Architecture / system design: hebert + meadows + tef + muratori
+   - Type system / data validation / parsing: king + tef + antirez
+   - Test design / coverage strategy: test-architect + hughes + chin
+   - Property-based / generative testing: hughes + king + test-architect
+   - Domain modeling / bounded contexts: evans + fp-structure + meadows
+   - Functional architecture / pure-impure boundary: fp-structure + king + test-architect
+   - Formal spec / concurrency / state machines: wayne + hebert + meadows
+   - Infrastructure / deployment / IaC: iac-craft + hebert + cicd-build
+   - Systems performance at scale (fleet / Linux / JVM): gregg + muratori + hebert
+   - AI / LLM features / prompt design / evals: ai-quality + chin + hebert
+   - CI/CD / deploy frequency / oncall: cicd-build + hebert + tef
    - When in doubt, ask the user via a user approval prompt which 3-6 to summon.
 3. **Round 1 - opening positions.** Each selected persona gives their independent first read.
 4. **Round 2 - responses.** Pass each persona's Round 1 output to the others. Each responds: where do they agree, where do they disagree with which named persona, what evidence shifts the picture.
