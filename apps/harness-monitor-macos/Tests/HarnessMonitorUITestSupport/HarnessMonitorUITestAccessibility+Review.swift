@@ -10,19 +10,19 @@ extension HarnessMonitorUITestAccessibility {
   static let observeDoctorButton = "observeDoctorButton"
 
   static func awaitingReviewBadge(_ taskID: String) -> String {
-    "harness.inspector.task.awaiting-review-badge.\(slug(taskID))"
+    "harness.review.task.awaiting.\(slug(taskID))"
   }
 
   static func reviewerClaimBadge(_ taskID: String, runtime: String) -> String {
-    "harness.inspector.task.reviewer-claim-badge.\(slug(taskID)).\(slug(runtime))"
+    "harness.review.task.reviewer-claim.\(slug(taskID)).\(slug(runtime))"
   }
 
   static func reviewerQuorumIndicator(_ taskID: String) -> String {
-    "harness.inspector.task.reviewer-quorum.\(slug(taskID))"
+    "harness.review.task.reviewer-quorum.\(slug(taskID))"
   }
 
   static func reviewPointChip(_ pointID: String) -> String {
-    "harness.inspector.task.review-point.\(slug(pointID))"
+    "harness.review.task.review-point.\(slug(pointID))"
   }
 
   static func partialAgreementChip(_ pointID: String) -> String {
@@ -30,11 +30,11 @@ extension HarnessMonitorUITestAccessibility {
   }
 
   static func roundCounter(_ taskID: String) -> String {
-    "harness.inspector.task.round-counter.\(slug(taskID))"
+    "harness.review.task.round-counter.\(slug(taskID))"
   }
 
   static func improverTaskCard(_ taskID: String) -> String {
-    "harness.inspector.task.improver-card.\(slug(taskID))"
+    "harness.review.task.improver.\(slug(taskID))"
   }
 
   static func arbitrationBanner(_ taskID: String) -> String {

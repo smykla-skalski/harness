@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class InspectorButtonScopeUITests: HarnessMonitorUITestCase {
+final class ActionConsoleScopeUITests: HarnessMonitorUITestCase {
   private static let actionDelayKey = "HARNESS_MONITOR_TEST_ACTION_DELAY_MS"
   private static let actionDelayMilliseconds = 1_200
 
@@ -33,7 +33,7 @@ final class InspectorButtonScopeUITests: HarnessMonitorUITestCase {
       waitUntil(timeout: Self.fastActionTimeout) {
         observeButton.exists && !observeButton.isEnabled
       },
-      "Other inspector buttons must disable while Create Task runs - proves per-button scoping"
+      "Other action buttons must disable while Create Task runs - proves per-button scoping"
     )
     XCTAssertFalse(
       endSessionButton.isEnabled,
@@ -104,7 +104,7 @@ final class InspectorButtonScopeUITests: HarnessMonitorUITestCase {
       waitUntil(timeout: Self.actionTimeout) {
         observeButton.isEnabled && endSessionButton.isEnabled
       },
-      "All inspector buttons should re-enable after the action completes"
+      "All action buttons should re-enable after the action completes"
     )
     XCTAssertFalse(
       createTaskButton.isEnabled,
@@ -113,7 +113,7 @@ final class InspectorButtonScopeUITests: HarnessMonitorUITestCase {
   }
 }
 
-extension InspectorButtonScopeUITests {
+extension ActionConsoleScopeUITests {
   fileprivate func launchInCockpitPreview() -> XCUIApplication {
     launch(
       mode: "preview",

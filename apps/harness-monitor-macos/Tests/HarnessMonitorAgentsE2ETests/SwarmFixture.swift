@@ -154,11 +154,11 @@ final class SwarmFixture {
   func selectTask(_ taskID: String) {
     let identifier = Accessibility.sessionTaskCard(taskID)
     let task = testCase.element(in: app, identifier: identifier)
-    if taskIsSelectedInInspector(task, taskID: taskID) {
+    if taskIsSelectedInDetailPane(task, taskID: taskID) {
       return
     }
     expectIdentifier(Accessibility.sessionTaskListState, labelContains: taskID)
-    if taskIsSelectedInInspector(task, taskID: taskID) {
+    if taskIsSelectedInDetailPane(task, taskID: taskID) {
       return
     }
     XCTAssertTrue(
@@ -171,14 +171,14 @@ final class SwarmFixture {
       """
     )
     testCase.tapElement(in: app, identifier: identifier)
-    let inspector = testCase.element(in: app, identifier: Accessibility.taskInspectorCard)
+    let detailPane = testCase.element(in: app, identifier: Accessibility.agentsTaskCard)
     XCTAssertTrue(
-      testCase.waitUntil(timeout: 5) { self.taskIsSelectedInInspector(task, taskID: taskID) },
+      testCase.waitUntil(timeout: 5) { self.taskIsSelectedInDetailPane(task, taskID: taskID) },
       """
-      Expected swarm task \(taskID) to become selected in the inspector.
+      Expected swarm task \(taskID) to become selected in the agents detail pane.
       taskLabel=\(task.label)
-      inspectorLabel=\(inspector.label)
-      inspectorValue=\(String(describing: inspector.value))
+      detailPaneLabel=\(detailPane.label)
+      detailPaneValue=\(String(describing: detailPane.value))
       \(diagnosticsSummary())
       """
     )
@@ -304,29 +304,29 @@ final class SwarmFixture {
       .contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
   }
 
-  private func taskIsSelectedInInspector(_ task: XCUIElement, taskID: String) -> Bool {
+  private func taskIsSelectedInDetailPane(_ task: XCUIElement, taskID: String) -> Bool {
     let selectionMarker = testCase.element(
       in: app,
-      identifier: Accessibility.taskInspectorSelection(taskID)
+      identifier: Accessibility.agentsTaskSelection(taskID)
     )
     if selectionMarker.exists {
       return true
     }
-    let inspector = testCase.element(in: app, identifier: Accessibility.taskInspectorCard)
-    guard inspector.exists else { return false }
-    if (inspector.value as? String) == taskID {
+    let detailPane = testCase.element(in: app, identifier: Accessibility.agentsTaskCard)
+    guard detailPane.exists else { return false }
+    if (detailPane.value as? String) == taskID {
       return true
     }
     guard task.exists else { return false }
 
     let taskLabel = task.label.trimmingCharacters(in: .whitespacesAndNewlines)
-    let inspectorLabel = inspector.label.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !taskLabel.isEmpty, !inspectorLabel.isEmpty else { return false }
+    let detailPaneLabel = detailPane.label.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !taskLabel.isEmpty, !detailPaneLabel.isEmpty else { return false }
 
     return
-      taskLabel == inspectorLabel
-      || taskLabel.contains(inspectorLabel)
-      || inspectorLabel.contains(taskLabel)
+      taskLabel == detailPaneLabel
+      || taskLabel.contains(detailPaneLabel)
+      || detailPaneLabel.contains(taskLabel)
   }
 
   private func scrollToward(_ element: XCUIElement) {

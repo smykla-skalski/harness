@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 extension HarnessMonitorUITests {
-  func testTaskInspectorShowsCheckpointNotesAndSuggestedFix() throws {
+  func testAgentsTaskDetailShowsCheckpointNotesAndSuggestedFix() throws {
     let app = launch(mode: "preview")
 
     let sessionRow = previewSessionTrigger(in: app)
@@ -12,9 +12,9 @@ extension HarnessMonitorUITests {
     tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
-    let inspectorCard = element(in: app, identifier: Accessibility.taskInspectorCard)
+    let detailCard = element(in: app, identifier: Accessibility.agentsTaskCard)
 
-    XCTAssertTrue(inspectorCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(detailCard.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(app.staticTexts["Checkpoint"].exists)
     XCTAssertTrue(app.staticTexts["Suggested Fix"].exists)
     XCTAssertTrue(
@@ -22,7 +22,7 @@ extension HarnessMonitorUITests {
     )
   }
 
-  func testObserverInspectorShowsCycleHistoryAndTrackedSessions() throws {
+  func testObserverPanelShowsCycleHistoryAndTrackedSessions() throws {
     let app = launch(mode: "preview")
 
     let sessionRow = previewSessionTrigger(in: app)
@@ -30,9 +30,9 @@ extension HarnessMonitorUITests {
     tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
-    let inspectorCard = element(in: app, identifier: Accessibility.observerInspectorCard)
+    let observerPanel = element(in: app, identifier: Accessibility.decisionsObserverPanel)
 
-    XCTAssertTrue(inspectorCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(observerPanel.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(app.staticTexts["Cycle History"].exists)
     XCTAssertTrue(app.staticTexts["Tracked Agent Sessions"].exists)
     XCTAssertTrue(app.staticTexts["Cursor 104"].exists)

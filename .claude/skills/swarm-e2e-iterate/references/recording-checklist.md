@@ -86,14 +86,14 @@ Tier-4 rows always emit `needs-verification` with a one-line rationale; the agen
 - `swarm.act1.session`: selected sidebar row + cockpit window title at `act1`.
 - `swarm.act2.roles`: required runtime/role pairs visible; duplicate claim visibly rejected.
 - `swarm.act3.tasks`: five task cards visible at `act3`.
-- `swarm.act4.selection`: `taskInspectorCard.value == task_review_id`.
+- `swarm.act4.selection`: `agentsTaskCard.value == task_review_id`.
 - `swarm.act5.heuristics`: ten distinct `heuristicIssueCard.<code>` cards present.
-- `swarm.act6.improver`: improver dry-run reflected in inspector.
+- `swarm.act6.improver`: improver dry-run reflected in the agents detail pane.
 - `swarm.act7.roster`: agents card reflects current roster after the rejoin.
-- `swarm.act8.awaitingReview`: `awaitingReviewBadge(task_review_id)` present.
+- `swarm.act8.awaitingReview`: `awaitingReviewBadge(task_review_id)` present in the review panel.
 - `swarm.act9.reviewers`: claim badge or quorum indicator with two runtimes.
 - `swarm.act10.autospawn`: auto-spawn-reviewer indicator present after removal cascade.
-- `swarm.act11.workerRefusal`: `harness.toast.worker-refusal` toast or inspector rejection visible.
+- `swarm.act11.workerRefusal`: `harness.toast.worker-refusal` toast or `agentsTaskCard` rejection state visible.
 - `swarm.act12.round1`: `roundCounter(task_arbitration_id)` shows `1`; partial-agreement chip visible.
 - `swarm.act13.round3`: round counter shows `3`; arbitration banner visible.
 - `swarm.act14.signalCollision`: `harness.toast.signal-collision` toast present, no overlap with the act11 toast.
