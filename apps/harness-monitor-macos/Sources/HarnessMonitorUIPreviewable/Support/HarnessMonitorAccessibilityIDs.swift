@@ -135,6 +135,7 @@ public enum HarnessMonitorAccessibility {
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   public static let sessionHeaderCard = "harness.session.header"
   public static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"
+  public static let sessionHeaderLeaderActivity = "harness.session.header.leader-activity"
   public static let observeSessionButton = "harness.session.action.observe"
   public static let endSessionButton = "harness.session.action.end"
   public static let pendingLeaderTransferCard = "harness.session.pending-transfer"

@@ -57,6 +57,15 @@ struct SessionCockpitHeaderCard: View {
           Text(sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(
+            sessionLeaderAndActivityLine(
+              detail.session,
+              configuration: dateTimeConfiguration
+            )
+          )
+          .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionHeaderLeaderActivity)
           let shouldShowContext =
             !detail.session.context.isEmpty
             && detail.session.context != detail.session.displayTitle
@@ -240,6 +249,16 @@ struct SessionCockpitHeaderCard: View {
 
 private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
   "\(session.projectName) • \(session.worktreeDisplayName) • \(session.sessionId)"
+}
+
+@MainActor
+private func sessionLeaderAndActivityLine(
+  _ session: SessionSummary,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  let leader = session.leaderId ?? "unassigned"
+  let activity = formatTimestamp(session.lastActivityAt, configuration: configuration)
+  return "Leader: \(leader) • Updated \(activity)"
 }
 
 #Preview("Cockpit header") {
