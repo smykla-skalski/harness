@@ -151,11 +151,9 @@ final class HarnessMonitorActionToastUITests: HarnessMonitorUITestCase {
 
     let window = mainWindow(in: app)
     let contentRootFrame = frameElement(in: app, identifier: Accessibility.contentRootFrame)
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
 
     XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(contentRootFrame.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
 
     let initialContentFrame = contentRootFrame.frame
 
@@ -171,11 +169,6 @@ final class HarnessMonitorActionToastUITests: HarnessMonitorUITestCase {
       16,
       accuracy: 8,
       "Toast should hug the window trailing edge with the shared large margin"
-    )
-    XCTAssertGreaterThan(
-      toastFrame.frame.maxX,
-      inspectorRoot.frame.minX,
-      "Toast should overlap the inspector edge because the overlay floats above that column too"
     )
     XCTAssertEqual(
       contentRootFrame.frame.minY,

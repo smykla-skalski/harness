@@ -113,7 +113,6 @@ extension HarnessMonitorStoreProjectionTests {
     #expect(store.debugUISyncCount(for: .contentSession) == 0)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
     #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
   @Test("Summary-only updates skip all content resync when the selected session is elsewhere")
@@ -163,7 +162,6 @@ extension HarnessMonitorStoreProjectionTests {
     #expect(store.debugUISyncCount(for: .contentSession) == 0)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
     #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
   @Test("Recent sessions stay sorted by activity outside the visible filter")

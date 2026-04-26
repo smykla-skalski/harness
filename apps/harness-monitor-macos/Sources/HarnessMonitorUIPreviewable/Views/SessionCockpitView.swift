@@ -92,7 +92,14 @@ struct SessionCockpitView: View {
       store: store,
       sessionID: detail.session.sessionId,
       tasks: detail.tasks,
-      inspectTask: store.inspect(taskID:)
+      inspectTask: openTaskActions
+    )
+  }
+
+  private func openTaskActions(_ taskID: String) {
+    store.presentedSheet = .taskActions(
+      sessionID: detail.session.sessionId,
+      taskID: taskID
     )
   }
 

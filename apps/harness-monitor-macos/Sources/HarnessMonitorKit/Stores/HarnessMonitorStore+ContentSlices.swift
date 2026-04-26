@@ -370,37 +370,4 @@ extension HarnessMonitorStore {
     }
   }
 
-  @MainActor
-  @Observable
-  public final class InspectorUISlice {
-    public var isPersistenceAvailable = false
-    public var selectedActionActorID = ""
-    public var isSessionReadOnly = true
-    public var isSessionActionInFlight = false
-    public var primaryContent: InspectorPrimaryContentState = .empty
-    public var actionContext: InspectorActionContext?
-
-    public init() {}
-
-    internal func apply(_ state: InspectorUIState) {
-      if isPersistenceAvailable != state.isPersistenceAvailable {
-        isPersistenceAvailable = state.isPersistenceAvailable
-      }
-      if selectedActionActorID != state.selectedActionActorID {
-        selectedActionActorID = state.selectedActionActorID
-      }
-      if isSessionReadOnly != state.isSessionReadOnly {
-        isSessionReadOnly = state.isSessionReadOnly
-      }
-      if isSessionActionInFlight != state.isSessionActionInFlight {
-        isSessionActionInFlight = state.isSessionActionInFlight
-      }
-      if primaryContent != state.primaryContent {
-        primaryContent = state.primaryContent
-      }
-      if actionContext != state.actionContext {
-        actionContext = state.actionContext
-      }
-    }
-  }
 }

@@ -16,13 +16,7 @@ public struct ContentView<CornerContent: View>: View {
   private let toast: ToastSlice
   let auditBuildState: AuditBuildDisplayState?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
-  @AppStorage("showInspector")
-  private var persistedShowInspector = true
-  @AppStorage("inspectorColumnWidth")
-  private var inspectorColumnWidth: Double = HarnessMonitorInspectorLayout.idealWidth
-  @State private var showInspector = false
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
-  @State private var shouldIgnoreNextInspectorMeasurement = false
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -49,7 +43,6 @@ public struct ContentView<CornerContent: View>: View {
       "harness.view.surface":
         contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit",
       "harness.view.column_visibility": columnVisibilityProfilingLabel,
-      "harness.view.inspector_presented": showInspector ? "true" : "false",
     ]
   }
 
@@ -64,15 +57,6 @@ public struct ContentView<CornerContent: View>: View {
     // equality bucket on macOS. This window drives explicit visibility, so the
     // ambiguous branch represents the middle two-column state.
     return "doubleColumn"
-  }
-
-  private var inspectorPresentationBinding: Binding<Bool> {
-    Binding(
-      get: { showInspector },
-      set: { newValue in
-        applyInspectorVisibilityChange(to: newValue, source: .framework)
-      }
-    )
   }
 
   @MainActor
@@ -91,7 +75,6 @@ public struct ContentView<CornerContent: View>: View {
     self.contentDashboard = store.contentUI.dashboard
     self.toast = store.toast
     self.auditBuildState = Self.resolveAuditBuildState()
-    _showInspector = State(initialValue: ContentInspectorInitialPresentation.resolve())
   }
 
   public var body: some View {
@@ -120,9 +103,6 @@ public struct ContentView<CornerContent: View>: View {
     .toolbarBackgroundVisibility(contentWindowToolbarBackgroundVisibility, for: .windowToolbar)
     .toolbar {
       contentToolbarItems
-    }
-    .onChange(of: persistedShowInspector) { _, newValue in
-      applyInspectorVisibilityChange(to: newValue, source: .persistedPreference)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
@@ -159,8 +139,7 @@ public struct ContentView<CornerContent: View>: View {
       canNavigateForward: store.contentUI.toolbar.canNavigateForward,
       canStartNewSession: store.connectionState == .online,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled
     )
   }
 
@@ -237,47 +216,8 @@ public struct ContentView<CornerContent: View>: View {
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       dashboardUI: contentDashboard,
-      showInspector: showInspector,
-      setInspectorVisibility: applyInspectorVisibilityChange,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
-    .inspector(isPresented: inspectorPresentationBinding) {
-      inspectorColumn
-    }
-  }
-
-  private var inspectorColumn: some View {
-    InspectorColumnView(
-      store: store,
-      inspectorUI: store.inspectorUI
-    )
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      updateInspectorWidth(width)
-    }
-    .inspectorColumnWidth(
-      min: HarnessMonitorInspectorLayout.minWidth,
-      ideal: inspectorColumnWidth,
-      max: HarnessMonitorInspectorLayout.maxWidth
-    )
-  }
-
-  private func updateInspectorWidth(_ width: CGFloat) {
-    guard showInspector,
-      width >= HarnessMonitorInspectorLayout.minWidth,
-      width <= HarnessMonitorInspectorLayout.maxWidth
-    else {
-      return
-    }
-    if shouldIgnoreNextInspectorMeasurement {
-      shouldIgnoreNextInspectorMeasurement = false
-      return
-    }
-    guard abs(width - inspectorColumnWidth) > 1 else {
-      return
-    }
-    inspectorColumnWidth = width
   }
 
   private func enableStartupFocusParticipation() {
@@ -285,35 +225,6 @@ public struct ContentView<CornerContent: View>: View {
       return
     }
     isStartupFocusParticipationEnabled = true
-  }
-
-  private func applyInspectorVisibilityChange(
-    to newValue: Bool,
-    source: ContentInspectorVisibilitySource
-  ) {
-    guard
-      let change = ContentInspectorVisibilityPolicy.resolve(
-        currentPresentation: showInspector,
-        currentPersistedPreference: persistedShowInspector,
-        nextPresentation: newValue,
-        source: source
-      )
-    else {
-      return
-    }
-
-    let isPresentingInspector = !showInspector && change.nextPresentation
-    if isPresentingInspector {
-      shouldIgnoreNextInspectorMeasurement = true
-    }
-    if showInspector != change.nextPresentation {
-      showInspector = change.nextPresentation
-    }
-    if let persistedPreference = change.persistedPreference,
-      persistedShowInspector != persistedPreference
-    {
-      persistedShowInspector = persistedPreference
-    }
   }
 }
 

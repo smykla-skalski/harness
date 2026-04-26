@@ -6,27 +6,6 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
 
-  func testInspectorEmptyStateIsReadable() throws {
-    let app = launch(mode: "empty")
-
-    let emptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
-    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.actionTimeout))
-
-    let stats = luminanceStats(of: emptyState)
-    let screenshot = XCTAttachment(screenshot: emptyState.screenshot())
-    screenshot.name = "inspector-empty-state"
-    screenshot.lifetime = .keepAlways
-    add(screenshot)
-
-    XCTAssertGreaterThan(
-      stats.stddev,
-      0.04,
-      "Section content washed out: stddev=\(stats.stddev), "
-        + "min=\(stats.min), max=\(stats.max), "
-        + "mean=\(stats.mean), samples=\(stats.count)"
-    )
-  }
-
   func testSessionTaskCardContentIsReadable() throws {
     let app = launch(mode: "preview")
     let sessionRow = previewSessionTrigger(in: app)

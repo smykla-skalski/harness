@@ -13,7 +13,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.createTask(sessionID: action.sessionID).key,
+      actionID: ActionID.createTask(sessionID: action.sessionID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -41,7 +41,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.assignTask(sessionID: action.sessionID, taskID: taskID).key,
+      actionID: ActionID.assignTask(sessionID: action.sessionID, taskID: taskID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -66,7 +66,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.dropTask(sessionID: action.sessionID, taskID: taskID).key,
+      actionID: ActionID.dropTask(sessionID: action.sessionID, taskID: taskID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -94,7 +94,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.updateTaskQueuePolicy(
+      actionID: ActionID.updateTaskQueuePolicy(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -122,7 +122,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.updateTaskStatus(sessionID: action.sessionID, taskID: taskID)
+      actionID: ActionID.updateTaskStatus(sessionID: action.sessionID, taskID: taskID)
         .key,
       using: action.client,
       sessionID: action.sessionID,
@@ -148,7 +148,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.checkpointTask(sessionID: action.sessionID, taskID: taskID).key,
+      actionID: ActionID.checkpointTask(sessionID: action.sessionID, taskID: taskID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {

@@ -18,15 +18,7 @@ extension HarnessMonitorStore {
   }
 
   public func copySelectedItemID() {
-    let text: String
-    switch inspectorSelection {
-    case .task(let taskID): text = taskID
-    case .signal(let signalID): text = signalID
-    case .observer:
-      text = selectedSession?.observer?.observeId ?? selectedSessionID ?? ""
-    case .none:
-      text = selectedSessionID ?? ""
-    }
+    let text = selectedSessionID ?? ""
     guard !text.isEmpty else { return }
     #if canImport(AppKit)
       NSPasteboard.general.clearContents()
