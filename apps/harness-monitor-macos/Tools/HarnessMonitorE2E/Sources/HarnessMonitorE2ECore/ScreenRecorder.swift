@@ -1,4 +1,3 @@
-import AVFoundation
 import AppKit
 import CoreGraphics
 import Darwin
