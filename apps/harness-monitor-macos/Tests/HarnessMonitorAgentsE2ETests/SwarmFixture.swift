@@ -335,9 +335,9 @@ final class SwarmFixture {
     let window = testCase.mainWindow(in: app)
     let shouldScrollUp =
       !(element.exists
-        && !element.frame.isEmpty
-        && !window.frame.isEmpty
-        && element.frame.minY < window.frame.minY + 72)
+      && !element.frame.isEmpty
+      && !window.frame.isEmpty
+      && element.frame.minY < window.frame.minY + 72)
     let magnitude = max(240, target.frame.height * 0.9)
     let delta: CGFloat = shouldScrollUp ? -magnitude : magnitude
     target.scroll(byDeltaX: 0, deltaY: delta)
