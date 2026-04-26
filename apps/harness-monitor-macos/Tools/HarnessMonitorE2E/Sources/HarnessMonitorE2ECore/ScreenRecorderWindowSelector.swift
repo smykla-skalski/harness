@@ -55,8 +55,8 @@ enum ScreenRecorderWindowSelector {
   ) throws -> ScreenRecorderWindowCandidate? {
     let matchingCandidates = candidates.filter { candidate in
       guard candidate.isOnScreen else { return false }
-      guard mainWindowTitles.contains(candidate.title.trimmingCharacters(in: .whitespacesAndNewlines))
-      else { return false }
+      let trimmedTitle = candidate.title.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard mainWindowTitles.contains(trimmedTitle) else { return false }
       if let requiredPID = requireProcessID {
         return candidate.processID == requiredPID
       }
