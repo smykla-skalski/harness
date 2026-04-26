@@ -36,7 +36,8 @@ final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
       "UI test host should publish supervisor badge state"
     )
 
-    let activeBadgeState = "count=1 severity=needsUser tint=orange"
+    let activeBadgeState =
+      "count=1 severity=needsUser tint=orange symbol=bell.badge.fill"
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         badge.exists && self.markerText(for: badgeState) == activeBadgeState
@@ -77,7 +78,8 @@ final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.markerText(for: badgeState) == "count=0 severity=none tint=secondary"
+        self.markerText(for: badgeState)
+          == "count=0 severity=none tint=secondary symbol=bell.badge"
       },
       """
       Resolving the decision should clear the toolbar badge state.
