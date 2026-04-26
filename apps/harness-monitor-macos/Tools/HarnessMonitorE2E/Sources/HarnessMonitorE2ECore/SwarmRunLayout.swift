@@ -80,7 +80,8 @@ public struct SwarmRunLayout {
     self.logRoot = stateRoot.appendingPathComponent("logs", isDirectory: true)
     self.daemonLog = logRoot.appendingPathComponent("daemon.log")
     self.actDriverLog = logRoot.appendingPathComponent("act-driver.log")
-    self.derivedDataPath = commonRepoRoot.appendingPathComponent("xcode-derived", isDirectory: true)
+    self.derivedDataPath = commonRepoRoot.appendingPathComponent(
+      "xcode-derived-e2e", isDirectory: true)
 
     self.triageRoot =
       triageRootOverride
