@@ -3,6 +3,7 @@ import XCTest
 
 @testable import HarnessMonitorE2ECore
 
+@available(macOS 15.0, *)
 final class ScreenRecordingControlTests: XCTestCase {
   func testManifestRoundTripPreservesAllFields() throws {
     let manifest = ScreenRecordingManifest(
@@ -17,6 +18,15 @@ final class ScreenRecordingControlTests: XCTestCase {
     XCTAssertEqual(decoded.processID, manifest.processID)
     XCTAssertEqual(decoded.outputPath, manifest.outputPath)
     XCTAssertEqual(decoded.logPath, manifest.logPath)
+  }
+
+  func testAlreadyStoppedStreamErrorIsIgnoredDuringTeardown() {
+    let error = NSError(
+      domain: "com.apple.ScreenCaptureKit.SCStreamErrorDomain",
+      code: -3808
+    )
+
+    XCTAssertTrue(ScreenRecorder.shouldIgnoreStopCaptureError(error))
   }
 
   func testStopSendsSigintAndReturnsWhenRecorderExitsGracefully() {

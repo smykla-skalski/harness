@@ -6,11 +6,11 @@ import Foundation
 ///
 /// `SCShareableContent.current` can report a window as `isOnScreen=true`
 /// before AppKit has run its first layout pass, so the SCWindow's frame
-/// is briefly `0x0` (or off any display). Passing such a window straight
-/// to `SCContentFilter(desktopIndependentWindow:)` has been observed to
-/// either fail silently or stall the recorder bootstrap on macOS 26, so
-/// the recorder loops on this check and only proceeds once the window
-/// has a real geometry that intersects an `SCDisplay`.
+/// is briefly `0x0` (or off any display). Passing such a window into the
+/// recorder's display-scoped ScreenCaptureKit setup has been observed to
+/// either fail silently or stall bootstrap on macOS 26, so the recorder
+/// loops on this check and only proceeds once the window has real geometry
+/// that intersects an `SCDisplay`.
 @available(macOS 15.0, *)
 enum ScreenRecorderWindowReadinessResult {
   case ready(display: ScreenRecorderDisplayCandidate)
