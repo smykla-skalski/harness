@@ -78,14 +78,20 @@ final class HarnessMonitorSwarmE2ELiveHarness {
   }
 
   func diagnosticsSummary() -> String {
-    [
+    var lines = [
       "stateRoot=\(stateRootURL.path)",
       "dataHome=\(dataHomeURL.path)",
       "sessionID=\(sessionID)",
       "taskID=\(taskID)",
       "reviewerAgentID=\(reviewerAgentID)",
       "daemonLog=\(daemonLogPath)",
-    ].joined(separator: "\n")
+    ]
+    if let tracePath = diagnosticsTraceFileURL(
+      for: HarnessMonitorUITestCase.artifactsDirectoryKey
+    )?.path {
+      lines.append("uiTrace=\(tracePath)")
+    }
+    return lines.joined(separator: "\n")
   }
 
   private static func required(

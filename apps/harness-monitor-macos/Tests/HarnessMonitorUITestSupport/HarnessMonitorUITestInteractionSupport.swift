@@ -7,18 +7,50 @@ extension HarnessMonitorUITestCase {
 
   func tapSession(in app: XCUIApplication, identifier: String) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
+    recordDiagnosticsTrace(
+      event: "tap-session.begin",
+      app: app,
+      details: ["identifier": identifier]
+    )
+    let exists = waitForElement(sessionRow, timeout: Self.fastActionTimeout)
+    if !exists {
+      recordDiagnosticsTrace(
+        event: "tap-session.timeout",
+        app: app,
+        details: ["identifier": identifier]
+      )
+    }
     XCTAssertTrue(
-      waitForElement(sessionRow, timeout: Self.fastActionTimeout)
+      exists,
+      """
+      Expected session row \(identifier)
+      trace=\(diagnosticsTracePath() ?? "unavailable")
+      """
     )
     guard !sessionRowIsSelected(sessionRow) else { return }
     if sessionRow.isHittable {
       sessionRow.tap()
+      recordDiagnosticsTrace(
+        event: "tap-session.hittable",
+        app: app,
+        details: ["identifier": identifier]
+      )
       return
     }
     if let coordinate = centerCoordinate(in: app, for: sessionRow) {
       coordinate.tap()
+      recordDiagnosticsTrace(
+        event: "tap-session.coordinate",
+        app: app,
+        details: ["identifier": identifier]
+      )
       return
     }
+    recordDiagnosticsTrace(
+      event: "tap-session.failed",
+      app: app,
+      details: ["identifier": identifier]
+    )
     XCTFail("Failed to tap session row \(identifier)")
   }
 
@@ -223,15 +255,17 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
-    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !identifier.isEmpty {
-      let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
-      if let coordinate = centerCoordinate(in: app, for: frameMarker) {
-        return coordinate
-      }
+    if let coordinate = centerCoordinate(in: app, for: element) {
+      return coordinate
     }
 
-    return centerCoordinate(in: app, for: element)
+    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !identifier.isEmpty else {
+      return nil
+    }
+
+    let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
+    return centerCoordinate(in: app, for: frameMarker)
   }
 
   func invokeMenuItem(

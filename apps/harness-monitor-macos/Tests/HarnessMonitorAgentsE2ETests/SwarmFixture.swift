@@ -18,12 +18,12 @@ final class SwarmFixture {
   let app: XCUIApplication
   let sessionID: String
 
-  private let testCase: HarnessMonitorUITestCase
-  private let stateRootURL: URL
-  private let dataHomeURL: URL
-  private let daemonLogPath: String
-  private let syncDirURL: URL
-  private let stepTimeouts: [String: TimeInterval]
+  let testCase: HarnessMonitorUITestCase
+  let stateRootURL: URL
+  let dataHomeURL: URL
+  let daemonLogPath: String
+  let syncDirURL: URL
+  let stepTimeouts: [String: TimeInterval]
 
   init(testCase: HarnessMonitorUITestCase) throws {
     let environment = ProcessInfo.processInfo.environment
@@ -68,60 +68,139 @@ final class SwarmFixture {
       "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1280",
       "HARNESS_MONITOR_UI_TESTS": "1",
     ]
+    trace(
+      "launch.start",
+      details: [
+        "session_id": sessionID,
+        "data_home": dataHomeURL.path,
+        "daemon_log": daemonLogPath,
+        "sync_dir": syncDirURL.path,
+      ]
+    )
     guard testCase.armRecordingStartIfConfigured(context: diagnosticsSummary()) else {
       return
     }
     app.launch()
-    XCTAssertTrue(
-      testCase.waitUntil(timeout: 25) {
-        if self.app.state != .runningForeground {
-          self.app.activate()
-        }
-        return self.app.state == .runningForeground || self.testCase.mainWindow(in: self.app).exists
-      },
-      diagnosticsSummary()
-    )
+    trace("launch.app-launched", app: app)
+    let foregroundReady = testCase.waitUntil(timeout: 25) {
+      if self.app.state != .runningForeground {
+        self.app.activate()
+      }
+      return self.app.state == .runningForeground || self.testCase.mainWindow(in: self.app).exists
+    }
+    if !foregroundReady {
+      trace(
+        "launch.foreground.timeout",
+        app: app,
+        details: [
+          "session_id": sessionID,
+          "sync_dir": syncDirURL.path,
+        ]
+      )
+    }
+    XCTAssertTrue(foregroundReady, diagnosticsSummary())
     guard testCase.provideRecordingPidIfConfigured(for: app, context: diagnosticsSummary()) else {
       return
     }
     guard testCase.waitForRecordingStartIfConfigured(context: diagnosticsSummary()) else {
       return
     }
-    XCTAssertTrue(
-      testCase.waitUntil(timeout: 25) {
-        let window = self.testCase.mainWindow(in: self.app)
-        return window.exists && window.frame.width > 0 && window.frame.height > 0
-      },
-      diagnosticsSummary()
-    )
+    trace("launch.recording-started", app: app)
+    let windowReady = testCase.waitUntil(timeout: 25) {
+      let window = self.testCase.mainWindow(in: self.app)
+      return window.exists && window.frame.width > 0 && window.frame.height > 0
+    }
+    if !windowReady {
+      trace(
+        "launch.window.timeout",
+        app: app,
+        details: [
+          "session_id": sessionID,
+          "sync_dir": syncDirURL.path,
+        ]
+      )
+    }
+    XCTAssertTrue(windowReady, diagnosticsSummary())
+    if windowReady {
+      trace("launch.window-ready", app: app)
+    }
   }
 
   func waitForReady(_ act: String, timeout: TimeInterval? = nil) throws -> [String: String] {
     let url = syncDirURL.appendingPathComponent("\(act).ready")
     let resolvedTimeout = timeout ?? stepTimeouts[act] ?? stepTimeouts["default"] ?? 30
+    trace(
+      "act.ready.wait.begin",
+      details: [
+        "act": act,
+        "timeout_seconds": String(resolvedTimeout),
+        "marker": url.path,
+      ]
+    )
+    let ready = testCase.waitUntil(timeout: resolvedTimeout) {
+      FileManager.default.fileExists(atPath: url.path)
+    }
+    if !ready {
+      trace(
+        "act.ready.wait.timeout",
+        details: [
+          "act": act,
+          "marker": url.path,
+          "timeout_seconds": String(resolvedTimeout),
+        ]
+      )
+    }
     XCTAssertTrue(
-      testCase.waitUntil(timeout: resolvedTimeout) {
-        FileManager.default.fileExists(atPath: url.path)
-      },
+      ready,
       "Timed out waiting for \(act).ready after \(Int(resolvedTimeout))s\n\(diagnosticsSummary())"
     )
+    if ready {
+      trace(
+        "act.ready.wait.success",
+        details: [
+          "act": act,
+          "marker": url.path,
+        ]
+      )
+    }
     return try Self.readKeyValueMarker(url)
   }
 
   func ack(_ act: String) throws {
     let url = syncDirURL.appendingPathComponent("\(act).ack")
     try "ack\n".write(to: url, atomically: true, encoding: .utf8)
+    trace("act.ack.write", details: ["act": act, "marker": url.path])
   }
 
   func captureCheckpoint(_ name: String) {
+    trace("checkpoint.capture", app: app, details: ["name": name])
     testCase.recordDiagnosticsSnapshot(in: app, named: "swarm-\(name)")
   }
 
   func openSession(_ sessionID: String) {
     let identifier = Accessibility.sessionRow(sessionID)
     let row = testCase.sessionTrigger(in: app, identifier: identifier)
+    trace(
+      "open-session.begin",
+      app: app,
+      details: [
+        "session_id": sessionID,
+        "identifier": identifier,
+      ]
+    )
+    let rowExists = testCase.waitForElement(row, timeout: 25)
+    if !rowExists {
+      trace(
+        "open-session.row-timeout",
+        app: app,
+        details: [
+          "session_id": sessionID,
+          "identifier": identifier,
+        ]
+      )
+    }
     XCTAssertTrue(
-      testCase.waitForElement(row, timeout: 25),
+      rowExists,
       "Expected swarm session row \(identifier)\n\(diagnosticsSummary())"
     )
 
@@ -139,6 +218,17 @@ final class SwarmFixture {
 
     if !sessionIsOpen() {
       let selected = attemptSelection() || attemptSelection() || attemptSelection()
+      trace(
+        selected ? "open-session.selected" : "open-session.failed",
+        app: app,
+        details: [
+          "session_id": sessionID,
+          "identifier": identifier,
+          "row_value": row.value.map { String(describing: $0) } ?? "nil",
+          "toolbar_state": toolbarState.label,
+          "selected": String(selected),
+        ]
+      )
       XCTAssertTrue(
         selected,
         """
@@ -148,81 +238,90 @@ final class SwarmFixture {
         \(diagnosticsSummary())
         """
       )
+    } else {
+      trace(
+        "open-session.already-selected",
+        app: app,
+        details: [
+          "session_id": sessionID,
+          "identifier": identifier,
+          "row_value": row.value.map { String(describing: $0) } ?? "nil",
+          "toolbar_state": toolbarState.label,
+        ]
+      )
     }
   }
 
   func selectTask(_ taskID: String) {
     let identifier = Accessibility.sessionTaskCard(taskID)
     let task = testCase.element(in: app, identifier: identifier)
-    if taskIsSelectedInDetailPane(task, taskID: taskID) {
+    trace(
+      "select-task.begin",
+      app: app,
+      details: [
+        "task_id": taskID,
+        "identifier": identifier,
+        "task_exists": String(task.exists),
+      ]
+    )
+    if taskActionsSheetIsPresented() {
+      trace("select-task.sheet-presented", app: app, details: ["task_id": taskID])
       return
     }
     expectIdentifier(Accessibility.sessionTaskListState, labelContains: taskID)
-    if taskIsSelectedInDetailPane(task, taskID: taskID) {
+    if taskActionsSheetIsPresented() {
+      trace(
+        "select-task.sheet-presented-after-list-check",
+        app: app,
+        details: ["task_id": taskID]
+      )
       return
     }
+    let target = scrollTarget(for: task)
+    let taskVisible = scrollElementIntoView(task)
+    if !taskVisible {
+      trace(
+        "select-task.scroll-timeout",
+        app: app,
+        details: [
+          "task_id": taskID,
+          "identifier": identifier,
+          "task_frame": frameSummary(task.frame),
+          "scroll_frame": frameSummary(target.frame),
+        ]
+      )
+    }
     XCTAssertTrue(
-      scrollElementIntoView(task),
+      taskVisible,
       """
       Expected swarm task card \(taskID) to become hittable.
       taskFrame=\(task.frame)
-      scrollFrame=\(scrollTarget(for: task).frame)
+      scrollFrame=\(target.frame)
       \(diagnosticsSummary())
       """
     )
+    if taskVisible {
+      trace(
+        "select-task.visible",
+        app: app,
+        details: [
+          "task_id": taskID,
+          "identifier": identifier,
+          "task_frame": frameSummary(task.frame),
+          "scroll_frame": frameSummary(target.frame),
+        ]
+      )
+    }
     testCase.tapElement(in: app, identifier: identifier)
-    let detailPane = testCase.element(in: app, identifier: Accessibility.agentsTaskCard)
     XCTAssertTrue(
-      testCase.waitUntil(timeout: 5) { self.taskIsSelectedInDetailPane(task, taskID: taskID) },
+      testCase.waitUntil(timeout: 5) { self.taskActionsSheetIsPresented() },
       """
-      Expected swarm task \(taskID) to become selected in the agents detail pane.
+      Expected swarm task \(taskID) to open the task actions sheet.
       taskLabel=\(task.label)
-      detailPaneLabel=\(detailPane.label)
-      detailPaneValue=\(String(describing: detailPane.value))
       \(diagnosticsSummary())
       """
     )
-  }
-
-  func expectIdentifier(_ identifier: String, timeout: TimeInterval = 15) {
-    let element = testCase.element(in: app, identifier: identifier)
-    XCTAssertTrue(
-      testCase.waitForElement(element, timeout: timeout),
-      "Expected identifier \(identifier)\n\(diagnosticsSummary())"
-    )
-  }
-
-  func expectIdentifier(_ identifier: String, labelContains expectedText: String) {
-    let element = testCase.element(in: app, identifier: identifier)
-    XCTAssertTrue(
-      testCase.waitUntil(timeout: 15) {
-        element.exists && element.label.contains(expectedText)
-      },
-      """
-      Expected identifier \(identifier) label to contain \(expectedText).
-      actualLabel=\(element.label)
-      \(diagnosticsSummary())
-      """
-    )
-  }
-
-  func expectAnyIdentifier(_ identifiers: [String], timeout: TimeInterval = 15) {
-    XCTAssertTrue(
-      testCase.waitUntil(timeout: timeout) {
-        identifiers.contains { self.testCase.element(in: self.app, identifier: $0).exists }
-      },
-      "Expected one of \(identifiers.joined(separator: ", "))\n\(diagnosticsSummary())"
-    )
-  }
-
-  func diagnosticsSummary() -> String {
-    [
-      "stateRoot=\(stateRootURL.path)",
-      "dataHome=\(dataHomeURL.path)",
-      "sessionID=\(sessionID)",
-      "daemonLog=\(daemonLogPath)",
-      "syncDir=\(syncDirURL.path)",
-    ].joined(separator: "\n")
+    trace("select-task.sheet-opened", app: app, details: ["task_id": taskID])
   }
 
   private static func required(
@@ -273,139 +372,4 @@ final class SwarmFixture {
     return decoded
   }
 
-  private func scrollElementIntoView(
-    _ element: XCUIElement,
-    timeout: TimeInterval = 8
-  ) -> Bool {
-    let deadline = Date.now.addingTimeInterval(timeout)
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
-      if element.exists && (element.isHittable || elementIsVisibleInScrollTarget(element)) {
-        return true
-      }
-
-      scrollToward(element)
-      RunLoop.current.run(until: Date.now.addingTimeInterval(0.15))
-    }
-    return element.exists && (element.isHittable || elementIsVisibleInScrollTarget(element))
-  }
-
-  private func elementIsVisibleInScrollTarget(_ element: XCUIElement) -> Bool {
-    guard element.exists, !element.frame.isEmpty else { return false }
-
-    let targetFrame = scrollTarget(for: element).frame
-    let windowFrame = testCase.mainWindow(in: app).frame
-    let visibleFrame = targetFrame.intersection(windowFrame)
-    guard !visibleFrame.isNull, !visibleFrame.isEmpty else { return false }
-
-    return visibleFrame.insetBy(dx: -1, dy: -1)
-      .contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
-  }
-
-  private func taskIsSelectedInDetailPane(_ task: XCUIElement, taskID: String) -> Bool {
-    let selectionMarker = testCase.element(
-      in: app,
-      identifier: Accessibility.agentsTaskSelection(taskID)
-    )
-    if selectionMarker.exists {
-      return true
-    }
-    let detailPane = testCase.element(in: app, identifier: Accessibility.agentsTaskCard)
-    guard detailPane.exists else { return false }
-    if (detailPane.value as? String) == taskID {
-      return true
-    }
-    guard task.exists else { return false }
-
-    let taskLabel = task.label.trimmingCharacters(in: .whitespacesAndNewlines)
-    let detailPaneLabel = detailPane.label.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !taskLabel.isEmpty, !detailPaneLabel.isEmpty else { return false }
-
-    return
-      taskLabel == detailPaneLabel
-      || taskLabel.contains(detailPaneLabel)
-      || detailPaneLabel.contains(taskLabel)
-  }
-
-  private func scrollToward(_ element: XCUIElement) {
-    let target = scrollTarget(for: element)
-    guard target.exists else { return }
-    let window = testCase.mainWindow(in: app)
-    let shouldScrollUp =
-      !(element.exists
-      && !element.frame.isEmpty
-      && !window.frame.isEmpty
-      && element.frame.minY < window.frame.minY + 72)
-    let magnitude = max(240, target.frame.height * 0.9)
-    let delta: CGFloat = shouldScrollUp ? -magnitude : magnitude
-    target.scroll(byDeltaX: 0, deltaY: delta)
-  }
-
-  private func scrollTarget(for element: XCUIElement) -> XCUIElement {
-    let window = testCase.mainWindow(in: app)
-    if let scrollView = matchingScrollTarget(in: window.scrollViews, for: element) {
-      return scrollView
-    }
-    if let scrollView = matchingScrollTarget(in: app.scrollViews, for: element) {
-      return scrollView
-    }
-
-    if let largest = largestScrollTarget(in: window.scrollViews) {
-      return largest
-    }
-    if let largest = largestScrollTarget(in: app.scrollViews) {
-      return largest
-    }
-    return window
-  }
-
-  private func largestScrollTarget(in query: XCUIElementQuery) -> XCUIElement? {
-    let searchCount = min(query.count, 12)
-    var bestArea: CGFloat = 0
-    var bestMatch: XCUIElement?
-    for index in 0..<searchCount {
-      let candidate = query.element(boundBy: index)
-      guard candidate.exists, !candidate.frame.isEmpty else { continue }
-      let area = candidate.frame.width * candidate.frame.height
-      if area > bestArea {
-        bestArea = area
-        bestMatch = candidate
-      }
-    }
-    return bestMatch
-  }
-
-  private func matchingScrollTarget(
-    in query: XCUIElementQuery,
-    for element: XCUIElement
-  ) -> XCUIElement? {
-    guard element.exists, !element.frame.isEmpty else { return nil }
-
-    let elementFrame = element.frame
-    let elementMidX = elementFrame.midX
-    let searchCount = min(query.count, 12)
-    var bestOverlap: CGFloat = 0
-    var bestMatch: XCUIElement?
-
-    for index in 0..<searchCount {
-      let candidate = query.element(boundBy: index)
-      guard candidate.exists, !candidate.frame.isEmpty else { continue }
-
-      let candidateFrame = candidate.frame
-      if candidateFrame.minX <= elementMidX, elementMidX <= candidateFrame.maxX {
-        return candidate
-      }
-
-      let horizontalOverlap =
-        min(candidateFrame.maxX, elementFrame.maxX) - max(candidateFrame.minX, elementFrame.minX)
-      if horizontalOverlap > bestOverlap {
-        bestOverlap = horizontalOverlap
-        bestMatch = candidate
-      }
-    }
-
-    return bestMatch
-  }
 }
