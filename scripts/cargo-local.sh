@@ -35,6 +35,13 @@ cargo_bin_usable() {
   "$candidate" -V >/dev/null 2>&1
 }
 
+sccache_bin_usable() {
+  local candidate="${1:-}"
+  [[ -n "$candidate" ]] || return 1
+  command -v "$candidate" >/dev/null 2>&1 || return 1
+  "$candidate" cc --version >/dev/null 2>&1
+}
+
 tmpdir_is_usable() {
   local candidate probe
   candidate="${1:-}"
@@ -175,7 +182,7 @@ fi
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 
-if [[ -z "${RUSTC_WRAPPER:-}" ]] && command -v sccache >/dev/null 2>&1; then
+if [[ -z "${RUSTC_WRAPPER:-}" ]] && sccache_bin_usable sccache; then
   export RUSTC_WRAPPER
   RUSTC_WRAPPER="$(command -v sccache)"
 fi
