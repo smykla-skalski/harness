@@ -38,26 +38,26 @@ enum HarnessMonitorPerfDriver {
   static func run(
     scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openSettings: OpenSettingsAction
   ) async {
     #if HARNESS_FEATURE_OTEL
       await signpostBridge.withInterval(
         name: scenario.signpostName,
         flushOnCompletion: true
       ) {
-        await runScenario(scenario, store: store, openWindow: openWindow)
+        await runScenario(scenario, store: store, openSettings: openSettings)
       }
     #else
       let state = signposter.beginInterval(scenario.signpostName, id: .exclusive)
       defer { signposter.endInterval(scenario.signpostName, state) }
-      await runScenario(scenario, store: store, openWindow: openWindow)
+      await runScenario(scenario, store: store, openSettings: openSettings)
     #endif
   }
 
   private static func runScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openSettings: OpenSettingsAction
   ) async {
     switch scenario {
     case .launchDashboard:
@@ -81,10 +81,10 @@ enum HarnessMonitorPerfDriver {
         store: store
       )
     case .settingsBackdropCycle:
-      await openAppearanceSettings(openWindow: openWindow)
+      await openAppearanceSettings(openSettings: openSettings)
       await cycleBackdropModes()
     case .settingsBackgroundCycle:
-      await openAppearanceSettings(openWindow: openWindow)
+      await openAppearanceSettings(openSettings: openSettings)
       await cycleBackgroundSelections()
     case .timelineBurst:
       await settle()
@@ -115,12 +115,12 @@ enum HarnessMonitorPerfDriver {
     await settle()
   }
 
-  private static func openAppearanceSettings(openWindow: OpenWindowAction) async {
+  private static func openAppearanceSettings(openSettings: OpenSettingsAction) async {
     UserDefaults.standard.set(
       HarnessMonitorBackdropMode.window.rawValue,
       forKey: HarnessMonitorBackdropDefaults.modeKey
     )
-    openWindow(id: HarnessMonitorWindowID.preferences)
+    openSettings()
     await settle(.milliseconds(1_000))
   }
 
