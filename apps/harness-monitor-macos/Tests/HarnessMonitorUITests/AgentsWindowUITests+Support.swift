@@ -47,26 +47,6 @@ extension AgentsWindowUITests {
     )
   }
 
-  func invokeHarnessMonitorMenuItem(
-    in app: XCUIApplication,
-    title: String
-  ) {
-    app.activate()
-    let commandMenu = app.menuBars.menuBarItems["Harness Monitor"].firstMatch
-    XCTAssertTrue(
-      waitForElement(commandMenu, timeout: Self.actionTimeout),
-      "Harness Monitor menu should exist"
-    )
-    commandMenu.click()
-
-    let menuItem = app.menuItems[title].firstMatch
-    XCTAssertTrue(
-      waitForElement(menuItem, timeout: Self.actionTimeout),
-      "\(title) menu item should appear after opening the Harness Monitor menu"
-    )
-    menuItem.click()
-  }
-
   func startAgentTui(
     in app: XCUIApplication,
     runtimeTitle: String,

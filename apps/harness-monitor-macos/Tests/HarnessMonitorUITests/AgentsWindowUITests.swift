@@ -107,7 +107,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase {
       },
       "Selecting the create tab should move the active Agents window into its create pane"
     )
-    invokeHarnessMonitorMenuItem(in: app, title: "Back")
+    invokeMenuItem(in: app, menu: "Go", title: "Back")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=session:preview-agent-tui-1")
@@ -123,7 +123,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase {
       forwardEnabled=\(forwardButton.isEnabled)
       """
     )
-    invokeHarnessMonitorMenuItem(in: app, title: "Forward")
+    invokeMenuItem(in: app, menu: "Go", title: "Forward")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=create")

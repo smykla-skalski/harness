@@ -23,19 +23,7 @@ extension HarnessMonitorUITestCase {
   }
 
   func terminateIfRunning(_ app: XCUIApplication) {
-    switch app.state {
-    case .runningForeground, .runningBackground:
-      app.terminate()
-      XCTAssertTrue(
-        waitUntil(timeout: Self.fastActionTimeout) {
-          app.state == .notRunning
-        }
-      )
-    case .notRunning, .unknown:
-      break
-    @unknown default:
-      break
-    }
+    HarnessMonitorUITestCase.terminateAndWait(app)
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
@@ -244,5 +232,26 @@ extension HarnessMonitorUITestCase {
     }
 
     return centerCoordinate(in: app, for: element)
+  }
+
+  func invokeMenuItem(
+    in app: XCUIApplication,
+    menu menuTitle: String,
+    title: String
+  ) {
+    app.activate()
+    let menuBarItem = app.menuBars.menuBarItems[menuTitle].firstMatch
+    XCTAssertTrue(
+      waitForElement(menuBarItem, timeout: Self.actionTimeout),
+      "\(menuTitle) menu should exist in the menu bar"
+    )
+    menuBarItem.click()
+
+    let menuItem = app.menuItems[title].firstMatch
+    XCTAssertTrue(
+      waitForElement(menuItem, timeout: Self.actionTimeout),
+      "\(title) menu item should appear after opening the \(menuTitle) menu"
+    )
+    menuItem.click()
   }
 }
