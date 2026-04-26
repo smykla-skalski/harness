@@ -243,9 +243,19 @@ final class SupervisorServiceTests: XCTestCase {
     )
 
     await service.start()
+    let sleepDeadline = Date().addingTimeInterval(2)
+    while clock.pendingSleepCount == 0 && Date() < sleepDeadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    XCTAssertEqual(
+      clock.pendingSleepCount,
+      1,
+      "run loop should register its initial sleep before the test advances the manual clock"
+    )
     await clock.advance(by: .seconds(5))
     // Poll until the slow rule is blocked inside gate.wait(), confirming the tick body is
-    // in flight. Polling replaces a fixed sleep which is flaky on loaded machines.
+    // in flight after the clock resumes the registered sleep. Polling replaces a fixed sleep
+    // which is flaky on loaded machines.
     let deadline = Date().addingTimeInterval(2)
     while await gate.waitCount == 0 && Date() < deadline {
       try? await Task.sleep(nanoseconds: 5_000_000)
