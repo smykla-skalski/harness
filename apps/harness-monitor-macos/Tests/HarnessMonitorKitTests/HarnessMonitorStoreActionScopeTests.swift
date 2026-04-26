@@ -46,7 +46,7 @@ struct HarnessMonitorStoreActionScopeTests {
     let sessionID = PreviewFixtures.summary.sessionId
     await store.selectSession(sessionID)
 
-    let expectedKey = InspectorActionID.createTask(sessionID: sessionID).key
+    let expectedKey = ActionID.createTask(sessionID: sessionID).key
     #expect(store.inFlightActionID == nil)
 
     let barrier = InspectorActionTestBarrier()
@@ -76,7 +76,7 @@ struct HarnessMonitorStoreActionScopeTests {
     let sessionID = PreviewFixtures.summary.sessionId
     await store.selectSession(sessionID)
 
-    let expectedKey = InspectorActionID.createTask(sessionID: sessionID).key
+    let expectedKey = ActionID.createTask(sessionID: sessionID).key
     _ = await store.createTask(
       title: "Irrelevant failure",
       context: nil,
@@ -85,7 +85,7 @@ struct HarnessMonitorStoreActionScopeTests {
     )
 
     #expect(store.inFlightActionID == nil)
-    #expect(expectedKey == InspectorActionID.createTask(sessionID: sessionID).key)
+    #expect(expectedKey == ActionID.createTask(sessionID: sessionID).key)
   }
 
   @Test("Switching to a different session clears inFlightActionID")
@@ -94,7 +94,7 @@ struct HarnessMonitorStoreActionScopeTests {
     let firstSession = PreviewFixtures.summary.sessionId
     await store.selectSession(firstSession)
 
-    let key = InspectorActionID.createTask(sessionID: firstSession).key
+    let key = ActionID.createTask(sessionID: firstSession).key
     store.inFlightActionID = key
     #expect(store.inFlightActionID == key)
 
@@ -108,7 +108,7 @@ struct HarnessMonitorStoreActionScopeTests {
     let sessionID = PreviewFixtures.summary.sessionId
     await store.selectSession(sessionID)
 
-    let key = InspectorActionID.createTask(sessionID: sessionID).key
+    let key = ActionID.createTask(sessionID: sessionID).key
     store.inFlightActionID = key
 
     store.primeSessionSelection(sessionID)
@@ -122,8 +122,8 @@ struct HarnessMonitorStoreActionScopeTests {
     let sessionID = PreviewFixtures.summary.sessionId
     await store.selectSession(sessionID)
 
-    let key1 = InspectorActionID.createTask(sessionID: sessionID).key
-    let key2 = InspectorActionID.assignTask(sessionID: sessionID, taskID: "t1").key
+    let key1 = ActionID.createTask(sessionID: sessionID).key
+    let key2 = ActionID.assignTask(sessionID: sessionID, taskID: "t1").key
 
     async let r1: Bool = store.mutateSelectedSession(
       actionName: "Create task",

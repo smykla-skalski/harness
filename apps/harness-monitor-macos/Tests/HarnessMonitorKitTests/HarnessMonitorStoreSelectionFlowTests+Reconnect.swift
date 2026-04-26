@@ -100,28 +100,6 @@ extension HarnessMonitorStoreSelectionFlowTests {
     store.stopAllStreams()
   }
 
-  @Test("Selected task observation tracks inspector selection changes")
-  func selectedTaskObservationTracksInspectorSelectionChanges() async throws {
-    let store = await makeBootstrappedStore()
-
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    await confirmation("selected task observation fired") { confirm in
-      _ = withObservationTracking(
-        {
-          store.selectedTask?.taskId
-        },
-        onChange: {
-          confirm()
-        }
-      )
-
-      store.inspect(taskID: "task-ui")
-    }
-
-    #expect(store.selectedTask?.taskId == "task-ui")
-  }
-
   @Test("Rapid session clicks cancel previous selection tasks")
   func rapidSessionClicksCancelPreviousSelectionTasks() async throws {
     let summaries = (0..<10).map { index in
@@ -234,19 +212,17 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.selectionTask != nil)
   }
 
-  @Test("Reselecting the loaded sidebar session clears inspector without reloading")
-  func reselectingLoadedSidebarSessionClearsInspectorWithoutReloading() async {
+  @Test("Reselecting the loaded sidebar session does not reload")
+  func reselectingLoadedSidebarSessionDoesNotReload() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
     let detailCallCount = client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId))
     let timelineCallCount = client.readCallCount(.timeline(PreviewFixtures.summary.sessionId))
 
-    store.inspect(taskID: "task-ui")
     store.selectSessionFromList(PreviewFixtures.summary.sessionId)
     await store.pendingListSelectionTask?.value
 
-    #expect(store.inspectorSelection == .none)
     #expect(
       client.readCallCount(.sessionDetail(PreviewFixtures.summary.sessionId)) == detailCallCount)
     #expect(client.readCallCount(.timeline(PreviewFixtures.summary.sessionId)) == timelineCallCount)

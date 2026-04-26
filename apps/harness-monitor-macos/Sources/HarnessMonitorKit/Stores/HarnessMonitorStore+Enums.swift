@@ -41,13 +41,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public enum InspectorSelection: Equatable, Sendable {
-    case none
-    case task(String)
-    case signal(String)
-    case observer
-  }
-
   public enum PendingConfirmation: Equatable {
     case endSession(sessionID: String, actorID: String)
     case removeAgent(sessionID: String, agentID: String, actorID: String)

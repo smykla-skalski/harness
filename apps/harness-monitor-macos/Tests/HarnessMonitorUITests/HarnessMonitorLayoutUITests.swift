@@ -55,7 +55,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       in: app, identifier: Accessibility.persistedDataBannerFrame)
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionRow = previewSessionTrigger(in: app)
     let observeButton = button(in: app, title: "Observe")
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
@@ -67,7 +66,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(persistedBannerFrame, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(sidebarRoot, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(sidebarContent, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(inspectorRoot, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(endSessionButton, timeout: Self.fastActionTimeout))
@@ -78,7 +76,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(persistedBanner.label.contains("Daemon is off"))
     XCTAssertTrue(persistedBanner.label.contains("may be stale"))
     XCTAssertEqual(persistedBannerFrame.frame.minX, sidebarContent.frame.maxX, accuracy: 8)
-    XCTAssertEqual(persistedBannerFrame.frame.maxX, inspectorRoot.frame.minX, accuracy: 12)
     XCTAssertTrue(sessionRowIsSelected(sessionRow))
     XCTAssertFalse(observeButton.isEnabled)
     XCTAssertFalse(endSessionButton.isEnabled)
@@ -114,136 +111,6 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) { createTaskButton.isEnabled }
     )
-  }
-
-  func testInspectorCardsFillTheirColumn() throws {
-    let app = launch(mode: "preview")
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let sessionInspectorCard = element(in: app, identifier: Accessibility.sessionInspectorCard)
-    let sessionRow = previewSessionTrigger(in: app)
-
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
-
-    tapPreviewSession(in: app)
-
-    XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.actionTimeout))
-    assertFillsColumn(
-      child: sessionInspectorCard,
-      in: inspectorRoot,
-      expectedHorizontalInset: 18,
-      tolerance: 8
-    )
-  }
-
-  func testSelectedInspectorCardsFillTheirColumn() throws {
-    let app = launch(mode: "preview")
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let sessionRow = previewSessionTrigger(in: app)
-
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
-
-    tapPreviewSession(in: app)
-    tapButton(in: app, identifier: Accessibility.taskUICard)
-
-    let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
-    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.actionTimeout))
-    assertFillsColumn(
-      child: taskInspector,
-      in: inspectorRoot,
-      expectedHorizontalInset: 18,
-      tolerance: 8
-    )
-
-    tapButton(in: app, identifier: Accessibility.observeSummaryButton)
-
-    let observerInspector = element(in: app, identifier: Accessibility.observerInspectorCard)
-    XCTAssertTrue(observerInspector.waitForExistence(timeout: Self.actionTimeout))
-    assertFillsColumn(
-      child: observerInspector,
-      in: inspectorRoot,
-      expectedHorizontalInset: 18,
-      tolerance: 8
-    )
-  }
-
-  func testInspectorContentStartsBelowToolbarChrome() throws {
-    let app = launch(mode: "empty")
-
-    let window = mainWindow(in: app)
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
-
-    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
-
-    let cardOffset = inspectorEmptyState.frame.minY - window.frame.minY
-    XCTAssertGreaterThan(cardOffset, 40, "Inspector content overlaps toolbar")
-    XCTAssertLessThan(cardOffset, 120, "Inspector content too far below toolbar")
-  }
-
-  func testInspectorCanBeResizedWiderByDraggingDivider() throws {
-    let app = launch(mode: "empty")
-    let window = mainWindow(in: app)
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-
-    XCTAssertTrue(window.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-
-    let initialWidth = inspectorRoot.frame.width
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let dividerOffsetX = max(2, inspectorRoot.frame.minX - window.frame.minX - 2)
-    let dividerOffsetY = max(2, inspectorRoot.frame.midY - window.frame.minY)
-    let start = origin.withOffset(CGVector(dx: dividerOffsetX, dy: dividerOffsetY))
-    let end = start.withOffset(CGVector(dx: -140, dy: 0))
-
-    start.press(forDuration: 0.01, thenDragTo: end)
-
-    let widenedInspector = waitUntil(timeout: Self.actionTimeout) {
-      inspectorRoot.frame.width >= initialWidth + 80
-    }
-
-    if !widenedInspector {
-      attachWindowScreenshot(in: app, named: "inspector-wide-width")
-      let attachment = XCTAttachment(
-        string: """
-          initial inspector width: \(initialWidth)
-          final inspector frame: \(inspectorRoot.exists ? String(describing: inspectorRoot.frame) : "missing")
-          divider drag start: \(dividerOffsetX), \(dividerOffsetY)
-          """
-      )
-      attachment.name = "inspector-wide-width-diagnostics"
-      attachment.lifetime = .keepAlways
-      add(attachment)
-    }
-
-    XCTAssertTrue(
-      widenedInspector,
-      "Expected the inspector divider drag to widen the column"
-    )
-  }
-
-  func testInspectorToolbarControlsStayWithinInspectorColumn() throws {
-    let app = launch(mode: "empty")
-
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
-    let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
-    let hideInspectorButton = toolbarButton(
-      in: app, identifier: Accessibility.inspectorToggleButton)
-
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.actionTimeout))
-
-    for control in [refreshButton, hideInspectorButton] {
-      XCTAssertGreaterThanOrEqual(control.frame.minX, inspectorRoot.frame.minX - 6)
-      XCTAssertLessThanOrEqual(control.frame.maxX, inspectorRoot.frame.maxX + 6)
-      XCTAssertLessThan(control.frame.maxY, inspectorEmptyState.frame.minY)
-    }
   }
 
   func testCockpitSessionStatusCornerFollowsContentScroll() throws {

@@ -88,20 +88,6 @@ extension HarnessMonitorStore {
     return agents.filter { $0.status == .active }
   }
 
-  public var selectedTask: WorkItem? {
-    guard case .task(let taskID) = inspectorSelection else {
-      return nil
-    }
-    return selectedSession?.tasks.first(where: { $0.taskId == taskID })
-  }
-
-  public var selectedSignal: SessionSignalRecord? {
-    guard case .signal(let signalID) = inspectorSelection else {
-      return nil
-    }
-    return selectedSession?.signals.first(where: { $0.signal.signalId == signalID })
-  }
-
   public func resetFilters() {
     searchText = ""
     sessionFilter = .all

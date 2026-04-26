@@ -161,7 +161,7 @@ extension HarnessMonitorStore {
     guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.changeRole(sessionID: action.sessionID, agentID: agentID).key,
+      actionID: ActionID.changeRole(sessionID: action.sessionID, agentID: agentID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -184,7 +184,7 @@ extension HarnessMonitorStore {
     guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.removeAgent(sessionID: action.sessionID, agentID: agentID).key,
+      actionID: ActionID.removeAgent(sessionID: action.sessionID, agentID: agentID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -208,7 +208,7 @@ extension HarnessMonitorStore {
     guard let actor = leaderActionActor(for: actor, actionName: actionName) else { return false }
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.transferLeader(
+      actionID: ActionID.transferLeader(
         sessionID: action.sessionID,
         newLeaderID: newLeaderID
       ).key,
@@ -234,7 +234,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.observeSession(sessionID: action.sessionID).key,
+      actionID: ActionID.observeSession(sessionID: action.sessionID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {
@@ -253,7 +253,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.endSession(sessionID: action.sessionID).key,
+      actionID: ActionID.endSession(sessionID: action.sessionID).key,
       using: action.client,
       sessionID: action.sessionID,
       mutation: {

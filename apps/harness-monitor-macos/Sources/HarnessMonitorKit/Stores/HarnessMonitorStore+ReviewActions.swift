@@ -13,7 +13,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.submitTaskForReview(
+      actionID: ActionID.submitTaskForReview(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -43,7 +43,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.claimTaskReview(
+      actionID: ActionID.claimTaskReview(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -72,7 +72,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.submitTaskReview(
+      actionID: ActionID.submitTaskReview(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -106,7 +106,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.respondTaskReview(
+      actionID: ActionID.respondTaskReview(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -139,7 +139,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.arbitrateTask(
+      actionID: ActionID.arbitrateTask(
         sessionID: action.sessionID,
         taskID: taskID
       ).key,
@@ -174,7 +174,7 @@ extension HarnessMonitorStore {
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,
-      actionID: InspectorActionID.applyImproverPatch(
+      actionID: ActionID.applyImproverPatch(
         sessionID: action.sessionID,
         issueID: issueId
       ).key,

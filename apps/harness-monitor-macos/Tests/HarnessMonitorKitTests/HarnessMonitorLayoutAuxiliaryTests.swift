@@ -5,78 +5,6 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Content inspector visibility policy")
-struct ContentInspectorVisibilityPolicyTests {
-  @Test("Initial presentation keeps the inspector hidden when no preference exists")
-  func initialPresentationKeepsInspectorHiddenWithoutPreference() {
-    let defaults = UserDefaults(suiteName: #function)!
-    defaults.removePersistentDomain(forName: #function)
-
-    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == false)
-  }
-
-  @Test("Initial presentation uses the persisted preference without a hydration pass")
-  func initialPresentationUsesPersistedPreferenceImmediately() {
-    let defaults = UserDefaults(suiteName: #function)!
-    defaults.removePersistentDomain(forName: #function)
-    defaults.set(false, forKey: "showInspector")
-
-    #expect(ContentInspectorInitialPresentation.resolve(defaults: defaults) == false)
-  }
-
-  @Test("Explicit user toggles persist the preference")
-  func explicitUserTogglesPersistPreference() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: true,
-      currentPersistedPreference: true,
-      nextPresentation: false,
-      source: .explicitUserPreference
-    )
-
-    #expect(change?.nextPresentation == false)
-    #expect(change?.persistedPreference == false)
-  }
-
-  @Test("Framework-driven presentation changes do not persist preference")
-  func frameworkDrivenChangesRemainEphemeral() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: true,
-      currentPersistedPreference: true,
-      nextPresentation: false,
-      source: .framework
-    )
-
-    #expect(change?.nextPresentation == false)
-    #expect(change?.persistedPreference == nil)
-  }
-
-  @Test("Contextual auto-open keeps the persisted preference unchanged")
-  func contextualAutoOpenDoesNotRewritePreference() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: false,
-      currentPersistedPreference: false,
-      nextPresentation: true,
-      source: .contextualAutoOpen
-    )
-
-    #expect(change?.nextPresentation == true)
-    #expect(change?.persistedPreference == nil)
-  }
-
-  @Test("Persisted preference sync updates presentation without writing back to storage")
-  func persistedPreferenceSyncDoesNotRepersist() {
-    let change = ContentInspectorVisibilityPolicy.resolve(
-      currentPresentation: false,
-      currentPersistedPreference: true,
-      nextPresentation: true,
-      source: .persistedPreference
-    )
-
-    #expect(change?.nextPresentation == true)
-    #expect(change?.persistedPreference == nil)
-  }
-}
-
 @Suite("Adaptive grid layout cache normalization")
 struct HarnessMonitorAdaptiveGridLayoutCacheTests {
   @Test("Sub-point width jitter collapses to one cache width")
@@ -182,29 +110,6 @@ struct AdaptiveGridLayoutMeasurementKeyTests {
 
 @Suite("Content window toolbar model")
 struct ContentWindowToolbarModelTests {
-  @Test("Inspector label follows presentation state")
-  func inspectorLabelFollowsPresentationState() {
-    let shown = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canStartNewSession: false,
-      isRefreshing: false,
-      sleepPreventionEnabled: false,
-      showInspector: true
-    )
-    let hidden = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canStartNewSession: false,
-      isRefreshing: false,
-      sleepPreventionEnabled: false,
-      showInspector: false
-    )
-
-    #expect(shown.inspectorToggleTitle == "Hide Inspector")
-    #expect(hidden.inspectorToggleTitle == "Show Inspector")
-  }
-
   @Test("Sleep prevention presentation follows enabled state")
   func sleepPreventionPresentationFollowsEnabledState() {
     let enabled = ContentWindowToolbarModel(
@@ -212,16 +117,14 @@ struct ContentWindowToolbarModelTests {
       canNavigateForward: false,
       canStartNewSession: false,
       isRefreshing: false,
-      sleepPreventionEnabled: true,
-      showInspector: false
+      sleepPreventionEnabled: true
     )
     let disabled = ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
       canStartNewSession: false,
       isRefreshing: false,
-      sleepPreventionEnabled: false,
-      showInspector: false
+      sleepPreventionEnabled: false
     )
 
     #expect(enabled.sleepPreventionTitle == "Sleep Prevention On")

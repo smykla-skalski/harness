@@ -88,9 +88,7 @@ struct HarnessMonitorApp: App {
         increaseTextSize: increaseTextSize,
         decreaseTextSize: decreaseTextSize,
         resetTextSize: resetTextSize,
-        refreshStore: refreshStore,
-        inspectSessionOverview: inspectSessionOverview,
-        inspectObserver: inspectObserver
+        refreshStore: refreshStore
       )
       NewSessionCommand(store: store)
       OpenFolderCommand(isPresented: $showOpenFolder)
@@ -219,11 +217,4 @@ struct HarnessMonitorApp: App {
     }
   }
 
-  private func inspectSessionOverview() {
-    store.inspectorSelection = .none
-  }
-
-  private func inspectObserver() {
-    store.inspectObserver()
-  }
 }

@@ -92,7 +92,6 @@ extension HarnessMonitorStore {
       case selectedSessionDetail
       case timeline
       case timelineWindow
-      case inspectorSelection
       case actionActorID
       case selectionLoading
       case timelineLoading
@@ -127,12 +126,6 @@ extension HarnessMonitorStore {
       didSet {
         guard oldValue != timelineWindow else { return }
         onChanged?(.timelineWindow)
-      }
-    }
-    public var inspectorSelection: InspectorSelection = .none {
-      didSet {
-        guard oldValue != inspectorSelection else { return }
-        onChanged?(.inspectorSelection)
       }
     }
     public var actionActorID: String? {
@@ -349,15 +342,6 @@ extension HarnessMonitorStore {
     public var sessionCount = 0
     public var openWorkCount = 0
     public var blockedCount = 0
-  }
-
-  public struct InspectorUIState: Equatable {
-    public var isPersistenceAvailable = false
-    public var selectedActionActorID = ""
-    public var isSessionReadOnly = true
-    public var isSessionActionInFlight = false
-    public var primaryContent: InspectorPrimaryContentState = .empty
-    public var actionContext: InspectorActionContext?
   }
 
   @MainActor

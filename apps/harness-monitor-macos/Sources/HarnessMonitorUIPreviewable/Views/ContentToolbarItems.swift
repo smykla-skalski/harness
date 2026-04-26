@@ -7,7 +7,6 @@ struct ContentWindowToolbarModel: Equatable {
   let canStartNewSession: Bool
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
-  let showInspector: Bool
 
   var sleepPreventionTitle: String {
     sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep"
@@ -15,10 +14,6 @@ struct ContentWindowToolbarModel: Equatable {
 
   var sleepPreventionSystemImage: String {
     sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
-  }
-
-  var inspectorToggleTitle: String {
-    showInspector ? "Hide Inspector" : "Show Inspector"
   }
 }
 
@@ -43,7 +38,6 @@ struct ContentWindowToolbarItems: ToolbarContent {
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
   let model: ContentWindowToolbarModel
-  let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
@@ -70,16 +64,6 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
       SupervisorToolbarItem(slice: store.supervisorToolbarSlice)
-    }
-    ToolbarItem(placement: .primaryAction) {
-      Button {
-        setInspectorVisibility(!model.showInspector, .explicitUserPreference)
-      } label: {
-        Label(model.inspectorToggleTitle, systemImage: "sidebar.trailing")
-      }
-      .accessibilityLabel(model.inspectorToggleTitle)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.inspectorToggleButton)
-      .help(model.showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 }

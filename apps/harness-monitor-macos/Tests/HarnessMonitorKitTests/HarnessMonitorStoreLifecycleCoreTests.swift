@@ -110,7 +110,6 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.selectedSession == nil)
     #expect(store.timeline.isEmpty)
     #expect(store.isSelectionLoading)
-    #expect(store.inspectorSelection == .none)
   }
 
   @Test("Prime session selection with nil clears everything")

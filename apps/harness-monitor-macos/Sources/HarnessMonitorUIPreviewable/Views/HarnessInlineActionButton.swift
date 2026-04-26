@@ -5,7 +5,7 @@ public struct HarnessInlineActionButton: View {
   public typealias Action = HarnessMonitorActionButton.Action
 
   public let title: String
-  public let actionID: InspectorActionID
+  public let actionID: ActionID
   public let store: HarnessMonitorStore
   public let variant: HarnessMonitorAsyncActionButton.Variant
   public let tint: Color?
@@ -19,7 +19,7 @@ public struct HarnessInlineActionButton: View {
 
   public init(
     title: String,
-    actionID: InspectorActionID,
+    actionID: ActionID,
     store: HarnessMonitorStore,
     variant: HarnessMonitorAsyncActionButton.Variant = .prominent,
     tint: Color? = nil,

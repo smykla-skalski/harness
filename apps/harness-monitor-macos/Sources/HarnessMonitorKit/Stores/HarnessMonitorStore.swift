@@ -11,7 +11,6 @@ public final class HarnessMonitorStore {
   public let userData: UserDataSlice
   public let contentUI: ContentUISlice
   public let sidebarUI: SidebarUISlice
-  public let inspectorUI: InspectorUISlice
   public let toast: ToastSlice
   @ObservationIgnored public let supervisorToolbarSlice: SupervisorToolbarSlice
   public let bookmarkStore: BookmarkStore?
@@ -197,7 +196,6 @@ public final class HarnessMonitorStore {
     self.userData = UserDataSlice()
     self.contentUI = ContentUISlice()
     self.sidebarUI = SidebarUISlice()
-    self.inspectorUI = InspectorUISlice()
     self.toast = ToastSlice()
     self.supervisorToolbarSlice = SupervisorToolbarSlice()
     self.bookmarkStore = Self.makeBookmarkStore()

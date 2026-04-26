@@ -299,7 +299,6 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.navigateForwardButton,
       HarnessMonitorUITestAccessibility.refreshButton,
       HarnessMonitorUITestAccessibility.sleepPreventionButton,
-      HarnessMonitorUITestAccessibility.inspectorToggleButton,
       HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
     ]
     let toolbarButtons = mainWindow(in: app).toolbars.buttons
