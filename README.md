@@ -26,7 +26,7 @@ The repo `mise` tasks route Rust compilation through the shared local cargo wrap
 
 Without `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Install `sccache` if you want multi-agent sessions to reuse most compile work instead of rebuilding the same crates in parallel.
 
-Linked git worktrees share the same wrapper-managed `target/`, `xcode-derived/`, and `xcode-derived-instruments/` roots under the repository common dir. Repo scripts and `mise` tasks resolve those shared paths automatically, so routine worktree use does not spray duplicate build trees across each checkout.
+Linked git worktrees share the same wrapper-managed `target/`, `xcode-derived/`, `xcode-derived-e2e/`, and `xcode-derived-instruments/` roots under the repository common dir. Repo scripts and `mise` tasks resolve those shared paths automatically, so routine worktree use does not spray duplicate build trees across each checkout.
 
 Inspect the current wrapper settings with:
 
