@@ -36,8 +36,12 @@ public struct ContentView<CornerContent: View>: View {
   private var supervisorBadgeAccessibilityValue: String {
     let slice = store.supervisorToolbarSlice
     let severity = slice.maxSeverity?.rawValue ?? "none"
+    let symbol = supervisorBadgeSymbol(for: slice.count)
     return
-      "count=\(slice.count) severity=\(severity) tint=\(supervisorBadgeTint(for: slice.maxSeverity))"
+      """
+      count=\(slice.count) severity=\(severity) \
+      tint=\(supervisorBadgeTint(for: slice.maxSeverity)) symbol=\(symbol)
+      """
   }
 
   private var profilingAttributes: [String: String] {
@@ -187,6 +191,10 @@ public struct ContentView<CornerContent: View>: View {
     case .critical:
       return "red"
     }
+  }
+
+  private func supervisorBadgeSymbol(for count: Int) -> String {
+    count > 0 ? "bell.badge.fill" : "bell.badge"
   }
 
   @ViewBuilder private var contentBackground: some View {

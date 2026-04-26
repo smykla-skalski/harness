@@ -18,7 +18,7 @@ public struct SupervisorToolbarItem: View {
     Button {
       openWindow(id: HarnessMonitorWindowID.decisions)
     } label: {
-      Label("Decisions", systemImage: "bell.badge")
+      Label("Decisions", systemImage: toolbarSymbolName(for: slice.count))
         .symbolRenderingMode(.hierarchical)
         .foregroundStyle(toolbarTint(for: slice.maxSeverity))
         .overlay(alignment: .topTrailing) {
@@ -45,8 +45,15 @@ public struct SupervisorToolbarItem: View {
     }
   }
 
+  private func toolbarSymbolName(for count: Int) -> String {
+    count > 0 ? "bell.badge.fill" : "bell.badge"
+  }
+
   private func badgeStateLabel(count: Int, maxSeverity: DecisionSeverity?) -> String {
-    "count=\(count) severity=\(severityLabel(for: maxSeverity)) tint=\(tintLabel(for: maxSeverity))"
+    """
+    count=\(count) severity=\(severityLabel(for: maxSeverity)) \
+    tint=\(tintLabel(for: maxSeverity)) symbol=\(toolbarSymbolName(for: count))
+    """
   }
 
   private func severityLabel(for severity: DecisionSeverity?) -> String {
