@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
@@ -125,6 +126,32 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testNewSessionSheetDoesNotEmitLayoutRecursionWarning() throws {
+    let app = launch(mode: "preview")
+    let processID = try launchedMonitorPID()
+    let logStart = Date()
+
+    tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
+
+    let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
+    XCTAssertTrue(
+      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
+      "New Session sheet should appear before checking AppKit warnings"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Session title"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should finish presenting before log inspection"
+    )
+
+    RunLoop.current.run(until: Date.now.addingTimeInterval(1.0))
+
+    let warnings = appKitLayoutRecursionWarnings(since: logStart, processID: processID)
+    XCTAssertTrue(
+      warnings.isEmpty,
+      "Opening New Session should not emit the AppKit layout recursion warning.\n\(warnings)"
+    )
+  }
+
   func testSendSignalVoicePopoverRecordsPreviewTranscript() throws {
     let app = launchInCockpitPreview()
 
@@ -246,6 +273,83 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
 }
 
 extension HarnessMonitorSheetUITests {
+  fileprivate func launchedMonitorPID() throws -> pid_t {
+    let candidates = NSRunningApplication.runningApplications(
+      withBundleIdentifier: Self.uiTestHostBundleIdentifier)
+    guard let mostRecent = candidates.max(by: { lhs, rhs in
+      let lhsDate = lhs.launchDate ?? .distantPast
+      let rhsDate = rhs.launchDate ?? .distantPast
+      return lhsDate < rhsDate
+    })
+    else {
+      throw NSError(
+        domain: "HarnessMonitorSheetUITests",
+        code: 1,
+        userInfo: [
+          NSLocalizedDescriptionKey: "Could not resolve the UI test host process ID."
+        ]
+      )
+    }
+    return mostRecent.processIdentifier
+  }
+
+  fileprivate func appKitLayoutRecursionWarnings(
+    since startDate: Date,
+    processID: pid_t
+  ) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .current
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+    let output = Pipe()
+    let errors = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+    process.arguments = [
+      "show",
+      "--style",
+      "compact",
+      "--start",
+      formatter.string(from: startDate),
+      "--predicate",
+      """
+      processID == \(processID) AND subsystem == "com.apple.AppKit" AND \
+      (eventMessage CONTAINS "layoutSubtreeIfNeeded" OR \
+      eventMessage CONTAINS "already being laid out")
+      """,
+    ]
+    process.standardOutput = output
+    process.standardError = errors
+
+    do {
+      try process.run()
+      process.waitUntilExit()
+    } catch {
+      XCTFail("Failed to run log show: \(error)")
+      return ""
+    }
+
+    let stdout = String(
+      decoding: output.fileHandleForReading.readDataToEndOfFile(),
+      as: UTF8.self
+    )
+    let stderr = String(
+      decoding: errors.fileHandleForReading.readDataToEndOfFile(),
+      as: UTF8.self
+    )
+    if process.terminationStatus != 0 {
+      XCTFail("log show exited with status \(process.terminationStatus): \(stderr)")
+    }
+    let matchingLines = stdout
+      .split(whereSeparator: \.isNewline)
+      .map(String.init)
+      .filter {
+        $0.contains("layoutSubtreeIfNeeded") || $0.contains("already being laid out")
+      }
+    return matchingLines.joined(separator: "\n")
+  }
+
   fileprivate func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
