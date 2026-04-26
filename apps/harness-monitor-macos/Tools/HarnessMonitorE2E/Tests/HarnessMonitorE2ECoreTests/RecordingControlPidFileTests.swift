@@ -8,8 +8,9 @@ final class RecordingControlPidFileTests: XCTestCase {
 
   override func setUpWithError() throws {
     try super.setUpWithError()
+    let directoryName = "RecordingControlPidFileTests-\(UUID().uuidString)"
     temporaryDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("RecordingControlPidFileTests-\(UUID().uuidString)", isDirectory: true)
+      .appendingPathComponent(directoryName, isDirectory: true)
     try FileManager.default.createDirectory(
       at: temporaryDirectory, withIntermediateDirectories: true)
   }

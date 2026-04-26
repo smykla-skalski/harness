@@ -103,7 +103,8 @@ require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/Harness
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_TEST_RETRY_ITERATIONS'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift" 'HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'controlDirectoryURL'
-require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'SCContentFilter(desktopIndependentWindow: captureWindow)'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'boundedFilterCreate(window: captureWindow)'
+require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'SCContentFilter(desktopIndependentWindow: window)'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'ignoreShadowsSingleWindow = true'
 require_text "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/ScreenRecorder.swift" 'using-window id='
 # Single-quoted literals carry the contract text verbatim; SC2016 is not applicable.

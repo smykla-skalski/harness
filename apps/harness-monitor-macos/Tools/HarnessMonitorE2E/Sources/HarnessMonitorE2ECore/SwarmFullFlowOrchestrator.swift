@@ -457,21 +457,10 @@ private final class SwarmFullFlowRunner {
     }
     let finalJSON = layout.stateRoot.appendingPathComponent("final-status.json")
     try write(data: result.stdout, to: finalJSON)
-    guard
-      let json = try JSONSerialization.jsonObject(with: result.stdout) as? [String: Any],
-      let status = json["status"] as? String,
-      status == "ended"
-    else {
-      throw CommandFailure(status: 1, message: "swarm final status was not ended")
-    }
-    let tasks = json["tasks"] as? [[String: Any]] ?? []
-    let hasArbitration = tasks.contains {
-      $0["arbitration"] != nil && !($0["arbitration"] is NSNull)
-    }
-    let hasObserveTask = tasks.contains { ($0["source"] as? String) == "observe" }
-    guard hasArbitration, hasObserveTask else {
-      throw CommandFailure(
-        status: 1, message: "swarm final status missing expected arbitration or observe tasks")
+    do {
+      try SwarmFinalSessionStatusValidator.validate(result.stdout)
+    } catch let failure as SwarmFinalSessionStatusValidator.ValidationFailure {
+      throw CommandFailure(status: 1, message: failure.message)
     }
 
     let gapsResult = try runCapturedCommand(
