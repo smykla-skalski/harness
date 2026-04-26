@@ -10,6 +10,10 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
   private let hidesDockIconForPerfRuns =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_PERF_HIDE_DOCK_ICON"] == "1"
+  private let isUITestRun: Bool = {
+    let environment = HarnessMonitorAppDelegate.launchEnvironment()
+    return environment[HarnessMonitorAppDelegate.uiTestsEnvironmentKey] == "1"
+  }()
   private let launchMode = HarnessMonitorLaunchMode(
     environment: HarnessMonitorAppDelegate.launchEnvironment()
   )
@@ -90,6 +94,10 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(
     _ sender: NSApplication
   ) -> Bool {
+    if isUITestRun {
+      _ = sender
+      return true
+    }
     let storedValue =
       UserDefaults.standard.object(
         forKey: SupervisorPreferencesDefaults.runInBackgroundKey
@@ -151,6 +159,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    if isUITestRun {
+      _ = sender
+      #if HARNESS_FEATURE_OTEL
+        HarnessMonitorTelemetry.shared.shutdown()
+      #endif
+      return .terminateNow
+    }
     guard terminationTask == nil else {
       return .terminateLater
     }
@@ -189,6 +204,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func handleSignalTermination(_ handledSignal: Int32) {
+    if isUITestRun {
+      #if HARNESS_FEATURE_OTEL
+        HarnessMonitorTelemetry.shared.shutdown()
+      #endif
+      terminateProcess(for: handledSignal)
+      return
+    }
     guard terminationTask == nil else {
       return
     }
