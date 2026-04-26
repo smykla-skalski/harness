@@ -24,3 +24,8 @@ for runner in "$BUILT_PRODUCTS_DIR"/*-Runner.app; do
     strip_attrs "$runner"
   fi
 done
+
+if [ -n "${SCRIPT_OUTPUT_FILE_0:-}" ]; then
+  /bin/mkdir -p "$(dirname "$SCRIPT_OUTPUT_FILE_0")"
+  /usr/bin/touch "$SCRIPT_OUTPUT_FILE_0"
+fi

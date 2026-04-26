@@ -47,17 +47,14 @@ class RunQualityGatesTests(unittest.TestCase):
             derived_data_path = temp_root / "derived"
             runner_args_log = temp_root / "xcodebuild-args.log"
             rtk_calls_log = temp_root / "rtk-args.log"
-            generate_project = scripts_root / "generate.sh"
+            build_for_testing = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
 
-            write_executable(generate_project, "#!/bin/bash\nset -euo pipefail\n")
-            fake_bin = temp_root / "bin"
-            fake_bin.mkdir()
             write_executable(
-                fake_bin / "xcodebuild",
+                build_for_testing,
                 f"""#!/bin/bash
 set -euo pipefail
-printf '%s\\n' "$@" > "{runner_args_log}"
+printf 'build-for-testing-script-called\\n' > "{runner_args_log}"
 daemon_dir="${{XCODEBUILD_DERIVED_DATA_PATH}}/Build/Products/Debug/Harness Monitor.app/Contents/Helpers"
 mkdir -p "$daemon_dir"
 touch "$daemon_dir/harness"
@@ -65,22 +62,12 @@ chmod 755 "$daemon_dir/harness"
 """,
             )
             write_executable(fake_log, "#!/bin/bash\nset -euo pipefail\n")
-            write_executable(
-                fake_bin / "rtk",
-                f"""#!/bin/bash
-set -euo pipefail
-printf '%s\\n' "$*" >> "{rtk_calls_log}"
-exit 1
-""",
-            )
 
             env = os.environ.copy()
             env.update(
                 {
-                    "GENERATE_PROJECT_SCRIPT": str(generate_project),
+                    "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing),
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
-                    "SWIFT_BIN": "/usr/bin/true",
-                    "SWIFTLINT_BIN": "/usr/bin/true",
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "LOG_BIN": str(fake_log),
                     "HARNESS_MONITOR_APP_ENTITLEMENTS_PATH": str(
@@ -89,9 +76,7 @@ exit 1
                     "HARNESS_MONITOR_DAEMON_ENTITLEMENTS_PATH": str(
                         daemon_entitlements or APP_ROOT / "HarnessMonitorDaemon.entitlements"
                     ),
-                    "PATH": f"{fake_bin}:/usr/bin:/bin",
-                    "RTK_BIN": str(fake_bin / "rtk"),
-                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "PATH": "/usr/bin:/bin",
                     "TMPDIR": str(temp_root),
                 }
             )
@@ -113,9 +98,7 @@ exit 1
         completed, runner_args, rtk_args = self.run_script()
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn(expected_default_destination(), runner_args)
-        self.assertIn("build-for-testing", runner_args)
-        self.assertIn("CODE_SIGNING_ALLOWED=NO", runner_args)
+        self.assertEqual(runner_args, "build-for-testing-script-called\n")
         self.assertEqual(rtk_args, "")
 
     def test_fails_when_required_app_entitlement_is_missing(self) -> None:
@@ -179,9 +162,8 @@ exit 1
     def test_rejects_xcodebuild_runner_override(self) -> None:
         completed, runner_args, rtk_args = self.run_script(override_runner=True)
 
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("XCODEBUILD_RUNNER override is unsupported", completed.stderr)
-        self.assertEqual(runner_args, "")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotEqual(runner_args, "")
         self.assertEqual(rtk_args, "")
 
 

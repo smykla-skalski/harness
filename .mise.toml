@@ -103,11 +103,15 @@ description = "Build the Harness Monitor macOS app (Debug) via the lock-aware sh
 run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
 [tasks."monitor:macos:lint"]
-description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
+description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
+run = "apps/harness-monitor-macos/Scripts/run-lint.sh"
+
+[tasks."monitor:macos:quality-gate"]
+description = "Run the slower build-based sandbox and daemon quality gates for the Harness Monitor macOS app"
 run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
 [tasks."monitor:macos:test"]
-description = "Generate, lint, and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
+description = "Run the fast lint lane, build-for-testing, and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
 [tasks."monitor:macos:test:scripts"]
