@@ -6,6 +6,7 @@ use fs_err as fs;
 use super::install::{install_wrapper, path_candidates};
 use super::plugin_cache::{read_plugin_version, sync_directory, sync_plugin_cache};
 use super::*;
+use serde_json::Value;
 
 mod bootstrap;
 
@@ -316,7 +317,7 @@ fn sync_plugin_cache_updates_agents_in_cache() {
 }
 
 #[test]
-fn sync_plugin_cache_skips_when_no_cache_dir() {
+fn sync_plugin_cache_creates_cache_when_missing() {
     let dir = tempfile::tempdir().unwrap();
     let home = dir.path().join("home");
 
@@ -339,4 +340,57 @@ fn sync_plugin_cache_skips_when_no_cache_dir() {
     .unwrap();
 
     sync_plugin_cache(&plugin_dir, &home).unwrap();
+
+    let cache_dir = home
+        .join(".claude")
+        .join("plugins")
+        .join("cache")
+        .join("harness")
+        .join("suite")
+        .join("1.0.0");
+    assert!(cache_dir.is_dir(), "cache dir must be created");
+    assert_eq!(
+        fs::read_to_string(cache_dir.join("agents").join("a.md")).unwrap(),
+        "content"
+    );
+}
+
+#[test]
+fn sync_plugin_cache_registers_in_installed_plugins() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = dir.path().join("home");
+
+    let plugin_dir = dir
+        .path()
+        .join("project")
+        .join(".claude")
+        .join("plugins")
+        .join("council");
+    let plugin_json_dir = plugin_dir.join(".claude-plugin");
+    fs::create_dir_all(&plugin_json_dir).unwrap();
+    fs::write(
+        plugin_json_dir.join("plugin.json"),
+        r#"{"name":"council","version":"1.1.0","description":"council"}"#,
+    )
+    .unwrap();
+
+    let installed_path = home
+        .join(".claude")
+        .join("plugins")
+        .join("installed_plugins.json");
+    fs::create_dir_all(installed_path.parent().unwrap()).unwrap();
+    fs::write(&installed_path, r#"{"version":2,"plugins":{}}"#).unwrap();
+
+    sync_plugin_cache(&plugin_dir, &home).unwrap();
+
+    let content = fs::read_to_string(&installed_path).unwrap();
+    let parsed: Value = serde_json::from_str(&content).unwrap();
+    let entry = &parsed["plugins"]["council@harness"][0];
+    assert_eq!(entry["scope"], "user");
+    assert_eq!(entry["version"], "1.1.0");
+    let install_path = entry["installPath"].as_str().unwrap();
+    assert!(
+        install_path.contains("/harness/council/"),
+        "installPath must contain /harness/council/, got: {install_path}"
+    );
 }

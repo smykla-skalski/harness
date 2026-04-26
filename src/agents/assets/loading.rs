@@ -161,7 +161,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::{SKILLS_ROOT, load_plugin_sources, load_skill_sources};
+    use super::{SKILLS_ROOT, load_plugin_sources, load_skill_definition, load_skill_sources};
 
     #[test]
     fn load_skill_sources_returns_empty_when_shared_skills_root_is_missing() {
@@ -223,8 +223,7 @@ mod tests {
         write(workspace.join("iteration-1").join("scratch.md"), "scratch")
             .expect("write workspace scratch file");
 
-        let plugins =
-            load_plugin_sources(tmp.path(), &[]).expect("loader skips plugin workspaces");
+        let plugins = load_plugin_sources(tmp.path(), &[]).expect("loader skips plugin workspaces");
         assert_eq!(plugins.len(), 1);
         let plugin = &plugins[0];
         assert_eq!(plugin.source.name, "demo");
@@ -248,8 +247,7 @@ mod tests {
             "name: real-skill\ndescription: codex\n",
         )
         .expect("write codex skill.yaml");
-        write(skill_dir.join("codex").join("body.md"), "codex body")
-            .expect("write codex body.md");
+        write(skill_dir.join("codex").join("body.md"), "codex body").expect("write codex body.md");
 
         let loaded = load_skill_definition(skill_dir).expect("load skill");
         let codex = loaded.codex.expect("codex variant");
