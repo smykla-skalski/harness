@@ -29,10 +29,10 @@ struct AgentsWindowTaskDetailPane: View {
       Text(task.context ?? "No task context provided.")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if task.source == .improver {
-        ImproverTaskCardView(task: task)
+        ReviewImproverCard(task: task)
       }
       InspectorFactGrid(facts: facts)
-      InspectorReviewStateSection(task: task)
+      ReviewStatePanel(task: task)
       if let checkpoint = task.checkpointSummary {
         InspectorSection(title: "Checkpoint") {
           InspectorFactGrid(
