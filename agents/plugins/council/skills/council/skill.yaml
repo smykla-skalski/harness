@@ -1,0 +1,12 @@
+name: council
+description: >-
+  Summon a council of engineering persona agents - antirez, tef, Casey Muratori, Fred Hebert,
+  Donella Meadows, Cedric Chin - to collaboratively review code, debate a plan, or advise on
+  strategy. Personas are sourced from each thinker's primary public writing. Use when reviewing
+  a design document, architecture proposal, refactoring plan, code change, or strategic decision
+  and you want diverse, opinionated, evidence-grounded perspectives that cut through generic
+  AI-style hedging.
+argument-hint: "core|all|debate <problem-description|@file>"
+allowed-tools: Agent, AskUserQuestion, Read, Grep, Glob, Bash, Write, Edit
+user-invocable: true
+disable-model-invocation: true

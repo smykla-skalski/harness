@@ -5,6 +5,11 @@
   },
   "plugins": [
     {
+      "description": "Council of engineering persona agents - summon practitioner perspectives to review code, debate plans, or advise on strategy",
+      "name": "council",
+      "source": "./council"
+    },
+    {
       "description": "Harness multi-agent session orchestration",
       "name": "harness",
       "source": "./harness"
