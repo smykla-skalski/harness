@@ -5,7 +5,22 @@ struct ScreenRecorderWindowCandidate: Equatable {
   let windowID: UInt32
   let title: String
   let bundleIdentifier: String?
+  let processID: Int32
   let isOnScreen: Bool
+
+  init(
+    windowID: UInt32,
+    title: String,
+    bundleIdentifier: String?,
+    processID: Int32 = 0,
+    isOnScreen: Bool
+  ) {
+    self.windowID = windowID
+    self.title = title
+    self.bundleIdentifier = bundleIdentifier
+    self.processID = processID
+    self.isOnScreen = isOnScreen
+  }
 }
 
 @available(macOS 15.0, *)
@@ -22,21 +37,30 @@ enum ScreenRecorderWindowSelector {
   ]
 
   static func captureWindow(
-    from candidates: [ScreenRecorderWindowCandidate]
+    from candidates: [ScreenRecorderWindowCandidate],
+    requireProcessID: Int32? = nil
   ) throws -> ScreenRecorderWindowCandidate {
-    guard let selectedWindow = try captureWindowIfAvailable(from: candidates) else {
+    guard
+      let selectedWindow = try captureWindowIfAvailable(
+        from: candidates, requireProcessID: requireProcessID)
+    else {
       throw ScreenRecorder.Failure.monitorWindowNotFound
     }
     return selectedWindow
   }
 
   static func captureWindowIfAvailable(
-    from candidates: [ScreenRecorderWindowCandidate]
+    from candidates: [ScreenRecorderWindowCandidate],
+    requireProcessID: Int32? = nil
   ) throws -> ScreenRecorderWindowCandidate? {
-    let matchingCandidates = candidates.filter {
-      $0.isOnScreen
-        && allowedBundleIdentifiers.contains($0.bundleIdentifier ?? "")
-        && mainWindowTitles.contains($0.title.trimmingCharacters(in: .whitespacesAndNewlines))
+    let matchingCandidates = candidates.filter { candidate in
+      guard candidate.isOnScreen else { return false }
+      guard mainWindowTitles.contains(candidate.title.trimmingCharacters(in: .whitespacesAndNewlines))
+      else { return false }
+      if let requiredPID = requireProcessID {
+        return candidate.processID == requiredPID
+      }
+      return allowedBundleIdentifiers.contains(candidate.bundleIdentifier ?? "")
     }
 
     guard !matchingCandidates.isEmpty else { return nil }

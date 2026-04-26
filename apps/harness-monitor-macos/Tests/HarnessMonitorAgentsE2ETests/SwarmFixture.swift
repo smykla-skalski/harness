@@ -81,6 +81,9 @@ final class SwarmFixture {
       },
       diagnosticsSummary()
     )
+    guard testCase.provideRecordingPidIfConfigured(for: app, context: diagnosticsSummary()) else {
+      return
+    }
     guard testCase.waitForRecordingStartIfConfigured(context: diagnosticsSummary()) else {
       return
     }

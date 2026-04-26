@@ -1063,6 +1063,8 @@ private final class SwarmActDriverRunner {
     try actReady("act15", values: ["session_id": inputs.sessionID])
     try actAck("act15")
 
+    try driveAllTasksToDone(leaderID: leaderID)
+
     try runHarness([
       "session", "end", inputs.sessionID,
       "--project-dir", inputs.projectDir.path,
@@ -1312,6 +1314,277 @@ private final class SwarmActDriverRunner {
     formatter.timeZone = TimeZone(secondsFromGMT: 0)
     formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
     return formatter.string(from: date)
+  }
+
+  private func driveAllTasksToDone(leaderID: String) throws {
+    let reviewers = try cleanupReviewerPair()
+    let beforeState = try fetchSessionState()
+    guard let tasks = beforeState["tasks"] as? [String: Any] else {
+      throw Failure(status: 1, message: "session status JSON missing 'tasks' map")
+    }
+    for taskID in tasks.keys.sorted() {
+      guard let task = tasks[taskID] as? [String: Any],
+        let status = task["status"] as? String
+      else { continue }
+      let assignedTo = task["assigned_to"] as? String
+      if !taskBlocksSessionEnd(status: status, assignedTo: assignedTo) { continue }
+      let claimReviewers: [[String: Any]] =
+        ((task["review_claim"] as? [String: Any])?["reviewers"] as? [[String: Any]]) ?? []
+      logProgress("step=cleanup-task task=\(taskID) status=\(status)")
+      try driveTaskToDone(
+        taskID: taskID,
+        status: status,
+        assignedTo: assignedTo,
+        reviewClaimReviewers: claimReviewers,
+        leaderID: leaderID,
+        reviewerClaudeID: reviewers.claude,
+        reviewerCodexID: reviewers.codex
+      )
+    }
+    try assertNoBlockingTasksRemain()
+  }
+
+  private func assertNoBlockingTasksRemain() throws {
+    let after = try fetchSessionState()
+    guard let afterTasks = after["tasks"] as? [String: Any] else {
+      throw Failure(status: 1, message: "post-cleanup session status missing 'tasks'")
+    }
+    var stuck: [String] = []
+    for (taskID, raw) in afterTasks {
+      guard let task = raw as? [String: Any],
+        let status = task["status"] as? String
+      else { continue }
+      let assignedTo = task["assigned_to"] as? String
+      if taskBlocksSessionEnd(status: status, assignedTo: assignedTo) {
+        stuck.append("\(taskID)(\(status))")
+      }
+    }
+    if !stuck.isEmpty {
+      stuck.sort()
+      throw Failure(
+        status: 1,
+        message: "cleanup left blocking tasks: \(stuck.joined(separator: ", "))"
+      )
+    }
+  }
+
+  private func taskBlocksSessionEnd(status: String, assignedTo: String?) -> Bool {
+    switch status {
+    case "in_progress", "awaiting_review", "in_review", "blocked":
+      return true
+    case "open":
+      return assignedTo != nil
+    default:
+      return false
+    }
+  }
+
+  private func cleanupReviewerPair() throws -> (claude: String, codex: String) {
+    let state = try fetchSessionState()
+    let agents = (state["agents"] as? [String: Any]) ?? [:]
+    var claudeReviewer: String?
+    var codexReviewer: String?
+    for (agentKey, raw) in agents {
+      guard let agent = raw as? [String: Any],
+        (agent["role"] as? String) == "reviewer",
+        let runtime = agent["runtime"] as? String,
+        isAliveAgentStatus(agent["status"] as? String)
+      else { continue }
+      let resolvedID = (agent["agent_id"] as? String) ?? agentKey
+      if runtime == "claude", claudeReviewer == nil {
+        claudeReviewer = resolvedID
+      } else if runtime == "codex", codexReviewer == nil {
+        codexReviewer = resolvedID
+      }
+    }
+    let claude: String
+    if let existing = claudeReviewer {
+      claude = existing
+    } else {
+      claude = try joinAgent(
+        role: "reviewer", runtime: "claude",
+        name: "Swarm Cleanup Reviewer Claude", persona: "code-reviewer")
+    }
+    let codex: String
+    if let existing = codexReviewer {
+      codex = existing
+    } else {
+      codex = try joinAgent(
+        role: "reviewer", runtime: "codex",
+        name: "Swarm Cleanup Reviewer Codex", persona: "code-reviewer")
+    }
+    logProgress("step=cleanup-reviewers claude=\(claude) codex=\(codex)")
+    return (claude, codex)
+  }
+
+  private func isAliveAgentStatus(_ status: String?) -> Bool {
+    switch status {
+    case "active", "idle", "awaiting_review":
+      return true
+    default:
+      return false
+    }
+  }
+
+  private func fetchSessionState() throws -> [String: Any] {
+    let output = try runHarness([
+      "session", "status", inputs.sessionID,
+      "--json",
+      "--project-dir", inputs.projectDir.path,
+    ])
+    guard let json = try JSONSerialization.jsonObject(with: output.stdout) as? [String: Any] else {
+      throw Failure(status: 1, message: "failed to decode session status JSON")
+    }
+    return json
+  }
+
+  private func driveTaskToDone(
+    taskID: String,
+    status: String,
+    assignedTo: String?,
+    reviewClaimReviewers: [[String: Any]],
+    leaderID: String,
+    reviewerClaudeID: String,
+    reviewerCodexID: String
+  ) throws {
+    switch status {
+    case "open":
+      guard let assignee = assignedTo else { return }
+      try runHarness([
+        "session", "task", "update", inputs.sessionID, taskID,
+        "--project-dir", inputs.projectDir.path,
+        "--status", "in_progress",
+        "--actor", assignee,
+      ])
+      try submitForReviewCleanup(taskID: taskID, actor: assignee)
+      try claimReviewPair(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+      try approveQuorum(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+    case "in_progress":
+      guard let assignee = assignedTo else {
+        throw Failure(
+          status: 1,
+          message:
+            "task '\(taskID)' is in_progress without an assignee; cleanup cannot submit for review"
+        )
+      }
+      try submitForReviewCleanup(taskID: taskID, actor: assignee)
+      try claimReviewPair(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+      try approveQuorum(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+    case "awaiting_review":
+      try claimReviewPair(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+      try approveQuorum(
+        taskID: taskID, reviewerClaudeID: reviewerClaudeID, reviewerCodexID: reviewerCodexID)
+    case "in_review":
+      let actors = try resolveInReviewActors(
+        taskID: taskID,
+        claimReviewers: reviewClaimReviewers,
+        reviewerClaudeID: reviewerClaudeID,
+        reviewerCodexID: reviewerCodexID
+      )
+      try approveQuorum(
+        taskID: taskID, reviewerClaudeID: actors.claude, reviewerCodexID: actors.codex)
+    case "blocked":
+      try runHarness([
+        "session", "task", "arbitrate", inputs.sessionID, taskID,
+        "--project-dir", inputs.projectDir.path,
+        "--actor", leaderID,
+        "--verdict", "approve",
+        "--summary", "cleanup",
+      ])
+    default:
+      return
+    }
+  }
+
+  private func submitForReviewCleanup(taskID: String, actor: String) throws {
+    try runHarness([
+      "session", "task", "submit-for-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", actor,
+      "--summary", "cleanup",
+    ])
+  }
+
+  private func claimReviewPair(
+    taskID: String, reviewerClaudeID: String, reviewerCodexID: String
+  ) throws {
+    _ = runHarnessMayFail([
+      "session", "task", "claim-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerClaudeID,
+    ])
+    _ = runHarnessMayFail([
+      "session", "task", "claim-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerCodexID,
+    ])
+  }
+
+  private func approveQuorum(
+    taskID: String, reviewerClaudeID: String, reviewerCodexID: String
+  ) throws {
+    try runHarness([
+      "session", "task", "submit-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerClaudeID,
+      "--verdict", "approve",
+      "--summary", "cleanup",
+    ])
+    try runHarness([
+      "session", "task", "submit-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerCodexID,
+      "--verdict", "approve",
+      "--summary", "cleanup",
+    ])
+  }
+
+  private func resolveInReviewActors(
+    taskID: String,
+    claimReviewers: [[String: Any]],
+    reviewerClaudeID: String,
+    reviewerCodexID: String
+  ) throws -> (claude: String, codex: String) {
+    var claude: String?
+    var codex: String?
+    for entry in claimReviewers {
+      guard let runtime = entry["reviewer_runtime"] as? String,
+        let agentID = entry["reviewer_agent_id"] as? String
+      else { continue }
+      if runtime == "claude", claude == nil {
+        claude = agentID
+      } else if runtime == "codex", codex == nil {
+        codex = agentID
+      }
+    }
+    if claude == nil {
+      _ = runHarnessMayFail([
+        "session", "task", "claim-review", inputs.sessionID, taskID,
+        "--project-dir", inputs.projectDir.path,
+        "--actor", reviewerClaudeID,
+      ])
+      claude = reviewerClaudeID
+    }
+    if codex == nil {
+      _ = runHarnessMayFail([
+        "session", "task", "claim-review", inputs.sessionID, taskID,
+        "--project-dir", inputs.projectDir.path,
+        "--actor", reviewerCodexID,
+      ])
+      codex = reviewerCodexID
+    }
+    guard let resolvedClaude = claude, let resolvedCodex = codex else {
+      throw Failure(
+        status: 1,
+        message: "task '\(taskID)' is in_review but the cleanup claim cannot be completed"
+      )
+    }
+    return (resolvedClaude, resolvedCodex)
   }
 
   @discardableResult

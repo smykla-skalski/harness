@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -74,6 +75,9 @@ extension HarnessMonitorUITestCase {
         return app.state == .runningForeground || self.mainWindow(in: app).exists
       }
     )
+    guard provideRecordingPidIfConfigured(for: app) else {
+      return app
+    }
     guard waitForRecordingStartIfConfigured() else {
       return app
     }
@@ -102,13 +106,14 @@ extension HarnessMonitorUITestCase {
     let startRequest = controlDirectory.appendingPathComponent("start.request")
     let startAck = controlDirectory.appendingPathComponent("start.ready")
     let stopRequest = controlDirectory.appendingPathComponent("stop.request")
+    let startPid = controlDirectory.appendingPathComponent("start.pid")
 
     do {
       try FileManager.default.createDirectory(
         at: controlDirectory,
         withIntermediateDirectories: true
       )
-      for marker in [startRequest, startAck, stopRequest] {
+      for marker in [startRequest, startAck, stopRequest, startPid] {
         try? FileManager.default.removeItem(at: marker)
       }
       try Data().write(to: startRequest, options: .atomic)
@@ -123,6 +128,61 @@ extension HarnessMonitorUITestCase {
     }
 
     return true
+  }
+
+  func provideRecordingPidIfConfigured(
+    for app: XCUIApplication,
+    context: String = "",
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) -> Bool {
+    guard let controlDirectory = Self.recordingControlDirectory() else {
+      return true
+    }
+    guard let pid = Self.resolveLaunchedPid(forBundleIdentifier: Self.uiTestHostBundleIdentifier)
+    else {
+      let suffix = context.isEmpty ? "" : "\n\(context)"
+      XCTFail(
+        "Could not resolve a running NSRunningApplication for "
+          + "'\(Self.uiTestHostBundleIdentifier)' after launch; recorder needs the spawned PID."
+          + suffix,
+        file: file,
+        line: line
+      )
+      return false
+    }
+    let target = controlDirectory.appendingPathComponent("start.pid")
+    do {
+      try FileManager.default.createDirectory(
+        at: controlDirectory, withIntermediateDirectories: true)
+      try Data("\(pid)\n".utf8).write(to: target, options: .atomic)
+    } catch {
+      let suffix = context.isEmpty ? "" : "\n\(context)"
+      XCTFail(
+        "Failed to publish recorder PID hint to \(target.path): \(error)\(suffix)",
+        file: file,
+        line: line
+      )
+      return false
+    }
+    return true
+  }
+
+  /// Most-recently-launched NSRunningApplication for the given bundle id, or nil
+  /// when nothing matches. The recorder uses this to filter shareable windows
+  /// down to the exact UI-testing host process the current XCTest run spawned,
+  /// even if the user already has the shipping Harness Monitor.app or an
+  /// orphaned UI-test host running.
+  private static func resolveLaunchedPid(forBundleIdentifier bundleIdentifier: String) -> Int32? {
+    let candidates = NSRunningApplication.runningApplications(
+      withBundleIdentifier: bundleIdentifier)
+    guard !candidates.isEmpty else { return nil }
+    let mostRecent = candidates.max { lhs, rhs in
+      let lhsDate = lhs.launchDate ?? .distantPast
+      let rhsDate = rhs.launchDate ?? .distantPast
+      return lhsDate < rhsDate
+    }
+    return mostRecent.map { $0.processIdentifier }
   }
 
   func waitForRecordingStartIfConfigured(
