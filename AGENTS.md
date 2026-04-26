@@ -36,7 +36,11 @@ Harness Monitor app validation expectations:
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
 - `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
-- All xcodebuild invocations must use `-derivedDataPath xcode-derived` so build artifacts land in a single, known location at the repo root (gitignored). Never create variant-named directories like `xcode-derived-foo` - one directory, reused across builds.
+- All xcodebuild invocations must use one of the approved repo-root `-derivedDataPath` values:
+  - `xcode-derived` for quality gates, tests, and general dev builds
+  - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
+  - `xcode-derived-instruments` for the instruments audit pipeline
+- Do not invent additional variant names beyond those approved roots.
 - For macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'` because it matches both `My Mac` and `Any Mac` and triggers the multiple-matching-destinations warning. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64`. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless a more specific `id=...` selector is required.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.

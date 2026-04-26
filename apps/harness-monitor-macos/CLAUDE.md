@@ -17,8 +17,9 @@ Validation expectations (run from repo root):
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
 - `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
-- All xcodebuild invocations must use one of two approved `-derivedDataPath` values:
+- All xcodebuild invocations must use one of the approved `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
+  - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
