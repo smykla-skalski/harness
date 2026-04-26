@@ -257,6 +257,9 @@ extension HarnessMonitorStore {
     supervisorToolbarSlice.stop()
     supervisorOpenDecisions = []
     supervisorSelectedDecisionID = nil
+    if let controller = supervisorBindings.notificationController {
+      await controller.resetBadge()
+    }
     supervisorDecisionRefreshTick &+= 1
 
     HarnessMonitorLogger.supervisorTrace("supervisor.stopped")
@@ -367,6 +370,9 @@ extension HarnessMonitorStore {
     }
     supervisorOpenDecisions = openDecisions
     supervisorToolbarSlice.refresh(counts: counts)
+    if let controller = supervisorBindings.notificationController {
+      await controller.syncAppBadgeCount(openDecisions.count)
+    }
     supervisorDecisionRefreshTick &+= 1
   }
 

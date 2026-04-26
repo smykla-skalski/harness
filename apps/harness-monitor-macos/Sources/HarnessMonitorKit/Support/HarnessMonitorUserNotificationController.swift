@@ -37,6 +37,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   public private(set) var pendingRequestCount = 0
   public private(set) var deliveredNotificationCount = 0
   public private(set) var registeredCategoryCount = 0
+  public private(set) var appBadgeCount = 0
   public private(set) var isWorking = false
   public private(set) var lastResult = "Notifications not checked yet."
   public private(set) var lastResponse: HarnessMonitorNotificationResponseSnapshot?
@@ -202,14 +203,22 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     await refreshStatus()
   }
 
-  public func resetBadge() async {
-    do {
-      try await centerBox.base.setBadgeCount(0)
-      lastResult = "Reset the app badge."
-      await refreshStatus()
-    } catch {
-      lastResult = "Badge reset failed: \(error.localizedDescription)"
+  public func syncAppBadgeCount(_ nextCount: Int) async {
+    let normalizedCount = max(0, nextCount)
+    guard normalizedCount != appBadgeCount else {
+      return
     }
+
+    do {
+      try await centerBox.base.setBadgeCount(normalizedCount)
+      appBadgeCount = normalizedCount
+    } catch {
+      lastResult = "Badge update failed: \(error.localizedDescription)"
+    }
+  }
+
+  public func resetBadge() async {
+    await syncAppBadgeCount(0)
   }
 
   nonisolated public func userNotificationCenter(
