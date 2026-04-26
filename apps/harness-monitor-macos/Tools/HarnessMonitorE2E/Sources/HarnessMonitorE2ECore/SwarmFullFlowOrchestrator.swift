@@ -1004,22 +1004,10 @@ private final class SwarmActDriverRunner {
       ])
     try actAck("act12")
 
-    _ = runHarnessMayFail([
-      "session", "task", "update", inputs.sessionID, taskArbitrationID,
-      "--project-dir", inputs.projectDir.path,
-      "--status", "in_progress",
-      "--actor", workerCodexID,
-    ])
-    try submitRequestChangesRound(
+    try continueReviewRound(
       taskID: taskArbitrationID, workerID: workerCodexID, reviewerA: reviewerRoundClaudeID,
       reviewerB: reviewerRoundCodexID, note: "round two")
-    _ = runHarnessMayFail([
-      "session", "task", "update", inputs.sessionID, taskArbitrationID,
-      "--project-dir", inputs.projectDir.path,
-      "--status", "in_progress",
-      "--actor", workerCodexID,
-    ])
-    try submitRequestChangesRound(
+    try continueReviewRound(
       taskID: taskArbitrationID, workerID: workerCodexID, reviewerA: reviewerRoundClaudeID,
       reviewerB: reviewerRoundCodexID, note: "round three")
     _ = SwarmContractCommands.taskArbitrate
@@ -1201,6 +1189,41 @@ private final class SwarmActDriverRunner {
       "--project-dir", inputs.projectDir.path,
       "--actor", reviewerB,
     ])
+    try runHarness([
+      "session", "task", "submit-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerA,
+      "--verdict", "request_changes",
+      "--summary", "changes requested",
+      "--points", points,
+    ])
+    try runHarness([
+      "session", "task", "submit-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", reviewerB,
+      "--verdict", "request_changes",
+      "--summary", "changes requested",
+      "--points", points,
+    ])
+    try runHarness([
+      "session", "task", "respond-review", inputs.sessionID, taskID,
+      "--project-dir", inputs.projectDir.path,
+      "--actor", workerID,
+      "--agreed", "p1",
+      "--disputed", "p2,p3",
+      "--note", note,
+    ])
+  }
+
+  private func continueReviewRound(
+    taskID: String,
+    workerID: String,
+    reviewerA: String,
+    reviewerB: String,
+    note: String
+  ) throws {
+    let points =
+      #"[{"point_id":"p1","text":"A","state":"open"},{"point_id":"p2","text":"B","state":"open"},{"point_id":"p3","text":"C","state":"open"}]"#
     try runHarness([
       "session", "task", "submit-review", inputs.sessionID, taskID,
       "--project-dir", inputs.projectDir.path,
