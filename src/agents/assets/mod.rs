@@ -15,6 +15,8 @@ mod render_plugins;
 mod render_skills;
 mod rewrite;
 #[cfg(test)]
+mod council_tests;
+#[cfg(test)]
 mod tests;
 
 use files::{ensure_outputs_match, write_outputs};
