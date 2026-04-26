@@ -112,7 +112,7 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var helpCommands: some Commands {
-    CommandGroup(replacing: .help) {
+    CommandGroup(after: .help) {
       Link(
         "Harness Monitor Documentation",
         destination: Self.documentationURL
