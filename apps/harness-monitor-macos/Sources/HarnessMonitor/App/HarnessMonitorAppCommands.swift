@@ -63,6 +63,14 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   var body: some Commands {
+    systemCommands
+    fileAndEditCommands
+    viewCommands
+    navigationAndDaemonCommands
+    helpCommands
+  }
+
+  @CommandsBuilder private var systemCommands: some Commands {
     SidebarCommands()
     TextEditingCommands()
     CommandGroup(replacing: .appSettings) {
@@ -71,7 +79,44 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut(",", modifiers: .command)
     }
+  }
+
+  @CommandsBuilder private var fileAndEditCommands: some Commands {
+    CommandGroup(after: .newItem) {
+      Button("Attach External Session…") {
+        store.requestAttachExternalSession()
+      }
+      .keyboardShortcut("a", modifiers: [.command, .shift])
+    }
+    CommandGroup(after: .pasteboard) {
+      Button("Find in Sessions") {
+        sidebarSearchFocus?.invoke()
+      }
+      .keyboardShortcut("f", modifiers: .command)
+      .disabled(sidebarSearchFocus?.isAvailable != true)
+    }
+  }
+
+  @CommandsBuilder private var viewCommands: some Commands {
+    CommandGroup(after: .sidebar) {
+      Button {
+        showInspector.toggle()
+      } label: {
+        Text(showInspector ? "Hide Inspector" : "Show Inspector")
+      }
+      .keyboardShortcut("i", modifiers: [.command, .option])
+    }
     CommandGroup(after: .toolbar) {
+      Button("Inspect Session Overview", action: inspectSessionOverview)
+        .keyboardShortcut("1", modifiers: [.command, .option])
+        .disabled(!displayState.hasSelectedSession)
+
+      Button("Inspect Observer", action: inspectObserver)
+        .keyboardShortcut("2", modifiers: [.command, .option])
+        .disabled(!displayState.hasObserver)
+
+      Divider()
+
       Button("Increase Text Size", action: increaseTextSize)
         .keyboardShortcut("+", modifiers: .command)
         .disabled(!canIncreaseTextSize)
@@ -83,36 +128,16 @@ struct HarnessMonitorAppCommands: Commands {
       Button("Reset Text Size", action: resetTextSize)
         .keyboardShortcut("0", modifiers: .command)
         .disabled(textSizeIndex == HarnessMonitorTextSize.defaultIndex)
-    }
-    CommandGroup(replacing: .help) {
-      Link(
-        "Harness Monitor Documentation",
-        destination: Self.documentationURL
-      )
-    }
-    CommandGroup(after: .newItem) {
-      Button("Attach External Session…") {
-        store.requestAttachExternalSession()
-      }
-      .keyboardShortcut("a", modifiers: [.command, .shift])
-    }
-    CommandMenu("Harness Monitor") {
-      Button("Find in Sessions") {
-        sidebarSearchFocus?.invoke()
-      }
-      .keyboardShortcut("f", modifiers: .command)
-      .disabled(sidebarSearchFocus?.isAvailable != true)
+
+      Divider()
 
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command, .shift])
+    }
+  }
 
-      Divider()
-
-      Button("Start Daemon", action: startDaemon)
-      Button("Install Launch Agent", action: installLaunchAgent)
-
-      Divider()
-
+  @CommandsBuilder private var navigationAndDaemonCommands: some Commands {
+    CommandMenu("Go") {
       Button("Back") {
         navigateBack()
       }
@@ -124,9 +149,8 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut("]", modifiers: [.command])
       .disabled(!canNavigateForward)
-
-      Divider()
-
+    }
+    CommandMenu("Session") {
       Button("Observe Selected Session", action: observeSelectedSession)
         .keyboardShortcut("o", modifiers: [.command, .option])
         .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
@@ -148,25 +172,19 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut("c", modifiers: [.command, .shift])
       .disabled(!displayState.hasSelectedSession)
+    }
+    CommandMenu("Daemon") {
+      Button("Start Daemon", action: startDaemon)
+      Button("Install Launch Agent", action: installLaunchAgent)
+    }
+  }
 
-      Divider()
-
-      Button("Inspect Session Overview", action: inspectSessionOverview)
-        .keyboardShortcut("1", modifiers: [.command, .option])
-        .disabled(!displayState.hasSelectedSession)
-
-      Button("Inspect Observer", action: inspectObserver)
-        .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(!displayState.hasObserver)
-
-      Divider()
-
-      Button {
-        showInspector.toggle()
-      } label: {
-        Text(showInspector ? "Hide Inspector" : "Show Inspector")
-      }
-      .keyboardShortcut("i", modifiers: [.command, .option])
+  @CommandsBuilder private var helpCommands: some Commands {
+    CommandGroup(replacing: .help) {
+      Link(
+        "Harness Monitor Documentation",
+        destination: Self.documentationURL
+      )
     }
   }
 
