@@ -989,26 +989,49 @@ extension RecordingTriage {
   }
 
   private static func assertAct16(
-    payload _: [String: String],
+    payload: [String: String],
     identifiers: [AccessibilityIdentifier]
   ) -> [ChecklistFinding] {
-    let corner = identifiers.first { $0.identifier == "harness.session-status.corner" }
-    let label = corner?.label ?? ""
-    let closedTokens = ["closed", "ended"]
-    if closedTokens.contains(where: { label.lowercased().contains($0) }) {
+    guard let sessionID = payload["session_id"], !sessionID.isEmpty else {
+      return [
+        ChecklistFinding(
+          id: "swarm.act16.sessionEnded",
+          verdict: .notFound,
+          message: "act16 payload missing session_id; cannot inspect sidebar row"
+        )
+      ]
+    }
+    let rowIdentifier = "harness.sidebar.session.\(sessionID)"
+    let rows = identifiers.filter { $0.identifier == rowIdentifier }
+    guard !rows.isEmpty else {
+      return [
+        ChecklistFinding(
+          id: "swarm.act16.sessionEnded",
+          verdict: .notFound,
+          message: "sidebar row \(rowIdentifier) not present in hierarchy"
+        )
+      ]
+    }
+    let endedTokens = ["ended", "closed"]
+    let matched = rows.first { row in
+      let label = row.label?.lowercased() ?? ""
+      return endedTokens.contains(where: { label.contains($0) })
+    }
+    if let matched, let label = matched.label {
       return [
         ChecklistFinding(
           id: "swarm.act16.sessionEnded",
           verdict: .found,
-          message: "session-status.corner shows \(label)"
+          message: "sidebar row \(rowIdentifier) label includes ended status: \(label)"
         )
       ]
     }
+    let combinedLabels = rows.compactMap(\.label).joined(separator: " | ")
     return [
       ChecklistFinding(
         id: "swarm.act16.sessionEnded",
         verdict: .notFound,
-        message: "session-status.corner not in closed/ended state"
+        message: "sidebar row \(rowIdentifier) label has no ended/closed token: \(combinedLabels)"
       )
     ]
   }
