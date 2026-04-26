@@ -302,6 +302,13 @@ final class SwarmFixture {
   }
 
   private func taskIsSelectedInInspector(_ task: XCUIElement, taskID: String) -> Bool {
+    let selectionMarker = testCase.element(
+      in: app,
+      identifier: Accessibility.taskInspectorSelection(taskID)
+    )
+    if selectionMarker.exists {
+      return true
+    }
     let inspector = testCase.element(in: app, identifier: Accessibility.taskInspectorCard)
     guard inspector.exists else { return false }
     if (inspector.value as? String) == taskID {
@@ -321,17 +328,16 @@ final class SwarmFixture {
 
   private func scrollToward(_ element: XCUIElement) {
     let target = scrollTarget(for: element)
+    guard target.exists else { return }
     let window = testCase.mainWindow(in: app)
-    if element.exists,
-      !element.frame.isEmpty,
-      !window.frame.isEmpty,
-      element.frame.minY < window.frame.minY + 72
-    {
-      testCase.dragDown(in: app, element: target, distanceRatio: 0.18)
-      return
-    }
-
-    testCase.dragUp(in: app, element: target, distanceRatio: 0.18)
+    let shouldScrollUp =
+      !(element.exists
+        && !element.frame.isEmpty
+        && !window.frame.isEmpty
+        && element.frame.minY < window.frame.minY + 72)
+    let magnitude = max(240, target.frame.height * 0.9)
+    let delta: CGFloat = shouldScrollUp ? -magnitude : magnitude
+    target.scroll(byDeltaX: 0, deltaY: delta)
   }
 
   private func scrollTarget(for element: XCUIElement) -> XCUIElement {

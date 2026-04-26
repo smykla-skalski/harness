@@ -19,6 +19,10 @@ struct TaskInspectorCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.taskInspectorSelection(task.taskId),
+        text: task.taskId
+      )
       Text(task.title)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text(task.context ?? "No task context provided.")

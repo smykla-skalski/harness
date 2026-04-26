@@ -352,6 +352,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.task.\(slug(taskID))"
   }
 
+  static func taskInspectorSelection(_ taskID: String) -> String {
+    "harness.inspector.task-card.selection.\(slug(taskID))"
+  }
+
   static let sessionTaskListState = "harness.session.tasks.state"
   static func agentRowPersonaChip(_ agentID: String) -> String {
     "\(sessionAgentCard(agentID)).persona"
