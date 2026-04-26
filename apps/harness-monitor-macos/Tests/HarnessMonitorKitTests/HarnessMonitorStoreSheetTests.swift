@@ -75,6 +75,57 @@ struct HarnessMonitorStoreSheetTests {
     #expect(sheet1.id != sheet2.id)
   }
 
+  @Test("createTask sheet id encodes session id")
+  func createTaskSheetIdEncodesSession() {
+    let sheet = HarnessMonitorStore.PresentedSheet.createTask(sessionID: "sess1234")
+    #expect(sheet.id == "createTask:sess1234")
+  }
+
+  @Test("taskActions sheet id encodes session and task ids")
+  func taskActionsSheetIdEncodesSessionAndTask() {
+    let sheet = HarnessMonitorStore.PresentedSheet.taskActions(
+      sessionID: "sess1234",
+      taskID: "task-ui"
+    )
+    #expect(sheet.id == "taskActions:sess1234:task-ui")
+  }
+
+  @Test("leaderTransfer sheet id encodes session id")
+  func leaderTransferSheetIdEncodesSession() {
+    let sheet = HarnessMonitorStore.PresentedSheet.leaderTransfer(sessionID: "sess1234")
+    #expect(sheet.id == "leaderTransfer:sess1234")
+  }
+
+  @Test("Setting createTask sheet replaces a prior sendSignal sheet")
+  func createTaskReplacesPriorSheet() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.presentSendSignalSheet(agentID: "leader-claude")
+
+    store.presentedSheet = .createTask(sessionID: PreviewFixtures.summary.sessionId)
+
+    #expect(
+      store.presentedSheet == .createTask(sessionID: PreviewFixtures.summary.sessionId)
+    )
+  }
+
+  @Test("dismissSheet clears taskActions and leaderTransfer sheets")
+  func dismissSheetClearsActionSheets() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.presentedSheet = .taskActions(
+      sessionID: PreviewFixtures.summary.sessionId,
+      taskID: PreviewFixtures.tasks[0].taskId
+    )
+    store.dismissSheet()
+    #expect(store.presentedSheet == nil)
+
+    store.presentedSheet = .leaderTransfer(sessionID: PreviewFixtures.summary.sessionId)
+    store.dismissSheet()
+    #expect(store.presentedSheet == nil)
+  }
+
   @Test("PresentedSheet cases are exhaustively matchable")
   func presentedSheetCasesAreExhaustivelyMatchable() {
     let sheet = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")
