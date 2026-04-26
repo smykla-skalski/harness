@@ -11,66 +11,6 @@ public struct CommandsDisplayState: Equatable {
   public let hasObserver: Bool
 }
 
-public enum HarnessMonitorInspectorLayout {
-  public static let minWidth: CGFloat = 320
-  public static let idealWidth: CGFloat = 420
-  public static let maxWidth: CGFloat = 480
-}
-
-public enum ContentInspectorVisibilitySource {
-  case persistedPreference
-  case explicitUserPreference
-  case contextualAutoOpen
-  case framework
-}
-
-public enum ContentInspectorInitialPresentation {
-  private static let storageKey = "showInspector"
-
-  public static func resolve(defaults: UserDefaults = .standard) -> Bool {
-    guard defaults.object(forKey: storageKey) != nil else {
-      return false
-    }
-    return defaults.bool(forKey: storageKey)
-  }
-}
-
-public struct ContentInspectorVisibilityChange: Equatable {
-  public let nextPresentation: Bool
-  public let persistedPreference: Bool?
-}
-
-public enum ContentInspectorVisibilityPolicy {
-  public static func resolve(
-    currentPresentation: Bool,
-    currentPersistedPreference: Bool,
-    nextPresentation: Bool,
-    source: ContentInspectorVisibilitySource
-  ) -> ContentInspectorVisibilityChange? {
-    let shouldPersistPreference: Bool
-
-    switch source {
-    case .persistedPreference:
-      shouldPersistPreference = false
-    case .explicitUserPreference:
-      shouldPersistPreference = currentPersistedPreference != nextPresentation
-    case .contextualAutoOpen:
-      shouldPersistPreference = false
-    case .framework:
-      shouldPersistPreference = false
-    }
-
-    guard currentPresentation != nextPresentation || shouldPersistPreference else {
-      return nil
-    }
-
-    return ContentInspectorVisibilityChange(
-      nextPresentation: nextPresentation,
-      persistedPreference: shouldPersistPreference ? nextPresentation : nil
-    )
-  }
-}
-
 // MARK: - Commands state
 
 extension HarnessMonitorStore {
@@ -98,8 +38,6 @@ public struct ContentDetailColumn: View {
   public let contentSession: HarnessMonitorStore.ContentSessionSlice
   public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
-  public let showInspector: Bool
-  public let setInspectorVisibility: (Bool, ContentInspectorVisibilitySource) -> Void
   public let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
 
   public init(
@@ -110,8 +48,6 @@ public struct ContentDetailColumn: View {
     contentSession: HarnessMonitorStore.ContentSessionSlice,
     contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
-    showInspector: Bool,
-    setInspectorVisibility: @escaping (Bool, ContentInspectorVisibilitySource) -> Void,
     toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   ) {
     self.store = store
@@ -121,8 +57,6 @@ public struct ContentDetailColumn: View {
     self.contentSession = contentSession
     self.contentSessionDetail = contentSessionDetail
     self.dashboardUI = dashboardUI
-    self.showInspector = showInspector
-    self.setInspectorVisibility = setInspectorVisibility
     self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
   }
 
@@ -140,8 +74,7 @@ public struct ContentDetailColumn: View {
       canNavigateForward: false,
       canStartNewSession: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      showInspector: showInspector
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled
     )
   }
 
@@ -174,17 +107,11 @@ public struct ContentDetailColumn: View {
     .toolbar {
       ContentPrimaryToolbarItems(
         store: store,
-        model: contentToolbarModel,
-        setInspectorVisibility: setInspectorVisibility
+        model: contentToolbarModel
       )
     }
     .navigationTitle(navigationTitleText)
     .navigationSubtitle(navigationSubtitleText ?? "")
-    .onChange(of: selection.inspectorSelection) { _, newValue in
-      if newValue != .none, !showInspector {
-        setInspectorVisibility(true, .contextualAutoOpen)
-      }
-    }
   }
 
   private var sessionContent: some View {
@@ -209,10 +136,6 @@ public struct ContentDetailColumn: View {
     .onKeyPress(.escape) {
       if let feedbackID = toast.activeFeedback.first?.id {
         toast.dismiss(id: feedbackID)
-        return .handled
-      }
-      if contentSessionDetail.presentedSessionDetail != nil {
-        store.inspectorSelection = .none
         return .handled
       }
       return .ignored

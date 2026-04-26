@@ -38,18 +38,12 @@ struct ContentEscapeCommandBridge: View {
       toast.dismiss(id: feedbackID)
       return .handled
     }
-    if contentSessionDetail.presentedSessionDetail != nil {
-      store.inspectorSelection = .none
-      return .handled
-    }
     return .ignored
   }
 
   private func handleExitCommand() {
     if let feedbackID = toast.activeFeedback.first?.id {
       toast.dismiss(id: feedbackID)
-    } else if contentSessionDetail.presentedSessionDetail != nil {
-      store.inspectorSelection = .none
     }
   }
 

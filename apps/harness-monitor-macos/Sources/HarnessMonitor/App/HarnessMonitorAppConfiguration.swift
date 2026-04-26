@@ -34,8 +34,6 @@ struct HarnessMonitorAppConfiguration {
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
         HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
-      "showInspector": false,
-      "inspectorColumnWidth": 420.0,
     ]
     registrationDefaults.merge(
       HarnessMonitorLoggerDefaults.registrationDefaults()
@@ -108,7 +106,6 @@ struct HarnessMonitorAppConfiguration {
         textSizeIndex: HarnessMonitorTextSize.defaultIndex,
         backdropMode: .none,
         backgroundImage: .defaultSelection,
-        showInspector: true,
         resetBackgroundRecents: false
       )
     }
@@ -125,9 +122,6 @@ struct HarnessMonitorAppConfiguration {
       backgroundImage: HarnessMonitorBackgroundSelection.decode(
         environment.values["HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"] ?? ""
       ),
-      showInspector: uiTestBoolOverride(
-        from: environment.values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]
-      ) ?? true,
       resetBackgroundRecents: uiTestBoolOverride(
         from: environment.values[resetBackgroundRecentsOverrideKey]
       ) ?? false
@@ -139,7 +133,6 @@ struct HarnessMonitorAppConfiguration {
     let textSizeIndex: Int
     let backdropMode: HarnessMonitorBackdropMode
     let backgroundImage: HarnessMonitorBackgroundSelection
-    let showInspector: Bool
     let resetBackgroundRecents: Bool
   }
 
@@ -251,10 +244,6 @@ struct HarnessMonitorAppConfiguration {
     UserDefaults.standard.set(
       overrides.backgroundImage.storageValue,
       forKey: HarnessMonitorBackgroundDefaults.imageKey
-    )
-    UserDefaults.standard.set(
-      overrides.showInspector,
-      forKey: "showInspector"
     )
     UserDefaults.standard.set(
       uiTestTimeZoneMode.rawValue,

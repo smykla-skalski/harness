@@ -9,7 +9,6 @@ extension HarnessMonitorStore {
     case contentSessionDetail
     case contentDashboard
     case sidebar
-    case inspector
   }
 }
 
@@ -48,7 +47,6 @@ extension HarnessMonitorStore {
         .contentChrome,
         .contentSession,
         .contentDashboard,
-        .inspector,
       ])
     case .daemonStatus:
       scheduleUISync([.contentToolbar, .contentDashboard, .sidebar])
@@ -64,32 +62,28 @@ extension HarnessMonitorStore {
   private func handleSelectionChange(_ change: SelectionSlice.Change) {
     switch change {
     case .selectedSessionID:
-      var areas: Set<UISyncArea> = [.contentSession, .sidebar]
-      if selection.selectedSessionID == nil {
-        areas.insert(.inspector)
-      }
-      scheduleUISync(areas)
+      scheduleUISync([.contentSession, .sidebar])
     case .selectedSession:
-      scheduleUISync([.contentChrome, .contentSessionDetail, .inspector])
+      scheduleUISync([.contentChrome, .contentSessionDetail])
     case .selectedSessionDetail:
-      scheduleUISync([.contentSessionDetail, .inspector])
+      scheduleUISync([.contentSessionDetail])
     case .timeline, .timelineWindow, .timelineLoading:
       scheduleUISync([.contentSessionDetail])
-    case .inspectorSelection, .actionActorID:
-      scheduleUISync([.inspector])
+    case .actionActorID:
+      break
     case .selectionLoading, .extensionsLoading:
       scheduleUISync([.contentSession])
     case .sessionAction:
-      scheduleUISync([.contentToolbar, .contentSession, .contentDashboard, .inspector])
+      scheduleUISync([.contentToolbar, .contentSession, .contentDashboard])
     case .inFlightActionID:
-      scheduleUISync([.inspector])
+      break
     }
   }
 
   private func handleSessionIndexChange(_ change: SessionIndexSlice.Change) {
     switch change {
     case .snapshot:
-      scheduleUISync([.contentToolbar, .contentChrome, .contentSession, .inspector, .sidebar])
+      scheduleUISync([.contentToolbar, .contentChrome, .contentSession, .sidebar])
     case .summaryProjection(let sessionID):
       var areas: Set<UISyncArea> = [.contentToolbar]
       if shouldSyncSelectedSessionLoadingChrome(for: sessionID) {
@@ -126,7 +120,6 @@ extension HarnessMonitorStore {
       .contentSessionDetail,
       .contentDashboard,
       .sidebar,
-      .inspector,
     ])
   }
 
@@ -161,9 +154,6 @@ extension HarnessMonitorStore {
     }
     if areas.contains(.sidebar) {
       syncSidebarUI()
-    }
-    if areas.contains(.inspector) {
-      syncInspectorUI()
     }
     for area in areas {
       debugUISyncCounts[area, default: 0] += 1
@@ -299,42 +289,6 @@ extension HarnessMonitorStore {
         sessionCount: indexedSessionCount,
         openWorkCount: sessionIndex.totalOpenWorkCount,
         blockedCount: sessionIndex.totalBlockedCount
-      )
-    )
-  }
-
-  private func syncInspectorUI() {
-    let selectedSessionSummary = sessionIndex.sessionSummary(
-      for: selection.selectedSessionID
-    )
-    let selectedSession = selection.matchedSelectedSession
-    let selectedActionActorID = resolvedActionActor() ?? ""
-    let lookupIndex = selectedSession.map { InspectorLookupIndex(detail: $0) }
-    let resolvedPrimaryContent = InspectorPrimaryContentState(
-      selectedSession: selectedSession,
-      selectedSessionSummary: selectedSessionSummary,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: isPersistenceAvailable,
-      lookupIndex: lookupIndex
-    )
-
-    let resolvedActionContext = InspectorActionContext(
-      detail: selectedSession,
-      inspectorSelection: selection.inspectorSelection,
-      isPersistenceAvailable: isPersistenceAvailable,
-      selectedActionActorID: selectedActionActorID,
-      isSessionReadOnly: isSessionReadOnly,
-      isSessionActionInFlight: isSessionActionInFlight,
-      lookupIndex: lookupIndex
-    )
-    inspectorUI.apply(
-      InspectorUIState(
-        isPersistenceAvailable: isPersistenceAvailable,
-        selectedActionActorID: selectedActionActorID,
-        isSessionReadOnly: isSessionReadOnly,
-        isSessionActionInFlight: isSessionActionInFlight,
-        primaryContent: resolvedPrimaryContent,
-        actionContext: resolvedActionContext
       )
     )
   }

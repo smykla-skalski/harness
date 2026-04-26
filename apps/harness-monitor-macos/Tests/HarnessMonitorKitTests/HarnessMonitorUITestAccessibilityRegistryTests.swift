@@ -51,13 +51,6 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
-  @Test("Task inspector emits per-task selection marker")
-  func taskInspectorEmitsSelectionMarker() throws {
-    let inspectorCardView = try sourceFile(named: "InspectorTaskAgentCards.swift")
-
-    #expect(inspectorCardView.contains("taskInspectorSelection"))
-  }
-
   @Test("Sidebar, banner, and metric identifiers match UI-test mirror")
   func sidebarAndMetricIdentifiersMirror() {
     #expect(

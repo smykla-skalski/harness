@@ -14,8 +14,6 @@ struct HarnessMonitorAppCommands: Commands {
   private var openWindow
   @FocusedValue(\.harnessSidebarSearchFocusAction)
   private var sidebarSearchFocus
-  @AppStorage("showInspector")
-  private var showInspector = true
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -23,8 +21,6 @@ struct HarnessMonitorAppCommands: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
-  let inspectSessionOverview: () -> Void
-  let inspectObserver: () -> Void
 
   private var canIncreaseTextSize: Bool {
     HarnessMonitorTextSize.canIncrease(textSizeIndex)
@@ -63,25 +59,7 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var viewCommands: some Commands {
-    CommandGroup(after: .sidebar) {
-      Button {
-        showInspector.toggle()
-      } label: {
-        Text(showInspector ? "Hide Inspector" : "Show Inspector")
-      }
-      .keyboardShortcut("i", modifiers: [.command, .option])
-    }
     CommandGroup(after: .toolbar) {
-      Button("Show Session Overview", action: inspectSessionOverview)
-        .keyboardShortcut("1", modifiers: [.command, .option])
-        .disabled(!displayState.hasSelectedSession)
-
-      Button("Show Observer", action: inspectObserver)
-        .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(!displayState.hasObserver)
-
-      Divider()
-
       Button("Increase Text Size", action: increaseTextSize)
         .keyboardShortcut("+", modifiers: .command)
         .disabled(!canIncreaseTextSize)
@@ -109,5 +87,4 @@ struct HarnessMonitorAppCommands: Commands {
       )
     }
   }
-
 }

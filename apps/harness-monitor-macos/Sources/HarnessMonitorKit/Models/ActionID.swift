@@ -1,6 +1,6 @@
 import Foundation
 
-public enum InspectorActionID: Hashable, Sendable {
+public enum ActionID: Hashable, Sendable {
   case createTask(sessionID: String)
   case assignTask(sessionID: String, taskID: String)
   case dropTask(sessionID: String, taskID: String)

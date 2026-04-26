@@ -27,26 +27,6 @@ struct HarnessMonitorContentSelectionTests {
     #expect(filterInvalidated == false)
   }
 
-  @Test("Content shell state ignores inspector selection churn")
-  func contentShellStateIgnoresInspectorSelectionChurn() async {
-    let store = await makeBootstrappedStore()
-    await store.selectSession(PreviewFixtures.summary.sessionId)
-
-    let didChange = await didInvalidate(
-      {
-        (
-          toolbarGlobalActionState(for: store)(),
-          store.contentUI.shell.connectionState
-        )
-      },
-      after: {
-        store.inspect(taskID: PreviewFixtures.tasks[0].taskId)
-      }
-    )
-
-    #expect(didChange == false)
-  }
-
   @Test("Content session summary ignores toast feedback churn")
   func contentSessionSummaryIgnoresToastFeedbackChurn() async {
     let store = await makeBootstrappedStore()
@@ -106,7 +86,6 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 0)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
   @Test("Daemon busy churn only resyncs toolbar and dashboard")
@@ -122,11 +101,10 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 0)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
-  @Test("Persisted data availability churn skips shell session dashboard and inspector")
-  func persistedDataAvailabilityChurnSkipsShellSessionDashboardAndInspector() async {
+  @Test("Persisted data availability churn skips shell session and dashboard")
+  func persistedDataAvailabilityChurnSkipsShellSessionAndDashboard() async {
     let store = await makeBootstrappedStore()
     store.connectionState = .offline("Daemon offline")
     store.debugResetUISyncCounts()
@@ -139,7 +117,6 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentSession) == 0)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 0)
     #expect(store.debugUISyncCount(for: .contentDashboard) == 0)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
   }
 
   @Test("Content toolbar global actions ignore session selection churn")
@@ -207,20 +184,6 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.sidebarUI.selectedSessionID == PreviewFixtures.summary.sessionId)
   }
 
-  @Test("Priming session selection defers inspector primary content until detail loads")
-  func primingSessionSelectionDefersInspectorPrimaryContentUntilDetailLoads() async {
-    let store = await makeBootstrappedStore()
-
-    let didChange = await didInvalidate(
-      { store.inspectorUI.primaryContent },
-      after: {
-        store.primeSessionSelection(PreviewFixtures.summary.sessionId)
-      }
-    )
-
-    #expect(didChange == false)
-  }
-
   @Test("Priming session selection does not resync content chrome before detail loads")
   func primingSessionSelectionSkipsContentChromeResync() async {
     let store = await makeBootstrappedStore()
@@ -231,7 +194,6 @@ struct HarnessMonitorContentSelectionTests {
     #expect(store.debugUISyncCount(for: .contentShell) == 0)
     #expect(store.debugUISyncCount(for: .contentSession) == 1)
     #expect(store.debugUISyncCount(for: .sidebar) == 1)
-    #expect(store.debugUISyncCount(for: .inspector) == 0)
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
 
@@ -292,7 +254,6 @@ struct HarnessMonitorContentSelectionTests {
 
     #expect(store.contentUI.sessionDetail.selectedSessionTasks.last?.taskId == task.taskId)
     #expect(store.debugUISyncCount(for: .contentSessionDetail) == 1)
-    #expect(store.debugUISyncCount(for: .inspector) == 1)
     #expect(store.debugUISyncCount(for: .contentChrome) == 0)
   }
 

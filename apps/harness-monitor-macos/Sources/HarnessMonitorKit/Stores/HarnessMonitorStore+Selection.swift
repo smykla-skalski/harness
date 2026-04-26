@@ -38,14 +38,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public var inspectorSelection: InspectorSelection {
-    get { selection.inspectorSelection }
-    set {
-      guard selection.inspectorSelection != newValue else { return }
-      selection.inspectorSelection = newValue
-    }
-  }
-
   public var actionActorID: String? {
     get { selection.actionActorID }
     set {
@@ -124,7 +116,6 @@ extension HarnessMonitorStore {
       }
       selection.retainPresentedDetailWhenSelectionClears = true
       selectedSessionID = sessionID
-      inspectorSelection = .none
       isExtensionsLoading = false
       if pendingExtensions != nil {
         pendingExtensions = nil
@@ -214,10 +205,6 @@ extension HarnessMonitorStore {
       return false
     }
     guard let sessionID else {
-      return true
-    }
-    if inspectorSelection != .none, selectedSession?.session.sessionId == sessionID {
-      inspectorSelection = .none
       return true
     }
     if selectionTask != nil || isSelectionLoading {
@@ -368,10 +355,6 @@ extension HarnessMonitorStore {
     selectedTimelinePageLoadTask = task
     await task.value
   }
-
-  public func inspect(taskID: String) { inspectorSelection = .task(taskID) }
-  public func inspect(signalID: String) { inspectorSelection = .signal(signalID) }
-  public func inspectObserver() { inspectorSelection = .observer }
 
   func cancelSessionLoad() {
     sessionLoadTask?.cancel()

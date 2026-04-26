@@ -89,47 +89,4 @@ extension HarnessMonitorUITests {
     )
   }
 
-  func testLeaderTransferSectionShowsPickerWithCurrentLeaderDimmed() throws {
-    let app = launch(mode: "preview")
-
-    tapPreviewSession(in: app)
-
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-
-    let transferSection = element(in: app, identifier: Accessibility.leaderTransferSection)
-    let transferButton = button(in: app, title: "Transfer Leadership")
-
-    for _ in 0..<8 where !transferButton.exists {
-      dragUp(in: app, element: inspectorRoot, distanceRatio: 0.25)
-    }
-
-    XCTAssertTrue(transferSection.exists, "Leader transfer section should be visible")
-    XCTAssertTrue(transferButton.exists, "Transfer button should be visible")
-    XCTAssertTrue(
-      app.staticTexts["Leader Transfer"].exists,
-      "Section header should read Leader Transfer"
-    )
-  }
-
-  func testLeaderTransferSectionIsDisabledForSingleAgentSession() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_FIXTURE_SET": "single-agent"]
-    )
-
-    tapSession(in: app, identifier: Accessibility.singleAgentSessionRow)
-
-    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.actionTimeout))
-
-    let transferSection = element(in: app, identifier: Accessibility.leaderTransferSection)
-
-    for _ in 0..<8 where !transferSection.exists {
-      dragUp(in: app, element: inspectorRoot, distanceRatio: 0.25)
-    }
-
-    XCTAssertTrue(transferSection.exists, "Leader transfer section should be in the tree")
-    XCTAssertFalse(transferSection.isEnabled, "Section should be disabled with only one agent")
-  }
 }
