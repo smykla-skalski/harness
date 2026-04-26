@@ -107,6 +107,7 @@ struct HarnessMonitorApp: App {
         store: store,
         displayState: store.commandsDisplayState
       )
+      WindowMenuCommands()
     }
 
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {
