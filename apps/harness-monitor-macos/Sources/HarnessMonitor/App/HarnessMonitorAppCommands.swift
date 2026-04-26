@@ -23,8 +23,6 @@ struct HarnessMonitorAppCommands: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
-  let startDaemon: () -> Void
-  let installLaunchAgent: () -> Void
   let inspectSessionOverview: () -> Void
   let inspectObserver: () -> Void
 
@@ -40,7 +38,6 @@ struct HarnessMonitorAppCommands: Commands {
     systemCommands
     fileAndEditCommands
     viewCommands
-    sessionAndDaemonCommands
     helpCommands
   }
 
@@ -101,13 +98,6 @@ struct HarnessMonitorAppCommands: Commands {
 
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command])
-    }
-  }
-
-  @CommandsBuilder private var sessionAndDaemonCommands: some Commands {
-    CommandMenu("Daemon") {
-      Button("Start Daemon", action: startDaemon)
-      Button("Install Launch Agent", action: installLaunchAgent)
     }
   }
 
