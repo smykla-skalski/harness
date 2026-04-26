@@ -99,7 +99,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         state.label.contains("selection=create")
-          && commandRoutingState.label.contains("scope=agentTui")
+          && commandRoutingState.label.contains("scope=agents")
           && commandRoutingState.label.contains("canGoBack=true")
           && commandRoutingState.label.contains("canGoForward=false")
           && backButton.isEnabled
