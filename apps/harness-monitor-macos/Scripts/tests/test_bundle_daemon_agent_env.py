@@ -59,7 +59,7 @@ class ResolveCargoTargetDirTests(unittest.TestCase):
             "resolve_cargo_target_dir"
         )
 
-        self.assertEqual(resolved, f"{repo_root}/target/harness-monitor-xcode-daemon")
+        self.assertEqual(resolved, f"{repo_root}/tmp/harness-monitor-xcode-daemon")
 
     def test_worktree_defaults_to_common_repo_target_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -118,7 +118,7 @@ class ResolveCargoTargetDirTests(unittest.TestCase):
 
             self.assertEqual(
                 resolved,
-                f"{repo_root.resolve()}/target/harness-monitor-xcode-daemon",
+                f"{repo_root.resolve()}/tmp/harness-monitor-xcode-daemon",
             )
 
 

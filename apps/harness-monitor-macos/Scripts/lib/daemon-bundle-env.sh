@@ -21,7 +21,9 @@ default_cargo_target_dir() {
   local resolved_repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
   local common_repo_root
   common_repo_root="$(resolve_common_repo_root "$resolved_repo_root")"
-  printf '%s/target/harness-monitor-xcode-daemon\n' "$common_repo_root"
+  # Keep the shared daemon cargo cache out of target/ because raw Xcode builds
+  # surface spurious SWIFT_DEBUG_INFORMATION_* warnings for that location.
+  printf '%s/tmp/harness-monitor-xcode-daemon\n' "$common_repo_root"
 }
 
 resolve_cargo_target_dir() {
