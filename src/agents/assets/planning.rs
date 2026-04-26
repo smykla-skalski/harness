@@ -15,10 +15,22 @@ use super::render_local_skills::render_local_skills;
 use super::render_plugins::render_plugin_outputs;
 use super::render_skills::render_skill_outputs;
 
+/// Test convenience wrapper that preserves the default production behavior of
+/// omitting Gemini command wrappers unless explicitly requested.
+#[cfg(test)]
 pub(super) fn plan_outputs(
     repo_root: &Path,
     selection: AgentAssetTarget,
     skip_runtime_hooks: &[HookAgent],
+) -> Result<Vec<PlannedOutput>, CliError> {
+    plan_outputs_with_gemini_commands(repo_root, selection, skip_runtime_hooks, false)
+}
+
+pub(super) fn plan_outputs_with_gemini_commands(
+    repo_root: &Path,
+    selection: AgentAssetTarget,
+    skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
 ) -> Result<Vec<PlannedOutput>, CliError> {
     let targets = selected_targets(selection);
     let skills = load_skill_sources(repo_root)?;
@@ -26,6 +38,11 @@ pub(super) fn plan_outputs(
     let mut outputs: BTreeMap<PathBuf, PlannedOutput> = BTreeMap::new();
 
     for target in targets {
+        // Gemini render targets only emit `.gemini/commands/**` wrappers. The
+        // managed root still gets its `AGENTS.md` guide below via `render_guides`.
+        if matches!(target, RenderTarget::Gemini) && !include_gemini_commands {
+            continue;
+        }
         for skill in &skills {
             for (path, content) in render_skill_outputs(repo_root, *target, skill)? {
                 let managed_root = managed_root_for_path(repo_root, &path)?;

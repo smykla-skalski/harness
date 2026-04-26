@@ -84,7 +84,7 @@ fn assert_codex_hooks(hooks: &str) {
 #[test]
 fn write_agent_bootstrap_writes_codex_notify_config() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Codex, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Codex, false, &[]).unwrap();
 
     let plugin_skill = dir
         .path()
@@ -112,7 +112,7 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
 #[test]
 fn write_agent_bootstrap_writes_claude_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude, false, &[]).unwrap();
 
     let settings_path = dir.path().join(".claude").join("settings.json");
     let plugin_skill = dir
@@ -131,9 +131,27 @@ fn write_agent_bootstrap_writes_claude_plugin_assets() {
 }
 
 #[test]
-fn write_agent_bootstrap_writes_gemini_session_command() {
+fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, false, &[]).unwrap();
+
+    let settings_path = dir.path().join(".gemini").join("settings.json");
+    let command_path = dir
+        .path()
+        .join(".gemini")
+        .join("commands")
+        .join("harness")
+        .join("harness.toml");
+
+    assert!(written.contains(&settings_path));
+    assert!(!written.contains(&command_path));
+    assert!(!command_path.exists());
+}
+
+#[test]
+fn write_agent_bootstrap_includes_gemini_session_command_when_requested() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[]).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -152,7 +170,7 @@ fn write_agent_bootstrap_writes_gemini_session_command() {
 #[test]
 fn write_agent_bootstrap_writes_opencode_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode, false, &[]).unwrap();
 
     let hooks_path = dir.path().join(".opencode").join("hooks.json");
     let plugin_skill = dir
@@ -173,7 +191,7 @@ fn write_agent_bootstrap_writes_opencode_plugin_assets() {
 #[test]
 fn write_agent_bootstrap_writes_vibe_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Vibe, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Vibe, false, &[]).unwrap();
 
     let hooks_path = dir.path().join(".vibe").join("hooks.json");
     let plugin_skill = dir
@@ -194,7 +212,7 @@ fn write_agent_bootstrap_writes_vibe_plugin_assets() {
 #[test]
 fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot, &[]).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[]).unwrap();
 
     let config_path = dir
         .path()
@@ -229,7 +247,7 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
 fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
     let dir = tempfile::tempdir().unwrap();
     let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Gemini, &[HookAgent::Gemini]).unwrap();
+        write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[HookAgent::Gemini]).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -249,7 +267,8 @@ fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
 fn write_agent_bootstrap_skips_copilot_hook_config_when_requested() {
     let dir = tempfile::tempdir().unwrap();
     let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Copilot, &[HookAgent::Copilot]).unwrap();
+        write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[HookAgent::Copilot])
+            .unwrap();
 
     let config_path = dir
         .path()

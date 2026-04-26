@@ -2,6 +2,7 @@ use std::fs;
 
 use harness::agents::assets::{AgentAssetTarget, write_agent_target_outputs};
 use tempfile::tempdir;
+use walkdir::WalkDir;
 
 const MANAGED_ROOTS: &[&str] = &[
     ".claude/skills",
@@ -32,6 +33,38 @@ fn every_managed_root_gets_agents_md_after_generate() {
             marker.display()
         );
     }
+}
+
+#[test]
+fn default_generate_omits_gemini_command_wrappers() {
+    let tmp = tempdir().expect("tempdir");
+    write_agent_target_outputs(tmp.path(), AgentAssetTarget::All).expect("generate");
+
+    let commands_root = tmp.path().join(".gemini").join("commands");
+    // `every_managed_root_gets_agents_md_after_generate` covers the root marker;
+    // this assertion only verifies that the default output contains no Gemini
+    // command-wrapper TOMLs under that managed root.
+    let toml_files = WalkDir::new(&commands_root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.file_type().is_file()
+                && entry.path().extension().is_some_and(|extension| extension == "toml")
+        })
+        .map(|entry| {
+            entry
+                .path()
+                .strip_prefix(tmp.path())
+                .expect("generated path stays under tempdir")
+                .display()
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+
+    assert!(
+        toml_files.is_empty(),
+        "default generate should omit Gemini command wrappers, found {toml_files:?}"
+    );
 }
 
 #[test]

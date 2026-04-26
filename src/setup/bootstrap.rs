@@ -13,6 +13,7 @@ impl Execute for BootstrapArgs {
             self.project_dir.as_deref(),
             &self.agents,
             &self.skip_runtime_hooks,
+            self.include_gemini_commands,
         )
     }
 }
@@ -29,6 +30,9 @@ pub struct BootstrapArgs {
     /// Skip runtime hook config files for the listed agents while bootstrapping.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub skip_runtime_hooks: Vec<HookAgent>,
+    /// Also emit Gemini `.gemini/commands/**` command wrappers.
+    #[arg(long)]
+    pub include_gemini_commands: bool,
 }
 
 const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
@@ -45,13 +49,14 @@ const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn bootstrap(project_dir: Option<&str>, agents: &[HookAgent]) -> Result<i32, CliError> {
-    bootstrap_with_skipped_runtime_hooks(project_dir, agents, &[])
+    bootstrap_with_skipped_runtime_hooks(project_dir, agents, &[], false)
 }
 
 fn bootstrap_with_skipped_runtime_hooks(
     project_dir: Option<&str>,
     agents: &[HookAgent],
     skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
 ) -> Result<i32, CliError> {
     let dir = resolve_project_dir(project_dir);
     let path_env = env::var("PATH").unwrap_or_default();
@@ -64,7 +69,12 @@ fn bootstrap_with_skipped_runtime_hooks(
         .into());
     }
     for agent in selected_agents(agents) {
-        let _ = wrapper::write_agent_bootstrap(&dir, agent, skip_runtime_hooks)?;
+        let _ = wrapper::write_agent_bootstrap(
+            &dir,
+            agent,
+            include_gemini_commands,
+            skip_runtime_hooks,
+        )?;
     }
     Ok(0)
 }

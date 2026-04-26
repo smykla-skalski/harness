@@ -1,8 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::agents::assets::{
-    AgentAssetTarget, generate_agent_assets, generate_agent_assets_with_skipped_runtime_hooks,
-};
+use crate::agents::assets::{AgentAssetTarget, generate_agent_assets_with_skipped_runtime_hooks};
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
@@ -27,6 +25,9 @@ pub struct GenerateAgentAssetsArgs {
     /// Fail if generated output differs from the checked-in files.
     #[arg(long)]
     pub check: bool,
+    /// Also emit Gemini `.gemini/commands/**` command wrappers.
+    #[arg(long)]
+    pub include_gemini_commands: bool,
     /// Limit generation to a single target.
     #[arg(long, value_enum, default_value_t = AgentAssetTarget::All)]
     pub target: AgentAssetTarget,
@@ -37,14 +38,11 @@ pub struct GenerateAgentAssetsArgs {
 
 impl Execute for GenerateAgentAssetsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        if self.skip_runtime_hooks.is_empty() {
-            generate_agent_assets(self.target, self.check)
-        } else {
-            generate_agent_assets_with_skipped_runtime_hooks(
-                self.target,
-                self.check,
-                &self.skip_runtime_hooks,
-            )
-        }
+        generate_agent_assets_with_skipped_runtime_hooks(
+            self.target,
+            self.check,
+            &self.skip_runtime_hooks,
+            self.include_gemini_commands,
+        )
     }
 }

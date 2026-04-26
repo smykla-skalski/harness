@@ -48,13 +48,7 @@ fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
                         "plugins/harness/skills/harness/SKILL.md",
                     ],
                 ),
-                (
-                    "gemini",
-                    vec![
-                        ".gemini/settings.json",
-                        ".gemini/commands/harness/harness.toml",
-                    ],
-                ),
+                ("gemini", vec![".gemini/settings.json"]),
                 (
                     "copilot",
                     vec![

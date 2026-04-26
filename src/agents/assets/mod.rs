@@ -23,7 +23,7 @@ use files::{ensure_outputs_match, write_outputs};
 use loading::{load_plugin_sources, load_skill_sources};
 pub use model::AgentAssetTarget;
 use model::{PlannedOutput, repo_root};
-use planning::{plan_outputs, rebase_planned_outputs};
+use planning::{plan_outputs_with_gemini_commands, rebase_planned_outputs};
 use render_plugins::render_claude_plugin_outputs;
 
 /// Generate checked-in multi-agent skill and plugin assets.
@@ -32,7 +32,7 @@ use render_plugins::render_claude_plugin_outputs;
 /// Returns `CliError` when source assets cannot be loaded, rendered, written,
 /// or verified against the checked-in outputs.
 pub fn generate_agent_assets(target: AgentAssetTarget, check: bool) -> Result<i32, CliError> {
-    generate_agent_assets_with_skipped_runtime_hooks(target, check, &[])
+    generate_agent_assets_with_skipped_runtime_hooks(target, check, &[], false)
 }
 
 /// Generate checked-in multi-agent skill and plugin assets while optionally
@@ -45,9 +45,15 @@ pub(crate) fn generate_agent_assets_with_skipped_runtime_hooks(
     target: AgentAssetTarget,
     check: bool,
     skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
 ) -> Result<i32, CliError> {
     let repo_root = repo_root();
-    let planned = plan_outputs(&repo_root, target, skip_runtime_hooks)?;
+    let planned = plan_outputs_with_gemini_commands(
+        &repo_root,
+        target,
+        skip_runtime_hooks,
+        include_gemini_commands,
+    )?;
     if check {
         ensure_outputs_match(&planned)?;
     } else {
@@ -64,7 +70,7 @@ pub fn write_agent_target_outputs(
     project_root: &Path,
     target: AgentAssetTarget,
 ) -> Result<Vec<PathBuf>, CliError> {
-    write_agent_target_outputs_with_skipped_runtime_hooks(project_root, target, &[])
+    write_agent_target_outputs_with_skipped_runtime_hooks(project_root, target, &[], false)
 }
 
 /// Materialize the generated target outputs into a project directory while
@@ -76,12 +82,18 @@ pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks(
     project_root: &Path,
     target: AgentAssetTarget,
     skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
 ) -> Result<Vec<PathBuf>, CliError> {
     let source_root = repo_root();
     let planned = rebase_planned_outputs(
         &source_root,
         project_root,
-        plan_outputs(&source_root, target, skip_runtime_hooks)?,
+        plan_outputs_with_gemini_commands(
+            &source_root,
+            target,
+            skip_runtime_hooks,
+            include_gemini_commands,
+        )?,
     )?;
     let written = planned
         .iter()
