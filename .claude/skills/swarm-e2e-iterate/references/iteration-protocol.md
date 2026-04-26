@@ -1,16 +1,23 @@
 # Swarm e2e iteration ledger
 
-The ledger lives in two files. `_artifacts/active.md` carries the live header plus every Open and `needs-verification` row. `_artifacts/ledger.md` is the append-only archive of Closed rows. The two files never share a row.
+The ledger system spans two files. `_artifacts/active.md` carries the live header plus every Open and `needs-verification` row. `_artifacts/ledger.md` is the append-only archive of Closed rows. The two files never share a row.
+
+## Glossary
+
+- **ledger system** - both files together (the active findings file plus the closed archive).
+- **active findings** - rows in `_artifacts/active.md`. Status is `Open` or `needs-verification`.
+- **closed archive** - rows in `_artifacts/ledger.md`. Status is `Closed`. Append-only.
+- **the ledger** - legacy term. When ambiguous, prefer "active findings" or "closed archive".
 
 ## Loop Protocol
 
 - Recording-first triage: start from the `.mov` before any other artifact.
 - Read `_artifacts/active.md` before any iteration. Read `_artifacts/ledger.md` only to recall history.
 - After the recording pass, complete the checklist proof loop in `references/recording-checklist.md` with one terse verdict line per item.
-- Record the run slug and iteration count in the `active.md` header.
+- Refresh the `active.md` header (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`) once per iteration, after the lane settles. Header state is iteration-scoped, not row-scoped.
 - Append confirmed findings to `active.md` only.
 - Never delete archive history in `ledger.md`.
-- One row per committed fix. The fix moves the row from `active.md` to `ledger.md` (see Move Protocol).
+- One row per committed fix. The fix moves the row from `active.md` to `ledger.md` via the Move Protocol.
 
 ## Fix Protocol
 
@@ -18,7 +25,7 @@ The ledger lives in two files. `_artifacts/active.md` carries the live header pl
 2. Confirm red.
 3. Implement the smallest fix.
 4. Confirm green on the targeted test.
-5. Run the required gate.
+5. Run the gate matching the change scope: Rust -> `rtk mise run check`; Swift -> `rtk mise run monitor:macos:lint` plus the relevant build/test lane (see `apps/harness-monitor-macos/CLAUDE.md`); cross-stack -> both.
 6. Commit with `rtk git commit -sS`.
 7. Verify signature with `rtk git log --show-signature -1`.
 8. Keep the sign-off trailer exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`.
@@ -26,15 +33,23 @@ The ledger lives in two files. `_artifacts/active.md` carries the live header pl
 
 ## Move Protocol
 
-Run as a single atomic edit per row so neither file double-counts:
+Per row, after a successful Fix Protocol pass, run:
 
-1. In `active.md`, set `Status` to `Closed`, fill `Iteration closed` with the current iteration, and fill `Fix commit` with the short SHA from step 6 of the Fix Protocol.
-2. Cut the now-Closed row out of `active.md`.
-3. Append the same row to the bottom of the table in `_artifacts/ledger.md`. Order in `ledger.md` is append-only by closure time; do not re-sort.
-4. Update the `active.md` header (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`) to reflect the run that produced or closed the row.
-5. Re-read both files and confirm the row appears exactly once in `ledger.md` and not at all in `active.md`.
+```
+bash scripts/swarm-iterate/close-finding.sh <id> <short-sha>
+```
 
-If the test stays red, the gate fails, or signature verification fails, do not move the row. Leave it Open in `active.md` and return control or retry.
+The helper performs the move as a single transaction:
+
+1. Reads the matching `| <id> |` row from `_artifacts/active.md`.
+2. Rewrites `Status` to `Closed`, fills `Iteration closed` from the `active.md` header, fills `Fix commit` with `<short-sha>`.
+3. Appends the rewritten row to `_artifacts/ledger.md`.
+4. Deletes the original row from `active.md`.
+5. Re-reads both files and asserts `<id>` appears exactly once in `ledger.md` and not at all in `active.md`. Exits non-zero on any invariant break, leaving the prior good state on disk.
+
+If the test stays red, the gate fails, or signature verification fails, do not run the move helper. Leave the row Open in `active.md` and return control or retry.
+
+Manual move (no helper) follows the same five steps but is discouraged because the writes are not atomic.
 
 ## Escape Hatches
 
@@ -48,7 +63,7 @@ If the test stays red, the gate fails, or signature verification fails, do not m
 - Batching unrelated fixes.
 - Running the full UI suite.
 - Editing rows in `ledger.md` after they land - history is append-only.
-- Leaving a Closed row in `active.md` or duplicating a row across both files.
+- Leaving a Closed row in `active.md` or duplicating a row across both files. `scripts/swarm-iterate/check-active-ledger.sh` (run by `rtk mise run check:scripts`) catches both deterministically.
 
 ## Version Policy
 
@@ -63,11 +78,24 @@ If the test stays red, the gate fails, or signature verification fails, do not m
 - `rtk mise run monitor:macos:tools:test:e2e`
 - `rtk mise run test:integration`
 - `rtk mise run check`
+- `rtk mise run check:scripts` (covers ledger-system invariants)
 - `rtk mise run monitor:macos:lint`
 
 ## File Schemas
 
 Both files share the same column schema. The header lines in `active.md` track live iteration state; `ledger.md` carries no header beyond the title.
+
+### Column vocabulary
+
+- `ID`: `L-####` zero-padded sequential identifier, unique within each file and across the ledger system.
+- `Status`: `Open`, `needs-verification`, or `Closed`. `active.md` rows are `Open` or `needs-verification`; `ledger.md` rows are `Closed`.
+- `Severity`: `low`, `medium`, `high`, or `critical`.
+- `Subsystem`: short kebab-case identifier scoped to the affected component (`recording-control`, `act-driver`, `swarm-orchestrator`, `perf-hitch-budget`, etc.).
+- `Iteration found` / `Iteration closed`: integer matching the `Iteration` header at the time. `Iteration closed` is `-` while Open.
+- `Recording timestamps`: `mm:ss-mm:ss (launch N)` for a windowed event, or `n/a (<reason>)` when no recording exists.
+- `Current behavior` / `Desired behavior`: prose. Code identifiers in backticks; preserve exact error text in backticks too.
+- `Evidence`: semicolon-separated list of artifact paths (under `_artifacts/runs/<slug>/...` or repo source paths). At least one secondary artifact alongside the recording reference.
+- `Fix commit`: short SHA from the Fix Protocol commit, or `-` while Open.
 
 ### `_artifacts/active.md`
 

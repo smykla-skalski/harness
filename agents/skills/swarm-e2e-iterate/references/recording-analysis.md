@@ -2,6 +2,8 @@
 
 Recording-first doctrine for `swarm-full-flow`. Read the `.mov` first; use artifacts here to confirm findings.
 
+> Note: `scripts/e2e/recording-triage/` is the wrapper directory in the repo (the detector implementations). `<run-dir>/recording-triage/` is the per-run artifact directory the wrappers emit into. The two share a name on purpose; they are not the same path.
+
 ## Investigation order
 
 1. Recording first: startup, shutdown, retries, relaunches, UI state, stalls, layout, interactions.
