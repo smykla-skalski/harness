@@ -132,10 +132,9 @@ class HarnessMonitorUITestCase: XCTestCase {
 
   override class func tearDown() {
     MainActor.assumeIsolated {
-      if let cached = cachedLaunchedApp {
-        terminateAndWait(cached)
-        cachedLaunchedApp = nil
-      }
+      // launch(mode:) tears down any leftover UI-test host before the next class
+      // launches, so avoid an extra XCTest-driven terminate here too.
+      cachedLaunchedApp = nil
     }
     super.tearDown()
   }
