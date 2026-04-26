@@ -114,9 +114,15 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
 pub fn write_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
+    include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
 ) -> Result<Vec<PathBuf>, CliError> {
-    write_process_agent_bootstrap(project_dir, agent, skip_runtime_hooks)
+    write_process_agent_bootstrap(
+        project_dir,
+        agent,
+        include_gemini_commands,
+        skip_runtime_hooks,
+    )
 }
 
 /// Returns whether `harness` resolves from the provided PATH.
@@ -130,12 +136,14 @@ pub fn harness_on_path(path_env: &str) -> bool {
 fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
+    include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
 ) -> Result<Vec<PathBuf>, CliError> {
     let mut written = write_agent_target_outputs_with_skipped_runtime_hooks(
         project_dir,
         agent_asset_target(agent),
         skip_runtime_hooks,
+        include_gemini_commands,
     )?;
     let existing = written.iter().cloned().collect::<BTreeSet<_>>();
     let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks);

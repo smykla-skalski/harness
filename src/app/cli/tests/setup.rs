@@ -48,6 +48,19 @@ fn parse_bootstrap_skip_runtime_hooks_csv() {
 }
 
 #[test]
+fn parse_bootstrap_include_gemini_commands_flag() {
+    let cli = Cli::try_parse_from(["harness", "setup", "bootstrap", "--include-gemini-commands"])
+        .unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert!(args.include_gemini_commands);
+}
+
+#[test]
 fn parse_agents_generate_skip_runtime_hooks_csv() {
     let cli = Cli::try_parse_from([
         "harness",
@@ -71,6 +84,28 @@ fn parse_agents_generate_skip_runtime_hooks_csv() {
         args.skip_runtime_hooks,
         vec![HookAgent::Gemini, HookAgent::Copilot]
     );
+}
+
+#[test]
+fn parse_agents_generate_include_gemini_commands_flag() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "agents",
+        "generate",
+        "--include-gemini-commands",
+    ])
+    .unwrap();
+    let Command::Setup {
+        command:
+            SetupCommand::Agents {
+                command: AgentsSetupCommand::Generate(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected agents generate command");
+    };
+    assert!(args.include_gemini_commands);
 }
 
 #[test]

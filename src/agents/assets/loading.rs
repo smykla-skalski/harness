@@ -1,4 +1,3 @@
-use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
@@ -9,6 +8,11 @@ use super::model::{
     PLUGINS_ROOT, PluginDefinition, PluginSource, SKILLS_ROOT, SkillDefinition, SkillSource,
     SkillVariant,
 };
+
+enum SkillDirectoryKind {
+    SkillDefinition,
+    NonSkill,
+}
 
 pub(super) fn load_skill_sources(repo_root: &Path) -> Result<Vec<SkillDefinition>, CliError> {
     let root = repo_root.join(SKILLS_ROOT);
@@ -21,24 +25,14 @@ pub(super) fn load_skill_sources(repo_root: &Path) -> Result<Vec<SkillDefinition
         if !entry.file_type().map_err(|error| io_err(&error))?.is_dir() {
             continue;
         }
-        if is_skill_creator_workspace(&entry) {
-            continue;
+        let skill_root = entry.path();
+        match classify_skill_directory(&skill_root)? {
+            SkillDirectoryKind::SkillDefinition => skills.push(load_skill_definition(skill_root)?),
+            SkillDirectoryKind::NonSkill => continue,
         }
-        skills.push(load_skill_definition(entry.path())?);
     }
     skills.sort_by(|a, b| a.source.name.cmp(&b.source.name));
     Ok(skills)
-}
-
-/// Skip `<name>-workspace/` directories created by the skill-creator workflow.
-/// They live as siblings of the canonical skill source per the skill-creator
-/// convention and are not themselves skills, so the loader must not try to
-/// read `skill.yaml` from them.
-fn is_skill_creator_workspace(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .is_some_and(|name| name.ends_with("-workspace"))
 }
 
 pub(super) fn load_plugin_sources(
@@ -73,10 +67,13 @@ pub(super) fn load_plugin_sources(
                 {
                     continue;
                 }
-                if is_skill_creator_workspace(&skill_dir) {
-                    continue;
+                let skill_root = skill_dir.path();
+                match classify_skill_directory(&skill_root)? {
+                    SkillDirectoryKind::SkillDefinition => {
+                        skills.push(load_skill_definition(skill_root)?);
+                    }
+                    SkillDirectoryKind::NonSkill => continue,
                 }
-                skills.push(load_skill_definition(skill_dir.path())?);
             }
         }
         if let Some(skill_name) = source.source_skill.as_deref() {
@@ -111,6 +108,25 @@ pub(super) fn load_plugin_source(plugin_root: &Path) -> Result<PluginSource, Cli
     })?;
     validate_safe_segment(&source.name)?;
     Ok(source)
+}
+
+fn classify_skill_directory(root: &Path) -> Result<SkillDirectoryKind, CliError> {
+    let has_skill_yaml = root.join("skill.yaml").is_file();
+    let has_body_md = root.join("body.md").is_file();
+    match (has_skill_yaml, has_body_md) {
+        (true, true) => Ok(SkillDirectoryKind::SkillDefinition),
+        (false, false) => Ok(SkillDirectoryKind::NonSkill),
+        (true, false) => Err(CliErrorKind::usage_error(format!(
+            "malformed skill directory `{}`: found skill.yaml but missing body.md",
+            root.display()
+        ))
+        .into()),
+        (false, true) => Err(CliErrorKind::usage_error(format!(
+            "malformed skill directory `{}`: found body.md but missing skill.yaml",
+            root.display()
+        ))
+        .into()),
+    }
 }
 
 pub(super) fn load_skill_definition(root: PathBuf) -> Result<SkillDefinition, CliError> {
@@ -157,11 +173,19 @@ pub(super) fn discover_plugin_sources(root: &Path) -> Result<Vec<PluginSource>, 
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{create_dir_all, write};
+    use std::fs::{self, create_dir_all};
+    use std::path::Path;
 
     use tempfile::TempDir;
 
     use super::{SKILLS_ROOT, load_plugin_sources, load_skill_definition, load_skill_sources};
+
+    fn write(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent directories");
+        }
+        fs::write(path, content).expect("write file");
+    }
 
     #[test]
     fn load_skill_sources_returns_empty_when_shared_skills_root_is_missing() {
@@ -177,18 +201,16 @@ mod tests {
         let skill_dir = skills_root.join("real-skill");
         create_dir_all(&skill_dir).expect("create real-skill dir");
         write(
-            skill_dir.join("skill.yaml"),
+            &skill_dir.join("skill.yaml"),
             "name: real-skill\ndescription: ok\n",
-        )
-        .expect("write skill.yaml");
-        write(skill_dir.join("body.md"), "body").expect("write body.md");
+        );
+        write(&skill_dir.join("body.md"), "body");
 
         // Sibling workspace directory created by skill-creator iterations.
         // It carries no `skill.yaml` and the loader must not try to read one.
         let workspace = skills_root.join("real-skill-workspace");
         create_dir_all(workspace.join("iteration-1")).expect("create workspace dir");
-        write(workspace.join("iteration-1").join("notes.md"), "scratch")
-            .expect("write workspace scratch file");
+        write(&workspace.join("iteration-1").join("notes.md"), "scratch");
 
         let skills = load_skill_sources(tmp.path()).expect("loader skips workspace siblings");
         assert_eq!(skills.len(), 1);
@@ -202,26 +224,19 @@ mod tests {
         create_dir_all(plugin_root.join("skills").join("real").join("references"))
             .expect("create plugin skill dir");
         write(
-            plugin_root.join("plugin.yaml"),
+            &plugin_root.join("plugin.yaml"),
             "name: demo\ndescription: demo plugin\nversion: 0.1.0\n",
-        )
-        .expect("write plugin.yaml");
+        );
         write(
-            plugin_root.join("skills").join("real").join("skill.yaml"),
+            &plugin_root.join("skills").join("real").join("skill.yaml"),
             "name: real\ndescription: ok\n",
-        )
-        .expect("write skill.yaml");
-        write(
-            plugin_root.join("skills").join("real").join("body.md"),
-            "body",
-        )
-        .expect("write body.md");
+        );
+        write(&plugin_root.join("skills").join("real").join("body.md"), "body");
 
         // Sibling workspace inside the plugin's `skills/` directory.
         let workspace = plugin_root.join("skills").join("real-workspace");
         create_dir_all(workspace.join("iteration-1")).expect("create plugin workspace");
-        write(workspace.join("iteration-1").join("scratch.md"), "scratch")
-            .expect("write workspace scratch file");
+        write(&workspace.join("iteration-1").join("scratch.md"), "scratch");
 
         let plugins = load_plugin_sources(tmp.path(), &[]).expect("loader skips plugin workspaces");
         assert_eq!(plugins.len(), 1);
@@ -237,17 +252,15 @@ mod tests {
         let skill_dir = tmp.path().join("agents").join("skills").join("real-skill");
         create_dir_all(skill_dir.join("codex")).expect("create codex variant dir");
         write(
-            skill_dir.join("skill.yaml"),
+            &skill_dir.join("skill.yaml"),
             "name: real-skill\ndescription: base\nallowed-tools: Bash\n",
-        )
-        .expect("write base skill.yaml");
-        write(skill_dir.join("body.md"), "base body").expect("write base body.md");
+        );
+        write(&skill_dir.join("body.md"), "base body");
         write(
-            skill_dir.join("codex").join("skill.yaml"),
+            &skill_dir.join("codex").join("skill.yaml"),
             "name: real-skill\ndescription: codex\n",
-        )
-        .expect("write codex skill.yaml");
-        write(skill_dir.join("codex").join("body.md"), "codex body").expect("write codex body.md");
+        );
+        write(&skill_dir.join("codex").join("body.md"), "codex body");
 
         let loaded = load_skill_definition(skill_dir).expect("load skill");
         let codex = loaded.codex.expect("codex variant");
@@ -255,5 +268,137 @@ mod tests {
         assert_eq!(loaded.body, "base body");
         assert_eq!(codex.source.description, "codex");
         assert_eq!(codex.body, "codex body");
+    }
+
+    #[test]
+    fn load_skill_sources_ignores_directories_without_skill_files() {
+        let tmp = TempDir::new().expect("tempdir");
+        let shared_root = tmp.path().join("agents/skills");
+        write(
+            &shared_root.join("council/skill.yaml"),
+            "name: council\ndescription: Council skill\n",
+        );
+        write(
+            &shared_root.join("council/body.md"),
+            "# Council\n\nCanonical skill body.\n",
+        );
+        write(
+            &shared_root.join("workspace/notes.md"),
+            "# Scratch workspace.\n",
+        );
+
+        let skills = load_skill_sources(tmp.path()).expect("shared skill discovery succeeds");
+
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].source.name, "council");
+    }
+
+    #[test]
+    fn load_skill_sources_errors_when_body_is_missing_from_skill_directory() {
+        let tmp = TempDir::new().expect("tempdir");
+        let shared_root = tmp.path().join("agents/skills");
+        write(
+            &shared_root.join("council/skill.yaml"),
+            "name: council\ndescription: Council skill\n",
+        );
+
+        let error =
+            load_skill_sources(tmp.path()).expect_err("partial shared skill should be rejected");
+
+        let rendered = format!("{error:#}");
+        assert!(rendered.contains("malformed skill directory"));
+        assert!(rendered.contains("missing body.md"));
+        assert!(rendered.contains("agents/skills/council"));
+    }
+
+    #[test]
+    fn load_skill_sources_errors_when_skill_yaml_is_missing_from_skill_directory() {
+        let tmp = TempDir::new().expect("tempdir");
+        let shared_root = tmp.path().join("agents/skills");
+        write(
+            &shared_root.join("council/body.md"),
+            "# Council\n\nCanonical skill body.\n",
+        );
+
+        let error =
+            load_skill_sources(tmp.path()).expect_err("partial shared skill should be rejected");
+
+        let rendered = format!("{error:#}");
+        assert!(rendered.contains("malformed skill directory"));
+        assert!(rendered.contains("missing skill.yaml"));
+        assert!(rendered.contains("agents/skills/council"));
+    }
+
+    #[test]
+    fn load_plugin_sources_ignores_plugin_skill_directories_without_skill_files() {
+        let tmp = TempDir::new().expect("tempdir");
+        let plugin_root = tmp.path().join("agents/plugins/council");
+        write(
+            &plugin_root.join("plugin.yaml"),
+            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+        );
+        write(
+            &plugin_root.join("skills/council/skill.yaml"),
+            "name: council\ndescription: Council skill\n",
+        );
+        write(
+            &plugin_root.join("skills/council/body.md"),
+            "# Council\n\nCanonical skill body.\n",
+        );
+        write(
+            &plugin_root.join("skills/council-workspace/evals.md"),
+            "# Workspace artifacts live here.\n",
+        );
+
+        let plugins = load_plugin_sources(tmp.path(), &[]).expect("plugin discovery succeeds");
+
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].source.name, "council");
+        assert_eq!(plugins[0].skills.len(), 1);
+        assert_eq!(plugins[0].skills[0].source.name, "council");
+    }
+
+    #[test]
+    fn load_plugin_sources_errors_when_plugin_skill_directory_is_missing_body() {
+        let tmp = TempDir::new().expect("tempdir");
+        let plugin_root = tmp.path().join("agents/plugins/council");
+        write(
+            &plugin_root.join("plugin.yaml"),
+            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+        );
+        write(
+            &plugin_root.join("skills/council/skill.yaml"),
+            "name: council\ndescription: Council skill\n",
+        );
+
+        let error = load_plugin_sources(tmp.path(), &[])
+            .expect_err("partial plugin skill directory should be rejected");
+
+        let rendered = format!("{error:#}");
+        assert!(rendered.contains("malformed skill directory"));
+        assert!(rendered.contains("missing body.md"));
+        assert!(rendered.contains("agents/plugins/council/skills/council"));
+    }
+
+    #[test]
+    fn load_plugin_sources_errors_when_plugin_skill_directory_is_missing_skill_yaml() {
+        let tmp = TempDir::new().expect("tempdir");
+        let plugin_root = tmp.path().join("agents/plugins/council");
+        write(
+            &plugin_root.join("plugin.yaml"),
+            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+        );
+        write(
+            &plugin_root.join("skills/council/body.md"),
+            "# Council\n\nCanonical skill body.\n",
+        );
+
+        let error = load_plugin_sources(tmp.path(), &[])
+            .expect_err("partial plugin skill directory should be rejected");
+
+        let rendered = format!("{error:#}");
+        assert!(rendered.contains("malformed skill directory"));
+        assert!(rendered.contains("missing skill.yaml"));
+        assert!(rendered.contains("agents/plugins/council/skills/council"));
     }
 }

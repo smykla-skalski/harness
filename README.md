@@ -241,7 +241,7 @@ Managed output roots (renderer-owned - do not edit directly):
 
 - `.claude/skills`, `.claude/plugins` - Claude skills and plugins
 - `.agents/skills`, `.agents/plugins` - cross-agent assets
-- `.gemini/commands` - Gemini wrapper
+- `.gemini/commands` - Gemini command root (`AGENTS.md` always present; command wrappers are opt-in)
 - `.vibe/skills`, `.vibe/plugins` - Vibe skills and plugins
 - `.opencode/skills`, `.opencode/plugins` - OpenCode skills and plugins
 - `plugins/` - agent plugin definitions
@@ -252,8 +252,10 @@ Each managed root contains an `AGENTS.md` marker emitted by the renderer. The so
 ```bash
 harness setup agents generate        # render agents/ into host directories
 harness setup agents generate --check  # verify they are in sync
+harness setup agents generate --include-gemini-commands
 harness setup agents generate --skip-runtime-hooks copilot
 harness setup bootstrap                # wire every supported agent runtime
+harness setup bootstrap --include-gemini-commands
 harness setup bootstrap --agents codex # narrow to one runtime
 harness setup bootstrap --skip-runtime-hooks gemini,copilot
 ```
