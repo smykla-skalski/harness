@@ -219,6 +219,7 @@ mod observe_persistence;
 mod observe_stream;
 mod read_reconciliation;
 mod review_mutations;
+mod review_mutations_async;
 mod review_submit_txn;
 mod serve;
 mod session_setup;
@@ -263,7 +264,7 @@ pub use observe_stream::{
 pub use review_mutations::{
     arbitrate as arbitrate_review, claim_review, respond_review, submit_for_review, submit_review,
 };
-pub(crate) use review_mutations::{
+pub(crate) use review_mutations_async::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
 };

@@ -135,11 +135,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     recordingConfiguration.outputFileType = .mov
     recordingConfiguration.videoCodecType = .h264
 
-    let captureDisplay = captureTarget.display
+    let captureWindow = captureTarget.window
     try appendLog(
-      "recording-create-filter-begin display_id=\(captureDisplay.displayID)"
+      "recording-create-filter-begin window_id=\(captureWindow.windowID)"
     )
-    let filter = try boundedFilterCreate(display: captureDisplay)
+    let filter = try boundedFilterCreate(window: captureWindow)
     try appendLog("recording-create-filter-returned")
 
     let streamConfiguration = SCStreamConfiguration()
@@ -281,7 +281,6 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
   }
 
   private struct CaptureTarget {
-    let display: SCDisplay
     let window: SCWindow
   }
 
@@ -346,17 +345,10 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     case .ready(let candidate):
       selectedDisplayCandidate = candidate
     }
-    guard
-      let captureDisplay = content.displays.first(where: {
-        $0.displayID == selectedDisplayCandidate.displayID
-      })
-    else {
-      throw ScreenRecorder.Failure.monitorDisplayNotFound
-    }
     try appendLog(
-      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight) recording_scope=display"
+      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight) recording_scope=window"
     )
-    return CaptureTarget(display: captureDisplay, window: captureWindow)
+    return CaptureTarget(window: captureWindow)
   }
 
   private func installSignalHandlers() {
@@ -463,11 +455,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     }
   }
 
-  private func boundedFilterCreate(display: SCDisplay) throws -> SCContentFilter {
+  private func boundedFilterCreate(window: SCWindow) throws -> SCContentFilter {
     let result: BoundedAsyncResult<SCContentFilter> = try runAsyncBounded(
       timeout: Self.bootstrapStepTimeout
     ) {
-      SCContentFilter(display: display, excludingWindows: [])
+      SCContentFilter(desktopIndependentWindow: window)
     }
     switch result {
     case .completed(let filter):
