@@ -93,7 +93,7 @@ struct SessionCockpitHeaderCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .animation(.spring(duration: 0.3), value: supplementalSummaryVisibility)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionHeaderCard)
+    .accessibilityTestProbe(HarnessMonitorAccessibility.sessionHeaderCard)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionHeaderCardFrame)
   }
 
