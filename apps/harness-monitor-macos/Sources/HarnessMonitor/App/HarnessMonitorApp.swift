@@ -108,7 +108,7 @@ struct HarnessMonitorApp: App {
       WindowMenuCommands()
     }
 
-    Window("Preferences", id: HarnessMonitorWindowID.preferences) {
+    Window("Settings", id: HarnessMonitorWindowID.preferences) {
       HarnessMonitorSettingsRootView(
         store: store,
         notifications: notificationController,
