@@ -9,9 +9,12 @@ use crate::setup::wrapper::PROJECT_PLUGIN_LAUNCHER;
 use super::loading::discover_plugin_sources;
 use super::model::{
     PLUGINS_ROOT, PluginDefinition, PluginSource, RenderTarget, skill_alias_dir, skill_dir_name,
+    skill_has_target_variant,
 };
-use super::render_common::{copy_extra_text_files, copy_plugin_assets};
-use super::render_skills::{render_gemini_command, render_skill_markdown};
+use super::render_common::copy_plugin_assets;
+use super::render_skills::{
+    copy_skill_extra_text_files, render_gemini_command, render_skill_markdown,
+};
 
 pub(super) fn render_plugin_outputs(
     repo_root: &Path,
@@ -97,7 +100,7 @@ fn render_codex_plugin_outputs(
     );
     files.insert(base.join(".claude-plugin").join("plugin.json"), manifest);
     copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
-    render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)?;
+    render_codex_plugin_skill_markdown(plugin, &base, files)?;
     files.insert(
         repo_root
             .join(".agents")
@@ -178,14 +181,28 @@ fn render_plugin_skill_markdown(
             skill_base.join("SKILL.md"),
             render_skill_markdown(target, skill, None)?,
         );
-        copy_extra_text_files(
-            &skill.root,
-            &skill_base,
-            files,
-            &["skill.yaml", "body.md"],
-            target,
-            &skill.source.name,
-        )?;
+        copy_skill_extra_text_files(skill, &skill_base, files, target)?;
+    }
+    Ok(())
+}
+
+fn render_codex_plugin_skill_markdown(
+    plugin: &PluginDefinition,
+    base: &Path,
+    files: &mut BTreeMap<PathBuf, String>,
+) -> Result<(), CliError> {
+    for skill in &plugin.skills {
+        let target = if skill_has_target_variant(skill, RenderTarget::Codex) {
+            RenderTarget::Codex
+        } else {
+            RenderTarget::Portable
+        };
+        let skill_base = base.join("skills").join(skill_dir_name(skill)?);
+        files.insert(
+            skill_base.join("SKILL.md"),
+            render_skill_markdown(target, skill, None)?,
+        );
+        copy_skill_extra_text_files(skill, &skill_base, files, target)?;
     }
     Ok(())
 }
@@ -207,14 +224,7 @@ fn render_skill_alias_outputs(
             alias_base.join("SKILL.md"),
             render_skill_markdown(target, skill, Some(alias_dir.as_str()))?,
         );
-        copy_extra_text_files(
-            &skill.root,
-            &alias_base,
-            files,
-            &["skill.yaml", "body.md"],
-            target,
-            &skill.source.name,
-        )?;
+        copy_skill_extra_text_files(skill, &alias_base, files, target)?;
     }
     Ok(())
 }

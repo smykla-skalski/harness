@@ -50,6 +50,7 @@ fn sample_skill() -> SkillDefinition {
             })),
         },
         body: "Run the suite through harness.".to_string(),
+        codex: None,
     }
 }
 

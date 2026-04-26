@@ -1,8 +1,3 @@
----
-name: swarm-e2e-iterate
-description: Use when running the Harness Monitor swarm full-flow e2e loop in Codex, triaging recordings, invoking the council plugin through Codex subagents, or closing open findings in the iteration ledger.
----
-
 # Swarm E2E Iterate
 
 Drive `swarm-full-flow` to zero open findings from Codex. Keep the loop recording-first, TDD-driven, and commit-by-commit. Treat avoidable waiting as a suite-speed defect.

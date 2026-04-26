@@ -254,9 +254,10 @@ fn mise_toml_publishes_recording_triage_tasks() {
 }
 
 #[test]
-fn generated_skill_mirrors_follow_the_canonical_source() {
+fn generated_skill_mirrors_use_codex_specific_source() {
     let claude_skill = repo_root().join(".claude/skills/swarm-e2e-iterate/SKILL.md");
     let codex_skill = repo_root().join(".agents/skills/swarm-e2e-iterate/SKILL.md");
+    let codex_metadata = repo_root().join(".agents/skills/swarm-e2e-iterate/agents/openai.yaml");
     let claude_checklist =
         repo_root().join(".claude/skills/swarm-e2e-iterate/references/recording-checklist.md");
     let codex_checklist =
@@ -265,6 +266,7 @@ fn generated_skill_mirrors_follow_the_canonical_source() {
     for path in [
         &claude_skill,
         &codex_skill,
+        &codex_metadata,
         &claude_checklist,
         &codex_checklist,
     ] {
@@ -275,14 +277,43 @@ fn generated_skill_mirrors_follow_the_canonical_source() {
             "generated mirror must be a file tree, not a symlink: {}",
             path.display()
         );
-        assert!(path.is_file(), "expected generated file: {}", path.display());
+        assert!(
+            path.is_file(),
+            "expected generated file: {}",
+            path.display()
+        );
     }
 
     let claude = fs::read_to_string(&claude_skill).expect("read Claude mirror");
     let codex = fs::read_to_string(&codex_skill).expect("read Codex mirror");
     assert!(claude.contains("name: swarm-e2e-iterate"));
     assert!(codex.contains("name: swarm-e2e-iterate"));
-    assert_eq!(claude, codex, "Claude and Codex skill mirrors should match");
+    assert!(
+        codex.contains("spawn_agent"),
+        "Codex skill must describe the Codex subagent primitive"
+    );
+    assert!(
+        codex.contains("plugins/council/skills/council/SKILL.md"),
+        "Codex skill must point at the Codex-rendered council plugin"
+    );
+    assert!(
+        !codex.contains(".claude/plugins/council"),
+        "Codex skill must not point at Claude plugin paths"
+    );
+    assert!(
+        !codex.contains("allowed-tools:"),
+        "Codex skill frontmatter should not carry Claude-only tool constraints"
+    );
+    assert_ne!(
+        claude, codex,
+        "Claude and Codex skill mirrors must diverge when a Codex source variant exists"
+    );
+
+    let codex_metadata_body = fs::read_to_string(&codex_metadata).expect("read openai.yaml");
+    assert!(
+        codex_metadata_body.contains("display_name:"),
+        "Codex skill should include OpenAI-facing metadata"
+    );
 
     let claude_checklist_body = fs::read_to_string(&claude_checklist).expect("read mirror");
     let codex_checklist_body = fs::read_to_string(&codex_checklist).expect("read mirror");

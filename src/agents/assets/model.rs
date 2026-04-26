@@ -79,10 +79,18 @@ pub(super) struct PluginSource {
 }
 
 #[derive(Debug, Clone)]
+pub(super) struct SkillVariant {
+    pub(super) root: PathBuf,
+    pub(super) source: SkillSource,
+    pub(super) body: String,
+}
+
+#[derive(Debug, Clone)]
 pub(super) struct SkillDefinition {
     pub(super) root: PathBuf,
     pub(super) source: SkillSource,
     pub(super) body: String,
+    pub(super) codex: Option<SkillVariant>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,11 +117,11 @@ pub(super) fn selected_targets(selection: AgentAssetTarget) -> &'static [RenderT
     match selection {
         AgentAssetTarget::All => &[
             RenderTarget::Claude,
-            RenderTarget::Codex,
             RenderTarget::Gemini,
             RenderTarget::Copilot,
             RenderTarget::Vibe,
             RenderTarget::OpenCode,
+            RenderTarget::Codex,
         ],
         AgentAssetTarget::Claude => &[RenderTarget::Claude],
         AgentAssetTarget::Codex => &[RenderTarget::Codex],
@@ -144,6 +152,31 @@ pub(super) fn skill_dir_name(skill: &SkillDefinition) -> Result<String, CliError
         .to_string();
     validate_safe_segment(&dir_name)?;
     Ok(dir_name)
+}
+
+pub(super) fn skill_has_target_variant(skill: &SkillDefinition, target: RenderTarget) -> bool {
+    matches!(target, RenderTarget::Codex) && skill.codex.is_some()
+}
+
+pub(super) fn skill_source_for_target<'a>(
+    skill: &'a SkillDefinition,
+    target: RenderTarget,
+) -> &'a SkillSource {
+    if matches!(target, RenderTarget::Codex)
+        && let Some(variant) = &skill.codex
+    {
+        return &variant.source;
+    }
+    &skill.source
+}
+
+pub(super) fn skill_body_for_target(skill: &SkillDefinition, target: RenderTarget) -> &str {
+    if matches!(target, RenderTarget::Codex)
+        && let Some(variant) = &skill.codex
+    {
+        return &variant.body;
+    }
+    &skill.body
 }
 
 pub(super) fn target_label(target: RenderTarget) -> &'static str {

@@ -1,5 +1,5 @@
 {
   "description": "Council of engineering persona agents - 16 sourced practitioner lenses (6 core bias-correction + 10 domain-specific) to review code, debate plans, or advise on strategy",
   "name": "council",
-  "version": "1.1.0"
+  "version": "1.2.0"
 }
