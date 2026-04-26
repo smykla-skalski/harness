@@ -33,6 +33,15 @@ struct AgentsWindowTaskDetailPane: View {
       }
       InspectorFactGrid(facts: facts)
       ReviewStatePanel(task: task)
+      Button("Manage Task") {
+        store.presentedSheet = .taskActions(
+          sessionID: store.selectedSessionID ?? "",
+          taskID: task.taskId
+        )
+      }
+      .harnessActionButtonStyle(variant: .bordered)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.manageTaskOpenButton)
+      .disabled(!store.areSelectedSessionActionsAvailable)
       if let checkpoint = task.checkpointSummary {
         InspectorSection(title: "Checkpoint") {
           InspectorFactGrid(

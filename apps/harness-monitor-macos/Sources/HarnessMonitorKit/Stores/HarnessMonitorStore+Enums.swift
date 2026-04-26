@@ -75,6 +75,9 @@ extension HarnessMonitorStore {
     case newSession
     case attachExternal(bookmarkId: String, preview: SessionDiscoveryProbe.Preview?)
     case signalDetail(signalID: String)
+    case createTask(sessionID: String)
+    case taskActions(sessionID: String, taskID: String)
+    case leaderTransfer(sessionID: String)
 
     public var id: String {
       switch self {
@@ -82,6 +85,9 @@ extension HarnessMonitorStore {
       case .newSession: "newSession"
       case .attachExternal(let bookmarkId, _): "attachExternal:\(bookmarkId)"
       case .signalDetail(let signalID): "signalDetail:\(signalID)"
+      case .createTask(let sessionID): "createTask:\(sessionID)"
+      case .taskActions(let sessionID, let taskID): "taskActions:\(sessionID):\(taskID)"
+      case .leaderTransfer(let sessionID): "leaderTransfer:\(sessionID)"
       }
     }
   }

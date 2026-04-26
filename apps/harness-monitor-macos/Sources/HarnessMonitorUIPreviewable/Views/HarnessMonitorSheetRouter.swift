@@ -16,6 +16,12 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 480, idealWidth: 560, minHeight: 360)
     case .signalDetail:
       Self(minWidth: 460, idealWidth: 560, minHeight: 420)
+    case .createTask:
+      Self(minWidth: 480, idealWidth: 560, minHeight: 420)
+    case .taskActions:
+      Self(minWidth: 520, idealWidth: 620, minHeight: 560)
+    case .leaderTransfer:
+      Self(minWidth: 460, idealWidth: 540, minHeight: 420)
     }
   }
 }
@@ -53,6 +59,12 @@ struct HarnessMonitorSheetRouter: View {
       AttachSessionSheetView(store: store, bookmarkID: bookmarkID, preview: preview)
     case .signalDetail(let signalID):
       SignalDetailSheet(store: store, signalID: signalID)
+    case .createTask(let sessionID):
+      CreateTaskSheet(store: store, sessionID: sessionID)
+    case .taskActions(let sessionID, let taskID):
+      TaskActionsSheet(store: store, sessionID: sessionID, taskID: taskID)
+    case .leaderTransfer(let sessionID):
+      LeaderTransferSheet(store: store, sessionID: sessionID)
     }
   }
 

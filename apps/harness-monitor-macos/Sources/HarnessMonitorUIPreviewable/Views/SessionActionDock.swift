@@ -11,13 +11,9 @@ struct SessionActionDock: View {
   }
 
   let detail: SessionDetail
-  let inspectTask: (String) -> Void
+  let createTask: () -> Void
   let inspectObserver: () -> Void
   let openAgents: () -> Void
-
-  private var firstTaskID: String? {
-    detail.tasks.first?.taskId
-  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -26,7 +22,7 @@ struct SessionActionDock: View {
           Text("Action Flow")
             .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
             .accessibilityAddTraits(.isHeader)
-          Text("Pick a lane, then use the inspector to submit the change.")
+          Text("Pick a lane to drive the session forward.")
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
@@ -46,12 +42,12 @@ struct SessionActionDock: View {
         flowButton(
           FlowButtonDetails(
             title: "Task Flow",
-            subtitle: "Create, reassign, checkpoint",
+            subtitle: "Create new task in this session",
             symbol: "checklist",
-            helpText: "Jump to the first task to inspect.",
+            helpText: "Open the create-task sheet for this session.",
             accessibilityID: nil
           ),
-          action: focusFirstTask,
+          action: createTask,
         )
         flowButton(
           FlowButtonDetails(
@@ -97,13 +93,6 @@ struct SessionActionDock: View {
     .optionalAccessibilityIdentifier(details.accessibilityID)
   }
 
-  private func focusFirstTask() {
-    guard let taskID = firstTaskID else {
-      return
-    }
-    inspectTask(taskID)
-  }
-
   private func focusObserver() {
     inspectObserver()
   }
@@ -123,7 +112,7 @@ extension View {
 #Preview("Action flow") {
   SessionActionDock(
     detail: PreviewFixtures.detail,
-    inspectTask: { _ in },
+    createTask: {},
     inspectObserver: {},
     openAgents: {}
   )
