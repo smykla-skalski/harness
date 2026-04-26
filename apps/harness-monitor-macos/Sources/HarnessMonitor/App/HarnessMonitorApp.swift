@@ -83,8 +83,6 @@ struct HarnessMonitorApp: App {
     .commands {
       HarnessMonitorAppCommands(
         store: store,
-        agentsNavigationBridge: agentsNavigationBridge,
-        windowCommandRouting: windowCommandRouting,
         displayState: store.commandsDisplayState,
         textSizeIndex: textSizeIndex,
         increaseTextSize: increaseTextSize,
@@ -101,6 +99,12 @@ struct HarnessMonitorApp: App {
       NewSessionCommand(store: store)
       OpenFolderCommand(isPresented: $showOpenFolder)
       AttachExternalSessionCommand(store: store)
+      GoCommands(
+        store: store,
+        agentsNavigationBridge: agentsNavigationBridge,
+        windowCommandRouting: windowCommandRouting,
+        displayState: store.commandsDisplayState
+      )
     }
 
     Window("Preferences", id: HarnessMonitorWindowID.preferences) {

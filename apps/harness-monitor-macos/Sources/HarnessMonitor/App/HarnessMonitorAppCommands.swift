@@ -17,8 +17,6 @@ struct HarnessMonitorAppCommands: Commands {
   @AppStorage("showInspector")
   private var showInspector = true
   let store: HarnessMonitorStore
-  let agentsNavigationBridge: AgentsWindowNavigationBridge
-  let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
@@ -40,33 +38,11 @@ struct HarnessMonitorAppCommands: Commands {
     HarnessMonitorTextSize.canDecrease(textSizeIndex)
   }
 
-  private var canNavigateBack: Bool {
-    switch activeWindowNavigationScope {
-    case .agents:
-      agentsNavigationBridge.state.canGoBack
-    case .main:
-      displayState.canNavigateBack
-    }
-  }
-
-  private var canNavigateForward: Bool {
-    switch activeWindowNavigationScope {
-    case .agents:
-      agentsNavigationBridge.state.canGoForward
-    case .main:
-      displayState.canNavigateForward
-    }
-  }
-
-  private var activeWindowNavigationScope: WindowNavigationScope {
-    windowCommandRouting.activeScope ?? .main
-  }
-
   var body: some Commands {
     systemCommands
     fileAndEditCommands
     viewCommands
-    navigationAndDaemonCommands
+    sessionAndDaemonCommands
     helpCommands
   }
 
@@ -130,20 +106,7 @@ struct HarnessMonitorAppCommands: Commands {
     }
   }
 
-  @CommandsBuilder private var navigationAndDaemonCommands: some Commands {
-    CommandMenu("Go") {
-      Button("Back") {
-        navigateBack()
-      }
-      .keyboardShortcut("[", modifiers: [.command])
-      .disabled(!canNavigateBack)
-
-      Button("Forward") {
-        navigateForward()
-      }
-      .keyboardShortcut("]", modifiers: [.command])
-      .disabled(!canNavigateForward)
-    }
+  @CommandsBuilder private var sessionAndDaemonCommands: some Commands {
     CommandMenu("Session") {
       Button("Observe Selected Session", action: observeSelectedSession)
         .keyboardShortcut("o", modifiers: [.command, .option])
@@ -182,27 +145,4 @@ struct HarnessMonitorAppCommands: Commands {
     }
   }
 
-  private func navigateBack() {
-    let scope = activeWindowNavigationScope
-    Task {
-      switch scope {
-      case .agents:
-        await agentsNavigationBridge.navigateBack()
-      case .main:
-        await store.navigateBack()
-      }
-    }
-  }
-
-  private func navigateForward() {
-    let scope = activeWindowNavigationScope
-    Task {
-      switch scope {
-      case .agents:
-        await agentsNavigationBridge.navigateForward()
-      case .main:
-        await store.navigateForward()
-      }
-    }
-  }
 }
