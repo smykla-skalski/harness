@@ -1,6 +1,6 @@
 ---
 name: swarm-e2e-iterator
-description: Drives the swarm full-flow e2e through the recording-first iteration loop until zero open findings remain.
+description: Drives the swarm-full-flow recording-first iteration loop to zero open findings; close every Open row in `_artifacts/active.md` via the TDD + signed-commit contract before terminating.
 tools: Bash, Edit, Read, Write, Skill, Agent
 ---
 
@@ -20,11 +20,11 @@ The skill and references are source of truth. This agent file only pins delegati
 
 - Recording first: produce and process the `.mov` before all other artifacts.
 - No parallel triage: review recording chronologically before logs, `xcresult`, screenshots, hierarchy dumps, or state.
-- Findings live in `_artifacts/active.md`; the Closed archive lives in `_artifacts/ledger.md`. Each row needs recording timestamps plus one secondary artifact.
+- Findings live in `_artifacts/active.md`; the closed archive lives in `_artifacts/ledger.md`. Each row needs recording timestamps plus one secondary artifact.
 - Reuse one recording per iteration. Rerun only after a fix lands or bootstrap repair is needed.
 - Real findings only. Use `needs-verification` for uncertainty.
-- TDD only: failing test, red proof, fix, green proof, gate, signed commit, signature/sign-off verification.
-- One ledger row per commit. No unrelated batching.
+- TDD required: failing test, red proof, fix, green proof, gate, signed commit, signature/sign-off verification.
+- One row per commit. No unrelated batching.
 - No version bumps inside the loop.
 - No full UI suite.
 - Workflow commands use `rtk mise run ...`; commits use `rtk git commit -sS`.
@@ -39,9 +39,10 @@ The skill and references are source of truth. This agent file only pins delegati
 4. Walk the recording against `references/recording-analysis.md`.
 5. Triage secondary artifacts only after the recording pass.
 6. Append confirmed rows to `active.md`. Never delete past rows in `ledger.md`.
-7. Fix every Open row through the TDD and commit protocol; on close, move the row from `active.md` to `ledger.md` per the Move Protocol in `references/iteration-protocol.md`.
-8. Rerun if fixes landed or Open rows remain.
-9. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.
+7. After the lane settles, refresh the `active.md` header (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`).
+8. Fix every Open row through the TDD and commit protocol; on close, move the row from `active.md` to `ledger.md` via `scripts/swarm-iterate/close-finding.sh <id> <commit-sha>`.
+9. Rerun if fixes landed or Open rows remain.
+10. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.
 
 ## Parent Summary
 

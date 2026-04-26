@@ -21,6 +21,8 @@ shell_scripts=(
   "$ROOT"/scripts/e2e/recording-triage/*.sh
   "$ROOT"/scripts/e2e/recording-triage/tests/*.sh
   "$ROOT"/scripts/lib/*.sh
+  "$ROOT"/scripts/swarm-iterate/*.sh
+  "$ROOT"/scripts/swarm-iterate/tests/*.sh
   "$ROOT"/scripts/tests/*.sh
 )
 python_scripts=("$ROOT"/scripts/*.py)
@@ -57,3 +59,5 @@ fi
 "$ROOT/scripts/tests/test-stale-scan.sh"
 "$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
 "$ROOT/scripts/e2e/recording-triage/tests/run-all.sh"
+"$ROOT/scripts/swarm-iterate/tests/run-all.sh"
+"$ROOT/scripts/swarm-iterate/check-active-ledger.sh"
