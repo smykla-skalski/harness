@@ -74,12 +74,14 @@ extension HarnessMonitorStore {
     case sendSignal(agentID: String)
     case newSession
     case attachExternal(bookmarkId: String, preview: SessionDiscoveryProbe.Preview?)
+    case signalDetail(signalID: String)
 
     public var id: String {
       switch self {
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       case .newSession: "newSession"
       case .attachExternal(let bookmarkId, _): "attachExternal:\(bookmarkId)"
+      case .signalDetail(let signalID): "signalDetail:\(signalID)"
       }
     }
   }
