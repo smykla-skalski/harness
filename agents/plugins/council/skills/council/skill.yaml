@@ -1,11 +1,18 @@
 name: council
 description: >-
-  Summon a council of engineering persona agents - antirez, tef, Casey Muratori, Fred Hebert,
-  Donella Meadows, Cedric Chin - to collaboratively review code, debate a plan, or advise on
-  strategy. Personas are sourced from each thinker's primary public writing. Use when reviewing
-  a design document, architecture proposal, refactoring plan, code change, or strategic decision
-  and you want diverse, opinionated, evidence-grounded perspectives that cut through generic
-  AI-style hedging.
+  Summon a council of 16 engineering persona agents to collaboratively review code, debate
+  a plan, or advise on strategy. Six core bias-correction lenses - antirez (simplicity),
+  tef (deletability), Casey Muratori (perf-from-day-one), Fred Hebert (resilience), Donella
+  Meadows (systems), Cedric Chin (tacit knowledge) - plus ten domain-specific lenses -
+  Alexis King (type-driven design), John Hughes (property-based testing), Eric Evans (DDD),
+  Mark Seemann with Scott Wlaschin (functional architecture), Hillel Wayne (formal methods,
+  TLA+), Kief Morris with Yevgeniy Brikman (immutable infrastructure as code), Gary Bernhardt
+  with Beck and Fowler (test architecture, FCIS), Brendan Gregg (systems performance), Simon
+  Willison (LLM/AI quality, prompt injection, evals), Charity Majors (CI/CD, observability,
+  oncall). Personas are sourced from each thinker's primary public writing. Use when reviewing
+  a design document, architecture proposal, refactoring plan, code change, or strategic
+  decision and you want diverse, opinionated, evidence-grounded perspectives that cut through
+  generic AI-style hedging.
 argument-hint: "core|all|debate <problem-description|@file>"
 allowed-tools: Agent, AskUserQuestion, Read, Grep, Glob, Bash, Write, Edit
 user-invocable: true

@@ -5,7 +5,7 @@
   },
   "plugins": [
     {
-      "description": "Council of engineering persona agents - summon practitioner perspectives to review code, debate plans, or advise on strategy",
+      "description": "Council of engineering persona agents - 16 sourced practitioner lenses (6 core bias-correction + 10 domain-specific) to review code, debate plans, or advise on strategy",
       "name": "council",
       "source": "./council"
     },

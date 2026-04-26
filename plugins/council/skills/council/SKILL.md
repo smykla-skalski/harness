@@ -1,6 +1,6 @@
 ---
 name: council
-description: Summon a council of engineering persona agents - antirez, tef, Casey Muratori, Fred Hebert, Donella Meadows, Cedric Chin - to collaboratively review code, debate a plan, or advise on strategy. Personas are sourced from each thinker's primary public writing. Use when reviewing a design document, architecture proposal, refactoring plan, code change, or strategic decision and you want diverse, opinionated, evidence-grounded perspectives that cut through generic AI-style hedging.
+description: Summon a council of 16 engineering persona agents to collaboratively review code, debate a plan, or advise on strategy. Six core bias-correction lenses - antirez (simplicity), tef (deletability), Casey Muratori (perf-from-day-one), Fred Hebert (resilience), Donella Meadows (systems), Cedric Chin (tacit knowledge) - plus ten domain-specific lenses - Alexis King (type-driven design), John Hughes (property-based testing), Eric Evans (DDD), Mark Seemann with Scott Wlaschin (functional architecture), Hillel Wayne (formal methods, TLA+), Kief Morris with Yevgeniy Brikman (immutable infrastructure as code), Gary Bernhardt with Beck and Fowler (test architecture, FCIS), Brendan Gregg (systems performance), Simon Willison (LLM/AI quality, prompt injection, evals), Charity Majors (CI/CD, observability, oncall). Personas are sourced from each thinker's primary public writing. Use when reviewing a design document, architecture proposal, refactoring plan, code change, or strategic decision and you want diverse, opinionated, evidence-grounded perspectives that cut through generic AI-style hedging.
 argument-hint: core|all|debate <problem-description|@file>
 allowed-tools: Agent, Read, Grep, Glob, Bash, Write, Edit
 disable-model-invocation: true
@@ -17,21 +17,24 @@ Generic AI review drifts to safe, hedged, template-shaped output. Opinionated pe
 
 ## Mode dispatch
 
-Parse `$ARGUMENTS`. First word selects the council composition:
+| Mode     | Keyword  | Agents Summoned                  | Cost & purpose |
+|----------|----------|----------------------------------|----------------|
+| **Core** | `core`   | All 6 core personas              | Default. ~6 persona calls + 1 synthesis. Best signal-to-noise for catching over-engineering, blind spots, premature abstraction, missing failure modes. |
+| **All**  | `all`    | All 16 personas (6 core + 10 extended) | ~16 persona calls + 1 wider-context synthesis (~2.7x core cost). Use when the problem touches multiple domains (e.g. type design, deployment, observability, perf at scale all in one review) and you want every lens. Reserve for substantial designs. |
+| **Debate** | `debate` | 3-6 personas you select for the topic | ~3-6 calls per round x 3 rounds + 1 synthesis. Multi-round - personas read each other's positions and respond. Use for hard tradeoff calls where disagreement is the point. |
 
-| Mode     | Keyword  | Agents Summoned                  | Purpose |
-|----------|----------|----------------------------------|---------|
-| **Core** | `core`   | All 6 core personas              | Default. Best signal-to-noise for catching over-engineering, blind spots, premature abstraction, missing failure modes. |
-| **All**  | `all`    | All 16 personas (6 core + 10 extended) | Full coverage. Use when the problem touches multiple domains (e.g. type design, deployment, observability, perf at scale all in one review) and you want every lens. Expensive in tokens; reserve for substantial designs. |
-| **Debate** | `debate` | 3-6 personas you select for the topic | Multi-round - personas read each other's positions and respond. Use for hard tradeoff calls where disagreement is the point. |
+### Parsing `$ARGUMENTS`
 
-If the first word is none of `core`, `all`, `debate`, treat the whole `$ARGUMENTS` as a problem description and default to `core` mode.
+Apply this algorithm in order:
 
-The remainder of `$ARGUMENTS` is the problem statement. If it begins with `@`, treat as a file path - read it before dispatching to personas.
+1. Split off the first whitespace-separated token.
+2. If that token is `core`, `all`, or `debate`: set `mode` to that value and `problem` to the remainder of `$ARGUMENTS`.
+3. Otherwise: set `mode` to `core` and `problem` to the full `$ARGUMENTS`.
+4. If `problem` (after trimming) begins with `@`, treat the rest of that token as a file path and use `Read` on it - the file contents become the problem context. Any text after the `@<path>` token is appended as additional framing.
 
 ## Roster
 
-Located in [agents/](../../agents/). Each persona is a self-contained subagent with its own system prompt, voice, philosophy, and review questions. Read [references/personas.md](references/personas.md) for the registry summary.
+Located in [agents/](../../agents/). Each persona is a self-contained subagent with its own system prompt, voice, philosophy, and review questions. The canonical registry (with full person/lens/dossier mapping and the "what each persona is good at catching" symptom map) lives in [references/personas.md](references/personas.md); the tables below are a quick-reference convenience for selection.
 
 ### Core (6) - bias-correction default
 
@@ -63,7 +66,7 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 
 ### Core / All mode
 
-1. **Read input.** If `$ARGUMENTS` second segment begins with `@`, read that file. Otherwise treat the remainder as a free-form problem statement.
+1. **Resolve `mode` and `problem` per the parse algorithm above.** If the resolved problem starts with `@`, read the file via `Read` first; the file contents are the problem context.
 2. **Brief each persona in parallel.** Spawn each persona via the Agent tool with `subagent_type` matching the persona's registered name. Use the right roster for the mode:
    - **Core mode (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`
    - **All mode (16)**: the 6 core above plus `king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor`
@@ -71,16 +74,12 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
    - The full problem context (file contents or problem statement)
    - Instruction to review through *their specific lens only*
    - Format expectation (see "Persona output contract" below)
-3. **Synthesize.** When all personas return, write a single integrated review for the user with:
-   - **Convergence**: where multiple personas agreed (high-confidence signals)
-   - **Disagreement**: where they pulled in opposite directions (real tradeoffs the user must decide)
-   - **Per-persona top-3**: each persona's three most pointed objections or recommendations, with their voice intact
-   - **What to do next**: the smallest set of concrete actions that respect the strongest critiques
+3. **Synthesize.** When all personas return, write a single integrated review for the user using the synthesis output shape below (Convergence, Disagreement, Per-persona top-3, What to do next, What we did not address).
 4. **Do not** average the personas into bland consensus. The point is the disagreement.
 
 ### Debate mode
 
-1. **Read input.** Same as above.
+1. **Resolve input.** Same parse algorithm as above; if the problem starts with `@`, read the file first.
 2. **Select 3-6 relevant personas.** Pick personas whose lenses most directly bear on the problem. Default selection rules:
    - Code-style / refactor: antirez + tef + muratori
    - Reliability / failure / ops: hebert + meadows + tef
@@ -139,7 +138,64 @@ When you brief a persona, include these constraints in the briefing:
 
 ## Privacy / scope
 
-The persona dossiers in [references/](references/) are derived from each thinker's public writing for personal review use. They quote directly with citations to the original sources. Do not republish wholesale. The personas are best used as private review tools, not as public-facing impersonations.
+The persona dossiers in [references/](references/) are derived from each thinker's public writing for personal review use. They quote directly with citations to the original sources, often 200+ lines of verbatim quotation per persona.
+
+Constraints:
+
+- **Do not republish dossiers wholesale.** They are private review aids, not redistributable content.
+- **Do not use the personas to misrepresent the writer's published positions to third parties.** A council review is a tool for *you* to think with - not a synthesised public statement attributable to the named thinker.
+- **Keep persona output internal-facing.** If a council review's content leaves the team (issue comments, blog posts, public PR descriptions), strip the persona framing and re-state the underlying argument in your own voice.
+- **Treat the dossiers as living source material, not finished work.** They drift as the writer publishes more; a quote from 2019 may have been refined or retracted since.
+
+## Synthesis output shape
+
+Use this shape when integrating persona returns. The point is to make the disagreement legible, not to flatten it.
+
+```
+# Council review: <topic>
+
+## Convergence (high-confidence signals)
+
+<2-5 bullets. Each bullet names the shared finding and lists the personas
+who arrived at it independently. Format: `- [finding] — [persona1, persona2,
+persona3]`. Convergence across opposed lenses is the strongest signal in the
+review; surface it first.>
+
+## Disagreement (real tradeoffs the user must decide)
+
+<2-4 bullets. Each bullet names the axis of disagreement and the personas on
+each side, with a one-line summary of each position. Format:
+`- [axis] — [persona A] argues X / [persona B] argues Y. Decision is yours
+because <constraint that breaks the tie>.`>
+
+## Per-persona top-3
+
+<For each persona that returned, three bullets in their voice. Quote phrases
+from their dossier; do not paraphrase into AI-review tone. Name the concrete
+file/line/decision they're objecting to. Keep each bullet under 30 words.>
+
+### antirez
+- ...
+- ...
+- ...
+
+### tef
+- ...
+
+(repeat per persona)
+
+## What to do next
+
+<3-7 numbered concrete actions, smallest first, each tied back to which
+persona(s) called for it. Separate "before merging this PR" from "before
+shipping the next iteration" if both timescales are in play.>
+
+## What we did not address
+
+<1-3 bullets naming gaps the council does not cover for this problem
+(see "What no persona is good at catching" in references/personas.md).
+Explicit gaps prevent the user mistaking the review for full coverage.>
+```
 
 ## Examples
 
@@ -148,7 +204,15 @@ Default core review of a refactoring plan:
 ```
 /council core @docs/plans/refactor-auth-module.md
 ```
-Spawns all 6 personas in parallel, returns an integrated review.
+Spawns all 6 core personas in parallel, returns an integrated review using the synthesis shape above.
+</example>
+
+<example>
+Full coverage on a substantial design touching multiple lenses:
+```
+/council all @docs/plans/llm-feature-rollout.md
+```
+Spawns all 16 personas. Use when the design touches type design, deployment, observability, AI quality, and perf at scale in one piece. Roughly 2.7x the token cost of `core`.
 </example>
 
 <example>
@@ -168,7 +232,9 @@ Quick free-form question (defaults to core):
 
 ## Adding a persona
 
-1. Add a research dossier in [references/](references/) (markdown).
-2. Add a subagent file in [agents/](../../agents/) following the existing six as a template.
-3. Add a row to the table in this file and in [references/personas.md](references/personas.md).
-4. Decide whether the persona belongs in `core` or only in `all` / `debate` selection.
+[references/personas.md](references/personas.md) is the canonical persona registry. The tables in this file are a quick-reference convenience for selection - keep them in sync with `personas.md` when you add or rename a persona.
+
+1. Add a research dossier in [references/](references/) (markdown). Match the structure of existing dossiers - identity & canon with primary URLs, core philosophy with verbatim quotes, signature phrases, what they reject and praise, review voice & technique, common questions, edge cases, anti-patterns when impersonating.
+2. Add a subagent file in [agents/](../../agents/) following the existing personas as a template - frontmatter with `name`, `description`, `tools`, `permissionMode`; voice rules (don't-bullets); core lens (numbered principles with sourced quotes); required output format including the mandatory "Where I'd be wrong" section; debate-mode named-agreement and named-disagreement scaffolding; honest skew.
+3. Add a row to the canonical table in [references/personas.md](references/personas.md) and to the matching quick-reference table in this file.
+4. Decide whether the persona belongs in `core` (bias-correction default) or only in `all` / `debate` selection (domain-specific lens).
