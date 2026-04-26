@@ -91,8 +91,6 @@ struct HarnessMonitorApp: App {
         refreshStore: refreshStore,
         startDaemon: startDaemon,
         installLaunchAgent: installLaunchAgent,
-        observeSelectedSession: observeSelectedSession,
-        endSelectedSession: endSelectedSession,
         inspectSessionOverview: inspectSessionOverview,
         inspectObserver: inspectObserver
       )
@@ -103,6 +101,10 @@ struct HarnessMonitorApp: App {
         store: store,
         agentsNavigationBridge: agentsNavigationBridge,
         windowCommandRouting: windowCommandRouting,
+        displayState: store.commandsDisplayState
+      )
+      SessionCommands(
+        store: store,
         displayState: store.commandsDisplayState
       )
     }
@@ -227,18 +229,6 @@ struct HarnessMonitorApp: App {
   private func installLaunchAgent() {
     Task {
       await store.installLaunchAgent()
-    }
-  }
-
-  private func observeSelectedSession() {
-    Task {
-      await store.observeSelectedSession()
-    }
-  }
-
-  private func endSelectedSession() {
-    Task {
-      await store.endSelectedSession()
     }
   }
 

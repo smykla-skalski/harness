@@ -25,8 +25,6 @@ struct HarnessMonitorAppCommands: Commands {
   let refreshStore: () -> Void
   let startDaemon: () -> Void
   let installLaunchAgent: () -> Void
-  let observeSelectedSession: () -> Void
-  let endSelectedSession: () -> Void
   let inspectSessionOverview: () -> Void
   let inspectObserver: () -> Void
 
@@ -107,29 +105,6 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var sessionAndDaemonCommands: some Commands {
-    CommandMenu("Session") {
-      Button("Observe Selected Session", action: observeSelectedSession)
-        .keyboardShortcut("o", modifiers: [.command, .option])
-        .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
-
-      Button("End Selected Session", action: endSelectedSession)
-        .keyboardShortcut("e", modifiers: [.command, .shift])
-        .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
-
-      Divider()
-
-      Button(displayState.bookmarkTitle) {
-        store.toggleSelectedSessionBookmark()
-      }
-      .keyboardShortcut("b", modifiers: [.command, .shift])
-      .disabled(!displayState.hasSelectedSession || !displayState.isPersistenceAvailable)
-
-      Button("Copy Selection ID") {
-        store.copySelectedItemID()
-      }
-      .keyboardShortcut("c", modifiers: [.command, .shift])
-      .disabled(!displayState.hasSelectedSession)
-    }
     CommandMenu("Daemon") {
       Button("Start Daemon", action: startDaemon)
       Button("Install Launch Agent", action: installLaunchAgent)
