@@ -238,6 +238,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         controlDirectoryURL.appendingPathComponent("start.request"),
         controlDirectoryURL.appendingPathComponent("start.ready"),
         controlDirectoryURL.appendingPathComponent("stop.request"),
+        controlDirectoryURL.appendingPathComponent(RecordingControlPidFile.fileName),
       ] {
         try? FileManager.default.removeItem(at: marker)
       }
@@ -278,24 +279,28 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
         windowID: window.windowID,
         title: window.title ?? "",
         bundleIdentifier: window.owningApplication?.bundleIdentifier,
+        processID: window.owningApplication.map { Int32($0.processID) } ?? 0,
         isOnScreen: window.isOnScreen
       )
     }
+    let requiredPid = controlDirectoryURL.flatMap { RecordingControlPidFile.read(from: $0) }
     let harnessWindowSummary =
       candidates
       .filter { ($0.bundleIdentifier ?? "").contains("io.harnessmonitor") }
       .map { candidate in
         let title = candidate.title.isEmpty ? "<empty>" : candidate.title
         return
-          "id=\(candidate.windowID),bundle=\(candidate.bundleIdentifier ?? "?"),title=\(title),onScreen=\(candidate.isOnScreen)"
+          "id=\(candidate.windowID),bundle=\(candidate.bundleIdentifier ?? "?"),pid=\(candidate.processID),title=\(title),onScreen=\(candidate.isOnScreen)"
       }
       .joined(separator: " | ")
+    let probePrefix = requiredPid.map { "require_pid=\($0) " } ?? ""
     updateWindowProbeSummary(
-      harnessWindowSummary.isEmpty ? "no-harness-windows" : harnessWindowSummary
+      probePrefix
+        + (harnessWindowSummary.isEmpty ? "no-harness-windows" : harnessWindowSummary)
     )
     guard
       let selectedWindow = try ScreenRecorderWindowSelector.captureWindowIfAvailable(
-        from: candidates)
+        from: candidates, requireProcessID: requiredPid)
     else {
       return nil
     }
