@@ -45,7 +45,7 @@ struct SessionActionDock: View {
             subtitle: "Create new task in this session",
             symbol: "checklist",
             helpText: "Open the create-task sheet for this session.",
-            accessibilityID: nil
+            accessibilityID: HarnessMonitorAccessibility.createTaskOpenButton
           ),
           action: createTask,
         )
