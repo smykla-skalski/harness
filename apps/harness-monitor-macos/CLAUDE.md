@@ -12,6 +12,8 @@ Native Xcode local compilation cache is enabled directly through the generated b
 
 Validation expectations (run from repo root):
 
+- `mise run monitor:macos:lint`
+- `mise run monitor:macos:quality-gate`
 - `mise run monitor:macos:build`
 - `mise run monitor:macos:test`
 - `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
@@ -27,7 +29,8 @@ Validation expectations (run from repo root):
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
 - Keep the `-ApplePersistenceIgnoreState YES` UI-test launch argument in place for the isolated host so macOS window restoration does not make targeted UI runs flaky.
-- SwiftLint runs externally via `mise run monitor:macos:lint` and CI, not as an Xcode build plugin. This keeps SwiftLint out of the build graph so SwiftUI previews and local builds stay fast. Config lives in `.swiftlint.yml`.
+- SwiftLint runs externally via `mise run monitor:macos:lint` and CI, not as an Xcode build plugin. The lint lane is intentionally non-build-only: it generate-checks the workspace, runs `swift format`, and runs `swiftlint` without invoking `xcodebuild` or daemon bundle logic. Config lives in `.swiftlint.yml`.
+- `mise run monitor:macos:quality-gate` owns the slower build-based sandbox and daemon validation that used to be bundled into the lint lane.
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 

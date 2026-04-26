@@ -34,6 +34,22 @@ sanitize_xcode_tool_environment() {
   unset SWIFT_DEBUG_INFORMATION_VERSION
 }
 
+daemon_build_profile_dir() {
+  local configuration="${CONFIGURATION:-Debug}"
+  if [ "$configuration" = "Release" ]; then
+    printf '%s\n' "release"
+  else
+    printf '%s\n' "debug"
+  fi
+}
+
+daemon_binary_output_path() {
+  local target_dir profile_dir
+  target_dir="$(resolve_cargo_target_dir)"
+  profile_dir="$(daemon_build_profile_dir)"
+  printf '%s/%s/harness\n' "$target_dir" "$profile_dir"
+}
+
 build_daemon_binary() {
   local repo_root
   repo_root="$(resolve_repo_root)"
@@ -41,11 +57,10 @@ build_daemon_binary() {
   local target_dir
   target_dir="$(resolve_cargo_target_dir)"
 
-  local configuration="${CONFIGURATION:-Debug}"
-  local profile_dir="debug"
+  local profile_dir
+  profile_dir="$(daemon_build_profile_dir)"
   local cargo_args=(rustc --bin harness)
-  if [ "$configuration" = "Release" ]; then
-    profile_dir="release"
+  if [ "$profile_dir" = "release" ]; then
     cargo_args+=(--release)
   fi
 
@@ -70,5 +85,5 @@ build_daemon_binary() {
       -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
   )
 
-  printf '%s/%s/harness\n' "$target_dir" "$profile_dir"
+  printf '%s\n' "$(daemon_binary_output_path)"
 }

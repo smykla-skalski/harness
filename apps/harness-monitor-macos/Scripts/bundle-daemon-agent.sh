@@ -42,7 +42,10 @@ repo_root="$(resolve_repo_root)"
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
-  daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
+  daemon_source="$(daemon_binary_output_path)"
+  if [ ! -x "$daemon_source" ]; then
+    daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
+  fi
 fi
 
 if [ ! -x "$daemon_source" ]; then

@@ -13,6 +13,8 @@ DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-deriv
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
+RUN_LINT_SCRIPT="${RUN_LINT_SCRIPT:-$ROOT/Scripts/run-lint.sh}"
+BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 
 append_only_testing_args() {
   local selector
@@ -48,7 +50,18 @@ if [ "${XCODEBUILD_RUNNER}" != "${CANONICAL_XCODEBUILD_RUNNER}" ]; then
   exit 1
 fi
 
-"$ROOT/Scripts/run-quality-gates.sh"
+if [ ! -x "${RUN_LINT_SCRIPT}" ]; then
+  echo "lint script is not executable: ${RUN_LINT_SCRIPT}" >&2
+  exit 1
+fi
+
+if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
+  echo "build-for-testing script is not executable: ${BUILD_FOR_TESTING_SCRIPT}" >&2
+  exit 1
+fi
+
+"$RUN_LINT_SCRIPT"
+"$BUILD_FOR_TESTING_SCRIPT"
 
 clear_gatekeeper_metadata
 

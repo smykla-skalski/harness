@@ -21,17 +21,22 @@ public enum BuildPhases {
             inputPaths: [
                 "$(PROJECT_DIR)/../../Cargo.toml",
                 "$(PROJECT_DIR)/../../Cargo.lock",
+                "$(PROJECT_DIR)/../../build.rs",
+                "$(PROJECT_DIR)/../../src",
                 "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
-                "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh"
+                "$(PROJECT_DIR)/Scripts/build-daemon-agent.sh",
+                "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+                "$(PROJECT_DIR)/Scripts/lib/daemon-bundle-env.sh",
+                "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh"
             ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
             ],
-            basedOnDependencyAnalysis: false
+            basedOnDependencyAnalysis: true
         )
     }
 
@@ -71,7 +76,7 @@ public enum BuildPhases {
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist"
             ],
-            basedOnDependencyAnalysis: false
+            basedOnDependencyAnalysis: true
         )
     }
 
@@ -82,9 +87,13 @@ public enum BuildPhases {
             """,
             name: "Clear Gatekeeper Metadata",
             inputPaths: [
-                "$(PROJECT_DIR)/Scripts/strip-test-xattrs.sh"
+                "$(PROJECT_DIR)/Scripts/strip-test-xattrs.sh",
+                "$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"
             ],
-            basedOnDependencyAnalysis: false
+            outputPaths: [
+                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-strip-test-xattrs.stamp"
+            ],
+            basedOnDependencyAnalysis: true
         )
     }
 }

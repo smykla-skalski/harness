@@ -30,12 +30,23 @@ class TestSwiftScriptTests(unittest.TestCase):
             scripts_root = app_root / "Scripts"
             scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
-            generate_project = scripts_root / "generate.sh"
+            run_lint_script = scripts_root / "run-lint.sh"
+            build_for_testing_script = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
             rtk_calls = temp_root / "rtk-calls.log"
 
-            write_executable(generate_project, "#!/bin/bash\nset -euo pipefail\n")
+            write_executable(run_lint_script, "#!/bin/bash\nset -euo pipefail\n")
+            write_executable(
+                build_for_testing_script,
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "build-for-testing" >> "{runner_calls}"
+app_dir="${{XCODEBUILD_DERIVED_DATA_PATH}}/Build/Products/Debug/Harness Monitor.app"
+mkdir -p "$app_dir"
+touch "$app_dir/build-for-testing.marker"
+""",
+            )
             write_executable(
                 fake_log,
                 "#!/bin/bash\nset -euo pipefail\n",
@@ -68,10 +79,9 @@ exit 1
             env = os.environ.copy()
             env.update(
                 {
-                    "GENERATE_PROJECT_SCRIPT": str(generate_project),
+                    "RUN_LINT_SCRIPT": str(run_lint_script),
+                    "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
-                    "SWIFT_BIN": "/usr/bin/true",
-                    "SWIFTLINT_BIN": "/usr/bin/true",
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "LOG_BIN": str(fake_log),
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
@@ -106,7 +116,7 @@ exit 1
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 2)
-        self.assertIn("build-for-testing", calls[0])
+        self.assertEqual(calls[0], ["build-for-testing"])
         self.assertIn("test-without-building", calls[1])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests",
