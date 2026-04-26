@@ -1,0 +1,5 @@
+display_name: Council
+short_description: Run a Codex-native multi-persona engineering review and synthesize convergence, disagreement, and next moves.
+default_prompt: Use $council core on the current design or code context, briefing Codex subagents from the persona files and returning one integrated council review.
+policy:
+  allow_implicit_invocation: false

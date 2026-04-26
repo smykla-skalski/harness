@@ -46,6 +46,16 @@ fn portable_council_skill_path() -> PathBuf {
         .join("SKILL.md")
 }
 
+fn codex_council_skill_metadata_path() -> PathBuf {
+    repo_root()
+        .join("plugins")
+        .join("council")
+        .join("skills")
+        .join("council")
+        .join("agents")
+        .join("openai.yaml")
+}
+
 #[test]
 fn claude_council_plugin_skill_preserves_all_yaml_keys_and_tools() {
     let planned =
@@ -81,25 +91,43 @@ fn claude_council_plugin_skill_preserves_all_yaml_keys_and_tools() {
 }
 
 #[test]
-fn portable_council_plugin_skill_drops_question_tool_and_rewrites_body() {
+fn codex_council_plugin_uses_codex_native_orchestration() {
     let planned =
         plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let skill = portable_council_skill_path();
     let rendered = planned
         .iter()
         .find_map(|output| output.files.get(&skill))
-        .expect("portable council plugin skill should be planned");
+        .expect("Codex council plugin skill should be planned");
 
     assert!(rendered.contains("name: council"));
+    assert!(rendered.contains("spawn_agent"));
+    assert!(rendered.contains("wait_agent"));
+    assert!(rendered.contains("agent_type: default"));
     assert!(
-        !rendered.contains(", AskUserQuestion,"),
-        "portable target must drop AskUserQuestion from allowed-tools"
+        rendered.contains("read `agents/<persona>.md`"),
+        "Codex council skill should brief generic subagents with persona files"
     );
     assert!(
-        rendered.contains("via a user approval prompt"),
-        "portable body must rewrite `via AskUserQuestion` to `via a user approval prompt`"
+        !rendered.contains("$ARGUMENTS"),
+        "Codex skill should not carry Claude slash-command argument syntax"
     );
-    assert!(!rendered.contains("via AskUserQuestion"));
+    assert!(
+        !rendered.contains("AskUserQuestion"),
+        "Codex skill should not carry Claude-only approval tool text"
+    );
+    assert!(
+        !rendered.contains("allowed-tools:"),
+        "Codex skill frontmatter should not carry Claude-only tool constraints"
+    );
+
+    let metadata = codex_council_skill_metadata_path();
+    let metadata_body = planned
+        .iter()
+        .find_map(|output| output.files.get(&metadata))
+        .expect("Codex council openai.yaml should be planned");
+    assert!(metadata_body.contains("display_name:"));
+    assert!(metadata_body.contains("default_prompt:"));
 }
 
 #[test]

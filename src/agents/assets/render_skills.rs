@@ -7,9 +7,15 @@ use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::model::{RenderTarget, SkillDefinition, gemini_command_name, skill_dir_name};
+use super::model::{
+    RenderTarget, SkillDefinition, gemini_command_name, skill_body_for_target, skill_dir_name,
+    skill_source_for_target,
+};
 use super::render_common::copy_extra_text_files;
 use super::rewrite::{rewrite_allowed_tools, rewrite_skill_hooks, rewrite_text_for_target};
+
+const SKILL_SOURCE_EXCLUDES: &[&str] = &["skill.yaml", "body.md", "codex"];
+const SKILL_VARIANT_EXCLUDES: &[&str] = &["skill.yaml", "body.md"];
 
 pub(super) fn render_skill_outputs(
     repo_root: &Path,
@@ -25,14 +31,7 @@ pub(super) fn render_skill_outputs(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
             );
-            copy_extra_text_files(
-                &skill.root,
-                &base,
-                &mut files,
-                &["skill.yaml", "body.md"],
-                target,
-                &skill.source.name,
-            )?;
+            copy_skill_extra_text_files(skill, &base, &mut files, target)?;
         }
         RenderTarget::Codex => {
             let base = repo_root.join(".agents").join("skills").join(&skill_dir);
@@ -40,14 +39,7 @@ pub(super) fn render_skill_outputs(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
             );
-            copy_extra_text_files(
-                &skill.root,
-                &base,
-                &mut files,
-                &["skill.yaml", "body.md"],
-                target,
-                &skill.source.name,
-            )?;
+            copy_skill_extra_text_files(skill, &base, &mut files, target)?;
         }
         RenderTarget::Gemini => {
             let path = repo_root
@@ -62,14 +54,7 @@ pub(super) fn render_skill_outputs(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
             );
-            copy_extra_text_files(
-                &skill.root,
-                &base,
-                &mut files,
-                &["skill.yaml", "body.md"],
-                target,
-                &skill.source.name,
-            )?;
+            copy_skill_extra_text_files(skill, &base, &mut files, target)?;
         }
         RenderTarget::OpenCode => {
             let base = repo_root.join(".opencode").join("skills").join(&skill_dir);
@@ -77,14 +62,7 @@ pub(super) fn render_skill_outputs(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
             );
-            copy_extra_text_files(
-                &skill.root,
-                &base,
-                &mut files,
-                &["skill.yaml", "body.md"],
-                target,
-                &skill.source.name,
-            )?;
+            copy_skill_extra_text_files(skill, &base, &mut files, target)?;
         }
         RenderTarget::Copilot | RenderTarget::Portable => {}
     }
@@ -98,9 +76,9 @@ pub(super) fn render_skill_markdown(
 ) -> Result<String, CliError> {
     let mut out = render_skill_frontmatter(target, skill, name_override)?;
     out.push_str(&rewrite_text_for_target(
-        &skill.body,
+        skill_body_for_target(skill, target),
         target,
-        &skill.source.name,
+        &skill_source_for_target(skill, target).name,
     ));
     Ok(out)
 }
@@ -110,11 +88,11 @@ fn render_skill_frontmatter(
     skill: &SkillDefinition,
     name_override: Option<&str>,
 ) -> Result<String, CliError> {
+    let source = skill_source_for_target(skill, target);
     let hooks = if matches!(target, RenderTarget::Portable) {
         None
     } else {
-        skill
-            .source
+        source
             .hooks
             .as_ref()
             .map(|value| rewrite_skill_hooks(value, target))
@@ -124,26 +102,22 @@ fn render_skill_frontmatter(
     append_yaml_line(
         &mut out,
         "name",
-        name_override.unwrap_or(skill.source.name.as_str()),
+        name_override.unwrap_or(source.name.as_str()),
     );
-    append_yaml_line(&mut out, "description", &skill.source.description);
-    append_optional_yaml_line(
-        &mut out,
-        "argument-hint",
-        skill.source.argument_hint.as_deref(),
-    );
-    if let Some(allowed_tools) = skill.source.allowed_tools.as_deref() {
+    append_yaml_line(&mut out, "description", &source.description);
+    append_optional_yaml_line(&mut out, "argument-hint", source.argument_hint.as_deref());
+    if let Some(allowed_tools) = source.allowed_tools.as_deref() {
         append_yaml_line(
             &mut out,
             "allowed-tools",
             &rewrite_allowed_tools(allowed_tools, target),
         );
     }
-    if let Some(disable) = skill.source.disable_model_invocation {
+    if let Some(disable) = source.disable_model_invocation {
         writeln!(out, "disable-model-invocation: {disable}")
             .expect("writing to a string cannot fail");
     }
-    if let Some(invocable) = skill.source.user_invocable {
+    if let Some(invocable) = source.user_invocable {
         writeln!(out, "user-invocable: {invocable}").expect("writing to a string cannot fail");
     }
     append_optional_hooks(&mut out, hooks)?;
@@ -152,12 +126,45 @@ fn render_skill_frontmatter(
 }
 
 pub(super) fn render_gemini_command(skill: &SkillDefinition) -> String {
-    let prompt = rewrite_text_for_target(&skill.body, RenderTarget::Gemini, &skill.source.name);
+    let prompt = rewrite_text_for_target(
+        skill_body_for_target(skill, RenderTarget::Gemini),
+        RenderTarget::Gemini,
+        &skill.source.name,
+    );
     format!(
         "description = {}\nprompt = '''\n{}'''\n",
         toml_string(&skill.source.description),
         prompt
     )
+}
+
+pub(super) fn copy_skill_extra_text_files(
+    skill: &SkillDefinition,
+    base: &Path,
+    files: &mut BTreeMap<PathBuf, String>,
+    target: RenderTarget,
+) -> Result<(), CliError> {
+    copy_extra_text_files(
+        &skill.root,
+        base,
+        files,
+        SKILL_SOURCE_EXCLUDES,
+        target,
+        &skill.source.name,
+    )?;
+    if matches!(target, RenderTarget::Codex)
+        && let Some(variant) = &skill.codex
+    {
+        copy_extra_text_files(
+            &variant.root,
+            base,
+            files,
+            SKILL_VARIANT_EXCLUDES,
+            target,
+            &variant.source.name,
+        )?;
+    }
+    Ok(())
 }
 
 fn append_yaml_line(out: &mut String, key: &str, value: &str) {

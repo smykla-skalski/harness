@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 
+#[cfg(test)]
+mod council_tests;
 mod files;
 mod loading;
 mod model;
@@ -14,8 +16,6 @@ mod render_local_skills;
 mod render_plugins;
 mod render_skills;
 mod rewrite;
-#[cfg(test)]
-mod council_tests;
 #[cfg(test)]
 mod tests;
 
