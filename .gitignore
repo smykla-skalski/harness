@@ -4,6 +4,7 @@
 
 # Xcode derived data (Swift/Xcode build artifacts, kept at repo root so Zed can scope-exclude them)
 /xcode-derived/
+/xcode-derived-e2e/
 /xcode-derived-instruments/
 
 # Local scratch
