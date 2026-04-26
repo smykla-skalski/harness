@@ -79,8 +79,8 @@ final class ActSurfaceWalkTests: XCTestCase {
     try writeSnapshot(
       snapshots.appendingPathComponent("swarm-act3.txt"),
       body: """
-        Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'awaitingReviewBadge.task-1'
-        Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'inReviewBadge.task-1'
+        Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-1'
+        Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-claim-badge.task-1.claude'
         """)
 
     let report = try RecordingTriage.walkRecordingActs(
