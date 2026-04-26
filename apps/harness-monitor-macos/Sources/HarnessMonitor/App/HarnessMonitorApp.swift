@@ -89,8 +89,6 @@ struct HarnessMonitorApp: App {
         decreaseTextSize: decreaseTextSize,
         resetTextSize: resetTextSize,
         refreshStore: refreshStore,
-        startDaemon: startDaemon,
-        installLaunchAgent: installLaunchAgent,
         inspectSessionOverview: inspectSessionOverview,
         inspectObserver: inspectObserver
       )
@@ -218,18 +216,6 @@ struct HarnessMonitorApp: App {
   private func refreshStore() {
     Task {
       await store.refresh()
-    }
-  }
-
-  private func startDaemon() {
-    Task {
-      await store.startDaemon()
-    }
-  }
-
-  private func installLaunchAgent() {
-    Task {
-      await store.installLaunchAgent()
     }
   }
 
