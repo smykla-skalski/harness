@@ -48,10 +48,10 @@ Pick `<mode>` from the next section. The Agent may spawn nested persona subagent
 | 0 | skip | nothing to review |
 | 1-3 | core | 6 personas catch over-engineering, blind spots, missing failure modes; ~6 calls + 1 synthesis (~50k tokens, ~2.5 min) |
 | 4+, single lens (all `perf-*`, or all `swarm-act*`) | core | extra personas would be filler; bias-correction is enough |
-| 4+, mixed lenses (`perf-*` + `lifecycle.*` + `swarm-act*`, or design + AI quality) | all | 16 personas surface lens-specific bugs the core 6 cannot; ~92k tokens, ~8 min - reserve for substantial iterations |
+| 4+, mixed lenses (`perf-*` + `lifecycle.*` + `swarm-act*`, or design + AI quality + UX/a11y) | all | 27 personas (6 core + 10 extended-domain + 11 extended UX/platform) surface lens-specific bugs the core 6 cannot; ~150k tokens, ~13 min - reserve for substantial iterations whose findings span domain + UX + platform lenses |
 | any count, single contested fix decision (e.g., raise the perf budget vs. hoist hot work) | debate | run debate scoped to that one finding; pick 3-6 personas from the persona table; ~70k tokens, ~6 min |
 
-Lens spread is decided by the `Subsystem` column in `active.md`. Treat `perf-*`, `startup-*`, `swarm-act*`, `artifact-*`, `a11y-*`, `interaction-*`, `suite-*`, `lifecycle-*` as distinct lenses.
+Lens spread is decided by the `Subsystem` column in `active.md`. Treat `perf-*`, `startup-*`, `swarm-act*`, `artifact-*`, `a11y-*`, `interaction-*`, `suite-*`, `lifecycle-*`, `swiftui-*`, `cocoa-*`, `motion-*` as distinct lenses.
 
 ## Persona selection by finding subsystem
 
@@ -59,13 +59,16 @@ For `debate` mode (or to verify `core` mode covers your finding shape):
 
 | Finding subsystem prefix | Strongest personas | What they catch |
 |---|---|---|
-| `perf-*` (hitch, stall, layoutThrash, toolbar) | muratori, gregg, hebert | semantic compression, USE method profiling, operability cost of fixes |
-| `startup-*` / `lifecycle.*` (ttff, freeze, dashboard, manifest, persistence) | muratori, gregg, hebert, meadows | cold-start budget, off-CPU profiling, leverage-point framing |
+| `perf-*` (hitch, stall, layoutThrash, toolbar) | muratori, gregg, hebert, ash | semantic compression, USE method profiling, operability cost of fixes, Cocoa-runtime hot paths |
+| `startup-*` / `lifecycle.*` (ttff, freeze, dashboard, manifest, persistence) | muratori, gregg, hebert, meadows, simmons, siracusa | cold-start budget, off-CPU profiling, leverage-point framing, Mac-app lifecycle finesse, platform-convention violations |
 | `swarm-act*` (state, badge, transition, roster) | king, wayne, evans | type/invariant guarantees, model-checkable protocol, bounded contexts |
-| `artifact-*` (head, tail, freezes, blanks, segments, size) | test-architect, iac-craft, antirez | functional core / boundaries, pipeline-as-process, simplicity reviewer |
-| `a11y-*` (truncation, contrast, tapTarget, fontScaling, density) | chin, meadows, antirez | close-the-loop UX, leverage points, design sacrifices |
-| `interaction-*` (click, hover, drag, shortcut) | chin, tef, antirez | naturalistic decision making, deletability of compensating animation |
+| `artifact-*` (head, tail, freezes, blanks, segments, size) | test-architect, iac-craft, antirez, tufte | functional core / boundaries, pipeline-as-process, simplicity reviewer, data-ink and chartjunk on rendered artifacts |
+| `a11y-*` (truncation, contrast, tapTarget, fontScaling, density) | watson, nielsen, norman, krug | lived screen-reader experience, severity-rated heuristic violations, affordance/signifier mismatches, muddle-through gaps |
+| `interaction-*` (click, hover, drag, shortcut) | tognazzini, norman, krug, head | First Principles of Interaction Design + Fitts's law, mental models, three laws / mindless clicks, motion choreography on transitions |
 | `suite-*` (deadHead, deadTail, handoff, repeatedWait, delayedAssert) | muratori, tef, hebert | semantic compression, anti-naive-DRY, suite-as-feedback-system |
+| `swiftui-*` (identity, state placement, render thrash, modifier branches) | eidhof, ash, king | SwiftUI declarative discipline, Cocoa runtime cost of bridging, type-driven illegal-state-unrepresentable |
+| `cocoa-*` (ARC, GCD, NSRunLoop, blocks, locks/dispatch) | ash, muratori, gregg | runtime mechanics, single-process hot-path cost, off-CPU and lock contention |
+| `motion-*` (animation duration, easing, vestibular, prefers-reduced-motion) | head, muratori, simmons | motion has purpose, frame budget, "feels like a real Mac app" timing |
 
 Cross-cutting findings (multiple prefixes in one row's evidence) usually warrant `all` mode.
 

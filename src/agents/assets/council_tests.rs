@@ -25,6 +25,17 @@ const COUNCIL_PERSONAS: &[&str] = &[
     "gregg-perf-reviewer",
     "ai-quality-advisor",
     "cicd-build-advisor",
+    "eidhof-swiftui-reviewer",
+    "ash-cocoa-runtime-reviewer",
+    "simmons-mac-craft-reviewer",
+    "norman-affordance-reviewer",
+    "tognazzini-fpid-reviewer",
+    "krug-usability-reviewer",
+    "nielsen-heuristics-reviewer",
+    "watson-a11y-reviewer",
+    "head-motion-reviewer",
+    "siracusa-mac-critic",
+    "tufte-density-reviewer",
 ];
 
 fn claude_council_skill_path() -> PathBuf {
@@ -179,7 +190,7 @@ fn council_plugin_manifest_version_matches_canonical_yaml() {
 }
 
 #[test]
-fn council_skill_body_lists_all_sixteen_personas() {
+fn council_skill_body_lists_all_personas() {
     let planned =
         plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
     let skill = claude_council_skill_path();
@@ -192,6 +203,24 @@ fn council_skill_body_lists_all_sixteen_personas() {
         assert!(
             rendered.contains(persona),
             "council SKILL.md body must reference persona `{persona}`"
+        );
+    }
+}
+
+#[test]
+fn codex_council_skill_body_lists_all_personas() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let skill = portable_council_skill_path();
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("Codex council plugin skill should be planned");
+
+    for persona in COUNCIL_PERSONAS {
+        assert!(
+            rendered.contains(persona),
+            "Codex council SKILL.md body must reference persona `{persona}`"
         );
     }
 }
