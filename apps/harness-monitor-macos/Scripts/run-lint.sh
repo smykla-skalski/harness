@@ -1,16 +1,28 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
+
+report_lint_failure() {
+  local status="$?"
+  echo "[monitor:macos:lint] failed (exit ${status})" >&2
+  echo "monitor:macos lint/quality-gate: failed" >&2
+  exit "${status}"
+}
+
+trap report_lint_failure ERR
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$ROOT/Scripts/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
 GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
 FORMAT_CONFIG="$ROOT/.swift-format"
-SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
-SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(command -v swiftlint || true)}"
+SWIFT_BIN="${SWIFT_BIN:-$(type -P swift || true)}"
+SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(type -P swiftlint || true)}"
 SWIFTLINT_CACHE_PATH="${SWIFTLINT_CACHE_PATH:-$COMMON_REPO_ROOT/tmp/swiftlint-cache/harness-monitor-macos}"
 
 FORMAT_TARGETS=(
@@ -53,7 +65,7 @@ fi
 
 "$GENERATE_PROJECT_SCRIPT"
 
-"$SWIFT_BIN" format lint \
+run_with_sanitized_xcode_only_swift_environment "$SWIFT_BIN" format lint \
   --configuration "$FORMAT_CONFIG" \
   --recursive \
   --parallel \

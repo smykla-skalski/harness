@@ -56,6 +56,19 @@ is_db_transient_failure() {
   /usr/bin/grep -Eq 'database is locked|accessing build database ".*build\.db": disk I/O error' "$log_path"
 }
 
+latest_activity_log_has_transient_db_failure() {
+  local activity_log
+  activity_log="$(latest_nonempty_activity_log || true)"
+  if [[ -z "$activity_log" ]]; then
+    return 1
+  fi
+
+  /usr/bin/gzip -dc "$activity_log" 2>/dev/null \
+    | strings \
+    | /usr/bin/grep -Eq \
+      'database is locked|accessing build database ".*build\.db": disk I/O error'
+}
+
 recover_build_db() {
   local xcbuild_data_path="$derive_data_path/Build/Intermediates.noindex/XCBuildData"
   if [[ -d "$xcbuild_data_path" ]]; then
@@ -246,7 +259,7 @@ should_use_tuist_test() {
     1|true|TRUE|yes|YES|on|ON) ;;
     *) return 1 ;;
   esac
-  command -v tuist >/dev/null 2>&1
+  type -P tuist >/dev/null 2>&1
 }
 
 run_inner() {
@@ -283,7 +296,8 @@ run_once() {
     return 0
   fi
 
-  if is_db_transient_failure "$log_path"; then
+  if is_db_transient_failure "$log_path" || latest_activity_log_has_transient_db_failure; then
+    printf 'Detected transient xcodebuild database failure in build logs\n' >&2
     /bin/rm -f "$log_path"
     return "$TRANSIENT_DB_STATUS"
   fi

@@ -6,7 +6,7 @@ public enum BuildPhases {
             title: "Build harness daemon (parallel)",
             scriptText: """
             set -euo pipefail
-            "$SRCROOT/Scripts/build-daemon-agent.sh"
+            /bin/sh "$SRCROOT/Scripts/lib/xcode-build-phase-entry.sh" "$SRCROOT/Scripts/build-daemon-agent.sh"
             """,
             target: .target("HarnessMonitor")
         )
@@ -15,7 +15,7 @@ public enum BuildPhases {
     public static func bundleDaemonAgent() -> TargetScript {
         .post(
             script: """
-            /bin/bash "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"
+            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"
             """,
             name: "Bundle Daemon Agent",
             inputPaths: [
@@ -29,7 +29,9 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/build-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/lib/daemon-bundle-env.sh",
-                "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh"
+                "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh",
+                "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
+                "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh"
             ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
@@ -56,6 +58,8 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/inject-build-provenance.sh",
                 "$(PROJECT_DIR)/Scripts/run-xcode-build-server.sh",
+                "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
+                "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh",
                 "$(PROJECT_DIR)/Sources/HarnessMonitor",
                 "$(PROJECT_DIR)/Sources/HarnessMonitorKit"
             ])
@@ -69,7 +73,7 @@ public enum BuildPhases {
     public static func clearGatekeeperMetadata(variant: ProvenanceVariant) -> TargetScript {
         .post(
             script: """
-            /bin/bash "$PROJECT_DIR/Scripts/inject-build-provenance.sh" \(variant.rawValue)
+            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/inject-build-provenance.sh" \(variant.rawValue)
             """,
             name: "Clear Gatekeeper Metadata",
             inputPaths: variant.inputPaths.map { .glob(.path($0)) },
@@ -83,11 +87,13 @@ public enum BuildPhases {
     public static func stripTestBundleXattrs() -> TargetScript {
         .post(
             script: """
-            /bin/bash "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"
+            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"
             """,
             name: "Clear Gatekeeper Metadata",
             inputPaths: [
                 "$(PROJECT_DIR)/Scripts/strip-test-xattrs.sh",
+                "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
+                "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh",
                 "$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"
             ],
             outputPaths: [

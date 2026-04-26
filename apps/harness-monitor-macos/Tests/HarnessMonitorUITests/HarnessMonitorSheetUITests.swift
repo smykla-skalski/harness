@@ -276,11 +276,12 @@ extension HarnessMonitorSheetUITests {
   fileprivate func launchedMonitorPID() throws -> pid_t {
     let candidates = NSRunningApplication.runningApplications(
       withBundleIdentifier: Self.uiTestHostBundleIdentifier)
-    guard let mostRecent = candidates.max(by: { lhs, rhs in
-      let lhsDate = lhs.launchDate ?? .distantPast
-      let rhsDate = rhs.launchDate ?? .distantPast
-      return lhsDate < rhsDate
-    })
+    guard
+      let mostRecent = candidates.max(by: { lhs, rhs in
+        let lhsDate = lhs.launchDate ?? .distantPast
+        let rhsDate = rhs.launchDate ?? .distantPast
+        return lhsDate < rhsDate
+      })
     else {
       throw NSError(
         domain: "HarnessMonitorSheetUITests",
@@ -330,18 +331,22 @@ extension HarnessMonitorSheetUITests {
       return ""
     }
 
-    let stdout = String(
-      decoding: output.fileHandleForReading.readDataToEndOfFile(),
-      as: UTF8.self
-    )
-    let stderr = String(
-      decoding: errors.fileHandleForReading.readDataToEndOfFile(),
-      as: UTF8.self
-    )
+    let stdout =
+      String(
+        bytes: output.fileHandleForReading.readDataToEndOfFile(),
+        encoding: .utf8
+      ) ?? ""
+    let stderr =
+      String(
+        bytes: errors.fileHandleForReading.readDataToEndOfFile(),
+        encoding: .utf8
+      ) ?? ""
     if process.terminationStatus != 0 {
       XCTFail("log show exited with status \(process.terminationStatus): \(stderr)")
     }
-    let matchingLines = stdout
+
+    let matchingLines =
+      stdout
       .split(whereSeparator: \.isNewline)
       .map(String.init)
       .filter {

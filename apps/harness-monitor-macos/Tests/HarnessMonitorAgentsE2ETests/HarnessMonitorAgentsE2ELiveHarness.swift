@@ -78,14 +78,20 @@ final class HarnessMonitorAgentsE2ELiveHarness {
   }
 
   func diagnosticsSummary() -> String {
-    [
+    var lines = [
       "purpose=\(purpose)",
       "stateRoot=\(stateRootURL.path)",
       "dataHome=\(dataHomeURL.path)",
       "sessionID=\(sessionID)",
       "daemonLog=\(daemonLogPath)",
       "bridgeLog=\(bridgeLogPath)",
-    ].joined(separator: "\n")
+    ]
+    if let tracePath = diagnosticsTraceFileURL(
+      for: HarnessMonitorUITestCase.artifactsDirectoryKey
+    )?.path {
+      lines.append("uiTrace=\(tracePath)")
+    }
+    return lines.joined(separator: "\n")
   }
 
   private static func requiredEnvironmentValue(
