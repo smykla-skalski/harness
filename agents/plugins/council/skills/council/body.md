@@ -11,7 +11,7 @@ Generic AI review drifts to safe, hedged, template-shaped output. Opinionated pe
 | Mode     | Keyword  | Agents Summoned                  | Cost & purpose |
 |----------|----------|----------------------------------|----------------|
 | **Core** | `core`   | All 6 core personas              | Default. ~6 persona calls + 1 synthesis. Best signal-to-noise for catching over-engineering, blind spots, premature abstraction, missing failure modes. |
-| **All**  | `all`    | All 16 personas (6 core + 10 extended) | ~16 persona calls + 1 wider-context synthesis (~2.7x core cost). Use when the problem touches multiple domains (e.g. type design, deployment, observability, perf at scale all in one review) and you want every lens. Reserve for substantial designs. |
+| **All**  | `all`    | All 27 personas (6 core + 10 extended domain + 11 extended UX/platform) | ~27 persona calls + 1 wider-context synthesis (~4.5x core cost). Use when the problem touches multiple domains (type design, deployment, observability, perf at scale, UX, accessibility, motion, macOS-platform craft) in one review and you want every lens. Reserve for substantial designs. |
 | **Debate** | `debate` | 3-6 personas you select for the topic | ~3-6 calls per round x 3 rounds + 1 synthesis. Multi-round - personas read each other's positions and respond. Use for hard tradeoff calls where disagreement is the point. |
 
 ### Parsing `$ARGUMENTS`
@@ -38,7 +38,7 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 | [meadows-systems-advisor](../../agents/meadows-systems-advisor.md) | 12 leverage points, stocks/flows/loops, intervene at the right level |
 | [chin-strategy-advisor](../../agents/chin-strategy-advisor.md) | Tacit knowledge, NDM, anti-framework-cult, close the loop |
 
-### Extended (10) - domain-specific lenses for `all` mode and `debate` selection
+### Extended Domain (10) - domain-specific lenses for `all` mode and `debate` selection
 
 | Persona | Lens |
 |---------|------|
@@ -53,6 +53,22 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 | [ai-quality-advisor](../../agents/ai-quality-advisor.md) | Prompt injection, eval-driven LLM development, lethal trifecta, sandboxed tool use |
 | [cicd-build-advisor](../../agents/cicd-build-advisor.md) | Test in production, observability over monitoring, deploy small deploy often, oncall as cultural force |
 
+### Extended UX/Platform (11) - UI craft, accessibility, motion, macOS conventions, dashboard density
+
+| Persona | Lens |
+|---------|------|
+| [eidhof-swiftui-reviewer](../../agents/eidhof-swiftui-reviewer.md) | SwiftUI declarative discipline, view identity, state ownership, environment over singletons, value semantics |
+| [ash-cocoa-runtime-reviewer](../../agents/ash-cocoa-runtime-reviewer.md) | Cocoa runtime mechanics, ARC retain/release, GCD edge cases, NSRunLoop, blocks, Swift bridging cost |
+| [simmons-mac-craft-reviewer](../../agents/simmons-mac-craft-reviewer.md) | Mac app craft, "feels like a real Mac app", lifecycle finesse, multi-window, sandbox vs HIG, ship-it-small |
+| [norman-affordance-reviewer](../../agents/norman-affordance-reviewer.md) | Affordances vs signifiers, mappings, mental models, seven stages of action, error mode design |
+| [tognazzini-fpid-reviewer](../../agents/tognazzini-fpid-reviewer.md) | First Principles of Interaction Design, Fitts's law, anticipation, latency, autonomy, protect user's work |
+| [krug-usability-reviewer](../../agents/krug-usability-reviewer.md) | Don't make me think, muddling through, three laws, trunk test, recording-as-usability-test, three-users-a-month |
+| [nielsen-heuristics-reviewer](../../agents/nielsen-heuristics-reviewer.md) | 10 Usability Heuristics, severity rating 0-4, discount usability, 5-users finding, thinking-aloud protocol |
+| [watson-a11y-reviewer](../../agents/watson-a11y-reviewer.md) | Lived screen-reader experience, semantic HTML over ARIA, accessible-name computation, focus order, four rules of ARIA |
+| [head-motion-reviewer](../../agents/head-motion-reviewer.md) | Motion has purpose, easing curves, timing budgets 200-500ms, vestibular safety, prefers-reduced-motion |
+| [siracusa-mac-critic](../../agents/siracusa-mac-critic.md) | Mac platform critique, AppKit/Cocoa appreciation, backwards compatibility, "this is not how a Mac app does X" |
+| [tufte-density-reviewer](../../agents/tufte-density-reviewer.md) | Data-ink ratio, chartjunk, sparklines, small multiples, "above all else show the data", lie factor |
+
 ## Workflow
 
 ### Core / All mode
@@ -60,7 +76,7 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 1. **Resolve `mode` and `problem` per the parse algorithm above.** If the resolved problem starts with `@`, read the file via `Read` first; the file contents are the problem context.
 2. **Brief each persona in parallel.** Spawn each persona via the Agent tool with `subagent_type` matching the persona's registered name. Use the right roster for the mode:
    - **Core mode (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`
-   - **All mode (16)**: the 6 core above plus `king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor`
+   - **All mode (27)**: the 6 core above plus the 10 extended-domain personas - `king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor` - plus the 11 extended UX/platform personas - `eidhof-swiftui-reviewer`, `ash-cocoa-runtime-reviewer`, `simmons-mac-craft-reviewer`, `norman-affordance-reviewer`, `tognazzini-fpid-reviewer`, `krug-usability-reviewer`, `nielsen-heuristics-reviewer`, `watson-a11y-reviewer`, `head-motion-reviewer`, `siracusa-mac-critic`, `tufte-density-reviewer`
    Each call gets:
    - The full problem context (file contents or problem statement)
    - Instruction to review through *their specific lens only*
@@ -87,6 +103,16 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
    - Systems performance at scale (fleet / Linux / JVM): gregg + muratori + hebert
    - AI / LLM features / prompt design / evals: ai-quality + chin + hebert
    - CI/CD / deploy frequency / oncall: cicd-build + hebert + tef
+   - SwiftUI / view identity / state placement: eidhof + ash + king
+   - Cocoa runtime / ARC / GCD / NSRunLoop: ash + muratori + gregg
+   - macOS app craft / lifecycle / "feels like a Mac app": simmons + siracusa + tognazzini
+   - Interaction design / affordances / discoverability: norman + tognazzini + krug
+   - Heuristic evaluation / severity scoring: nielsen + krug + norman
+   - Accessibility / screen-reader / WCAG: watson + norman + nielsen
+   - Motion / animation / vestibular safety: head + muratori + simmons
+   - Dashboard density / chartjunk / data-ink: tufte + antirez + tef
+   - macOS platform conventions / HIG: siracusa + tognazzini + simmons
+   - Recording-first triage / muddle-through: krug + chin + watson
    - When in doubt, ask the user via AskUserQuestion which 3-6 to summon.
 3. **Round 1 - opening positions.** Each selected persona gives their independent first read.
 4. **Round 2 - responses.** Pass each persona's Round 1 output to the others. Each responds: where do they agree, where do they disagree with which named persona, what evidence shifts the picture.
@@ -203,7 +229,7 @@ Full coverage on a substantial design touching multiple lenses:
 ```
 /council all @docs/plans/llm-feature-rollout.md
 ```
-Spawns all 16 personas. Use when the design touches type design, deployment, observability, AI quality, and perf at scale in one piece. Roughly 2.7x the token cost of `core`.
+Spawns all 27 personas. Use when the design touches type design, deployment, observability, AI quality, perf at scale, UX, accessibility, macOS-platform craft, and dashboard density in one piece. Roughly 4.5x the token cost of `core`.
 </example>
 
 <example>
