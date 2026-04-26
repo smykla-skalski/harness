@@ -46,6 +46,14 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
             "agents e2e must disable xcodebuild retry iterations so expensive UI runs do not relaunch automatically",
         )
 
+    def test_defaults_to_e2e_specific_derived_data_root(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            'DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived-e2e}"',
+            script,
+            "agents e2e must use a dedicated shared DerivedData root so normal monitor lanes do not share its xcodebuild lock",
+        )
+
     def test_ui_test_targets_use_apple_development_signing(self) -> None:
         project_swift = (APP_ROOT / "Project.swift").read_text(encoding="utf-8")
 
