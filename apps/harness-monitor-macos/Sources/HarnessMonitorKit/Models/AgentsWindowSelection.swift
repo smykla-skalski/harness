@@ -3,6 +3,7 @@ public enum AgentTuiSheetSelection: Hashable, Sendable {
   case terminal(String)
   case codex(String)
   case agent(String)
+  case task(String)
 
   public var terminalID: String? {
     guard case .terminal(let terminalID) = self else {
@@ -23,5 +24,12 @@ public enum AgentTuiSheetSelection: Hashable, Sendable {
       return nil
     }
     return agentID
+  }
+
+  public var taskID: String? {
+    guard case .task(let taskID) = self else {
+      return nil
+    }
+    return taskID
   }
 }

@@ -366,6 +366,19 @@ enum HarnessMonitorUITestAccessibility {
     "harness.sidebar.session.\(slug(sessionID))"
   }
 
+  static let agentsTaskCard = "harness.agents.task.card"
+  static let agentsTaskNoteField = "harness.agents.task.note-field"
+  static let agentsTaskNoteAddButton = "harness.agents.task.note-add"
+  static let agentsTaskNotesUnavailable = "harness.agents.task.notes-unavailable"
+
+  static func agentsTaskTab(_ taskID: String) -> String {
+    "harness.agents.task.tab.\(slug(taskID))"
+  }
+
+  static func agentsTaskSelection(_ taskID: String) -> String {
+    "harness.agents.task.selection.\(slug(taskID))"
+  }
+
   static func agentTuiTab(_ tuiID: String) -> String {
     "harness.sheet.agent-tui.tab.\(slug(tuiID))"
   }

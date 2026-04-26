@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+
 extension AgentsWindowView {
   static func initialSelection(
     displayState: AgentTuiDisplayState,
@@ -34,7 +35,7 @@ extension AgentsWindowView {
     Task {
       await flushPendingKeySequenceIfNeeded()
       switch viewModel.selection {
-      case .create:
+      case .create, .agent, .task:
         async let tuiRefresh = store.refreshSelectedAgentTuis()
         async let codexRefresh = store.refreshSelectedCodexRuns()
         _ = await tuiRefresh
@@ -51,11 +52,6 @@ extension AgentsWindowView {
         } else {
           _ = await store.refreshSelectedCodexRuns()
         }
-      case .agent:
-        async let tuiRefresh = store.refreshSelectedAgentTuis()
-        async let codexRefresh = store.refreshSelectedCodexRuns()
-        _ = await tuiRefresh
-        _ = await codexRefresh
       }
       reconcileSheetState(afterRefresh: false)
       enforceExpectedSize()
@@ -371,50 +367,13 @@ extension AgentsWindowView {
         applyProgrammaticSelection(preferredSelection)
         return
       }
-    }
-  }
-  func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
-    guard viewModel.selection != nextSelection else {
-      if nextSelection.terminalID != nil {
-        enforceExpectedSize()
+    case .task(let selectedTaskID):
+      guard
+        store.selectedSession?.tasks.contains(where: { $0.taskId == selectedTaskID }) ?? false
+      else {
+        applyProgrammaticSelection(preferredSelection)
+        return
       }
-      return
     }
-    viewModel.suppressHistoryRecording = true
-    viewModel.selection = nextSelection
-    if nextSelection.terminalID != nil {
-      enforceExpectedSize()
-    }
-  }
-  func navigateHistoryBack() {
-    guard !viewModel.navigationBackStack.isEmpty else { return }
-    let destination = viewModel.navigationBackStack.removeLast()
-    viewModel.navigationForwardStack.append(viewModel.selection)
-    viewModel.suppressHistoryRecording = true
-    viewModel.selection = destination
-    updateNavigationState()
-  }
-  func navigateHistoryForward() {
-    guard !viewModel.navigationForwardStack.isEmpty else { return }
-    let destination = viewModel.navigationForwardStack.removeLast()
-    viewModel.navigationBackStack.append(viewModel.selection)
-    viewModel.suppressHistoryRecording = true
-    viewModel.selection = destination
-    updateNavigationState()
-  }
-  func updateNavigationState() {
-    let canGoBack = !viewModel.navigationBackStack.isEmpty
-    let canGoForward = !viewModel.navigationForwardStack.isEmpty
-    guard
-      viewModel.windowNavigation.canGoBack != canGoBack
-        || viewModel.windowNavigation.canGoForward != canGoForward
-    else {
-      return
-    }
-    viewModel.windowNavigation = viewModel.windowNavigation.updating(
-      canGoBack: canGoBack,
-      canGoForward: canGoForward
-    )
-    navigationBridge.update(viewModel.windowNavigation)
   }
 }

@@ -2,6 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import Observation
 import SwiftUI
+
 extension AgentsWindowView {
   protocol KeySequenceClock: AnyObject, Sendable {
     @MainActor var now: ContinuousClock.Instant { get }

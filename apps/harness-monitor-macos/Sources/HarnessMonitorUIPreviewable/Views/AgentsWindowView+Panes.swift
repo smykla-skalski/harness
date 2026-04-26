@@ -39,6 +39,23 @@ extension AgentsWindowView {
       }
     case .agent(let agentID):
       agentDetailPane(agentID: agentID)
+    case .task(let taskID):
+      taskDetailPane(taskID: taskID)
+    }
+  }
+
+  @ViewBuilder
+  func taskDetailPane(taskID: String) -> some View {
+    if let task = store.selectedSession?.tasks.first(where: { $0.taskId == taskID }) {
+      AgentsWindowTaskDetailPane(
+        store: store,
+        task: task,
+        notesSessionID: store.selectedSessionID,
+        isPersistenceAvailable: store.isPersistenceAvailable
+      )
+      .id("agents.task.\(taskID)")
+    } else {
+      unavailableSessionPane
     }
   }
 

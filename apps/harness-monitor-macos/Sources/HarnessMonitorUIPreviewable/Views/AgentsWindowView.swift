@@ -238,6 +238,18 @@ public struct AgentsWindowView: View {
         codexStartLabel,
         toastLabel,
       ].joined(separator: ",")
+    case .task(let taskID):
+      let taskStatus =
+        store.selectedSession?.tasks.first(where: { $0.taskId == taskID })?.status.rawValue
+        ?? "missing"
+      return [
+        "selection=task:\(taskID)",
+        "status=\(taskStatus)",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
     }
   }
 
@@ -251,6 +263,8 @@ public struct AgentsWindowView: View {
       "codex:\(runID)"
     case .agent(let agentID):
       "agent:\(agentID)"
+    case .task(let taskID):
+      "task:\(taskID)"
     }
   }
 
@@ -265,6 +279,7 @@ public struct AgentsWindowView: View {
         codexRuns: displayState.sortedCodexRuns,
         codexTitlesByID: displayState.codexTitlesByID,
         externalAgents: displayState.externalAgents,
+        tasks: store.selectedSession?.tasks ?? [],
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
@@ -369,6 +384,8 @@ public struct AgentsWindowView: View {
         guard oldValue.codexRunID != runID else { return }
         store.selectCodexRun(runID: runID)
       case .agent:
+        break
+      case .task:
         break
       }
     }
