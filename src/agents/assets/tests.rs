@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde_json::json;
 
@@ -7,9 +8,12 @@ use crate::infra::io::read_text;
 use crate::setup::wrapper::PROJECT_PLUGIN_LAUNCHER;
 
 use super::model::{RenderTarget, SkillDefinition, SkillSource, repo_root};
-use super::planning::plan_outputs;
+use super::planning::{plan_outputs, plan_outputs_with_gemini_commands};
 use super::render_skills::{render_skill_markdown, yaml_serialized_lines};
-use super::{AgentAssetTarget, write_agent_target_outputs, write_suite_plugin_outputs};
+use super::{
+    AgentAssetTarget, write_agent_target_outputs,
+    write_agent_target_outputs_with_skipped_runtime_hooks, write_suite_plugin_outputs,
+};
 
 fn sample_skill() -> SkillDefinition {
     SkillDefinition {
@@ -54,6 +58,13 @@ fn sample_skill() -> SkillDefinition {
     }
 }
 
+fn write(path: &Path, content: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create parent directories");
+    }
+    fs::write(path, content).expect("write file");
+}
+
 #[test]
 fn agent_assets_round_trip_smoke_covers_public_surface() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -89,18 +100,14 @@ fn agent_assets_round_trip_smoke_covers_public_surface() {
         .join("plugin.json");
     assert!(written.contains(&claude_harness_skill));
     assert!(written.contains(&codex_harness_skill));
-    assert!(written.contains(&gemini_command));
+    assert!(!written.contains(&gemini_command));
+    assert!(!gemini_command.exists());
     assert!(written.contains(&copilot_hook));
     assert!(written.contains(&portable_suite_plugin));
     assert!(
         read_text(&codex_harness_skill)
             .expect("codex harness skill reads")
             .contains("name: harness")
-    );
-    assert!(
-        read_text(&gemini_command)
-            .expect("gemini command reads")
-            .contains("harness session")
     );
 
     let suite_written = write_suite_plugin_outputs(project_root).expect("suite plugin writes");
@@ -125,6 +132,32 @@ fn agent_assets_round_trip_smoke_covers_public_surface() {
     assert_eq!(
         read_text(&launcher).expect("launcher reads"),
         PROJECT_PLUGIN_LAUNCHER
+    );
+}
+
+#[test]
+fn agent_assets_include_gemini_commands_when_requested() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project_root = tmp.path();
+
+    let written = write_agent_target_outputs_with_skipped_runtime_hooks(
+        project_root,
+        AgentAssetTarget::All,
+        &[],
+        true,
+    )
+    .expect("asset write succeeds");
+    let gemini_command = project_root
+        .join(".gemini")
+        .join("commands")
+        .join("harness")
+        .join("harness.toml");
+
+    assert!(written.contains(&gemini_command));
+    assert!(
+        read_text(&gemini_command)
+            .expect("gemini command reads")
+            .contains("harness session")
     );
 }
 
@@ -169,8 +202,8 @@ fn portable_plugin_skill_omits_host_specific_hooks_and_question_tool() {
 
 #[test]
 fn copilot_generation_includes_repo_hook_config() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[])
+        .expect("assets plan succeeds");
     let hook_path = repo_root()
         .join(".github")
         .join("hooks")
@@ -191,8 +224,8 @@ fn copilot_generation_includes_repo_hook_config() {
 
 #[test]
 fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::All, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::All, &[])
+        .expect("assets plan succeeds");
     let shared_skill = repo_root()
         .join("plugins")
         .join("suite")
@@ -212,8 +245,8 @@ fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
 
 #[test]
 fn harness_plugin_is_in_codex_marketplace() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
+        .expect("assets plan succeeds");
     let marketplace = repo_root()
         .join(".agents")
         .join("plugins")
@@ -230,8 +263,8 @@ fn harness_plugin_is_in_codex_marketplace() {
 
 #[test]
 fn codex_harness_plugin_skill_is_planned() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
+        .expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -249,8 +282,8 @@ fn codex_harness_plugin_skill_is_planned() {
 
 #[test]
 fn claude_harness_plugin_skill_is_planned() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[])
+        .expect("assets plan succeeds");
     let skill = repo_root()
         .join(".claude")
         .join("plugins")
@@ -269,8 +302,8 @@ fn claude_harness_plugin_skill_is_planned() {
 
 #[test]
 fn gemini_harness_plugin_command_is_namespaced_under_harness() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Gemini, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs_with_gemini_commands(&repo_root(), AgentAssetTarget::Gemini, &[], true)
+        .expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")
         .join("commands")
@@ -286,9 +319,27 @@ fn gemini_harness_plugin_command_is_namespaced_under_harness() {
 }
 
 #[test]
+fn gemini_commands_are_omitted_from_default_plan() {
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::All, &[])
+        .expect("assets plan succeeds");
+    let command = repo_root()
+        .join(".gemini")
+        .join("commands")
+        .join("harness")
+        .join("harness.toml");
+
+    assert!(
+        planned
+            .iter()
+            .all(|output| !output.files.contains_key(&command)),
+        "default plan should omit Gemini commands"
+    );
+}
+
+#[test]
 fn copilot_harness_plugin_includes_cli_skill() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[])
+        .expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -307,8 +358,8 @@ fn copilot_harness_plugin_includes_cli_skill() {
 
 #[test]
 fn claude_direct_skill_alias_uses_safe_frontmatter_name() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[])
+        .expect("assets plan succeeds");
     let skill = repo_root()
         .join(".claude")
         .join("skills")
@@ -325,8 +376,8 @@ fn claude_direct_skill_alias_uses_safe_frontmatter_name() {
 
 #[test]
 fn codex_direct_skill_alias_uses_safe_frontmatter_name() {
-    let planned =
-        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
+        .expect("assets plan succeeds");
     let skill = repo_root()
         .join(".agents")
         .join("skills")
@@ -339,6 +390,56 @@ fn codex_direct_skill_alias_uses_safe_frontmatter_name() {
 
     assert!(rendered.contains("name: harness-cli"));
     assert!(!rendered.contains("name: harness:cli"));
+}
+
+#[test]
+fn plan_outputs_ignores_plugin_workspace_dirs_without_skill_definitions() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let repo_root = tmp.path();
+    write(
+        &repo_root.join("agents/plugins/council/plugin.yaml"),
+        "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+    );
+    write(
+        &repo_root.join("agents/plugins/council/skills/council/skill.yaml"),
+        "name: council\ndescription: Council skill\n",
+    );
+    write(
+        &repo_root.join("agents/plugins/council/skills/council/body.md"),
+        "# Council\n\nCanonical skill body.\n",
+    );
+    write(
+        &repo_root.join("agents/plugins/council/skills/council-workspace/evals.md"),
+        "# Workspace artifacts live here.\n",
+    );
+
+    let planned = plan_outputs(repo_root, AgentAssetTarget::Claude, &[])
+        .expect("assets plan succeeds");
+
+    let manifest = repo_root
+        .join(".claude")
+        .join("plugins")
+        .join("council")
+        .join(".claude-plugin")
+        .join("plugin.json");
+    let skill = repo_root
+        .join(".claude")
+        .join("plugins")
+        .join("council")
+        .join("skills")
+        .join("council")
+        .join("SKILL.md");
+    assert!(
+        planned
+            .iter()
+            .any(|output| output.files.contains_key(&manifest)),
+        "council plugin manifest should be planned"
+    );
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("council plugin skill should be planned");
+    assert!(rendered.contains("name: council"));
 }
 
 #[test]
