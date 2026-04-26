@@ -7,7 +7,7 @@ struct OpenFolderCommand: Commands {
   var body: some Commands {
     CommandGroup(after: .newItem) {
       Button("Open Folder…") { isPresented = true }
-        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .keyboardShortcut("o", modifiers: [.command])
     }
   }
 }
