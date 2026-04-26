@@ -102,6 +102,22 @@ e2e_timestamp_slug_utc() {
   TZ=UTC date '+%y%m%d%H%M%S'
 }
 
+e2e_copy_path_if_exists() {
+  local source="$1"
+  local destination="$2"
+  if [[ ! -e "$source" ]]; then
+    return 1
+  fi
+
+  rm -rf "$destination"
+  mkdir -p "$(dirname -- "$destination")"
+  if [[ -d "$source" ]]; then
+    cp -Rp "$source" "$destination"
+  else
+    cp -p "$source" "$destination"
+  fi
+}
+
 e2e_run_with_log() {
   local log_path="$1"
   shift

@@ -59,22 +59,6 @@ json_array() {
   printf '%s\n' "$@" | jq -R . | jq -s .
 }
 
-copy_path_if_exists() {
-  local source="$1"
-  local destination="$2"
-  if [[ ! -e "$source" ]]; then
-    return 1
-  fi
-
-  rm -rf "$destination"
-  mkdir -p "$(dirname -- "$destination")"
-  if [[ -d "$source" ]]; then
-    cp -R "$source" "$destination"
-  else
-    cp -f "$source" "$destination"
-  fi
-}
-
 require_arg() {
   local flag="$1"
   local value="$2"
@@ -137,7 +121,7 @@ mkdir -p "$CONTEXT_DIR" "$LOGS_DIR"
 if [[ -n "$UI_SNAPSHOTS_SOURCE" ]]; then
   if [[ -e "$UI_SNAPSHOTS_SOURCE" ]]; then
     if [[ "$UI_SNAPSHOTS_SOURCE" != "$UI_SNAPSHOTS_DIR" ]]; then
-      copy_path_if_exists "$UI_SNAPSHOTS_SOURCE" "$UI_SNAPSHOTS_DIR"
+      e2e_copy_path_if_exists "$UI_SNAPSHOTS_SOURCE" "$UI_SNAPSHOTS_DIR"
     fi
   else
     note_warning "missing ui snapshots source: $UI_SNAPSHOTS_SOURCE"
@@ -156,13 +140,13 @@ for log_path in "${LOG_PATHS[@]}"; do
   local_destination="$log_path"
   if [[ "$log_path" != "$ARTIFACTS_DIR"/* ]]; then
     local_destination="$LOGS_DIR/$(basename -- "$log_path")"
-    copy_path_if_exists "$log_path" "$local_destination"
+    e2e_copy_path_if_exists "$log_path" "$local_destination"
   fi
   LOCAL_LOG_PATHS+=("$local_destination")
 done
 
 if [[ -n "$STATE_ROOT" ]]; then
-  if copy_path_if_exists "$STATE_ROOT" "$CONTEXT_DIR/state-root"; then
+  if e2e_copy_path_if_exists "$STATE_ROOT" "$CONTEXT_DIR/state-root"; then
     COPIED_CONTEXT_PATHS+=("$CONTEXT_DIR/state-root")
   else
     note_warning "missing state root: $STATE_ROOT"
@@ -170,7 +154,7 @@ if [[ -n "$STATE_ROOT" ]]; then
 fi
 
 if [[ -n "$SYNC_ROOT" ]]; then
-  if copy_path_if_exists "$SYNC_ROOT" "$CONTEXT_DIR/sync-root"; then
+  if e2e_copy_path_if_exists "$SYNC_ROOT" "$CONTEXT_DIR/sync-root"; then
     COPIED_CONTEXT_PATHS+=("$CONTEXT_DIR/sync-root")
   else
     note_warning "missing sync root: $SYNC_ROOT"
