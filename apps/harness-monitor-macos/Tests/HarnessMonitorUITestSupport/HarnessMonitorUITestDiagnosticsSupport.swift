@@ -34,15 +34,25 @@ func recordStandaloneDiagnosticsSnapshot(
       at: artifactsDirectory,
       withIntermediateDirectories: true
     )
-    try screenshot.pngRepresentation.write(
-      to: artifactsDirectory.appendingPathComponent("\(stem).png")
-    )
+    let screenshotURL = artifactsDirectory.appendingPathComponent("\(stem).png")
+    let hierarchyURL = artifactsDirectory.appendingPathComponent("\(stem).txt")
+    try screenshot.pngRepresentation.write(to: screenshotURL)
     try hierarchy.write(
-      to: artifactsDirectory.appendingPathComponent("\(stem).txt"),
+      to: hierarchyURL,
       atomically: true,
       encoding: .utf8
     )
   } catch {
+    appendDiagnosticsTrace(
+      component: "ui-diagnostics",
+      event: "snapshot.failed",
+      testName: "standalone-diagnostics",
+      details: [
+        "name": name,
+        "error": String(describing: error),
+      ],
+      artifactsDirectoryKey: artifactsDirectoryKey
+    )
     XCTFail(
       "Failed to persist UI-test diagnostics snapshot \(name): \(error)",
       file: file,
@@ -51,7 +61,7 @@ func recordStandaloneDiagnosticsSnapshot(
   }
 }
 
-private func diagnosticsArtifactsDirectory(for artifactsDirectoryKey: String) -> URL? {
+func diagnosticsArtifactsDirectory(for artifactsDirectoryKey: String) -> URL? {
   guard
     let rawPath = ProcessInfo.processInfo.environment[artifactsDirectoryKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -88,12 +98,22 @@ extension HarnessMonitorUITestCase {
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
+    recordDiagnosticsTrace(
+      event: "snapshot.begin",
+      app: app,
+      details: ["name": name]
+    )
     recordStandaloneDiagnosticsSnapshot(
       in: app,
       named: name,
       artifactsDirectoryKey: Self.artifactsDirectoryKey,
       file: file,
       line: line
+    )
+    recordDiagnosticsTrace(
+      event: "snapshot.finish",
+      app: app,
+      details: ["name": name]
     )
   }
 
