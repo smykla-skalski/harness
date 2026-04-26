@@ -26,10 +26,21 @@ private struct HarnessMonitorSheetMetrics {
   }
 }
 
+@MainActor
 struct HarnessMonitorSheetRouter: View {
   let store: HarnessMonitorStore
   let sheet: HarnessMonitorStore.PresentedSheet
   @State private var newSessionViewModel: NewSessionViewModel?
+
+  init(store: HarnessMonitorStore, sheet: HarnessMonitorStore.PresentedSheet) {
+    self.store = store
+    self.sheet = sheet
+    if case .newSession = sheet {
+      _newSessionViewModel = State(initialValue: store.makeNewSessionViewModel())
+    } else {
+      _newSessionViewModel = State(initialValue: nil)
+    }
+  }
 
   var body: some View {
     sheetContent
@@ -38,11 +49,6 @@ struct HarnessMonitorSheetRouter: View {
         idealWidth: metrics.idealWidth,
         minHeight: metrics.minHeight
       )
-      .onAppear {
-        if case .newSession = sheet {
-          newSessionViewModel = store.makeNewSessionViewModel()
-        }
-      }
   }
 
   @ViewBuilder private var sheetContent: some View {
