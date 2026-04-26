@@ -32,6 +32,17 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     )
   }
 
+  func testAppSettingsMenuOpensPreferences() throws {
+    let app = launch(mode: "preview")
+    app.typeKey(",", modifierFlags: .command)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) { preferencesRoot.exists },
+      "Preferences root should appear after Cmd+, invokes the system Settings menu item"
+    )
+  }
+
   func testViewMenuTogglesInspector() throws {
     let app = launch(mode: "preview")
 
