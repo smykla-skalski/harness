@@ -8,6 +8,7 @@ struct AgentsSidebar: View {
   let codexRuns: [CodexRunSnapshot]
   let codexTitlesByID: [String: String]
   let externalAgents: [AgentRegistration]
+  let tasks: [WorkItem]
   let refresh: () -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -129,6 +130,29 @@ struct AgentsSidebar: View {
             .padding(.vertical, rowPadding)
             .tag(AgentTuiSheetSelection.codex(run.runId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(run.runId))
+          }
+        }
+      }
+
+      if !tasks.isEmpty {
+        Section("Tasks") {
+          ForEach(tasks, id: \.taskId) { task in
+            HStack(spacing: HarnessMonitorTheme.spacingSM) {
+              Image(systemName: "checklist")
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                  .scaledFont(.body)
+                  .lineLimit(1)
+                Text("\(task.severity.title) • \(task.status.title)")
+                  .scaledFont(.caption)
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, rowPadding)
+            .tag(AgentTuiSheetSelection.task(task.taskId))
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentsTaskTab(task.taskId))
           }
         }
       }

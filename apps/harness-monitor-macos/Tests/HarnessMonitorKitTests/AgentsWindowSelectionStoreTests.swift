@@ -36,6 +36,24 @@ struct AgentsWindowSelectionStoreTests {
     #expect(AgentTuiSheetSelection.terminal("t-1").agentID == nil)
     #expect(AgentTuiSheetSelection.codex("c-1").agentID == nil)
     #expect(AgentTuiSheetSelection.create.agentID == nil)
+    #expect(AgentTuiSheetSelection.task("task-1").agentID == nil)
+  }
+
+  @Test("AgentTuiSheetSelection.task exposes its taskID accessor")
+  func taskAccessorReturnsTaskID() {
+    #expect(AgentTuiSheetSelection.task("task-omega").taskID == "task-omega")
+    #expect(AgentTuiSheetSelection.terminal("t-1").taskID == nil)
+    #expect(AgentTuiSheetSelection.codex("c-1").taskID == nil)
+    #expect(AgentTuiSheetSelection.agent("agent-1").taskID == nil)
+    #expect(AgentTuiSheetSelection.create.taskID == nil)
+  }
+
+  @Test("requestAgentsWindowSelection round-trips a task selection")
+  func taskSelectionRoundTrips() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.requestAgentsWindowSelection(.task("task-zeta"))
+    #expect(store.consumePendingAgentsWindowSelection() == .task("task-zeta"))
+    #expect(store.consumePendingAgentsWindowSelection() == nil)
   }
 
   @Test("Existing terminal/codex accessors keep working")
@@ -44,5 +62,7 @@ struct AgentsWindowSelectionStoreTests {
     #expect(AgentTuiSheetSelection.codex("c-1").codexRunID == "c-1")
     #expect(AgentTuiSheetSelection.agent("agent-delta").terminalID == nil)
     #expect(AgentTuiSheetSelection.agent("agent-delta").codexRunID == nil)
+    #expect(AgentTuiSheetSelection.task("task-1").terminalID == nil)
+    #expect(AgentTuiSheetSelection.task("task-1").codexRunID == nil)
   }
 }
