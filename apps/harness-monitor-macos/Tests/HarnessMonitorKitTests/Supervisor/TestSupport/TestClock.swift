@@ -26,6 +26,10 @@ final class TestClock: @unchecked Sendable, SupervisorClock {
     lock.withLock { nowValue }
   }
 
+  var pendingSleepCount: Int {
+    lock.withLock { sleepers.count }
+  }
+
   /// Suspends the caller until `advance(by:)` has accumulated enough budget to cover `duration`.
   /// If the budget already covers the duration (pre-credit from a prior `advance` call),
   /// the method returns immediately without suspending.
