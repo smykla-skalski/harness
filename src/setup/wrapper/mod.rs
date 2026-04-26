@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use fs_err;
+
 use crate::agents::assets::{
     AgentAssetTarget, write_agent_target_outputs_with_skipped_runtime_hooks,
     write_suite_plugin_outputs,
@@ -79,13 +81,13 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
     let _ = write_suite_plugin_outputs(project_dir)?;
-    let plugin_dir = project_dir.join(".claude").join("plugins").join("suite");
-    let plugin_path = plugin_dir.join("harness");
+    let plugins_root = project_dir.join(".claude").join("plugins");
+    let suite_launcher = plugins_root.join("suite").join("harness");
 
-    if !plugin_path.exists() {
+    if !suite_launcher.exists() {
         return Err(CliErrorKind::missing_file(format!(
             "missing source wrapper: {}",
-            plugin_path.display()
+            suite_launcher.display()
         ))
         .into());
     }
@@ -93,8 +95,13 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
     let (target_dir, _already_on_path) = choose_install_dir_with_home(path_env, home)?;
     install_wrapper(&target_dir)?;
 
-    if plugin_dir.is_dir() {
-        sync_plugin_cache(&plugin_dir, home)?;
+    if plugins_root.is_dir() {
+        for entry in fs_err::read_dir(&plugins_root).map_err(CliError::from)? {
+            let entry = entry.map_err(CliError::from)?;
+            if entry.path().is_dir() {
+                sync_plugin_cache(&entry.path(), home)?;
+            }
+        }
     }
 
     Ok(0)
