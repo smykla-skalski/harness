@@ -1,3 +1,12 @@
 name: council
 description: "Council of engineering persona agents - 16 sourced practitioner lenses (6 core bias-correction + 10 domain-specific) to review code, debate plans, or advise on strategy"
 version: 1.2.0
+author:
+  name: Smykla Skalski Labs
+license: MIT
+category: productivity
+tags:
+  - review
+  - personas
+  - code-review
+  - council

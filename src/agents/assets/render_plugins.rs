@@ -84,6 +84,10 @@ pub(super) fn render_claude_plugin_outputs(
             .join("marketplace.json"),
         render_claude_marketplace(source_root)?,
     );
+    files.insert(
+        output_root.join(".claude-plugin").join("marketplace.json"),
+        render_repo_root_marketplace(source_root)?,
+    );
     Ok(())
 }
 
@@ -264,20 +268,69 @@ fn render_codex_marketplace(repo_root: &Path) -> Result<String, CliError> {
 }
 
 fn render_claude_marketplace(repo_root: &Path) -> Result<String, CliError> {
+    render_marketplace_with_prefix(repo_root, "./", false)
+}
+
+fn render_repo_root_marketplace(repo_root: &Path) -> Result<String, CliError> {
+    render_marketplace_with_prefix(repo_root, "./plugins/", true)
+}
+
+fn render_marketplace_with_prefix(
+    repo_root: &Path,
+    source_prefix: &str,
+    include_metadata: bool,
+) -> Result<String, CliError> {
     let plugins: Vec<Value> = discover_plugin_sources(&repo_root.join(PLUGINS_ROOT))?
         .into_iter()
-        .map(|plugin| {
-            serde_json::json!({
-                "name": plugin.name,
-                "source": format!("./{}", plugin.name),
-                "description": plugin.description,
-            })
-        })
+        .map(|plugin| plugin_marketplace_entry(&plugin, source_prefix))
         .collect();
-    Ok(serde_json::to_string_pretty(&serde_json::json!({
-        "name": "harness",
-        "owner": { "name": "smykla-skalski" },
-        "plugins": plugins,
-    }))
-    .expect("typed claude marketplace serializes"))
+    let mut root = serde_json::Map::new();
+    root.insert("name".into(), Value::String("harness".into()));
+    root.insert(
+        "owner".into(),
+        serde_json::json!({ "name": "Smykla Skalski Labs" }),
+    );
+    if include_metadata {
+        root.insert(
+            "metadata".into(),
+            serde_json::json!({
+                "description": "Harness test orchestration framework plugins for Kubernetes/Kuma"
+            }),
+        );
+    }
+    root.insert("plugins".into(), Value::Array(plugins));
+    Ok(serde_json::to_string_pretty(&Value::Object(root))
+        .expect("typed claude marketplace serializes"))
+}
+
+fn plugin_marketplace_entry(plugin: &PluginSource, source_prefix: &str) -> Value {
+    let mut entry = serde_json::Map::new();
+    entry.insert("name".into(), Value::String(plugin.name.clone()));
+    entry.insert(
+        "source".into(),
+        Value::String(format!("{source_prefix}{}", plugin.name)),
+    );
+    entry.insert(
+        "description".into(),
+        Value::String(plugin.description.clone()),
+    );
+    if let Some(author) = &plugin.author {
+        entry.insert(
+            "author".into(),
+            serde_json::json!({ "name": author.name.clone() }),
+        );
+    }
+    if let Some(license) = &plugin.license {
+        entry.insert("license".into(), Value::String(license.clone()));
+    }
+    if let Some(category) = &plugin.category {
+        entry.insert("category".into(), Value::String(category.clone()));
+    }
+    if !plugin.tags.is_empty() {
+        entry.insert(
+            "tags".into(),
+            Value::Array(plugin.tags.iter().cloned().map(Value::String).collect()),
+        );
+    }
+    Value::Object(entry)
 }

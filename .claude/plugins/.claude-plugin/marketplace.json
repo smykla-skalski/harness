@@ -1,23 +1,55 @@
 {
   "name": "harness",
   "owner": {
-    "name": "smykla-skalski"
+    "name": "Smykla Skalski Labs"
   },
   "plugins": [
     {
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "category": "productivity",
       "description": "Council of engineering persona agents - 16 sourced practitioner lenses (6 core bias-correction + 10 domain-specific) to review code, debate plans, or advise on strategy",
+      "license": "MIT",
       "name": "council",
-      "source": "./council"
+      "source": "./council",
+      "tags": [
+        "review",
+        "personas",
+        "code-review",
+        "council"
+      ]
     },
     {
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "category": "productivity",
       "description": "Harness multi-agent session orchestration",
+      "license": "MIT",
       "name": "harness",
-      "source": "./harness"
+      "source": "./harness",
+      "tags": [
+        "multi-agent",
+        "orchestration",
+        "session"
+      ]
     },
     {
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "category": "productivity",
       "description": "Harness suite create and execution",
+      "license": "MIT",
       "name": "suite",
-      "source": "./suite"
+      "source": "./suite",
+      "tags": [
+        "testing",
+        "kubernetes",
+        "kuma",
+        "suite"
+      ]
     }
   ]
 }
