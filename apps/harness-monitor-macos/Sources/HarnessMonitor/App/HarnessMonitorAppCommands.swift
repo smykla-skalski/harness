@@ -101,11 +101,11 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("i", modifiers: [.command, .option])
     }
     CommandGroup(after: .toolbar) {
-      Button("Inspect Session Overview", action: inspectSessionOverview)
+      Button("Show Session Overview", action: inspectSessionOverview)
         .keyboardShortcut("1", modifiers: [.command, .option])
         .disabled(!displayState.hasSelectedSession)
 
-      Button("Inspect Observer", action: inspectObserver)
+      Button("Show Observer", action: inspectObserver)
         .keyboardShortcut("2", modifiers: [.command, .option])
         .disabled(!displayState.hasObserver)
 
@@ -126,7 +126,7 @@ struct HarnessMonitorAppCommands: Commands {
       Divider()
 
       Button("Refresh", action: refreshStore)
-        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .keyboardShortcut("r", modifiers: [.command])
     }
   }
 
