@@ -12,7 +12,7 @@ Before each iteration, act in this order:
 
 1. Load `Skill swarm-e2e-iterate`.
 2. Read [references/recording-analysis.md](references/recording-analysis.md) before recording triage or finding promotion.
-3. Read [references/iteration-protocol.md](references/iteration-protocol.md) before lane execution, ledger updates, fixes, commits, or termination.
+3. Read [references/iteration-protocol.md](references/iteration-protocol.md) before lane execution, `active.md`/`ledger.md` updates, fixes, commits, or termination.
 
 The skill and references are source of truth. This agent file only pins delegation behavior.
 
@@ -20,7 +20,7 @@ The skill and references are source of truth. This agent file only pins delegati
 
 - Recording first: produce and process the `.mov` before all other artifacts.
 - No parallel triage: review recording chronologically before logs, `xcresult`, screenshots, hierarchy dumps, or state.
-- Ledger rows need recording timestamps plus one secondary artifact.
+- Findings live in `_artifacts/active.md`; the Closed archive lives in `_artifacts/ledger.md`. Each row needs recording timestamps plus one secondary artifact.
 - Reuse one recording per iteration. Rerun only after a fix lands or bootstrap repair is needed.
 - Real findings only. Use `needs-verification` for uncertainty.
 - TDD only: failing test, red proof, fix, green proof, gate, signed commit, signature/sign-off verification.
@@ -33,15 +33,15 @@ The skill and references are source of truth. This agent file only pins delegati
 
 ## Per-Iteration Script
 
-1. Read or create `tmp/e2e-triage/ledger.md`.
+1. Read or create `_artifacts/active.md`. Consult `_artifacts/ledger.md` only for historical context.
 2. Run `rtk mise run e2e:swarm:full`; capture status and run slug.
-3. Run `rtk mise run e2e:swarm:triage:recording -- tmp/e2e-triage/runs/<slug>`.
+3. Run `rtk mise run e2e:swarm:triage:recording -- _artifacts/runs/<slug>`.
 4. Walk the recording against `references/recording-analysis.md`.
 5. Triage secondary artifacts only after the recording pass.
-6. Append confirmed rows. Never delete past rows.
-7. Fix every Open row through the TDD and commit protocol.
+6. Append confirmed rows to `active.md`. Never delete past rows in `ledger.md`.
+7. Fix every Open row through the TDD and commit protocol; on close, move the row from `active.md` to `ledger.md` per the Move Protocol in `references/iteration-protocol.md`.
 8. Rerun if fixes landed or Open rows remain.
-9. Stop only when latest iteration has zero new findings, ledger has zero Open rows, and gates are green.
+9. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.
 
 ## Parent Summary
 
@@ -54,7 +54,7 @@ After every iteration report:
 - `open_findings_count`
 - `commits_this_iteration`
 
-Keep summaries terse. The ledger remains the full audit record.
+Keep summaries terse. `active.md` shows the live work surface; `ledger.md` remains the full Closed-row audit record.
 
 ## Return Control
 

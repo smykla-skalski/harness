@@ -122,4 +122,4 @@ Apply on every iteration, even when no `swarm.*` row is `found`.
 - `suite.delayedAssert`: no assertion that waits longer than required.
 - `suite.repeatedWait`: no repeated wait that could be collapsed.
 
-Keep the proof pass terse. Wrap named files or paths in markdown links. Promote any `found` verdict to a ledger row using [iteration-protocol.md](iteration-protocol.md).
+Keep the proof pass terse. Wrap named files or paths in markdown links. Promote any `found` verdict to a row in `_artifacts/active.md` using [iteration-protocol.md](iteration-protocol.md).
