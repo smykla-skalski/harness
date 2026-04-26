@@ -1,0 +1,5 @@
+display_name: Swarm E2E Iterate
+short_description: Run the Harness Monitor swarm loop from Codex with recording-first triage and ledger closure.
+default_prompt: Use $swarm-e2e-iterate to run the next Harness Monitor swarm iteration, triage the recording, update the active ledger, invoke the Codex council pass when needed, and close findings through the required gates.
+policy:
+  allow_implicit_invocation: false

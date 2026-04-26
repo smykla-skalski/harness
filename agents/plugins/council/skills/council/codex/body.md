@@ -1,8 +1,3 @@
----
-name: council
-description: Use in Codex to run a council review with 16 sourced engineering persona lenses by briefing generic Codex subagents from persona files, then synthesizing convergence, disagreement, and concrete next moves.
----
-
 # Council of Experts
 
 Run an engineering council review from Codex. Use generic Codex subagents, not Claude named subagents. Each persona is loaded from a Markdown file under `agents/`, reviews through one sourced lens, and returns material for one integrated synthesis.
