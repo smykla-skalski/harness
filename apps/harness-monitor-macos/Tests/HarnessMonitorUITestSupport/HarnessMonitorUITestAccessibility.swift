@@ -20,6 +20,7 @@ enum HarnessMonitorUITestAccessibility {
   static let supervisorBadge = "harness.supervisor.badge"
   static let supervisorBadgeState = "harness.supervisor.badge.state"
   static let supervisorForceTick = "harness.supervisor.force-tick"
+  static let agentsWindow = "harness.agents.window"
   static let decisionsWindow = "harness.decisions.window"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"

@@ -12,24 +12,23 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
-  nonisolated static let fastActionTimeout: TimeInterval = 0.75
-  nonisolated static let fastPollInterval: TimeInterval = 0.05
+  nonisolated static let fastActionTimeout: TimeInterval = 0.4
+  nonisolated static let fastPollInterval: TimeInterval = 0.02
+
+  /// Subclasses override to keep the launched UI-test host alive across test methods
+  /// in the same class. Eliminates the terminate + relaunch dead wait between cases.
+  /// Only safe when every test launches the host with identical mode/environment.
+  nonisolated class var reuseLaunchedApp: Bool { false }
+
+  static var cachedLaunchedApp: XCUIApplication?
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+    let reuse = Self.reuseLaunchedApp
     addTeardownBlock { @MainActor in
-      let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-      switch app.state {
-      case .runningForeground, .runningBackground:
-        app.terminate()
-        let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
-        while Date.now < deadline, app.state != .notRunning {
-          RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
-        }
-      case .notRunning, .unknown:
-        break
-      @unknown default:
-        break
+      if !reuse {
+        let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+        Self.terminateAndWait(app)
       }
       Self.signalRecordingStopIfConfigured()
     }
@@ -49,10 +48,47 @@ class HarnessMonitorUITestCase: XCTestCase {
     }
     try super.tearDownWithError()
   }
+
+  override class func tearDown() {
+    MainActor.assumeIsolated {
+      if let cached = cachedLaunchedApp {
+        terminateAndWait(cached)
+        cachedLaunchedApp = nil
+      }
+    }
+    super.tearDown()
+  }
+
+  static func terminateAndWait(_ app: XCUIApplication) {
+    switch app.state {
+    case .runningForeground, .runningBackground:
+      app.terminate()
+      let deadline = Date.now.addingTimeInterval(fastActionTimeout)
+      while Date.now < deadline, app.state != .notRunning {
+        RunLoop.current.run(until: Date.now.addingTimeInterval(fastPollInterval))
+      }
+    case .notRunning, .unknown:
+      break
+    @unknown default:
+      break
+    }
+  }
 }
 
 extension HarnessMonitorUITestCase {
   func launch(mode: String, additionalEnvironment: [String: String] = [:]) -> XCUIApplication {
+    if Self.reuseLaunchedApp,
+      let cached = Self.cachedLaunchedApp,
+      cached.state == .runningForeground || cached.state == .runningBackground
+    {
+      cached.activate()
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          cached.state == .runningForeground
+        }
+      )
+      return cached
+    }
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     terminateIfRunning(app)
     app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
@@ -91,6 +127,9 @@ extension HarnessMonitorUITestCase {
           && window.frame.height > 0
       }
     )
+    if Self.reuseLaunchedApp {
+      Self.cachedLaunchedApp = app
+    }
     return app
   }
 

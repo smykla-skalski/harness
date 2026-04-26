@@ -1,4 +1,5 @@
 extension HarnessMonitorAccessibility {
+  public static let agentsWindow = "harness.agents.window"
   public static let agentsWindowDetailCard = "harness.agents.detail-card"
   public static let agentsWindowDetailSignalCommand = "harness.agents.detail.signal-command"
   public static let agentsWindowDetailSignalMessage = "harness.agents.detail.signal-message"
