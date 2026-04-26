@@ -23,6 +23,7 @@ bash scripts/swarm-iterate/close-finding.sh <id> <short-sha>
 - [recording-checklist.md](references/recording-checklist.md) for the proof-pass format.
 - [act-marker-matrix.md](references/act-marker-matrix.md) for act-by-act surfaces and invariants.
 - [iteration-protocol.md](references/iteration-protocol.md) for ledger-system glossary, schema, Move Protocol, gates, and loop termination rules.
+- [council-review.md](references/council-review.md) for the per-iteration council pass: when to invoke, mode dispatch, persona selection, output handling.
 
 ## Operating Contract
 
@@ -44,7 +45,8 @@ Headline rules. Full Loop Protocol lives in [iteration-protocol.md](references/i
 4. Walk the recording chronologically, then read `_artifacts/runs/<slug>/recording-triage/checklist.md`. Promote `found` rows straight into `active.md` and only re-watch rows the emitter marked `needs-verification`.
 5. Triage secondary artifacts only after the recording pass and checklist pass.
 6. Refresh the `active.md` header once for this iteration (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`).
-7. Append confirmed rows to `active.md`. Fix open rows one at a time; on close, run `bash scripts/swarm-iterate/close-finding.sh <id> <short-sha>`. Rerun until `active.md` carries zero data rows.
+7. Council review: with `active.md` frozen, spawn an Agent that follows `.claude/plugins/council/skills/council/SKILL.md` to review the integrated findings list. Pick mode by row count + lens spread per [council-review.md](references/council-review.md). Save the synthesis to `_artifacts/runs/<slug>/council-review.md`. Skip if `active.md` carries zero data rows.
+8. Append confirmed rows to `active.md`. Fix open rows one at a time, ranked by the council's Convergence + smallest-row heuristic; on close, run `bash scripts/swarm-iterate/close-finding.sh <id> <short-sha>`. Rerun until `active.md` carries zero data rows.
 
 ## Done Bar
 

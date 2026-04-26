@@ -64,3 +64,4 @@ mcp-servers/harness-monitor-registry/Derived/
 # Skill-creator iteration workspaces (transient eval run artifacts; canonical
 # eval prompts/inputs live in <skill>/evals/ and ARE committed)
 agents/plugins/*/skills/*-workspace/
+agents/skills/*-workspace/
