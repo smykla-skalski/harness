@@ -3,6 +3,18 @@
   "plugins": [
     {
       "category": "Productivity",
+      "name": "council",
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/council",
+        "source": "local"
+      }
+    },
+    {
+      "category": "Productivity",
       "name": "harness",
       "policy": {
         "authentication": "ON_INSTALL",
