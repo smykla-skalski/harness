@@ -115,16 +115,21 @@ public struct DecisionsWindowView: View {
     inspectorVisible ? "Hide Inspector" : "Show Inspector"
   }
 
+  private var sessionObserver: ObserverSummary? {
+    store?.selectedSession?.observer
+  }
+
   @ViewBuilder private var detailColumn: some View {
     if let selectedDecision {
       DecisionDetailView(
         decision: selectedDecision,
         handler: actionHandler,
         auditEvents: runtime.auditEvents,
-        selectedTab: $detailTab
+        selectedTab: $detailTab,
+        observer: sessionObserver
       )
     } else {
-      DecisionDetailView(selectedTab: $detailTab)
+      DecisionDetailView(selectedTab: $detailTab, observer: sessionObserver)
     }
   }
 
@@ -162,6 +167,10 @@ public struct DecisionsWindowView: View {
     }
     .onChange(of: selection) { _, newValue in
       store?.supervisorSelectedDecisionID = newValue
+    }
+    .onChange(of: store?.supervisorObserverFocusTick ?? 0) { _, _ in
+      selection = nil
+      store?.supervisorSelectedDecisionID = nil
     }
   }
 

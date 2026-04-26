@@ -29,20 +29,27 @@ public struct DecisionDetailView: View {
 
   private let viewModel: DecisionDetailViewModel?
   private let auditEvents: [SupervisorEvent]
+  private let observer: ObserverSummary?
 
-  public init(selectedTab: Binding<DecisionDetailTab> = .constant(.context)) {
+  public init(
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil
+  ) {
     viewModel = nil
     auditEvents = []
+    self.observer = observer
     _selectedTab = selectedTab
   }
 
   public init(
     viewModel: DecisionDetailViewModel,
     auditEvents: [SupervisorEvent] = [],
-    selectedTab: Binding<DecisionDetailTab> = .constant(.context)
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil
   ) {
     self.viewModel = viewModel
     self.auditEvents = auditEvents
+    self.observer = observer
     _selectedTab = selectedTab
   }
 
@@ -50,12 +57,14 @@ public struct DecisionDetailView: View {
     decision: Decision,
     handler: any DecisionActionHandler = NullDecisionActionHandler(),
     auditEvents: [SupervisorEvent] = [],
-    selectedTab: Binding<DecisionDetailTab> = .constant(.context)
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
       auditEvents: auditEvents,
-      selectedTab: selectedTab
+      selectedTab: selectedTab,
+      observer: observer
     )
   }
 
@@ -117,19 +126,27 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private var emptyState: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "bell.badge")
-        .font(.largeTitle)
-        .foregroundStyle(.secondary)
-      Text("Select a decision")
-        .font(.title3)
-      Text("The Monitor supervisor will surface decisions here.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
+  @ViewBuilder private var emptyState: some View {
+    if let observer {
+      ScrollView {
+        ObserverSummaryPanel(observer: observer)
+          .padding(HarnessMonitorTheme.spacingLG)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    } else {
+      VStack(spacing: 12) {
+        Image(systemName: "bell.badge")
+          .font(.largeTitle)
+          .foregroundStyle(.secondary)
+        Text("Select a decision")
+          .font(.title3)
+        Text("The Monitor supervisor will surface decisions here.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+      }
+      .padding()
     }
-    .padding()
   }
 
   private func suggestedActions(_ viewModel: DecisionDetailViewModel) -> some View {
