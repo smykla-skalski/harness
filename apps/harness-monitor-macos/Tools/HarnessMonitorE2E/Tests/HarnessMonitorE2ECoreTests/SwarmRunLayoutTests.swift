@@ -20,7 +20,7 @@ final class SwarmRunLayoutTests: XCTestCase {
       "/Users/test/Library/Containers/io.harnessmonitor.agents-e2e-tests.xctrunner/Data/tmp/HarnessMonitorSwarmE2E/run-123"
     )
     XCTAssertEqual(layout.syncDir.path, layout.syncRoot.appendingPathComponent("e2e-sync").path)
-    XCTAssertEqual(layout.derivedDataPath.path, "/common/xcode-derived")
+    XCTAssertEqual(layout.derivedDataPath.path, "/common/xcode-derived-e2e")
     XCTAssertEqual(layout.uiSnapshotsSource.lastPathComponent, "ui-snapshots")
     XCTAssertEqual(layout.screenRecordingControlDirectory.lastPathComponent, "recording-control")
   }
