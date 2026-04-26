@@ -135,9 +135,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     recordingConfiguration.outputFileType = .mov
     recordingConfiguration.videoCodecType = .h264
 
-    try appendLog("recording-create-filter-begin")
-    let captureWindow = captureTarget.window
-    let filter = try boundedFilterCreate(window: captureWindow)
+    let captureDisplay = captureTarget.display
+    try appendLog(
+      "recording-create-filter-begin display_id=\(captureDisplay.displayID)"
+    )
+    let filter = try boundedFilterCreate(display: captureDisplay)
     try appendLog("recording-create-filter-returned")
 
     let streamConfiguration = SCStreamConfiguration()
@@ -190,7 +192,14 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     }
 
     try? stream.removeRecordingOutput(recordingOutput)
-    try runAsync { try await stream.stopCapture() }
+    do {
+      try runAsync { try await stream.stopCapture() }
+    } catch {
+      guard ScreenRecorder.shouldIgnoreStopCaptureError(error) else {
+        throw error
+      }
+      try appendLog("recording-stop-already-finished")
+    }
     if let failure = consumeFailure() {
       throw failure
     }
@@ -255,14 +264,18 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
   /// Establish a connection to the WindowServer before any
   /// ScreenCaptureKit call. The recorder runs as a plain CLI helper that
   /// never instantiates `NSApplication`, so the first CG entry point inside
-  /// `SCContentFilter(desktopIndependentWindow:)` traps with
+  /// `SCContentFilter(display:excludingWindows:)` traps with
   /// `Assertion failed: (did_initialize), function CGS_REQUIRE_INIT,
   /// file CGInitialization.c, line 44.` and aborts the process before
   /// any further log line lands on disk. Touching `NSApplication.shared`
   /// performs the WindowServer handshake; calling `CGMainDisplayID()`
   /// guarantees CG is fully primed for the subsequent SCK calls.
   private func warmUpCoreGraphics() throws {
-    _ = NSApplication.shared
+    _ = try runAsync {
+      await MainActor.run {
+        NSApplication.shared
+      }
+    }
     let mainDisplay = CGMainDisplayID()
     try appendLog("recording-cg-warmup main_display=\(mainDisplay)")
   }
@@ -341,7 +354,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
       throw ScreenRecorder.Failure.monitorDisplayNotFound
     }
     try appendLog(
-      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight)"
+      "using-window id=\(selectedWindow.windowID) title=\(selectedWindow.title) bundle_id=\(selectedWindow.bundleIdentifier ?? "?") display_id=\(selectedDisplayCandidate.displayID) size=\(frameWidth)x\(frameHeight) recording_scope=display"
     )
     return CaptureTarget(display: captureDisplay, window: captureWindow)
   }
@@ -450,11 +463,11 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     }
   }
 
-  private func boundedFilterCreate(window: SCWindow) throws -> SCContentFilter {
+  private func boundedFilterCreate(display: SCDisplay) throws -> SCContentFilter {
     let result: BoundedAsyncResult<SCContentFilter> = try runAsyncBounded(
       timeout: Self.bootstrapStepTimeout
     ) {
-      SCContentFilter(desktopIndependentWindow: window)
+      SCContentFilter(display: display, excludingWindows: [])
     }
     switch result {
     case .completed(let filter):
@@ -503,6 +516,14 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
     }
     semaphore.wait()
     return try resultBox.unwrap()
+  }
+}
+
+@available(macOS 15.0, *)
+extension ScreenRecorder {
+  static func shouldIgnoreStopCaptureError(_ error: Error) -> Bool {
+    let nsError = error as NSError
+    return nsError.domain == SCStreamErrorDomain && nsError.code == -3808
   }
 }
 
