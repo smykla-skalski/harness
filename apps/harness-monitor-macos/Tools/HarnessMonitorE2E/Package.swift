@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "HarnessMonitorE2ECore", targets: ["HarnessMonitorE2ECore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.1"),
     ],
     targets: [
         .executableTarget(
