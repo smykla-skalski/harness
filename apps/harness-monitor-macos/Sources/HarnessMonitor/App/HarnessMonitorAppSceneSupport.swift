@@ -12,6 +12,8 @@ struct HarnessMonitorWindowRootView: View {
   let perfScenario: HarnessMonitorPerfScenario?
   @Environment(\.openWindow)
   private var openWindow
+  @Environment(\.openSettings)
+  private var openSettings
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -84,7 +86,7 @@ struct HarnessMonitorWindowRootView: View {
       }
       handledSettingsOpenRequestID = requestID
       preferencesSelectedSection = .notifications
-      openWindow(id: HarnessMonitorWindowID.preferences)
+      openSettings()
     }
     .task(id: notifications.decisionRequestTick) {
       routeDecisionWindowRequest(for: notifications.decisionRequestTick)
@@ -115,8 +117,8 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let perfScenario: HarnessMonitorPerfScenario?
-  @Environment(\.openWindow)
-  private var openWindow
+  @Environment(\.openSettings)
+  private var openSettings
   @State private var hasRunPerfScenario = false
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
   private var perfScenarioStateText: String? {
@@ -160,7 +162,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       await HarnessMonitorPerfDriver.run(
         scenario: perfScenario,
         store: store,
-        openWindow: openWindow
+        openSettings: openSettings
       )
       publishPerfScenarioStatus(.completed)
       return
@@ -171,7 +173,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     await HarnessMonitorPerfDriver.run(
       scenario: perfScenario,
       store: store,
-      openWindow: openWindow
+      openSettings: openSettings
     )
     publishPerfScenarioStatus(.completed)
   }
@@ -226,6 +228,7 @@ struct HarnessMonitorSettingsRootView: View {
     )
     .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)
+    .frame(idealWidth: 860, idealHeight: 620)
     .modifier(
       HarnessMonitorWindowBackdropModifier(
         mode: backdropMode,
