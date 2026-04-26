@@ -10,6 +10,8 @@ struct HarnessMonitorAppCommands: Commands {
     return documentationURL
   }
 
+  @Environment(\.openWindow)
+  private var openWindow
   @FocusedValue(\.harnessSidebarSearchFocusAction)
   private var sidebarSearchFocus
   @AppStorage("showInspector")
@@ -42,6 +44,12 @@ struct HarnessMonitorAppCommands: Commands {
   @CommandsBuilder private var systemCommands: some Commands {
     SidebarCommands()
     TextEditingCommands()
+    CommandGroup(replacing: .appSettings) {
+      Button("Settings…") {
+        openWindow(id: HarnessMonitorWindowID.preferences)
+      }
+      .keyboardShortcut(",", modifiers: .command)
+    }
   }
 
   @CommandsBuilder private var fileAndEditCommands: some Commands {

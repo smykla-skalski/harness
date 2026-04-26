@@ -108,7 +108,7 @@ struct HarnessMonitorApp: App {
       WindowMenuCommands()
     }
 
-    Settings {
+    Window("Preferences", id: HarnessMonitorWindowID.preferences) {
       HarnessMonitorSettingsRootView(
         store: store,
         notifications: notificationController,
@@ -119,6 +119,9 @@ struct HarnessMonitorApp: App {
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
+    .windowStyle(.titleBar)
+    .defaultSize(width: 860, height: 620)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
 
     Window("Agents", id: HarnessMonitorWindowID.agents) {
       AgentsWindowRootView(
