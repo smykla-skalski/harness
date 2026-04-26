@@ -323,26 +323,37 @@ final class ActSurfaceAssertionTests: XCTestCase {
     XCTAssertEqual(verdict(findings, for: "swarm.act15.observeAction"), .found)
   }
 
-  func testAct16FindsClosedSessionStatus() {
+  func testAct16FindsEndedStatusInSidebarRow() {
+    let session = "sess-foo"
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session-status.corner', label: 'state=closed'
+      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, Repository, Ended, 0 active, 0 moving, sess-foo'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act16",
-      payload: ["session_id": "sess-foo"],
+      payload: ["session_id": session],
       identifiers: parse(text)
     )
     XCTAssertEqual(verdict(findings, for: "swarm.act16.sessionEnded"), .found)
   }
 
-  func testAct16FlagsLingeringActiveStatus() {
+  func testAct16FlagsLingeringActiveStatusInSidebarRow() {
+    let session = "sess-foo"
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.session-status.corner', label: 'state=active'
+      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, Repository, Active, 3 active, 1 moving, sess-foo'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act16",
-      payload: ["session_id": "sess-foo"],
+      payload: ["session_id": session],
       identifiers: parse(text)
+    )
+    XCTAssertEqual(verdict(findings, for: "swarm.act16.sessionEnded"), .notFound)
+  }
+
+  func testAct16FlagsMissingSidebarRow() {
+    let findings = RecordingTriage.assertActSurface(
+      act: "act16",
+      payload: ["session_id": "sess-foo"],
+      identifiers: []
     )
     XCTAssertEqual(verdict(findings, for: "swarm.act16.sessionEnded"), .notFound)
   }
