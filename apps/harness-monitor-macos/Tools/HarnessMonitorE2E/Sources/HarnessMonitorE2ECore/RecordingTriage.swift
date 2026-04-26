@@ -1075,9 +1075,9 @@ extension RecordingTriage {
       ))
     findings.append(
       ChecklistFinding(
-        id: "swarm.invariant.taskInspectorMatches",
+        id: "swarm.invariant.taskDetailPaneMatches",
         verdict: .needsVerification,
-        message: "taskInspectorCard.value parsing not yet wired; verify in recording"
+        message: "agentsTaskCard.value parsing not yet wired; verify in recording"
       ))
     findings.append(
       ChecklistFinding(
@@ -1105,7 +1105,7 @@ extension RecordingTriage {
     // proxy: either signals at least one reviewer has attached, which is the
     // exact transition we are trying to prove (AwaitingReview -> InReview).
     let claimedTaskPrefix =
-      "harness.inspector.task.reviewer-claim-badge.\(SwarmAccessibilityID.slug(taskID))."
+      "\(SwarmAccessibilityID.reviewerClaimBadgePrefix)\(SwarmAccessibilityID.slug(taskID))."
     let quorumID = SwarmAccessibilityID.reviewerQuorumIndicator(taskID)
     var awaitingActIndex: Int?
     var inReviewActIndex: Int?

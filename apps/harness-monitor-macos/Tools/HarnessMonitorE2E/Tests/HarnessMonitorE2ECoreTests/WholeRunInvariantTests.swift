@@ -23,19 +23,19 @@ final class WholeRunInvariantTests: XCTestCase {
   }
 
   func testTaskReviewProgressionFoundWhenBothBadgesSeen() {
-    // Real UI emits `harness.inspector.task.awaiting-review-badge.<slug>` for
-    // AwaitingReview and `harness.inspector.task.reviewer-claim-badge.<slug>.<runtime>`
+    // Real UI emits `harness.review.task.awaiting.<slug>` for
+    // AwaitingReview and `harness.review.task.reviewer-claim.<slug>.<runtime>`
     // (or the quorum indicator) once a reviewer attaches; the latter is the
     // canonical InReview proxy because the UI does not render a per-task
     // `inReviewBadge.<id>`.
     let hierarchies = [
       hierarchy(
         "act8",
-        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-1'"
+        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.awaiting.task-1'"
       ),
       hierarchy(
         "act9",
-        "Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-claim-badge.task-1.claude'"
+        "Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.reviewer-claim.task-1.claude'"
       ),
     ]
     let findings = RecordingTriage.assertWholeRunInvariants(
@@ -49,11 +49,11 @@ final class WholeRunInvariantTests: XCTestCase {
     let hierarchies = [
       hierarchy(
         "act8",
-        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-1'"
+        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.awaiting.task-1'"
       ),
       hierarchy(
         "act9",
-        "Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-quorum.task-1'"
+        "Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.reviewer-quorum.task-1'"
       ),
     ]
     let findings = RecordingTriage.assertWholeRunInvariants(
@@ -67,7 +67,7 @@ final class WholeRunInvariantTests: XCTestCase {
     let hierarchies = [
       hierarchy(
         "act8",
-        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-1'"
+        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.awaiting.task-1'"
       ),
       hierarchy("act9", "Other, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'unrelated'"),
     ]
@@ -82,7 +82,7 @@ final class WholeRunInvariantTests: XCTestCase {
     let hierarchies = [
       hierarchy(
         "act9",
-        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-claim-badge.task-1.claude'"
+        "Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.reviewer-claim.task-1.claude'"
       )
     ]
     let findings = RecordingTriage.assertWholeRunInvariants(
@@ -160,7 +160,7 @@ final class WholeRunInvariantTests: XCTestCase {
     XCTAssertEqual(
       verdict(findings, for: "swarm.invariant.toastQueueAppendOnly"), .needsVerification)
     XCTAssertEqual(
-      verdict(findings, for: "swarm.invariant.taskInspectorMatches"), .needsVerification)
+      verdict(findings, for: "swarm.invariant.taskDetailPaneMatches"), .needsVerification)
     XCTAssertEqual(
       verdict(findings, for: "swarm.invariant.heuristicCodesPersist"), .needsVerification)
   }

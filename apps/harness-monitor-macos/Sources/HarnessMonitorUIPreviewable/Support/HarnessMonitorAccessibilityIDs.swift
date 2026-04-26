@@ -51,27 +51,6 @@ public enum HarnessMonitorAccessibility {
   public static let sessionsBoardRoot = "harness.board.root"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
   public static let contentRoot = "harness.content.root"
-  public static let sessionInspectorCard = "harness.inspector.session-card"
-  public static let taskInspectorCard = "harness.inspector.task-card"
-  public static let taskNoteField = "harness.inspector.task-note-field"
-  public static let taskNoteAddButton = "harness.inspector.task-note-add"
-  public static let taskNotesUnavailable = "harness.inspector.task-notes-unavailable"
-  public static let signalInspectorCard = "harness.inspector.signal-card"
-  public static let observerInspectorCard = "harness.inspector.observer-card"
-  public static let actionActorPicker = "harness.inspector.action-actor"
-  public static let signalCommandField = "harness.inspector.signal-command"
-  public static let signalMessageField = "harness.inspector.signal-message"
-  public static let createTaskTitleField = "harness.inspector.create-task.title"
-  public static let createTaskButton = "harness.inspector.create-task"
-  public static let assignTaskButton = "harness.inspector.assign-task"
-  public static let updateTaskQueuePolicyButton = "harness.inspector.update-task-queue-policy"
-  public static let updateTaskStatusButton = "harness.inspector.update-task-status"
-  public static let checkpointTaskButton = "harness.inspector.checkpoint-task"
-  public static let changeRoleButton = "harness.inspector.change-role"
-  public static let removeAgentButton = "harness.inspector.remove-agent"
-  public static let signalSendButton = "harness.inspector.signal-send"
-  public static let leaderTransferSection = "harness.inspector.leader-transfer"
-  public static let leaderTransferPicker = "harness.inspector.leader-transfer-picker"
   public static let preferencesRoot = "harness.preferences.root"
   public static let preferencesState = "harness.preferences.state"
   public static let preferencesPanel = "harness.preferences.panel"
@@ -339,10 +318,6 @@ public enum HarnessMonitorAccessibility {
 
   public static func sessionTaskCard(_ taskID: String) -> String {
     "harness.session.task.\(slug(taskID))"
-  }
-
-  public static func taskInspectorSelection(_ taskID: String) -> String {
-    "harness.inspector.task-card.selection.\(slug(taskID))"
   }
 
   public static func sessionAgentCard(_ agentID: String) -> String {

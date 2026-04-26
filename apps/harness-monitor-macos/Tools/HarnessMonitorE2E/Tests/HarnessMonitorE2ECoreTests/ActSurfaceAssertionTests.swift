@@ -214,10 +214,10 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct8FindsAwaitingReviewBadge() {
     // Real UI helper `HarnessMonitorAccessibility.awaitingReviewBadge(taskID)`
-    // emits `harness.inspector.task.awaiting-review-badge.<slug>`. Detector
-    // must consume that canonical string.
+    // emits `harness.review.task.awaiting.<slug>`. Detector must consume that
+    // canonical string.
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-1', label: 'Awaiting review, submitted by codex-1'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.awaiting.task-1', label: 'Awaiting review, submitted by codex-1'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act8",
@@ -229,7 +229,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct9FindsReviewerClaimOrQuorum() {
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-claim-badge.task-1.claude'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.reviewer-claim.task-1.claude'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act9",
@@ -241,7 +241,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct9AcceptsQuorumIndicatorAlone() {
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.reviewer-quorum.task-1'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.reviewer-quorum.task-1'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act9",
@@ -253,7 +253,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct10FindsAwaitingReviewForAutospawn() {
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.awaiting-review-badge.task-2'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.awaiting.task-2'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act10",
@@ -277,7 +277,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct12FindsRoundCounter() {
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.inspector.task.round-counter.task-3', label: '1'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.round-counter.task-3', label: '1'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act12",

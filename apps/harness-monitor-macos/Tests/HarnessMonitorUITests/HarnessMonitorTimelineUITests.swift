@@ -67,7 +67,7 @@ final class HarnessMonitorTimelineUITests: HarnessMonitorUITestCase {
     )
     let primarySignal = button(in: app, identifier: Accessibility.previewSignalCard)
     let noSignalsState = app.staticTexts["No signals"]
-    let signalInspector = element(in: app, identifier: Accessibility.signalInspectorCard)
+    let signalSheet = element(in: app, identifier: Accessibility.signalDetailSheet)
 
     XCTAssertTrue(primarySession.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(secondarySession.waitForExistence(timeout: Self.actionTimeout))
@@ -82,8 +82,8 @@ final class HarnessMonitorTimelineUITests: HarnessMonitorUITestCase {
     )
     tapButton(in: app, identifier: Accessibility.previewSignalCard)
     XCTAssertTrue(
-      signalInspector.waitForExistence(timeout: Self.actionTimeout),
-      "Selecting a signal row should open the signal inspector"
+      signalSheet.waitForExistence(timeout: Self.actionTimeout),
+      "Selecting a signal row should open the signal detail sheet"
     )
 
     tapSession(in: app, identifier: Accessibility.signalRegressionSecondarySessionRow)
