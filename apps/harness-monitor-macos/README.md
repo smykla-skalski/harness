@@ -17,6 +17,7 @@ mise run version:check
 mise run monitor:macos:build
 mise run monitor:macos:generate
 mise run monitor:macos:lint
+mise run monitor:macos:quality-gate
 mise run monitor:macos:test
 mise run monitor:macos:audit -- --label baseline
 mise run monitor:macos:test:scripts
@@ -48,9 +49,11 @@ mise run monitor:macos:build
 
 The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one DerivedData tree instead of bloating each checkout. The wrapper no longer re-runs Tuist after every successful `xcodebuild`; set `HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD=1` only when you explicitly need to rewrite generated shared scheme metadata after a CLI lane.
 
-`monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against the shared `xcode-derived`.
+`monitor:macos:lint` is the fast non-build lane. It generate-checks the workspace, runs strict `swift format` over Sources and Tests, and runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`. It never invokes `xcodebuild`, daemon pre-actions, or daemon bundle validation.
 
-`monitor:macos:test` runs the same quality gates first, then executes:
+`monitor:macos:quality-gate` is the slower build-based validation lane. It runs `build-for-testing` against the shared `xcode-derived`, scans sandbox logs, and verifies the checked-in app/daemon entitlements expected by the built product.
+
+`monitor:macos:test` runs the fast lint lane first, then performs `build-for-testing`, then executes:
 
 ```bash
 mise run monitor:macos:xcodebuild -- \
@@ -80,7 +83,7 @@ Example targeted UI regression:
 XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow mise run monitor:macos:test
 ```
 
-The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. Lint enforcement lives in the monitor quality-gate scripts and CI instead.
+The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. The fast lint lane owns `swift format` + `swiftlint`; the slower `monitor:macos:quality-gate` task owns build-based validation and daemon checks.
 
 For SwiftUI canvas previews, open `HarnessMonitor.xcodeproj` and select the shared `HarnessMonitorUIPreviews` scheme. It uses the `Preview` configuration, builds only the UI framework graph, and avoids launching the full `Harness Monitor.app` as the preview host.
 

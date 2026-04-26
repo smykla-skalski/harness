@@ -184,17 +184,36 @@ emit_swift_compile_context() {
   fi
 }
 
+lock_owner_command() {
+  local owner_pid="$1"
+  /bin/ps -p "$owner_pid" -o command= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//'
+}
+
 acquire_lock() {
-  local started_at now owner_pid
+  local started_at now owner_pid owner_command last_reported_owner
   /bin/mkdir -p "$derive_data_path"
   started_at="$(date +%s)"
+  last_reported_owner=""
   while ! /bin/mkdir "$lock_dir" 2>/dev/null; do
+    owner_pid=""
     if [[ -f "$lock_pid_file" ]]; then
       owner_pid="$(cat "$lock_pid_file" 2>/dev/null || true)"
       if [[ -n "$owner_pid" ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
         /bin/rm -rf "$lock_dir"
         continue
       fi
+    fi
+
+    if [[ "$owner_pid" != "$last_reported_owner" ]]; then
+      printf 'Waiting for xcodebuild lock at %s\n' "$lock_dir" >&2
+      if [[ -n "$owner_pid" ]]; then
+        printf 'lock owner pid: %s\n' "$owner_pid" >&2
+        owner_command="$(lock_owner_command "$owner_pid" || true)"
+        if [[ -n "$owner_command" ]]; then
+          printf 'lock owner command: %s\n' "$owner_command" >&2
+        fi
+      fi
+      last_reported_owner="$owner_pid"
     fi
 
     now="$(date +%s)"

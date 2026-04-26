@@ -6,43 +6,14 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
-source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
-DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
-CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
-XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
-GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
-FORMAT_CONFIG="$ROOT/.swift-format"
-SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
-SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(command -v swiftlint || true)}"
-SWIFTLINT_CACHE_PATH="${SWIFTLINT_CACHE_PATH:-$COMMON_REPO_ROOT/tmp/swiftlint-cache/harness-monitor-macos}"
+BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 LOG_BIN="${LOG_BIN:-log}"
 APP_ENTITLEMENTS_PATH="${HARNESS_MONITOR_APP_ENTITLEMENTS_PATH:-$ROOT/HarnessMonitor.entitlements}"
 DAEMON_ENTITLEMENTS_PATH="${HARNESS_MONITOR_DAEMON_ENTITLEMENTS_PATH:-$ROOT/HarnessMonitorDaemon.entitlements}"
 
-if [ -z "${SWIFT_BIN}" ]; then
-  echo "swift is required on PATH" >&2
-  exit 1
-fi
-
-if [ -z "${SWIFTLINT_BIN}" ]; then
-  echo "swiftlint is required on PATH" >&2
-  exit 1
-fi
-
-if [ "${XCODEBUILD_RUNNER}" != "${CANONICAL_XCODEBUILD_RUNNER}" ]; then
-  echo "XCODEBUILD_RUNNER override is unsupported; use ${CANONICAL_XCODEBUILD_RUNNER}" >&2
-  exit 1
-fi
-
-if [ ! -x "${XCODEBUILD_RUNNER}" ]; then
-  echo "xcodebuild runner is not executable: ${XCODEBUILD_RUNNER}" >&2
-  exit 1
-fi
-
-if [ ! -x "${GENERATE_PROJECT_SCRIPT}" ]; then
-  echo "generate script is not executable: ${GENERATE_PROJECT_SCRIPT}" >&2
+if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
+  echo "build-for-testing script is not executable: ${BUILD_FOR_TESTING_SCRIPT}" >&2
   exit 1
 fi
 
@@ -83,53 +54,7 @@ ensure_entitlement_absent() {
   fi
 }
 
-"$GENERATE_PROJECT_SCRIPT"
-
-"$SWIFT_BIN" format lint \
-  --configuration "$FORMAT_CONFIG" \
-  --recursive \
-  --parallel \
-  --strict \
-  "$ROOT/Sources" \
-  "$ROOT/Tests/HarnessMonitorKitTests" \
-  "$ROOT/Tests/HarnessMonitorUITestSupport" \
-  "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
-  "$ROOT/Tests/HarnessMonitorUITests" \
-  "$ROOT/Tools/HarnessMonitorE2E/Sources" \
-  "$ROOT/Tools/HarnessMonitorE2E/Tests"
-
-mkdir -p "$SWIFTLINT_CACHE_PATH"
-
-"$SWIFTLINT_BIN" lint \
-  --config "$ROOT/.swiftlint.yml" \
-  --working-directory "$ROOT" \
-  --cache-path "$SWIFTLINT_CACHE_PATH" \
-  --strict \
-  --force-exclude \
-  --quiet \
-  "$ROOT/Sources" \
-  "$ROOT/Tests/HarnessMonitorKitTests" \
-  "$ROOT/Tests/HarnessMonitorUITestSupport" \
-  "$ROOT/Tests/HarnessMonitorAgentsE2ETests" \
-  "$ROOT/Tests/HarnessMonitorUITests"
-
-"$SWIFTLINT_BIN" lint \
-  --config "$ROOT/Tools/HarnessMonitorE2E/.swiftlint.yml" \
-  --working-directory "$ROOT/Tools/HarnessMonitorE2E" \
-  --cache-path "$SWIFTLINT_CACHE_PATH" \
-  --strict \
-  --force-exclude \
-  --quiet \
-  "$ROOT/Tools/HarnessMonitorE2E/Sources" \
-  "$ROOT/Tools/HarnessMonitorE2E/Tests"
-
-"$XCODEBUILD_RUNNER" \
-  -workspace "$ROOT/HarnessMonitor.xcworkspace" \
-  -scheme "HarnessMonitor" \
-  -destination "$DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA_PATH" \
-  CODE_SIGNING_ALLOWED=NO \
-  build-for-testing
+"$BUILD_FOR_TESTING_SCRIPT"
 
 SANDBOX_VIOLATIONS="$("$LOG_BIN" show \
   --predicate 'subsystem == "com.apple.sandbox.reporting" AND composedMessage CONTAINS "io.harnessmonitor"' \

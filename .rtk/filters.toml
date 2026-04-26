@@ -333,8 +333,8 @@ expected = "rust mise lane: ok"
 # Harness Monitor — apps/harness-monitor-macos quality gate
 # ---------------------------------------------------------------------------
 [filters.harness-monitor-run-quality-gates]
-description = "Compact Harness Monitor quality-gates output (SwiftLint + Swift Format + xcodebuild)"
-match_command = "^(run-quality-gates\\.sh|((rtk(\\s+proxy)?\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:lint)((['\"])?(\\s|$))"
+description = "Compact Harness Monitor lint and quality-gate output"
+match_command = "^(run-(lint|quality-gates)\\.sh|((rtk(\\s+proxy)?\\s+)?(((env\\s+)?[A-Z_][A-Z0-9_]*=[^[:space:]]+\\s+)+)?)?(((sh|bash|zsh|fish)\\b.*?['\"][^'\"]*?))?mise(\\s+run)?\\s+monitor:macos:(lint|quality-gate))((['\"])?(\\s|$))"
 strip_ansi = true
 filter_stderr = true
 keep_lines_matching = [
@@ -352,6 +352,10 @@ keep_lines_matching = [
   # Sandbox / quality gate harness output
   "^=== Sandbox violations detected ===$",
   "^Sandbox violation:",
+  "^Waiting for xcodebuild lock at ",
+  "^lock owner pid: ",
+  "^lock owner command: ",
+  "^Timed out waiting for xcodebuild lock at ",
   # Entitlement / bundle checks emitted by the shell script
   "^swift is required on PATH$",
   "^swiftlint is required on PATH$",
@@ -378,7 +382,7 @@ truncate_lines_at = 240
 head_lines = 20
 tail_lines = 20
 max_lines = 50
-on_empty = "run-quality-gates: ok"
+on_empty = "monitor:macos lint/quality-gate: ok"
 
 [[tests.harness-monitor-run-quality-gates]]
 name = "drops project generation chatter on success"

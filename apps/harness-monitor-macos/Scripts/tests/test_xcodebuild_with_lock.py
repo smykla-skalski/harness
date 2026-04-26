@@ -24,6 +24,7 @@ class XcodebuildWithLockTests(unittest.TestCase):
         self,
         *args: str,
         extra_env: dict[str, str] | None = None,
+        preexisting_lock_pid: int | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -31,6 +32,11 @@ class XcodebuildWithLockTests(unittest.TestCase):
             fake_bin.mkdir()
             derived_data_path = temp_root / "derived"
             tool_log = temp_root / "tool.log"
+
+            if preexisting_lock_pid is not None:
+                lock_dir = derived_data_path / ".xcodebuild.lock"
+                lock_dir.mkdir(parents=True)
+                (lock_dir / "pid").write_text(f"{preexisting_lock_pid}\n")
 
             write_executable(
                 fake_bin / "rtk",
@@ -73,6 +79,30 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
             )
             log = tool_log.read_text() if tool_log.exists() else ""
             return completed, log
+
+    def test_reports_lock_owner_while_waiting_for_shared_derived_data(self) -> None:
+        sleeper = subprocess.Popen(["/bin/sleep", "10"])
+        try:
+            completed, log = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={
+                    "XCODEBUILD_LOCK_TIMEOUT_SECONDS": "1",
+                    "XCODEBUILD_LOCK_POLL_SECONDS": "1",
+                },
+                preexisting_lock_pid=sleeper.pid,
+            )
+        finally:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("Waiting for xcodebuild lock at", completed.stderr)
+        self.assertIn(f"lock owner pid: {sleeper.pid}", completed.stderr)
+        self.assertIn("lock owner command:", completed.stderr)
+        self.assertIn("Timed out waiting for xcodebuild lock at", completed.stderr)
+        self.assertEqual(log, "")
 
     def test_uses_direct_xcodebuild_for_normal_build_invocations(self) -> None:
         completed, log = self.run_script("-scheme", "HarnessMonitor", "build")
