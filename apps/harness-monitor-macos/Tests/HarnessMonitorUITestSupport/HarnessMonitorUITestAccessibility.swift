@@ -92,27 +92,6 @@ enum HarnessMonitorUITestAccessibility {
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
   static let contentRootFrame = "harness.content.root.frame"
-  static let sessionInspectorCard = "harness.inspector.session-card"
-  static let taskInspectorCard = "harness.inspector.task-card"
-  static let taskNoteField = "harness.inspector.task-note-field"
-  static let taskNoteAddButton = "harness.inspector.task-note-add"
-  static let taskNotesUnavailable = "harness.inspector.task-notes-unavailable"
-  static let signalInspectorCard = "harness.inspector.signal-card"
-  static let observerInspectorCard = "harness.inspector.observer-card"
-  static let actionActorPicker = "harness.inspector.action-actor"
-  static let signalCommandField = "harness.inspector.signal-command"
-  static let signalMessageField = "harness.inspector.signal-message"
-  static let createTaskTitleField = "harness.inspector.create-task.title"
-  static let createTaskButton = "harness.inspector.create-task"
-  static let assignTaskButton = "harness.inspector.assign-task"
-  static let updateTaskQueuePolicyButton = "harness.inspector.update-task-queue-policy"
-  static let updateTaskStatusButton = "harness.inspector.update-task-status"
-  static let checkpointTaskButton = "harness.inspector.checkpoint-task"
-  static let changeRoleButton = "harness.inspector.change-role"
-  static let removeAgentButton = "harness.inspector.remove-agent"
-  static let signalSendButton = "harness.inspector.signal-send"
-  static let leaderTransferSection = "harness.inspector.leader-transfer"
-  static let leaderTransferPicker = "harness.inspector.leader-transfer-picker"
   static let observeSummaryButton = "harness.session.observe.summary"
   static let observeSessionButton = "harness.session.action.observe"
   static let endSessionButton = "harness.session.action.end"
@@ -349,10 +328,6 @@ enum HarnessMonitorUITestAccessibility {
 
   static func sessionTaskCard(_ taskID: String) -> String {
     "harness.session.task.\(slug(taskID))"
-  }
-
-  static func taskInspectorSelection(_ taskID: String) -> String {
-    "harness.inspector.task-card.selection.\(slug(taskID))"
   }
 
   static let sessionTaskListState = "harness.session.tasks.state"

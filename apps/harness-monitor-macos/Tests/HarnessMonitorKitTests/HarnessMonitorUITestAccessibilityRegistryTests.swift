@@ -15,23 +15,23 @@ import Testing
 /// test mirror, update the expected values in this test in the same commit.
 @Suite("Harness Monitor UI-test accessibility registry mirror")
 struct HarnessMonitorUITestAccessibilityRegistryTests {
-  @Test("Review inspector identifiers match UI-test mirror")
-  func reviewInspectorIdentifiersMirror() {
+  @Test("Review badge identifiers match UI-test mirror")
+  func reviewBadgeIdentifiersMirror() {
     #expect(
       HarnessMonitorAccessibility.awaitingReviewBadge("task-1")
-        == "harness.inspector.task.awaiting-review-badge.task-1"
+        == "harness.review.task.awaiting.task-1"
     )
     #expect(
       HarnessMonitorAccessibility.reviewerClaimBadge("task-1", runtime: "claude")
-        == "harness.inspector.task.reviewer-claim-badge.task-1.claude"
+        == "harness.review.task.reviewer-claim.task-1.claude"
     )
     #expect(
       HarnessMonitorAccessibility.reviewerQuorumIndicator("task-1")
-        == "harness.inspector.task.reviewer-quorum.task-1"
+        == "harness.review.task.reviewer-quorum.task-1"
     )
     #expect(
       HarnessMonitorAccessibility.reviewPointChip("point-a")
-        == "harness.inspector.task.review-point.point-a"
+        == "harness.review.task.review-point.point-a"
     )
     #expect(
       HarnessMonitorAccessibility.partialAgreementChip("point-a")
@@ -39,15 +39,42 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       HarnessMonitorAccessibility.roundCounter("task-1")
-        == "harness.inspector.task.round-counter.task-1"
+        == "harness.review.task.round-counter.task-1"
     )
     #expect(
       HarnessMonitorAccessibility.improverTaskCard("task-1")
-        == "harness.inspector.task.improver-card.task-1"
+        == "harness.review.task.improver.task-1"
     )
     #expect(
-      HarnessMonitorAccessibility.taskInspectorSelection("task-1")
-        == "harness.inspector.task-card.selection.task-1"
+      HarnessMonitorAccessibility.agentsTaskSelection("task-1")
+        == "harness.agents.task.selection.task-1"
+    )
+  }
+
+  @Test("Action console identifiers match UI-test mirror")
+  func actionConsoleIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.createTaskTitleField
+        == "harness.action.create-task.title-field"
+    )
+    #expect(HarnessMonitorAccessibility.createTaskButton == "harness.action.create-task.submit")
+    #expect(HarnessMonitorAccessibility.assignTaskButton == "harness.action.task.assign")
+    #expect(
+      HarnessMonitorAccessibility.updateTaskQueuePolicyButton
+        == "harness.action.task.update-queue-policy"
+    )
+    #expect(
+      HarnessMonitorAccessibility.updateTaskStatusButton
+        == "harness.action.task.update-status"
+    )
+    #expect(HarnessMonitorAccessibility.checkpointTaskButton == "harness.action.task.checkpoint")
+    #expect(
+      HarnessMonitorAccessibility.leaderTransferSection
+        == "harness.action.leader-transfer.section"
+    )
+    #expect(
+      HarnessMonitorAccessibility.leaderTransferPicker
+        == "harness.action.leader-transfer.picker"
     )
   }
 

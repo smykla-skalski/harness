@@ -116,7 +116,12 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "launch-dashboard")
     let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
     let sessionRow = sessionTrigger(in: launched, identifier: Accessibility.previewSessionRow)
-    let sessionInspectorCard = element(in: launched, identifier: Accessibility.sessionInspectorCard)
+    // Regression guard: the legacy inspector column is retired; the dashboard
+    // launch path must not resurrect a `harness.inspector.session-card` element.
+    let retiredSessionInspectorCard = element(
+      in: launched,
+      identifier: "harness.inspector.session-card"
+    )
 
     waitForScenarioCompletion(
       app: launched,
@@ -125,7 +130,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertFalse(sessionInspectorCard.exists)
+    XCTAssertFalse(retiredSessionInspectorCard.exists)
     assertAuditBuildState(in: launched, scenario: "launch-dashboard")
 
     launched.terminate()
