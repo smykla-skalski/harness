@@ -4,13 +4,21 @@ import Foundation
 /// host. When the host is enabled, `HarnessMonitorMCPAccessibilityService`
 /// binds a Unix-domain socket inside the app-group container so the
 /// `harness mcp serve` client can connect to it.
+///
+/// MCP is a product-level contract: the registry host is **on by default**.
+/// Users must explicitly disable it via the Preferences toggle to opt out.
 public enum HarnessMonitorMCPPreferencesDefaults {
-  /// `@AppStorage` key for the master toggle. Bool. Default: `false`.
+  /// `@AppStorage` key for the master toggle. Bool. Default: `true`.
   public static let registryHostEnabledKey = "harnessMonitorMCPRegistryHostEnabled"
 
-  /// Default value for the master toggle. The host is off until the user
-  /// explicitly opts in.
-  public static let registryHostEnabledDefault = false
+  /// Default value for the master toggle. MCP is enabled by default; the
+  /// user must explicitly disable it to opt out.
+  public static let registryHostEnabledDefault = true
+
+  /// Returns the `UserDefaults.register(defaults:)` payload for MCP keys.
+  public static func registrationDefaults() -> [String: Any] {
+    [registryHostEnabledKey: registryHostEnabledDefault]
+  }
 
   /// App-group identifier shared with the harness CLI MCP client. The
   /// socket lives inside this container so the sandboxed app and the

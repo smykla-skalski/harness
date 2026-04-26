@@ -17,6 +17,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let launchMode = HarnessMonitorLaunchMode(
     environment: HarnessMonitorAppDelegate.launchEnvironment()
   )
+  private let mcpStartupController = HarnessMonitorMCPStartupController()
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
@@ -41,6 +42,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    mcpStartupController.start()
     guard !hidesDockIconForPerfRuns else {
       return
     }
@@ -233,6 +235,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     if let store {
       await store.prepareForTermination()
     }
+    await mcpStartupController.stop()
     #if HARNESS_FEATURE_OTEL
       HarnessMonitorTelemetry.shared.shutdown()
     #endif
