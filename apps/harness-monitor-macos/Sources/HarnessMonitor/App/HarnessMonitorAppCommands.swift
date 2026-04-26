@@ -82,7 +82,7 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var fileAndEditCommands: some Commands {
-    CommandGroup(after: .pasteboard) {
+    CommandGroup(after: .textEditing) {
       Button("Find in Sessions") {
         sidebarSearchFocus?.invoke()
       }
