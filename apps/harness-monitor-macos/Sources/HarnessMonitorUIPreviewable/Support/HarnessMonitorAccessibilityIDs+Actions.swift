@@ -7,4 +7,5 @@ extension HarnessMonitorAccessibility {
   public static let leaderTransferSheetDismiss = "harness.action.leader-transfer.dismiss"
   public static let leaderTransferOpenButton = "harness.session.header.leader-transfer.open"
   public static let manageTaskOpenButton = "harness.agents.task.manage-open"
+  public static let createTaskOpenButton = "harness.session.action-dock.task-flow"
 }
