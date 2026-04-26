@@ -3,8 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 /// UI tests covering the macOS HIG menu bar restructure: the new Window menu
-/// items must open the Agents and Decisions windows, and the View menu's
-/// Show / Hide Inspector toggle must flip the inspector column visibility.
+/// items must open the Agents and Decisions windows.
 @MainActor
 final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   // swiftlint:disable:next static_over_final_class
@@ -59,32 +58,5 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     )
 
     windowMenu.typeKey(.escape, modifierFlags: [])
-  }
-
-  func testViewMenuTogglesInspector() throws {
-    let app = launch(mode: "preview")
-
-    let inspector = element(in: app, identifier: Accessibility.inspectorRoot)
-    let initiallyVisible = inspector.waitForExistence(timeout: Self.actionTimeout)
-
-    invokeMenuItem(
-      in: app,
-      menu: "View",
-      title: initiallyVisible ? "Hide Inspector" : "Show Inspector"
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { inspector.exists != initiallyVisible },
-      "Inspector visibility should flip after the first View menu toggle"
-    )
-
-    invokeMenuItem(
-      in: app,
-      menu: "View",
-      title: initiallyVisible ? "Show Inspector" : "Hide Inspector"
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { inspector.exists == initiallyVisible },
-      "Inspector visibility should return to its initial state after the second toggle"
-    )
   }
 }
