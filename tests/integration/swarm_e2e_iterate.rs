@@ -297,12 +297,74 @@ fn generated_skill_mirrors_follow_the_canonical_source() {
 }
 
 #[test]
+fn protocol_reference_carries_glossary_and_column_vocab() {
+    let body = read_repo_file(PROTOCOL_REF);
+    let required_phrases = [
+        "## Glossary",
+        "**ledger system**",
+        "**active findings**",
+        "**closed archive**",
+        "### Column vocabulary",
+        "`Status`: `Open`, `needs-verification`, or `Closed`",
+        "`Severity`: `low`, `medium`, `high`, or `critical`",
+        "## Move Protocol",
+        "scripts/swarm-iterate/close-finding.sh",
+    ];
+    for phrase in required_phrases {
+        assert!(
+            body.contains(phrase),
+            "iteration-protocol.md missing glossary/vocab phrase: {phrase}"
+        );
+    }
+}
+
+#[test]
+fn subagent_mirror_matches_canonical() {
+    let canonical = read_repo_file(SUBAGENT_BODY);
+    let mirror = repo_root().join(".claude/agents/swarm-e2e-iterator.md");
+    let mirror_body = std::fs::read_to_string(&mirror).unwrap_or_else(|err| {
+        panic!(
+            "failed to read .claude/agents/swarm-e2e-iterator.md: {err}; expected hand-maintained mirror of {SUBAGENT_BODY}",
+        );
+    });
+    assert_eq!(
+        canonical, mirror_body,
+        ".claude/agents/swarm-e2e-iterator.md must mirror {SUBAGENT_BODY} byte-for-byte. \
+         Run: cp {SUBAGENT_BODY} .claude/agents/swarm-e2e-iterator.md"
+    );
+}
+
+#[test]
+fn swarm_iterate_helpers_are_executable() {
+    let scripts = [
+        "scripts/swarm-iterate/close-finding.sh",
+        "scripts/swarm-iterate/check-active-ledger.sh",
+        "scripts/swarm-iterate/lib.sh",
+        "scripts/swarm-iterate/tests/run-all.sh",
+    ];
+    for relative in scripts {
+        let path = repo_root().join(relative);
+        assert!(path.is_file(), "expected helper script: {}", path.display());
+    }
+    let check_scripts = read_repo_file("scripts/check-scripts.sh");
+    assert!(
+        check_scripts.contains("scripts/swarm-iterate/tests/run-all.sh"),
+        "scripts/check-scripts.sh must invoke the swarm-iterate test runner"
+    );
+    assert!(
+        check_scripts.contains("scripts/swarm-iterate/check-active-ledger.sh"),
+        "scripts/check-scripts.sh must invoke check-active-ledger.sh"
+    );
+}
+
+#[test]
 fn references_dir_holds_required_companions() {
     let dir = repo_root().join(SKILL_DIR).join("references");
     let expected = [
         "recording-analysis.md",
         "recording-checklist.md",
         "iteration-protocol.md",
+        "act-marker-matrix.md",
     ];
     for name in expected {
         let path = dir.join(name);

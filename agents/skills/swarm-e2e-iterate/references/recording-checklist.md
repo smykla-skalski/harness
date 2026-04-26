@@ -122,4 +122,4 @@ Apply on every iteration, even when no `swarm.*` row is `found`.
 - `suite.delayedAssert`: no assertion that waits longer than required.
 - `suite.repeatedWait`: no repeated wait that could be collapsed.
 
-Keep the proof pass terse. Wrap named files or paths in markdown links. Promote any `found` verdict to a row in `_artifacts/active.md` using [iteration-protocol.md](iteration-protocol.md).
+Keep the proof pass terse. Wrap named files or paths in markdown links. Promote any `found` verdict to a row in the active findings file `_artifacts/active.md` using [iteration-protocol.md](iteration-protocol.md). Closed rows belong in the closed archive `_artifacts/ledger.md`; the move is owned by `scripts/swarm-iterate/close-finding.sh`.
