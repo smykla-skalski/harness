@@ -35,6 +35,12 @@ pub struct GenerateAgentAssetsArgs {
     /// Skip runtime hook config files for the listed agents while generating.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub skip_runtime_hooks: Vec<HookAgent>,
+    #[command(flatten)]
+    pub hook_flags: GenerateAgentHookFlags,
+}
+
+#[derive(Debug, Clone, Args, Default)]
+pub struct GenerateAgentHookFlags {
     /// Re-enable the suite-lifecycle hooks (`guard-stop`, `context-agent`,
     /// `validate-agent`, `tool-failure`) that are off by default while the
     /// suite workflow is unfinished. Equivalent to `HARNESS_FEATURE_SUITE_HOOKS=1`.
@@ -49,8 +55,8 @@ pub struct GenerateAgentAssetsArgs {
 
 impl Execute for GenerateAgentAssetsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let suite = self.enable_suite_hooks.then_some(true);
-        let repo_policy = self.enable_repo_policy.then_some(true);
+        let suite = self.hook_flags.enable_suite_hooks.then_some(true);
+        let repo_policy = self.hook_flags.enable_repo_policy.then_some(true);
         generate_agent_assets_with_skipped_runtime_hooks(
             self.target,
             self.check,
