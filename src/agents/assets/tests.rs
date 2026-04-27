@@ -237,6 +237,71 @@ fn target_specific_write_preserves_other_managed_roots() {
 }
 
 #[test]
+fn copilot_specific_write_preserves_existing_shared_plugin_outputs() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project_root = tmp.path();
+
+    write_agent_target_outputs(project_root, AgentAssetTarget::All).expect("all assets write");
+    let council_claude_manifest = project_root
+        .join("plugins")
+        .join("council")
+        .join(".claude-plugin")
+        .join("plugin.json");
+    let council_codex_manifest = project_root
+        .join("plugins")
+        .join("council")
+        .join(".codex-plugin")
+        .join("plugin.json");
+    let council_skill = project_root
+        .join("plugins")
+        .join("council")
+        .join("skills")
+        .join("council")
+        .join("SKILL.md");
+    let council_agent = project_root
+        .join("plugins")
+        .join("council")
+        .join("skills")
+        .join("council")
+        .join("agents")
+        .join("openai.yaml");
+    let copilot_hook = project_root
+        .join(".github")
+        .join("hooks")
+        .join("harness.json");
+    let council_skill_before = read_text(&council_skill).expect("council skill reads");
+    assert!(council_claude_manifest.exists());
+    assert!(council_codex_manifest.exists());
+    assert!(council_agent.exists());
+    assert!(copilot_hook.exists());
+
+    write_agent_target_outputs(project_root, AgentAssetTarget::Copilot)
+        .expect("Copilot assets write");
+
+    assert!(
+        council_claude_manifest.exists(),
+        "Copilot-only generation must not prune shared Claude plugin manifests"
+    );
+    assert!(
+        council_codex_manifest.exists(),
+        "Copilot-only generation must not prune shared Codex plugin manifests"
+    );
+    assert!(
+        council_agent.exists(),
+        "Copilot-only generation must not prune shared plugin support files"
+    );
+    assert_eq!(
+        read_text(&council_skill).expect("council skill reads after Copilot write"),
+        council_skill_before,
+        "Copilot-only generation must not rewrite shared plugin skill variants"
+    );
+    assert!(
+        copilot_hook.exists(),
+        "Copilot-only generation must still refresh the local hook config"
+    );
+}
+
+#[test]
 fn render_skill_markdown_keeps_first_scalar_and_hook_entries() {
     let rendered =
         render_skill_markdown(RenderTarget::Claude, &sample_skill(), None).expect("skill renders");
