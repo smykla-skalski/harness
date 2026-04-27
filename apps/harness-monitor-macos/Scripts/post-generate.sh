@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="${HARNESS_MONITOR_APP_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 BUILD_SERVER_VERSION="1.3.0"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$ROOT/Scripts/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
 write_build_server_config() {
   local config_path="$1"

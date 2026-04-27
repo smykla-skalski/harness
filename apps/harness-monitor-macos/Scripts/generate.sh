@@ -9,8 +9,11 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$SCRIPT_DIR/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
-TUIST_BIN="${TUIST_BIN:-$(command -v tuist || true)}"
+TUIST_BIN="${TUIST_BIN:-$(type -P tuist || true)}"
 if [ -z "$TUIST_BIN" ]; then
   echo "tuist is required on PATH (pinned via mise)" >&2
   exit 1
@@ -90,9 +93,9 @@ should_generate() {
 
 if should_generate; then
   if [ ! -d "$ROOT/Tuist/.build" ]; then
-    "$TUIST_BIN" install --path "$ROOT"
+    run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" install --path "$ROOT"
   fi
 
-  "$TUIST_BIN" generate --no-open --path "$ROOT"
+  run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" generate --no-open --path "$ROOT"
   "$SCRIPT_DIR/post-generate.sh"
 fi

@@ -14,6 +14,9 @@ CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$ROOT/Scripts/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 CODEX_BINARY="${HARNESS_MONITOR_E2E_CODEX_BINARY:-$(command -v codex || true)}"
 CODEX_MODEL_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_MODEL:-}"
 CODEX_EFFORT_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_EFFORT:-}"
@@ -72,7 +75,8 @@ ensure_e2e_tool_binary() {
     return 0
   fi
   echo "Building harness-monitor-e2e helper at $E2E_TOOL_BINARY" >&2
-  swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
+  run_with_sanitized_xcode_only_swift_environment \
+    swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
   if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
     echo "harness-monitor-e2e binary missing after build at $E2E_TOOL_BINARY" >&2
     exit 1
