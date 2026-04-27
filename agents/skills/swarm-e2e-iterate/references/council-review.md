@@ -21,25 +21,16 @@ Skip if `_artifacts/active.md` carries zero data rows. Nothing to review; the it
 
 ## How to invoke
 
-The council skill is `disable-model-invocation: true`, so the iterate skill cannot reach it through the Skill tool. Spawn an Agent that follows `.claude/plugins/council/skills/council/SKILL.md` directly.
+The council skill is model-invocable. Call it via the Skill tool directly:
 
 ```
-Agent (general-purpose, sonnet):
-  prompt: |
-    Read .claude/plugins/council/skills/council/SKILL.md, then execute the
-    workflow it describes for this user input:
-
-      /council <mode> @_artifacts/active.md
-
-    Pick the mode per the heuristic in
-    agents/skills/swarm-e2e-iterate/references/council-review.md.
-
-    Save the integrated synthesis (Convergence / Disagreement / Per-persona
-    top-3 / What to do next / What we did not address) - not the per-persona
-    drafts - to _artifacts/runs/<slug>/council-review.md.
+Skill: council
+Arguments: <mode> @_artifacts/active.md
 ```
 
-Pick `<mode>` from the next section. The Agent may spawn nested persona subagents in parallel; that is by design.
+`<mode>` is one of `core`, `all`, or `debate`, picked per the heuristic in the next section. The council skill spawns its persona subagents in parallel and returns the integrated synthesis.
+
+Save the synthesis (Convergence / Disagreement / Per-persona top-3 / What to do next / What we did not address) - not the per-persona drafts - to `_artifacts/runs/<slug>/council-review.md`.
 
 ## Mode dispatch
 
