@@ -275,6 +275,18 @@ final class ActSurfaceAssertionTests: XCTestCase {
     XCTAssertEqual(verdict(findings, for: "swarm.act11.refusal"), .found)
   }
 
+  func testAct11FindsSelectedAgentsTaskDetail() {
+    let text = """
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.agents.task.selection.task-4', label: 'task-4'
+      """
+    let findings = RecordingTriage.assertActSurface(
+      act: "act11",
+      payload: ["task_refusal_id": "task-4", "worker_claude_id": "claude-2"],
+      identifiers: parse(text)
+    )
+    XCTAssertEqual(verdict(findings, for: "swarm.act11.refusal"), .found)
+  }
+
   func testAct12FindsRoundCounter() {
     let text = """
       Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.review.task.round-counter.task-3', label: '1'

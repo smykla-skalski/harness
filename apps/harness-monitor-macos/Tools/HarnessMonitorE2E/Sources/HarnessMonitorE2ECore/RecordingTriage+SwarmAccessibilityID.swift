@@ -48,5 +48,9 @@ extension RecordingTriage {
     public static func arbitrationBanner(_ taskID: String) -> String {
       "harness.banner.arbitration.\(slug(taskID))"
     }
+
+    public static func agentsTaskSelection(_ taskID: String) -> String {
+      "harness.agents.task.selection.\(slug(taskID))"
+    }
   }
 }

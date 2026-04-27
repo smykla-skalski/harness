@@ -846,7 +846,7 @@ extension RecordingTriage {
   }
 
   private static func assertAct11(
-    payload _: [String: String],
+    payload: [String: String],
     identifiers: [AccessibilityIdentifier]
   ) -> [ChecklistFinding] {
     if identifiers.contains(where: { $0.identifier == "harness.toast.worker-refusal" }) {
@@ -858,11 +858,23 @@ extension RecordingTriage {
         )
       ]
     }
+    if let taskID = payload["task_refusal_id"], !taskID.isEmpty {
+      let selectionID = SwarmAccessibilityID.agentsTaskSelection(taskID)
+      if identifiers.contains(where: { $0.identifier == selectionID }) {
+        return [
+          ChecklistFinding(
+            id: "swarm.act11.refusal",
+            verdict: .found,
+            message: "\(selectionID) visible"
+          )
+        ]
+      }
+    }
     return [
       ChecklistFinding(
         id: "swarm.act11.refusal",
         verdict: .needsVerification,
-        message: "no refusal toast in hierarchy; transient toasts may have dismissed"
+        message: "no refusal toast or selected agents task detail in hierarchy"
       )
     ]
   }
