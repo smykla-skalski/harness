@@ -100,6 +100,35 @@ impl Drop for ManagedChild {
             }
             Err(_) => {}
         }
+
+        // If a managed child existed, also attempt to clean up any lingering
+        // Harness Monitor UI Testing / Harness Monitor app processes. Tests
+        // sometimes launch the UI host which can be left running if the test
+        // process aborts; proactively quit the app on macOS to avoid Dock
+        // pollution and leaked hosts.
+        #[cfg(target_os = "macos")]
+        {
+            // Try graceful AppleScript quit
+            let _ = ProcessCommand::new("/usr/bin/osascript")
+                .args(&["-e", "tell application \"Harness Monitor\" to quit"]) 
+                .status();
+
+            // Short wait to allow graceful shutdown
+            std::thread::sleep(std::time::Duration::from_millis(500));
+
+            // If still running, send TERM to the binary process
+            let _ = ProcessCommand::new("/usr/bin/pgrep")
+                .args(&["-f", "Harness Monitor.app/Contents/MacOS/Harness Monitor"])
+                .status()
+                .and_then(|s| {
+                    if s.success() {
+                        let _ = ProcessCommand::new("/usr/bin/pkill")
+                            .args(&["-TERM", "-f", "Harness Monitor.app/Contents/MacOS/Harness Monitor"])
+                            .status();
+                    }
+                    Ok(s)
+                });
+        }
     }
 }
 
