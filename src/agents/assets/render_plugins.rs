@@ -97,14 +97,7 @@ fn render_codex_plugin_outputs(
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     let base = repo_root.join("plugins").join(&plugin.source.name);
-    let manifest = render_plugin_manifest(&plugin.source);
-    files.insert(
-        base.join(".codex-plugin").join("plugin.json"),
-        manifest.clone(),
-    );
-    files.insert(base.join(".claude-plugin").join("plugin.json"), manifest);
-    copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
-    render_codex_plugin_skill_markdown(plugin, &base, files)?;
+    render_shared_plugin_root_outputs(plugin, &base, files)?;
     files.insert(
         repo_root
             .join(".agents")
@@ -139,12 +132,7 @@ fn render_copilot_plugin_outputs(
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     let base = repo_root.join("plugins").join(&plugin.source.name);
-    files.insert(
-        base.join("plugin.json"),
-        render_plugin_manifest(&plugin.source),
-    );
-    copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
-    render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)
+    render_shared_plugin_root_outputs(plugin, &base, files)
 }
 
 fn render_opencode_plugin_outputs(
@@ -188,6 +176,22 @@ fn render_plugin_skill_markdown(
         copy_skill_extra_text_files(skill, &skill_base, files, target)?;
     }
     Ok(())
+}
+
+fn render_shared_plugin_root_outputs(
+    plugin: &PluginDefinition,
+    base: &Path,
+    files: &mut BTreeMap<PathBuf, String>,
+) -> Result<(), CliError> {
+    let manifest = render_plugin_manifest(&plugin.source);
+    files.insert(base.join("plugin.json"), manifest.clone());
+    files.insert(
+        base.join(".codex-plugin").join("plugin.json"),
+        manifest.clone(),
+    );
+    files.insert(base.join(".claude-plugin").join("plugin.json"), manifest);
+    copy_plugin_assets(plugin, base, files, RenderTarget::Portable)?;
+    render_codex_plugin_skill_markdown(plugin, base, files)
 }
 
 fn render_codex_plugin_skill_markdown(
