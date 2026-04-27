@@ -18,9 +18,7 @@ use crate::session::service::{
     submit_review as svc_submit_review,
 };
 
-use super::{
-    effective_project_dir, index, project_dir_for_db_session, session_detail,
-};
+use super::{effective_project_dir, index, project_dir_for_db_session, session_detail};
 
 fn project_dir_from_db_or_index(
     db: Option<&super::db::DaemonDb>,
@@ -154,4 +152,3 @@ pub fn arbitrate(
     bump_and_refresh(db, session_id)?;
     session_detail(session_id, db)
 }
-
