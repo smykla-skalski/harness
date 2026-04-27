@@ -1,4 +1,5 @@
 use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
 use std::{thread, time::Duration};
 
 use fs_err as fs;
@@ -35,6 +36,64 @@ fn project_plugin_launcher_prefers_repo_build_then_path() {
     assert!(PROJECT_PLUGIN_LAUNCHER.contains("CLAUDE_PROJECT_DIR"));
     assert!(PROJECT_PLUGIN_LAUNCHER.contains("target/debug/harness"));
     assert!(PROJECT_PLUGIN_LAUNCHER.contains("command -v harness"));
+}
+
+#[test]
+fn project_plugin_launcher_refuses_stale_installed_harness() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo_root = dir.path().join("repo");
+    let plugin_dir = repo_root.join(".claude").join("plugins").join("suite");
+    let bin_dir = dir.path().join("bin");
+    let sentinel = dir.path().join("stale-sentinel");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap();
+    fs::write(
+        repo_root.join("Cargo.toml"),
+        format!(
+            "[package]\nname = \"harness\"\nversion = \"{}\"\n",
+            env!("CARGO_PKG_VERSION")
+        ),
+    )
+    .unwrap();
+
+    let launcher = plugin_dir.join("harness");
+    fs::write(&launcher, PROJECT_PLUGIN_LAUNCHER).unwrap();
+    let mut launcher_permissions = fs::metadata(&launcher).unwrap().permissions();
+    launcher_permissions.set_mode(0o755);
+    fs::set_permissions(&launcher, launcher_permissions).unwrap();
+
+    let stale_harness = bin_dir.join("harness");
+    fs::write(
+        &stale_harness,
+        "#!/bin/sh
+set -eu
+if [ \"${1:-}\" = \"--version\" ]; then
+  printf 'harness 0.0.0\\n'
+  exit 0
+fi
+printf 'stale binary executed\\n' >\"$HARNESS_SENTINEL\"
+",
+    )
+    .unwrap();
+    let mut stale_permissions = fs::metadata(&stale_harness).unwrap().permissions();
+    stale_permissions.set_mode(0o755);
+    fs::set_permissions(&stale_harness, stale_permissions).unwrap();
+
+    let output = Command::new(&launcher)
+        .arg("agents")
+        .arg("session-start")
+        .env("HARNESS_SENTINEL", &sentinel)
+        .env("PATH", format!("{}:/usr/bin:/bin", bin_dir.display()))
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(!sentinel.exists(), "stale installed harness must not execute");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("version"),
+        "stderr should explain the stale harness refusal: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
