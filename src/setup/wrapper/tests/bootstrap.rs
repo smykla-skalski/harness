@@ -4,7 +4,12 @@ use fs_err as fs;
 
 use super::super::registrations::{build_codex_config, lifecycle_command};
 use super::super::write_agent_bootstrap;
+use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
+
+fn legacy_flags() -> RuntimeHookFlags {
+    RuntimeHookFlags::all_enabled()
+}
 
 #[test]
 fn lifecycle_commands_include_project_dirs() {
@@ -84,7 +89,8 @@ fn assert_codex_hooks(hooks: &str) {
 #[test]
 fn write_agent_bootstrap_writes_codex_notify_config() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Codex, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Codex, false, &[], legacy_flags()).unwrap();
 
     let plugin_skill = dir
         .path()
@@ -112,7 +118,8 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
 #[test]
 fn write_agent_bootstrap_writes_claude_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Claude, false, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".claude").join("settings.json");
     let plugin_skill = dir
@@ -133,7 +140,8 @@ fn write_agent_bootstrap_writes_claude_plugin_assets() {
 #[test]
 fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Gemini, false, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -151,7 +159,8 @@ fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
 #[test]
 fn write_agent_bootstrap_includes_gemini_session_command_when_requested() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -170,7 +179,8 @@ fn write_agent_bootstrap_includes_gemini_session_command_when_requested() {
 #[test]
 fn write_agent_bootstrap_writes_opencode_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::OpenCode, false, &[], legacy_flags()).unwrap();
 
     let hooks_path = dir.path().join(".opencode").join("hooks.json");
     let plugin_skill = dir
@@ -191,7 +201,8 @@ fn write_agent_bootstrap_writes_opencode_plugin_assets() {
 #[test]
 fn write_agent_bootstrap_writes_vibe_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Vibe, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Vibe, false, &[], legacy_flags()).unwrap();
 
     let hooks_path = dir.path().join(".vibe").join("hooks.json");
     let plugin_skill = dir
@@ -212,7 +223,8 @@ fn write_agent_bootstrap_writes_vibe_plugin_assets() {
 #[test]
 fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[]).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[], legacy_flags()).unwrap();
 
     let config_path = dir
         .path()
@@ -244,10 +256,89 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
 }
 
 #[test]
+fn rebootstrap_replaces_gated_hooks_with_default_off_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Claude,
+        false,
+        &[],
+        RuntimeHookFlags::all_enabled(),
+    )
+    .unwrap();
+    let settings_path = dir.path().join(".claude").join("settings.json");
+    let baseline = fs::read_to_string(&settings_path).unwrap();
+    assert!(baseline.contains("guard-stop"));
+    assert!(baseline.contains("repo-policy"));
+
+    write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Claude,
+        false,
+        &[],
+        RuntimeHookFlags::default(),
+    )
+    .unwrap();
+    let migrated = fs::read_to_string(&settings_path).unwrap();
+    assert!(!migrated.contains("guard-stop"));
+    assert!(!migrated.contains("context-agent"));
+    assert!(!migrated.contains("validate-agent"));
+    assert!(!migrated.contains("tool-failure"));
+    assert!(!migrated.contains("repo-policy"));
+    assert!(migrated.contains("tool-guard"));
+}
+
+#[test]
+fn default_flags_omit_suite_and_repo_policy_hooks_in_codex_hooks_json() {
+    let dir = tempfile::tempdir().unwrap();
+    write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Codex,
+        false,
+        &[],
+        RuntimeHookFlags::default(),
+    )
+    .unwrap();
+    let hooks = fs::read_to_string(dir.path().join(".codex").join("hooks.json")).unwrap();
+    assert!(!hooks.contains("repo-policy"));
+    assert!(!hooks.contains("guard-stop"));
+    assert!(!hooks.contains("context-agent"));
+    assert!(!hooks.contains("validate-agent"));
+    assert!(hooks.contains("tool-guard"));
+    assert!(hooks.contains("tool-result"));
+}
+
+#[test]
+fn default_flags_omit_suite_and_repo_policy_hooks_in_claude_settings_json() {
+    let dir = tempfile::tempdir().unwrap();
+    write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Claude,
+        false,
+        &[],
+        RuntimeHookFlags::default(),
+    )
+    .unwrap();
+    let settings = fs::read_to_string(dir.path().join(".claude").join("settings.json")).unwrap();
+    assert!(!settings.contains("repo-policy"));
+    assert!(!settings.contains("guard-stop"));
+    assert!(!settings.contains("context-agent"));
+    assert!(!settings.contains("validate-agent"));
+    assert!(!settings.contains("tool-failure"));
+    assert!(settings.contains("tool-guard"));
+}
+
+#[test]
 fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[HookAgent::Gemini]).unwrap();
+    let written = write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Gemini,
+        true,
+        &[HookAgent::Gemini],
+        legacy_flags(),
+    )
+    .unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -266,9 +357,14 @@ fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
 #[test]
 fn write_agent_bootstrap_skips_copilot_hook_config_when_requested() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[HookAgent::Copilot])
-            .unwrap();
+    let written = write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Copilot,
+        false,
+        &[HookAgent::Copilot],
+        legacy_flags(),
+    )
+    .unwrap();
 
     let config_path = dir
         .path()

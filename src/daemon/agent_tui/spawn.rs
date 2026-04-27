@@ -72,7 +72,13 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
     let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
         CliErrorKind::workflow_parse(format!("unsupported terminal agent runtime '{runtime}'"))
     })?;
-    let _ = wrapper::write_agent_bootstrap(project_dir, agent, false, &[])?;
+    let _ = wrapper::write_agent_bootstrap(
+        project_dir,
+        agent,
+        false,
+        &[],
+        crate::feature_flags::RuntimeHookFlags::from_env(),
+    )?;
     Ok(())
 }
 

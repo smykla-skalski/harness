@@ -7,7 +7,10 @@ use crate::agents::assets::{
     AgentAssetTarget, write_agent_target_outputs_with_skipped_runtime_hooks,
     write_suite_plugin_outputs,
 };
+use tracing::info;
+
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::{REPO_POLICY_ENV, RuntimeHookFlags, SUITE_HOOKS_ENV};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
@@ -116,12 +119,14 @@ pub fn write_agent_bootstrap(
     agent: HookAgent,
     include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
+    flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
     write_process_agent_bootstrap(
         project_dir,
         agent,
         include_gemini_commands,
         skip_runtime_hooks,
+        flags,
     )
 }
 
@@ -138,15 +143,17 @@ fn write_process_agent_bootstrap(
     agent: HookAgent,
     include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
+    flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
     let mut written = write_agent_target_outputs_with_skipped_runtime_hooks(
         project_dir,
         agent_asset_target(agent),
         skip_runtime_hooks,
         include_gemini_commands,
+        flags,
     )?;
     let existing = written.iter().cloned().collect::<BTreeSet<_>>();
-    let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks);
+    let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks, flags);
     for (path, content) in planned {
         if existing.contains(&path) {
             continue;
@@ -156,6 +163,21 @@ fn write_process_agent_bootstrap(
     }
 
     Ok(written)
+}
+
+fn log_omitted_hook_families(path: &Path, flags: RuntimeHookFlags) {
+    if !flags.suite_hooks {
+        info!(
+            config = %path.display(),
+            "regenerated runtime config: suite-lifecycle hooks omitted (guard-stop / context-agent / validate-agent / tool-failure); set {SUITE_HOOKS_ENV}=1 or pass --enable-suite-hooks to restore",
+        );
+    }
+    if !flags.repo_policy {
+        info!(
+            config = %path.display(),
+            "regenerated runtime config: repo-policy pre-tool hook omitted; set {REPO_POLICY_ENV}=1 or pass --enable-repo-policy to restore",
+        );
+    }
 }
 
 fn agent_asset_target(agent: HookAgent) -> AgentAssetTarget {
@@ -173,6 +195,7 @@ pub(crate) fn planned_agent_bootstrap_files(
     project_dir: &Path,
     agent: HookAgent,
     skip_runtime_hooks: &[HookAgent],
+    flags: RuntimeHookFlags,
 ) -> Vec<(PathBuf, String)> {
     let mut planned = Vec::new();
     if !skip_runtime_hooks.contains(&agent) {
@@ -187,8 +210,9 @@ pub(crate) fn planned_agent_bootstrap_files(
             HookAgent::Vibe => project_dir.join(".vibe").join("hooks.json"),
             HookAgent::OpenCode => project_dir.join(".opencode").join("hooks.json"),
         };
-        let registrations = process_agent_registrations(agent);
+        let registrations = process_agent_registrations(agent, flags);
         let config = adapter_for(agent).generate_config(&registrations);
+        log_omitted_hook_families(&path, flags);
         planned.push((path, config));
     }
     if agent == HookAgent::Codex {

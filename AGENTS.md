@@ -74,9 +74,14 @@ Harness is a test orchestration framework for Kubernetes/Kuma. It enforces track
 
 Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
 
-- **Unified tool lifecycle**: `tool-guard` (pre-tool policy dispatch), `tool-result` (post-tool verification and audit), `tool-failure` (failure enrichment and audit)
-- **Blocking**: `guard-stop` (prevents session end if run incomplete)
-- **Subagent gates**: `context-agent` (start), `validate-agent` (stop)
+- **Unified tool lifecycle**: `tool-guard` (pre-tool policy dispatch), `tool-result` (post-tool verification and audit), `tool-failure` (failure enrichment and audit, **off by default**)
+- **Blocking**: `guard-stop` (prevents session end if run incomplete, **off by default**)
+- **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
+- **Repo policy pre-tool**: `repo-policy` (warns about raw `cargo`/`xcodebuild` instead of `mise run ...`, **off by default**)
+
+The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the `repo-policy` pre-tool hook are gated behind feature flags because the underlying suite workflow and repo-policy checker are unfinished and slow tool calls without producing useful guidance. Re-enable per invocation with `--enable-suite-hooks` / `--enable-repo-policy` on `harness setup bootstrap` or `harness setup agents generate`, or globally via `HARNESS_FEATURE_SUITE_HOOKS=1` / `HARNESS_FEATURE_REPO_POLICY=1`. CLI flag wins over env var; default is off. Bootstrap logs an `info!` line per regenerated config naming each omitted family.
+
+**Hook landing rule**: a new hook lands with its handler doing observable work, *or* behind a dated feature flag in `src/feature_flags.rs` with a tracking issue. Triggers without working handlers slow every tool call without producing signal — that is what the current `RuntimeHookFlags` exists to undo.
 
 ### Key modules
 

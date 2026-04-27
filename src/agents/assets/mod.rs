@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 
 #[cfg(test)]
@@ -32,7 +33,13 @@ use render_plugins::render_claude_plugin_outputs;
 /// Returns `CliError` when source assets cannot be loaded, rendered, written,
 /// or verified against the checked-in outputs.
 pub fn generate_agent_assets(target: AgentAssetTarget, check: bool) -> Result<i32, CliError> {
-    generate_agent_assets_with_skipped_runtime_hooks(target, check, &[], false)
+    generate_agent_assets_with_skipped_runtime_hooks(
+        target,
+        check,
+        &[],
+        false,
+        RuntimeHookFlags::from_env(),
+    )
 }
 
 /// Generate checked-in multi-agent skill and plugin assets while optionally
@@ -46,6 +53,7 @@ pub(crate) fn generate_agent_assets_with_skipped_runtime_hooks(
     check: bool,
     skip_runtime_hooks: &[HookAgent],
     include_gemini_commands: bool,
+    flags: RuntimeHookFlags,
 ) -> Result<i32, CliError> {
     let repo_root = repo_root();
     let planned = plan_outputs_with_gemini_commands(
@@ -53,6 +61,7 @@ pub(crate) fn generate_agent_assets_with_skipped_runtime_hooks(
         target,
         skip_runtime_hooks,
         include_gemini_commands,
+        flags,
     )?;
     if check {
         ensure_outputs_match(&planned)?;
@@ -70,7 +79,13 @@ pub fn write_agent_target_outputs(
     project_root: &Path,
     target: AgentAssetTarget,
 ) -> Result<Vec<PathBuf>, CliError> {
-    write_agent_target_outputs_with_skipped_runtime_hooks(project_root, target, &[], false)
+    write_agent_target_outputs_with_skipped_runtime_hooks(
+        project_root,
+        target,
+        &[],
+        false,
+        RuntimeHookFlags::from_env(),
+    )
 }
 
 /// Materialize the generated target outputs into a project directory while
@@ -83,6 +98,7 @@ pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks(
     target: AgentAssetTarget,
     skip_runtime_hooks: &[HookAgent],
     include_gemini_commands: bool,
+    flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
     let source_root = repo_root();
     let planned = rebase_planned_outputs(
@@ -93,6 +109,7 @@ pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks(
             target,
             skip_runtime_hooks,
             include_gemini_commands,
+            flags,
         )?,
     )?;
     let written = planned
@@ -101,6 +118,26 @@ pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks(
         .collect::<Vec<_>>();
     write_outputs(&planned)?;
     Ok(written)
+}
+
+/// Test-only wrapper that calls
+/// [`write_agent_target_outputs_with_skipped_runtime_hooks`] with the
+/// pre-flag-gating "all hooks on" baseline so legacy assertions about
+/// generated runtime configs keep working.
+#[cfg(test)]
+pub(crate) fn write_agent_target_outputs_with_skipped_runtime_hooks_legacy(
+    project_root: &Path,
+    target: AgentAssetTarget,
+    skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
+) -> Result<Vec<PathBuf>, CliError> {
+    write_agent_target_outputs_with_skipped_runtime_hooks(
+        project_root,
+        target,
+        skip_runtime_hooks,
+        include_gemini_commands,
+        RuntimeHookFlags::all_enabled(),
+    )
 }
 
 /// Materialize the current suite plugin payload into a project directory.
