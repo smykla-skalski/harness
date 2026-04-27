@@ -344,6 +344,7 @@ private final class SwarmFullFlowRunner {
   }
 
   private func createDirectories() throws {
+    try layout.ensureGeneratedDataRootsNonIndexable()
     try FileManager.default.createDirectory(at: layout.dataHome, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: layout.syncDir, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: layout.logRoot, withIntermediateDirectories: true)
@@ -700,7 +701,7 @@ final class SwarmActDriverRunner {
         FileManager.default.createFile(atPath: progressLog.path, contents: nil)
       }
       let handle = try FileHandle(forWritingTo: progressLog)
-      try? handle.seekToEnd()
+      _ = try? handle.seekToEnd()
       self.progressHandle = handle
     } else {
       self.progressHandle = nil
