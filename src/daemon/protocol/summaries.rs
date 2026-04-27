@@ -133,6 +133,8 @@ pub struct SessionSummary {
 pub struct ObserverSummary {
     pub observe_id: String,
     pub last_scan_time: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_sweep_at: Option<String>,
     pub open_issue_count: usize,
     pub resolved_issue_count: usize,
     pub muted_code_count: usize,

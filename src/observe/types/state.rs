@@ -72,6 +72,11 @@ pub struct ObserverState {
     pub project_hint: Option<String>,
     pub cursor: usize,
     pub last_scan_time: String,
+    /// RFC3339 timestamp of the most recent sweep. Read by Decisions-pane
+    /// liveness rendering to answer "when did the observer last *do*
+    /// anything" without scraping the cycle log.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_sweep_at: Option<String>,
     pub open_issues: Vec<OpenIssue>,
     pub resolved_issue_ids: Vec<String>,
     pub issue_attempts: Vec<IssueAttempt>,
@@ -127,6 +132,7 @@ impl ObserverState {
             project_hint: None,
             cursor: 0,
             last_scan_time: String::new(),
+            last_sweep_at: None,
             open_issues: Vec::new(),
             resolved_issue_ids: Vec::new(),
             issue_attempts: Vec::new(),

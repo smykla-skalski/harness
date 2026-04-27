@@ -6,6 +6,7 @@ import Testing
 private struct ObserverSummaryPayload: Encodable {
   let observeId: String
   let lastScanTime: String
+  let lastSweepAt: String?
   let openIssueCount: Int
   let resolvedIssueCount: Int
   let mutedCodeCount: Int
@@ -62,6 +63,7 @@ struct ObserverSummaryTests {
     let payload = ObserverSummaryPayload(
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
+      lastSweepAt: nil,
       openIssueCount: 3,
       resolvedIssueCount: 1,
       mutedCodeCount: 1,
@@ -76,6 +78,7 @@ struct ObserverSummaryTests {
     let summary = try decodeObserverSummary(from: payload)
 
     #expect(summary.observeId == "observe-sess-1")
+    #expect(summary.lastSweepAt == nil)
     #expect(summary.openIssues == nil)
     #expect(summary.mutedCodes == nil)
     #expect(summary.activeWorkers == nil)
@@ -87,6 +90,7 @@ struct ObserverSummaryTests {
     let payload = ObserverSummaryPayload(
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
+      lastSweepAt: "2026-03-28T14:17:45Z",
       openIssueCount: 3,
       resolvedIssueCount: 2,
       mutedCodeCount: 1,
@@ -143,6 +147,7 @@ struct ObserverSummaryTests {
 
     #expect(summary.openIssues?.count == 1)
     #expect(summary.resolvedIssueCount == 2)
+    #expect(summary.lastSweepAt == "2026-03-28T14:17:45Z")
     #expect(openIssue.code == "agent_stalled_progress")
     #expect(openIssue.category == "agent_coordination")
     #expect(summary.mutedCodes == ["agent_repeated_error"])
@@ -167,6 +172,7 @@ struct ObserverSummaryTests {
     let payload = ObserverSummaryPayload(
       observeId: "observe-legacy",
       lastScanTime: "2026-04-27T08:00:00Z",
+      lastSweepAt: nil,
       openIssueCount: 0,
       resolvedIssueCount: 0,
       mutedCodeCount: 0,
