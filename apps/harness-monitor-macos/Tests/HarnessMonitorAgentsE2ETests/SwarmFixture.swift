@@ -449,21 +449,17 @@ final class SwarmFixture {
         "task_id": taskID,
         "identifier": identifier,
         "task_exists": String(task.exists),
+        "sheet_presented_before": String(taskActionsSheetIsPresented()),
       ]
     )
-    if taskActionsSheetIsPresented() {
-      trace("select-task.sheet-presented", app: app, details: ["task_id": taskID])
-      return
-    }
+    // Any task-actions sheet still presented from a prior act would mask this
+    // call: SwiftUI keeps the sheet bound to whichever task last won the
+    // selection, so the snapshot would contain `harness.action.task-actions.sheet`
+    // but ReviewStatePanel would render the *previous* task's badges. Dismiss
+    // first so the per-task review-surface identifiers (e.g.
+    // `harness.review.task.awaiting.<taskID>`) belong to the requested task.
+    dismissTaskActionsSheetIfPresent()
     expectIdentifier(Accessibility.sessionTaskListState, labelContains: taskID)
-    if taskActionsSheetIsPresented() {
-      trace(
-        "select-task.sheet-presented-after-list-check",
-        app: app,
-        details: ["task_id": taskID]
-      )
-      return
-    }
     let target = sessionTaskScrollView(for: task)
     trace(
       "select-task.scroll-target",
