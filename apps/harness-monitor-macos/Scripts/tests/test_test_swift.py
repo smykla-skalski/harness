@@ -56,6 +56,9 @@ touch "$app_dir/build-for-testing.marker"
                 fake_runner,
                 f"""#!/bin/bash
 set -euo pipefail
+if printf '%s\\n' "$*" | /usr/bin/grep -q 'test-without-building'; then
+  printf '%s\\n' "HARNESS_MONITOR_USE_TUIST_TEST=${{HARNESS_MONITOR_USE_TUIST_TEST:-}}" >> "{runner_calls}"
+fi
 printf '%s\\n' "$*" >> "{runner_calls}"
 enumeration_output_path=""
 only_testing_selector=""
@@ -160,24 +163,26 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 5)
         self.assertEqual(calls[0], ["build-for-testing"])
-        self.assertIn("test-without-building", calls[1])
-        self.assertIn("-enumerate-tests", calls[1])
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
         self.assertIn("test-without-building", calls[2])
+        self.assertIn("-enumerate-tests", calls[2])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertIn("test-without-building", calls[4])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
-            "testDefaultPolicyGapRuleUsesStableMetadata",
-            calls[2],
+            "testDefaultPolicyGapRuleUsesStableMetadata()",
+            calls[4],
         )
         self.assertNotIn(
             "-skip-testing:HarnessMonitorUITests",
-            calls[2],
+            calls[4],
             "explicit only-testing selector must not be overridden by default skips",
         )
         self.assertNotIn(
             "-skip-testing:HarnessMonitorAgentsE2ETests",
-            calls[2],
+            calls[4],
             "explicit only-testing selector must not be overridden by default skips",
         )
         self.assertEqual(rtk_log, "")
@@ -186,11 +191,12 @@ exit 1
         completed, calls, rtk_log = self.run_script()
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3)
         self.assertEqual(calls[0], ["build-for-testing"])
-        self.assertIn("test-without-building", calls[1])
-        self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
-        self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST="])
+        self.assertIn("test-without-building", calls[2])
+        self.assertIn("-skip-testing:HarnessMonitorUITests", calls[2])
+        self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[2])
         self.assertEqual(rtk_log, "")
 
     def test_splits_comma_separated_only_testing_selectors(self) -> None:
@@ -202,18 +208,20 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
-        self.assertIn("test-without-building", calls[1])
-        self.assertIn("-enumerate-tests", calls[1])
+        self.assertEqual(len(calls), 5)
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
         self.assertIn("test-without-building", calls[2])
+        self.assertIn("-enumerate-tests", calls[2])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertIn("test-without-building", calls[4])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
-            "testDefaultPolicyGapRuleUsesStableMetadata",
-            calls[2],
+            "testDefaultPolicyGapRuleUsesStableMetadata()",
+            calls[4],
         )
         self.assertIn(
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
-            calls[2],
+            calls[4],
         )
         self.assertEqual(rtk_log, "")
 
@@ -223,23 +231,25 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
-        self.assertIn("test-without-building", calls[1])
-        self.assertIn(
-            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests",
-            calls[1],
-        )
-        self.assertIn("-enumerate-tests", calls[1])
+        self.assertEqual(len(calls), 5)
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
         self.assertIn("test-without-building", calls[2])
         self.assertIn(
-            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
-            "testInitialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary",
+            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests",
             calls[2],
+        )
+        self.assertIn("-enumerate-tests", calls[2])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertIn("test-without-building", calls[4])
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
+            "testInitialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary()",
+            calls[4],
         )
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
-            "testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan",
-            calls[2],
+            "testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan()",
+            calls[4],
         )
         self.assertEqual(rtk_log, "")
 

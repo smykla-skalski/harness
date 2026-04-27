@@ -29,7 +29,7 @@ final class PreferencesSupervisorBackgroundViewModelTests: XCTestCase {
     )
   }
 
-  func test_setRunInBackgroundPersistsAndCallsRuntime() {
+  func test_enableRunInBackgroundPersistsAndCallsRuntime() {
     let userDefaults = makeUserDefaults()
     let runtime = BackgroundRuntimeSpy()
     let viewModel = PreferencesSupervisorBackgroundViewModel(
@@ -38,13 +38,13 @@ final class PreferencesSupervisorBackgroundViewModelTests: XCTestCase {
       onRunInBackgroundChange: { enabled in runtime.runInBackgroundChanges.append(enabled) }
     )
 
-    viewModel.setRunInBackground(false)
+    viewModel.setRunInBackground(true)
 
     XCTAssertEqual(
       userDefaults.object(forKey: SupervisorPreferencesDefaults.runInBackgroundKey) as? Bool,
-      false
+      true
     )
-    XCTAssertEqual(runtime.runInBackgroundChanges, [false])
+    XCTAssertEqual(runtime.runInBackgroundChanges, [true])
   }
 
   func test_settingQuietHoursPersistsWindowAndNotifiesRuntime() {

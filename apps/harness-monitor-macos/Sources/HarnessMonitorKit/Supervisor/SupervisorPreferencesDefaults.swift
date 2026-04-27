@@ -9,11 +9,11 @@ import Foundation
 public enum SupervisorPreferencesDefaults {
   /// `@AppStorage` key for "Run supervisor in background when no window is open".
   ///
-  /// Type: `Bool`. Default: `true` — the scheduler starts unless the user opts out.
+  /// Type: `Bool`. Default: `false` — users opt in before the app stays alive after close.
   public static let runInBackgroundKey = "supervisorRunInBackground"
 
   /// Default value for the background-activity toggle.
-  public static let runInBackgroundDefault = true
+  public static let runInBackgroundDefault = false
 
   /// `@AppStorage` key for quiet-hours suppression.
   ///

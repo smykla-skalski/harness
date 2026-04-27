@@ -56,14 +56,16 @@ expand_only_testing_selector() {
 
 enumerate_only_testing_selector() {
   local selector="$1"
-  local enumeration_path expanded_selectors
+  local enumeration_dir enumeration_log_path enumeration_path expanded_selectors
 
   if [ ! -x /usr/bin/python3 ]; then
     echo "python3 is required to expand XCODE_ONLY_TESTING class selector: ${selector}" >&2
     return 1
   fi
 
-  enumeration_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-tests.XXXXXX.json")"
+  enumeration_dir="$(mktemp -d "${TMPDIR:-/tmp}/harness-monitor-tests.XXXXXX")"
+  enumeration_path="$enumeration_dir/tests.json"
+  enumeration_log_path="$enumeration_dir/xcodebuild.log"
   if ! HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
       HARNESS_MONITOR_USE_TUIST_TEST=0 \
       "$XCODEBUILD_RUNNER" \
@@ -72,8 +74,9 @@ enumerate_only_testing_selector() {
     -enumerate-tests \
     -test-enumeration-style flat \
     -test-enumeration-format json \
-    -test-enumeration-output-path "$enumeration_path" >/dev/null; then
-    rm -f "$enumeration_path"
+    -test-enumeration-output-path "$enumeration_path" >"$enumeration_log_path" 2>&1; then
+    /usr/bin/tail -n 80 "$enumeration_log_path" >&2 || true
+    /bin/rm -rf "$enumeration_dir"
     echo "failed to enumerate tests for XCODE_ONLY_TESTING selector: ${selector}" >&2
     return 1
   fi
@@ -93,19 +96,17 @@ for value in payload.get("values", []):
     for test in value.get("enabledTests", []):
         identifier = test.get("identifier", "")
         if identifier.startswith(selector + "/"):
-            if identifier.endswith("()"):
-                identifier = identifier[:-2]
             identifiers[identifier] = None
 
 for identifier in identifiers:
     print(identifier)
 PY
   )"; then
-    rm -f "$enumeration_path"
+    /bin/rm -rf "$enumeration_dir"
     echo "failed to parse enumerated tests for XCODE_ONLY_TESTING selector: ${selector}" >&2
     return 1
   fi
-  rm -f "$enumeration_path"
+  /bin/rm -rf "$enumeration_dir"
 
   if [[ -z "$expanded_selectors" ]]; then
     echo "no tests discovered for XCODE_ONLY_TESTING class selector: ${selector}" >&2
@@ -159,6 +160,10 @@ fi
 "$BUILD_FOR_TESTING_SCRIPT"
 
 clear_gatekeeper_metadata
+
+if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+  export HARNESS_MONITOR_USE_TUIST_TEST=0
+fi
 
 BASE_TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
