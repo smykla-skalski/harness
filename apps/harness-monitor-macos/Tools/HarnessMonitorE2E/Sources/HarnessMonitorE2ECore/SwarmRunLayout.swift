@@ -7,6 +7,7 @@ public struct SwarmRunLayout {
   public static let defaultRunnerBundleID = "\(agentsE2ETestBundleID).xctrunner"
   public static let appGroupEnvironmentKey = "HARNESS_APP_GROUP_ID"
   public static let defaultMonitorAppGroupIdentifier = "Q498EB36N4.io.harnessmonitor"
+  public static let nonIndexableMarkerName = ".metadata_never_index"
 
   public let runID: String
   public let sessionID: String
@@ -127,6 +128,17 @@ public struct SwarmRunLayout {
       .appendingPathComponent("project-\(prefix)", isDirectory: true)
   }
 
+  public func ensureGeneratedDataRootsNonIndexable(
+    fileManager: FileManager = .default
+  ) throws {
+    try Self.ensureDirectoryNonIndexable(dataRoot, fileManager: fileManager)
+    try Self.ensureDirectoryNonIndexable(dataHome, fileManager: fileManager)
+    try Self.ensureDirectoryNonIndexable(
+      dataHome.appendingPathComponent("harness", isDirectory: true),
+      fileManager: fileManager
+    )
+  }
+
   public static func timestampUTC(date: Date = Date()) -> String {
     formatter(format: "yyyy-MM-dd'T'HH:mm:ss'Z'").string(from: date)
   }
@@ -150,6 +162,23 @@ public struct SwarmRunLayout {
     }
     let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private static func ensureDirectoryNonIndexable(
+    _ directory: URL,
+    fileManager: FileManager
+  ) throws {
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+    var mutableDirectory = directory
+    var resourceValues = URLResourceValues()
+    resourceValues.isExcludedFromBackup = true
+    try? mutableDirectory.setResourceValues(resourceValues)
+
+    let marker = directory.appendingPathComponent(Self.nonIndexableMarkerName)
+    if !fileManager.fileExists(atPath: marker.path) {
+      try Data().write(to: marker, options: .atomic)
+    }
   }
 
   private static func defaultDataRoot(

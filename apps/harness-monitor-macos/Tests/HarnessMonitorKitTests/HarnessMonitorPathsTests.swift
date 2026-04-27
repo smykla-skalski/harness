@@ -207,6 +207,31 @@ struct HarnessMonitorPathsTests {
     #expect(FileManager.default.fileExists(atPath: marker.path))
   }
 
+  @Test("Ensuring harness root non-indexable avoids the app group parent")
+  func ensureHarnessRootNonIndexableDoesNotMarkAppGroupRoot() throws {
+    let homeDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-app-group-noindex-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: homeDirectory) }
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier],
+      homeDirectory: homeDirectory
+    )
+
+    try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: environment)
+
+    let appGroupRoot = expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
+    let appGroupMarker = appGroupRoot.appendingPathComponent(".metadata_never_index")
+    let harnessMarker =
+      appGroupRoot
+      .appendingPathComponent(
+        "harness",
+        isDirectory: true
+      )
+      .appendingPathComponent(".metadata_never_index")
+    #expect(FileManager.default.fileExists(atPath: appGroupMarker.path) == false)
+    #expect(FileManager.default.fileExists(atPath: harnessMarker.path))
+  }
+
   @Test("Tests skip native app group lookup for shared observability config")
   func sharedObservabilityConfigSkipsNativeAppGroupLookupUnderXCTest() {
     let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)

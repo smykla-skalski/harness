@@ -10,10 +10,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
   private let hidesDockIconForPerfRuns =
     ProcessInfo.processInfo.environment["HARNESS_MONITOR_PERF_HIDE_DOCK_ICON"] == "1"
-  private let isUITestRun: Bool = {
-    let environment = HarnessMonitorAppDelegate.launchEnvironment()
-    return environment[HarnessMonitorAppDelegate.uiTestsEnvironmentKey] == "1"
-  }()
+  private let isTestHarnessRun = HarnessMonitorAppDelegate.isCurrentTestHarnessRun()
   private let launchMode = HarnessMonitorLaunchMode(
     environment: HarnessMonitorAppDelegate.launchEnvironment()
   )
@@ -26,9 +23,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     super.init()
     installSignalHandlers()
     let environment = Self.launchEnvironment()
-    let isUITestRun = environment[Self.uiTestsEnvironmentKey] == "1"
     let keepsAnimations = environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] == "1"
-    if isUITestRun && !keepsAnimations {
+    if isTestHarnessRun && !keepsAnimations {
       disableAnimationsForUITesting()
     }
   }
@@ -42,7 +38,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    mcpStartupController.start()
+    if !isTestHarnessRun {
+      mcpStartupController.start()
+    }
     guard !hidesDockIconForPerfRuns else {
       return
     }
@@ -97,7 +95,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(
     _ sender: NSApplication
   ) -> Bool {
-    if isUITestRun {
+    if isTestHarnessRun {
       _ = sender
       return true
     }
@@ -162,7 +160,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if isUITestRun {
+    if isTestHarnessRun {
       _ = sender
       #if HARNESS_FEATURE_OTEL
         HarnessMonitorTelemetry.shared.shutdown()
@@ -207,7 +205,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func handleSignalTermination(_ handledSignal: Int32) {
-    if isUITestRun {
+    if isTestHarnessRun {
       #if HARNESS_FEATURE_OTEL
         HarnessMonitorTelemetry.shared.shutdown()
       #endif
@@ -268,6 +266,35 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.preview.rawValue
     }
     return values
+  }
+
+  nonisolated static func isCurrentTestHarnessRun(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+    processName: String = ProcessInfo.processInfo.processName,
+    loadedBundlePaths: [String] = Bundle.allBundles.map(\.bundlePath)
+  ) -> Bool {
+    isTestHarnessRun(
+      environment: environment,
+      bundleIdentifier: bundleIdentifier,
+      processName: processName,
+      loadedBundlePaths: loadedBundlePaths
+    )
+  }
+
+  nonisolated static func isTestHarnessRun(
+    environment: [String: String],
+    bundleIdentifier: String?,
+    processName: String,
+    loadedBundlePaths: [String] = []
+  ) -> Bool {
+    environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+      || environment["XCTestConfigurationFilePath"] != nil
+      || environment["XCInjectBundle"] != nil
+      || environment["XCInjectBundleInto"] != nil
+      || bundleIdentifier == "io.harnessmonitor.app.ui-testing"
+      || processName == "xctest"
+      || loadedBundlePaths.contains { $0.hasSuffix(".xctest") }
   }
 
   private static func isBlank(_ rawValue: String?) -> Bool {
