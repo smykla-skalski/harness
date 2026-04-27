@@ -11,6 +11,7 @@ use super::{
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
+use crate::session::observe::{should_observe, should_tick_liveness};
 
 const SWEEP_CYCLE_COUNT: u64 = 100;
 
@@ -90,12 +91,18 @@ async fn watch_cycle_async(
     };
     let liveness_changed =
         sync_resolved_liveness_async(async_db, &mut resolved, project_dir).await?;
-    let logs_changed =
-        process_incremental_observe(async_db, &mut resolved, actor_id, project_dir, cycle).await?;
-    cycle.cycle_count += 1;
-    if cycle.cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
-        run_periodic_sweep_async(async_db, &mut resolved, actor_id, project_dir, cycle).await?;
-    }
+    let logs_changed = if should_observe(resolved.state.status) {
+        let changed =
+            process_incremental_observe(async_db, &mut resolved, actor_id, project_dir, cycle)
+                .await?;
+        cycle.cycle_count += 1;
+        if cycle.cycle_count.is_multiple_of(SWEEP_CYCLE_COUNT) {
+            run_periodic_sweep_async(async_db, &mut resolved, actor_id, project_dir, cycle).await?;
+        }
+        changed
+    } else {
+        false
+    };
     sync_runtime_transcripts_if_changed(async_db, &resolved, logs_changed || liveness_changed)
         .await?;
     Ok(true)
@@ -109,7 +116,7 @@ async fn resolve_observable_session(
         .resolve_session(session_id)
         .await?
         .ok_or_else(|| session_not_found(session_id))?;
-    if resolved.state.status.is_liveness_eligible() {
+    if should_tick_liveness(resolved.state.status) {
         Ok(Some(resolved))
     } else {
         Ok(None)
