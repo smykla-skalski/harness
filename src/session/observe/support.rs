@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::observe::types::{CycleRecord, Issue, IssueCode, IssueSeverity, OpenIssue};
+use crate::observe::types::{Issue, IssueCode, IssueSeverity, OpenIssue};
 use crate::observe::{is_observer_conflict, load_observer_state, save_observer_state};
 use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, TaskSeverity, TaskSource};
@@ -116,12 +116,11 @@ pub(crate) fn persist_observer_snapshot(
         let mut observer_state =
             load_observer_state(&project_context_root, observe_id, &state.session_id)?;
         let now = utc_now();
-        let from_line = observer_state.cursor;
         let to_line = issues
             .iter()
             .map(|issue| issue.line.saturating_add(1))
             .max()
-            .unwrap_or(from_line);
+            .unwrap_or(observer_state.cursor);
 
         observer_state.cursor = to_line;
         observer_state.last_scan_time.clone_from(&now);
@@ -129,7 +128,6 @@ pub(crate) fn persist_observer_snapshot(
             observer_state.project_hint = Some(state.project_name.clone());
         }
 
-        let mut new_issue_count = 0;
         for issue in issues {
             if let Some(open_issue) = observer_state.open_issues.iter_mut().find(|open_issue| {
                 open_issue.code == issue.code && open_issue.fingerprint == issue.fingerprint
@@ -141,16 +139,7 @@ pub(crate) fn persist_observer_snapshot(
             observer_state
                 .open_issues
                 .push(open_issue_from_issue(issue));
-            new_issue_count += 1;
         }
-
-        observer_state.cycle_history.push(CycleRecord {
-            timestamp: now,
-            from_line,
-            to_line,
-            new_issues: new_issue_count,
-            resolved: 0,
-        });
 
         if issues.is_empty() && observer_state.baseline_issue_ids.is_empty() {
             observer_state.baseline_issue_ids = observer_state

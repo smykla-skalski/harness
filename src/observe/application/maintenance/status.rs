@@ -7,14 +7,6 @@ use crate::hooks::adapters::HookAgent;
 use crate::observe::application::maintenance::{load_observer_state, render_pretty_json};
 
 #[derive(Serialize)]
-struct RecentCycle {
-    from: usize,
-    to: usize,
-    new_issues: usize,
-    resolved: usize,
-}
-
-#[derive(Serialize)]
 struct ActiveWorkerView<'a> {
     issue_id: &'a str,
     target_file: &'a str,
@@ -33,8 +25,6 @@ struct ObserverStatus<'a> {
     has_baseline: bool,
     handoff_safe: bool,
     active_workers: Vec<ActiveWorkerView<'a>>,
-    cycles: usize,
-    recent_cycles: Vec<RecentCycle>,
 }
 
 pub(in crate::observe::application) fn execute_status(
@@ -55,19 +45,6 @@ pub(in crate::observe::application) fn execute_status(
         map
     };
 
-    let recent_cycles = state
-        .cycle_history
-        .iter()
-        .rev()
-        .take(5)
-        .map(|cycle| RecentCycle {
-            from: cycle.from_line,
-            to: cycle.to_line,
-            new_issues: cycle.new_issues,
-            resolved: cycle.resolved,
-        })
-        .collect::<Vec<_>>();
-
     let status = ObserverStatus {
         session_id: &state.session_id,
         cursor: state.cursor,
@@ -87,8 +64,6 @@ pub(in crate::observe::application) fn execute_status(
                 started_at: &worker.started_at,
             })
             .collect(),
-        cycles: state.cycle_history.len(),
-        recent_cycles,
     };
     println!("{}", render_pretty_json(&status));
     Ok(0)

@@ -37,11 +37,6 @@ public struct ObserverSummaryPanel: View {
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
         ObserverPanelWorkersSection(workers: activeWorkers)
       }
-      if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
-        InspectorSection(title: "Cycle History") {
-          ObserverPanelCycleHistory(cycles: cycleHistory)
-        }
-      }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
         InspectorSection(title: "Tracked Agent Sessions") {
           ObserverPanelAgentSessions(sessions: agentSessions)
@@ -161,32 +156,6 @@ private struct ObserverPanelWorkersSection: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-  }
-}
-
-private struct ObserverPanelCycleHistory: View {
-  let cycles: [ObserverCycleSummary]
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      ForEach(cycles) { cycle in
-        VStack(alignment: .leading, spacing: 4) {
-          HStack {
-            Text(formatTimestamp(cycle.timestamp))
-              .scaledFont(.caption.monospaced())
-            Spacer()
-            Text("+\(cycle.newIssues) / -\(cycle.resolved)")
-              .scaledFont(.caption.bold())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-          Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-        .harnessCellPadding()
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 

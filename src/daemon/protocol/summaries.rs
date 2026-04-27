@@ -140,7 +140,6 @@ pub struct ObserverSummary {
     pub open_issues: Vec<ObserverOpenIssue>,
     pub muted_codes: Vec<IssueCode>,
     pub active_workers: Vec<ObserverActiveWorker>,
-    pub cycle_history: Vec<ObserverCycleSummary>,
     pub agent_sessions: Vec<ObserverAgentSessionSummary>,
 }
 
@@ -166,15 +165,6 @@ pub struct ObserverActiveWorker {
     pub started_at: String,
     pub agent_id: Option<String>,
     pub runtime: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObserverCycleSummary {
-    pub timestamp: String,
-    pub from_line: usize,
-    pub to_line: usize,
-    pub new_issues: usize,
-    pub resolved: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

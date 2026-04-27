@@ -1,7 +1,6 @@
 use super::super::index::{self, DiscoveredProject};
 use super::super::protocol::{
-    ObserverActiveWorker, ObserverAgentSessionSummary, ObserverCycleSummary, ObserverOpenIssue,
-    ObserverSummary,
+    ObserverActiveWorker, ObserverAgentSessionSummary, ObserverOpenIssue, ObserverSummary,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
@@ -63,17 +62,6 @@ pub(super) fn load_observer_summary(
                     .and_then(|agent_id| state.agents.get(agent_id))
                     .map(|agent| agent.runtime.clone()),
                 agent_id: worker.agent_id,
-            })
-            .collect(),
-        cycle_history: observer
-            .cycle_history
-            .into_iter()
-            .map(|cycle| ObserverCycleSummary {
-                timestamp: cycle.timestamp,
-                from_line: cycle.from_line,
-                to_line: cycle.to_line,
-                new_issues: cycle.new_issues,
-                resolved: cycle.resolved,
             })
             .collect(),
         agent_sessions: observer

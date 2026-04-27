@@ -359,7 +359,6 @@ private enum SessionsFixtureBuilder {
       openIssues: [issue],
       mutedCodes: [],
       activeWorkers: [],
-      cycleHistory: [],
       agentSessions: []
     )
   }

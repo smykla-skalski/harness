@@ -18,9 +18,9 @@ mod tests;
 
 pub use transport::{ObserveArgs, ObserveFilterArgs, ObserveMode, ObserveScanActionKind};
 pub use types::{
-    Confidence, CycleRecord, FOCUS_PRESETS, FixSafety, FocusPreset, Issue, IssueCategory,
-    IssueCode, IssueSeverity, MessageRole, ObserverState, OccurrenceTracker, OpenIssue, ScanState,
-    SourceTool, ToolUseRecord, compute_issue_id,
+    Confidence, FOCUS_PRESETS, FixSafety, FocusPreset, Issue, IssueCategory, IssueCode,
+    IssueSeverity, MessageRole, ObserverState, OccurrenceTracker, OpenIssue, ScanState, SourceTool,
+    ToolUseRecord, compute_issue_id,
 };
 
 pub(crate) use application::maintenance::{

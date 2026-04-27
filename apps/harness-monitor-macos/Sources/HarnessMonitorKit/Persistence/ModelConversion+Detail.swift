@@ -127,7 +127,6 @@ struct ObserverDetailBlob: Codable {
   var openIssues: [ObserverIssueSummary]?
   var mutedCodes: [String]?
   var activeWorkers: [ObserverWorkerSummary]?
-  var cycleHistory: [ObserverCycleSummary]?
   var agentSessions: [ObserverAgentSessionSummary]?
 }
 
@@ -149,7 +148,6 @@ extension CachedObserver {
       openIssues: detail.openIssues,
       mutedCodes: detail.mutedCodes,
       activeWorkers: detail.activeWorkers,
-      cycleHistory: detail.cycleHistory,
       agentSessions: detail.agentSessions
     )
   }
@@ -165,7 +163,6 @@ extension CachedObserver {
       openIssues: summary.openIssues,
       mutedCodes: summary.mutedCodes,
       activeWorkers: summary.activeWorkers,
-      cycleHistory: summary.cycleHistory,
       agentSessions: summary.agentSessions
     )
     detailData = (try? Codecs.encoder.encode(blob)) ?? Data()
@@ -178,7 +175,6 @@ extension ObserverSummary {
       openIssues: openIssues,
       mutedCodes: mutedCodes,
       activeWorkers: activeWorkers,
-      cycleHistory: cycleHistory,
       agentSessions: agentSessions
     )
     return CachedObserver(

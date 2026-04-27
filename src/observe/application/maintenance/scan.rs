@@ -53,14 +53,6 @@ pub(in crate::observe::application) fn execute_cycle(
             }
         }
 
-        observer_state.cycle_history.push(types::CycleRecord {
-            timestamp: now,
-            from_line,
-            to_line: last_line,
-            new_issues: issues.len(),
-            resolved: 0,
-        });
-
         if issues.is_empty() && observer_state.baseline_issue_ids.is_empty() {
             observer_state.baseline_issue_ids = observer_state
                 .open_issues
