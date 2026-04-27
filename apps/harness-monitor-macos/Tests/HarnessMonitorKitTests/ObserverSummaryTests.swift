@@ -78,7 +78,6 @@ struct ObserverSummaryTests {
     let summary = try decodeObserverSummary(from: payload)
 
     #expect(summary.observeId == "observe-sess-1")
-    #expect(summary.lastSweepAt == nil)
     #expect(summary.openIssues == nil)
     #expect(summary.mutedCodes == nil)
     #expect(summary.activeWorkers == nil)
@@ -147,7 +146,6 @@ struct ObserverSummaryTests {
 
     #expect(summary.openIssues?.count == 1)
     #expect(summary.resolvedIssueCount == 2)
-    #expect(summary.lastSweepAt == "2026-03-28T14:17:45Z")
     #expect(openIssue.code == "agent_stalled_progress")
     #expect(openIssue.category == "agent_coordination")
     #expect(summary.mutedCodes == ["agent_repeated_error"])
@@ -166,7 +164,7 @@ struct ObserverSummaryTests {
   }
 
   @Test("Observer summary tolerates legacy v1 cycle_history field on the wire")
-  func observerSummaryTolerLegacyCycleHistoryKey() throws {
+  func observerSummaryToleratesLegacyCycleHistoryKey() throws {
     // v1 daemons still emit `cycle_history`. Decoding must drop the unknown
     // field silently so the Swift app keeps working during the rollout.
     let payload = ObserverSummaryPayload(

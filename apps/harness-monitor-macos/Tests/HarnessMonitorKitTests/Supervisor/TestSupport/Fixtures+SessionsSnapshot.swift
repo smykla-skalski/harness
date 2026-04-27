@@ -352,7 +352,6 @@ private enum SessionsFixtureBuilder {
     return ObserverSummary(
       observeId: "observe-beta",
       lastScanTime: isoString(secondsBeforeFixed: 5),
-      lastSweepAt: nil,
       openIssueCount: 1,
       resolvedIssueCount: 0,
       mutedCodeCount: 0,
