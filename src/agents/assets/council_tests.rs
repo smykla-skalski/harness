@@ -96,7 +96,12 @@ fn claude_council_plugin_skill_preserves_all_yaml_keys_and_tools() {
             "Claude council SKILL.md frontmatter should retain `{tool}` from skill.yaml"
         );
     }
-    assert!(rendered.contains("disable-model-invocation: true"));
+    assert!(
+        !rendered.contains("disable-model-invocation"),
+        "council SKILL.md must NOT carry `disable-model-invocation` - the skill must be \
+         invocable from other skills (notably swarm-e2e-iterate council-review) via the \
+         Skill tool, not only manually by the user"
+    );
     assert!(rendered.contains("user-invocable: true"));
     assert!(rendered.contains("via AskUserQuestion"));
 }
