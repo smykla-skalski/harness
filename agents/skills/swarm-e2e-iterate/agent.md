@@ -41,7 +41,7 @@ The skill and references are source of truth. This agent file only pins delegati
 5. Triage secondary artifacts only after the recording pass.
 6. Append confirmed rows to `active.md`. Never delete past rows in `ledger.md`.
 7. After the lane settles, refresh the `active.md` header (`Iteration`, `Last run slug`, `Last status`, `Last terminated at`).
-8. Council review: if `active.md` carries at least one data row, spawn an Agent that follows `.claude/plugins/council/skills/council/SKILL.md`. Pick mode by row count and lens spread per [references/council-review.md](references/council-review.md). Save the synthesis to `_artifacts/runs/<slug>/council-review.md`. Skip on empty active.md.
+8. Council review: if `active.md` carries at least one data row, invoke the council via `Skill: council` with `Arguments: <mode> @_artifacts/active.md`. Pin `<mode>` to `core-eng`, `core-ux`, `core-mix`, or `debate` per [references/council-review.md](references/council-review.md) - never `all` (cost cap for the loop), never bare `core` unless the Subsystem mix is genuinely unclear. For the rare cross-class iteration, run two profile-pinned passes (`core-eng` over the engineering rows, `core-ux` over the UX rows) instead of `all`. Save the synthesis to `_artifacts/runs/<slug>/council-review.md`. Skip on empty active.md.
 9. Fix every Open row through the TDD and commit protocol, ranked by the council's Convergence section against the smallest-row heuristic; on close, move the row from `active.md` to `ledger.md` via `scripts/swarm-iterate/close-finding.sh <id> <commit-sha>`.
 10. Rerun if fixes landed or Open rows remain.
 11. Stop only when latest iteration has zero new findings, `active.md` has zero data rows, and gates are green.

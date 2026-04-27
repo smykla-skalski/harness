@@ -28,21 +28,45 @@ Skill: council
 Arguments: <mode> @_artifacts/active.md
 ```
 
-`<mode>` is one of `core`, `all`, or `debate`, picked per the heuristic in the next section. The council skill spawns its persona subagents in parallel and returns the integrated synthesis.
+`<mode>` is one of `core-eng`, `core-ux`, `core-mix`, or `debate`. Pin the profile rather than passing bare `core`: the iteration owner already knows the Subsystem mix from `active.md`, so the auto-detect inside the council skill is redundant and occasionally misclassifies (e.g. it scores `swarm-act*` rows as UX because of the word "interaction" in the row's evidence). The bare `core` token still works as a fallback when the mix is genuinely unclear; if you use it, the council will announce the profile it picked in its synthesis - cross-check that against the dispatch rules below before acting on the review.
 
-Save the synthesis (Convergence / Disagreement / Per-persona top-3 / What to do next / What we did not address) - not the per-persona drafts - to `_artifacts/runs/<slug>/council-review.md`.
+**Do not invoke `all` mode from this loop.** 27 personas + synthesis runs ~150k tokens and ~13 minutes per iteration; that cost compounds across the loop and is not justified at the current iteration cadence. If a finding genuinely spans 4+ lenses across both classes, escalate by either splitting the iteration so each `core-*` profile reviews its own slice, or by running `debate` on the single contested decision the cross-cutting finding hinges on. Reserve `all` for one-off design reviews outside the iteration loop.
+
+The council skill spawns its persona subagents in parallel and returns the integrated synthesis. Save the synthesis (Convergence / Disagreement / Per-persona top-3 / What to do next / What we did not address) - not the per-persona drafts - to `_artifacts/runs/<slug>/council-review.md`.
 
 ## Mode dispatch
 
-| `active.md` data rows | Suggested mode | Why |
-|---|---|---|
-| 0 | skip | nothing to review |
-| 1-3 | core | 6 personas catch over-engineering, blind spots, missing failure modes; ~6 calls + 1 synthesis (~50k tokens, ~2.5 min) |
-| 4+, single lens (all `perf-*`, or all `swarm-act*`) | core | extra personas would be filler; bias-correction is enough |
-| 4+, mixed lenses (`perf-*` + `lifecycle.*` + `swarm-act*`, or design + AI quality + UX/a11y) | all | 27 personas (6 core + 10 extended-domain + 11 extended UX/platform) surface lens-specific bugs the core 6 cannot; ~150k tokens, ~13 min - reserve for substantial iterations whose findings span domain + UX + platform lenses |
-| any count, single contested fix decision (e.g., raise the perf budget vs. hoist hot work) | debate | run debate scoped to that one finding; pick 3-6 personas from the persona table; ~70k tokens, ~6 min |
+Resolve mode in two passes: classify `active.md` rows by Subsystem prefix, then pick the profile that matches.
 
-Lens spread is decided by the `Subsystem` column in `active.md`. Treat `perf-*`, `startup-*`, `swarm-act*`, `artifact-*`, `a11y-*`, `interaction-*`, `suite-*`, `lifecycle-*`, `swiftui-*`, `cocoa-*`, `motion-*` as distinct lenses.
+### Subsystem-prefix classes
+
+| Class | Prefixes |
+|---|---|
+| **Engineering** | `perf-*`, `startup-*`, `lifecycle-*`, `swarm-act*`, `artifact-*`, `suite-*`, `swiftui-*`, `cocoa-*` |
+| **UX/platform** | `a11y-*`, `interaction-*`, `motion-*` |
+
+`swiftui-*` and `cocoa-*` ride with engineering because their strongest reviewers (eidhof, ash, king) work the runtime/identity/state-placement axis, not the interaction-design axis. If the row's evidence is genuinely about interaction (e.g. a SwiftUI view whose drag affordance fails), promote it to UX/platform manually.
+
+### Profile selection
+
+| `active.md` data rows | Subsystem mix | Mode | Why |
+|---|---|---|---|
+| 0 | n/a | skip | nothing to review |
+| any | every row in the Engineering class | `core-eng` | 6 engineering bias-correction personas (antirez, tef, muratori, hebert, meadows, chin); ~6 calls + 1 synthesis (~50k tokens, ~2.5 min) |
+| any | every row in the UX/platform class | `core-ux` | 6 UX bias-correction personas (norman, nielsen, krug, watson, tognazzini, tufte); same cost as `core-eng` |
+| any | rows in both classes, no class is dominant | `core-mix` | 3 engineering + 3 UX (antirez, tef, hebert, norman, nielsen, watson); same cost; forces both lenses in one pass |
+| 4+ | rows span 4+ distinct lenses across **both** classes | split into two passes: `core-eng` over the engineering rows, then `core-ux` over the UX rows | two `core` runs cost ~100k tokens and ~5 min combined - still cheaper and more legible than `all` (~150k, ~13 min), and each pass keeps the persona set on-lens |
+| any | one contested fix decision (e.g. raise the perf budget vs. hoist hot work) | `debate` | run debate scoped to that one finding; pick 3-6 personas from the persona table below; ~70k tokens, ~6 min |
+
+Distinct lenses are counted by Subsystem prefix. Two `perf-*` rows count as one lens; one `perf-*` row plus one `swarm-act*` row count as two.
+
+Quick examples:
+
+- 3 rows, all `perf-*` -> `core-eng`
+- 1 row `a11y-truncation`, 1 row `interaction-hover` -> `core-ux`
+- 2 rows `perf-stall`, 1 row `a11y-contrast` -> `core-mix`
+- 5 rows spanning `lifecycle-dashboard`, `swarm-actState`, `artifact-tail`, `interaction-drag`, `motion-easing` -> two passes: `core-eng @<engineering subset>` then `core-ux @<UX subset>` (write the subset paths in the council's `Arguments` line, or feed each subset as a temporary file). Do not call `all`.
+- single contested row "raise the 50ms perf budget vs. hoist work off main" -> `debate` with muratori + gregg + hebert + meadows
 
 ## Persona selection by finding subsystem
 
@@ -61,7 +85,7 @@ For `debate` mode (or to verify `core` mode covers your finding shape):
 | `cocoa-*` (ARC, GCD, NSRunLoop, blocks, locks/dispatch) | ash, muratori, gregg | runtime mechanics, single-process hot-path cost, off-CPU and lock contention |
 | `motion-*` (animation duration, easing, vestibular, prefers-reduced-motion) | head, muratori, simmons | motion has purpose, frame budget, "feels like a real Mac app" timing |
 
-Cross-cutting findings (multiple prefixes in one row's evidence) usually warrant `all` mode.
+Cross-cutting findings (multiple prefixes in one row's evidence) usually warrant a `debate` scoped to the contested decision, not `all`. Pick 3-6 personas spanning the involved prefixes from this table and run debate; the disagreement is what makes those rows worth the spend.
 
 ## Output handling
 
@@ -77,7 +101,9 @@ Use the synthesis sections like this:
 
 ## Cost vs. value
 
-A 30-minute swarm e2e iteration absorbs the `core` cost without changing the loop shape. `all` mode is wider but pricier; reserve for iterations where the findings genuinely span 4+ lenses. `debate` is for one specific contested fix per iteration.
+A 30-minute swarm e2e iteration absorbs one `core-*` profile (~50k tokens, ~2.5 min) without changing the loop shape. `debate` is for one specific contested fix per iteration (~70k tokens, ~6 min). Two-profile splits (`core-eng` + `core-ux` over disjoint subsets) cap at ~100k tokens and ~5 min combined - acceptable but the exception, not the default.
+
+`all` mode is intentionally off the table for this loop right now (~150k tokens, ~13 min, runs the cost up across iterations without proportional signal). If you find yourself wanting `all`, the right move is to either narrow the iteration's scope or run `debate` on the one decision driving the urge.
 
 Skip the council on iterations where `active.md` is empty, where every Open row already has a green Fix Protocol path queued from the prior iteration, or where the recording itself is missing (no input to review).
 
