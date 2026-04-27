@@ -39,6 +39,7 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated private static let failureTracker = HarnessMonitorUITestFailureTracker()
 
   static var cachedLaunchedApp: XCUIApplication?
+  var launchedAppForTeardown: XCUIApplication?
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -73,9 +74,16 @@ class HarnessMonitorUITestCase: XCTestCase {
           artifactsDirectoryKey: artifactsKey
         )
       }
-      // launch(mode:) already cleans up any leftover UI-test host before the next
-      // launch. Re-terminating here keeps XCTest automation alive after the app
-      // has already closed.
+      if !Self.reuseLaunchedApp, let launchedApp = self.launchedAppForTeardown {
+        appendDiagnosticsTrace(
+          component: "ui-test",
+          event: "test.teardown.terminate-app",
+          testName: testName,
+          artifactsDirectoryKey: artifactsKey
+        )
+        Self.terminateAndWait(launchedApp)
+        self.launchedAppForTeardown = nil
+      }
       appendDiagnosticsTrace(
         component: "ui-test",
         event: "test.teardown.stop-requested",
@@ -132,8 +140,9 @@ class HarnessMonitorUITestCase: XCTestCase {
 
   override class func tearDown() {
     MainActor.assumeIsolated {
-      // launch(mode:) tears down any leftover UI-test host before the next class
-      // launches, so avoid an extra XCTest-driven terminate here too.
+      if let cachedLaunchedApp {
+        terminateAndWait(cachedLaunchedApp)
+      }
       cachedLaunchedApp = nil
     }
     super.tearDown()
