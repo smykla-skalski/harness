@@ -26,7 +26,7 @@ pub(super) fn managed_root_for_path(repo_root: &Path, path: &Path) -> Result<Pat
 
 pub(super) fn write_outputs(planned: &[PlannedOutput]) -> Result<(), CliError> {
     for output in planned {
-        let _ = &output.managed_root;
+        prune_unexpected_outputs(output)?;
         for (path, content) in &output.files {
             write_text(path, content)?;
             if is_executable_generated_output(path) {
@@ -37,6 +37,13 @@ pub(super) fn write_outputs(planned: &[PlannedOutput]) -> Result<(), CliError> {
         for (link, target) in &output.symlinks {
             write_symlink(link, target)?;
         }
+    }
+    Ok(())
+}
+
+fn prune_unexpected_outputs(output: &PlannedOutput) -> Result<(), CliError> {
+    for path in unexpected_output_paths(output)? {
+        remove_file(&path).map_err(|error| io_err(&error))?;
     }
     Ok(())
 }
@@ -102,13 +109,20 @@ fn expected_output_drift(output: &PlannedOutput) -> Vec<String> {
 }
 
 fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliError> {
+    Ok(unexpected_output_paths(output)?
+        .into_iter()
+        .map(|path| format!("unexpected: {}", path.display()))
+        .collect())
+}
+
+fn unexpected_output_paths(output: &PlannedOutput) -> Result<Vec<PathBuf>, CliError> {
     if !output.managed_root.exists() {
         return Ok(Vec::new());
     }
 
     let expected_files: BTreeSet<&Path> = output.files.keys().map(PathBuf::as_path).collect();
     let expected_symlinks: BTreeSet<&Path> = output.symlinks.keys().map(PathBuf::as_path).collect();
-    let mut drift = Vec::new();
+    let mut unexpected = Vec::new();
     for entry in WalkDir::new(&output.managed_root)
         .min_depth(1)
         .follow_links(false)
@@ -119,10 +133,10 @@ fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliErr
         }
         let path = entry.path();
         if !expected_files.contains(path) && !expected_symlinks.contains(path) {
-            drift.push(format!("unexpected: {}", path.display()));
+            unexpected.push(path.to_path_buf());
         }
     }
-    Ok(drift)
+    Ok(unexpected)
 }
 
 fn is_executable_generated_output(path: &Path) -> bool {
