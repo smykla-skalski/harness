@@ -95,8 +95,8 @@ fn parse_agents_generate_enable_flags() {
     else {
         panic!("expected agents generate command");
     };
-    assert!(args.enable_suite_hooks);
-    assert!(args.enable_repo_policy);
+    assert!(args.hook_flags.enable_suite_hooks);
+    assert!(args.hook_flags.enable_repo_policy);
 }
 
 #[test]
