@@ -39,6 +39,7 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             '/bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"',
             source,
         )
+        self.assertNotIn("Helpers/harness.cstemp", source)
 
     def test_entry_script_unsets_swift_debug_environment_before_bash_starts(self) -> None:
         self.assertTrue(
