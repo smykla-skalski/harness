@@ -912,6 +912,20 @@ final class SwarmActDriverRunner {
       "--project-dir", inputs.projectDir.path,
       "--actor", reviewerCodexID,
     ])
+    // Snapshot act9 while both reviewers are still in the `claimed` state.
+    // The Inspector's `ReviewStatePanel` only renders the
+    // `reviewer-claim-badge` and `reviewer-quorum-indicator` while
+    // `task.awaitingReview != nil || task.reviewClaim != nil`. Once both
+    // `submit-review` verdicts land the task transitions out of
+    // `awaiting_review` and both fields clear, so the badges disappear
+    // before the swarm UI fixture can capture them.
+    try actReady(
+      "act9",
+      values: [
+        "task_review_id": taskReviewID,
+        "reviewer_runtime": "claude",
+      ])
+    try actAck("act9")
     try runHarness([
       "session", "task", "submit-review", inputs.sessionID, taskReviewID,
       "--project-dir", inputs.projectDir.path,
@@ -926,13 +940,6 @@ final class SwarmActDriverRunner {
       "--verdict", "approve",
       "--summary", "LGTM",
     ])
-    try actReady(
-      "act9",
-      values: [
-        "task_review_id": taskReviewID,
-        "reviewer_runtime": "claude",
-      ])
-    try actAck("act9")
 
     _ = runHarnessMayFail([
       "session", "remove", inputs.sessionID, reviewerClaudeID, "--project-dir",

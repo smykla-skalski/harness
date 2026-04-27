@@ -16,6 +16,18 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 RUN_LINT_SCRIPT="${RUN_LINT_SCRIPT:-$ROOT/Scripts/run-lint.sh}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 
+# Targets that launch a hosted app under xctest. macOS attributes their
+# startup-time app-data access to the Xcode-bundled xctest agent, which
+# triggers a session-scoped "Xcode would like to access data from other
+# apps" TCC prompt every time the test runner relaunches. Default-skip
+# them in the fast lane so unattended runs do not block on a system
+# dialog. CLAUDE.md already requires explicit user approval for UI
+# suites; the explicit XCODE_ONLY_TESTING selector still opts back in.
+DEFAULT_SKIP_TEST_TARGETS=(
+  "HarnessMonitorUITests"
+  "HarnessMonitorAgentsE2ETests"
+)
+
 append_only_testing_args() {
   local selector
   while IFS= read -r selector; do
@@ -23,6 +35,17 @@ append_only_testing_args() {
       TEST_ARGS+=("-only-testing:${selector}")
     fi
   done < <(printf '%s\n' "$XCODE_ONLY_TESTING" | tr ',' '\n')
+}
+
+append_default_skip_args() {
+  if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+    return 0
+  fi
+
+  local target
+  for target in "${DEFAULT_SKIP_TEST_TARGETS[@]}"; do
+    TEST_ARGS+=("-skip-testing:${target}")
+  done
 }
 
 clear_gatekeeper_metadata() {
@@ -75,6 +98,7 @@ TEST_ARGS=(
 )
 
 append_only_testing_args
+append_default_skip_args
 
 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}"
