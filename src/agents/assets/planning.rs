@@ -8,8 +8,8 @@ use crate::setup::wrapper::planned_agent_bootstrap_files;
 use super::files::managed_root_for_path;
 use super::loading::{load_plugin_sources, load_skill_sources};
 use super::model::{
-    AgentAssetTarget, MANAGED_ROOTS, PlannedOutput, PluginDefinition, RenderTarget, SkillDefinition,
-    selected_targets,
+    AgentAssetTarget, MANAGED_ROOTS, PlannedOutput, PluginDefinition, RenderTarget,
+    SkillDefinition, selected_targets,
 };
 use super::render_guides::render_guides;
 use super::render_local_skills::render_local_skills;
@@ -44,13 +44,42 @@ pub(super) fn plan_outputs_with_gemini_commands(
         if matches!(target, RenderTarget::Gemini) && !include_gemini_commands {
             continue;
         }
-        collect_target_outputs(repo_root, *target, &skills, &plugins, skip_runtime_hooks, &mut outputs)?;
+        collect_target_outputs(
+            repo_root,
+            *target,
+            &skills,
+            &plugins,
+            skip_runtime_hooks,
+            &mut outputs,
+        )?;
     }
 
-    render_guides(repo_root, MANAGED_ROOTS, &mut outputs);
-    render_local_skills(repo_root, &mut outputs)?;
+    render_guides(
+        repo_root,
+        managed_roots_for_selection(selection),
+        &mut outputs,
+    );
+    if renders_claude_local_skills(selection) {
+        render_local_skills(repo_root, &mut outputs)?;
+    }
 
     Ok(outputs.into_values().collect())
+}
+
+fn managed_roots_for_selection(selection: AgentAssetTarget) -> &'static [&'static str] {
+    match selection {
+        AgentAssetTarget::All => MANAGED_ROOTS,
+        AgentAssetTarget::Claude => &[".claude-plugin", ".claude/skills", ".claude/plugins"],
+        AgentAssetTarget::Codex => &[".agents/skills", ".agents/plugins", "plugins"],
+        AgentAssetTarget::Gemini => &[".gemini/commands"],
+        AgentAssetTarget::Copilot => &[".github/hooks", "plugins"],
+        AgentAssetTarget::Vibe => &[".vibe/skills", ".vibe/plugins"],
+        AgentAssetTarget::OpenCode => &[".opencode/skills", ".opencode/plugins"],
+    }
+}
+
+fn renders_claude_local_skills(selection: AgentAssetTarget) -> bool {
+    matches!(selection, AgentAssetTarget::All | AgentAssetTarget::Claude)
 }
 
 fn collect_target_outputs(
