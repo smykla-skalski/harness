@@ -1,9 +1,9 @@
 import Darwin
 import Foundation
+import HarnessMonitorUIPreviewable
 import Testing
 
 @testable import HarnessMonitorKit
-import HarnessMonitorUIPreviewable
 
 /// Locks down the default-on startup and orchestration contract for the MCP
 /// accessibility registry host.
@@ -62,7 +62,8 @@ struct HarnessMonitorMCPContractTests {
   @Test("disabled startup stays disabled and does not start the service")
   func disabledStartupStaysDisabled() async throws {
     let defaults = try isolatedDefaults()
-    defaults.defaults.set(false, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    let enabledKey = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+    defaults.defaults.set(false, forKey: enabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let service = StubMCPService()
@@ -158,7 +159,8 @@ struct HarnessMonitorMCPContractTests {
     controller.start()
     await Task.yield()
 
-    defaults.defaults.set(false, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    let enabledKey = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+    defaults.defaults.set(false, forKey: enabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await Task.yield()
 
@@ -303,8 +305,7 @@ private final class BlockingMCPService: HarnessMonitorMCPStartupControlling {
   private(set) var recordedEnabledStates: [Bool] = []
 
   private var enableAttemptWaiters: [CheckedContinuation<Void, Never>] = []
-  private var enableFinishedContinuation:
-    CheckedContinuation<HarnessMonitorMCPRuntimeState, Never>?
+  private var enableFinishedContinuation: CheckedContinuation<HarnessMonitorMCPRuntimeState, Never>?
   private var enableAttemptStarted = false
 
   func setEnabled(_ enabled: Bool) async {
