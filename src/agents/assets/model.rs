@@ -172,10 +172,10 @@ pub(super) fn skill_has_target_variant(skill: &SkillDefinition, target: RenderTa
     matches!(target, RenderTarget::Codex) && skill.codex.is_some()
 }
 
-pub(super) fn skill_source_for_target<'a>(
-    skill: &'a SkillDefinition,
+pub(super) fn skill_source_for_target(
+    skill: &SkillDefinition,
     target: RenderTarget,
-) -> &'a SkillSource {
+) -> &SkillSource {
     if matches!(target, RenderTarget::Codex)
         && let Some(variant) = &skill.codex
     {

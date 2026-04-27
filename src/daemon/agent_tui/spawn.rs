@@ -11,6 +11,7 @@ use crate::agents::runtime::{
     runtime_for_name,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::RuntimeHookFlags;
 use crate::session::types::SessionRole;
 use crate::setup::wrapper;
 use crate::workspace::{dirs_home, host_home_dir};
@@ -77,7 +78,7 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
         agent,
         false,
         &[],
-        crate::feature_flags::RuntimeHookFlags::from_env(),
+        RuntimeHookFlags::from_env(),
     )?;
     Ok(())
 }

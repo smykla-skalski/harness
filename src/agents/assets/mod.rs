@@ -11,6 +11,8 @@ mod files;
 mod loading;
 mod model;
 mod planning;
+#[cfg(test)]
+mod planning_tests;
 mod render_common;
 mod render_guides;
 mod render_local_skills;

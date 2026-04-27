@@ -1,4 +1,5 @@
 name: council
+direct-skill-name: council
 description: >-
   Summon a council of 27 engineering persona agents to collaboratively review code, debate
   a plan, or advise on strategy. Six core bias-correction lenses - antirez (simplicity),

@@ -2,6 +2,16 @@
 
 Run an engineering council review from Codex. Use generic Codex subagents, not Claude named subagents. Each persona is loaded from a Markdown file under `agents/`, reviews through one sourced lens, and returns material for one integrated synthesis.
 
+## Path Sanity
+
+If you need to inspect or debug this skill from repo files, keep the skill-name segment in the path:
+
+- Canonical Codex variant: `agents/plugins/council/skills/council/codex/body.md`
+- Canonical base skill: `agents/plugins/council/skills/council/body.md`
+- Rendered Codex skill: `plugins/council/skills/council/SKILL.md`
+
+Do not guess `skills/codex/body.md`. That path is wrong for this repo and for the rendered plugin mirrors; the variant always lives under `skills/council/codex/`.
+
 ## Mode Dispatch
 
 | Mode | Agents | Cost & purpose |

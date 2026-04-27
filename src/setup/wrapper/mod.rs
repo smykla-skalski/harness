@@ -166,18 +166,36 @@ fn write_process_agent_bootstrap(
 }
 
 fn log_omitted_hook_families(path: &Path, flags: RuntimeHookFlags) {
-    if !flags.suite_hooks {
-        info!(
-            config = %path.display(),
-            "regenerated runtime config: suite-lifecycle hooks omitted (guard-stop / context-agent / validate-agent / tool-failure); set {SUITE_HOOKS_ENV}=1 or pass --enable-suite-hooks to restore",
-        );
+    log_suite_hook_omission(path, flags.suite_hooks);
+    log_repo_policy_omission(path, flags.repo_policy);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_suite_hook_omission(path: &Path, enabled: bool) {
+    if enabled {
+        return;
     }
-    if !flags.repo_policy {
-        info!(
-            config = %path.display(),
-            "regenerated runtime config: repo-policy pre-tool hook omitted; set {REPO_POLICY_ENV}=1 or pass --enable-repo-policy to restore",
-        );
+    info!(
+        config = %path.display(),
+        "regenerated runtime config: suite-lifecycle hooks omitted (guard-stop / context-agent / validate-agent / tool-failure); set {SUITE_HOOKS_ENV}=1 or pass --enable-suite-hooks to restore",
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_repo_policy_omission(path: &Path, enabled: bool) {
+    if enabled {
+        return;
     }
+    info!(
+        config = %path.display(),
+        "regenerated runtime config: repo-policy pre-tool hook omitted; set {REPO_POLICY_ENV}=1 or pass --enable-repo-policy to restore",
+    );
 }
 
 fn agent_asset_target(agent: HookAgent) -> AgentAssetTarget {
