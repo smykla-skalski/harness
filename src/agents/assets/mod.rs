@@ -120,7 +120,7 @@ pub fn write_suite_plugin_outputs(project_root: &Path) -> Result<Vec<PathBuf>, C
     render_claude_plugin_outputs(project_root, &source_root, plugin, &mut files)?;
 
     let planned = PlannedOutput {
-        managed_root: project_root.join(".claude").join("plugins"),
+        managed_root: project_root.join(".claude").join("plugins").join("suite"),
         files,
         symlinks: BTreeMap::new(),
     };
