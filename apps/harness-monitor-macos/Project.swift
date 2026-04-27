@@ -191,6 +191,7 @@ private let uiTestHostSettings: Settings = .settings(
         "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.ui-testing",
         "PRODUCT_NAME": "Harness Monitor UI Testing",
+        "REGISTER_APP_GROUPS": "NO",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
 )
