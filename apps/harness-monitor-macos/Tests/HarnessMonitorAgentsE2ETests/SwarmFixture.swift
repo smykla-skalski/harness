@@ -177,6 +177,149 @@ final class SwarmFixture {
     testCase.recordDiagnosticsSnapshot(in: app, named: "swarm-\(name)")
   }
 
+  func dismissTaskActionsSheetIfPresent() {
+    guard taskActionsSheetIsPresented() else {
+      return
+    }
+    trace("task-actions.dismiss.begin", app: app)
+    app.typeKey(.escape, modifierFlags: [])
+    let dismissed = testCase.waitUntil(timeout: 5) { !self.taskActionsSheetIsPresented() }
+    if dismissed {
+      trace("task-actions.dismiss.success", app: app)
+    } else {
+      trace("task-actions.dismiss.timeout", app: app)
+    }
+    XCTAssertTrue(
+      dismissed,
+      "Expected task actions sheet to dismiss\n\(diagnosticsSummary())"
+    )
+  }
+
+  func openAgentsWindow() {
+    dismissTaskActionsSheetIfPresent()
+    let identifier = Accessibility.agentsButton
+    trace("open-agents.begin", app: app, details: ["identifier": identifier])
+    testCase.tapElement(in: app, identifier: identifier)
+    let opened = testCase.waitUntil(timeout: 10) {
+      self.testCase.element(in: self.app, identifier: Accessibility.agentTuiLaunchPane).exists
+        || self.testCase.element(in: self.app, identifier: Accessibility.agentTuiSessionPane)
+          .exists
+    }
+    if opened {
+      trace("open-agents.success", app: app)
+    } else {
+      trace("open-agents.timeout", app: app)
+    }
+    XCTAssertTrue(
+      opened,
+      "Expected Agents window to appear\n\(diagnosticsSummary())"
+    )
+  }
+
+  func closeAgentsWindow() {
+    let launchPane = testCase.element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    let sessionPane = testCase.element(in: app, identifier: Accessibility.agentTuiSessionPane)
+    guard launchPane.exists || sessionPane.exists else {
+      return
+    }
+    trace("close-agents.begin", app: app)
+    app.typeKey("w", modifierFlags: .command)
+    let closed = testCase.waitUntil(timeout: 10) {
+      !launchPane.exists && !sessionPane.exists
+    }
+    if closed {
+      trace("close-agents.success", app: app)
+    } else {
+      trace("close-agents.timeout", app: app)
+    }
+    XCTAssertTrue(
+      closed,
+      "Expected Agents window to close\n\(diagnosticsSummary())"
+    )
+  }
+
+  func selectAgentsTask(_ taskID: String) {
+    let tabID = Accessibility.agentsTaskTab(taskID)
+    let selectionID = Accessibility.agentsTaskSelection(taskID)
+    trace(
+      "select-agents-task.begin",
+      app: app,
+      details: [
+        "task_id": taskID,
+        "tab_identifier": tabID,
+        "selection_identifier": selectionID,
+      ]
+    )
+    if let selectionIdentifier = currentAgentsSidebarSelectionIdentifier() {
+      testCase.tapElement(in: app, identifier: selectionIdentifier)
+    } else {
+      testCase.tapElement(in: app, identifier: Accessibility.agentTuiCreateTab)
+    }
+    let selected = testCase.waitUntil(timeout: 12) {
+      if self.app.state != .runningForeground {
+        self.app.activate()
+      }
+      if self.currentAgentsWindowStateLabel().contains("selection=task:\(taskID)") {
+        return true
+      }
+      self.app.typeKey(XCUIKeyboardKey.downArrow.rawValue, modifierFlags: [])
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
+      return false
+    }
+    if selected {
+      trace("select-agents-task.selected", app: app, details: ["task_id": taskID])
+    } else {
+      trace("select-agents-task.timeout", app: app, details: ["task_id": taskID])
+    }
+    XCTAssertTrue(
+      selected,
+      """
+      Expected Agents task tab \(taskID) to become selected.
+      agentsWindowState=\(currentAgentsWindowStateLabel())
+      \(diagnosticsSummary())
+      """
+    )
+    expectIdentifier(selectionID)
+  }
+
+  private func currentAgentsSidebarSelectionIdentifier() -> String? {
+    let label = currentAgentsWindowStateLabel()
+    if label.contains("selection=create") {
+      return Accessibility.agentTuiCreateTab
+    }
+    if let agentID = selectionValue(in: label, prefix: "selection=agent:") {
+      return Accessibility.agentTuiExternalTab(agentID)
+    }
+    if let taskID = selectionValue(in: label, prefix: "selection=task:") {
+      return Accessibility.agentsTaskTab(taskID)
+    }
+    return nil
+  }
+
+  private func currentAgentsWindowStateLabel() -> String {
+    let identifiers = [Accessibility.agentTuiState, Accessibility.agentsWindow]
+    for identifier in identifiers {
+      let matches = app.descendants(matching: .any).matching(identifier: identifier)
+      let searchCount = min(matches.count, 8)
+      for index in 0..<searchCount {
+        let candidate = matches.element(boundBy: index)
+        guard candidate.exists, candidate.label.isEmpty == false else {
+          continue
+        }
+        return candidate.label
+      }
+    }
+    return ""
+  }
+
+  private func selectionValue(in label: String, prefix: String) -> String? {
+    guard let start = label.range(of: prefix)?.upperBound else {
+      return nil
+    }
+    let tail = label[start...]
+    return tail.split(separator: ",", maxSplits: 1).first.map(String.init)
+  }
+
   func openSession(_ sessionID: String) {
     let identifier = Accessibility.sessionRow(sessionID)
     let row = testCase.sessionTrigger(in: app, identifier: identifier)

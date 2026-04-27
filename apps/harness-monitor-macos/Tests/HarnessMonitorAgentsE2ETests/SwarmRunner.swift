@@ -105,11 +105,16 @@ final class SwarmRunner {
   }
 
   func act11() throws {
-    _ = try fixture.waitForReady("act11")
-    fixture.expectAnyIdentifier([
-      Accessibility.workerRefusalToast,
-      Accessibility.agentsTaskCard,
-    ])
+    let marker = try fixture.waitForReady("act11")
+    if let taskID = marker["task_refusal_id"] {
+      fixture.openAgentsWindow()
+      fixture.selectAgentsTask(taskID)
+      fixture.captureCheckpoint("act11")
+      try fixture.ack("act11")
+      fixture.closeAgentsWindow()
+      return
+    }
+    fixture.expectIdentifier(Accessibility.workerRefusalToast)
     try acknowledge("act11")
   }
 
