@@ -79,7 +79,6 @@ struct ObserverSummaryTests {
     #expect(summary.openIssues == nil)
     #expect(summary.mutedCodes == nil)
     #expect(summary.activeWorkers == nil)
-    #expect(summary.cycleHistory == nil)
     #expect(summary.agentSessions == nil)
   }
 
@@ -140,7 +139,6 @@ struct ObserverSummaryTests {
     let summary = try decodeObserverSummary(from: payload)
     let openIssue = try #require(summary.openIssues?.first)
     let activeWorker = try #require(summary.activeWorkers?.first)
-    let cycle = try #require(summary.cycleHistory?.first)
     let agentSession = try #require(summary.agentSessions?.first)
 
     #expect(summary.openIssues?.count == 1)
@@ -149,7 +147,6 @@ struct ObserverSummaryTests {
     #expect(openIssue.category == "agent_coordination")
     #expect(summary.mutedCodes == ["agent_repeated_error"])
     #expect(activeWorker.agentId == "worker-codex")
-    #expect(cycle.resolved == 1)
     #expect(agentSession.runtime == "codex")
     #expect(openIssue.evidenceExcerpt == "No checkpoint for 12 minutes.")
   }
@@ -160,8 +157,37 @@ struct ObserverSummaryTests {
     #expect(PreviewFixtures.observer.resolvedIssueCount == 4)
     #expect(PreviewFixtures.observer.mutedCodes == ["agent_repeated_error"])
     #expect(PreviewFixtures.observer.activeWorkers?.count == 2)
-    #expect(PreviewFixtures.observer.cycleHistory?.count == 2)
     #expect(PreviewFixtures.observer.agentSessions?.count == 2)
+  }
+
+  @Test("Observer summary tolerates legacy v1 cycle_history field on the wire")
+  func observerSummaryTolerLegacyCycleHistoryKey() throws {
+    // v1 daemons still emit `cycle_history`. Decoding must drop the unknown
+    // field silently so the Swift app keeps working during the rollout.
+    let payload = ObserverSummaryPayload(
+      observeId: "observe-legacy",
+      lastScanTime: "2026-04-27T08:00:00Z",
+      openIssueCount: 0,
+      resolvedIssueCount: 0,
+      mutedCodeCount: 0,
+      activeWorkerCount: 0,
+      openIssues: nil,
+      mutedCodes: nil,
+      activeWorkers: nil,
+      cycleHistory: [
+        ObserverCyclePayload(
+          timestamp: "2026-03-28T14:17:45Z",
+          fromLine: 0,
+          toLine: 42,
+          newIssues: 1,
+          resolved: 0
+        )
+      ],
+      agentSessions: nil
+    )
+
+    let summary = try decodeObserverSummary(from: payload)
+    #expect(summary.observeId == "observe-legacy")
   }
 
   private func decodeObserverSummary(

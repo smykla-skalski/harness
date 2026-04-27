@@ -22,7 +22,7 @@ extension HarnessMonitorUITests {
     )
   }
 
-  func testObserverPanelShowsCycleHistoryAndTrackedSessions() throws {
+  func testObserverPanelShowsTrackedAgentSessions() throws {
     let app = launch(mode: "preview")
 
     let sessionRow = previewSessionTrigger(in: app)
@@ -33,7 +33,6 @@ extension HarnessMonitorUITests {
     let observerPanel = element(in: app, identifier: Accessibility.decisionsObserverPanel)
 
     XCTAssertTrue(observerPanel.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(app.staticTexts["Cycle History"].exists)
     XCTAssertTrue(app.staticTexts["Tracked Agent Sessions"].exists)
     XCTAssertTrue(app.staticTexts["Cursor 104"].exists)
   }
