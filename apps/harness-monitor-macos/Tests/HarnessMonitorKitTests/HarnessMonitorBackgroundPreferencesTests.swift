@@ -1,9 +1,21 @@
 import CoreGraphics
 import Foundation
 import Testing
+import XCTest
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
+
+final class BackgroundAssetBundleTests: XCTestCase {
+  func testBundledBackgroundImagesArePackagedWithPreviewableAssets() {
+    for image in HarnessMonitorBackgroundImage.allCases {
+      XCTAssertNotNil(
+        HarnessMonitorUIAssets.bundle.image(forResource: image.assetName),
+        "Missing bundled background asset: \(image.assetName)"
+      )
+    }
+  }
+}
 
 @Suite("Background thumbnail cache")
 struct BackgroundThumbnailCacheTests {
