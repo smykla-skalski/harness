@@ -241,6 +241,8 @@ final class SwarmFixture {
   func selectAgentsTask(_ taskID: String) {
     let tabID = Accessibility.agentsTaskTab(taskID)
     let selectionID = Accessibility.agentsTaskSelection(taskID)
+    let taskTab = testCase.element(in: app, identifier: tabID)
+    let sidebar = agentsSidebarScrollView()
     trace(
       "select-agents-task.begin",
       app: app,
@@ -250,31 +252,49 @@ final class SwarmFixture {
         "selection_identifier": selectionID,
       ]
     )
-    if let selectionIdentifier = currentAgentsSidebarSelectionIdentifier() {
-      testCase.tapElement(in: app, identifier: selectionIdentifier)
-    } else {
-      testCase.tapElement(in: app, identifier: Accessibility.agentTuiCreateTab)
-    }
-    let selected = testCase.waitUntil(timeout: 12) {
+    let sidebarReady = testCase.waitUntil(timeout: 5) {
       if self.app.state != .runningForeground {
         self.app.activate()
       }
-      if self.currentAgentsWindowStateLabel().contains("selection=task:\(taskID)") {
+      return sidebar.exists && !sidebar.frame.isEmpty && sidebar.scrollBars.firstMatch.exists
+    }
+    XCTAssertTrue(
+      sidebarReady,
+      "Expected Agents sidebar scroll view to be available\n\(diagnosticsSummary())"
+    )
+
+    let taskVisible = testCase.waitUntil(timeout: 12) {
+      if self.app.state != .runningForeground {
+        self.app.activate()
+      }
+      if self.elementIsVisible(taskTab, in: sidebar) {
         return true
       }
-      self.app.typeKey(XCUIKeyboardKey.downArrow.rawValue, modifierFlags: [])
+      sidebar.scroll(byDeltaX: 0, deltaY: -max(240, sidebar.frame.height * 0.9))
       RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
       return false
     }
-    if selected {
-      trace("select-agents-task.selected", app: app, details: ["task_id": taskID])
+    if taskVisible {
+      trace("select-agents-task.visible", app: app, details: ["task_id": taskID])
     } else {
       trace("select-agents-task.timeout", app: app, details: ["task_id": taskID])
     }
     XCTAssertTrue(
+      taskVisible,
+      """
+      Expected Agents task tab \(taskID) to become visible inside the Agents sidebar.
+      agentsWindowState=\(currentAgentsWindowStateLabel())
+      \(diagnosticsSummary())
+      """
+    )
+    testCase.tapElement(in: app, identifier: tabID)
+    let selected = testCase.waitUntil(timeout: 5) {
+      self.currentAgentsWindowStateLabel().contains("selection=task:\(taskID)")
+    }
+    XCTAssertTrue(
       selected,
       """
-      Expected Agents task tab \(taskID) to become selected.
+      Expected Agents task tab \(taskID) to become selected after tap.
       agentsWindowState=\(currentAgentsWindowStateLabel())
       \(diagnosticsSummary())
       """
@@ -318,6 +338,28 @@ final class SwarmFixture {
     }
     let tail = label[start...]
     return tail.split(separator: ",", maxSplits: 1).first.map(String.init)
+  }
+
+  private func agentsSidebarScrollView() -> XCUIElement {
+    let createRow = testCase.element(in: app, identifier: Accessibility.agentTuiCreateTab)
+    let launchPane = testCase.element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    let anchor = createRow.exists ? createRow : launchPane
+    let agentsWindow = testCase.window(in: app, containing: anchor)
+    return agentsWindow.scrollViews.element(boundBy: 0)
+  }
+
+  private func elementIsVisible(_ element: XCUIElement, in container: XCUIElement) -> Bool {
+    guard
+      element.exists,
+      !element.frame.isEmpty,
+      container.exists,
+      !container.frame.isEmpty
+    else {
+      return false
+    }
+
+    let visibleFrame = element.frame.intersection(container.frame)
+    return !visibleFrame.isNull && !visibleFrame.isEmpty
   }
 
   func openSession(_ sessionID: String) {
