@@ -217,15 +217,17 @@ final class SwarmFixture {
   }
 
   func closeAgentsWindow() {
+    let agentsWindow = testCase.element(in: app, identifier: Accessibility.agentsWindow)
+    let agentsState = testCase.element(in: app, identifier: Accessibility.agentTuiState)
     let launchPane = testCase.element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let sessionPane = testCase.element(in: app, identifier: Accessibility.agentTuiSessionPane)
-    guard launchPane.exists || sessionPane.exists else {
+    guard agentsWindow.exists || agentsState.exists || launchPane.exists || sessionPane.exists else {
       return
     }
     trace("close-agents.begin", app: app)
     app.typeKey("w", modifierFlags: .command)
     let closed = testCase.waitUntil(timeout: 10) {
-      !launchPane.exists && !sessionPane.exists
+      !agentsWindow.exists && !agentsState.exists && !launchPane.exists && !sessionPane.exists
     }
     if closed {
       trace("close-agents.success", app: app)
@@ -462,8 +464,17 @@ final class SwarmFixture {
       )
       return
     }
-    let target = scrollTarget(for: task)
-    let taskVisible = scrollElementIntoView(task)
+    let target = sessionTaskScrollView(for: task)
+    trace(
+      "select-task.scroll-target",
+      app: app,
+      details: [
+        "task_id": taskID,
+        "identifier": identifier,
+        "scroll_frame": frameSummary(target.frame),
+      ]
+    )
+    let taskVisible = scrollSessionTaskIntoView(task)
     if !taskVisible {
       trace(
         "select-task.scroll-timeout",
