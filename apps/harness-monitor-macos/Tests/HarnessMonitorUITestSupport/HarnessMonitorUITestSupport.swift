@@ -19,6 +19,65 @@ private final class HarnessMonitorUITestFailureTracker: @unchecked Sendable {
   }
 }
 
+private struct HarnessMonitorUITestTeardownContext: Sendable {
+  let testName: String
+  let artifactsDirectoryKey: String
+  let reuseLaunchedApp: Bool
+  let failureTracker: HarnessMonitorUITestFailureTracker
+  let uiTestHostBundleIdentifier: String
+}
+
+@MainActor
+private func performHarnessMonitorUITestTeardown(
+  _ context: HarnessMonitorUITestTeardownContext
+) {
+  appendDiagnosticsTrace(
+    component: "ui-test",
+    event: "test.teardown.begin",
+    testName: context.testName,
+    artifactsDirectoryKey: context.artifactsDirectoryKey
+  )
+  if context.failureTracker.takeFailure(for: context.testName) {
+    let snapshotName = "failure-final-\(UUID().uuidString.lowercased())"
+    let app = XCUIApplication(bundleIdentifier: context.uiTestHostBundleIdentifier)
+    appendDiagnosticsTrace(
+      component: "ui-test",
+      event: "test.failure.snapshot",
+      testName: context.testName,
+      details: ["snapshot": snapshotName],
+      artifactsDirectoryKey: context.artifactsDirectoryKey
+    )
+    recordStandaloneDiagnosticsSnapshot(
+      in: app,
+      named: snapshotName,
+      artifactsDirectoryKey: context.artifactsDirectoryKey
+    )
+  }
+  if !context.reuseLaunchedApp {
+    appendDiagnosticsTrace(
+      component: "ui-test",
+      event: "test.teardown.terminate-app",
+      testName: context.testName,
+      artifactsDirectoryKey: context.artifactsDirectoryKey
+    )
+    let launchedApp = XCUIApplication(bundleIdentifier: context.uiTestHostBundleIdentifier)
+    HarnessMonitorUITestCase.terminateAndWait(launchedApp)
+  }
+  appendDiagnosticsTrace(
+    component: "ui-test",
+    event: "test.teardown.stop-requested",
+    testName: context.testName,
+    artifactsDirectoryKey: context.artifactsDirectoryKey
+  )
+  HarnessMonitorUITestCase.signalRecordingStopIfConfigured()
+  appendDiagnosticsTrace(
+    component: "ui-test",
+    event: "test.teardown.end",
+    testName: context.testName,
+    artifactsDirectoryKey: context.artifactsDirectoryKey
+  )
+}
+
 @MainActor
 class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
@@ -42,60 +101,21 @@ class HarnessMonitorUITestCase: XCTestCase {
 
   override func setUpWithError() throws {
     continueAfterFailure = false
-    let testName = name
-    let artifactsKey = Self.artifactsDirectoryKey
+    let teardownContext = HarnessMonitorUITestTeardownContext(
+      testName: name,
+      artifactsDirectoryKey: Self.artifactsDirectoryKey,
+      reuseLaunchedApp: Self.reuseLaunchedApp,
+      failureTracker: Self.failureTracker,
+      uiTestHostBundleIdentifier: Self.uiTestHostBundleIdentifier
+    )
     appendDiagnosticsTrace(
       component: "ui-test",
       event: "test.setup",
-      testName: testName,
-      artifactsDirectoryKey: artifactsKey
+      testName: teardownContext.testName,
+      artifactsDirectoryKey: teardownContext.artifactsDirectoryKey
     )
-    addTeardownBlock { @MainActor in
-      appendDiagnosticsTrace(
-        component: "ui-test",
-        event: "test.teardown.begin",
-        testName: testName,
-        artifactsDirectoryKey: artifactsKey
-      )
-      if Self.failureTracker.takeFailure(for: testName) {
-        let snapshotName = "failure-final-\(UUID().uuidString.lowercased())"
-        let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-        appendDiagnosticsTrace(
-          component: "ui-test",
-          event: "test.failure.snapshot",
-          testName: testName,
-          details: ["snapshot": snapshotName],
-          artifactsDirectoryKey: artifactsKey
-        )
-        recordStandaloneDiagnosticsSnapshot(
-          in: app,
-          named: snapshotName,
-          artifactsDirectoryKey: artifactsKey
-        )
-      }
-      if !Self.reuseLaunchedApp {
-        appendDiagnosticsTrace(
-          component: "ui-test",
-          event: "test.teardown.terminate-app",
-          testName: testName,
-          artifactsDirectoryKey: artifactsKey
-        )
-        let launchedApp = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-        Self.terminateAndWait(launchedApp)
-      }
-      appendDiagnosticsTrace(
-        component: "ui-test",
-        event: "test.teardown.stop-requested",
-        testName: testName,
-        artifactsDirectoryKey: artifactsKey
-      )
-      Self.signalRecordingStopIfConfigured()
-      appendDiagnosticsTrace(
-        component: "ui-test",
-        event: "test.teardown.end",
-        testName: testName,
-        artifactsDirectoryKey: artifactsKey
-      )
+    addTeardownBlock { @MainActor [teardownContext] in
+      performHarnessMonitorUITestTeardown(teardownContext)
     }
   }
 
