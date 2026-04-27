@@ -5,6 +5,8 @@ public struct SwarmRunLayout {
   public static let agentsE2ETestBundleID = "io.harnessmonitor.agents-e2e-tests"
   public static let runnerContainerEnvironmentKey = "AGENTS_E2E_RUNNER_CONTAINER_ROOT"
   public static let defaultRunnerBundleID = "\(agentsE2ETestBundleID).xctrunner"
+  public static let appGroupEnvironmentKey = "HARNESS_APP_GROUP_ID"
+  public static let defaultMonitorAppGroupIdentifier = "Q498EB36N4.io.harnessmonitor"
 
   public let runID: String
   public let sessionID: String
@@ -41,6 +43,7 @@ public struct SwarmRunLayout {
     temporaryDirectory: URL,
     homeDirectory: URL,
     sessionID: String? = nil,
+    appGroupIdentifierOverride: String? = nil,
     stateRootOverride: URL? = nil,
     dataRootOverride: URL? = nil,
     dataHomeOverride: URL? = nil,
@@ -60,8 +63,16 @@ public struct SwarmRunLayout {
       .appendingPathComponent("HarnessMonitorSwarmE2E", isDirectory: true)
       .appendingPathComponent(runID, isDirectory: true)
     self.stateRoot = stateRoot
+    let appGroupIdentifier =
+      Self.normalizedAppGroupIdentifier(appGroupIdentifierOverride)
+      ?? Self.defaultMonitorAppGroupIdentifier
     self.dataRoot =
-      dataRootOverride ?? stateRoot.appendingPathComponent("data-root", isDirectory: true)
+      dataRootOverride
+      ?? Self.defaultDataRoot(
+        runID: runID,
+        homeDirectory: homeDirectory,
+        appGroupIdentifier: appGroupIdentifier
+      )
     self.dataHome =
       dataHomeOverride ?? dataRoot.appendingPathComponent("data-home", isDirectory: true)
 
@@ -131,5 +142,27 @@ public struct SwarmRunLayout {
     formatter.timeZone = TimeZone(secondsFromGMT: 0)
     formatter.dateFormat = format
     return formatter
+  }
+
+  private static func normalizedAppGroupIdentifier(_ rawValue: String?) -> String? {
+    guard let rawValue else {
+      return nil
+    }
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private static func defaultDataRoot(
+    runID: String,
+    homeDirectory: URL,
+    appGroupIdentifier: String
+  ) -> URL {
+    homeDirectory
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Group Containers", isDirectory: true)
+      .appendingPathComponent(appGroupIdentifier, isDirectory: true)
+      .appendingPathComponent("HarnessMonitorSwarmE2E", isDirectory: true)
+      .appendingPathComponent(runID, isDirectory: true)
+      .appendingPathComponent("data-root", isDirectory: true)
   }
 }

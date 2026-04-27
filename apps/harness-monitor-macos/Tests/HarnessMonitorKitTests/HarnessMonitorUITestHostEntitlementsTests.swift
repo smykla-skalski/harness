@@ -3,8 +3,8 @@ import Testing
 
 @Suite("UI test host entitlements")
 struct HarnessMonitorUITestHostEntitlementsTests {
-  @Test("UI test host does not request app-group access")
-  func uiTestHostDoesNotRequestAppGroupAccess() throws {
+  @Test("UI test host requests the monitor app-group access it needs")
+  func uiTestHostRequestsMonitorAppGroupAccess() throws {
     let entitlementsURL = monitorAppRoot()
       .appendingPathComponent("HarnessMonitorUITestHost.entitlements", isDirectory: false)
     let plist = try PropertyListSerialization.propertyList(
@@ -15,7 +15,10 @@ struct HarnessMonitorUITestHostEntitlementsTests {
     let entitlements = try #require(plist as? [String: Any])
 
     #expect(entitlements["com.apple.security.app-sandbox"] as? Bool == true)
-    #expect(entitlements["com.apple.security.application-groups"] == nil)
+    #expect(
+      entitlements["com.apple.security.application-groups"] as? [String]
+        == ["Q498EB36N4.io.harnessmonitor"]
+    )
   }
 
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {

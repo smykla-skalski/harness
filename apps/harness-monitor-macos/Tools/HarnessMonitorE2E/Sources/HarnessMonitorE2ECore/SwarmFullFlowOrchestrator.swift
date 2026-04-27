@@ -124,6 +124,10 @@ private final class SwarmFullFlowRunner {
     let dataHomeOverride = environment["HARNESS_E2E_DATA_HOME"].flatMap {
       $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true)
     }
+    let appGroupIdentifierOverride = environment[SwarmRunLayout.appGroupEnvironmentKey].flatMap {
+      let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty ? nil : trimmed
+    }
     let syncRootOverride = environment["HARNESS_E2E_SYNC_ROOT"].flatMap {
       $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true)
     }
@@ -140,6 +144,7 @@ private final class SwarmFullFlowRunner {
       temporaryDirectory: tmpDirectory,
       homeDirectory: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true),
       sessionID: environment["HARNESS_E2E_SESSION_ID"],
+      appGroupIdentifierOverride: appGroupIdentifierOverride,
       stateRootOverride: stateRootOverride,
       dataRootOverride: dataRootOverride,
       dataHomeOverride: dataHomeOverride,

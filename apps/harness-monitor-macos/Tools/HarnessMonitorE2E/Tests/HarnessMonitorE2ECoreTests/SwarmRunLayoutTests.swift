@@ -14,7 +14,14 @@ final class SwarmRunLayoutTests: XCTestCase {
 
     XCTAssertEqual(layout.sessionID, "sess-e2e-swarm-run-123")
     XCTAssertEqual(layout.stateRoot.path, "/tmp/HarnessMonitorSwarmE2E/run-123")
-    XCTAssertEqual(layout.dataHome.path, "/tmp/HarnessMonitorSwarmE2E/run-123/data-root/data-home")
+    XCTAssertEqual(
+      layout.dataRoot.path,
+      "/Users/test/Library/Group Containers/Q498EB36N4.io.harnessmonitor/HarnessMonitorSwarmE2E/run-123/data-root"
+    )
+    XCTAssertEqual(
+      layout.dataHome.path,
+      "/Users/test/Library/Group Containers/Q498EB36N4.io.harnessmonitor/HarnessMonitorSwarmE2E/run-123/data-root/data-home"
+    )
     XCTAssertEqual(
       layout.syncRoot.path,
       "/Users/test/Library/Containers/io.harnessmonitor.agents-e2e-tests.xctrunner/Data/tmp/HarnessMonitorSwarmE2E/run-123"
@@ -23,6 +30,22 @@ final class SwarmRunLayoutTests: XCTestCase {
     XCTAssertEqual(layout.derivedDataPath.path, "/common/xcode-derived-e2e")
     XCTAssertEqual(layout.uiSnapshotsSource.lastPathComponent, "ui-snapshots")
     XCTAssertEqual(layout.screenRecordingControlDirectory.lastPathComponent, "recording-control")
+  }
+
+  func testAppGroupOverrideAdjustsDefaultDataHomePath() {
+    let layout = SwarmRunLayout(
+      runID: "run-123",
+      repoRoot: URL(fileURLWithPath: "/repo", isDirectory: true),
+      commonRepoRoot: URL(fileURLWithPath: "/common", isDirectory: true),
+      temporaryDirectory: URL(fileURLWithPath: "/tmp", isDirectory: true),
+      homeDirectory: URL(fileURLWithPath: "/Users/test", isDirectory: true),
+      appGroupIdentifierOverride: "TEAM123.io.harnessmonitor"
+    )
+
+    XCTAssertEqual(
+      layout.dataHome.path,
+      "/Users/test/Library/Group Containers/TEAM123.io.harnessmonitor/HarnessMonitorSwarmE2E/run-123/data-root/data-home"
+    )
   }
 
   func testProjectContextRootUsesStableDigestDirectory() {
