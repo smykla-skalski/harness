@@ -108,7 +108,10 @@ impl Drop for ManagedChild {
         // pollution and leaked hosts.
         #[cfg(target_os = "macos")]
         {
-            // Try graceful AppleScript quit
+                // Try graceful AppleScript quit for both UI testing host and shipping app
+            let _ = ProcessCommand::new("/usr/bin/osascript")
+                .args(&["-e", "tell application \"Harness Monitor UI Testing\" to quit"]) 
+                .status();
             let _ = ProcessCommand::new("/usr/bin/osascript")
                 .args(&["-e", "tell application \"Harness Monitor\" to quit"]) 
                 .status();
@@ -116,18 +119,24 @@ impl Drop for ManagedChild {
             // Short wait to allow graceful shutdown
             std::thread::sleep(std::time::Duration::from_millis(500));
 
-            // If still running, send TERM to the binary process
-            let _ = ProcessCommand::new("/usr/bin/pgrep")
-                .args(&["-f", "Harness Monitor.app/Contents/MacOS/Harness Monitor"])
-                .status()
-                .and_then(|s| {
-                    if s.success() {
-                        let _ = ProcessCommand::new("/usr/bin/pkill")
-                            .args(&["-TERM", "-f", "Harness Monitor.app/Contents/MacOS/Harness Monitor"])
-                            .status();
-                    }
-                    Ok(s)
-                });
+            // If still running, send TERM to the binary processes (try both host and shipping paths)
+            let patterns = [
+                "Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing",
+                "Harness Monitor.app/Contents/MacOS/Harness Monitor",
+            ];
+            for pat in patterns {
+                let _ = ProcessCommand::new("/usr/bin/pgrep")
+                    .args(&["-f", pat])
+                    .status()
+                    .and_then(|s| {
+                        if s.success() {
+                            let _ = ProcessCommand::new("/usr/bin/pkill")
+                                .args(&["-TERM", "-f", pat])
+                                .status();
+                        }
+                        Ok(s)
+                    });
+            }
         }
     }
 }
