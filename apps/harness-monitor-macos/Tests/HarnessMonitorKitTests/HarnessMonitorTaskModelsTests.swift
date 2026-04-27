@@ -41,6 +41,16 @@ struct HarnessMonitorTaskModelsTests {
     #expect(kebab == .requestChanges)
   }
 
+  @Test("Review statuses are managed by the review flow")
+  func reviewStatusesAreReviewManaged() {
+    #expect(TaskStatus.awaitingReview.isReviewManagedStatus)
+    #expect(TaskStatus.inReview.isReviewManagedStatus)
+    #expect(!TaskStatus.open.isReviewManagedStatus)
+    #expect(!TaskStatus.inProgress.isReviewManagedStatus)
+    #expect(!TaskStatus.done.isReviewManagedStatus)
+    #expect(!TaskStatus.blocked.isReviewManagedStatus)
+  }
+
   @Test("WorkItem decodes with absent v10 fields")
   func workItemDecodesWithoutV10Fields() throws {
     let json = """
