@@ -37,14 +37,16 @@ Score the problem text (file contents + framing) against two cue sets:
 - **UX cues:** `ui`, `ux`, `view`, `screen`, `sidebar`, `toolbar`, `button`, `menu`, `window`, `sheet`, `tab`, `dashboard`, `chart`, `layout`, `typography`, `color`, `contrast`, `animation`, `motion`, `transition`, `easing`, `swiftui`, `appkit`, `cocoa`, `accessibility`, `a11y`, `voiceover`, `screen reader`, `wcag`, `aria`, `focus`, `keyboard navigation`, `affordance`, `usability`, `recording`, `figma`, `mockup`, `interaction`, `tooltip`, `hover`, `drag`, `gesture`.
 - **Engineering cues:** `refactor`, `architecture`, `module`, `crate`, `package`, `function`, `class`, `struct`, `actor`, `protocol` (in code-design sense), `api`, `endpoint`, `schema`, `migration`, `database`, `sql`, `query`, `cache`, `lock`, `thread`, `concurrency`, `async`, `await`, `goroutine`, `tokio`, `performance` (in CPU/memory/throughput sense), `latency` (system), `throughput`, `pipeline`, `ci`, `cd`, `deploy`, `kubernetes`, `terraform`, `helm`, `oncall`, `incident`, `dependency`, `lint`, `test` (unit/integration), `mock`, `fuzz`, `tla+`.
 
-Resolution:
+Apply file path hints first - they are the strongest signal. `*.swift`, `*.css`, `*.html`, `apps/harness-monitor-macos/Sources/...` bias UX; `*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf` bias engineering. Treat each path hint as adding 2 to the matching side's score.
 
-- UX score > Engineering score: `core-ux`.
-- Engineering score > UX score: `core-eng`.
-- Both non-zero and within ~30%, or both zero: `core-mix`.
-- File extension hints (`*.swift`, `*.css`, `*.html`) bias UX; (`*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf`) bias engineering.
+Then resolve in this order - first matching rule wins:
 
-If you cannot tell, use `core-mix`. Do not silently fall back to `core-eng`; that hides the choice from the user.
+1. Two-surface framing wins. If the problem text names two halves (`both halves`, `backend + UI`, `code and UI`, `crate and SwiftUI`, `API and view`, `frontend and backend`, `server and client`), pick `core-mix`.
+2. Both halves have real signal. If UX score >= 2 AND engineering score >= 2 (after path hints), pick `core-mix`.
+3. Single side dominates. UX > engineering picks `core-ux`; engineering > UX picks `core-eng`.
+4. No signal at all. Both scores 0 picks `core-mix` and the announcement says so explicitly.
+
+Never silently fall back to `core-eng`; that hides the choice from the user.
 
 ## Roster
 

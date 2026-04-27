@@ -36,14 +36,18 @@ Score the problem text (file contents + framing) against two cue sets:
 
 **Engineering cues:** `refactor`, `architecture`, `module`, `crate`, `package`, `function`, `class`, `struct`, `actor`, `protocol` (in code-design sense), `api`, `endpoint`, `schema`, `migration`, `database`, `sql`, `query`, `cache`, `lock`, `thread`, `concurrency`, `async`, `await`, `goroutine`, `tokio`, `performance` (in CPU/memory/throughput sense), `latency` (system), `throughput`, `pipeline`, `ci`, `cd`, `deploy`, `kubernetes`, `terraform`, `helm`, `oncall`, `incident`, `dependency`, `lint`, `test` (unit/integration), `mock`, `fuzz`, `tla+`.
 
-Resolution:
+Apply file path hints first - they're the strongest signal. `*.swift`, `*.css`, `*.html`, `apps/harness-monitor-macos/Sources/...` bias toward UX; `*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf` bias toward engineering. Treat each path hint as adding 2 to the matching side's score so it can outweigh stray cue keywords in framing prose.
 
-- UX score > Engineering score: `core-ux`.
-- Engineering score > UX score: `core-eng`.
-- Both non-zero and within ~30% of each other, or both zero: `core-mix`.
-- File path hints (e.g., `apps/harness-monitor-macos/Sources/...SwiftUI views`, `*.swift`, `*.css`, `*.html`) bias toward `core-ux`; (`*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf`) bias toward `core-eng`.
+Then resolve in this order - check each rule in turn and stop on the first match:
 
-If you genuinely cannot tell, default to `core-mix` rather than guessing - mix gives both lenses one shot at the problem and the synthesis exposes which one matters. Do not silently fall back to `core-eng`; that hides the choice from the user.
+1. **Two-surface framing wins.** If the problem text explicitly names two halves of the work - phrases like `both halves`, `backend + UI`, `code and UI`, `crate and SwiftUI`, `API and view`, `frontend and backend`, `server and client` - pick `core-mix`. The user is telling you the surface is dual; respect that intent over keyword arithmetic.
+2. **Both halves have real signal.** If UX score >= 2 AND engineering score >= 2 (after path hints), pick `core-mix`. Two cues on each side means the problem genuinely touches both lenses; mix forces both into the review without paying for `all`.
+3. **Single side dominates.** If UX score > engineering score, pick `core-ux`. If engineering score > UX score, pick `core-eng`.
+4. **No signal at all.** If both scores are 0, pick `core-mix` and tell the user the auto-detect found nothing concrete so it's hedging.
+
+Why this order: the explicit framing rule (#1) catches the case where the user has already done the classification work in their prose - silently overriding that with keyword counts is hostile. The threshold rule (#2) catches the case where prose doesn't say "both halves" but the cues do. The strict-comparison rule (#3) only fires when one side is clearly thin or absent. The all-zero fallback (#4) is the last resort and must be transparent so the user knows nothing matched.
+
+Never silently fall back to `core-eng` - that hides the choice from the user and was the historical default.
 
 ## Roster
 
