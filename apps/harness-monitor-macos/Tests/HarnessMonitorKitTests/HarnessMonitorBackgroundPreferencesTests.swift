@@ -126,10 +126,8 @@ struct BackgroundThumbnailCacheTests {
   }
 }
 
-@Suite("Background gallery prefetch plan")
-struct BackgroundGalleryPrefetchPlanTests {
-  @Test("Initial plan keeps the selected background warm without prefetching the whole library")
-  func initialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary() {
+final class BackgroundGalleryPrefetchPlanTests: XCTestCase {
+  func testInitialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary() {
     let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(10))
     let selectedBackground = options[9]
     let recentItems = [options[8]]
@@ -141,29 +139,25 @@ struct BackgroundGalleryPrefetchPlanTests {
       visibleIDs: []
     )
 
-    #expect(
-      plan.map { $0.storageValue }
-        == Array(options.prefix(10)).map(\.storageValue)
-    )
+    XCTAssertEqual(plan.map(\.storageValue), Array(options.prefix(10)).map(\.storageValue))
   }
 
-  @Test("Visible tiles expand the plan with overscan and keep entries unique")
-  func visibleTilesExpandThePlanWithOverscanAndKeepEntriesUnique() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(10))
-    let selectedBackground = options[9]
+  func testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan() {
+    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(20))
+    let selectedBackground = options[19]
     let recentItems = [options[0]]
 
     let plan = PreferencesBackgroundGalleryPrefetchPlan.selections(
       options: options,
       recentItems: recentItems,
       selectedBackground: selectedBackground,
-      visibleIDs: [options[3].id, options[4].id]
+      visibleIDs: [options[15].id, options[16].id]
     )
 
-    #expect(
-      plan.map { $0.storageValue }
-        == Array(options.prefix(10)).map(\.storageValue)
-    )
+    let expectedStorageValues =
+      Array(options.prefix(PreferencesBackgroundGalleryPrefetchPlan.initialLimit))
+      .map(\.storageValue) + [selectedBackground.storageValue]
+    XCTAssertEqual(plan.map(\.storageValue), expectedStorageValues)
   }
 }
 

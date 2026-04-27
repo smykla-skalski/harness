@@ -111,7 +111,7 @@ description = "Run the slower build-based sandbox and daemon quality gates for t
 run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
 [tasks."monitor:macos:test"]
-description = "Run the fast lint lane, build-for-testing, and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
+description = "Build-for-testing and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
 [tasks."monitor:macos:test:scripts"]
