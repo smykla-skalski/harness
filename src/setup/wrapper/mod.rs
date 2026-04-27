@@ -16,6 +16,7 @@ use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
 
 mod install;
+mod codex_marketplace;
 mod plugin_cache;
 mod registrations;
 
@@ -25,6 +26,7 @@ mod tests;
 pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
+use codex_marketplace::sync_codex_council_marketplace;
 use plugin_cache::sync_plugin_cache;
 use registrations::{build_codex_config, process_agent_registrations};
 
@@ -84,6 +86,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
     let _ = write_suite_plugin_outputs(project_dir)?;
+    sync_codex_council_marketplace(project_dir, home)?;
     let plugins_root = project_dir.join(".claude").join("plugins");
     let suite_launcher = plugins_root.join("suite").join("harness");
 
