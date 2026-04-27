@@ -67,6 +67,14 @@ fn codex_council_skill_metadata_path() -> PathBuf {
         .join("openai.yaml")
 }
 
+fn codex_council_alias_skill_path() -> PathBuf {
+    repo_root()
+        .join(".agents")
+        .join("skills")
+        .join("council")
+        .join("SKILL.md")
+}
+
 #[test]
 fn claude_council_plugin_skill_preserves_all_yaml_keys_and_tools() {
     let planned =
@@ -144,6 +152,33 @@ fn codex_council_plugin_uses_codex_native_orchestration() {
         .expect("Codex council openai.yaml should be planned");
     assert!(metadata_body.contains("display_name:"));
     assert!(metadata_body.contains("default_prompt:"));
+}
+
+#[test]
+fn codex_council_direct_skill_alias_is_planned() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let skill = codex_council_alias_skill_path();
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("Codex council alias skill should be planned");
+
+    assert!(rendered.contains("name: council"));
+}
+
+#[test]
+fn codex_council_skill_documents_canonical_codex_source_layout() {
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
+    let skill = portable_council_skill_path();
+    let rendered = planned
+        .iter()
+        .find_map(|output| output.files.get(&skill))
+        .expect("Codex council plugin skill should be planned");
+
+    assert!(rendered.contains("agents/plugins/council/skills/council/codex/body.md"));
+    assert!(rendered.contains("skills/codex/body.md"));
 }
 
 #[test]
