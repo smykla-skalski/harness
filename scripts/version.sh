@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$ROOT/apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
 CARGO_LOCK="$ROOT/Cargo.lock"

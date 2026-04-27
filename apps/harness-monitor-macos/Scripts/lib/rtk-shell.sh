@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
+
 run_xcodebuild_command() {
   local xcodebuild_bin="${XCODEBUILD_BIN:-/usr/bin/xcodebuild}"
   if [[ ! -x "$xcodebuild_bin" ]]; then
@@ -14,15 +18,20 @@ run_xcodebuild_command() {
 # Required env: HARNESS_MONITOR_APP_ROOT must point at apps/harness-monitor-macos.
 run_tuist_xcodebuild_command() {
   local app_root="${HARNESS_MONITOR_APP_ROOT:-}"
+  local tuist_bin
   if [[ -z "$app_root" || ! -d "$app_root" ]]; then
     echo "run_tuist_xcodebuild_command: HARNESS_MONITOR_APP_ROOT is not set or missing" >&2
     return 1
   fi
-  if ! command -v tuist >/dev/null 2>&1; then
+  tuist_bin="$(type -P tuist || true)"
+  if [[ -z "$tuist_bin" ]]; then
     echo "run_tuist_xcodebuild_command: tuist is not on PATH; pin it in .mise.toml" >&2
     return 127
   fi
-  ( cd "$app_root" && tuist xcodebuild "$@" )
+  (
+    cd "$app_root" || exit 1
+    run_with_sanitized_xcode_only_swift_environment "$tuist_bin" xcodebuild "$@"
+  )
 }
 
 # Run xcodebuild and pipe its combined stdout/stderr through xcbeautify when

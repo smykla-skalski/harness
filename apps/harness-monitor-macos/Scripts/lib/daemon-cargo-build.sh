@@ -3,6 +3,9 @@
 # Sourceable helper that runs the cargo build for the harness daemon helper.
 # Callers must have sourced lib/daemon-bundle-env.sh first so resolve_repo_root
 # and resolve_cargo_target_dir are available.
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
 find_cargo() {
   if [ -n "${CARGO_BIN:-}" ] && [ -x "$CARGO_BIN" ]; then
@@ -27,11 +30,6 @@ find_cargo() {
 
   printf 'cargo is required to build the Harness daemon helper. Set CARGO_BIN or HARNESS_MONITOR_DAEMON_BINARY.\n' >&2
   exit 1
-}
-
-sanitize_xcode_tool_environment() {
-  unset SWIFT_DEBUG_INFORMATION_FORMAT
-  unset SWIFT_DEBUG_INFORMATION_VERSION
 }
 
 daemon_build_profile_dir() {
@@ -80,8 +78,8 @@ build_daemon_binary() {
 
   (
     cd "$repo_root" || exit 1
-    sanitize_xcode_tool_environment
-    CARGO_TARGET_DIR="$target_dir" "$cargo_bin" "${cargo_args[@]}" -- \
+    CARGO_TARGET_DIR="$target_dir" run_with_sanitized_xcode_only_swift_environment \
+      "$cargo_bin" "${cargo_args[@]}" -- \
       -C "link-arg=-Wl,-sectcreate,__TEXT,__info_plist,$daemon_info_link_plist"
   )
 

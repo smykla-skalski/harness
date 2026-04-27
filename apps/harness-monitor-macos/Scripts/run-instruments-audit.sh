@@ -8,6 +8,9 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$SCRIPT_DIR/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
 CANONICAL_XCODEBUILD_RUNNER="$APP_ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
@@ -16,7 +19,8 @@ PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"
 
 if [[ ! -x "$PERF_CLI_BINARY" ]]; then
   printf 'Building harness-monitor-perf Swift CLI...\n' >&2
-  swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
+  run_with_sanitized_xcode_only_swift_environment \
+    swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
 fi
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"

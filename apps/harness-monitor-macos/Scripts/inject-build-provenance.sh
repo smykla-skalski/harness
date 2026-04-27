@@ -16,6 +16,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 PERF_CLI_PACKAGE_DIR="$APP_ROOT/Tools/HarnessMonitorPerf"
 PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
+source "$SCRIPT_DIR/lib/swift-tool-env.sh"
+sanitize_xcode_only_swift_environment
 
 resolve_repo_root() {
   local candidate="$PROJECT_DIR"
@@ -51,7 +54,8 @@ if [ -z "$build_workspace_fingerprint" ]; then
   else
     if [ ! -x "$PERF_CLI_BINARY" ]; then
       echo "Building harness-monitor-perf Swift CLI..." >&2
-      swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
+      run_with_sanitized_xcode_only_swift_environment \
+        swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
     fi
     build_workspace_fingerprint="$("$PERF_CLI_BINARY" workspace-fingerprint --variant "$VARIANT" --project-dir "$PROJECT_DIR")"
   fi
