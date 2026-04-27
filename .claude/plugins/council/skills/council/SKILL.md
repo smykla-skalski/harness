@@ -1,7 +1,7 @@
 ---
 name: council
-description: Summon a council of 27 engineering persona agents to collaboratively review code, debate a plan, or advise on strategy. Six core bias-correction lenses - antirez (simplicity), tef (deletability), Casey Muratori (perf-from-day-one), Fred Hebert (resilience), Donella Meadows (systems), Cedric Chin (tacit knowledge) - plus ten extended-domain lenses - Alexis King (type-driven design), John Hughes (property-based testing), Eric Evans (DDD), Mark Seemann with Scott Wlaschin (functional architecture), Hillel Wayne (formal methods, TLA+), Kief Morris with Yevgeniy Brikman (immutable infrastructure as code), Gary Bernhardt with Beck and Fowler (test architecture, FCIS), Brendan Gregg (systems performance), Simon Willison (LLM/AI quality, prompt injection, evals), Charity Majors (CI/CD, observability, oncall) - plus eleven extended UX/platform lenses - Chris Eidhof with Florian Kugler (SwiftUI declarative discipline), Mike Ash (Cocoa runtime mechanics), Brent Simmons (Mac app craft), Don Norman (affordances, signifiers, mental models), Bruce Tognazzini (First Principles of Interaction Design, Fitts's law), Steve Krug (don't-make-me-think, muddling through, recording-as-usability-test), Jakob Nielsen (10 Usability Heuristics, severity rating), Léonie Watson (lived a11y, semantic HTML over ARIA), Val Head (motion design, vestibular safety), John Siracusa (Mac platform critique), Edward Tufte (data-ink ratio, chartjunk, small multiples). Personas are sourced from each thinker's primary public writing. Use when reviewing a design document, architecture proposal, refactoring plan, code change, UI/UX surface, dashboard layout, or strategic decision and you want diverse, opinionated, evidence-grounded perspectives that cut through generic AI-style hedging.
-argument-hint: core|all|debate <problem-description|@file>
+description: Summon a council of 27 engineering persona agents to collaboratively review code, debate a plan, or advise on strategy. Six core bias-correction lenses - antirez (simplicity), tef (deletability), Casey Muratori (perf-from-day-one), Fred Hebert (resilience), Donella Meadows (systems), Cedric Chin (tacit knowledge) - plus ten extended-domain lenses - Alexis King (type-driven design), John Hughes (property-based testing), Eric Evans (DDD), Mark Seemann with Scott Wlaschin (functional architecture), Hillel Wayne (formal methods, TLA+), Kief Morris with Yevgeniy Brikman (immutable infrastructure as code), Gary Bernhardt with Beck and Fowler (test architecture, FCIS), Brendan Gregg (systems performance), Simon Willison (LLM/AI quality, prompt injection, evals), Charity Majors (CI/CD, observability, oncall) - plus eleven extended UX/platform lenses - Chris Eidhof with Florian Kugler (SwiftUI declarative discipline), Mike Ash (Cocoa runtime mechanics), Brent Simmons (Mac app craft), Don Norman (affordances, signifiers, mental models), Bruce Tognazzini (First Principles of Interaction Design, Fitts's law), Steve Krug (don't-make-me-think, muddling through, recording-as-usability-test), Jakob Nielsen (10 Usability Heuristics, severity rating), Léonie Watson (lived a11y, semantic HTML over ARIA), Val Head (motion design, vestibular safety), John Siracusa (Mac platform critique), Edward Tufte (data-ink ratio, chartjunk, small multiples). Personas are sourced from each thinker's primary public writing. The default `core` mode picks one of three 6-persona profiles automatically from the problem text - `core-eng` for code/architecture, `core-ux` for interaction/layout/a11y, `core-mix` for features that ship code and UI together - and the user can pin any profile (`core-eng`, `core-ux`, `core-mix`, or aliases `eng`, `ux`, `mix`, `random`) to override. Use when reviewing a design document, architecture proposal, refactoring plan, code change, UI/UX surface, dashboard layout, or strategic decision and you want diverse, opinionated, evidence-grounded perspectives that cut through generic AI-style hedging.
+argument-hint: core|core-eng|core-ux|core-mix|all|debate <problem-description|@file>
 allowed-tools: Agent, AskUserQuestion, Read, Grep, Glob, Bash, Write, Edit
 user-invocable: true
 ---
@@ -18,24 +18,46 @@ Generic AI review drifts to safe, hedged, template-shaped output. Opinionated pe
 
 | Mode     | Keyword  | Agents Summoned                  | Cost & purpose |
 |----------|----------|----------------------------------|----------------|
-| **Core** | `core`   | All 6 core personas              | Default. ~6 persona calls + 1 synthesis. Best signal-to-noise for catching over-engineering, blind spots, premature abstraction, missing failure modes. |
-| **All**  | `all`    | All 27 personas (6 core + 10 extended domain + 11 extended UX/platform) | ~27 persona calls + 1 wider-context synthesis (~4.5x core cost). Use when the problem touches multiple domains (type design, deployment, observability, perf at scale, UX, accessibility, motion, macOS-platform craft) in one review and you want every lens. Reserve for substantial designs. |
+| **Core** | `core`   | 6 personas, profile auto-picked from problem text (eng / ux / mix) | Default. ~6 persona calls + 1 synthesis. Best signal-to-noise. Profile is selected by content heuristics; user can pin one with `core-eng`, `core-ux`, or `core-mix`. |
+| **Core (engineering)** | `core-eng` (alias `eng`) | 6 engineering bias-correction personas | Pin when the problem is code, architecture, refactor, perf, protocol, infra, ops. |
+| **Core (UI/UX)** | `core-ux` (alias `ux`) | 6 UI/UX bias-correction personas | Pin when the problem is interaction design, layout, dashboard, accessibility, usability test, visual density. |
+| **Core (mixed)** | `core-mix` (alias `mix`, `random`) | 3 engineering + 3 UX personas | Pin when the surface is a feature shipping both code and UI - the mix forces both lenses in one pass. |
+| **All**  | `all`    | All 27 personas (6 engineering core + 6 UX core overlap + 10 extended domain + 11 extended UX/platform) | ~27 persona calls + 1 wider-context synthesis (~4.5x core cost). Use when the problem touches multiple domains (type design, deployment, observability, perf at scale, UX, accessibility, motion, macOS-platform craft) in one review and you want every lens. Reserve for substantial designs. |
 | **Debate** | `debate` | 3-6 personas you select for the topic | ~3-6 calls per round x 3 rounds + 1 synthesis. Multi-round - personas read each other's positions and respond. Use for hard tradeoff calls where disagreement is the point. |
 
 ### Parsing `$ARGUMENTS`
 
 Apply this algorithm in order:
 
-1. Split off the first whitespace-separated token.
-2. If that token is `core`, `all`, or `debate`: set `mode` to that value and `problem` to the remainder of `$ARGUMENTS`.
-3. Otherwise: set `mode` to `core` and `problem` to the full `$ARGUMENTS`.
-4. If `problem` (after trimming) begins with `@`, treat the rest of that token as a file path and use `Read` on it - the file contents become the problem context. Any text after the `@<path>` token is appended as additional framing.
+1. Split off the first whitespace-separated token, lowercased.
+2. Map aliases: `eng` -> `core-eng`, `ux` -> `core-ux`, `mix` -> `core-mix`, `random` -> `core-mix`.
+3. If that token is `core`, `core-eng`, `core-ux`, `core-mix`, `all`, or `debate`: set `mode` to that value and `problem` to the remainder of `$ARGUMENTS`.
+4. Otherwise: set `mode` to `core` and `problem` to the full `$ARGUMENTS`.
+5. If `problem` (after trimming) begins with `@`, treat the rest of that token as a file path and use `Read` on it - the file contents become the problem context. Any text after the `@<path>` token is appended as additional framing.
+6. If `mode == core`, run the auto-detect rules below to resolve to one of `core-eng`, `core-ux`, or `core-mix`. Tell the user which profile you picked and why in one sentence before spawning, so they can override on the next call.
+
+### Auto-detect rules for plain `core`
+
+Score the problem text (file contents + framing) against two cue sets:
+
+**UX cues:** `ui`, `ux`, `view`, `screen`, `sidebar`, `toolbar`, `button`, `menu`, `window`, `sheet`, `tab`, `dashboard`, `chart`, `layout`, `typography`, `color`, `contrast`, `animation`, `motion`, `transition`, `easing`, `swiftui`, `appkit`, `cocoa`, `accessibility`, `a11y`, `voiceover`, `screen reader`, `wcag`, `aria`, `focus`, `keyboard navigation`, `affordance`, `usability`, `recording`, `figma`, `mockup`, `interaction`, `tooltip`, `hover`, `drag`, `gesture`.
+
+**Engineering cues:** `refactor`, `architecture`, `module`, `crate`, `package`, `function`, `class`, `struct`, `actor`, `protocol` (in code-design sense), `api`, `endpoint`, `schema`, `migration`, `database`, `sql`, `query`, `cache`, `lock`, `thread`, `concurrency`, `async`, `await`, `goroutine`, `tokio`, `performance` (in CPU/memory/throughput sense), `latency` (system), `throughput`, `pipeline`, `ci`, `cd`, `deploy`, `kubernetes`, `terraform`, `helm`, `oncall`, `incident`, `dependency`, `lint`, `test` (unit/integration), `mock`, `fuzz`, `tla+`.
+
+Resolution:
+
+- UX score > Engineering score: `core-ux`.
+- Engineering score > UX score: `core-eng`.
+- Both non-zero and within ~30% of each other, or both zero: `core-mix`.
+- File path hints (e.g., `apps/harness-monitor-macos/Sources/...SwiftUI views`, `*.swift`, `*.css`, `*.html`) bias toward `core-ux`; (`*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf`) bias toward `core-eng`.
+
+If you genuinely cannot tell, default to `core-mix` rather than guessing - mix gives both lenses one shot at the problem and the synthesis exposes which one matters. Do not silently fall back to `core-eng`; that hides the choice from the user.
 
 ## Roster
 
 Located in [agents/](../../agents/). Each persona is a self-contained subagent with its own system prompt, voice, philosophy, and review questions. The canonical registry (with full person/lens/dossier mapping and the "what each persona is good at catching" symptom map) lives in [references/personas.md](references/personas.md); the tables below are a quick-reference convenience for selection.
 
-### Core (6) - bias-correction default
+### Core (engineering) (6) - bias-correction default for code/architecture
 
 | Persona | Lens |
 |---------|------|
@@ -45,6 +67,30 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 | [hebert-resilience-reviewer](../../agents/hebert-resilience-reviewer.md) | Operability, supervision trees, complexity has to live somewhere, sociotechnical resilience |
 | [meadows-systems-advisor](../../agents/meadows-systems-advisor.md) | 12 leverage points, stocks/flows/loops, intervene at the right level |
 | [chin-strategy-advisor](../../agents/chin-strategy-advisor.md) | Tacit knowledge, NDM, anti-framework-cult, close the loop |
+
+### Core (UI/UX) (6) - bias-correction default for interaction/layout/a11y
+
+| Persona | Lens |
+|---------|------|
+| [norman-affordance-reviewer](../../agents/norman-affordance-reviewer.md) | Affordances vs signifiers, mappings, mental models, seven stages of action, error mode design |
+| [nielsen-heuristics-reviewer](../../agents/nielsen-heuristics-reviewer.md) | 10 Usability Heuristics, severity rating 0-4, discount usability, 5-users finding |
+| [krug-usability-reviewer](../../agents/krug-usability-reviewer.md) | Don't make me think, muddling through, three laws, trunk test, recording-as-usability-test |
+| [watson-a11y-reviewer](../../agents/watson-a11y-reviewer.md) | Lived screen-reader experience, semantic HTML over ARIA, accessible-name computation, focus order |
+| [tognazzini-fpid-reviewer](../../agents/tognazzini-fpid-reviewer.md) | First Principles of Interaction Design, Fitts's law, anticipation, latency, autonomy, protect user's work |
+| [tufte-density-reviewer](../../agents/tufte-density-reviewer.md) | Data-ink ratio, chartjunk, sparklines, small multiples, "above all else show the data" |
+
+### Core (mixed) (6) - 3 engineering + 3 UX, default when the assignment touches both
+
+| Persona | Lens |
+|---------|------|
+| [antirez-simplicity-reviewer](../../agents/antirez-simplicity-reviewer.md) | Engineering simplicity / design sacrifices |
+| [tef-deletability-reviewer](../../agents/tef-deletability-reviewer.md) | Deletability / anti-DRY / protocol over topology |
+| [hebert-resilience-reviewer](../../agents/hebert-resilience-reviewer.md) | Operability / failure modes / sociotechnical resilience |
+| [norman-affordance-reviewer](../../agents/norman-affordance-reviewer.md) | Affordances / mental models / error mode design |
+| [nielsen-heuristics-reviewer](../../agents/nielsen-heuristics-reviewer.md) | 10 Usability Heuristics / severity rating |
+| [watson-a11y-reviewer](../../agents/watson-a11y-reviewer.md) | Lived a11y / semantic structure / focus order |
+
+The mixed core is opinionated about the split. It picks the three engineering personas that most reliably catch product-level over-engineering (antirez, tef, hebert) and the three UX personas that most reliably catch product-level usability and a11y debt (norman, nielsen, watson). For deeper UI surface review use `core-ux`; for deeper code review use `core-eng`; for both at full strength use `all`.
 
 ### Extended Domain (10) - domain-specific lenses for `all` mode and `debate` selection
 
@@ -81,10 +127,12 @@ Located in [agents/](../../agents/). Each persona is a self-contained subagent w
 
 ### Core / All mode
 
-1. **Resolve `mode` and `problem` per the parse algorithm above.** If the resolved problem starts with `@`, read the file via `Read` first; the file contents are the problem context.
+1. **Resolve `mode` and `problem` per the parse algorithm above.** If the resolved problem starts with `@`, read the file via `Read` first; the file contents are the problem context. If the resolved mode is the bare `core`, run the auto-detect rules to pick `core-eng`, `core-ux`, or `core-mix`, and announce the chosen profile to the user in one sentence (e.g., "Picking `core-ux` because the problem references `sidebar`, `accessibility`, and `SwiftUI`. Override with `core-eng` or `core-mix` next time.").
 2. **Brief each persona in parallel.** Spawn each persona via the Agent tool with `subagent_type` matching the persona's registered name. Use the right roster for the mode:
-   - **Core mode (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`
-   - **All mode (27)**: the 6 core above plus the 10 extended-domain personas - `king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor` - plus the 11 extended UX/platform personas - `eidhof-swiftui-reviewer`, `ash-cocoa-runtime-reviewer`, `simmons-mac-craft-reviewer`, `norman-affordance-reviewer`, `tognazzini-fpid-reviewer`, `krug-usability-reviewer`, `nielsen-heuristics-reviewer`, `watson-a11y-reviewer`, `head-motion-reviewer`, `siracusa-mac-critic`, `tufte-density-reviewer`
+   - **`core-eng` (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `muratori-perf-reviewer`, `hebert-resilience-reviewer`, `meadows-systems-advisor`, `chin-strategy-advisor`
+   - **`core-ux` (6)**: `norman-affordance-reviewer`, `nielsen-heuristics-reviewer`, `krug-usability-reviewer`, `watson-a11y-reviewer`, `tognazzini-fpid-reviewer`, `tufte-density-reviewer`
+   - **`core-mix` (6)**: `antirez-simplicity-reviewer`, `tef-deletability-reviewer`, `hebert-resilience-reviewer`, `norman-affordance-reviewer`, `nielsen-heuristics-reviewer`, `watson-a11y-reviewer`
+   - **All mode (27)**: every persona in the engineering core, UX core, extended-domain (`king-type-reviewer`, `hughes-pbt-advisor`, `evans-ddd-reviewer`, `fp-structure-reviewer`, `wayne-spec-advisor`, `iac-craft-reviewer`, `test-architect`, `gregg-perf-reviewer`, `ai-quality-advisor`, `cicd-build-advisor`), and extended UX/platform (`eidhof-swiftui-reviewer`, `ash-cocoa-runtime-reviewer`, `simmons-mac-craft-reviewer`, `tognazzini-fpid-reviewer`, `krug-usability-reviewer`, `nielsen-heuristics-reviewer`, `watson-a11y-reviewer`, `head-motion-reviewer`, `siracusa-mac-critic`, `tufte-density-reviewer`, `norman-affordance-reviewer`) rosters - dedupe so each persona is spawned once.
    Each call gets:
    - The full problem context (file contents or problem statement)
    - Instruction to review through *their specific lens only*
@@ -225,11 +273,27 @@ Explicit gaps prevent the user mistaking the review for full coverage.>
 ## Examples
 
 <example>
-Default core review of a refactoring plan:
+Default core review of a refactoring plan (auto-detect picks `core-eng`):
 ```
 /council core @docs/plans/refactor-auth-module.md
 ```
-Spawns all 6 core personas in parallel, returns an integrated review using the synthesis shape above.
+Auto-detect sees `refactor`, `module`, code-shaped file path, picks `core-eng`, then spawns all 6 engineering core personas in parallel and returns an integrated review using the synthesis shape above.
+</example>
+
+<example>
+Pinned UX review of a sidebar redesign:
+```
+/council core-ux @apps/harness-monitor-macos/Sources/Sidebar.swift
+```
+Skips auto-detect, spawns the 6 UX core personas (norman, nielsen, krug, watson, tognazzini, tufte). Use `ux` as a shorter alias.
+</example>
+
+<example>
+Mixed review of a feature touching code and UI:
+```
+/council mix @docs/plans/sessions-window-redesign.md
+```
+Resolves `mix` -> `core-mix`, spawns 3 engineering + 3 UX personas (antirez, tef, hebert, norman, nielsen, watson). Use this when the design has both backend and frontend implications and you want both lenses without paying for `all`.
 </example>
 
 <example>

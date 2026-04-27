@@ -21,17 +21,36 @@ Do not guess `skills/codex/body.md`. That path is wrong for this repo and for th
 
 | Mode | Agents | Cost & purpose |
 |------|--------|----------------|
-| **core** | 6 core personas | Default. Best signal-to-noise for over-engineering, blind spots, premature abstraction, missing failure modes. |
-| **all** | 27 personas (6 core + 10 extended domain + 11 extended UX/platform) | Use for substantial designs touching multiple domains such as types, deployment, observability, AI quality, performance, UI craft, accessibility, motion, macOS-platform conventions, and dashboard density. Roughly 4.5x core cost. |
+| **core** | 6 personas, profile auto-picked from problem text | Default. Profile resolves to `core-eng`, `core-ux`, or `core-mix` via the auto-detect rules below. Tell the user which profile you picked and why before spawning. |
+| **core-eng** (alias `eng`) | 6 engineering bias-correction personas | Pin for code, architecture, refactor, perf, protocol, infra, ops problems. |
+| **core-ux** (alias `ux`) | 6 UI/UX bias-correction personas | Pin for interaction design, layout, dashboard, accessibility, usability, visual density. |
+| **core-mix** (alias `mix`, `random`) | 3 engineering + 3 UX personas | Pin for features that ship code and UI together. Forces both lenses without paying for `all`. |
+| **all** | 27 personas (engineering core + UX core + 10 extended domain + 11 extended UX/platform, deduped) | Use for substantial designs touching multiple domains such as types, deployment, observability, AI quality, performance, UI craft, accessibility, motion, macOS-platform conventions, and dashboard density. Roughly 4.5x core cost. |
 | **debate** | 3-6 selected personas | Use for hard tradeoff calls where disagreement is the point. Run opening positions, responses, then final positions. |
 
-If the user does not name a mode, use `core`. If the request starts with `@<path>`, read that file first and treat its contents as the problem context.
+If the user does not name a mode, use `core` and resolve the profile via auto-detect. If the request starts with `@<path>`, read that file first and treat its contents as the problem context.
+
+## Auto-detect rules for plain `core`
+
+Score the problem text (file contents + framing) against two cue sets:
+
+- **UX cues:** `ui`, `ux`, `view`, `screen`, `sidebar`, `toolbar`, `button`, `menu`, `window`, `sheet`, `tab`, `dashboard`, `chart`, `layout`, `typography`, `color`, `contrast`, `animation`, `motion`, `transition`, `easing`, `swiftui`, `appkit`, `cocoa`, `accessibility`, `a11y`, `voiceover`, `screen reader`, `wcag`, `aria`, `focus`, `keyboard navigation`, `affordance`, `usability`, `recording`, `figma`, `mockup`, `interaction`, `tooltip`, `hover`, `drag`, `gesture`.
+- **Engineering cues:** `refactor`, `architecture`, `module`, `crate`, `package`, `function`, `class`, `struct`, `actor`, `protocol` (in code-design sense), `api`, `endpoint`, `schema`, `migration`, `database`, `sql`, `query`, `cache`, `lock`, `thread`, `concurrency`, `async`, `await`, `goroutine`, `tokio`, `performance` (in CPU/memory/throughput sense), `latency` (system), `throughput`, `pipeline`, `ci`, `cd`, `deploy`, `kubernetes`, `terraform`, `helm`, `oncall`, `incident`, `dependency`, `lint`, `test` (unit/integration), `mock`, `fuzz`, `tla+`.
+
+Resolution:
+
+- UX score > Engineering score: `core-ux`.
+- Engineering score > UX score: `core-eng`.
+- Both non-zero and within ~30%, or both zero: `core-mix`.
+- File extension hints (`*.swift`, `*.css`, `*.html`) bias UX; (`*.rs`, `*.go`, `Cargo.toml`, `Dockerfile`, `*.tf`) bias engineering.
+
+If you cannot tell, use `core-mix`. Do not silently fall back to `core-eng`; that hides the choice from the user.
 
 ## Roster
 
 Persona files live in [agents/](../../agents/). The canonical registry and symptom map live in [references/personas.md](references/personas.md).
 
-Core (6) - bias-correction default:
+Core (engineering) (6) - bias-correction default for code/architecture:
 
 - `antirez-simplicity-reviewer`
 - `tef-deletability-reviewer`
@@ -39,6 +58,24 @@ Core (6) - bias-correction default:
 - `hebert-resilience-reviewer`
 - `meadows-systems-advisor`
 - `chin-strategy-advisor`
+
+Core (UI/UX) (6) - bias-correction default for interaction/layout/a11y:
+
+- `norman-affordance-reviewer`
+- `nielsen-heuristics-reviewer`
+- `krug-usability-reviewer`
+- `watson-a11y-reviewer`
+- `tognazzini-fpid-reviewer`
+- `tufte-density-reviewer`
+
+Core (mixed) (6) - 3 engineering + 3 UX, default when the assignment touches both:
+
+- `antirez-simplicity-reviewer`
+- `tef-deletability-reviewer`
+- `hebert-resilience-reviewer`
+- `norman-affordance-reviewer`
+- `nielsen-heuristics-reviewer`
+- `watson-a11y-reviewer`
 
 Extended Domain (10) - domain-specific lenses:
 
@@ -69,8 +106,8 @@ Extended UX/Platform (11) - UI craft, accessibility, motion, macOS conventions, 
 
 ## Codex Workflow
 
-1. Resolve `mode` and problem context. For file-backed requests, read the file before spawning reviewers.
-2. Select personas. Use core for default reviews, all for broad designs spanning domain + UX + platform lenses, and 3-6 focused personas for debate.
+1. Resolve `mode` and problem context. For file-backed requests, read the file before spawning reviewers. If `mode` is bare `core`, run auto-detect and announce the chosen profile (`core-eng`, `core-ux`, or `core-mix`) in one sentence so the user can override on the next call.
+2. Select personas from the matching roster: `core-eng` for the engineering 6, `core-ux` for the UX 6, `core-mix` for the 3+3 split, `all` for every persona deduped, and 3-6 focused personas for debate.
 3. For each selected persona, call `spawn_agent` with `agent_type: default` and a unique task name. The message must tell the subagent to read `agents/<persona>.md`, read any referenced dossier only if needed, review the supplied context through that persona's lens only, and return the Persona Output Contract below.
 4. Use `wait_agent` until every reviewer has returned. If one reviewer fails, continue with the successful reviewers and call out the missing lens in the synthesis.
 5. Synthesize the returned reviews. Do not average the personas into bland consensus. The value is convergence across opposed lenses and named disagreement where constraints decide the tradeoff.
