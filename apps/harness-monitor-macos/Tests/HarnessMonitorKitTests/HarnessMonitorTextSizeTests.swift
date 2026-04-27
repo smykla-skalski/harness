@@ -189,6 +189,59 @@ struct TaskDragPreviewLayoutTests {
   }
 }
 
+@MainActor
+@Suite("Accessibility text marker layout")
+struct AccessibilityTextMarkerLayoutTests {
+  @Test("Marker does not inflate a vertical stack")
+  func markerDoesNotInflateAVerticalStack() {
+    withEnvironmentValue("HARNESS_MONITOR_UI_TESTS", value: "1") {
+      withEnvironmentValue("HARNESS_MONITOR_UI_ACCESSIBILITY_MARKERS", value: "1") {
+        let baseline = fittingSize {
+          VStack(spacing: 0) {
+            Text("Tasks")
+          }
+        }
+        let withMarker = fittingSize {
+          VStack(spacing: 0) {
+            AccessibilityTextMarker(identifier: "test.marker", text: "marker")
+            Text("Tasks")
+          }
+        }
+
+        #expect(withMarker == baseline)
+      }
+    }
+  }
+
+  private func fittingSize<Content: View>(@ViewBuilder content: () -> Content) -> CGSize {
+    let host = NSHostingView(rootView: content())
+    host.frame = CGRect(x: 0, y: 0, width: 240, height: 120)
+    host.layoutSubtreeIfNeeded()
+    return host.fittingSize
+  }
+
+  private func withEnvironmentValue<T>(
+    _ key: String,
+    value: String?,
+    operation: () throws -> T
+  ) rethrows -> T {
+    let previousValue = getenv(key).map { String(cString: $0) }
+    if let value {
+      setenv(key, value, 1)
+    } else {
+      unsetenv(key)
+    }
+    defer {
+      if let previousValue {
+        setenv(key, previousValue, 1)
+      } else {
+        unsetenv(key)
+      }
+    }
+    return try operation()
+  }
+}
+
 @Suite("Task drag feedback metrics")
 struct TaskDragFeedbackMetricsTests {
   @Test("Hand-feedback metrics scale dynamically across compact task card sizes")

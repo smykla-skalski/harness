@@ -85,6 +85,7 @@ public struct AccessibilityTextMarker: View {
   @ViewBuilder public var body: some View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       Color.clear
+        .frame(width: 0, height: 0)
         .allowsHitTesting(false)
         .accessibilityElement()
         .accessibilityLabel(text)
