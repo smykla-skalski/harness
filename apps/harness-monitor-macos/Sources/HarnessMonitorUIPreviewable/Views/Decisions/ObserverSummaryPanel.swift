@@ -100,7 +100,7 @@ private struct ObserverPanelOpenIssuesSection: View {
   let issues: [ObserverIssueSummary]
 
   var body: some View {
-    InspectorSection(title: "Open Issues") {
+    InspectorSection(title: "Recent Findings") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         ForEach(issues) { issue in
           VStack(alignment: .leading, spacing: 4) {
