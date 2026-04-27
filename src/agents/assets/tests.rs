@@ -133,6 +133,10 @@ fn agent_assets_round_trip_smoke_covers_public_surface() {
         read_text(&launcher).expect("launcher reads"),
         PROJECT_PLUGIN_LAUNCHER
     );
+    assert!(
+        claude_harness_skill.exists(),
+        "suite plugin refresh must not prune sibling Claude plugins"
+    );
 }
 
 #[test]
@@ -169,7 +173,10 @@ fn default_gemini_write_prunes_stale_command_wrappers() {
         .join(".gemini")
         .join("commands")
         .join("swarm-e2e-iterate.toml");
-    let guide = project_root.join(".gemini").join("commands").join("AGENTS.md");
+    let guide = project_root
+        .join(".gemini")
+        .join("commands")
+        .join("AGENTS.md");
 
     write(
         &stale_command,
@@ -184,6 +191,48 @@ fn default_gemini_write_prunes_stale_command_wrappers() {
     assert!(
         !stale_command.exists(),
         "default Gemini write should prune stale command wrappers"
+    );
+}
+
+#[test]
+fn target_specific_write_preserves_other_managed_roots() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project_root = tmp.path();
+
+    write_agent_target_outputs(project_root, AgentAssetTarget::All).expect("all assets write");
+    let portable_plugin_skill = project_root
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("harness")
+        .join("SKILL.md");
+    let codex_alias_skill = project_root
+        .join(".agents")
+        .join("skills")
+        .join("harness-cli")
+        .join("SKILL.md");
+    let copilot_hook = project_root
+        .join(".github")
+        .join("hooks")
+        .join("harness.json");
+    assert!(portable_plugin_skill.exists());
+    assert!(codex_alias_skill.exists());
+    assert!(copilot_hook.exists());
+
+    write_agent_target_outputs(project_root, AgentAssetTarget::Claude)
+        .expect("Claude assets write");
+
+    assert!(
+        portable_plugin_skill.exists(),
+        "Claude-only generation must not prune portable plugin outputs"
+    );
+    assert!(
+        codex_alias_skill.exists(),
+        "Claude-only generation must not prune Codex skill aliases"
+    );
+    assert!(
+        copilot_hook.exists(),
+        "Claude-only generation must not prune Copilot hook config"
     );
 }
 
@@ -228,8 +277,8 @@ fn portable_plugin_skill_omits_host_specific_hooks_and_question_tool() {
 
 #[test]
 fn copilot_generation_includes_repo_hook_config() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
     let hook_path = repo_root()
         .join(".github")
         .join("hooks")
@@ -250,8 +299,8 @@ fn copilot_generation_includes_repo_hook_config() {
 
 #[test]
 fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::All, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::All, &[]).expect("assets plan succeeds");
     let shared_skill = repo_root()
         .join("plugins")
         .join("suite")
@@ -271,8 +320,8 @@ fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
 
 #[test]
 fn harness_plugin_is_in_codex_marketplace() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let marketplace = repo_root()
         .join(".agents")
         .join("plugins")
@@ -289,8 +338,8 @@ fn harness_plugin_is_in_codex_marketplace() {
 
 #[test]
 fn codex_harness_plugin_skill_is_planned() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -308,8 +357,8 @@ fn codex_harness_plugin_skill_is_planned() {
 
 #[test]
 fn claude_harness_plugin_skill_is_planned() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join(".claude")
         .join("plugins")
@@ -328,8 +377,9 @@ fn claude_harness_plugin_skill_is_planned() {
 
 #[test]
 fn gemini_harness_plugin_command_is_namespaced_under_harness() {
-    let planned = plan_outputs_with_gemini_commands(&repo_root(), AgentAssetTarget::Gemini, &[], true)
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs_with_gemini_commands(&repo_root(), AgentAssetTarget::Gemini, &[], true)
+            .expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")
         .join("commands")
@@ -346,8 +396,8 @@ fn gemini_harness_plugin_command_is_namespaced_under_harness() {
 
 #[test]
 fn gemini_commands_are_omitted_from_default_plan() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::All, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::All, &[]).expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")
         .join("commands")
@@ -364,8 +414,8 @@ fn gemini_commands_are_omitted_from_default_plan() {
 
 #[test]
 fn copilot_harness_plugin_includes_cli_skill() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Copilot, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join("plugins")
         .join("harness")
@@ -384,8 +434,8 @@ fn copilot_harness_plugin_includes_cli_skill() {
 
 #[test]
 fn claude_direct_skill_alias_uses_safe_frontmatter_name() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join(".claude")
         .join("skills")
@@ -402,8 +452,8 @@ fn claude_direct_skill_alias_uses_safe_frontmatter_name() {
 
 #[test]
 fn codex_direct_skill_alias_uses_safe_frontmatter_name() {
-    let planned = plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(&repo_root(), AgentAssetTarget::Codex, &[]).expect("assets plan succeeds");
     let skill = repo_root()
         .join(".agents")
         .join("skills")
@@ -439,8 +489,8 @@ fn plan_outputs_ignores_plugin_workspace_dirs_without_skill_definitions() {
         "# Workspace artifacts live here.\n",
     );
 
-    let planned = plan_outputs(repo_root, AgentAssetTarget::Claude, &[])
-        .expect("assets plan succeeds");
+    let planned =
+        plan_outputs(repo_root, AgentAssetTarget::Claude, &[]).expect("assets plan succeeds");
 
     let manifest = repo_root
         .join(".claude")
