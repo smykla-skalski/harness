@@ -39,7 +39,6 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated private static let failureTracker = HarnessMonitorUITestFailureTracker()
 
   static var cachedLaunchedApp: XCUIApplication?
-  var launchedAppForTeardown: XCUIApplication?
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -74,15 +73,15 @@ class HarnessMonitorUITestCase: XCTestCase {
           artifactsDirectoryKey: artifactsKey
         )
       }
-      if !Self.reuseLaunchedApp, let launchedApp = self.launchedAppForTeardown {
+      if !Self.reuseLaunchedApp {
         appendDiagnosticsTrace(
           component: "ui-test",
           event: "test.teardown.terminate-app",
           testName: testName,
           artifactsDirectoryKey: artifactsKey
         )
+        let launchedApp = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
         Self.terminateAndWait(launchedApp)
-        self.launchedAppForTeardown = nil
       }
       appendDiagnosticsTrace(
         component: "ui-test",

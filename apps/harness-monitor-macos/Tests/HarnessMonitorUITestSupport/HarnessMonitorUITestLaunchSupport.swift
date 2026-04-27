@@ -27,7 +27,6 @@ extension HarnessMonitorUITestCase {
     }
 
     app.launch()
-    launchedAppForTeardown = app
     recordDiagnosticsTrace(event: "launch.app-launched", app: app, details: ["mode": mode])
     XCTAssertTrue(
       waitForLaunchForeground(app, mode: mode),
