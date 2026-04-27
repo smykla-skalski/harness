@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 use crate::setup::wrapper::planned_agent_bootstrap_files;
 
@@ -17,14 +18,38 @@ use super::render_plugins::render_plugin_outputs;
 use super::render_skills::render_skill_outputs;
 
 /// Test convenience wrapper that preserves the default production behavior of
-/// omitting Gemini command wrappers unless explicitly requested.
+/// omitting Gemini command wrappers unless explicitly requested. Test sites
+/// that pre-date the runtime-hook feature flags use the legacy "all hooks on"
+/// shape so their assertions about generated runtime configs keep matching.
 #[cfg(test)]
 pub(super) fn plan_outputs(
     repo_root: &Path,
     selection: AgentAssetTarget,
     skip_runtime_hooks: &[HookAgent],
 ) -> Result<Vec<PlannedOutput>, CliError> {
-    plan_outputs_with_gemini_commands(repo_root, selection, skip_runtime_hooks, false)
+    plan_outputs_with_gemini_commands(
+        repo_root,
+        selection,
+        skip_runtime_hooks,
+        false,
+        RuntimeHookFlags::all_enabled(),
+    )
+}
+
+#[cfg(test)]
+pub(super) fn plan_outputs_with_gemini_commands_legacy(
+    repo_root: &Path,
+    selection: AgentAssetTarget,
+    skip_runtime_hooks: &[HookAgent],
+    include_gemini_commands: bool,
+) -> Result<Vec<PlannedOutput>, CliError> {
+    plan_outputs_with_gemini_commands(
+        repo_root,
+        selection,
+        skip_runtime_hooks,
+        include_gemini_commands,
+        RuntimeHookFlags::all_enabled(),
+    )
 }
 
 pub(super) fn plan_outputs_with_gemini_commands(
@@ -32,6 +57,7 @@ pub(super) fn plan_outputs_with_gemini_commands(
     selection: AgentAssetTarget,
     skip_runtime_hooks: &[HookAgent],
     include_gemini_commands: bool,
+    flags: RuntimeHookFlags,
 ) -> Result<Vec<PlannedOutput>, CliError> {
     let targets = selected_targets(selection);
     let skills = load_skill_sources(repo_root)?;
@@ -50,6 +76,7 @@ pub(super) fn plan_outputs_with_gemini_commands(
             &skills,
             &plugins,
             skip_runtime_hooks,
+            flags,
             &mut outputs,
         )?;
     }
@@ -88,6 +115,7 @@ fn collect_target_outputs(
     skills: &[SkillDefinition],
     plugins: &[PluginDefinition],
     skip_runtime_hooks: &[HookAgent],
+    flags: RuntimeHookFlags,
     outputs: &mut BTreeMap<PathBuf, PlannedOutput>,
 ) -> Result<(), CliError> {
     for skill in skills {
@@ -100,7 +128,7 @@ fn collect_target_outputs(
             insert_planned_file(repo_root, outputs, path, content)?;
         }
     }
-    for (path, content) in render_runtime_outputs(repo_root, target, skip_runtime_hooks) {
+    for (path, content) in render_runtime_outputs(repo_root, target, skip_runtime_hooks, flags) {
         insert_planned_file(repo_root, outputs, path, content)?;
     }
     Ok(())
@@ -179,10 +207,11 @@ fn render_runtime_outputs(
     repo_root: &Path,
     target: RenderTarget,
     skip_runtime_hooks: &[HookAgent],
+    flags: RuntimeHookFlags,
 ) -> Vec<(PathBuf, String)> {
     match target {
         RenderTarget::Copilot => {
-            planned_agent_bootstrap_files(repo_root, HookAgent::Copilot, skip_runtime_hooks)
+            planned_agent_bootstrap_files(repo_root, HookAgent::Copilot, skip_runtime_hooks, flags)
         }
         RenderTarget::Claude
         | RenderTarget::Codex

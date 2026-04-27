@@ -48,6 +48,58 @@ fn parse_bootstrap_skip_runtime_hooks_csv() {
 }
 
 #[test]
+fn parse_bootstrap_enable_suite_hooks_flag() {
+    let cli =
+        Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-suite-hooks"]).unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert!(args.enable_suite_hooks);
+    assert!(!args.enable_repo_policy);
+}
+
+#[test]
+fn parse_bootstrap_enable_repo_policy_flag() {
+    let cli =
+        Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-repo-policy"]).unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert!(args.enable_repo_policy);
+    assert!(!args.enable_suite_hooks);
+}
+
+#[test]
+fn parse_agents_generate_enable_flags() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "agents",
+        "generate",
+        "--enable-suite-hooks",
+        "--enable-repo-policy",
+    ])
+    .unwrap();
+    let Command::Setup {
+        command:
+            SetupCommand::Agents {
+                command: AgentsSetupCommand::Generate(args),
+            },
+    } = cli.command
+    else {
+        panic!("expected agents generate command");
+    };
+    assert!(args.enable_suite_hooks);
+    assert!(args.enable_repo_policy);
+}
+
+#[test]
 fn parse_bootstrap_include_gemini_commands_flag() {
     let cli = Cli::try_parse_from(["harness", "setup", "bootstrap", "--include-gemini-commands"])
         .unwrap();
