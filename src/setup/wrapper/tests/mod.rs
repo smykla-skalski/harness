@@ -88,7 +88,10 @@ printf 'stale binary executed\\n' >\"$HARNESS_SENTINEL\"
         .unwrap();
 
     assert!(!output.status.success());
-    assert!(!sentinel.exists(), "stale installed harness must not execute");
+    assert!(
+        !sentinel.exists(),
+        "stale installed harness must not execute"
+    );
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("version"),
         "stderr should explain the stale harness refusal: {}",
