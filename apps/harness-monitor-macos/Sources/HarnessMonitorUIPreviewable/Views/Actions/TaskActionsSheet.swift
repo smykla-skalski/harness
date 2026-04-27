@@ -16,7 +16,9 @@ struct TaskActionsSheet: View {
   @State private var checkpointSummary = ""
   @State private var checkpointProgress: Double = 50
 
-  private var detail: SessionDetail? { store.selectedSession }
+  private var detail: SessionDetail? {
+    store.contentUI.sessionDetail.presentedSessionDetail
+  }
 
   private var task: WorkItem? {
     detail?.tasks.first { $0.taskId == taskID }
@@ -50,6 +52,9 @@ struct TaskActionsSheet: View {
     .onChange(of: task == nil) { _, missing in
       if missing { dismiss() }
     }
+    .onChange(of: task?.status.rawValue) { _, _ in
+      syncDefaults()
+    }
   }
 
   private func header(for task: WorkItem) -> some View {
@@ -78,7 +83,8 @@ struct TaskActionsSheet: View {
           .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      pickers
+      ReviewStatePanel(task: task)
+      pickers(for: task)
       assignAndQueueRow(for: task)
       statusRow(for: task)
       Divider()
@@ -86,7 +92,8 @@ struct TaskActionsSheet: View {
     }
   }
 
-  @ViewBuilder private var pickers: some View {
+  @ViewBuilder
+  private func pickers(for task: WorkItem) -> some View {
     Picker("Task", selection: $localTaskID) {
       ForEach(tasks) { item in
         Text(item.title).tag(item.taskId)
@@ -99,12 +106,22 @@ struct TaskActionsSheet: View {
       }
     }
     .harnessNativeFormControl()
-    Picker("Status", selection: $taskStatus) {
-      ForEach(TaskStatus.genericStatusChoices, id: \.self) { status in
-        Text(status.title).tag(status)
+    if task.status.isReviewManagedStatus {
+      LabeledContent("Status") {
+        Text(task.status.title)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      Text("Review status changes are managed by the review flow.")
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    } else {
+      Picker("Status", selection: $taskStatus) {
+        ForEach(TaskStatus.genericStatusChoices, id: \.self) { status in
+          Text(status.title).tag(status)
+        }
+      }
+      .harnessNativeFormControl()
     }
-    .harnessNativeFormControl()
     Picker("Queue Policy", selection: $queuePolicy) {
       ForEach(TaskQueuePolicy.allCases, id: \.self) { policy in
         Text(policy.title).tag(policy)
@@ -138,22 +155,29 @@ struct TaskActionsSheet: View {
     }
   }
 
+  @ViewBuilder
   private func statusRow(for task: WorkItem) -> some View {
-    HStack {
-      HarnessInlineActionButton(
-        title: "Update Status",
-        actionID: .updateTaskStatus(sessionID: sessionID, taskID: task.taskId),
-        store: store,
-        variant: .bordered,
-        tint: .secondary,
-        isExternallyDisabled: !areSessionActionsAvailable,
-        accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskStatusButton,
-        action: submitUpdateStatus
-      )
-      TextField("Update note", text: $statusNote, axis: .vertical)
-        .harnessNativeFormControl()
-        .lineLimit(2, reservesSpace: true)
-        .submitLabel(.done)
+    if task.status.isReviewManagedStatus {
+      Text("Status updates are unavailable while the task is in the review flow.")
+        .scaledFont(.footnote)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    } else {
+      HStack {
+        HarnessInlineActionButton(
+          title: "Update Status",
+          actionID: .updateTaskStatus(sessionID: sessionID, taskID: task.taskId),
+          store: store,
+          variant: .bordered,
+          tint: .secondary,
+          isExternallyDisabled: !areSessionActionsAvailable,
+          accessibilityIdentifier: HarnessMonitorAccessibility.updateTaskStatusButton,
+          action: submitUpdateStatus
+        )
+        TextField("Update note", text: $statusNote, axis: .vertical)
+          .harnessNativeFormControl()
+          .lineLimit(2, reservesSpace: true)
+          .submitLabel(.done)
+      }
     }
   }
 
