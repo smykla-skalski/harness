@@ -160,7 +160,9 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
         let token = "session-observe-token";
         let token_lower = token.to_ascii_lowercase();
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-        listener.set_nonblocking(true).expect("nonblocking listener");
+        listener
+            .set_nonblocking(true)
+            .expect("nonblocking listener");
         let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
         let _lock_file = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
         let server = thread::spawn(move || {
@@ -170,8 +172,7 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
                         let request = read_http_request(&mut stream);
                         let request_lower = request.to_ascii_lowercase();
                         assert!(
-                            request_lower
-                                .contains(&format!("authorization: bearer {token_lower}")),
+                            request_lower.contains(&format!("authorization: bearer {token_lower}")),
                             "missing bearer auth: {request}"
                         );
                         if request.starts_with("GET /v1/health ") {
@@ -241,9 +242,7 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
         let requests = requests.lock().expect("request capture");
         let observe_request = requests
             .iter()
-            .find(|request| {
-                request.starts_with("POST /v1/sessions/sess-observe-daemon/observe ")
-            })
+            .find(|request| request.starts_with("POST /v1/sessions/sess-observe-daemon/observe "))
             .expect("captured observe request");
         assert!(
             observe_request.contains("\"actor\":\"observer-1\""),

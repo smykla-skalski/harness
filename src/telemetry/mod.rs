@@ -14,6 +14,7 @@ pub use config::{
     resolve_telemetry_config, runtime_service_from_args, runtime_service_from_current_process,
     shared_config_path,
 };
+pub use guard::TelemetryGuard;
 pub use metrics::{
     TelemetryBaggage, apply_current_baggage_to_span, apply_parent_context_from_headers,
     apply_parent_context_from_text_map, current_trace_headers, current_trace_id,
@@ -22,7 +23,6 @@ pub use metrics::{
     record_hook_metrics, with_active_baggage,
 };
 pub use profiler::DaemonProfiler;
-pub use guard::TelemetryGuard;
 pub use subscriber::init_tracing_subscriber;
 
 #[cfg(test)]

@@ -14,8 +14,8 @@ use crate::daemon::service::{
 use crate::session::types::{SessionRole, TaskSeverity, TaskStatus};
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
-use super::*;
 use super::super::tasks::post_task_submit_for_review;
+use super::*;
 
 #[test]
 fn post_task_submit_for_review_accepts_worker_actor() {

@@ -245,7 +245,10 @@ impl Execute for SessionObserveArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        let actor = self.actor.as_deref().filter(|value| !value.trim().is_empty());
+        let actor = self
+            .actor
+            .as_deref()
+            .filter(|value| !value.trim().is_empty());
         if self.poll_interval > 0 {
             observe::execute_session_watch(
                 &self.session_id,
