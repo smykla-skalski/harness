@@ -360,6 +360,10 @@ enum HarnessMonitorUITestAccessibility {
     "harness.sheet.agent-tui.tab.\(slug(tuiID))"
   }
 
+  static func agentTuiExternalTab(_ agentID: String) -> String {
+    "harness.sheet.agent-tui.external-tab.\(slug(agentID))"
+  }
+
   static func agentTuiKeyButton(_ key: String) -> String {
     "harness.sheet.agent-tui.key.\(slug(key))"
   }
