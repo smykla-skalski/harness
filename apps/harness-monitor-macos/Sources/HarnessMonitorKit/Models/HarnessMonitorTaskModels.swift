@@ -75,6 +75,15 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
     }
   }
 
+  public var isReviewManagedStatus: Bool {
+    switch self {
+    case .awaitingReview, .inReview:
+      true
+    case .open, .inProgress, .done, .blocked:
+      false
+    }
+  }
+
   /// Statuses a caller may set through a generic task update. Review states
   /// (`awaitingReview`, `inReview`) transition through dedicated review
   /// actions on the daemon and are rejected by `apply_update_task`, so the

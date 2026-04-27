@@ -148,11 +148,20 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   func reviewAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let cockpitView = try sourceFile(named: "SessionCockpitView.swift")
     let taskLaneView = try sourceFile(named: "SessionTaskLaneViews.swift")
+    let taskActionsSheet = try sourceFile(named: "Actions/TaskActionsSheet.swift")
     let toastView = try sourceFile(named: "HarnessMonitorFeedbackToastView.swift")
 
     #expect(cockpitView.contains("SessionCockpitHeuristicIssuesSection"))
     #expect(taskLaneView.contains("sessionTaskListState"))
+    #expect(taskActionsSheet.contains("ReviewStatePanel(task: task)"))
     #expect(toastView.contains("feedback.accessibilityIdentifier"))
+  }
+
+  @Test("Task actions sheet keeps using presented session detail during refresh")
+  func taskActionsSheetUsesPresentedSessionDetailDuringRefresh() throws {
+    let taskActionsSheet = try sourceFile(named: "Actions/TaskActionsSheet.swift")
+
+    #expect(taskActionsSheet.contains("contentUI.sessionDetail.presentedSessionDetail"))
   }
 
   private func sourceFile(named name: String) throws -> String {
