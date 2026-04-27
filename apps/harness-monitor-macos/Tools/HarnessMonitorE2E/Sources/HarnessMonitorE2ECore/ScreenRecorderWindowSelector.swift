@@ -35,6 +35,10 @@ enum ScreenRecorderWindowSelector {
     "Session Cockpit",
     "Cockpit",
   ]
+  private static let preferredBundleIdentifiers: [String] = [
+    "io.harnessmonitor.app",
+    "io.harnessmonitor.app.ui-testing",
+  ]
 
   static func captureWindow(
     from candidates: [ScreenRecorderWindowCandidate],
@@ -64,9 +68,32 @@ enum ScreenRecorderWindowSelector {
     }
 
     guard !matchingCandidates.isEmpty else { return nil }
-    guard matchingCandidates.count == 1 else {
-      throw ScreenRecorder.Failure.ambiguousMonitorWindows(matchingCandidates.count)
+    let prioritizedCandidates = matchingCandidates.sorted { lhs, rhs in
+      priority(for: lhs) < priority(for: rhs)
     }
-    return matchingCandidates[0]
+    guard let selectedWindow = prioritizedCandidates.first else {
+      return nil
+    }
+
+    let selectedPriority = priority(for: selectedWindow)
+    let samePriorityCount = prioritizedCandidates.filter {
+      priority(for: $0) == selectedPriority
+    }.count
+    guard samePriorityCount == 1 else {
+      throw ScreenRecorder.Failure.ambiguousMonitorWindows(samePriorityCount)
+    }
+
+    return selectedWindow
+  }
+
+  private static func priority(for candidate: ScreenRecorderWindowCandidate) -> Int {
+    let bundleIdentifier = candidate.bundleIdentifier ?? ""
+    if bundleIdentifier == preferredBundleIdentifiers[0] {
+      return 0
+    }
+    if bundleIdentifier == preferredBundleIdentifiers[1] {
+      return 1
+    }
+    return preferredBundleIdentifiers.count
   }
 }
