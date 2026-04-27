@@ -38,16 +38,6 @@ pub enum AttemptResult {
     Escalated,
 }
 
-/// Record of a single observer cycle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CycleRecord {
-    pub timestamp: String,
-    pub from_line: usize,
-    pub to_line: usize,
-    pub new_issues: usize,
-    pub resolved: usize,
-}
-
 /// An open issue tracked across observer cycles.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenIssue {
@@ -86,7 +76,6 @@ pub struct ObserverState {
     pub resolved_issue_ids: Vec<String>,
     pub issue_attempts: Vec<IssueAttempt>,
     pub muted_codes: Vec<IssueCode>,
-    pub cycle_history: Vec<CycleRecord>,
     #[serde(default)]
     pub baseline_issue_ids: Vec<String>,
     #[serde(default)]
@@ -122,7 +111,11 @@ pub struct ActiveWorker {
 
 impl ObserverState {
     /// Current schema version for observer state files.
-    pub const CURRENT_VERSION: u32 = 1;
+    ///
+    /// v2 (2026-04-27) drops the `cycle_history` field. Older v1 states are
+    /// still readable: serde silently ignores the extra field on
+    /// deserialization, and new writes omit it entirely.
+    pub const CURRENT_VERSION: u32 = 2;
 
     /// Create a default state for a new session.
     #[must_use]
@@ -138,7 +131,6 @@ impl ObserverState {
             resolved_issue_ids: Vec::new(),
             issue_attempts: Vec::new(),
             muted_codes: Vec::new(),
-            cycle_history: Vec::new(),
             baseline_issue_ids: Vec::new(),
             active_workers: Vec::new(),
             agent_sessions: Vec::new(),

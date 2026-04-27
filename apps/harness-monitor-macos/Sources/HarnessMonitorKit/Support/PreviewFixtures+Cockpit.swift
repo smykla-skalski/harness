@@ -66,22 +66,6 @@ extension PreviewFixtures {
         runtime: "gemini"
       ),
     ],
-    cycleHistory: [
-      ObserverCycleSummary(
-        timestamp: "2026-03-28T14:15:00Z",
-        fromLine: 0,
-        toLine: 72,
-        newIssues: 2,
-        resolved: 1
-      ),
-      ObserverCycleSummary(
-        timestamp: "2026-03-28T14:17:45Z",
-        fromLine: 72,
-        toLine: 104,
-        newIssues: 1,
-        resolved: 0
-      ),
-    ],
     agentSessions: [
       ObserverAgentSessionSummary(
         agentId: "leader-claude",

@@ -61,7 +61,6 @@ fn assert_observer_state_collections_empty(state: &ObserverState) {
     assert!(state.open_issues.is_empty());
     assert!(state.resolved_issue_ids.is_empty());
     assert!(state.muted_codes.is_empty());
-    assert!(state.cycle_history.is_empty());
 }
 
 #[test]
@@ -265,6 +264,43 @@ fn observer_state_serde_roundtrip() {
     let restored: ObserverState = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.session_id, "roundtrip-test");
     assert_eq!(restored.schema_version, state.schema_version);
+}
+
+#[test]
+fn observer_state_loads_legacy_v1_payload_with_cycle_history() {
+    // v1 (pre-2026-04-27) wrote a `cycle_history` array. v2 omits it; the
+    // unknown field must be ignored on load so existing on-disk state remains
+    // readable without an explicit migration step.
+    let legacy = r#"{
+        "schema_version": 1,
+        "state_version": 0,
+        "session_id": "legacy-cycle",
+        "project_hint": null,
+        "cursor": 10,
+        "last_scan_time": "2026-03-28T14:04:00Z",
+        "open_issues": [],
+        "resolved_issue_ids": [],
+        "issue_attempts": [],
+        "muted_codes": [],
+        "cycle_history": [
+            {"timestamp": "2026-03-28T14:04:00Z", "from_line": 0, "to_line": 10, "new_issues": 0, "resolved": 0}
+        ],
+        "baseline_issue_ids": [],
+        "active_workers": []
+    }"#;
+    let restored: ObserverState = serde_json::from_str(legacy).unwrap();
+    assert_eq!(restored.session_id, "legacy-cycle");
+    assert_eq!(restored.cursor, 10);
+}
+
+#[test]
+fn observer_state_writes_omit_cycle_history_field() {
+    let state = ObserverState::default_for_session("omit-cycle");
+    let json = serde_json::to_string(&state).unwrap();
+    assert!(
+        !json.contains("cycle_history"),
+        "v2 writes must not emit cycle_history; got: {json}"
+    );
 }
 
 #[test]

@@ -91,15 +91,6 @@ struct CachedModelsDetailTests {
       ],
       mutedCodes: ["W003"],
       activeWorkers: nil,
-      cycleHistory: [
-        ObserverCycleSummary(
-          timestamp: "2026-03-28T13:00:00Z",
-          fromLine: 1,
-          toLine: 500,
-          newIssues: 3,
-          resolved: 1
-        )
-      ],
       agentSessions: nil
     )
 

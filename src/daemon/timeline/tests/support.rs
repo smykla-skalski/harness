@@ -11,8 +11,7 @@ use crate::agents::runtime::signal::{
     acknowledge_signal, write_signal_file,
 };
 use crate::observe::types::{
-    ActiveWorker, CycleRecord, FixSafety, IssueCategory, IssueCode, IssueSeverity, ObserverState,
-    OpenIssue,
+    ActiveWorker, FixSafety, IssueCategory, IssueCode, IssueSeverity, ObserverState, OpenIssue,
 };
 use crate::session::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, SessionLogEntry, SessionMetrics, SessionRole,
@@ -442,13 +441,6 @@ fn observer_state(session_id: &str) -> ObserverState {
         resolved_issue_ids: vec!["issue-0".into()],
         issue_attempts: Vec::new(),
         muted_codes: vec![IssueCode::AgentRepeatedError],
-        cycle_history: vec![CycleRecord {
-            timestamp: "2026-03-28T14:04:00Z".into(),
-            from_line: 0,
-            to_line: 42,
-            new_issues: 1,
-            resolved: 0,
-        }],
         baseline_issue_ids: Vec::new(),
         active_workers: vec![ActiveWorker {
             issue_id: "issue-1".into(),

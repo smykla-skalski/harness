@@ -34,16 +34,6 @@ public struct ObserverWorkerSummary: Codable, Equatable, Identifiable, Sendable 
   }
 }
 
-public struct ObserverCycleSummary: Codable, Equatable, Identifiable, Sendable {
-  public let timestamp: String
-  public let fromLine: Int
-  public let toLine: Int
-  public let newIssues: Int
-  public let resolved: Int
-
-  public var id: String { timestamp }
-}
-
 public struct ObserverAgentSessionSummary: Codable, Equatable, Identifiable, Sendable {
   public let agentId: String
   public let runtime: String
@@ -64,7 +54,6 @@ public struct ObserverSummary: Codable, Equatable, Sendable {
   public let openIssues: [ObserverIssueSummary]?
   public let mutedCodes: [String]?
   public let activeWorkers: [ObserverWorkerSummary]?
-  public let cycleHistory: [ObserverCycleSummary]?
   public let agentSessions: [ObserverAgentSessionSummary]?
 }
 
