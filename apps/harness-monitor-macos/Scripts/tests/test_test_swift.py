@@ -122,6 +122,27 @@ exit 1
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests",
             calls[1],
         )
+        self.assertNotIn(
+            "-skip-testing:HarnessMonitorUITests",
+            calls[1],
+            "explicit only-testing selector must not be overridden by default skips",
+        )
+        self.assertNotIn(
+            "-skip-testing:HarnessMonitorAgentsE2ETests",
+            calls[1],
+            "explicit only-testing selector must not be overridden by default skips",
+        )
+        self.assertEqual(rtk_log, "")
+
+    def test_skips_ui_test_targets_by_default_to_avoid_tcc_prompts(self) -> None:
+        completed, calls, rtk_log = self.run_script()
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0], ["build-for-testing"])
+        self.assertIn("test-without-building", calls[1])
+        self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
+        self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
         self.assertEqual(rtk_log, "")
 
     def test_splits_comma_separated_only_testing_selectors(self) -> None:
