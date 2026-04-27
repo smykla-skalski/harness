@@ -186,7 +186,10 @@ fn monitor_generate_script_invokes_tuist_then_post_generate() {
 fn monitor_pbxproj_stays_on_current_xcode_format() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let post_generate = read_repo_file(root, "apps/harness-monitor-macos/Scripts/post-generate.sh");
-    let patcher = read_repo_file(root, "apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py");
+    let patcher = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py",
+    );
 
     assert!(
         post_generate.contains("HARNESS_MONITOR_PROJECT_OBJECT_VERSION")

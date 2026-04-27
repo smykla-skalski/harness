@@ -237,9 +237,11 @@ mod tests {
     #[test]
     fn grpc_exporters_initialize_without_existing_tokio_runtime() {
         let result = std::panic::catch_unwind(|| {
-            let (_runtime, _tracer, _meter, _logger) =
-                build_export_providers(&grpc_export_config(), telemetry_resource(RuntimeService::Cli))
-                    .expect("providers");
+            let (_runtime, _tracer, _meter, _logger) = build_export_providers(
+                &grpc_export_config(),
+                telemetry_resource(RuntimeService::Cli),
+            )
+            .expect("providers");
         });
 
         assert!(
@@ -255,9 +257,11 @@ mod tests {
         // those providers call tokio internals during Drop (to signal their
         // background connection tasks), which panicked when the reactor was gone.
         let result = std::panic::catch_unwind(|| {
-            let (runtime, tracer, meter, logger) =
-                build_export_providers(&grpc_export_config(), telemetry_resource(RuntimeService::Cli))
-                    .expect("providers");
+            let (runtime, tracer, meter, logger) = build_export_providers(
+                &grpc_export_config(),
+                telemetry_resource(RuntimeService::Cli),
+            )
+            .expect("providers");
             // Mimic the old (broken) drop order: runtime first, then providers.
             drop(runtime);
             drop(tracer);
