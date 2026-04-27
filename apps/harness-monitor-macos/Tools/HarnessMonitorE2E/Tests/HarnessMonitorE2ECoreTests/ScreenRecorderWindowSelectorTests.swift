@@ -82,17 +82,38 @@ final class ScreenRecorderWindowSelectorTests: XCTestCase {
     }
   }
 
-  func testCaptureWindowFailsWhenMultipleMainHarnessMonitorWindowsAreShareable() {
+  func testCaptureWindowSelectsShippingAppWindowWhenBothShareableHarnessMonitorWindowsAreVisible()
+    throws
+  {
+    let selected = try ScreenRecorderWindowSelector.captureWindow(from: [
+      ScreenRecorderWindowCandidate(
+        windowID: 30,
+        title: "Session Cockpit",
+        bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+        isOnScreen: true
+      ),
+      ScreenRecorderWindowCandidate(
+        windowID: 31,
+        title: "Session Cockpit",
+        bundleIdentifier: "io.harnessmonitor.app",
+        isOnScreen: true
+      ),
+    ])
+
+    XCTAssertEqual(selected.windowID, 31)
+  }
+
+  func testCaptureWindowFailsWhenMultipleShippingAppMainWindowsAreShareable() {
     XCTAssertThrowsError(
       try ScreenRecorderWindowSelector.captureWindow(from: [
         ScreenRecorderWindowCandidate(
-          windowID: 30,
+          windowID: 32,
           title: "Harness Monitor",
-          bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+          bundleIdentifier: "io.harnessmonitor.app",
           isOnScreen: true
         ),
         ScreenRecorderWindowCandidate(
-          windowID: 31,
+          windowID: 33,
           title: "Harness Monitor",
           bundleIdentifier: "io.harnessmonitor.app",
           isOnScreen: true
