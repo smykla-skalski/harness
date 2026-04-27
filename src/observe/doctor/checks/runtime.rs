@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 use crate::infra::io::read_json_typed;
 use crate::run::context::CurrentRunPointer;
@@ -19,9 +20,10 @@ pub(super) fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<Doctor
         HookAgent::OpenCode,
     ];
     let mut checks = Vec::new();
+    let flags = RuntimeHookFlags::from_env();
 
     for agent in agents {
-        for (path, expected) in planned_agent_bootstrap_files(project_dir, agent, &[]) {
+        for (path, expected) in planned_agent_bootstrap_files(project_dir, agent, &[], flags) {
             let code = runtime_bootstrap_code(agent, &path);
             let summary_name = runtime_bootstrap_label(agent, &path);
             if !path.exists() {

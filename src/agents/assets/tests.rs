@@ -8,11 +8,11 @@ use crate::infra::io::read_text;
 use crate::setup::wrapper::PROJECT_PLUGIN_LAUNCHER;
 
 use super::model::{RenderTarget, SkillDefinition, SkillSource, repo_root};
-use super::planning::{plan_outputs, plan_outputs_with_gemini_commands};
+use super::planning::{plan_outputs, plan_outputs_with_gemini_commands_legacy};
 use super::render_skills::{render_skill_markdown, yaml_serialized_lines};
 use super::{
     AgentAssetTarget, write_agent_target_outputs,
-    write_agent_target_outputs_with_skipped_runtime_hooks, write_suite_plugin_outputs,
+    write_agent_target_outputs_with_skipped_runtime_hooks_legacy, write_suite_plugin_outputs,
 };
 
 fn sample_skill() -> SkillDefinition {
@@ -144,7 +144,7 @@ fn agent_assets_include_gemini_commands_when_requested() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let project_root = tmp.path();
 
-    let written = write_agent_target_outputs_with_skipped_runtime_hooks(
+    let written = write_agent_target_outputs_with_skipped_runtime_hooks_legacy(
         project_root,
         AgentAssetTarget::All,
         &[],
@@ -443,7 +443,7 @@ fn claude_harness_plugin_skill_is_planned() {
 #[test]
 fn gemini_harness_plugin_command_is_namespaced_under_harness() {
     let planned =
-        plan_outputs_with_gemini_commands(&repo_root(), AgentAssetTarget::Gemini, &[], true)
+        plan_outputs_with_gemini_commands_legacy(&repo_root(), AgentAssetTarget::Gemini, &[], true)
             .expect("assets plan succeeds");
     let command = repo_root()
         .join(".gemini")

@@ -58,9 +58,14 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 
 - **Pre-tool-use guards**: `guard-bash` (blocks direct cluster binary access), `guard-write` (blocks writes outside run surface), `guard-question`
 - **Post-tool-use verifies**: `verify-bash`, `verify-write`, `verify-question`, `audit`
-- **Blocking**: `guard-stop` (prevents session end if run incomplete)
-- **Subagent gates**: `context-agent` (start), `validate-agent` (stop)
-- **Failure enrichment**: `enrich-failure`
+- **Blocking**: `guard-stop` (prevents session end if run incomplete, **off by default**)
+- **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
+- **Failure enrichment**: `enrich-failure` / `tool-failure` (**off by default**)
+- **Repo-policy pre-tool**: warns about raw `cargo`/`xcodebuild` use (**off by default**)
+
+The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the `repo-policy` pre-tool hook are gated by `HARNESS_FEATURE_SUITE_HOOKS` and `HARNESS_FEATURE_REPO_POLICY` (or the matching `--enable-suite-hooks` / `--enable-repo-policy` CLI flags on `harness setup bootstrap` and `harness setup agents generate`). Both default to off while the underlying features are unfinished. CLI flag wins over env var. Resolution lives in `src/feature_flags.rs::RuntimeHookFlags`. Bootstrap emits an `info!` line per regenerated config naming any omitted family.
+
+**Hook landing rule**: a new hook lands with its handler doing observable work, *or* behind a dated feature flag in `src/feature_flags.rs` with a tracking issue. Triggers without working handlers slow every tool call without producing signal.
 
 ### Key modules
 
