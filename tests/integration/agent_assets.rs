@@ -49,7 +49,10 @@ fn default_generate_omits_gemini_command_wrappers() {
         .filter_map(Result::ok)
         .filter(|entry| {
             entry.file_type().is_file()
-                && entry.path().extension().is_some_and(|extension| extension == "toml")
+                && entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "toml")
         })
         .map(|entry| {
             entry
