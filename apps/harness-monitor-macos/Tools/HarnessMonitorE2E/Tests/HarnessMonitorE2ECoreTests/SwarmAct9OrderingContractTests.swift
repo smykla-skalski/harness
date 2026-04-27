@@ -98,7 +98,11 @@ final class SwarmAct9OrderingContractTests: XCTestCase {
   private func locateAll(pattern: String, in text: String) -> [Range<String.Index>] {
     var ranges: [Range<String.Index>] = []
     var searchStart = text.startIndex
-    while let match = text.range(of: pattern, options: [.regularExpression], range: searchStart..<text.endIndex) {
+    while let match = text.range(
+      of: pattern,
+      options: [.regularExpression],
+      range: searchStart..<text.endIndex
+    ) {
       ranges.append(match)
       searchStart = match.upperBound
     }
