@@ -179,6 +179,26 @@ extension SwarmFixture {
     return element.exists && (element.isHittable || elementIsVisibleInScrollTarget(element))
   }
 
+  func scrollSessionTaskIntoView(
+    _ element: XCUIElement,
+    timeout: TimeInterval = 12
+  ) -> Bool {
+    let target = sessionTaskScrollView(for: element)
+    let deadline = Date.now.addingTimeInterval(timeout)
+    while Date.now < deadline {
+      if app.state != .runningForeground {
+        app.activate()
+      }
+      if element.exists && (element.isHittable || elementIsVisibleInContainer(element, target)) {
+        return true
+      }
+
+      scrollSessionTaskList(target, toward: element)
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.15))
+    }
+    return element.exists && (element.isHittable || elementIsVisibleInContainer(element, target))
+  }
+
   func taskActionsSheetIsPresented() -> Bool {
     let sheet = testCase.element(in: app, identifier: Accessibility.taskActionsSheet)
     if sheet.exists {
@@ -210,6 +230,21 @@ extension SwarmFixture {
     return window
   }
 
+  func sessionTaskScrollView(for element: XCUIElement) -> XCUIElement {
+    let cockpitWindow = sessionCockpitWindow()
+    if let scrollView = matchingSessionTaskScrollView(in: cockpitWindow.scrollViews, task: element)
+    {
+      return scrollView
+    }
+    if let scrollView = matchingScrollTarget(in: cockpitWindow.scrollViews, for: element) {
+      return scrollView
+    }
+    if let scrollView = matchingSessionTaskScrollView(in: app.scrollViews, task: element) {
+      return scrollView
+    }
+    return scrollTarget(for: element)
+  }
+
   private func elementIsVisibleInScrollTarget(_ element: XCUIElement) -> Bool {
     guard element.exists, !element.frame.isEmpty else { return false }
 
@@ -220,6 +255,23 @@ extension SwarmFixture {
 
     return visibleFrame.insetBy(dx: -1, dy: -1)
       .contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
+  }
+
+  private func elementIsVisibleInContainer(
+    _ element: XCUIElement,
+    _ container: XCUIElement
+  ) -> Bool {
+    guard
+      element.exists,
+      !element.frame.isEmpty,
+      container.exists,
+      !container.frame.isEmpty
+    else {
+      return false
+    }
+
+    let visibleFrame = element.frame.intersection(container.frame)
+    return !visibleFrame.isNull && !visibleFrame.isEmpty
   }
 
   private func scrollToward(_ element: XCUIElement) {
@@ -233,6 +285,22 @@ extension SwarmFixture {
       && element.frame.minY < window.frame.minY + 72)
     let magnitude = max(240, target.frame.height * 0.9)
     let delta: CGFloat = shouldScrollUp ? -magnitude : magnitude
+    target.scroll(byDeltaX: 0, deltaY: delta)
+  }
+
+  private func scrollSessionTaskList(
+    _ target: XCUIElement,
+    toward element: XCUIElement
+  ) {
+    guard target.exists, !target.frame.isEmpty else { return }
+
+    let magnitude = max(240, target.frame.height * 0.85)
+    let delta: CGFloat
+    if element.exists, !element.frame.isEmpty, element.frame.minY < target.frame.minY + 32 {
+      delta = magnitude
+    } else {
+      delta = -magnitude
+    }
     target.scroll(byDeltaX: 0, deltaY: delta)
   }
 
@@ -282,5 +350,51 @@ extension SwarmFixture {
     }
 
     return bestMatch
+  }
+
+  private func matchingSessionTaskScrollView(
+    in query: XCUIElementQuery,
+    task: XCUIElement
+  ) -> XCUIElement? {
+    let taskIdentifier = task.identifier
+    let searchCount = min(query.count, 12)
+    var fallback: XCUIElement?
+
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+
+      let stateMarker = candidate.descendants(matching: .any)
+        .matching(identifier: Accessibility.sessionTaskListState)
+        .firstMatch
+      if stateMarker.exists {
+        return candidate
+      }
+
+      if !taskIdentifier.isEmpty {
+        let taskMatch = candidate.descendants(matching: .any)
+          .matching(identifier: taskIdentifier)
+          .firstMatch
+        if taskMatch.exists, fallback == nil {
+          fallback = candidate
+        }
+      }
+    }
+
+    return fallback
+  }
+
+  private func sessionCockpitWindow() -> XCUIElement {
+    let taskListState = testCase.element(in: app, identifier: Accessibility.sessionTaskListState)
+    if taskListState.exists {
+      return testCase.window(in: app, containing: taskListState)
+    }
+
+    let appChrome = testCase.element(in: app, identifier: Accessibility.appChromeRoot)
+    if appChrome.exists {
+      return testCase.window(in: app, containing: appChrome)
+    }
+
+    return testCase.mainWindow(in: app)
   }
 }
