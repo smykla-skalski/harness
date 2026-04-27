@@ -24,6 +24,7 @@ __pycache__/
 # AI tool config dirs
 .claude/settings.local.json
 .claude/worktrees/
+.claude/plugins/suite/harness
 .codex/
 .gemini/
 .klaudiush/
