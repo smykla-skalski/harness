@@ -1,43 +1,64 @@
 use super::super::*;
 
-#[tokio::test]
-async fn websocket_async_task_create_mutation_succeeds_without_sync_db() {
-    let state = test_http_state_with_async_db_timeline().await;
-    let connection = Arc::new(Mutex::new(ConnectionState::new()));
-    let request = WsRequest {
-        id: "req-task-create-async".into(),
-        method: "task.create".into(),
-        params: serde_json::json!({
-            "session_id": "sess-test-1",
-            "actor": "spoofed-client",
-            "title": "async websocket task",
-            "context": "prefer sqlx websocket path",
-            "severity": "high",
-            "suggested_fix": "use async mutation dispatcher"
-        }),
-        trace_context: None,
-    };
+#[test]
+fn websocket_async_task_create_mutation_succeeds_without_sync_db() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("ws-async-task-create-leader"),
+            || {
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let project_dir = sandbox.path().join("project");
+                    init_git_project(&project_dir);
 
-    let response = dispatch(&request, &state, &connection).await;
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_websocket_state_with_empty_async_db(&db_path).await;
+                    start_async_session(&state, &project_dir, "ws-async-task-create").await;
+                    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+                    let request = WsRequest {
+                        id: "req-task-create-async".into(),
+                        method: "task.create".into(),
+                        params: serde_json::json!({
+                            "session_id": "ws-async-task-create",
+                            "actor": "spoofed-client",
+                            "title": "async websocket task",
+                            "context": "prefer sqlx websocket path",
+                            "severity": "high",
+                            "suggested_fix": "use async mutation dispatcher"
+                        }),
+                        trace_context: None,
+                    };
 
-    assert!(response.error.is_none());
-    assert_eq!(
-        response
-            .result
-            .as_ref()
-            .and_then(|result| result["tasks"].as_array())
-            .map(Vec::len),
-        Some(1)
-    );
-    assert_eq!(
-        response
-            .result
-            .as_ref()
-            .and_then(|result| result["tasks"].as_array())
-            .and_then(|tasks| tasks.first())
-            .and_then(|task| task["title"].as_str()),
-        Some("async websocket task")
-    );
+                    let response = dispatch(&request, &state, &connection).await;
+
+                    assert!(
+                        response.error.is_none(),
+                        "unexpected websocket error: {:?}",
+                        response.error
+                    );
+                    assert_eq!(
+                        response
+                            .result
+                            .as_ref()
+                            .and_then(|result| result["tasks"].as_array())
+                            .map(Vec::len),
+                        Some(1)
+                    );
+                    assert_eq!(
+                        response
+                            .result
+                            .as_ref()
+                            .and_then(|result| result["tasks"].as_array())
+                            .and_then(|tasks| tasks.first())
+                            .and_then(|task| task["title"].as_str()),
+                        Some("async websocket task")
+                    );
+                });
+            },
+        );
+    });
 }
 
 #[test]
