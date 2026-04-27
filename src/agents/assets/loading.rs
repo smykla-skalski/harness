@@ -26,9 +26,8 @@ pub(super) fn load_skill_sources(repo_root: &Path) -> Result<Vec<SkillDefinition
             continue;
         }
         let skill_root = entry.path();
-        match classify_skill_directory(&skill_root)? {
-            SkillDirectoryKind::SkillDefinition => skills.push(load_skill_definition(skill_root)?),
-            SkillDirectoryKind::NonSkill => continue,
+        if let SkillDirectoryKind::SkillDefinition = classify_skill_directory(&skill_root)? {
+            skills.push(load_skill_definition(skill_root)?);
         }
     }
     skills.sort_by(|a, b| a.source.name.cmp(&b.source.name));
@@ -68,11 +67,8 @@ pub(super) fn load_plugin_sources(
                     continue;
                 }
                 let skill_root = skill_dir.path();
-                match classify_skill_directory(&skill_root)? {
-                    SkillDirectoryKind::SkillDefinition => {
-                        skills.push(load_skill_definition(skill_root)?);
-                    }
-                    SkillDirectoryKind::NonSkill => continue,
+                if let SkillDirectoryKind::SkillDefinition = classify_skill_directory(&skill_root)? {
+                    skills.push(load_skill_definition(skill_root)?);
                 }
             }
         }

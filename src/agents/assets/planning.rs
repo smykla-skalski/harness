@@ -8,7 +8,8 @@ use crate::setup::wrapper::planned_agent_bootstrap_files;
 use super::files::managed_root_for_path;
 use super::loading::{load_plugin_sources, load_skill_sources};
 use super::model::{
-    AgentAssetTarget, MANAGED_ROOTS, PlannedOutput, RenderTarget, selected_targets,
+    AgentAssetTarget, MANAGED_ROOTS, PlannedOutput, PluginDefinition, RenderTarget, SkillDefinition,
+    selected_targets,
 };
 use super::render_guides::render_guides;
 use super::render_local_skills::render_local_skills;
@@ -43,52 +44,56 @@ pub(super) fn plan_outputs_with_gemini_commands(
         if matches!(target, RenderTarget::Gemini) && !include_gemini_commands {
             continue;
         }
-        for skill in &skills {
-            for (path, content) in render_skill_outputs(repo_root, *target, skill)? {
-                let managed_root = managed_root_for_path(repo_root, &path)?;
-                outputs
-                    .entry(managed_root.clone())
-                    .or_insert_with(|| PlannedOutput {
-                        managed_root,
-                        files: BTreeMap::new(),
-                        symlinks: BTreeMap::new(),
-                    })
-                    .files
-                    .insert(path, content);
-            }
-        }
-        for plugin in &plugins {
-            for (path, content) in render_plugin_outputs(repo_root, *target, plugin)? {
-                let managed_root = managed_root_for_path(repo_root, &path)?;
-                outputs
-                    .entry(managed_root.clone())
-                    .or_insert_with(|| PlannedOutput {
-                        managed_root,
-                        files: BTreeMap::new(),
-                        symlinks: BTreeMap::new(),
-                    })
-                    .files
-                    .insert(path, content);
-            }
-        }
-        for (path, content) in render_runtime_outputs(repo_root, *target, skip_runtime_hooks) {
-            let managed_root = managed_root_for_path(repo_root, &path)?;
-            outputs
-                .entry(managed_root.clone())
-                .or_insert_with(|| PlannedOutput {
-                    managed_root,
-                    files: BTreeMap::new(),
-                    symlinks: BTreeMap::new(),
-                })
-                .files
-                .insert(path, content);
-        }
+        collect_target_outputs(repo_root, *target, &skills, &plugins, skip_runtime_hooks, &mut outputs)?;
     }
 
     render_guides(repo_root, MANAGED_ROOTS, &mut outputs);
     render_local_skills(repo_root, &mut outputs)?;
 
     Ok(outputs.into_values().collect())
+}
+
+fn collect_target_outputs(
+    repo_root: &Path,
+    target: RenderTarget,
+    skills: &[SkillDefinition],
+    plugins: &[PluginDefinition],
+    skip_runtime_hooks: &[HookAgent],
+    outputs: &mut BTreeMap<PathBuf, PlannedOutput>,
+) -> Result<(), CliError> {
+    for skill in skills {
+        for (path, content) in render_skill_outputs(repo_root, target, skill)? {
+            insert_planned_file(repo_root, outputs, path, content)?;
+        }
+    }
+    for plugin in plugins {
+        for (path, content) in render_plugin_outputs(repo_root, target, plugin)? {
+            insert_planned_file(repo_root, outputs, path, content)?;
+        }
+    }
+    for (path, content) in render_runtime_outputs(repo_root, target, skip_runtime_hooks) {
+        insert_planned_file(repo_root, outputs, path, content)?;
+    }
+    Ok(())
+}
+
+fn insert_planned_file(
+    repo_root: &Path,
+    outputs: &mut BTreeMap<PathBuf, PlannedOutput>,
+    path: PathBuf,
+    content: String,
+) -> Result<(), CliError> {
+    let managed_root = managed_root_for_path(repo_root, &path)?;
+    outputs
+        .entry(managed_root.clone())
+        .or_insert_with(|| PlannedOutput {
+            managed_root,
+            files: BTreeMap::new(),
+            symlinks: BTreeMap::new(),
+        })
+        .files
+        .insert(path, content);
+    Ok(())
 }
 
 pub(super) fn rebase_planned_outputs(
