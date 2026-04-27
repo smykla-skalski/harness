@@ -9,7 +9,7 @@
         "name": "Smykla Skalski Labs"
       },
       "category": "productivity",
-      "description": "Council of engineering persona agents - 27 sourced practitioner lenses (6 core bias-correction + 10 extended-domain + 11 extended UX/platform) to review code, debate plans, or advise on strategy",
+      "description": "Council of engineering persona agents - 27 sourced practitioner lenses with three swappable 6-persona core profiles (engineering / UI-UX / mixed) auto-picked from the assignment (or pinned by the user), plus 10 extended-domain and 11 extended UX/platform lenses for review, debate, and strategy work",
       "license": "MIT",
       "name": "council",
       "source": "./council",

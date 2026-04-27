@@ -18,10 +18,14 @@ description: >-
   severity rating), Léonie Watson (lived a11y, semantic HTML over ARIA), Val Head (motion
   design, vestibular safety), John Siracusa (Mac platform critique), Edward Tufte (data-ink
   ratio, chartjunk, small multiples). Personas are sourced from each thinker's primary
-  public writing. Use when reviewing a design document, architecture proposal, refactoring
-  plan, code change, UI/UX surface, dashboard layout, or strategic decision and you want
-  diverse, opinionated, evidence-grounded perspectives that cut through generic AI-style
-  hedging.
-argument-hint: "core|all|debate <problem-description|@file>"
+  public writing. The default `core` mode picks one of three 6-persona profiles
+  automatically from the problem text - `core-eng` for code/architecture, `core-ux` for
+  interaction/layout/a11y, `core-mix` for features that ship code and UI together - and the
+  user can pin any profile (`core-eng`, `core-ux`, `core-mix`, or aliases `eng`, `ux`,
+  `mix`, `random`) to override. Use when reviewing a design document, architecture
+  proposal, refactoring plan, code change, UI/UX surface, dashboard layout, or strategic
+  decision and you want diverse, opinionated, evidence-grounded perspectives that cut
+  through generic AI-style hedging.
+argument-hint: "core|core-eng|core-ux|core-mix|all|debate <problem-description|@file>"
 allowed-tools: Agent, AskUserQuestion, Read, Grep, Glob, Bash, Write, Edit
 user-invocable: true
