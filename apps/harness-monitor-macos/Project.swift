@@ -63,7 +63,7 @@ private let uiPreviewableTarget: Target = {
         bundleId: "io.harnessmonitor.ui.previewable",
         deploymentTargets: macOSDeploymentTargets,
         sources: uiPreviewableSources,
-        resources: ["Sources/HarnessMonitor/Assets.xcassets"],
+        resources: ["Sources/HarnessMonitorUIPreviewable/Assets.xcassets"],
         dependencies: deps,
         settings: .settings(
             base: [
