@@ -143,7 +143,7 @@ final class BackgroundGalleryPrefetchPlanTests: XCTestCase {
   }
 
   func testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan() {
-    let options = Array(HarnessMonitorBackgroundSelection.bundledLibrary.prefix(20))
+    let options = makeSyntheticBackgroundSelections(count: 20)
     let selectedBackground = options[19]
     let recentItems = [options[0]]
 
@@ -158,6 +158,19 @@ final class BackgroundGalleryPrefetchPlanTests: XCTestCase {
       Array(options.prefix(PreferencesBackgroundGalleryPrefetchPlan.initialLimit))
       .map(\.storageValue) + [selectedBackground.storageValue]
     XCTAssertEqual(plan.map(\.storageValue), expectedStorageValues)
+  }
+}
+
+private func makeSyntheticBackgroundSelections(count: Int) -> [HarnessMonitorBackgroundSelection] {
+  (0..<count).map { index in
+    HarnessMonitorBackgroundSelection.system(
+      HarnessMonitorSystemWallpaper(
+        id: "synthetic-\(index)",
+        label: "Synthetic \(index)",
+        subtitle: "Synthetic fixture",
+        imagePath: "/tmp/synthetic-\(index).jpg"
+      )
+    )
   }
 }
 

@@ -122,15 +122,15 @@ final class SupervisorLifecycleTests: XCTestCase {
     lifecycle.stopBackgroundActivity()
   }
 
-  func test_missingPreferenceDefaultsToEnabled() {
+  func test_missingPreferenceDefaultsToDisabled() {
     let lifecycle = SupervisorLifecycle()
     UserDefaults.standard.removeObject(
       forKey: SupervisorPreferencesDefaults.runInBackgroundKey
     )
     lifecycle.startBackgroundActivity()
-    XCTAssertTrue(
+    XCTAssertFalse(
       lifecycle.isBackgroundActivityScheduled,
-      "A missing preference should use the default (enabled)"
+      "A missing preference should use the default (disabled)"
     )
     lifecycle.stopBackgroundActivity()
   }
@@ -175,8 +175,8 @@ final class SupervisorLifecycleTests: XCTestCase {
     )
   }
 
-  func test_runInBackgroundDefaultIsTrue() {
-    XCTAssertTrue(SupervisorPreferencesDefaults.runInBackgroundDefault)
+  func test_runInBackgroundDefaultIsFalse() {
+    XCTAssertFalse(SupervisorPreferencesDefaults.runInBackgroundDefault)
   }
 
   // MARK: - Store wiring
@@ -269,6 +269,12 @@ final class SupervisorLifecycleTests: XCTestCase {
   @MainActor
   func test_startSupervisorWithPersistenceSchedulesAuditRetention() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
     await store.startSupervisor()
     defer { Task { await store.stopSupervisor() } }
 
@@ -349,10 +355,16 @@ final class SupervisorLifecycleTests: XCTestCase {
   @MainActor
   func test_setSupervisorRunInBackgroundEnabledStopsAndStartsScheduler() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
     await store.startSupervisor()
     defer { Task { await store.stopSupervisor() } }
 
-    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(false)
@@ -360,7 +372,7 @@ final class SupervisorLifecycleTests: XCTestCase {
     XCTAssertFalse(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(true)
-    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
   }
 
