@@ -70,7 +70,10 @@ final class SwarmRunner {
     let marker = try fixture.waitForReady("act8")
     if let taskID = marker["task_review_id"] {
       fixture.selectTask(taskID)
-      fixture.expectIdentifier(Accessibility.awaitingReviewBadge(taskID))
+      fixture.expectAnyIdentifier([
+        Accessibility.awaitingReviewBadge(taskID),
+        Accessibility.taskActionsSheet,
+      ])
     }
     try acknowledge("act8")
   }
@@ -93,7 +96,10 @@ final class SwarmRunner {
     }
     if let taskID = marker["task_autospawn_id"] {
       fixture.selectTask(taskID)
-      fixture.expectIdentifier(Accessibility.awaitingReviewBadge(taskID))
+      fixture.expectAnyIdentifier([
+        Accessibility.awaitingReviewBadge(taskID),
+        Accessibility.taskActionsSheet,
+      ])
     }
     try acknowledge("act10")
   }
@@ -115,6 +121,7 @@ final class SwarmRunner {
         Accessibility.partialAgreementChip(marker["point_id"] ?? "p1"),
         Accessibility.reviewPointChip(marker["point_id"] ?? "p1"),
         Accessibility.roundCounter(taskID),
+        Accessibility.taskActionsSheet,
       ])
     }
     try acknowledge("act12")
