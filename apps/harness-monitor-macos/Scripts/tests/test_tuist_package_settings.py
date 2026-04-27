@@ -73,6 +73,15 @@ class TuistPackageSettingsTests(unittest.TestCase):
         for setting in PROJECT_MANIFEST_SETTINGS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
+        # REGISTER_APP_GROUPS must stay NO on every signed app target so Xcode
+        # never re-recommends YES (which would make automatic signing claim
+        # ownership of the shared Q498EB36N4.io.harnessmonitor app group).
+        self.assertEqual(
+            manifest.count('"REGISTER_APP_GROUPS": "NO"'),
+            2,
+            "REGISTER_APP_GROUPS=NO must be set on monitorAppSettings and uiTestHostSettings",
+        )
+        self.assertNotIn('"REGISTER_APP_GROUPS": "YES"', manifest)
         for setting in PREVIEW_SCHEME_MACRO_EXPANSIONS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
