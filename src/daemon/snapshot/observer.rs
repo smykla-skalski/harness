@@ -27,7 +27,6 @@ pub(super) fn load_observer_summary(
     Ok(Some(ObserverSummary {
         observe_id: observe_id.to_string(),
         last_scan_time: observer.last_scan_time,
-        last_sweep_at: observer.last_sweep_at,
         open_issue_count: observer.open_issues.len(),
         resolved_issue_count: observer.resolved_issue_ids.len(),
         muted_code_count: observer.muted_codes.len(),

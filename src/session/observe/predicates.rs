@@ -23,10 +23,7 @@ use crate::session::types::SessionStatus;
 /// joinable / liveness-eligible.
 #[must_use]
 pub const fn should_tick_liveness(status: SessionStatus) -> bool {
-    matches!(
-        status,
-        SessionStatus::AwaitingLeader | SessionStatus::Active | SessionStatus::LeaderlessDegraded
-    )
+    status.is_liveness_eligible()
 }
 
 /// Whether the observe loop should perform an observation scan.
@@ -83,6 +80,19 @@ mod tests {
                     "should_observe must imply should_tick_liveness for {status:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn liveness_predicate_matches_session_status_liveness_eligibility() {
+        for status in [
+            SessionStatus::AwaitingLeader,
+            SessionStatus::Active,
+            SessionStatus::Paused,
+            SessionStatus::LeaderlessDegraded,
+            SessionStatus::Ended,
+        ] {
+            assert_eq!(should_tick_liveness(status), status.is_liveness_eligible());
         }
     }
 

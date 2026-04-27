@@ -70,7 +70,6 @@ struct CachedModelsDetailTests {
     let original = ObserverSummary(
       observeId: "obs-1",
       lastScanTime: "2026-03-28T14:00:00Z",
-      lastSweepAt: "2026-03-28T14:00:00Z",
       openIssueCount: 2,
       resolvedIssueCount: 5,
       mutedCodeCount: 1,

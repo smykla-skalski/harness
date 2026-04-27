@@ -124,7 +124,6 @@ pub(crate) fn persist_observer_snapshot(
 
         observer_state.cursor = to_line;
         observer_state.last_scan_time.clone_from(&now);
-        observer_state.last_sweep_at = Some(now.clone());
         if observer_state.project_hint.is_none() && !state.project_name.is_empty() {
             observer_state.project_hint = Some(state.project_name.clone());
         }
