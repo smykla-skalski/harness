@@ -4,6 +4,7 @@ extension PreviewFixtures {
   public static let observer = ObserverSummary(
     observeId: "observe-sess-harness",
     lastScanTime: "2026-03-28T14:17:45Z",
+    lastSweepAt: "2026-03-28T14:17:45Z",
     openIssueCount: 3,
     resolvedIssueCount: 4,
     mutedCodeCount: 1,

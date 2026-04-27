@@ -47,6 +47,7 @@ public struct ObserverAgentSessionSummary: Codable, Equatable, Identifiable, Sen
 public struct ObserverSummary: Codable, Equatable, Sendable {
   public let observeId: String
   public let lastScanTime: String
+  public let lastSweepAt: String?
   public let openIssueCount: Int
   public let resolvedIssueCount: Int
   public let mutedCodeCount: Int

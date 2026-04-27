@@ -25,6 +25,7 @@ pub(in crate::observe::application) fn execute_cycle(
         let now = chrono::Utc::now().to_rfc3339();
         observer_state.cursor = last_line;
         observer_state.last_scan_time.clone_from(&now);
+        observer_state.last_sweep_at = Some(now.clone());
 
         for issue in &issues {
             let existing = observer_state.open_issues.iter_mut().find(|open_issue| {

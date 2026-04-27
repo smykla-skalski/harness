@@ -177,6 +177,7 @@ pub(super) fn observer_state(session_id: &str) -> ObserverState {
         project_hint: Some("project-alpha".into()),
         cursor: 42,
         last_scan_time: "2026-03-28T14:04:00Z".into(),
+        last_sweep_at: Some("2026-03-28T14:04:00Z".into()),
         open_issues: vec![OpenIssue {
             issue_id: "issue-1".into(),
             code: IssueCode::AgentStalledProgress,
