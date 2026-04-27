@@ -8,8 +8,9 @@ use tokio::time::sleep;
 use crate::errors::CliError;
 use crate::observe::types::Issue;
 use crate::session::service::{self, TaskSpec};
-use crate::session::types::{SessionState, SessionStatus, TaskSeverity, TaskSource};
+use crate::session::types::{SessionState, TaskSeverity, TaskSource};
 
+use super::predicates::should_observe;
 use super::scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
 use super::support::{
     create_work_items_for_issues, emit_watch_issues, persist_observer_snapshot,
@@ -106,7 +107,7 @@ fn watch_cycle(
     let Ok(state) = service::session_status(session_id, project_dir) else {
         return Ok(false);
     };
-    if state.status != SessionStatus::Active {
+    if !should_observe(state.status) {
         return Ok(false);
     }
 

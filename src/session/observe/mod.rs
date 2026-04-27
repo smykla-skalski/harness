@@ -1,4 +1,5 @@
 mod once;
+mod predicates;
 mod scan;
 mod support;
 mod watch;
@@ -14,6 +15,7 @@ mod test_support;
 
 pub use once::execute_session_observe;
 pub(crate) use once::run_session_observe;
+pub(crate) use predicates::{should_observe, should_tick_liveness};
 pub(crate) use scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
 pub(crate) use support::persist_observer_snapshot;
 pub use support::task_severity_for_issue;
