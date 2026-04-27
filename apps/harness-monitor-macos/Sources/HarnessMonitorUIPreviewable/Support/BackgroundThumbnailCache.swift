@@ -59,7 +59,8 @@ public actor BackgroundThumbnailCache {
       return await task.value
     }
 
-    let task = Task.detached(priority: Task.currentPriority) { [self] in
+    let priority = Self.imageGenerationPriority(for: Task.currentPriority)
+    let task = Task.detached(priority: priority) { [self] in
       generateThumbnail(key: key, selection: selection)
     }
     thumbnailTasks[key] = task
@@ -83,7 +84,8 @@ public actor BackgroundThumbnailCache {
       return await task.value
     }
 
-    let task = Task.detached(priority: Task.currentPriority) { [self] in
+    let priority = Self.imageGenerationPriority(for: Task.currentPriority)
+    let task = Task.detached(priority: priority) { [self] in
       generateFullImage(selection: selection)
     }
     fullImageTasks[key] = task
@@ -101,6 +103,10 @@ public actor BackgroundThumbnailCache {
       if Task.isCancelled { return }
       _ = await thumbnail(for: selection)
     }
+  }
+
+  static func imageGenerationPriority(for _: TaskPriority) -> TaskPriority {
+    .medium
   }
 
   // MARK: - Off-actor generation

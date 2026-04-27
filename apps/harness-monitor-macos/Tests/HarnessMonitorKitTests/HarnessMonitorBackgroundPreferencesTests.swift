@@ -15,6 +15,13 @@ final class BackgroundAssetBundleTests: XCTestCase {
       )
     }
   }
+
+  func testThumbnailGenerationCapsInheritedUIPriority() {
+    XCTAssertEqual(
+      BackgroundThumbnailCache.imageGenerationPriority(for: .userInitiated),
+      .medium
+    )
+  }
 }
 
 @Suite("Background thumbnail cache")
