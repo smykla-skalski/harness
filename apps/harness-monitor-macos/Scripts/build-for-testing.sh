@@ -14,6 +14,16 @@ CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
 
+# Unit and app-test builds exercise Swift code and do not need the embedded
+# Rust daemon helper. Keep the default macOS test lane out of Cargo and the
+# shared daemon target directory; build/quality lanes can opt back in. Pass the
+# values both as environment and Xcode build settings so scheme pre-actions and
+# target script phases see the same contract.
+DAEMON_AGENT_BUILD_SKIP="${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD:-1}"
+DAEMON_AGENT_BUNDLE_SKIP="${HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE:-1}"
+export HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD="$DAEMON_AGENT_BUILD_SKIP"
+export HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE="$DAEMON_AGENT_BUNDLE_SKIP"
+
 if [ "${XCODEBUILD_RUNNER}" != "${CANONICAL_XCODEBUILD_RUNNER}" ]; then
   echo "XCODEBUILD_RUNNER override is unsupported; use ${CANONICAL_XCODEBUILD_RUNNER}" >&2
   exit 1
@@ -37,4 +47,6 @@ fi
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   CODE_SIGNING_ALLOWED=NO \
+  HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD="$DAEMON_AGENT_BUILD_SKIP" \
+  HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE="$DAEMON_AGENT_BUNDLE_SKIP" \
   build-for-testing

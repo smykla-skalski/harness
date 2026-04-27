@@ -48,13 +48,12 @@ private enum PreferencesBackgroundGalleryRecents {
 
 enum PreferencesBackgroundGalleryPrefetchPlan {
   static let initialLimit = 12
-  static let overscan = 2
 
   static func selections(
     options: [HarnessMonitorBackgroundSelection],
     recentItems: [HarnessMonitorBackgroundSelection],
     selectedBackground: HarnessMonitorBackgroundSelection,
-    visibleIDs: [String]
+    visibleIDs _: [String]
   ) -> [HarnessMonitorBackgroundSelection] {
     var plannedSelections: [HarnessMonitorBackgroundSelection] = []
     var seenStorageValues = Set<String>()
@@ -68,18 +67,6 @@ enum PreferencesBackgroundGalleryPrefetchPlan {
 
     for selection in options.prefix(max(0, initialLimit)) {
       append(selection)
-    }
-
-    let indicesByID = Dictionary(uniqueKeysWithValues: options.enumerated().map { ($1.id, $0) })
-    let visibleIndices = visibleIDs.compactMap { indicesByID[$0] }
-    if let lowerBound = visibleIndices.min(), let upperBound = visibleIndices.max() {
-      let rangeLowerBound = max(0, lowerBound - max(0, overscan))
-      let rangeUpperBound = min(options.count - 1, upperBound + max(0, overscan))
-      if rangeLowerBound <= rangeUpperBound {
-        for selection in options[rangeLowerBound...rangeUpperBound] {
-          append(selection)
-        }
-      }
     }
 
     append(selectedBackground)
@@ -103,7 +90,6 @@ struct PreferencesBackgroundGallery: View {
 
   private static let maxRecents = 8
   private static let recentTileWidth: CGFloat = 140
-  @State private var visibleBackgroundIDs: Set<String> = []
 
   private var isBackdropDisabled: Bool {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) == HarnessMonitorBackdropMode.none
@@ -140,12 +126,12 @@ struct PreferencesBackgroundGallery: View {
       options: options,
       recentItems: recentItems,
       selectedBackground: selectedBackground,
-      visibleIDs: Array(visibleBackgroundIDs)
+      visibleIDs: []
     )
   }
 
-  private var galleryPrefetchSignature: [String] {
-    galleryPrefetchSelections.map(\.storageValue)
+  private var galleryPrefetchSignature: String {
+    galleryPrefetchSelections.map(\.storageValue).joined(separator: "|")
   }
 
   var body: some View {
@@ -192,9 +178,7 @@ struct PreferencesBackgroundGallery: View {
                 background: background,
                 isSelected: background.storageValue == selectedBackground.storageValue,
                 previewHeight: previewHeight,
-                select: { select(background) },
-                didAppear: { registerVisibleBackground(background) },
-                didDisappear: { unregisterVisibleBackground(background) }
+                select: { select(background) }
               )
             }
           }
@@ -258,14 +242,6 @@ struct PreferencesBackgroundGallery: View {
       maxItems: Self.maxRecents
     )
   }
-
-  private func registerVisibleBackground(_ background: HarnessMonitorBackgroundSelection) {
-    visibleBackgroundIDs.insert(background.id)
-  }
-
-  private func unregisterVisibleBackground(_ background: HarnessMonitorBackgroundSelection) {
-    visibleBackgroundIDs.remove(background.id)
-  }
 }
 
 private struct PreferencesBackgroundTile: View {
@@ -273,8 +249,6 @@ private struct PreferencesBackgroundTile: View {
   let isSelected: Bool
   let previewHeight: CGFloat
   let select: () -> Void
-  let didAppear: () -> Void
-  let didDisappear: () -> Void
   @State private var loadedImage: Image?
 
   private static let selectionRingWidth: CGFloat = 3
@@ -287,16 +261,12 @@ private struct PreferencesBackgroundTile: View {
     background: HarnessMonitorBackgroundSelection,
     isSelected: Bool,
     previewHeight: CGFloat,
-    select: @escaping () -> Void,
-    didAppear: @escaping () -> Void = {},
-    didDisappear: @escaping () -> Void = {}
+    select: @escaping () -> Void
   ) {
     self.background = background
     self.isSelected = isSelected
     self.previewHeight = previewHeight
     self.select = select
-    self.didAppear = didAppear
-    self.didDisappear = didDisappear
   }
 
   var body: some View {
@@ -357,8 +327,6 @@ private struct PreferencesBackgroundTile: View {
       }
       loadedImage = Image(decorative: cgImage, scale: 1.0)
     }
-    .onAppear(perform: didAppear)
-    .onDisappear(perform: didDisappear)
   }
 
   @ViewBuilder private var previewContent: some View {

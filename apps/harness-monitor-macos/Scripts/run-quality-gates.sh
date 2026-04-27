@@ -54,7 +54,9 @@ ensure_entitlement_absent() {
   fi
 }
 
-"$BUILD_FOR_TESTING_SCRIPT"
+HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD=0 \
+HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=0 \
+  "$BUILD_FOR_TESTING_SCRIPT"
 
 SANDBOX_VIOLATIONS="$("$LOG_BIN" show \
   --predicate 'subsystem == "com.apple.sandbox.reporting" AND composedMessage CONTAINS "io.harnessmonitor"' \

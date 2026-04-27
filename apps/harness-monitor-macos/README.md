@@ -53,9 +53,9 @@ General monitor build/test lanes keep using the shared `xcode-derived` root. The
 
 `monitor:macos:lint` is the fast non-build lane. It generate-checks the workspace, runs strict `swift format` over Sources and Tests, and runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`. It never invokes `xcodebuild`, daemon pre-actions, or daemon bundle validation.
 
-`monitor:macos:quality-gate` is the slower build-based validation lane. It runs `build-for-testing` against the shared `xcode-derived`, scans sandbox logs, and verifies the checked-in app/daemon entitlements expected by the built product.
+`monitor:macos:quality-gate` is the slower build-based validation lane. It runs `build-for-testing` against the shared `xcode-derived` with daemon embedding enabled, scans sandbox logs, and verifies the checked-in app/daemon entitlements expected by the built product.
 
-`monitor:macos:test` runs the fast lint lane first, then performs `build-for-testing`, then executes:
+`monitor:macos:test` performs `build-for-testing` with daemon embedding disabled by default, then executes:
 
 ```bash
 mise run monitor:macos:xcodebuild -- \
@@ -73,7 +73,7 @@ For routine work, prefer the smallest targeted command instead of the full `moni
 XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:macos:test
 ```
 
-`XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
+`XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. Class-level selectors are expanded through Xcode test enumeration before execution so the lane fails instead of reporting a misleading zero-test pass when Xcode does not run class selectors directly. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
 
 Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `mise run version:set -- <version>` from the repo root when you bump a release. `mise run monitor:macos:generate` regenerates the Xcode project via Tuist, then `Scripts/post-generate.sh` resyncs the marker-anchored version literals in `Tuist/ProjectDescriptionHelpers/BuildSettings.swift` (the `// VERSION_MARKER_CURRENT` and `// VERSION_MARKER_MARKETING` lines), the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version.
 

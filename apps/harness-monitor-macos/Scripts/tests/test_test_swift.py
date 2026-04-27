@@ -30,13 +30,11 @@ class TestSwiftScriptTests(unittest.TestCase):
             scripts_root = app_root / "Scripts"
             scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
-            run_lint_script = scripts_root / "run-lint.sh"
             build_for_testing_script = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
             rtk_calls = temp_root / "rtk-calls.log"
 
-            write_executable(run_lint_script, "#!/bin/bash\nset -euo pipefail\n")
             write_executable(
                 build_for_testing_script,
                 f"""#!/bin/bash
@@ -59,6 +57,54 @@ touch "$app_dir/build-for-testing.marker"
                 f"""#!/bin/bash
 set -euo pipefail
 printf '%s\\n' "$*" >> "{runner_calls}"
+enumeration_output_path=""
+only_testing_selector=""
+previous_arg=""
+for arg in "$@"; do
+  if [[ "$previous_arg" == "-test-enumeration-output-path" ]]; then
+    enumeration_output_path="$arg"
+  fi
+  if [[ "$arg" == -only-testing:* ]]; then
+    only_testing_selector="${{arg#-only-testing:}}"
+  fi
+  previous_arg="$arg"
+done
+if [[ -n "$enumeration_output_path" ]]; then
+  enabled_tests_json=""
+  case "$only_testing_selector" in
+    HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests)
+      enabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/testInitialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary()"
+        }},
+        {{
+          "identifier": "HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan()"
+        }}
+      ]'
+      ;;
+    HarnessMonitorKitTests/PolicyGapRuleTests)
+      enabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/PolicyGapRuleTests/testDefaultPolicyGapRuleUsesStableMetadata()"
+        }}
+      ]'
+      ;;
+    *)
+      enabled_tests_json='[]'
+      ;;
+  esac
+  cat > "$enumeration_output_path" <<JSON
+{{
+  "errors": [],
+  "values": [
+    {{
+      "enabledTests": $enabled_tests_json
+    }}
+  ]
+}}
+JSON
+  exit 0
+fi
 app_dir="${{XCODEBUILD_DERIVED_DATA_PATH}}/Build/Products/Debug/Harness Monitor.app"
 mkdir -p "$app_dir"
 if printf '%s\\n' "$@" | /usr/bin/grep -q 'build-for-testing'; then
@@ -79,7 +125,6 @@ exit 1
             env = os.environ.copy()
             env.update(
                 {
-                    "RUN_LINT_SCRIPT": str(run_lint_script),
                     "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
@@ -115,21 +160,24 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3)
         self.assertEqual(calls[0], ["build-for-testing"])
         self.assertIn("test-without-building", calls[1])
+        self.assertIn("-enumerate-tests", calls[1])
+        self.assertIn("test-without-building", calls[2])
         self.assertIn(
-            "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests",
-            calls[1],
+            "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
+            "testDefaultPolicyGapRuleUsesStableMetadata",
+            calls[2],
         )
         self.assertNotIn(
             "-skip-testing:HarnessMonitorUITests",
-            calls[1],
+            calls[2],
             "explicit only-testing selector must not be overridden by default skips",
         )
         self.assertNotIn(
             "-skip-testing:HarnessMonitorAgentsE2ETests",
-            calls[1],
+            calls[2],
             "explicit only-testing selector must not be overridden by default skips",
         )
         self.assertEqual(rtk_log, "")
@@ -154,15 +202,44 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3)
         self.assertIn("test-without-building", calls[1])
+        self.assertIn("-enumerate-tests", calls[1])
+        self.assertIn("test-without-building", calls[2])
         self.assertIn(
-            "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests",
-            calls[1],
+            "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
+            "testDefaultPolicyGapRuleUsesStableMetadata",
+            calls[2],
         )
         self.assertIn(
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
+            calls[2],
+        )
+        self.assertEqual(rtk_log, "")
+
+    def test_expands_xctest_class_only_testing_selector_to_methods(self) -> None:
+        completed, calls, rtk_log = self.run_script(
+            only_testing="HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests"
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("test-without-building", calls[1])
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests",
             calls[1],
+        )
+        self.assertIn("-enumerate-tests", calls[1])
+        self.assertIn("test-without-building", calls[2])
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
+            "testInitialPlanKeepsSelectedBackgroundWarmWithoutPrefetchingWholeLibrary",
+            calls[2],
+        )
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
+            "testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan",
+            calls[2],
         )
         self.assertEqual(rtk_log, "")
 

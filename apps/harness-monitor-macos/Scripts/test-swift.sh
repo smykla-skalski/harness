@@ -13,7 +13,6 @@ DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-deriv
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
-RUN_LINT_SCRIPT="${RUN_LINT_SCRIPT:-$ROOT/Scripts/run-lint.sh}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 
 # Targets that launch a hosted app under xctest. macOS attributes their
@@ -29,12 +28,91 @@ DEFAULT_SKIP_TEST_TARGETS=(
 )
 
 append_only_testing_args() {
-  local selector
+  local expanded_selector expanded_selectors selector
   while IFS= read -r selector; do
     if [[ -n "$selector" ]]; then
-      TEST_ARGS+=("-only-testing:${selector}")
+      if ! expanded_selectors="$(expand_only_testing_selector "$selector")"; then
+        return 1
+      fi
+      while IFS= read -r expanded_selector; do
+        if [[ -n "$expanded_selector" ]]; then
+          TEST_ARGS+=("-only-testing:${expanded_selector}")
+        fi
+      done <<< "$expanded_selectors"
     fi
   done < <(printf '%s\n' "$XCODE_ONLY_TESTING" | tr ',' '\n')
+}
+
+expand_only_testing_selector() {
+  local selector="$1"
+
+  if [[ "$selector" != */* ]] || [[ "$selector" == */*/* ]]; then
+    printf '%s\n' "$selector"
+    return 0
+  fi
+
+  enumerate_only_testing_selector "$selector"
+}
+
+enumerate_only_testing_selector() {
+  local selector="$1"
+  local enumeration_path expanded_selectors
+
+  if [ ! -x /usr/bin/python3 ]; then
+    echo "python3 is required to expand XCODE_ONLY_TESTING class selector: ${selector}" >&2
+    return 1
+  fi
+
+  enumeration_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-tests.XXXXXX.json")"
+  if ! HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
+      HARNESS_MONITOR_USE_TUIST_TEST=0 \
+      "$XCODEBUILD_RUNNER" \
+    "${BASE_TEST_ARGS[@]}" \
+    "-only-testing:${selector}" \
+    -enumerate-tests \
+    -test-enumeration-style flat \
+    -test-enumeration-format json \
+    -test-enumeration-output-path "$enumeration_path" >/dev/null; then
+    rm -f "$enumeration_path"
+    echo "failed to enumerate tests for XCODE_ONLY_TESTING selector: ${selector}" >&2
+    return 1
+  fi
+
+  if ! expanded_selectors="$(/usr/bin/python3 - "$enumeration_path" "$selector" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+selector = sys.argv[2]
+
+with open(path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+identifiers = {}
+for value in payload.get("values", []):
+    for test in value.get("enabledTests", []):
+        identifier = test.get("identifier", "")
+        if identifier.startswith(selector + "/"):
+            if identifier.endswith("()"):
+                identifier = identifier[:-2]
+            identifiers[identifier] = None
+
+for identifier in identifiers:
+    print(identifier)
+PY
+  )"; then
+    rm -f "$enumeration_path"
+    echo "failed to parse enumerated tests for XCODE_ONLY_TESTING selector: ${selector}" >&2
+    return 1
+  fi
+  rm -f "$enumeration_path"
+
+  if [[ -z "$expanded_selectors" ]]; then
+    echo "no tests discovered for XCODE_ONLY_TESTING class selector: ${selector}" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$expanded_selectors"
 }
 
 append_default_skip_args() {
@@ -73,22 +151,16 @@ if [ "${XCODEBUILD_RUNNER}" != "${CANONICAL_XCODEBUILD_RUNNER}" ]; then
   exit 1
 fi
 
-if [ ! -x "${RUN_LINT_SCRIPT}" ]; then
-  echo "lint script is not executable: ${RUN_LINT_SCRIPT}" >&2
-  exit 1
-fi
-
 if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   echo "build-for-testing script is not executable: ${BUILD_FOR_TESTING_SCRIPT}" >&2
   exit 1
 fi
 
-"$RUN_LINT_SCRIPT"
 "$BUILD_FOR_TESTING_SCRIPT"
 
 clear_gatekeeper_metadata
 
-TEST_ARGS=(
+BASE_TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
@@ -96,9 +168,15 @@ TEST_ARGS=(
   CODE_SIGNING_ALLOWED=NO \
   test-without-building
 )
+TEST_ARGS=("${BASE_TEST_ARGS[@]}")
 
 append_only_testing_args
 append_default_skip_args
+
+if [[ -n "$XCODE_ONLY_TESTING" ]] && [[ "${#TEST_ARGS[@]}" == "${#BASE_TEST_ARGS[@]}" ]]; then
+  echo "no tests discovered for XCODE_ONLY_TESTING selector(s): ${XCODE_ONLY_TESTING}" >&2
+  exit 1
+fi
 
 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}"
