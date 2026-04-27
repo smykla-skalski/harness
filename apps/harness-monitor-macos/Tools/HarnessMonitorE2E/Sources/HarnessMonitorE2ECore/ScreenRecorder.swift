@@ -271,11 +271,7 @@ private final class Runner: NSObject, SCRecordingOutputDelegate {
   /// performs the WindowServer handshake; calling `CGMainDisplayID()`
   /// guarantees CG is fully primed for the subsequent SCK calls.
   private func warmUpCoreGraphics() throws {
-    _ = try runAsync {
-      await MainActor.run {
-        NSApplication.shared
-      }
-    }
+    ScreenRecorder.warmUpWindowServer()
     let mainDisplay = CGMainDisplayID()
     try appendLog("recording-cg-warmup main_display=\(mainDisplay)")
   }
@@ -516,6 +512,24 @@ extension ScreenRecorder {
   static func shouldIgnoreStopCaptureError(_ error: Error) -> Bool {
     let nsError = error as NSError
     return nsError.domain == SCStreamErrorDomain && nsError.code == -3808
+  }
+
+  /// Touch the WindowServer + main display from the calling main thread so
+  /// later ScreenCaptureKit calls do not trap on uninitialised CoreGraphics.
+  ///
+  /// Runs synchronously: `Runner.run()` is invoked from the recorder
+  /// process's main thread (via `ParsableCommand.main()`), and
+  /// `NSApplication.shared` is `@MainActor`-isolated, so we use
+  /// `MainActor.assumeIsolated` instead of the previous
+  /// `runAsync { await MainActor.run { … } }` shim. That shim deadlocked on
+  /// macOS 26: the main thread blocked on a DispatchSemaphore while the
+  /// dispatched `Task` waited for the main actor to drain, leaving the
+  /// recorder log empty and the swarm fixture starved of `start.ready`.
+  static func warmUpWindowServer() {
+    MainActor.assumeIsolated {
+      _ = NSApplication.shared
+    }
+    _ = CGMainDisplayID()
   }
 }
 
