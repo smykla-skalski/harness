@@ -58,4 +58,36 @@ final class SwarmRunLayoutTests: XCTestCase {
     XCTAssertTrue(contextRoot.path.hasPrefix("/tmp/data-home/harness/projects/project-"))
     XCTAssertTrue(contextRoot.path.hasSuffix("/harness/projects/project-a2c9c0a0a46868bf"))
   }
+
+  func testEnsureGeneratedDataRootsNonIndexableMarksEveryGeneratedRoot() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("swarm-layout-noindex-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let dataRoot = root.appendingPathComponent("data-root", isDirectory: true)
+    let dataHome = root.appendingPathComponent("custom-data-home", isDirectory: true)
+    let layout = SwarmRunLayout(
+      runID: "run-123",
+      repoRoot: URL(fileURLWithPath: "/repo", isDirectory: true),
+      commonRepoRoot: URL(fileURLWithPath: "/common", isDirectory: true),
+      temporaryDirectory: root.appendingPathComponent("tmp", isDirectory: true),
+      homeDirectory: URL(fileURLWithPath: "/Users/test", isDirectory: true),
+      dataRootOverride: dataRoot,
+      dataHomeOverride: dataHome
+    )
+
+    try layout.ensureGeneratedDataRootsNonIndexable()
+    try layout.ensureGeneratedDataRootsNonIndexable()
+
+    for directory in [
+      layout.dataRoot,
+      layout.dataHome,
+      layout.dataHome.appendingPathComponent("harness", isDirectory: true),
+    ] {
+      let marker = directory.appendingPathComponent(SwarmRunLayout.nonIndexableMarkerName)
+      XCTAssertTrue(
+        FileManager.default.fileExists(atPath: marker.path),
+        "Missing no-index marker at \(marker.path)"
+      )
+    }
+  }
 }

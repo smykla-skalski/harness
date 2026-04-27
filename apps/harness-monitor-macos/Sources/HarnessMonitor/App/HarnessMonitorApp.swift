@@ -11,6 +11,7 @@ struct HarnessMonitorApp: App {
   @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
   private let container: ModelContainer?
   private let isUITesting: Bool
+  private let isTestRun: Bool
   private let launchMode: HarnessMonitorLaunchMode
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
@@ -31,12 +32,18 @@ struct HarnessMonitorApp: App {
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
-    do {
-      try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: configuration.environment)
-    } catch {
-      HarnessMonitorLogger.store.warning(
-        "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
-      )
+    let isTestRun =
+      configuration.isUITesting
+      || configuration.environment.isXCTestProcess
+      || HarnessMonitorAppDelegate.isCurrentTestHarnessRun()
+    if !isTestRun {
+      do {
+        try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: configuration.environment)
+      } catch {
+        HarnessMonitorLogger.store.warning(
+          "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
+        )
+      }
     }
     do {
       try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
@@ -50,10 +57,11 @@ struct HarnessMonitorApp: App {
     #endif
     container = configuration.container
     isUITesting = configuration.isUITesting
+    self.isTestRun = isTestRun
     launchMode = configuration.launchMode
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
     let notificationController =
-      configuration.isUITesting
+      isTestRun
       ? HarnessMonitorUserNotificationController.preview()
       : {
         let controller = HarnessMonitorUserNotificationController()
@@ -146,7 +154,7 @@ struct HarnessMonitorApp: App {
   }
 
   private var allowsWindowRestoration: Bool {
-    launchMode == .live && !isUITesting
+    launchMode == .live && !isTestRun
   }
 
   @ViewBuilder private var mainWindowContent: some View {

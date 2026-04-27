@@ -26,8 +26,12 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
 
   public var isXCTestProcess: Bool {
     values["XCTestConfigurationFilePath"] != nil
+      || values["XCInjectBundle"] != nil
+      || values["XCInjectBundleInto"] != nil
       || values["HARNESS_MONITOR_UI_TESTS"] == "1"
       || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+      || ProcessInfo.processInfo.environment["XCInjectBundle"] != nil
+      || ProcessInfo.processInfo.environment["XCInjectBundleInto"] != nil
       || ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TESTS"] == "1"
       || ProcessInfo.processInfo.processName == "xctest"
   }
@@ -279,32 +283,6 @@ public enum HarnessMonitorPaths {
       cleaningLegacyDirectories: Self.legacyGeneratedCacheDirectories(using: environment),
       fileManager: fileManager
     )
-  }
-
-  /// Name of the marker file Spotlight honors to skip a directory tree.
-  public static let nonIndexableMarkerName = ".metadata_never_index"
-
-  /// Ensure the harness data root is excluded from Spotlight indexing and Time Machine backups.
-  ///
-  /// Writes an empty `.metadata_never_index` marker at the root (idempotent) and applies
-  /// `isExcludedFromBackup`. Session workspaces, project caches, daemon DBs, and other
-  /// high-churn generated artifacts live under this root and should never be indexed.
-  public static func ensureHarnessRootNonIndexable(
-    using environment: HarnessMonitorEnvironment = .current,
-    fileManager: FileManager = .default
-  ) throws {
-    let root = Self.harnessRoot(using: environment)
-    try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-
-    var mutableRoot = root
-    var resourceValues = URLResourceValues()
-    resourceValues.isExcludedFromBackup = true
-    try? mutableRoot.setResourceValues(resourceValues)
-
-    let marker = root.appendingPathComponent(Self.nonIndexableMarkerName)
-    if !fileManager.fileExists(atPath: marker.path) {
-      try Data().write(to: marker, options: .atomic)
-    }
   }
 
   public static func prepareGeneratedCacheDirectory(
