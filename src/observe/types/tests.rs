@@ -294,32 +294,37 @@ fn observer_state_loads_legacy_v1_payload_with_cycle_history() {
 }
 
 #[test]
-fn observer_state_last_sweep_at_roundtrips_only_when_some() {
-    let mut state = ObserverState::default_for_session("sweep-test");
-    let json_none = serde_json::to_string(&state).unwrap();
-    assert!(
-        !json_none.contains("last_sweep_at"),
-        "None value must be skipped on serialize; got: {json_none}"
-    );
-
-    state.last_sweep_at = Some("2026-04-27T08:00:00Z".into());
-    let json_some = serde_json::to_string(&state).unwrap();
-    assert!(json_some.contains("\"last_sweep_at\":\"2026-04-27T08:00:00Z\""));
-
-    let restored: ObserverState = serde_json::from_str(&json_some).unwrap();
-    assert_eq!(
-        restored.last_sweep_at.as_deref(),
-        Some("2026-04-27T08:00:00Z")
-    );
-}
-
-#[test]
 fn observer_state_writes_omit_cycle_history_field() {
     let state = ObserverState::default_for_session("omit-cycle");
     let json = serde_json::to_string(&state).unwrap();
     assert!(
         !json.contains("cycle_history"),
         "v2 writes must not emit cycle_history; got: {json}"
+    );
+}
+
+#[test]
+fn observer_state_writes_omit_legacy_last_sweep_at_field() {
+    let legacy = r#"{
+        "schema_version": 2,
+        "state_version": 0,
+        "session_id": "legacy-sweep",
+        "project_hint": null,
+        "cursor": 10,
+        "last_scan_time": "2026-04-27T08:00:00Z",
+        "last_sweep_at": "2026-04-27T08:00:00Z",
+        "open_issues": [],
+        "resolved_issue_ids": [],
+        "issue_attempts": [],
+        "muted_codes": [],
+        "baseline_issue_ids": [],
+        "active_workers": []
+    }"#;
+    let restored: ObserverState = serde_json::from_str(legacy).unwrap();
+    let json = serde_json::to_string(&restored).unwrap();
+    assert!(
+        !json.contains("last_sweep_at"),
+        "observer writes must keep last_scan_time as the single sweep timestamp; got: {json}"
     );
 }
 
