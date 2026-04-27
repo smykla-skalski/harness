@@ -67,7 +67,8 @@ pub(super) fn load_plugin_sources(
                     continue;
                 }
                 let skill_root = skill_dir.path();
-                if let SkillDirectoryKind::SkillDefinition = classify_skill_directory(&skill_root)? {
+                if let SkillDirectoryKind::SkillDefinition = classify_skill_directory(&skill_root)?
+                {
                     skills.push(load_skill_definition(skill_root)?);
                 }
             }
@@ -227,7 +228,10 @@ mod tests {
             &plugin_root.join("skills").join("real").join("skill.yaml"),
             "name: real\ndescription: ok\n",
         );
-        write(&plugin_root.join("skills").join("real").join("body.md"), "body");
+        write(
+            &plugin_root.join("skills").join("real").join("body.md"),
+            "body",
+        );
 
         // Sibling workspace inside the plugin's `skills/` directory.
         let workspace = plugin_root.join("skills").join("real-workspace");
