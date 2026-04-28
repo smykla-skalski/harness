@@ -53,6 +53,28 @@ pub struct AcpAgentSnapshot {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpAgentInspectSnapshot {
+    pub acp_id: String,
+    pub session_id: String,
+    pub agent_id: String,
+    pub display_name: String,
+    pub pid: u32,
+    pub pgid: i32,
+    pub uptime_ms: u64,
+    pub last_update_at: String,
+    pub last_client_call_at: Option<String>,
+    pub watchdog_state: String,
+    pub pending_permissions: usize,
+    pub terminal_count: usize,
+    pub prompt_deadline_remaining_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpAgentInspectResponse {
+    pub agents: Vec<AcpAgentInspectSnapshot>,
+}
+
 #[derive(Clone)]
 pub struct AcpAgentManagerHandle {
     state: Arc<AcpAgentManagerState>,
@@ -230,6 +252,36 @@ impl AcpAgentManagerHandle {
                 .then_with(|| a.acp_id.cmp(&b.acp_id))
         });
         Ok(snapshots)
+    }
+
+    /// Inspect live ACP sessions without starting or stopping anything.
+    ///
+    /// # Panics
+    /// Panics if the ACP sessions mutex is poisoned.
+    #[must_use]
+    pub fn inspect(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
+        let sessions = self
+            .state
+            .sessions
+            .lock()
+            .expect("ACP sessions lock")
+            .values()
+            .filter(|session| session_id.is_none_or(|id| session.session_id() == id))
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut agents = sessions
+            .into_iter()
+            .map(|session| {
+                session.refresh();
+                session.inspect_snapshot()
+            })
+            .collect::<Vec<_>>();
+        agents.sort_by(|a, b| {
+            b.last_update_at
+                .cmp(&a.last_update_at)
+                .then_with(|| a.acp_id.cmp(&b.acp_id))
+        });
+        AcpAgentInspectResponse { agents }
     }
 
     /// Load one ACP session snapshot.

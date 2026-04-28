@@ -9,5 +9,8 @@ mod manager;
 mod permission_bridge;
 mod protocol;
 
-pub use manager::{AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest};
+pub use manager::{
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle, AcpAgentSnapshot,
+    AcpAgentStartRequest,
+};
 pub use permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem};

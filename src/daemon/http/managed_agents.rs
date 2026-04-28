@@ -7,7 +7,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
-use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
+use crate::daemon::agent_acp::AcpPermissionDecision;
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentListResponse,
@@ -19,6 +19,8 @@ use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 
+mod acp_inspect;
+mod acp_start;
 mod attach;
 
 pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
@@ -34,7 +36,7 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         )
         .route(
             http_paths::SESSION_MANAGED_AGENTS_ACP,
-            post(post_acp_agent_start),
+            post(acp_start::post_acp_agent_start),
         )
         .route(
             http_paths::MANAGED_AGENT_DETAIL,
@@ -75,6 +77,10 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::MANAGED_AGENT_ACP_PERMISSION,
             post(post_acp_permission),
+        )
+        .route(
+            http_paths::MANAGED_AGENTS_ACP_INSPECT,
+            get(acp_inspect::get_acp_inspect),
         )
 }
 
@@ -159,30 +165,6 @@ async fn post_codex_agent_start(
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_CODEX,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_acp_agent_start(
-    Path(session_id): Path<String>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<AcpAgentStartRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = state
-        .acp_agent_manager
-        .start(&session_id, &request)
-        .map(ManagedAgentSnapshot::Acp);
-    timed_json(
-        "POST",
-        http_paths::SESSION_MANAGED_AGENTS_ACP,
         &request_id,
         start,
         result,

@@ -51,6 +51,7 @@ use agent_client_protocol::schema::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
+use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
 use super::permission::{PermissionMode, stdin_permission_gateway};
@@ -173,7 +174,7 @@ impl HarnessAcpClient {
             suite_dir,
             denied_binaries: DeniedBinaries::new(denied_binaries),
             permission_mode,
-            terminals: TerminalManager::new(16),
+            terminals: TerminalManager::new(MAX_TERMINALS_PER_SESSION),
         }
     }
 
