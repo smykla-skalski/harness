@@ -4,6 +4,19 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
+  func testCreateTaskEntryPoints() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    verifyCreateTaskSheet(in: app)
+  }
+
   func testAllRetiredInspectorEntryPoints() throws {
     let app = launch(
       mode: "preview",
@@ -48,19 +61,19 @@ extension RetiredInspectorEntryPointsUITests {
   }
 
   fileprivate func verifyCreateTaskSheet(in app: XCUIApplication) {
-    let taskFlow = button(in: app, identifier: Accessibility.createTaskOpenButton)
+    let newTaskButton = button(in: app, identifier: Accessibility.createTaskOpenButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        taskFlow.exists && !taskFlow.frame.isEmpty
+        newTaskButton.exists && !newTaskButton.frame.isEmpty
       },
-      "Action dock should expose a Task Flow button"
+      "Session header should expose a New Task button"
     )
     tapButton(in: app, identifier: Accessibility.createTaskOpenButton)
 
     let sheet = element(in: app, identifier: Accessibility.createTaskSheet)
     XCTAssertTrue(
       sheet.waitForExistence(timeout: Self.actionTimeout),
-      "Create task sheet should appear after tapping Task Flow"
+      "Create task sheet should appear after tapping New Task"
     )
 
     let titleField = editableField(in: app, identifier: Accessibility.createTaskTitleField)
@@ -73,6 +86,18 @@ extension RetiredInspectorEntryPointsUITests {
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { !sheet.exists },
       "Create task sheet should dismiss on Escape"
+    )
+
+    app.typeKey("t", modifierFlags: .command)
+    XCTAssertTrue(
+      sheet.waitForExistence(timeout: Self.actionTimeout),
+      "Create task sheet should appear after pressing Cmd+T"
+    )
+
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !sheet.exists },
+      "Create task sheet should dismiss after the Cmd+T entry point as well"
     )
   }
 
