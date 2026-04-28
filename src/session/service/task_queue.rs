@@ -258,6 +258,15 @@ pub(crate) fn free_worker_ids(state: &SessionState) -> Vec<String> {
         .collect()
 }
 
+/// Whether `agent_id` can accept a new task right now.
+///
+/// `current_task_id` is the sole truth: it is set eagerly by
+/// `start_task_for_agent` when a task-start signal is sent, reaffirmed by
+/// the signal-ack handler on accept, and cleared by drop, ack rejection,
+/// signal expiry, and disconnect. The earlier task-walk fallback that
+/// looked for `InProgress`/`InReview` tasks assigned to this agent is no
+/// longer needed; the property test in `tests::task_drop_property` pins
+/// the invariant across the four reachable drop branches.
 pub(crate) fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
     let Some(agent) = state.agents.get(agent_id) else {
         return false;
@@ -265,8 +274,4 @@ pub(crate) fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
     agent.status.accepts_assignment()
         && agent.role == SessionRole::Worker
         && agent.current_task_id.is_none()
-        && !state.tasks.values().any(|task| {
-            task.assigned_to.as_deref() == Some(agent_id)
-                && matches!(task.status, TaskStatus::InProgress | TaskStatus::InReview)
-        })
 }
