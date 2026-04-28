@@ -78,6 +78,42 @@ pub(super) fn age_agent_activity(project: &Path, session_id: &str, agent_id: &st
     .expect("age agent activity");
 }
 
+/// Acknowledge the in-flight task-start signal for a worker. Tests that
+/// simulate "worker has started a task" call this so the signal leaves the
+/// pending dir; without this, liveness keeps the worker in Idle and tests
+/// expecting Disconnected/release flows misfire.
+pub(super) fn accept_task_start_signal(session_id: &str, worker_id: &str, project: &Path) {
+    let state = session_status(session_id, project).expect("status for ack");
+    let worker = state.agents.get(worker_id).expect("worker registration");
+    let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+    let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
+    let signals = list_signals(session_id, Some(worker_id), project).expect("signals");
+    let start_signal = signals
+        .iter()
+        .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)
+        .expect("start signal");
+    runtime::signal::acknowledge_signal(
+        &runtime.signal_dir(project, &worker_session_id),
+        &SignalAck {
+            signal_id: start_signal.signal.signal_id.clone(),
+            acknowledged_at: utc_now(),
+            result: AckResult::Accepted,
+            agent: worker_session_id,
+            session_id: session_id.to_string(),
+            details: None,
+        },
+    )
+    .expect("ack");
+    record_signal_acknowledgment(
+        session_id,
+        worker_id,
+        &start_signal.signal.signal_id,
+        AckResult::Accepted,
+        project,
+    )
+    .expect("record ack");
+}
+
 pub(super) fn write_agent_log_file(project: &Path, runtime: &str, session_id: &str) -> PathBuf {
     let log_path = crate::workspace::project_context_dir(project)
         .join(format!("agents/sessions/{runtime}/{session_id}/raw.jsonl"));

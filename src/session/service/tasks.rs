@@ -107,18 +107,23 @@ pub fn assign_task(
     }
 
     let now = utc_now();
+    let mut effects = Vec::new();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
     storage::update_state(&layout, |state| {
-        apply_assign_task(state, task_id, agent_id, actor_id, &now)
+        effects = apply_assign_task(state, task_id, agent_id, actor_id, &now)?;
+        Ok(())
     })?;
 
+    let start_signals = started_task_signals(&effects);
+    write_prepared_task_start_signals(project_dir, &start_signals)?;
     storage::append_log_entry(
         &layout,
         log_task_assigned(task_id, agent_id),
         Some(actor_id),
         None,
     )?;
+    append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
 
     Ok(())
 }

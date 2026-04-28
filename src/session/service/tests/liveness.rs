@@ -274,6 +274,10 @@ fn sync_liveness_returns_dead_agent_task_to_open() {
         )
         .expect("create task");
         assign_task("sync-3", &task.task_id, &worker_id, &leader_id, project).expect("assign");
+        // Ack the task-start signal so it leaves the pending dir; an unacked
+        // signal would keep the worker in Idle and prevent the disconnect
+        // transition this test is exercising.
+        accept_task_start_signal("sync-3", &worker_id, project);
         update_task(
             "sync-3",
             &task.task_id,
