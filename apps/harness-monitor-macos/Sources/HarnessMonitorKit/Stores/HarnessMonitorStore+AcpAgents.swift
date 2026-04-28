@@ -3,15 +3,12 @@ import Foundation
 extension HarnessMonitorStore {
   public var pendingAcpPermissionBatches: [AcpPermissionBatch] {
     let selectedBatches = selectedAcpAgents.flatMap(\.pendingPermissionBatches)
-    return mergedPermissionBatches(
-      primary: selectedBatches,
-      secondary: standaloneAcpPermissionBatches
-    ).sorted {
-      if $0.createdAt != $1.createdAt {
-        return $0.createdAt < $1.createdAt
-      }
-      return $0.batchId < $1.batchId
-    }
+    return sortedAcpPermissionBatches(
+      mergedPermissionBatches(
+        primary: selectedBatches,
+        secondary: standaloneAcpPermissionBatches
+      )
+    )
   }
 
   public func fetchAcpAgentDescriptors() async -> [AcpAgentDescriptor] {
@@ -103,9 +100,11 @@ extension HarnessMonitorStore {
     standaloneAcpPermissionBatches.removeAll { $0.acpId == snapshot.acpId }
     selectedAcpAgents = upsertingAcpAgent(
       snapshot.withPermissionBatches(
-        mergedPermissionBatches(
-          primary: snapshot.pendingPermissionBatches,
-          secondary: pendingStandaloneBatches
+        sortedAcpPermissionBatches(
+          mergedPermissionBatches(
+            primary: snapshot.pendingPermissionBatches,
+            secondary: pendingStandaloneBatches
+          )
         )
       ),
       into: selectedAcpAgents
@@ -117,17 +116,19 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
-    selectedAcpAgents = payload.agents.map { snapshot in
+    selectedAcpAgents = sortedAcpAgents(payload.agents.map { snapshot in
       let pendingStandaloneBatches = standaloneAcpPermissionBatches.filter {
         $0.acpId == snapshot.acpId
       }
       return snapshot.withPermissionBatches(
-        mergedPermissionBatches(
-          primary: snapshot.pendingPermissionBatches,
-          secondary: pendingStandaloneBatches
+        sortedAcpPermissionBatches(
+          mergedPermissionBatches(
+            primary: snapshot.pendingPermissionBatches,
+            secondary: pendingStandaloneBatches
+          )
         )
       )
-    }
+    })
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
     reconcilePresentedAcpPermissionBatch()
   }
@@ -176,7 +177,9 @@ extension HarnessMonitorStore {
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
       guard snapshot.acpId == batch.acpId else { return snapshot }
       return snapshot.withPermissionBatches(
-        mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
+        sortedAcpPermissionBatches(
+          mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
+        )
       )
     }
     reconcilePresentedAcpPermissionBatch()
@@ -223,7 +226,11 @@ extension HarnessMonitorStore {
   ) -> [AcpAgentSnapshot] {
     var updated = snapshots.filter { $0.acpId != snapshot.acpId }
     updated.append(snapshot)
-    return updated.sorted {
+    return sortedAcpAgents(updated)
+  }
+
+  private func sortedAcpAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
+    snapshots.sorted {
       if $0.displayName != $1.displayName {
         return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
       }
@@ -235,13 +242,11 @@ extension HarnessMonitorStore {
     primary: [AcpPermissionBatch],
     secondary: [AcpPermissionBatch]
   ) -> [AcpPermissionBatch] {
-    var merged = primary
-    var seen = Set(primary.map(\.batchId))
-    for batch in secondary where !seen.contains(batch.batchId) {
-      merged.append(batch)
-      seen.insert(batch.batchId)
+    var byBatchID = Dictionary(uniqueKeysWithValues: primary.map { ($0.batchId, $0) })
+    for batch in secondary {
+      byBatchID[batch.batchId] = batch
     }
-    return merged
+    return Array(byBatchID.values)
   }
 
   private func upsertingAcpPermissionBatch(

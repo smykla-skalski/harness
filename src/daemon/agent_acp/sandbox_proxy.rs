@@ -152,6 +152,7 @@ impl AcpAgentManagerHandle {
                 Ok(response) => {
                     let response_epoch = response.bridge_epoch.clone();
                     let response_continuity = response.continuity;
+                    let mut replay_events = response.events;
                     if response.requires_resync {
                         tracing::warn!(
                             after_seq,
@@ -169,11 +170,12 @@ impl AcpAgentManagerHandle {
                                 continue;
                             }
                         }
+                        replay_events = replay_safe_resync_events(replay_events);
                     }
                     self.set_sandbox_event_epoch(Some(response_epoch));
                     self.set_sandbox_event_continuity(Some(response_continuity));
                     self.set_sandbox_event_cursor(Some(response.next_seq));
-                    if response.requires_resync || response.events.is_empty() {
+                    if replay_events.is_empty() {
                         idle_polls = idle_polls.saturating_add(1);
                         if idle_polls >= SANDBOX_ACP_IDLE_INSPECT_POLLS
                             && bridge
@@ -184,7 +186,7 @@ impl AcpAgentManagerHandle {
                         }
                     } else {
                         idle_polls = 0;
-                        for event in response.events {
+                        for event in replay_events {
                             if let Some(session_id) = event.session_id.as_ref() {
                                 self.remember_sandbox_session(session_id);
                             }
@@ -206,17 +208,24 @@ impl AcpAgentManagerHandle {
         let inspect = bridge.acp_inspect(None)?;
         let mut agents_by_session = BTreeMap::<String, Vec<AcpAgentSnapshot>>::new();
         let mut current_sessions = BTreeSet::new();
-        for snapshot in inspect
-            .agents
-            .iter()
-            .map(|agent| bridge.acp_get(&agent.acp_id))
-            .collect::<Result<Vec<_>, _>>()?
-        {
-            current_sessions.insert(snapshot.session_id.clone());
-            agents_by_session
-                .entry(snapshot.session_id.clone())
-                .or_default()
-                .push(snapshot);
+        for agent in inspect.agents {
+            current_sessions.insert(agent.session_id.clone());
+            match bridge.acp_get(&agent.acp_id) {
+                Ok(snapshot) => {
+                    agents_by_session
+                        .entry(snapshot.session_id.clone())
+                        .or_default()
+                        .push(snapshot);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        session_id = %agent.session_id,
+                        acp_id = %agent.acp_id,
+                        "ACP sandbox reconcile skipped one agent after snapshot fetch failed"
+                    );
+                }
+            }
         }
         let reconciled_sessions = self
             .sandbox_known_sessions()
@@ -250,4 +259,43 @@ fn reconciled_event(payload: &AcpAgentsReconciledPayload) -> Option<StreamEvent>
         session_id: Some(payload.session_id.clone()),
         payload: serde_json::to_value(payload).ok()?,
     })
+}
+
+fn replay_safe_resync_events(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
+    events
+        .into_iter()
+        .filter(|event| event.event == "acp_events")
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::replay_safe_resync_events;
+    use crate::daemon::protocol::StreamEvent;
+
+    #[test]
+    fn replay_safe_resync_events_keeps_timeline_batches_only() {
+        let events = vec![
+            stream_event("acp_agent_started"),
+            stream_event("acp_events"),
+            stream_event("acp_permission_requested"),
+            stream_event("acp_events"),
+        ];
+
+        let filtered = replay_safe_resync_events(events);
+
+        assert_eq!(
+            filtered.iter().map(|event| event.event.as_str()).collect::<Vec<_>>(),
+            vec!["acp_events", "acp_events"]
+        );
+    }
+
+    fn stream_event(event: &str) -> StreamEvent {
+        StreamEvent {
+            event: event.to_string(),
+            recorded_at: "2026-04-29T00:00:00Z".to_string(),
+            session_id: Some("sess-1".to_string()),
+            payload: serde_json::json!({}),
+        }
+    }
 }
