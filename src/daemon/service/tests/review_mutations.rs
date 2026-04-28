@@ -124,7 +124,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                     .agents
                     .get(&leader_id)
                     .expect("leader present");
-                let leader_runtime = crate::agents::runtime::runtime_for_name(&leader_agent.runtime)
+                let leader_runtime = crate::agents::runtime::runtime_for_name(leader_agent.runtime.runtime_name())
                     .expect("leader runtime");
                 let leader_signal_session = leader_agent
                     .agent_session_id

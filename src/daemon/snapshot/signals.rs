@@ -52,7 +52,9 @@ pub fn load_signals_for(
         for signal_session_id in
             signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
         {
-            let signal_dir = root.join(&agent.runtime).join(&signal_session_id);
+            let signal_dir = root
+                .join(agent.runtime.runtime_name())
+                .join(&signal_session_id);
             for signal in read_pending_signals(&signal_dir)? {
                 signals_by_id.entry(signal.signal_id.clone()).or_insert((
                     signal,
@@ -95,7 +97,7 @@ pub fn load_signals_for(
                 |ack| SessionSignalStatus::from_ack_result(ack.result),
             );
             signals.push(SessionSignalRecord {
-                runtime: agent.runtime.clone(),
+                runtime: agent.runtime.to_string(),
                 agent_id: agent_id.clone(),
                 session_id: state.session_id.clone(),
                 status,

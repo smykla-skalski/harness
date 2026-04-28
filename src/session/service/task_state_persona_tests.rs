@@ -1,4 +1,5 @@
 use super::*;
+use crate::agents::kind::RuntimeKind;
 use crate::session::types::{
     AgentPersona, PersonaSymbol, SessionMetrics, SessionPolicy, SessionStatus, TaskSource,
 };
@@ -20,7 +21,7 @@ fn agent(id: &str, persona_identifier: Option<&str>) -> AgentRegistration {
     AgentRegistration {
         agent_id: id.to_string(),
         name: id.to_string(),
-        runtime: "codex".to_string(),
+        runtime: RuntimeKind::from("codex"),
         role: crate::session::types::SessionRole::Worker,
         capabilities: Vec::new(),
         joined_at: "t0".to_string(),

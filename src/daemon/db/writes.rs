@@ -4,7 +4,7 @@ use super::{
     extract_transition_kind, i64_from_u64, normalize_change_scope, session_status_db_label,
     stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry, utc_now,
 };
-use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::service::{agent_status_db_label, canonicalize_active_session_without_leader};
 
 impl DaemonDb {
     /// Upsert a discovered project into the database.
@@ -382,10 +382,10 @@ fn replace_agents(
                 agent_id,
                 session_id,
                 agent.name,
-                agent.runtime,
+                agent.runtime.runtime_name(),
                 format!("{:?}", agent.role).to_lowercase(),
                 capabilities_json,
-                format!("{:?}", agent.status).to_lowercase(),
+                agent_status_db_label(&agent.status),
                 agent.agent_session_id,
                 agent.joined_at,
                 agent.updated_at,

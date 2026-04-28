@@ -35,7 +35,9 @@ pub(super) fn signal_ack_entries(
         for signal_session_id in
             signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
         {
-            let signal_dir = signals_root.join(&agent.runtime).join(signal_session_id);
+            let signal_dir = signals_root
+                .join(agent.runtime.runtime_name())
+                .join(signal_session_id);
             for acknowledgment in read_acknowledgments(&signal_dir)? {
                 acknowledgments_by_id
                     .entry(acknowledgment.signal_id.clone())
@@ -57,7 +59,7 @@ pub(super) fn signal_ack_entries(
         let logged_signal = sent_signals.get(&signal_id);
         entries.push(signal_ack_entry(
             &state.session_id,
-            &runtime,
+            runtime.runtime_name(),
             logged_signal,
             signal,
             &acknowledgment,

@@ -198,7 +198,7 @@ fn conversation_entries_from_db(
             if let Some(entry) = conversation_entry(
                 &state.session_id,
                 agent_id,
-                &agent.runtime,
+                agent.runtime.runtime_name(),
                 &event,
                 payload_scope,
             )? {
@@ -220,13 +220,17 @@ fn conversation_entries(
             .agent_session_id
             .as_deref()
             .unwrap_or(&state.session_id);
-        let events =
-            index::load_conversation_events(project, &agent.runtime, session_key, agent_id)?;
+        let events = index::load_conversation_events(
+            project,
+            agent.runtime.runtime_name(),
+            session_key,
+            agent_id,
+        )?;
         for event in events {
             if let Some(entry) = conversation_entry(
                 &state.session_id,
                 agent_id,
-                &agent.runtime,
+                agent.runtime.runtime_name(),
                 &event,
                 payload_scope,
             )? {

@@ -91,7 +91,7 @@ fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
                 .agents
                 .get_mut(&previous_leader)
                 .expect("leader registration");
-            leader.status = AgentStatus::Disconnected;
+            leader.status = AgentStatus::disconnected_unknown();
             Ok(())
         })
         .expect("degrade session");
@@ -157,7 +157,7 @@ fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_se
                 .agents
                 .get_mut(&degraded_leader)
                 .expect("leader")
-                .status = AgentStatus::Disconnected;
+                .status = AgentStatus::disconnected_unknown();
             Ok(())
         })
         .expect("degrade session");
@@ -417,7 +417,7 @@ fn control_plane_can_end_non_ended_sessions() {
                 .agents
                 .get_mut(&previous_leader)
                 .expect("leader registration");
-            leader.status = AgentStatus::Disconnected;
+            leader.status = AgentStatus::disconnected_unknown();
             Ok(())
         })
         .expect("degrade session");

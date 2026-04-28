@@ -26,7 +26,7 @@ fn leave_session_db_direct_marks_leaderless_degraded_without_successor() {
         assert!(db_state.leader_id.is_none());
         assert_eq!(
             db_state.agents[&leader_id].status,
-            AgentStatus::Disconnected
+            AgentStatus::disconnected_unknown()
         );
     });
 }
@@ -76,7 +76,7 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
             assert!(resolved.state.leader_id.is_none());
             assert_eq!(
                 resolved.state.agents[&leader_id].status,
-                AgentStatus::Disconnected
+                AgentStatus::disconnected_unknown()
             );
         });
     });

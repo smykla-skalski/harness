@@ -263,7 +263,7 @@ fn observer_can_create_task_in_leaderless_degraded_session() {
                 .agents
                 .get_mut(&previous_leader)
                 .expect("leader registration");
-            leader.status = AgentStatus::Disconnected;
+            leader.status = AgentStatus::disconnected_unknown();
             Ok(())
         })
         .expect("degrade session");
@@ -429,7 +429,7 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
 
         let signal =
             list_signals("drop-ack-accept", Some(&worker_id), project).expect("signals")[0].clone();
-        let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+        let runtime = runtime::runtime_for_name(worker.runtime.runtime_name()).expect("runtime");
         let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
         let signal_dir = runtime.signal_dir(project, &worker_session_id);
         let ack = SignalAck {

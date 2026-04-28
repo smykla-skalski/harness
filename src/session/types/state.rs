@@ -9,7 +9,7 @@ use super::{
 };
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 10;
+pub const CURRENT_VERSION: u32 = 11;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///

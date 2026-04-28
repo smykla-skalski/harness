@@ -60,7 +60,7 @@ pub(super) fn load_observer_summary(
                     .agent_id
                     .as_ref()
                     .and_then(|agent_id| state.agents.get(agent_id))
-                    .map(|agent| agent.runtime.clone()),
+                    .map(|agent| agent.runtime.to_string()),
                 agent_id: worker.agent_id,
             })
             .collect(),

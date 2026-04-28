@@ -141,7 +141,7 @@ fn metrics_exclude_idle_from_active_count() {
             "dead-worker",
             "codex",
             super::SessionRole::Worker,
-            AgentStatus::Disconnected,
+            AgentStatus::disconnected_unknown(),
         ),
     );
 

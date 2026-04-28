@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::agents::kind::RuntimeKind;
 use crate::agents::runtime::RuntimeCapabilities;
 
 use super::{
@@ -18,7 +19,7 @@ pub(super) fn agent_registration(
     AgentRegistration {
         agent_id: agent_id.into(),
         name: agent_id.into(),
-        runtime: runtime.into(),
+        runtime: RuntimeKind::from(runtime),
         role,
         capabilities: vec![],
         joined_at: "2026-03-28T12:00:00Z".into(),

@@ -49,7 +49,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
 
         let signal =
             list_signals("drop-expire", Some(&worker_id), project).expect("signals")[0].clone();
-        let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+        let runtime = runtime::runtime_for_name(worker.runtime.runtime_name()).expect("runtime");
         let signal_dir = runtime.signal_dir(
             project,
             worker

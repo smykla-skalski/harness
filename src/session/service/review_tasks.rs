@@ -165,7 +165,7 @@ pub fn submit_review(
     let reviewer_runtime = state_before
         .agents
         .get(actor_id)
-        .map(|agent| agent.runtime.clone())
+        .map(|agent| agent.runtime.to_string())
         .unwrap_or_default();
     let review = Review {
         review_id: generate_review_id(task_id),
