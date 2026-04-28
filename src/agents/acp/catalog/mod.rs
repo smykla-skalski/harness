@@ -218,9 +218,11 @@ mod tests {
         let copilot = find_builtin("copilot").expect("copilot exists");
         let gemini = find_builtin("gemini").expect("gemini exists");
         assert_ne!(copilot.capabilities, gemini.capabilities);
-        assert!(gemini
-            .capabilities
-            .iter()
-            .any(|t| t == tags::REQUIRES_NETWORK));
+        assert!(
+            gemini
+                .capabilities
+                .iter()
+                .any(|t| t == tags::REQUIRES_NETWORK)
+        );
     }
 }

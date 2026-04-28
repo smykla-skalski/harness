@@ -151,7 +151,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatch(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
       )
-    case "acp_permission_resolved", "acp_permission_shutdown":
+    case "acp_permission_resolved", "acp_permission_shutdown", "acp_permission_timeout":
       return Self(
         recordedAt: at,
         sessionId: sessionId,

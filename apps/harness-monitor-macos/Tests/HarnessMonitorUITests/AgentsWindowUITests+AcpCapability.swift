@@ -19,4 +19,29 @@ extension AgentsWindowUITests {
       "Capability picker should not expose transport jargon to users"
     )
   }
+
+  func testPermissionModalCoalesce() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
+    )
+    openAgentsWindow(in: app)
+
+    let modal = element(in: app, identifier: "harness.acp-permission.modal")
+    XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
+    XCTAssertTrue(app.staticTexts["2 of 2 selected"].exists)
+    XCTAssertTrue(
+      element(in: app, identifier: "harness.acp-permission.item.preview-request-write").exists
+    )
+    XCTAssertTrue(
+      element(in: app, identifier: "harness.acp-permission.item.preview-request-terminal").exists
+    )
+
+    tapButton(in: app, title: "Approve Selected")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !modal.exists
+      },
+      "Approving the coalesced batch should resolve and dismiss the modal"
+    )
+  }
 }

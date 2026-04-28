@@ -78,6 +78,8 @@ pub fn recording_log_path_for_session(session_id: &str) -> PathBuf {
 pub struct PermissionBridgeRequest {
     /// The original ACP request.
     pub request: RequestPermissionRequest,
+    /// Maximum time to keep the request pending in the daemon bridge.
+    pub deadline: Duration,
     /// Channel to receive the user's response.
     pub response_tx: SyncSender<PermissionBridgeResult>,
 }
