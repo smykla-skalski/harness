@@ -41,15 +41,15 @@ run = "./scripts/check-scripts.sh"
 
 [tasks."test:unit"]
 description = "Run unit tests"
-run = "./scripts/cargo-local.sh test --lib"
+run = "./scripts/cargo-local.sh test --quiet --lib -- --format terse"
 
 [tasks."test:integration"]
 description = "Run integration tests (fast only, single-threaded for env safety)"
-run = "./scripts/cargo-local.sh test --test integration -- --test-threads=1"
+run = "./scripts/cargo-local.sh test --quiet --test integration -- --test-threads=1 --format terse"
 
 [tasks."test:slow"]
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
-run = "./scripts/cargo-local.sh test --test integration -- --ignored --test-threads=1"
+run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --test-threads=1 --format terse"
 
 [tasks.test]
 description = "Run all fast tests"
