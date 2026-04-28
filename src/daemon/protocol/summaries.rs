@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
+use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::service::ResolvedRuntimeSessionAgent;
 use crate::session::types::{
@@ -176,6 +177,14 @@ pub struct ObserverAgentSessionSummary {
     pub last_activity: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgentPendingUserPrompt {
+    pub tool_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting_since: Option<String>,
+    pub questions: Vec<AskUserQuestionPrompt>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentToolActivitySummary {
     pub agent_id: String,
@@ -186,6 +195,8 @@ pub struct AgentToolActivitySummary {
     pub latest_tool_name: Option<String>,
     pub latest_event_at: Option<String>,
     pub recent_tools: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_user_prompt: Option<AgentPendingUserPrompt>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

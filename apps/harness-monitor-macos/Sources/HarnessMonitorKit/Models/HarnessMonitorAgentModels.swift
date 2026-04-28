@@ -155,6 +155,16 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public var id: String { agentId }
 }
 
+public struct AgentPendingUserPrompt: Codable, Equatable, Sendable {
+  public let toolName: String
+  public let message: String
+
+  public init(toolName: String, message: String) {
+    self.toolName = toolName
+    self.message = message
+  }
+}
+
 public struct AgentToolActivitySummary: Codable, Equatable, Identifiable, Sendable {
   public let agentId: String
   public let runtime: String
@@ -164,6 +174,29 @@ public struct AgentToolActivitySummary: Codable, Equatable, Identifiable, Sendab
   public let latestToolName: String?
   public let latestEventAt: String?
   public let recentTools: [String]
+  public let pendingUserPrompt: AgentPendingUserPrompt?
+
+  public init(
+    agentId: String,
+    runtime: String,
+    toolInvocationCount: Int,
+    toolResultCount: Int,
+    toolErrorCount: Int,
+    latestToolName: String?,
+    latestEventAt: String?,
+    recentTools: [String],
+    pendingUserPrompt: AgentPendingUserPrompt? = nil
+  ) {
+    self.agentId = agentId
+    self.runtime = runtime
+    self.toolInvocationCount = toolInvocationCount
+    self.toolResultCount = toolResultCount
+    self.toolErrorCount = toolErrorCount
+    self.latestToolName = latestToolName
+    self.latestEventAt = latestEventAt
+    self.recentTools = recentTools
+    self.pendingUserPrompt = pendingUserPrompt
+  }
 
   public var id: String { agentId }
 }

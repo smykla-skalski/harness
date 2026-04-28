@@ -3,6 +3,20 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  static func pendingUserPrompt(
+    for tui: AgentTuiSnapshot,
+    session: SessionDetail?
+  ) -> AgentPendingUserPrompt? {
+    guard
+      let prompt = session?.agentActivity.first(where: { $0.agentId == tui.agentId })?.pendingUserPrompt,
+      !prompt.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      return nil
+    }
+
+    return prompt
+  }
+
   func terminalHeader(_ tui: AgentTuiSnapshot) -> some View {
     @Bindable var viewModel = viewModel
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -139,6 +153,24 @@ extension AgentsWindowView {
         )
       }
     }
+  }
+  func terminalPendingUserPrompt(_ prompt: AgentPendingUserPrompt) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label("User input required", systemImage: "questionmark.bubble.fill")
+        .scaledFont(.headline)
+        .foregroundStyle(.orange)
+      Text(prompt.message)
+        .scaledFont(.subheadline)
+        .textSelection(.enabled)
+      Text("This terminal agent is paused until you respond with the controls below.")
+        .scaledFont(.footnote)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPendingUserPrompt)
   }
   func terminalKeyControls(_ tui: AgentTuiSnapshot) -> some View {
     @Bindable var keySequenceBuffer = viewModel.keySequenceBuffer

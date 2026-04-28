@@ -106,6 +106,7 @@ fn db_round_trip_smoke_covers_public_surface() {
         latest_tool_name: Some("Read".into()),
         latest_event_at: Some("2026-04-03T12:00:02Z".into()),
         recent_tools: vec!["Read".into()],
+        pending_user_prompt: None,
     };
     db.sync_agent_activity(&state.session_id, std::slice::from_ref(&activity))
         .expect("sync agent activity");

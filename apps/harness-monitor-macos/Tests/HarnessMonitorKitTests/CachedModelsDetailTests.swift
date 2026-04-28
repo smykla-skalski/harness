@@ -116,7 +116,11 @@ struct CachedModelsDetailTests {
       toolErrorCount: 2,
       latestToolName: "Read",
       latestEventAt: "2026-03-28T14:00:00Z",
-      recentTools: ["Read", "Write", "Bash"]
+      recentTools: ["Read", "Write", "Bash"],
+      pendingUserPrompt: AgentPendingUserPrompt(
+        toolName: "ask_user",
+        message: "Approve the file write?"
+      )
     )
 
     let cached = original.toCachedAgentActivity()
@@ -129,6 +133,30 @@ struct CachedModelsDetailTests {
 
     let restored = fetched[0].toAgentToolActivitySummary()
     #expect(restored == original)
+  }
+
+  @Test("CachedAgentActivity restores legacy recent-tools payloads")
+  func agentActivityLegacyRecentToolsPayload() throws {
+    let cached = CachedAgentActivity(
+      agentId: "agent-1",
+      runtime: "claude",
+      toolInvocationCount: 2,
+      toolResultCount: 1,
+      toolErrorCount: 0,
+      latestToolName: "Read",
+      latestEventAt: "2026-03-28T14:00:00Z",
+      recentToolsData: try Codecs.encoder.encode(["Read", "Write"])
+    )
+    container.mainContext.insert(cached)
+    try container.mainContext.save()
+
+    let descriptor = FetchDescriptor<CachedAgentActivity>()
+    let fetched = try container.mainContext.fetch(descriptor)
+    #expect(fetched.count == 1)
+
+    let restored = fetched[0].toAgentToolActivitySummary()
+    #expect(restored.recentTools == ["Read", "Write"])
+    #expect(restored.pendingUserPrompt == nil)
   }
 
   @Test("CachedProject update-in-place preserves identity")

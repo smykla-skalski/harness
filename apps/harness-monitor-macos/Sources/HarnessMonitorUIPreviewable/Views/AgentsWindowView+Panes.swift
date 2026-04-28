@@ -216,6 +216,9 @@ extension AgentsWindowView {
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
       }
+      if let pendingPrompt = Self.pendingUserPrompt(for: tui, session: store.selectedSession) {
+        terminalPendingUserPrompt(pendingPrompt)
+      }
       terminalInputControls(tui)
       terminalKeyControls(tui)
       terminalResizeControls()

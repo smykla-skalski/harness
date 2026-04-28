@@ -191,13 +191,34 @@ extension ObserverSummary {
 
 // MARK: - AgentToolActivitySummary <-> CachedAgentActivity
 
+private struct CachedAgentActivityPayload: Codable {
+  let recentTools: [String]
+  let pendingUserPrompt: AgentPendingUserPrompt?
+}
+
+private func decodeCachedAgentActivityPayload(from data: Data) -> CachedAgentActivityPayload {
+  if let payload = try? Codecs.decoder.decode(CachedAgentActivityPayload.self, from: data) {
+    return payload
+  }
+
+  let recentTools = (try? Codecs.decoder.decode([String].self, from: data)) ?? []
+  return CachedAgentActivityPayload(recentTools: recentTools, pendingUserPrompt: nil)
+}
+
+private func encodeCachedAgentActivityPayload(
+  recentTools: [String],
+  pendingUserPrompt: AgentPendingUserPrompt?
+) -> Data {
+  let payload = CachedAgentActivityPayload(
+    recentTools: recentTools,
+    pendingUserPrompt: pendingUserPrompt
+  )
+  return (try? Codecs.encoder.encode(payload)) ?? Data()
+}
+
 extension CachedAgentActivity {
   func toAgentToolActivitySummary() -> AgentToolActivitySummary {
-    let recentTools =
-      (try? Codecs.decoder.decode(
-        [String].self,
-        from: recentToolsData
-      )) ?? []
+    let payload = decodeCachedAgentActivityPayload(from: recentToolsData)
 
     return AgentToolActivitySummary(
       agentId: agentId,
@@ -207,7 +228,8 @@ extension CachedAgentActivity {
       toolErrorCount: toolErrorCount,
       latestToolName: latestToolName,
       latestEventAt: latestEventAt,
-      recentTools: recentTools
+      recentTools: payload.recentTools,
+      pendingUserPrompt: payload.pendingUserPrompt
     )
   }
 
@@ -218,10 +240,10 @@ extension CachedAgentActivity {
     toolErrorCount = activity.toolErrorCount
     latestToolName = activity.latestToolName
     latestEventAt = activity.latestEventAt
-    recentToolsData =
-      (try? Codecs.encoder.encode(
-        activity.recentTools
-      )) ?? Data()
+    recentToolsData = encodeCachedAgentActivityPayload(
+      recentTools: activity.recentTools,
+      pendingUserPrompt: activity.pendingUserPrompt
+    )
   }
 }
 
@@ -235,7 +257,10 @@ extension AgentToolActivitySummary {
       toolErrorCount: toolErrorCount,
       latestToolName: latestToolName,
       latestEventAt: latestEventAt,
-      recentToolsData: (try? Codecs.encoder.encode(recentTools)) ?? Data()
+      recentToolsData: encodeCachedAgentActivityPayload(
+        recentTools: recentTools,
+        pendingUserPrompt: pendingUserPrompt
+      )
     )
   }
 }
