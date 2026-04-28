@@ -3,21 +3,49 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  @ViewBuilder
+  private func agentsStateMarkerOverlay() -> some View {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.agentTuiState,
+        text: currentStateMarker
+      )
+    }
+  }
+
   @ViewBuilder var detailColumnContent: some View {
     if usesLiveViewportSplitLayout, let selectedSessionTui {
       sessionPane(selectedSessionTui)
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onGeometryChange(for: CGSize.self) { proxy in
+          proxy.size
+        } action: { detailSize in
+          updateDetailColumnGeometry(detailSize)
+        }
         .id(scrollContainerIdentity)
+        .overlay { agentsStateMarkerOverlay() }
     } else if case .create = viewModel.selection {
       createPane
+        .onGeometryChange(for: CGSize.self) { proxy in
+          proxy.size
+        } action: { detailSize in
+          updateDetailColumnGeometry(detailSize)
+        }
         .id(scrollContainerIdentity)
+        .overlay { agentsStateMarkerOverlay() }
     } else {
       ScrollView {
         paneContent
           .padding(HarnessMonitorTheme.spacingLG)
       }
-      .id(scrollContainerIdentity)
+      .onGeometryChange(for: CGSize.self) { proxy in
+        proxy.size
+        } action: { detailSize in
+          updateDetailColumnGeometry(detailSize)
+        }
+        .id(scrollContainerIdentity)
+        .overlay { agentsStateMarkerOverlay() }
     }
   }
 
@@ -69,6 +97,7 @@ extension AgentsWindowView {
         agent: agent,
         activity: session.agentActivity.first(where: { $0.agentId == agentID })
       )
+      .id("agents.agent.\(agentID)")
     } else {
       unavailableSessionPane
     }
@@ -87,6 +116,7 @@ extension AgentsWindowView {
         agent: agent,
         activity: session.agentActivity.first(where: { $0.agentId == agentID })
       )
+      .id("agents.agent.inline.\(agentID)")
     }
   }
 
@@ -97,7 +127,6 @@ extension AgentsWindowView {
       Button("Back to create") {
         selectCreateTab()
       }
-      .id("agents.agent.\(agentID)")
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiBackToCreateButton)
     }
@@ -116,7 +145,6 @@ extension AgentsWindowView {
           terminalError(error)
         }
         terminalOutcome(tui)
-      .id("agents.agent.inline.\(agentID)")
         agentDetailForAgentID(tui.agentId)
       }
     }

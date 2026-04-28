@@ -156,7 +156,34 @@ public struct AgentsWindowView: View {
     selectedSessionTui?.status.isActive == true
   }
 
+  var liveViewportIsReconciling: Bool {
+    guard let selectedSessionTui, selectedSessionTui.status.isActive else {
+      return false
+    }
+    if viewModel.pendingViewportResizeTarget != nil {
+      return true
+    }
+    guard let expectedSize = viewModel.expectedSize else {
+      return false
+    }
+    return selectedSessionTui.size != expectedSize
+  }
+
   @MainActor var currentStateMarker: String {
+    func formatSize(_ size: AgentTuiSize?) -> String {
+      guard let size else {
+        return "none"
+      }
+      return "\(size.rows)x\(size.cols)"
+    }
+
+    func formatPoints(_ size: CGSize?) -> String {
+      guard let size else {
+        return "none"
+      }
+      return "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+    }
+
     let selectedSessionLabel = "session=\(store.selectedSessionID ?? "none")"
     let readOnlyLabel = "readOnly=\(store.isSessionReadOnly)"
     let focusedFieldLabel = "focus=\(focusedField.map(String.init(describing:)) ?? "none")"
@@ -205,10 +232,18 @@ public struct AgentsWindowView: View {
         return "size=\(selectedSessionTui.size.rows)x\(selectedSessionTui.size.cols)"
       }()
       return [
-        "selection=terminal:\(sessionID)",
+        "selection=session:\(sessionID)",
         "status=\(status)",
         "wrap=\(viewModel.wrapLines)",
         sizeLabel,
+        "detailPts=\(formatPoints(viewModel.lastDetailColumnSize))",
+        "viewportPts=\(formatPoints(viewModel.lastMeasuredViewportPoints))",
+        "measured=\(formatSize(viewModel.lastMeasuredViewportTerminalSize))",
+        "stabilized=\(formatSize(viewModel.lastMeasuredViewportSize))",
+        "expected=\(formatSize(viewModel.expectedSize))",
+        "pending=\(formatSize(viewModel.pendingViewportResizeTarget))",
+        "controls=\(viewModel.rows)x\(viewModel.cols)",
+        "reconciling=\(liveViewportIsReconciling)",
         selectedSessionLabel,
         readOnlyLabel,
         codexStartLabel,
@@ -351,9 +386,12 @@ public struct AgentsWindowView: View {
       guard let selectedTuiID else {
         return
       }
-      if viewModel.selection.terminalID == selectedTuiID {
+      if viewModel.selection.terminalID == selectedTuiID,
+        let currentSize = selectedSessionTui?.size
+      {
+        syncTerminalResizeControls(to: currentSize)
         if viewModel.expectedSize == nil {
-          viewModel.expectedSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+          viewModel.expectedSize = currentSize
         }
         enforceExpectedSize()
       }
@@ -378,7 +416,10 @@ public struct AgentsWindowView: View {
       case .terminal(let sessionID):
         guard oldValue.terminalID != sessionID else { return }
         store.selectAgentTui(tuiID: sessionID)
-        viewModel.expectedSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        if let currentSize = selectedSessionTui?.size {
+          syncTerminalResizeControls(to: currentSize)
+          viewModel.expectedSize = currentSize
+        }
         enforceExpectedSize()
       case .codex(let runID):
         guard oldValue.codexRunID != runID else { return }
@@ -398,13 +439,5 @@ public struct AgentsWindowView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
-    .overlay {
-      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.agentTuiState,
-          text: currentStateMarker
-        )
-      }
-    }
   }
 }
