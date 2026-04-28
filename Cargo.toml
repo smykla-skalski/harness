@@ -60,7 +60,7 @@ tonic = { version = "0.14.1", default-features = false }
 pyroscope = { version = "2.0.0", features = ["backend-pprof-rs"] }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
-gix = { version = "0.82.0", features = ["status", "worktree-mutation", "index"] }
+gix = { version = "0.83.0", features = ["status", "worktree-mutation", "index"] }
 pathdiff = "0.2.3"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 tar = "0.4.44"
