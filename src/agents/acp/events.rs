@@ -29,7 +29,7 @@ use super::ring::RawSessionUpdate;
 /// `sequence_start`. Returns the events and the next sequence number.
 #[must_use]
 pub fn materialise_batch(
-    batch: Vec<RawSessionUpdate>,
+    batch: &[RawSessionUpdate],
     agent: &str,
     session_id: &str,
     sequence_start: u64,
@@ -201,7 +201,7 @@ mod tests {
         )));
         let raw = make_raw_update(update);
 
-        let (events, next_seq) = materialise_batch(vec![raw], "copilot", "sess1", 0);
+        let (events, next_seq) = materialise_batch(&[raw], "copilot", "sess1", 0);
 
         assert_eq!(events.len(), 1);
         assert_eq!(next_seq, 1);
@@ -227,7 +227,7 @@ mod tests {
         let update = SessionUpdate::ToolCall(tc);
         let raw = make_raw_update(update);
 
-        let (events, _) = materialise_batch(vec![raw], "copilot", "sess1", 10);
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 10);
 
         assert_eq!(events.len(), 1);
         let event = &events[0];
@@ -260,7 +260,7 @@ mod tests {
         let update = SessionUpdate::ToolCallUpdate(tcu);
         let raw = make_raw_update(update);
 
-        let (events, _) = materialise_batch(vec![raw], "copilot", "sess1", 0);
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
 
         assert_eq!(events.len(), 1);
         match &events[0].kind {
@@ -289,7 +289,7 @@ mod tests {
         let update = SessionUpdate::ToolCallUpdate(tcu);
         let raw = make_raw_update(update);
 
-        let (events, _) = materialise_batch(vec![raw], "copilot", "sess1", 0);
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
 
         assert_eq!(events.len(), 1);
         match &events[0].kind {
@@ -309,7 +309,7 @@ mod tests {
         let update = SessionUpdate::ToolCallUpdate(tcu);
         let raw = make_raw_update(update);
 
-        let (events, next_seq) = materialise_batch(vec![raw], "copilot", "sess1", 5);
+        let (events, next_seq) = materialise_batch(&[raw], "copilot", "sess1", 5);
 
         assert!(events.is_empty());
         assert_eq!(next_seq, 5);
@@ -322,7 +322,7 @@ mod tests {
         );
         let raw = make_raw_update(update);
 
-        let (events, _) = materialise_batch(vec![raw], "copilot", "sess1", 0);
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
         assert!(events.is_empty());
     }
 
@@ -340,7 +340,7 @@ mod tests {
             ))),
         ];
 
-        let (events, next_seq) = materialise_batch(updates, "agent", "sess", 100);
+        let (events, next_seq) = materialise_batch(&updates, "agent", "sess", 100);
 
         assert_eq!(events.len(), 3);
         assert_eq!(next_seq, 103);

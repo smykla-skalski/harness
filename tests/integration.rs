@@ -2,6 +2,7 @@
 // Declares all submodules under tests/integration/.
 
 mod integration {
+    mod acp_streaming;
     mod agent_assets;
     mod agent_transcripts;
     mod architecture;

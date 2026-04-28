@@ -134,12 +134,13 @@ fn next_event_batch(
     session_id: &str,
     sequence: &mut u64,
 ) -> Option<EventBatch> {
-    let batch = ring.drain();
-    let raw_count = batch.len();
+    let raw_count = ring.len();
     if raw_count == 0 {
         return None;
     }
-    let (events, next_sequence) = materialise_batch(batch, agent_name, session_id, *sequence);
+    let (events, next_sequence) =
+        materialise_batch(ring.updates(), agent_name, session_id, *sequence);
     *sequence = next_sequence;
+    ring.clear();
     Some(EventBatch { events, raw_count })
 }
