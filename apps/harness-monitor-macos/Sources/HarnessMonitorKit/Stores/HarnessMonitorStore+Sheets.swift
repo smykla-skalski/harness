@@ -1,6 +1,12 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public func requestCreateTaskSheet() {
+    let actionName = "Create task"
+    guard let action = prepareSelectedSessionAction(named: actionName) else { return }
+    presentedSheet = .createTask(sessionID: action.sessionID)
+  }
+
   public func requestEndSelectedSessionConfirmation() {
     requestEndSelectedSessionConfirmation(actor: "harness-app")
   }

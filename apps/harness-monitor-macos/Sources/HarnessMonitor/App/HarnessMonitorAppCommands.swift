@@ -49,6 +49,13 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var fileAndEditCommands: some Commands {
+    CommandGroup(after: .newItem) {
+      Button("New Task") {
+        store.requestCreateTaskSheet()
+      }
+      .keyboardShortcut("t", modifiers: .command)
+      .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
+    }
     CommandGroup(after: .textEditing) {
       Button("Find in Sessions") {
         sidebarSearchFocus?.invoke()
