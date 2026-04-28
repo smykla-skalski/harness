@@ -269,6 +269,42 @@ extension RecordingHarnessClient {
       agentTuiInputResponsesByID[tuiID] = snapshots
     }
   }
+  func configureAgentTuiInputError(_ error: (any Error)?, for tuiID: String) {
+    lock.withLock {
+      if let error {
+        agentTuiInputErrorsByID[tuiID] = error
+      } else {
+        agentTuiInputErrorsByID.removeValue(forKey: tuiID)
+      }
+    }
+  }
+  func configureAgentTuiResizeError(_ error: (any Error)?, for tuiID: String) {
+    lock.withLock {
+      if let error {
+        agentTuiResizeErrorsByID[tuiID] = error
+      } else {
+        agentTuiResizeErrorsByID.removeValue(forKey: tuiID)
+      }
+    }
+  }
+  func configureAgentTuiStopError(_ error: (any Error)?, for tuiID: String) {
+    lock.withLock {
+      if let error {
+        agentTuiStopErrorsByID[tuiID] = error
+      } else {
+        agentTuiStopErrorsByID.removeValue(forKey: tuiID)
+      }
+    }
+  }
+  func configureAgentTuiReadError(_ error: (any Error)?, for tuiID: String) {
+    lock.withLock {
+      if let error {
+        agentTuiReadErrorsByID[tuiID] = error
+      } else {
+        agentTuiReadErrorsByID.removeValue(forKey: tuiID)
+      }
+    }
+  }
 
   func configureAgentTuiReadSnapshots(_ snapshots: [AgentTuiSnapshot], for tuiID: String) {
     lock.withLock {
