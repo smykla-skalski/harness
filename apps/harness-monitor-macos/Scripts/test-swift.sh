@@ -67,7 +67,6 @@ enumerate_only_testing_selector() {
   enumeration_path="$enumeration_dir/tests.json"
   enumeration_log_path="$enumeration_dir/xcodebuild.log"
   if ! HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
-      HARNESS_MONITOR_USE_TUIST_TEST=0 \
       "$XCODEBUILD_RUNNER" \
     "${BASE_TEST_ARGS[@]}" \
     "-only-testing:${selector}" \
@@ -160,10 +159,6 @@ fi
 "$BUILD_FOR_TESTING_SCRIPT"
 
 clear_gatekeeper_metadata
-
-if [[ -n "$XCODE_ONLY_TESTING" ]]; then
-  export HARNESS_MONITOR_USE_TUIST_TEST=0
-fi
 
 BASE_TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \

@@ -9,6 +9,7 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+CALLER_PWD="$(pwd -P)"
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
@@ -20,13 +21,79 @@ MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
 REGENERATE_AFTER_SUCCESS="${HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD:-0}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-2}"
 JUNIT_REPORT_DIR="${HARNESS_MONITOR_JUNIT_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
-USE_TUIST_TEST="${HARNESS_MONITOR_USE_TUIST_TEST:-1}"
 TRANSIENT_DB_STATUS=200
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
-derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
 args=("$@")
+resolve_invocation_relative_path() {
+  local raw_path="$1"
+  if [[ "$raw_path" == /* ]]; then
+    printf '%s\n' "$raw_path"
+    return 0
+  fi
+
+  printf '%s/%s\n' "${CALLER_PWD%/}" "$raw_path"
+}
+
+resolve_derived_data_path_arg() {
+  local raw_path="$1"
+  if [[ "$raw_path" == /* ]]; then
+    printf '%s\n' "$raw_path"
+    return 0
+  fi
+
+  case "$raw_path" in
+    xcode-derived|xcode-derived-e2e|xcode-derived-instruments)
+      printf '%s/%s\n' "$COMMON_REPO_ROOT" "$raw_path"
+      ;;
+    *)
+      resolve_invocation_relative_path "$raw_path"
+      ;;
+  esac
+}
+
+xcodebuild_flag_requires_path_value() {
+  case "$1" in
+    -archivePath|-clonedSourcePackagesDirPath|-derivedDataPath|-exportPath|\
+    -packageCachePath|-project|-resultBundlePath|-resultStreamPath|\
+    -test-enumeration-output-path|-testProductsPath|-workspace|-xctestrun)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+normalize_path_flag_value() {
+  local flag="$1"
+  local raw_path="$2"
+  case "$flag" in
+    -derivedDataPath) resolve_derived_data_path_arg "$raw_path" ;;
+    *) resolve_invocation_relative_path "$raw_path" ;;
+  esac
+}
+
+normalize_xcodebuild_path_args() {
+  local -a normalized_args=()
+  local index arg
+  for ((index = 0; index < ${#args[@]}; index += 1)); do
+    arg="${args[index]}"
+    if xcodebuild_flag_requires_path_value "$arg" \
+        && (( index + 1 < ${#args[@]} )); then
+      normalized_args+=("$arg" "$(normalize_path_flag_value "$arg" "${args[index + 1]}")")
+      index=$((index + 1))
+      continue
+    fi
+    normalized_args+=("$arg")
+  done
+  args=("${normalized_args[@]}")
+}
+
+normalize_xcodebuild_path_args
+
+derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
 has_derived_data_path=0
 for ((index = 0; index < ${#args[@]}; index += 1)); do
   if [[ "${args[index]}" == "-derivedDataPath" ]] && (( index + 1 < ${#args[@]} )); then
@@ -254,28 +321,17 @@ junit_report_path_for_run() {
   printf '%s/junit-%s-%s.xml\n' "$JUNIT_REPORT_DIR" "$$" "$(date +%s)"
 }
 
-should_use_tuist_test() {
-  case "$USE_TUIST_TEST" in
-    1|true|TRUE|yes|YES|on|ON) ;;
-    *) return 1 ;;
-  esac
-  type -P tuist >/dev/null 2>&1
-}
-
 run_inner() {
   local log_path="$1"
   local -a inner_args=("${args[@]}")
-  local -a fmt_prefix=()
+  local -a fmt_prefix=(--use-tuist)
   local line
   if xcodebuild_args_are_test_action "${args[@]}"; then
     inner_args=()
     while IFS= read -r line; do
       inner_args+=("$line")
     done < <(build_test_action_args)
-    fmt_prefix=(--junit-path "$(junit_report_path_for_run)")
-    if should_use_tuist_test; then
-      fmt_prefix+=(--use-tuist)
-    fi
+    fmt_prefix+=(--junit-path "$(junit_report_path_for_run)")
   fi
   set +e
   run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 | tee "$log_path"

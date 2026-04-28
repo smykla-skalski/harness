@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 APP_ROOT = Path(__file__).resolve().parents[2]
+CHECKOUT_ROOT = APP_ROOT.parents[1]
 SCRIPT_PATH = APP_ROOT / "Scripts" / "xcodebuild-with-lock.sh"
 RTK_SHELL_PATH = APP_ROOT / "Scripts" / "lib" / "rtk-shell.sh"
 
@@ -42,14 +43,27 @@ class XcodebuildWithLockTests(unittest.TestCase):
                 fake_bin / "rtk",
                 f"""#!/bin/bash
 set -euo pipefail
-printf 'RTK=%s\\n' "$*" > "{tool_log}"
+printf 'RTK=%s\\n' "$*" >> "{tool_log}"
 """,
             )
             write_executable(
                 fake_bin / "xcodebuild",
                 f"""#!/bin/bash
 set -euo pipefail
-printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
+printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'TUIST_PWD=%s\\nTUIST=%s\\n' "$PWD" "$*" >> "{tool_log}"
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@"
 """,
             )
 
@@ -104,10 +118,12 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         self.assertIn("Timed out waiting for xcodebuild lock at", completed.stderr)
         self.assertEqual(log, "")
 
-    def test_uses_direct_xcodebuild_for_normal_build_invocations(self) -> None:
+    def test_uses_tuist_xcodebuild_for_normal_build_invocations(self) -> None:
         completed, log = self.run_script("-scheme", "HarnessMonitor", "build")
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(f"TUIST_PWD={APP_ROOT}", log)
+        self.assertIn("TUIST=xcodebuild", log)
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-scheme HarnessMonitor build", log)
         self.assertNotIn("RTK=", log)
@@ -124,7 +140,20 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
                 fake_bin / "xcodebuild",
                 f"""#!/bin/bash
 set -euo pipefail
-printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
+printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'TUIST_PWD=%s\\nTUIST=%s\\n' "$PWD" "$*" >> "{tool_log}"
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@"
 """,
             )
 
@@ -154,6 +183,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
 
             log = tool_log.read_text() if tool_log.exists() else ""
             self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn(f"TUIST_PWD={APP_ROOT}", log)
             self.assertIn(f"XCODEBUILD=-derivedDataPath {derived_data_path}", log)
             self.assertIn("-scheme HarnessMonitor build", log)
 
@@ -168,6 +198,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         completed, log = self.run_script("-list", "-json")
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-list -json", log)
 
@@ -175,6 +206,7 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
         completed, log = self.run_script("-showBuildSettings", "-scheme", "HarnessMonitor")
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-showBuildSettings -scheme HarnessMonitor", log)
 
@@ -184,15 +216,74 @@ printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
             "HarnessMonitorAgentsE2E",
             "test-without-building",
             "-only-testing:HarnessMonitorAgentsE2ETests/SwarmFullFlowTests/testSwarmFullFlow",
-            extra_env={"HARNESS_MONITOR_USE_TUIST_TEST": "0"},
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-scheme HarnessMonitorAgentsE2E", log)
         self.assertIn("test-without-building", log)
         self.assertIn("-retry-tests-on-failure -test-iterations 2", log)
         self.assertNotIn("mapfile", completed.stderr)
+
+    def test_test_actions_resolve_repo_relative_paths_before_tuist_xcodebuild(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            tool_log = temp_root / "tool.log"
+
+            write_executable(
+                fake_bin / "rtk",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'RTK=%s\\n' "$*" > "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    "xcode-derived",
+                    "-workspace",
+                    "apps/harness-monitor-macos/HarnessMonitor.xcworkspace",
+                    "-scheme",
+                    "HarnessMonitor",
+                    "test-without-building",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=CHECKOUT_ROOT,
+                env=env,
+            )
+
+            log = tool_log.read_text() if tool_log.exists() else ""
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn(f"PWD={APP_ROOT}", log)
+            self.assertIn(f"-derivedDataPath {CHECKOUT_ROOT / 'xcode-derived'}", log)
+            self.assertIn(
+                f"-workspace {APP_ROOT / 'HarnessMonitor.xcworkspace'}",
+                log,
+            )
 
     def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -216,6 +307,18 @@ printf 'RTK=%s\\n' "$*" > "{tool_log}"
                 f"""#!/bin/bash
 set -euo pipefail
 printf 'XCODEBUILD=%s\\n' "$*" > "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@"
 """,
             )
 
@@ -299,6 +402,18 @@ set -euo pipefail
 echo "error: emit-module command failed with exit code 1" >&2
 echo "** BUILD FAILED **" >&2
 exit 65
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@"
 """,
             )
 
