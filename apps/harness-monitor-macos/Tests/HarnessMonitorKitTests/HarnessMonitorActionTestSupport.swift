@@ -190,6 +190,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuisDelaysBySessionID: [String: Duration] = [:]
+  var agentTuiInputErrorsByID: [String: any Error] = [:]
+  var agentTuiResizeErrorsByID: [String: any Error] = [:]
+  var agentTuiStopErrorsByID: [String: any Error] = [:]
+  var agentTuiReadErrorsByID: [String: any Error] = [:]
   var agentTuiInputResponsesByID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
   var codexStartError: (any Error)?

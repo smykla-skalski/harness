@@ -66,6 +66,18 @@ extension RecordingHarnessClient {
       agentTuisBySessionID.values.flatMap(\.self).first { $0.tuiId == tuiID }
     }
   }
+  func configuredAgentTuiInputError(id tuiID: String) -> (any Error)? {
+    lock.withLock { agentTuiInputErrorsByID[tuiID] }
+  }
+  func configuredAgentTuiResizeError(id tuiID: String) -> (any Error)? {
+    lock.withLock { agentTuiResizeErrorsByID[tuiID] }
+  }
+  func configuredAgentTuiStopError(id tuiID: String) -> (any Error)? {
+    lock.withLock { agentTuiStopErrorsByID[tuiID] }
+  }
+  func configuredAgentTuiReadError(id tuiID: String) -> (any Error)? {
+    lock.withLock { agentTuiReadErrorsByID[tuiID] }
+  }
 
   func dequeueConfiguredAgentTuiInputResponse(id tuiID: String) -> AgentTuiSnapshot? {
     lock.withLock {
