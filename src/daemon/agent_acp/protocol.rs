@@ -3,6 +3,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Arc;
+use std::time::Duration;
 
 use agent_client_protocol::schema::{
     ContentBlock, CreateTerminalRequest, InitializeRequest, KillTerminalRequest, NewSessionRequest,
@@ -17,6 +18,7 @@ use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::task::spawn_blocking;
+use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use crate::agents::acp::batcher::spawn_notification_batcher;
@@ -27,6 +29,8 @@ use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
+
+const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 
 pub(super) fn spawn_protocol_task(
     child: &mut Child,
@@ -87,7 +91,10 @@ async fn run_protocol(
     supervisor: Arc<AcpSessionSupervisor>,
 ) {
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
-    let context = ProtocolContext { client, supervisor };
+    let context = ProtocolContext {
+        client,
+        supervisor: Arc::clone(&supervisor),
+    };
     let read_context = context.clone();
     let write_context = context.clone();
     let create_terminal_context = context.clone();
@@ -164,7 +171,7 @@ async fn run_protocol(
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(transport, async move |connection| {
-            run_connection(connection, project_dir, prompt).await
+            run_connection(connection, project_dir, prompt, supervisor).await
         })
         .await;
     if let Err(error) = result {
@@ -176,23 +183,48 @@ async fn run_connection(
     connection: ConnectionTo<Agent>,
     project_dir: PathBuf,
     prompt: Option<String>,
+    supervisor: Arc<AcpSessionSupervisor>,
 ) -> agent_client_protocol::Result<()> {
-    connection
-        .send_request(InitializeRequest::new(ProtocolVersion::V1))
-        .block_task()
-        .await?;
+    let initialize_timeout = supervisor.config().initialize_timeout;
+    let prompt_timeout = supervisor.config().prompt_timeout;
+
+    timeout(
+        initialize_timeout,
+        connection
+            .send_request(InitializeRequest::new(ProtocolVersion::V1))
+            .block_task(),
+    )
+    .await
+    .map_err(|_| deadline_error("session/initialize", initialize_timeout))??;
+
     let response = connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
         .await?;
+
     if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
         let request = PromptRequest::new(
             response.session_id,
             vec![ContentBlock::Text(TextContent::new(prompt))],
         );
-        connection.send_request(request).block_task().await?;
+        timeout(
+            prompt_timeout,
+            connection.send_request(request).block_task(),
+        )
+        .await
+        .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
     }
     pending::<agent_client_protocol::Result<()>>().await
+}
+
+fn deadline_error(operation: &str, timeout_duration: Duration) -> AcpError {
+    AcpError::new(
+        ACP_DEADLINE_EXCEEDED,
+        format!(
+            "ACP {operation} timed out after {} ms",
+            timeout_duration.as_millis()
+        ),
+    )
 }
 
 #[derive(Clone)]

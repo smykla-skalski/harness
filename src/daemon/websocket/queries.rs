@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
+use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     ManagedAgentListResponse, ManagedAgentSnapshot, StreamEvent, TimelineWindowRequest, WsRequest,
@@ -47,6 +48,7 @@ async fn dispatch_daemon_read_query(
         ws_methods::RUNTIME_SESSION_RESOLVE => {
             Some(dispatch_runtime_session_resolve_query(request, state).await)
         }
+        ws_methods::RUNTIMES_PROBE => Some(dispatch_runtimes_probe_query(&request.id)),
         _ => None,
     }
 }
@@ -69,8 +71,13 @@ async fn dispatch_session_read_query(
         ws_methods::MANAGED_AGENT_DETAIL => {
             Some(dispatch_managed_agent_detail_query(request, state))
         }
+        ws_methods::MANAGED_AGENTS_ACP_INSPECT => Some(dispatch_acp_inspect_query(request, state)),
         _ => None,
     }
+}
+
+fn dispatch_runtimes_probe_query(request_id: &str) -> WsResponse {
+    dispatch_query_result(request_id, Ok(probe_acp_agents_cached()))
 }
 
 async fn dispatch_projects_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
@@ -241,6 +248,14 @@ fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpSt
             .acp_agent_manager
             .get(&agent_id)
             .map(ManagedAgentSnapshot::Acp),
+    )
+}
+
+fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let session_id = extract_string_param(&request.params, "session_id");
+    dispatch_query_result(
+        &request.id,
+        Ok(state.acp_agent_manager.inspect(session_id.as_deref())),
     )
 }
 

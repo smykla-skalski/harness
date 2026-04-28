@@ -4,12 +4,8 @@
 #![allow(unsafe_code)]
 
 use std::collections::HashMap;
-use std::io::ErrorKind;
-use std::io::Read as StdRead;
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -19,21 +15,29 @@ use agent_client_protocol::schema::{
     TerminalOutputRequest, TerminalOutputResponse, WaitForTerminalExitRequest,
     WaitForTerminalExitResponse,
 };
-use portable_pty::{
-    Child as PtyChild, CommandBuilder, ExitStatus as PtyExitStatus, MasterPty, PtySize,
-    native_pty_system,
-};
+use portable_pty::{Child as PtyChild, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
 use super::{ClientError, ClientResult};
+use crate::agents::acp::supervision::MAX_TERMINAL_WALL_CLOCK;
 use crate::agents::policy::DeniedBinaries;
 
+mod lifecycle;
+mod output;
+mod policy;
 #[cfg(test)]
 mod tests;
 
-struct TerminalOutputState {
-    output: Vec<u8>,
-    truncated: bool,
-    output_limit: u64,
+use lifecycle::{
+    close_reader, refresh_exit_status, terminate_process_group, terminate_terminal,
+    wait_for_terminal_exit_state,
+};
+use output::spawn_output_reader;
+use policy::denied_binary_name;
+
+pub(super) struct TerminalOutputState {
+    pub(super) output: Vec<u8>,
+    pub(super) truncated: bool,
+    pub(super) output_limit: u64,
 }
 
 type SharedTerminalState = Arc<Mutex<TerminalState>>;
@@ -50,6 +54,10 @@ pub struct TerminalState {
     pub pgid: Option<i32>,
     /// Accumulated output buffer and truncation state.
     output: Arc<Mutex<TerminalOutputState>>,
+    /// Wall-clock start for enforcing the per-terminal lifetime cap.
+    spawned_at: Instant,
+    /// Maximum wall-clock lifetime for this terminal.
+    wall_clock_limit: Duration,
     /// Exit status if the process has exited.
     pub exit_status: Option<TerminalExitStatus>,
 }
@@ -64,16 +72,24 @@ pub struct TerminalManager {
     active_slots: Mutex<usize>,
     /// Maximum terminals per session.
     cap: usize,
+    /// Maximum wall-clock per terminal.
+    wall_clock_limit: Duration,
 }
 
 impl TerminalManager {
     #[must_use]
     pub fn new(cap: usize) -> Self {
+        Self::new_with_limits(cap, MAX_TERMINAL_WALL_CLOCK)
+    }
+
+    #[must_use]
+    pub(super) fn new_with_limits(cap: usize, wall_clock_limit: Duration) -> Self {
         Self {
             terminals: Mutex::new(HashMap::new()),
             counter: Mutex::new(0),
             active_slots: Mutex::new(0),
             cap,
+            wall_clock_limit,
         }
     }
 
@@ -173,6 +189,8 @@ impl TerminalManager {
             reader_thread: Some(reader_thread),
             pgid,
             output,
+            spawned_at: Instant::now(),
+            wall_clock_limit: self.wall_clock_limit,
             exit_status: None,
         };
 
@@ -223,18 +241,7 @@ impl TerminalManager {
         let exit_status = {
             let state = self.terminal_state(terminal_id, &request.terminal_id)?;
             let mut state = state.lock().unwrap();
-
-            if state.exit_status.is_none() {
-                let status = state.child.wait().map_err(|e| {
-                    ClientError::terminal_denied(format!("failed to wait for terminal: {e}"))
-                })?;
-
-                state.exit_status = Some(terminal_exit_status(&status));
-                wait_for_output_drain(&state.output, Duration::from_millis(50));
-                close_reader(&mut state);
-            }
-
-            state.exit_status.clone().unwrap()
+            wait_for_terminal_exit_state(&mut state)?
         };
 
         Ok(WaitForTerminalExitResponse::new(exit_status))
@@ -320,201 +327,4 @@ impl TerminalManager {
             .cloned()
             .ok_or_else(|| ClientError::terminal_not_found(schema_id))
     }
-}
-
-fn denied_binary_name(
-    command: &str,
-    args: &[String],
-    denied_binaries: &DeniedBinaries,
-) -> Option<String> {
-    denied_binary_token(command, denied_binaries)
-        .or_else(|| denied_shell_command(command, args, denied_binaries))
-        .or_else(|| denied_env_command(command, args, denied_binaries))
-}
-
-fn denied_binary_token(token: &str, denied_binaries: &DeniedBinaries) -> Option<String> {
-    let token = token.trim_matches(|c: char| matches!(c, '"' | '\'' | ';' | '(' | ')' | '&' | '|'));
-    if denied_binaries.contains(token) {
-        return Some(token.to_string());
-    }
-    let file_name = Path::new(token).file_name()?.to_str()?;
-    denied_binaries
-        .contains(file_name)
-        .then(|| file_name.to_string())
-}
-
-fn denied_shell_command(
-    command: &str,
-    args: &[String],
-    denied_binaries: &DeniedBinaries,
-) -> Option<String> {
-    let shell = Path::new(command).file_name()?.to_str()?;
-    if !matches!(shell, "sh" | "bash" | "zsh") {
-        return None;
-    }
-    let command_line = args
-        .windows(2)
-        .find_map(|window| (window[0] == "-c").then_some(window[1].as_str()))?;
-    let first_command = command_line
-        .split_whitespace()
-        .find(|token| !matches!(*token, "exec" | "command"))?;
-    denied_binary_token(first_command, denied_binaries)
-}
-
-fn denied_env_command(
-    command: &str,
-    args: &[String],
-    denied_binaries: &DeniedBinaries,
-) -> Option<String> {
-    let command_name = Path::new(command).file_name()?.to_str()?;
-    if command_name != "env" {
-        return None;
-    }
-    let target = args
-        .iter()
-        .find(|arg| !arg.starts_with('-') && !arg.contains('='))?;
-    denied_binary_token(target, denied_binaries)
-}
-
-fn spawn_output_reader(
-    mut reader: Box<dyn StdRead + Send>,
-    output: Arc<Mutex<TerminalOutputState>>,
-) -> JoinHandle<()> {
-    thread::spawn(move || {
-        let mut buf = [0u8; 4096];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => append_with_limit(&output, &buf[..n]),
-                Err(error) if error.kind() == ErrorKind::Interrupted => {}
-                Err(_) => break,
-            }
-        }
-    })
-}
-
-fn refresh_exit_status(state: &mut TerminalState) -> ClientResult<()> {
-    if state.exit_status.is_some() {
-        return Ok(());
-    }
-    match state.child.try_wait() {
-        Ok(Some(status)) => {
-            state.exit_status = Some(terminal_exit_status(&status));
-            wait_for_output_drain(&state.output, Duration::from_millis(50));
-            close_reader(state);
-        }
-        Ok(None) => {}
-        Err(error) => {
-            return Err(ClientError::terminal_denied(format!(
-                "failed to poll terminal: {error}"
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Append bytes to a buffer with a limit, truncating from the front if needed.
-fn append_with_limit(output: &Mutex<TerminalOutputState>, data: &[u8]) {
-    let mut output = output.lock().unwrap();
-    output.output.extend_from_slice(data);
-    let limit = usize::try_from(output.output_limit).unwrap_or(usize::MAX);
-    if limit == 0 {
-        output.output.clear();
-        output.truncated = true;
-        return;
-    }
-    if output.output.len() > limit {
-        let start = output.output.len() - limit;
-        output.output.drain(..start);
-        output.truncated = true;
-    }
-}
-
-fn wait_for_output_drain(output: &Mutex<TerminalOutputState>, timeout: Duration) {
-    let start = Instant::now();
-    let mut previous_len = output.lock().unwrap().output.len();
-    while start.elapsed() < timeout {
-        thread::sleep(Duration::from_millis(5));
-        let len = output.lock().unwrap().output.len();
-        if len > 0 && len == previous_len {
-            return;
-        }
-        previous_len = len;
-    }
-}
-
-fn terminal_exit_status(status: &PtyExitStatus) -> TerminalExitStatus {
-    let exit_status = TerminalExitStatus::new().exit_code(Some(status.exit_code()));
-    if let Some(signal) = status.signal() {
-        exit_status.signal(signal.to_string())
-    } else {
-        exit_status
-    }
-}
-
-fn terminate_terminal(state: &mut TerminalState) {
-    if refresh_exit_status(state).is_ok() && state.exit_status.is_some() {
-        close_reader(state);
-        return;
-    }
-
-    #[cfg(unix)]
-    if let Some(pgid) = state.pgid {
-        unsafe {
-            libc::killpg(pgid, libc::SIGTERM);
-        }
-
-        if !poll_terminal_exit(state, Duration::from_secs(3)) {
-            unsafe {
-                libc::killpg(pgid, libc::SIGKILL);
-            }
-        }
-    } else {
-        let _ = state.child.kill();
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = state.child.kill();
-    }
-
-    if state.exit_status.is_none()
-        && let Ok(status) = state.child.wait()
-    {
-        state.exit_status = Some(terminal_exit_status(&status));
-    }
-
-    close_reader(state);
-}
-
-fn terminate_process_group(state: &TerminalState) {
-    #[cfg(unix)]
-    if let Some(pgid) = state.pgid {
-        unsafe {
-            libc::killpg(pgid, libc::SIGTERM);
-        }
-    }
-}
-
-fn poll_terminal_exit(state: &mut TerminalState, timeout: Duration) -> bool {
-    let deadline = Instant::now() + timeout;
-    loop {
-        match state.child.try_wait() {
-            Ok(Some(status)) => {
-                state.exit_status = Some(terminal_exit_status(&status));
-                return true;
-            }
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(Duration::from_millis(50));
-            }
-            Ok(None) | Err(_) => return false,
-        }
-    }
-}
-
-fn close_reader(state: &mut TerminalState) {
-    state.master.take();
-    // Dropping the handle detaches the reader. Joining can hang if a terminal
-    // descendant keeps the PTY slave open after the direct child exits.
-    state.reader_thread.take();
 }

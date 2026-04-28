@@ -8,6 +8,7 @@ use axum::{Json, Router};
 
 use axum::extract::Query;
 
+use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{
     HostBridgeReconfigureRequest, ReadinessResponse, RuntimeSessionResolutionResponse,
@@ -40,6 +41,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
             http_paths::RUNTIME_SESSION_RESOLVE,
             get(get_runtime_session_resolution),
         )
+        .route(http_paths::RUNTIMES_PROBE, get(get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
         .route(http_paths::STREAM, get(stream_global))
 }
@@ -126,6 +128,24 @@ pub(super) async fn get_diagnostics(
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
+}
+
+pub(super) async fn get_runtimes_probe(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        http_paths::RUNTIMES_PROBE,
+        &request_id,
+        start,
+        Ok(probe_acp_agents_cached()),
+    )
 }
 
 async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
