@@ -190,7 +190,7 @@ pub(crate) fn build_task_start_signal_record(
     );
     Ok(TaskStartSignalRecord {
         task_id: task_id.to_string(),
-        runtime: agent.runtime.clone(),
+        runtime: agent.runtime.to_string(),
         agent_id: agent_id.to_string(),
         signal_session_id: agent
             .agent_session_id

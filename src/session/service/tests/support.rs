@@ -85,7 +85,7 @@ pub(super) fn age_agent_activity(project: &Path, session_id: &str, agent_id: &st
 pub(super) fn accept_task_start_signal(session_id: &str, worker_id: &str, project: &Path) {
     let state = session_status(session_id, project).expect("status for ack");
     let worker = state.agents.get(worker_id).expect("worker registration");
-    let runtime = runtime::runtime_for_name(&worker.runtime).expect("runtime");
+    let runtime = runtime::runtime_for_name(worker.runtime.runtime_name()).expect("runtime");
     let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
     let signals = list_signals(session_id, Some(worker_id), project).expect("signals");
     let start_signal = signals

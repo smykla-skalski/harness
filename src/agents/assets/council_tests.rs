@@ -87,7 +87,7 @@ fn claude_council_plugin_skill_preserves_all_yaml_keys_and_tools() {
 
     assert!(rendered.contains("name: council"));
     assert!(rendered.contains("argument-hint:"));
-    assert!(rendered.contains("core|all|debate"));
+    assert!(rendered.contains("core-mix|all|debate"));
     assert!(rendered.contains("allowed-tools:"));
     for tool in [
         "Agent",

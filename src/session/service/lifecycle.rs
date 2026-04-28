@@ -434,12 +434,12 @@ pub(crate) fn apply_leave_session(
     if !agent.status.is_alive() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is already {}",
-            agent_status_label(agent.status)
+            agent_status_label(&agent.status)
         ))
         .into());
     }
 
-    agent.status = AgentStatus::Disconnected;
+    agent.status = AgentStatus::disconnected_unknown();
     now.clone_into(&mut agent.updated_at);
     agent.last_activity_at = Some(now.to_string());
     agent.current_task_id = None;

@@ -27,11 +27,15 @@ pub fn load_agent_activity_for(
             .agent_session_id
             .as_deref()
             .unwrap_or(&state.session_id);
-        let events =
-            index::load_conversation_events(project, &agent.runtime, session_key, agent_id)?;
+        let events = index::load_conversation_events(
+            project,
+            agent.runtime.runtime_name(),
+            session_key,
+            agent_id,
+        )?;
         summaries.push(agent_activity_summary_from_events(
             agent_id,
-            &agent.runtime,
+            agent.runtime.runtime_name(),
             agent.last_activity_at.as_deref(),
             &events,
         ));

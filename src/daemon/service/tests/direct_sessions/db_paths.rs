@@ -133,7 +133,7 @@ fn end_session_db_direct_allows_leaderless_degraded_control_plane_actor() {
             .agents
             .get_mut(&original_leader)
             .expect("leader registration")
-            .status = AgentStatus::Disconnected;
+            .status = AgentStatus::disconnected_unknown();
         db.save_session_state(&project_id, &degraded)
             .expect("save degraded state");
 

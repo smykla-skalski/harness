@@ -130,7 +130,7 @@ pub fn cancel_signal(
             "agent '{agent_id}' not found in session '{session_id}'"
         )))
     })?;
-    let runtime = runtime::runtime_for_name(&agent.runtime).ok_or_else(|| {
+    let runtime = runtime::runtime_for_name(agent.runtime.runtime_name()).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "unknown runtime '{}'",
             agent.runtime
@@ -199,7 +199,7 @@ pub fn list_signals(
         if agent_filter.is_some_and(|filter| filter != agent_id) {
             continue;
         }
-        let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
+        let Some(runtime) = runtime::runtime_for_name(agent.runtime.runtime_name()) else {
             continue;
         };
         let signal_dirs = signal_dirs_for_agent_in_context_root(
@@ -209,7 +209,7 @@ pub fn list_signals(
             &context_root,
         );
         signals.extend(signal_records_for_dirs(
-            &agent.runtime,
+            agent.runtime.runtime_name(),
             &agent_id,
             session_id,
             &signal_dirs,

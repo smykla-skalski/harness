@@ -119,7 +119,7 @@ pub(crate) fn apply_claim_review(
             )))
         })?
         .runtime
-        .clone();
+        .to_string();
 
     let task = state
         .tasks

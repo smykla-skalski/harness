@@ -58,7 +58,7 @@ pub(crate) fn scan_all_agents(
     let mut all_issues: Vec<Issue> = Vec::new();
     let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
     for agent in state.agents.values() {
-        let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
+        let Some(agent_runtime) = resolve_agent_runtime(agent.runtime.runtime_name()) else {
             continue;
         };
         let agent_session_id = service::agent_runtime_session_id(session_id, agent);
@@ -87,7 +87,7 @@ pub(crate) fn scan_all_agents_incremental(
 ) -> Result<Vec<Issue>, CliError> {
     let mut all_issues: Vec<Issue> = Vec::new();
     for agent in state.agents.values() {
-        let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
+        let Some(agent_runtime) = resolve_agent_runtime(agent.runtime.runtime_name()) else {
             continue;
         };
         let agent_session_id = service::agent_runtime_session_id(session_id, agent);

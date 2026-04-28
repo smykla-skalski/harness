@@ -334,7 +334,7 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
             leader.agent_session_id.as_deref(),
             Some("claude-runtime-session")
         );
-        assert_eq!(leader.status, AgentStatus::Disconnected);
+        assert_eq!(leader.status, AgentStatus::disconnected_unknown());
         assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
         assert!(
             leader_id.is_none(),

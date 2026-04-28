@@ -270,16 +270,16 @@ where
             .agent_session_id
             .as_deref()
             .unwrap_or(&state.session_id);
-        let events = load_events(agent_id, &agent.runtime, session_key)?;
+        let events = load_events(agent_id, agent.runtime.runtime_name(), session_key)?;
         activities.push(daemon_snapshot::agent_activity_summary_from_events(
             agent_id,
-            &agent.runtime,
+            agent.runtime.runtime_name(),
             agent.last_activity_at.as_deref(),
             &events,
         ));
         conversation_events.push(PreparedConversationEventImport {
             agent_id: agent_id.clone(),
-            runtime: agent.runtime.clone(),
+            runtime: agent.runtime.to_string(),
             events,
         });
     }
@@ -307,16 +307,16 @@ where
             continue;
         }
 
-        let events = load_events(agent_id, &agent.runtime, session_key)?;
+        let events = load_events(agent_id, agent.runtime.runtime_name(), session_key)?;
         let activity = daemon_snapshot::agent_activity_summary_from_events(
             agent_id,
-            &agent.runtime,
+            agent.runtime.runtime_name(),
             agent.last_activity_at.as_deref(),
             &events,
         );
         prepared.push(PreparedAgentTranscriptResync {
             agent_id: agent_id.clone(),
-            runtime: agent.runtime.clone(),
+            runtime: agent.runtime.to_string(),
             activity,
             events,
         });

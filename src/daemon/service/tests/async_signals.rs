@@ -23,7 +23,8 @@ async fn seed_pending_signal(
         .get(agent_id)
         .expect("agent present")
         .clone();
-    let runtime = crate::agents::runtime::runtime_for_name(&agent.runtime).expect("runtime");
+    let runtime =
+        crate::agents::runtime::runtime_for_name(agent.runtime.runtime_name()).expect("runtime");
     let signal = crate::session::service::build_signal(
         actor_id,
         "inject_context",

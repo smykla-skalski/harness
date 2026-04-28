@@ -16,7 +16,7 @@ use super::{
     stored_timeline_entry, u64_from_i64, utc_now,
 };
 use crate::errors::CliErrorKind;
-use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::service::{agent_status_db_label, canonicalize_active_session_without_leader};
 
 const LOAD_SESSION_FOR_MUTATION_SQL: &str =
     "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";
@@ -368,10 +368,10 @@ async fn replace_agents(
             .bind(agent_id)
             .bind(session_id)
             .bind(&agent.name)
-            .bind(&agent.runtime)
+            .bind(agent.runtime.runtime_name())
             .bind(format!("{:?}", agent.role).to_lowercase())
             .bind(capabilities_json)
-            .bind(format!("{:?}", agent.status).to_lowercase())
+            .bind(agent_status_db_label(&agent.status))
             .bind(agent.agent_session_id.as_deref())
             .bind(&agent.joined_at)
             .bind(&agent.updated_at)

@@ -78,7 +78,7 @@ pub(crate) fn collect_expired_pending_signals_for_state_in_context_root(
     let mut expired_by_id = BTreeMap::new();
 
     for (agent_id, agent) in &state.agents {
-        let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
+        let Some(runtime) = runtime::runtime_for_name(agent.runtime.runtime_name()) else {
             continue;
         };
         for (signal_session_id, signal_dir) in signal_dirs_for_agent_in_context_root(
@@ -182,7 +182,7 @@ pub(crate) fn load_signal_record_for_agent_from_state(
     let Some(agent) = state.agents.get(agent_id) else {
         return Ok(None);
     };
-    let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
+    let Some(runtime) = runtime::runtime_for_name(agent.runtime.runtime_name()) else {
         return Ok(None);
     };
     let context_root = signal_context_root(project_dir);
@@ -192,11 +192,14 @@ pub(crate) fn load_signal_record_for_agent_from_state(
         agent.agent_session_id.as_deref(),
         &context_root,
     );
-    Ok(
-        signal_records_for_dirs(&agent.runtime, agent_id, &state.session_id, &signal_dirs)?
-            .into_iter()
-            .find(|record| record.signal.signal_id == signal_id),
-    )
+    Ok(signal_records_for_dirs(
+        agent.runtime.runtime_name(),
+        agent_id,
+        &state.session_id,
+        &signal_dirs,
+    )?
+    .into_iter()
+    .find(|record| record.signal.signal_id == signal_id))
 }
 
 pub(crate) fn normalize_signal_ack_result(signal: &Signal, result: AckResult) -> AckResult {

@@ -109,7 +109,7 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
         .expect("worker present");
     assert_eq!(
         worker.status,
-        crate::session::types::AgentStatus::Disconnected
+        crate::session::types::AgentStatus::disconnected_unknown()
     );
 
     let follow_up_events = recv_broadcast_events(&mut receiver, 3, WAIT_TIMEOUT);
@@ -241,8 +241,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
             session_state
                 .agents
                 .get(&joined_agent_id)
-                .map(|agent| agent.status)
-                == Some(crate::session::types::AgentStatus::Disconnected)
+                .is_some_and(|agent| agent.status.is_disconnected())
         });
     });
 }

@@ -98,7 +98,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             .into_iter()
             .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)
             .expect("start signal");
-        let signal_dir = runtime::runtime_for_name(&worker.runtime)
+        let signal_dir = runtime::runtime_for_name(worker.runtime.runtime_name())
             .expect("runtime")
             .signal_dir(project, &worker_session_id);
         runtime::signal::acknowledge_signal(
@@ -153,7 +153,10 @@ fn session_service_round_trip_smoke_covers_public_surface() {
 
         let status = session_status(session_id, project).expect("status");
         assert_eq!(status.tasks[&task.task_id].status, TaskStatus::Done);
-        assert_eq!(status.agents[&worker_id].status, AgentStatus::Disconnected);
+        assert_eq!(
+            status.agents[&worker_id].status,
+            AgentStatus::disconnected_unknown()
+        );
         assert_eq!(
             list_tasks(session_id, Some(TaskStatus::Done), project)
                 .expect("done tasks")

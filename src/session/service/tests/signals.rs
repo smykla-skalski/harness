@@ -45,7 +45,7 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
                 .agents
                 .get_mut(&degraded_leader)
                 .expect("degraded leader")
-                .status = AgentStatus::Disconnected;
+                .status = AgentStatus::disconnected_unknown();
             Ok(())
         })
         .expect("degrade session");

@@ -31,9 +31,12 @@ fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
         assert_eq!(updated.status, SessionStatus::Ended);
         assert_eq!(updated.metrics.active_agent_count, 0);
         assert!(updated.pending_leader_transfer.is_none());
-        assert!(updated.agents.values().all(|agent| {
-            agent.status == AgentStatus::Disconnected && agent.current_task_id.is_none()
-        }));
+        assert!(
+            updated
+                .agents
+                .values()
+                .all(|agent| { agent.status.is_disconnected() && agent.current_task_id.is_none() })
+        );
 
         let signals = list_signals("end-leave", None, project).expect("signals");
         assert_eq!(signals.len(), 2);

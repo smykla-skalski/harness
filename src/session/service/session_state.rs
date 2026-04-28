@@ -1,3 +1,5 @@
+use crate::agents::kind::RuntimeKind;
+
 use super::{
     AgentRegistration, AgentStatus, CliError, CliErrorKind, END_SESSION_SIGNAL_ACTION_HINT,
     END_SESSION_SIGNAL_MESSAGE, LeaderTransferPlan, LeaveSignalRecord, Path,
@@ -121,7 +123,7 @@ pub(crate) fn apply_join_session(
         AgentRegistration {
             agent_id: agent_id.clone(),
             name: display_name.to_string(),
-            runtime: runtime_name.to_string(),
+            runtime: RuntimeKind::from(runtime_name),
             role,
             capabilities: capabilities.to_vec(),
             joined_at: now.to_string(),
@@ -304,7 +306,7 @@ pub(crate) fn apply_end_session(
     touch_agent(state, actor_id, now);
     for agent in state.agents.values_mut() {
         if agent.status.is_alive() {
-            agent.status = AgentStatus::Disconnected;
+            agent.status = AgentStatus::disconnected_unknown();
             agent.current_task_id = None;
             agent.updated_at = now.to_string();
             agent.last_activity_at = Some(now.to_string());

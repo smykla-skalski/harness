@@ -180,3 +180,70 @@ pub(super) fn migrate_v9_to_v10(mut value: Value) -> Result<Value, CliError> {
     object.insert("schema_version".to_string(), json!(10));
     Ok(value)
 }
+
+/// Chunk-2 migrator: rewrite legacy bare-string `runtime` and unit-tagged
+/// `status` shapes into the new tagged forms.
+///
+/// - `runtime: "claude"` → `runtime: { "kind": "tui", "id": "claude" }` for
+///   known TUI names; unknown legacy strings (forward-rolled state) become
+///   `{ "kind": "acp", "id": "<value>" }` so the daemon does not crash on
+///   load.
+/// - `status: "disconnected"` → `status: { "state": "disconnected", "reason":
+///   { "kind": "unknown" } }`. Other status strings (`active`, `idle`,
+///   `awaiting_review`, `removed`) become `{ "state": "<value>" }` to match
+///   the new `#[serde(tag = "state")]` shape on `AgentStatus`.
+pub(super) fn migrate_v10_to_v11(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+    object.insert("schema_version".to_string(), json!(11));
+
+    if let Some(agents) = object.get_mut("agents").and_then(Value::as_object_mut) {
+        for agent in agents.values_mut() {
+            let Some(agent_object) = agent.as_object_mut() else {
+                continue;
+            };
+            migrate_runtime_field(agent_object);
+            migrate_status_field(agent_object);
+        }
+    }
+
+    Ok(value)
+}
+
+fn migrate_runtime_field(agent: &mut serde_json::Map<String, Value>) {
+    let Some(runtime) = agent.get("runtime") else {
+        return;
+    };
+    if let Some(name) = runtime.as_str() {
+        // FROZEN v10 universe: this list represents every TUI runtime that
+        // existed when schema v10 was the steady state. Do NOT extend it
+        // when new TUI agents are added — new agents land in their own
+        // migrator step and a v10 state file by definition cannot reference
+        // them. Drift here would silently re-classify legitimate ACP ids
+        // that happen to match a future TUI name.
+        let kind = match name {
+            "claude" | "codex" | "gemini" | "copilot" | "vibe" | "opencode" => "tui",
+            _ => "acp",
+        };
+        agent.insert("runtime".to_string(), json!({ "kind": kind, "id": name }));
+    }
+}
+
+fn migrate_status_field(agent: &mut serde_json::Map<String, Value>) {
+    let Some(status) = agent.get("status") else {
+        return;
+    };
+    // Bare-string non-disconnected variants stay bare (the new
+    // `AgentStatus` deserializer accepts both shapes); only `"disconnected"`
+    // is upgraded so the new `reason` and `stderr_tail` slots exist on disk.
+    if status.as_str() == Some("disconnected") {
+        agent.insert(
+            "status".to_string(),
+            json!({
+                "state": "disconnected",
+                "reason": { "kind": "unknown" },
+            }),
+        );
+    }
+}

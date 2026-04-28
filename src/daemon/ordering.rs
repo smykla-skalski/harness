@@ -17,12 +17,12 @@ pub const fn agent_role_priority(role: SessionRole) -> u8 {
 }
 
 #[must_use]
-pub const fn agent_status_priority(status: AgentStatus) -> u8 {
+pub const fn agent_status_priority(status: &AgentStatus) -> u8 {
     match status {
         AgentStatus::Active => 0,
         AgentStatus::AwaitingReview => 1,
         AgentStatus::Idle => 2,
-        AgentStatus::Disconnected => 3,
+        AgentStatus::Disconnected { .. } => 3,
         AgentStatus::Removed => 4,
     }
 }
@@ -59,7 +59,9 @@ fn compare_session_agents(left: &AgentRegistration, right: &AgentRegistration) -
 
     left_role
         .cmp(&right_role)
-        .then_with(|| agent_status_priority(left.status).cmp(&agent_status_priority(right.status)))
+        .then_with(|| {
+            agent_status_priority(&left.status).cmp(&agent_status_priority(&right.status))
+        })
         .then_with(|| left.joined_at.cmp(&right.joined_at))
         .then_with(|| left.agent_id.cmp(&right.agent_id))
 }

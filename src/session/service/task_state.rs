@@ -377,12 +377,12 @@ pub(crate) fn apply_send_signal_state(
     if !target_agent.status.is_alive() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is {}",
-            agent_status_label(target_agent.status)
+            agent_status_label(&target_agent.status)
         ))
         .into());
     }
 
-    let runtime_name = target_agent.runtime.clone();
+    let runtime_name = target_agent.runtime.to_string();
     let target_agent_session_id = target_agent.agent_session_id.clone();
     touch_agent(state, actor_id, now);
     refresh_session(state, now);

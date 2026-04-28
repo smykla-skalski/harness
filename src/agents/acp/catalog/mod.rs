@@ -129,7 +129,12 @@ mod tests {
         let copilot = find_builtin("copilot").expect("copilot exists");
         assert!(copilot.capabilities.iter().any(|t| t == tags::FS_READ));
         assert!(copilot.capabilities.iter().any(|t| t == tags::FS_WRITE));
-        assert!(copilot.capabilities.iter().any(|t| t == tags::TERMINAL_SPAWN));
+        assert!(
+            copilot
+                .capabilities
+                .iter()
+                .any(|t| t == tags::TERMINAL_SPAWN)
+        );
         assert!(copilot.capabilities.iter().any(|t| t == tags::STREAMING));
         assert!(copilot.capabilities.iter().any(|t| t == tags::MULTI_TURN));
     }

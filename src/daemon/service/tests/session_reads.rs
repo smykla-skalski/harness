@@ -79,7 +79,7 @@ fn list_sessions_db_promotes_live_worker_and_excludes_dead_members() {
             "db state should persist the promoted successor"
         );
         let dead_leader = synced_state.agents.get(leader_id).expect("leader agent");
-        assert_eq!(dead_leader.status, AgentStatus::Disconnected);
+        assert_eq!(dead_leader.status, AgentStatus::disconnected_unknown());
         let promoted = synced_state
             .leader_id
             .as_deref()
@@ -130,7 +130,7 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
                 "db state should persist the promoted successor"
             );
             let dead_leader = resolved.state.agents.get(leader_id).expect("leader agent");
-            assert_eq!(dead_leader.status, AgentStatus::Disconnected);
+            assert_eq!(dead_leader.status, AgentStatus::disconnected_unknown());
             let promoted = resolved
                 .state
                 .leader_id
