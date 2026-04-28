@@ -18,6 +18,17 @@ extension AgentsWindowUITests {
       copilotRow.label.localizedCaseInsensitiveContains("ACP"),
       "Capability picker should not expose transport jargon to users"
     )
+
+    let geminiRow = element(in: app, identifier: Accessibility.agentCapabilityRow("gemini"))
+    XCTAssertTrue(
+      waitForElement(geminiRow, timeout: Self.actionTimeout),
+      "Gemini capability row should be visible in the create pane"
+    )
+    XCTAssertTrue(geminiRow.label.localizedCaseInsensitiveContains("gemini"))
+    XCTAssertFalse(
+      geminiRow.label.localizedCaseInsensitiveContains("ACP"),
+      "Second ACP descriptor row should not expose transport jargon to users"
+    )
   }
 
   func testPermissionModalCoalesce() throws {

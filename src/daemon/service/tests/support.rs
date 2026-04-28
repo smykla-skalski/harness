@@ -215,7 +215,7 @@ pub(super) fn write_idle_signal_script(
     let wake_behavior = match behavior {
         IdleSignalScriptBehavior::AckOnWake => format!(
             r#"attempt=0
-while [ "$attempt" -lt 20 ]; do
+while [ "$attempt" -lt 100 ]; do
   for signal_file in "{signal_dir}/pending"/*.json; do
 if [ -e "$signal_file" ]; then
   signal_id=$(basename "$signal_file" .json)
@@ -229,7 +229,7 @@ EOF
 fi
   done
   attempt=$((attempt + 1))
-  sleep 0.1
+  sleep 0.05
 done
 exit 1
 "#,

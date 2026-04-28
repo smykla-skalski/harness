@@ -11,6 +11,8 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
                 Some(tmp.path().to_str().expect("utf8 path")),
             ),
             ("HOME", Some(home.path().to_str().expect("utf8 path"))),
+            ("HARNESS_DAEMON_DATA_HOME", None),
+            ("HARNESS_APP_GROUP_ID", None),
         ],
         || {
             let manifest = DaemonManifest {

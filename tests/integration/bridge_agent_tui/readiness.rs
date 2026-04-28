@@ -1,4 +1,5 @@
 use super::*;
+use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
 /// Verify the full readiness callback flow: start a TUI, call signal_ready
 /// from a separate thread (simulating the SessionStart hook), and verify the
@@ -8,24 +9,21 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
     let tmp = tempdir().expect("tempdir");
     let project_dir = tmp.path().join("project");
     let db_path = tmp.path().join("harness.db");
-    std::fs::create_dir_all(&project_dir).expect("project dir");
+    init_git_repo_with_seed(&project_dir);
 
     let db = DaemonDb::open(&db_path).expect("open db");
     let project = harness::daemon::index::discovered_project_for_checkout(&project_dir);
     db.sync_project(&project).expect("sync project");
 
-    let state = temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8")))],
-        || {
-            harness::session::service::start_session(
-                "readiness",
-                "readiness callback test",
-                &project_dir,
-                Some("sess-readiness-cb"),
-            )
-            .expect("start session")
-        },
-    );
+    let state = with_isolated_harness_env(tmp.path(), || {
+        harness::session::service::start_session(
+            "readiness",
+            "readiness callback test",
+            &project_dir,
+            Some("sess-readiness-cb"),
+        )
+        .expect("start session")
+    });
     db.sync_session(&project.project_id, &state)
         .expect("sync session");
 
