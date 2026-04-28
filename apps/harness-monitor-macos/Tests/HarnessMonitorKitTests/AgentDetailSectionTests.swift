@@ -71,6 +71,95 @@ struct AgentDetailSectionTests {
     )
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let section = AgentDetailSection(store: store, agent: agent, activity: nil)
-    _ = section.body
+    _ = AnyView(section)
+  }
+
+  @Test("Role picker clamps stale leader draft state to the current agent role")
+  func rolePickerClampsStaleLeaderDraft() {
+    #expect(
+      AgentDetailSection.normalizedRoleSelection(
+        draftRole: .leader,
+        agentRole: .worker
+      ) == .worker
+    )
+  }
+
+  @Test("Role picker includes a leader tag when the current agent role is leader")
+  func rolePickerIncludesLeaderWhenCurrentAgentIsLeader() {
+    #expect(AgentDetailSection.rolePickerOptions(for: .worker) == [.observer, .worker, .reviewer, .improver])
+    #expect(AgentDetailSection.rolePickerOptions(for: .leader) == SessionRole.allCases)
+  }
+
+  @Test("Role changes submit the normalized picker value")
+  func roleChangesSubmitNormalizedPickerValue() {
+    #expect(
+      AgentDetailSection.submittedRoleSelection(
+        draftRole: .leader,
+        agentRole: .worker
+      ) == .worker
+    )
+    #expect(
+      AgentDetailSection.submittedRoleSelection(
+        draftRole: .reviewer,
+        agentRole: .worker
+      ) == .reviewer
+    )
+  }
+
+  @Test("Leader transfer picker clamps a stale leader-like ID before render")
+  func leaderTransferClampsStaleSelection() {
+    #expect(
+      LeaderTransferSheet.normalizedTransferLeaderID(
+        draftID: "leader",
+        leaderID: "leader-claude",
+        pendingLeaderID: nil,
+        availableAgentIDs: ["leader-claude", "worker-codex", "worker-gemini"]
+      ) == "worker-codex"
+    )
+  }
+
+  @Test("Leader transfer picker keeps a valid pending transfer selection")
+  func leaderTransferKeepsPendingSelection() {
+    #expect(
+      LeaderTransferSheet.normalizedTransferLeaderID(
+        draftID: "",
+        leaderID: "leader-claude",
+        pendingLeaderID: "worker-gemini",
+        availableAgentIDs: ["leader-claude", "worker-codex", "worker-gemini"]
+      ) == "worker-gemini"
+    )
+  }
+
+  @Test("Task actions assignee picker clamps a stale leader-like ID before render")
+  func taskActionsClampStaleAssigneeSelection() {
+    #expect(
+      TaskActionsSheet.normalizedAssigneeID(
+        draftID: "leader",
+        assignedAgentID: nil,
+        availableAgentIDs: ["worker-codex", "worker-gemini"]
+      ) == "worker-codex"
+    )
+  }
+
+  @Test("Task actions keep a valid draft reassignment when the task already has an assignee")
+  func taskActionsPreferValidDraftReassignment() {
+    #expect(
+      TaskActionsSheet.normalizedAssigneeID(
+        draftID: "worker-gemini",
+        assignedAgentID: "worker-codex",
+        availableAgentIDs: ["worker-codex", "worker-gemini"]
+      ) == "worker-gemini"
+    )
+  }
+
+  @Test("Task actions task picker stays scoped to the presented task")
+  func taskActionsKeepPresentedTaskSelection() {
+    #expect(
+      TaskActionsSheet.normalizedTaskID(
+        draftID: "stale-task",
+        currentTaskID: "task-ui",
+        availableTaskIDs: ["task-ui", "task-routing"]
+      ) == "task-ui"
+    )
   }
 }

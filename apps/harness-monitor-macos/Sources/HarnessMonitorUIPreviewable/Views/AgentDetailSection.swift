@@ -17,6 +17,26 @@ struct AgentDetailSection: View {
   private var roleStateKey: String {
     "\(agent.agentId)|\(agent.role.rawValue)|\(leaderID ?? "-")"
   }
+  private var rolePickerSelection: Binding<SessionRole> {
+    Binding(
+      get: {
+        Self.normalizedRoleSelection(
+          draftRole: selectedRole,
+          agentRole: agent.role
+        )
+      },
+      set: { selectedRole = $0 }
+    )
+  }
+  private var rolePickerValues: [SessionRole] {
+    Self.rolePickerOptions(for: agent.role)
+  }
+  private var effectiveSelectedRole: SessionRole {
+    Self.submittedRoleSelection(
+      draftRole: selectedRole,
+      agentRole: agent.role
+    )
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -171,8 +191,8 @@ struct AgentDetailSection: View {
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         } else {
-          Picker("Role", selection: $selectedRole) {
-            ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+          Picker("Role", selection: rolePickerSelection) {
+            ForEach(rolePickerValues, id: \.self) { role in
               Text(role.title).tag(role)
             }
           }
@@ -259,7 +279,38 @@ struct AgentDetailSection: View {
   }
 
   private func changeRole() async {
-    _ = await store.changeRole(agentID: agent.agentId, role: selectedRole)
+    _ = await store.changeRole(agentID: agent.agentId, role: effectiveSelectedRole)
     selectedRole = agent.role
+  }
+
+  static func submittedRoleSelection(
+    draftRole: SessionRole,
+    agentRole: SessionRole
+  ) -> SessionRole {
+    normalizedRoleSelection(
+      draftRole: draftRole,
+      agentRole: agentRole
+    )
+  }
+
+  static func normalizedRoleSelection(
+    draftRole: SessionRole,
+    agentRole: SessionRole
+  ) -> SessionRole {
+    let availableRoles = rolePickerOptions(for: agentRole)
+    if availableRoles.contains(draftRole) {
+      return draftRole
+    }
+    if availableRoles.contains(agentRole) {
+      return agentRole
+    }
+    return availableRoles.first ?? agentRole
+  }
+
+  static func rolePickerOptions(for agentRole: SessionRole) -> [SessionRole] {
+    if agentRole == .leader {
+      return SessionRole.allCases
+    }
+    return SessionRole.allCases.filter { $0 != .leader }
   }
 }

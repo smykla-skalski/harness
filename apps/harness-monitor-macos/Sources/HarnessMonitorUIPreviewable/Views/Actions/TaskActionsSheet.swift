@@ -30,6 +30,32 @@ struct TaskActionsSheet: View {
   private var areSessionActionsAvailable: Bool {
     store.areSelectedSessionActionsAvailable
   }
+  private var effectiveTaskID: String {
+    Self.normalizedTaskID(
+      draftID: localTaskID,
+      currentTaskID: task?.taskId,
+      availableTaskIDs: tasks.map(\.taskId)
+    )
+  }
+  private var effectiveAssigneeID: String {
+    Self.normalizedAssigneeID(
+      draftID: assigneeID,
+      assignedAgentID: task?.assignedTo,
+      availableAgentIDs: agents.map(\.agentId)
+    )
+  }
+  private var taskSelection: Binding<String> {
+    Binding(
+      get: { effectiveTaskID },
+      set: { localTaskID = $0 }
+    )
+  }
+  private var assigneeSelection: Binding<String> {
+    Binding(
+      get: { effectiveAssigneeID },
+      set: { assigneeID = $0 }
+    )
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -94,13 +120,13 @@ struct TaskActionsSheet: View {
 
   @ViewBuilder
   private func pickers(for task: WorkItem) -> some View {
-    Picker("Task", selection: $localTaskID) {
+    Picker("Task", selection: taskSelection) {
       ForEach(tasks) { item in
         Text(item.title).tag(item.taskId)
       }
     }
     .harnessNativeFormControl()
-    Picker("Assignee", selection: $assigneeID) {
+    Picker("Assignee", selection: assigneeSelection) {
       ForEach(agents) { agent in
         Text(agent.name).tag(agent.agentId)
       }
@@ -267,16 +293,16 @@ struct TaskActionsSheet: View {
   }
 
   private func assign() async {
-    guard !localTaskID.isEmpty, !assigneeID.isEmpty else { return }
-    _ = await store.assignTask(taskID: localTaskID, agentID: assigneeID)
+    guard !effectiveTaskID.isEmpty, !effectiveAssigneeID.isEmpty else { return }
+    _ = await store.assignTask(taskID: effectiveTaskID, agentID: effectiveAssigneeID)
     syncDefaults()
   }
 
   private func updateStatus() async {
-    guard !localTaskID.isEmpty else { return }
+    guard !effectiveTaskID.isEmpty else { return }
     let note = statusNote.trimmingCharacters(in: .whitespacesAndNewlines)
     let success = await store.updateTaskStatus(
-      taskID: localTaskID,
+      taskID: effectiveTaskID,
       status: taskStatus,
       note: note.isEmpty ? nil : note
     )
@@ -285,21 +311,49 @@ struct TaskActionsSheet: View {
   }
 
   private func updateQueuePolicy() async {
-    guard !localTaskID.isEmpty else { return }
-    _ = await store.updateTaskQueuePolicy(taskID: localTaskID, queuePolicy: queuePolicy)
+    guard !effectiveTaskID.isEmpty else { return }
+    _ = await store.updateTaskQueuePolicy(taskID: effectiveTaskID, queuePolicy: queuePolicy)
     syncDefaults()
   }
 
   private func checkpoint() async {
     let summary = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !localTaskID.isEmpty, !summary.isEmpty else { return }
+    guard !effectiveTaskID.isEmpty, !summary.isEmpty else { return }
     let success = await store.checkpointTask(
-      taskID: localTaskID,
+      taskID: effectiveTaskID,
       summary: summary,
       progress: Int(checkpointProgress)
     )
     if success { checkpointSummary = "" }
     syncDefaults()
+  }
+
+  static func normalizedTaskID(
+    draftID: String,
+    currentTaskID: String?,
+    availableTaskIDs: [String]
+  ) -> String {
+    if let currentTaskID, availableTaskIDs.contains(currentTaskID) {
+      return currentTaskID
+    }
+    if availableTaskIDs.contains(draftID) {
+      return draftID
+    }
+    return availableTaskIDs.first ?? ""
+  }
+
+  static func normalizedAssigneeID(
+    draftID: String,
+    assignedAgentID: String?,
+    availableAgentIDs: [String]
+  ) -> String {
+    if availableAgentIDs.contains(draftID) {
+      return draftID
+    }
+    if let assignedAgentID, availableAgentIDs.contains(assignedAgentID) {
+      return assignedAgentID
+    }
+    return availableAgentIDs.first ?? ""
   }
 }
 
