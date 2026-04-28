@@ -7,6 +7,7 @@ use tempfile::TempDir;
 use tokio::sync::broadcast;
 
 use super::*;
+use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
 
 fn manager() -> AcpAgentManagerHandle {
@@ -294,7 +295,7 @@ fn start_rejects_sandboxed_daemon_mode() {
             let error = manager().start("sess-1", &request).expect_err("sandbox must refuse ACP");
             let rendered = format!("{error}");
             assert!(
-                rendered.contains("sandbox feature disabled: acp.local-spawn"),
+                rendered.contains("sandbox feature disabled: acp.host-bridge"),
                 "unexpected error: {rendered}"
             );
         },
