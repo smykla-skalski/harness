@@ -122,6 +122,7 @@ extension HarnessMonitorStore {
       }
       resetSelectedCodexRuns()
       resetSelectedAgentTuis()
+      resetSelectedAcpAgents()
       if sessionID == nil {
         if activeSessionLoadRequest != 0 {
           activeSessionLoadRequest = 0

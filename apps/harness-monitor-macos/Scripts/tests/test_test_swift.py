@@ -51,12 +51,18 @@ touch "$app_dir/build-for-testing.marker"
             )
             fake_bin = temp_root / "bin"
             fake_bin.mkdir()
+            write_executable(
+                fake_bin / "xcbeautify",
+                """#!/bin/bash
+set -euo pipefail
+cat
+""",
+            )
             fake_runner = fake_bin / "xcodebuild"
             write_executable(
                 fake_runner,
                 f"""#!/bin/bash
 set -euo pipefail
-printf '%s\\n' "$*" >> "{runner_calls}"
 enumeration_output_path=""
 only_testing_selector=""
 previous_arg=""
@@ -70,6 +76,7 @@ for arg in "$@"; do
   previous_arg="$arg"
 done
 if [[ -n "$enumeration_output_path" ]]; then
+  printf '%s\\n' "$*" >> "{runner_calls}"
   enabled_tests_json=""
   case "$only_testing_selector" in
     HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests)
@@ -89,22 +96,61 @@ if [[ -n "$enumeration_output_path" ]]; then
         }}
       ]'
       ;;
+    HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests)
+      enabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpEventPushAppendsSelectedSessionTimeline()"
+        }},
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented()"
+        }}
+      ]'
+      ;;
+    HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented)
+      enabled_tests_json='[]'
+      disabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpEventPushAppendsSelectedSessionTimeline()"
+        }},
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented()"
+        }}
+      ]'
+      ;;
+    HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented\\(\\))
+      enabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented()"
+        }}
+      ]'
+      ;;
+    test://com.apple.xcode/HarnessMonitor/HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented\\(\\))
+      enabled_tests_json='[]'
+      disabled_tests_json='[
+        {{
+          "identifier": "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/acpPermissionBatchWaitsForSnapshotAndRemainsPresented()"
+        }}
+      ]'
+      ;;
     *)
       enabled_tests_json='[]'
       ;;
   esac
+  disabled_tests_json="${{disabled_tests_json:-[]}}"
   cat > "$enumeration_output_path" <<JSON
 {{
   "errors": [],
   "values": [
     {{
-      "enabledTests": $enabled_tests_json
+      "enabledTests": $enabled_tests_json,
+      "disabledTests": $disabled_tests_json
     }}
   ]
 }}
 JSON
   exit 0
 fi
+printf 'disable_xcbeautify=%s %s\\n' "${{HARNESS_MONITOR_DISABLE_XCBEAUTIFY:-}}" "$*" >> "{runner_calls}"
 app_dir="${{XCODEBUILD_DERIVED_DATA_PATH}}/Build/Products/Debug/Harness Monitor.app"
 mkdir -p "$app_dir"
 if printf '%s\\n' "$@" | /usr/bin/grep -q 'build-for-testing'; then
@@ -178,6 +224,7 @@ exit 1
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-enumerate-tests", calls[1])
         self.assertIn("test-without-building", calls[2])
+        self.assertEqual(calls[2][0], "disable_xcbeautify=1")
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
             "testDefaultPolicyGapRuleUsesStableMetadata()",
@@ -201,6 +248,7 @@ exit 1
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0], ["build-for-testing"])
+        self.assertEqual(calls[1][0], "disable_xcbeautify=")
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
@@ -215,18 +263,20 @@ exit 1
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 4)
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-enumerate-tests", calls[1])
         self.assertIn("test-without-building", calls[2])
+        self.assertIn("-enumerate-tests", calls[2])
+        self.assertIn("test-without-building", calls[3])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
             "testDefaultPolicyGapRuleUsesStableMetadata()",
-            calls[2],
+            calls[3],
         )
         self.assertIn(
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
-            calls[2],
+            calls[3],
         )
         self.assertEqual(rtk_log, "")
 
@@ -252,6 +302,60 @@ exit 1
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
             "testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan()",
+            calls[2],
+        )
+        self.assertEqual(rtk_log, "")
+
+    def test_expands_swift_testing_suite_selector_to_methods(self) -> None:
+        completed, calls, rtk_log = self.run_script(
+            only_testing="HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests"
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 3)
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
+            "acpEventPushAppendsSelectedSessionTimeline()",
+            calls[2],
+        )
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
+            "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
+            calls[2],
+        )
+        self.assertEqual(rtk_log, "")
+
+    def test_normalizes_swift_testing_method_selector_without_parentheses(self) -> None:
+        completed, calls, rtk_log = self.run_script(
+            only_testing=(
+                "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
+                "acpPermissionBatchWaitsForSnapshotAndRemainsPresented"
+            )
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 3)
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
+            "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
+            calls[2],
+        )
+        self.assertEqual(rtk_log, "")
+
+    def test_normalizes_xcode_test_url_selector(self) -> None:
+        completed, calls, rtk_log = self.run_script(
+            only_testing=(
+                "test://com.apple.xcode/HarnessMonitor/HarnessMonitorKitTests/"
+                "HarnessMonitorStoreUpdateStreamTests/"
+                "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()"
+            )
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 3)
+        self.assertIn(
+            "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
+            "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
             calls[2],
         )
         self.assertEqual(rtk_log, "")

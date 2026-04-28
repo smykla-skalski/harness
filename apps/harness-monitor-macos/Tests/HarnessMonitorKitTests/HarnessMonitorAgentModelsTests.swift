@@ -85,11 +85,31 @@ struct HarnessMonitorAgentModelsTests {
     #expect(snapshot.acp?.stderrTail == "boom")
   }
 
+  @Test("ACP permission decision wire format matches daemon")
+  func acpPermissionDecisionWireFormat() throws {
+    let approveAll = try encodedJSONObject(AcpPermissionDecision.approveAll)
+    #expect(approveAll["decision"] as? String == "approve_all")
+    #expect(approveAll["request_ids"] == nil)
+
+    let approveSome = try encodedJSONObject(AcpPermissionDecision.approveSome(["request-2"]))
+    #expect(approveSome["decision"] as? String == "approve_some")
+    #expect(approveSome["request_ids"] as? [String] == ["request-2"])
+
+    let denyAll = try encodedJSONObject(AcpPermissionDecision.denyAll)
+    #expect(denyAll["decision"] as? String == "deny_all")
+  }
+
   @Test("AgentStatus encodes idle snake case")
   func agentStatusEncodesIdle() throws {
     let data = try encoder.encode(AgentStatus.awaitingReview)
     let string = String(bytes: data, encoding: .utf8)
     #expect(string == "\"awaiting_review\"")
+  }
+
+  private func encodedJSONObject<T: Encodable>(_ value: T) throws -> [String: Any] {
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let data = try encoder.encode(value)
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 
   @Test("AgentStatus sort priority reorders awaiting review")

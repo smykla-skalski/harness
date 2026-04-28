@@ -3,12 +3,12 @@ import XCTest
 
 final class SwarmCleanupContractTests: XCTestCase {
   func testOrchestratorExposesDriveAllTasksToDoneHelper() throws {
-    let source = try orchestratorSource()
+    let source = try actDriverHelpersSource()
     XCTAssertTrue(
-      source.contains("private func driveAllTasksToDone("),
+      source.contains("func driveAllTasksToDone("),
       """
-      Orchestrator must expose `driveAllTasksToDone(leaderID:)` so the act driver \
-      can drive every non-terminal task through the regular review/arbitration \
+      Act driver helpers must expose `driveAllTasksToDone(leaderID:)` so the act \
+      driver can drive every non-terminal task through the regular review/arbitration \
       flow before calling `harness session end`.
       """
     )
@@ -136,6 +136,15 @@ final class SwarmCleanupContractTests: XCTestCase {
     )
   }
 
+  private func actDriverHelpersSource() throws -> String {
+    try String(
+      contentsOf: repoRoot().appendingPathComponent(
+        "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmActDriverRunner+Helpers.swift"
+      ),
+      encoding: .utf8
+    )
+  }
+
   private func extractActDriverRunBody() throws -> String {
     let source = try orchestratorSource()
     guard let startRange = source.range(of: "  func run() throws {") else {
@@ -163,15 +172,15 @@ final class SwarmCleanupContractTests: XCTestCase {
   }
 
   private func extractPrivateFuncBody(named name: String) throws -> String {
-    let source = try orchestratorSource()
-    let needle = "private func \(name)("
+    let source = try actDriverHelpersSource()
+    let needle = "func \(name)("
     guard let startRange = source.range(of: needle) else {
-      XCTFail("Orchestrator must declare `private func \(name)(...)`.")
+      XCTFail("Act driver helpers must declare `func \(name)(...)`.")
       return ""
     }
     let tail = source[startRange.lowerBound...]
     guard let openBraceRange = tail.range(of: "{") else {
-      XCTFail("`private func \(name)` opening brace missing.")
+      XCTFail("`func \(name)` opening brace missing.")
       return ""
     }
     var depth = 0
@@ -188,7 +197,7 @@ final class SwarmCleanupContractTests: XCTestCase {
       }
       index = tail.index(after: index)
     }
-    XCTFail("`private func \(name)` body did not close.")
+    XCTFail("`func \(name)` body did not close.")
     return ""
   }
 

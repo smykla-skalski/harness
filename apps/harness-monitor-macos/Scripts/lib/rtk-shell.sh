@@ -34,6 +34,13 @@ run_tuist_xcodebuild_command() {
   )
 }
 
+xcbeautify_is_disabled() {
+  case "${HARNESS_MONITOR_DISABLE_XCBEAUTIFY:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Run xcodebuild and pipe its combined stdout/stderr through xcbeautify when
 # available. Falls back to plain xcodebuild output when xcbeautify is missing,
 # so callers stay resilient on hosts that have not provisioned the tool yet.
@@ -70,7 +77,7 @@ run_xcodebuild_with_formatter() {
     invoker=run_tuist_xcodebuild_command
   fi
 
-  if command -v xcbeautify >/dev/null 2>&1; then
+  if ! xcbeautify_is_disabled && command -v xcbeautify >/dev/null 2>&1; then
     local -a xcb_args=(--renderer terminal --is-ci --disable-logging)
     if [[ -n "$junit_path" ]]; then
       /bin/mkdir -p "$(dirname "$junit_path")"

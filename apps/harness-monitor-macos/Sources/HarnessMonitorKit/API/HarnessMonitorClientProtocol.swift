@@ -153,6 +153,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     request: AgentTuiResizeRequest
   ) async throws -> ManagedAgentSnapshot
   func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot
+  func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot
   func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest
@@ -162,6 +163,11 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     agentID: String,
     approvalID: String,
     request: CodexApprovalDecisionRequest
+  ) async throws -> ManagedAgentSnapshot
+  func resolveManagedAcpPermission(
+    agentID: String,
+    batchID: String,
+    decision: AcpPermissionDecision
   ) async throws -> ManagedAgentSnapshot
   func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse
   func acpAgentDescriptors() async throws -> [AcpAgentDescriptor]

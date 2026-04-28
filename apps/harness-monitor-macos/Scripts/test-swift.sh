@@ -27,6 +27,37 @@ DEFAULT_SKIP_TEST_TARGETS=(
   "HarnessMonitorAgentsE2ETests"
 )
 
+filter_monitor_test_console_output() {
+  /usr/bin/awk '
+    /^Using cache binaries for the following targets:/ { next }
+    /^Loading and constructing the graph$/ { next }
+    /^It might take a while if the cache is empty$/ { next }
+    /^Generating workspace / { next }
+    /^Generating project / { next }
+    /^Total time taken: / { next }
+    /^✔ Success $/ { next }
+    /^  Project generated\. $/ { next }
+    /^note: Local cache/ { next }
+    /^note: L/ { next }
+    /^note: Replay cache/ { next }
+    /^note: Re/ { next }
+    /^note: R/ { next }
+    /^note: Using CAS/ { next }
+    /^note: Us/ { next }
+    /^note: U$/ { next }
+    /^note: Lo$/ { next }
+    { print }
+  '
+}
+
+run_build_for_testing() {
+  set +e
+  "$BUILD_FOR_TESTING_SCRIPT" 2>&1 | filter_monitor_test_console_output
+  local status="${PIPESTATUS[0]}"
+  set -e
+  return "$status"
+}
+
 append_only_testing_args() {
   local expanded_selector expanded_selectors selector
   while IFS= read -r selector; do
@@ -46,7 +77,7 @@ append_only_testing_args() {
 expand_only_testing_selector() {
   local selector="$1"
 
-  if [[ "$selector" != */* ]] || [[ "$selector" == */*/* ]]; then
+  if [[ "$selector" != */* ]]; then
     printf '%s\n' "$selector"
     return 0
   fi
@@ -90,11 +121,43 @@ selector = sys.argv[2]
 with open(path, encoding="utf-8") as handle:
     payload = json.load(handle)
 
+def canonical(value):
+    if value.startswith("test://"):
+        # Xcode copies links as test://com.apple.xcode/<app>/<target>/<suite>/<test>.
+        # The -only-testing flag wants <target>/<suite>/<test>.
+        parts = value.split("/")
+        if len(parts) >= 6:
+            value = "/".join(parts[4:])
+    value = value.strip("/")
+    if value.endswith("()"):
+        value = value[:-2]
+    return value
+
+
+def selector_matches(identifier, selector):
+    canonical_identifier = canonical(identifier)
+    canonical_selector = canonical(selector)
+    return (
+        canonical_identifier == canonical_selector
+        or canonical_identifier.startswith(canonical_selector + "/")
+    )
+
+
 identifiers = {}
+all_tests = []
 for value in payload.get("values", []):
-    for test in value.get("enabledTests", []):
+    enabled_tests = value.get("enabledTests", [])
+    all_tests.extend(enabled_tests)
+    all_tests.extend(value.get("disabledTests", []))
+    for test in enabled_tests:
         identifier = test.get("identifier", "")
-        if identifier.startswith(selector + "/"):
+        if selector_matches(identifier, selector):
+            identifiers[identifier] = None
+
+if not identifiers:
+    for test in all_tests:
+        identifier = test.get("identifier", "")
+        if selector_matches(identifier, selector):
             identifiers[identifier] = None
 
 for identifier in identifiers:
@@ -108,6 +171,10 @@ PY
   /bin/rm -rf "$enumeration_dir"
 
   if [[ -z "$expanded_selectors" ]]; then
+    if [[ "$selector" == */*/* ]]; then
+      printf '%s\n' "$selector"
+      return 0
+    fi
     echo "no tests discovered for XCODE_ONLY_TESTING class selector: ${selector}" >&2
     return 1
   fi
@@ -156,7 +223,7 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
-"$BUILD_FOR_TESTING_SCRIPT"
+run_build_for_testing
 
 clear_gatekeeper_metadata
 
@@ -178,5 +245,8 @@ if [[ -n "$XCODE_ONLY_TESTING" ]] && [[ "${#TEST_ARGS[@]}" == "${#BASE_TEST_ARGS
   exit 1
 fi
 
-"$XCODEBUILD_RUNNER" \
-  "${TEST_ARGS[@]}"
+if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+  HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+else
+  "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+fi

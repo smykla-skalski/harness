@@ -43,6 +43,7 @@ class XcodebuildWithLockTests(unittest.TestCase):
         cwd: Path | None = None,
         inject_derived_data_path: bool = True,
         include_tuist: bool = True,
+        include_xcbeautify: bool = False,
     ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -68,8 +69,28 @@ printf 'RTK=%s\\n' "$*" >> "{tool_log}"
                 f"""#!/bin/bash
 set -euo pipefail
 printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+if [[ "${{FAKE_XCODEBUILD_EMIT_NOISE:-}}" == "1" ]]; then
+  printf '%s\\n' \\
+    "Loading and constructing the graph" \\
+    "note: Local cache found for key: llvmcas://abc (in target 'HarnessMonitorKitTests')" \\
+    "note: Using CAS output object: llvmcas://def (in target 'HarnessMonitorKitTests')" \\
+    "note: Replay cache hit (in target 'HarnessMonitorKitTests')" \\
+    "Test run started." \\
+    "Suite \\"Important suite\\" started" \\
+    "    ✔ \\"important test\\" (0.001 seconds)" \\
+    "Test Execute Succeeded"
+fi
 """,
             )
+            if include_xcbeautify:
+                write_executable(
+                    fake_bin / "xcbeautify",
+                    f"""#!/bin/bash
+set -euo pipefail
+printf 'XCBEAUTIFY=%s\\n' "$*" >> "{tool_log}"
+cat
+""",
+                )
             if include_tuist:
                 write_executable(
                     fake_bin / "tuist",
@@ -249,6 +270,39 @@ shift
         self.assertIn('"$xcodebuild_bin" "$@"', rtk_shell)
         self.assertNotIn("\n  xcodebuild \"$@\"", rtk_shell)
 
+    def test_can_disable_xcbeautify_for_unfiltered_test_output(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "test-without-building",
+            extra_env={"HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1"},
+            include_xcbeautify=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
+        self.assertIn("XCODEBUILD=-derivedDataPath", log)
+        self.assertIn("test-without-building", log)
+        self.assertNotIn("XCBEAUTIFY=", log)
+
+    def test_filters_cache_noise_but_keeps_test_output(self) -> None:
+        completed, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "test-without-building",
+            extra_env={"FAKE_XCODEBUILD_EMIT_NOISE": "1"},
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("Loading and constructing the graph", completed.stdout)
+        self.assertNotIn("note: Local cache found", completed.stdout)
+        self.assertNotIn("note: Using CAS output", completed.stdout)
+        self.assertNotIn("note: Replay cache hit", completed.stdout)
+        self.assertIn("Test run started.", completed.stdout)
+        self.assertIn('Suite "Important suite" started', completed.stdout)
+        self.assertIn('✔ "important test"', completed.stdout)
+        self.assertIn("Test Execute Succeeded", completed.stdout)
+
     def test_skips_rtk_for_json_output(self) -> None:
         completed, log = self.run_script("-list", "-json")
 
@@ -415,7 +469,7 @@ PY
     def test_missing_tuist_reports_required_tool_and_normalized_paths(self) -> None:
         completed, _ = self.run_script(
             "-derivedDataPath",
-            "xcode-derived",
+            "tmp/harness-monitor-missing-tuist-derived",
             "-workspace",
             "apps/harness-monitor-macos/HarnessMonitor.xcworkspace",
             "-resultBundlePath",
@@ -435,8 +489,8 @@ PY
             combined_output,
         )
         self.assertIn(
-            "path-normalization: -derivedDataPath xcode-derived -> "
-            f"{COMMON_REPO_ROOT / 'xcode-derived'}",
+            "path-normalization: -derivedDataPath tmp/harness-monitor-missing-tuist-derived -> "
+            f"{CHECKOUT_ROOT / 'tmp/harness-monitor-missing-tuist-derived'}",
             completed.stderr,
         )
         self.assertIn(
@@ -455,7 +509,7 @@ PY
     def test_failure_diagnostics_only_echo_path_arguments(self) -> None:
         completed, _ = self.run_script(
             "-derivedDataPath",
-            "xcode-derived",
+            "tmp/harness-monitor-failure-diagnostics-derived",
             "-resultBundlePath",
             "tmp/result bundle.xcresult",
             "CUSTOM_SIGNING_TOKEN=top-secret",
@@ -471,8 +525,8 @@ PY
         self.assertIn("xcodebuild-wrapper: original path args:", completed.stderr)
         self.assertIn("xcodebuild-wrapper: normalized path args:", completed.stderr)
         self.assertIn(
-            "path-normalization: -derivedDataPath xcode-derived -> "
-            f"{COMMON_REPO_ROOT / 'xcode-derived'}",
+            "path-normalization: -derivedDataPath tmp/harness-monitor-failure-diagnostics-derived -> "
+            f"{CHECKOUT_ROOT / 'tmp/harness-monitor-failure-diagnostics-derived'}",
             completed.stderr,
         )
         self.assertIn(
@@ -567,11 +621,21 @@ shift
                 / "arm64"
                 / "HarnessMonitorKit.SwiftFileList"
             )
+            diagnostics_file = (
+                swift_file_list.parent
+                / "BrokenWarning.dia"
+            )
 
             logs_root.mkdir(parents=True)
             swift_file_list.parent.mkdir(parents=True, exist_ok=True)
             swift_file_list.write_text(
                 "/Users/x/Sources/RulesPane.swift\n/Users/x/Sources/SidebarView.swift\n"
+            )
+            diagnostics_file.write_text(
+                "DIAG\n"
+                "/Users/x/Tests/BrokenWarningTests.swift\n"
+                "no-usage\n"
+                "result of call to function returning 'HarnessMonitorAPIError' is unused\n"
             )
 
             empty_log = logs_root / "Z-empty.xcactivitylog"
@@ -655,6 +719,15 @@ shift
             self.assertIn(str(swift_file_list), completed.stderr)
             self.assertIn(
                 "swift-compile-context: source: /Users/x/Sources/RulesPane.swift",
+                completed.stderr,
+            )
+            self.assertIn(
+                "swift-diagnostics: extracted compiler diagnostics from .dia files",
+                completed.stderr,
+            )
+            self.assertIn(str(diagnostics_file), completed.stderr)
+            self.assertIn(
+                "result of call to function returning 'HarnessMonitorAPIError' is unused",
                 completed.stderr,
             )
             self.assertNotIn(str(empty_log), completed.stderr)

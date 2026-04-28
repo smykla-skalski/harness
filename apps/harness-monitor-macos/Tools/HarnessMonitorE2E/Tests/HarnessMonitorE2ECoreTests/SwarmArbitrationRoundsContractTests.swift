@@ -38,12 +38,13 @@ final class SwarmArbitrationRoundsContractTests: XCTestCase {
   }
 
   func testOrchestratorExposesContinueReviewRoundHelper() throws {
-    let source = try orchestratorSource()
+    let source = try actDriverHelpersSource()
     XCTAssertTrue(
-      source.contains("private func continueReviewRound("),
+      source.contains("func continueReviewRound("),
       """
-      Orchestrator must expose `continueReviewRound(taskID:workerID:reviewerA:reviewerB:note:)` \
-      so subsequent arbitration rounds drive submit-review×2 + respond-review without retrying \
+      Act driver helpers must expose \
+      `continueReviewRound(taskID:workerID:reviewerA:reviewerB:note:)` so subsequent \
+      arbitration rounds drive submit-review×2 + respond-review without retrying \
       submit-for-review against an already in-review task.
       """
     )
@@ -53,6 +54,15 @@ final class SwarmArbitrationRoundsContractTests: XCTestCase {
     try String(
       contentsOf: repoRoot().appendingPathComponent(
         "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift"
+      ),
+      encoding: .utf8
+    )
+  }
+
+  private func actDriverHelpersSource() throws -> String {
+    try String(
+      contentsOf: repoRoot().appendingPathComponent(
+        "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmActDriverRunner+Helpers.swift"
       ),
       encoding: .utf8
     )

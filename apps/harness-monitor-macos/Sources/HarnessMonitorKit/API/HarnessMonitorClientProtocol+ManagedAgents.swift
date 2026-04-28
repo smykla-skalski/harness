@@ -57,6 +57,10 @@ extension HarnessMonitorClientProtocol {
     .terminal(try await stopAgentTui(tuiID: agentID))
   }
 
+  public func stopManagedAcpAgent(agentID _: String) async throws -> ManagedAgentSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+  }
+
   public func steerManagedCodexAgent(
     agentID: String,
     request: CodexSteerRequest
@@ -80,6 +84,14 @@ extension HarnessMonitorClientProtocol {
         request: request
       )
     )
+  }
+
+  public func resolveManagedAcpPermission(
+    agentID _: String,
+    batchID _: String,
+    decision _: AcpPermissionDecision
+  ) async throws -> ManagedAgentSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
   }
 
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {

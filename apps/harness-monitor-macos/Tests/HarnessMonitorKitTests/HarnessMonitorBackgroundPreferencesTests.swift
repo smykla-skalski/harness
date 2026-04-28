@@ -83,8 +83,8 @@ struct BackgroundThumbnailCacheTests {
       thumbnailMemoryByteLimit: 512,
       fullImageMemoryByteLimit: 512
     )
-    let firstImage = makeTestImage(width: 12, height: 12)
-    let secondImage = makeTestImage(width: 12, height: 12)
+    let firstImage = makeTestImage(width: 9, height: 9)
+    let secondImage = makeTestImage(width: 9, height: 9)
 
     await cache.cacheMemoryImage(firstImage, for: "first", kind: .thumbnail)
     await cache.cacheMemoryImage(secondImage, for: "second", kind: .thumbnail)

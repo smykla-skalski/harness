@@ -54,12 +54,28 @@ struct ToolCallTimelineView: View {
   }
 
   static func materialiseRows(from entries: [TimelineEntry]) -> [ToolCallTimelineRow] {
-    entries.compactMap(ToolCallTimelineRow.init(entry:))
+    var rowsByID: [String: ToolCallTimelineRow] = [:]
+    for row in entries.compactMap(ToolCallTimelineRow.init(entry:)).sorted(by: {
+      if $0.recordedAt != $1.recordedAt {
+        return $0.recordedAt < $1.recordedAt
+      }
+      return $0.entryId < $1.entryId
+    }) {
+      rowsByID[row.id] = rowsByID[row.id]?.merging(row) ?? row
+    }
+    return rowsByID.values.sorted {
+      if $0.recordedAt != $1.recordedAt {
+        return $0.recordedAt > $1.recordedAt
+      }
+      return $0.entryId < $1.entryId
+    }
   }
 }
 
 struct ToolCallTimelineRow: Identifiable, Equatable {
   let id: String
+  let entryId: String
+  let recordedAt: String
   let title: String
   let detail: String
   let status: Status
@@ -71,30 +87,82 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
   }
 
   init?(entry: TimelineEntry) {
-    guard entry.kind == "conversation_event" else { return nil }
-    guard case .object(let payload) = entry.payload,
-      case .object(let kind)? = payload["kind"],
-      case .string(let type)? = kind["type"],
-      type == "tool_invocation" || type == "tool_result"
+    guard let event = Self.toolEventPayload(from: entry),
+      let type = event.stringValue(for: "type")
     else {
       return nil
     }
+    let status = Self.status(forEntryKind: entry.kind, eventType: type, event: event)
+    guard let status else { return nil }
+
     let toolName: String =
-      if case .string(let value)? = kind["tool_name"] {
+      if let value = event.stringValue(for: "tool_name") {
         value
       } else {
         "Tool"
       }
-    let isError =
-      if case .bool(let value)? = kind["is_error"] {
-        value
-      } else {
-        false
-      }
-    id = entry.entryId
+    id = event.stringValue(for: "invocation_id") ?? entry.entryId
+    entryId = entry.entryId
+    recordedAt = entry.recordedAt
     title = toolName
     detail = entry.summary
-    status = type == "tool_invocation" ? .started : (isError ? .failed : .completed)
+    self.status = status
+  }
+
+  private static func toolEventPayload(from entry: TimelineEntry) -> [String: JSONValue]? {
+    let canonicalKinds = ["tool_invocation", "tool_result", "tool_result_error"]
+    guard canonicalKinds.contains(entry.kind) || entry.kind == "conversation_event",
+      case .object(let payload) = entry.payload
+    else {
+      return nil
+    }
+    let eventPayload = payload["event"] ?? payload["kind"]
+    guard case .object(let event)? = eventPayload else {
+      return nil
+    }
+    return event
+  }
+
+  private static func status(
+    forEntryKind entryKind: String,
+    eventType: String,
+    event: [String: JSONValue]
+  ) -> Status? {
+    switch entryKind {
+    case "tool_invocation":
+      return .started
+    case "tool_result_error":
+      return .failed
+    case "tool_result":
+      return event.boolValue(for: "is_error") == true ? .failed : .completed
+    case "conversation_event":
+      switch eventType {
+      case "tool_invocation":
+        return .started
+      case "tool_result":
+        return event.boolValue(for: "is_error") == true ? .failed : .completed
+      default:
+        return nil
+      }
+    default:
+      return nil
+    }
+  }
+
+  func merging(_ newer: Self) -> Self {
+    guard isStarted || !newer.isStarted else {
+      return self
+    }
+    return newer
+  }
+
+  private var isStarted: Bool {
+    switch status {
+    case .started:
+      true
+    case .completed, .failed:
+      false
+    }
   }
 
   var symbolName: String {
@@ -139,5 +207,21 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
     case .failed:
       "Failed"
     }
+  }
+}
+
+extension [String: JSONValue] {
+  fileprivate func stringValue(for key: String) -> String? {
+    guard case .string(let value)? = self[key] else {
+      return nil
+    }
+    return value
+  }
+
+  fileprivate func boolValue(for key: String) -> Bool? {
+    guard case .bool(let value)? = self[key] else {
+      return nil
+    }
+    return value
   }
 }

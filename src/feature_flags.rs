@@ -8,7 +8,7 @@
 //!   suite lifecycle hooks: `guard-stop`, `context-agent`, `validate-agent`,
 //!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
 //! - `HARNESS_FEATURE_ACP=1` exposes ACP managed-agent start routes while the
-//!   permission UI is still landing. Chunk 11 flips this on by default.
+//!   blocking permission modal finishes landing.
 //!
 //! Resolution order: explicit CLI override (when supplied) wins over env vars,
 //! env vars over the disabled-by-default baseline. Truthy values match the

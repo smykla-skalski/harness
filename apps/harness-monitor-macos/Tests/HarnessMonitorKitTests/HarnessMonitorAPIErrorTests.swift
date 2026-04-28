@@ -6,10 +6,12 @@ import Testing
 struct HarnessMonitorAPIErrorTests {
   @Test("Nested daemon error payloads normalize to the inner semantic message")
   func nestedDaemonErrorPayloadNormalizesToInnerMessage() {
+    let message =
+      #"{"error":{"details":null,"message":"session not active: "#
+      + #"managed agent 'agent-tui-1' not found","code":"KSRCLI090"}}"#
     let error = HarnessMonitorAPIError.server(
       code: 400,
-      message:
-        #"{"error":{"details":null,"message":"session not active: managed agent 'agent-tui-1' not found","code":"KSRCLI090"}}"#
+      message: message
     )
 
     #expect(

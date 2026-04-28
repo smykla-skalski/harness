@@ -130,6 +130,10 @@ extension HarnessMonitorStore {
   }
 
   func applyGlobalPushEvent(_ event: DaemonPushEvent) {
+    if applyManagedAgentPushEvent(event) {
+      return
+    }
+
     switch event.kind {
     case .ready:
       break
@@ -148,12 +152,9 @@ extension HarnessMonitorStore {
       applySessionExtensions(payload)
     case .logLevelChanged(let response):
       daemonLogLevel = response.level
-    case .codexRunUpdated(let run):
-      applyCodexRun(run)
-    case .codexApprovalRequested(let payload):
-      applyCodexApprovalRequested(payload)
-    case .agentTuiUpdated(let tui):
-      applyAgentTui(tui)
+    case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
+      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
+      break
     case .unknown:
       break
     }
@@ -209,15 +210,13 @@ extension HarnessMonitorStore {
   }
 
   func applySessionPushEvent(_ event: DaemonPushEvent) {
+    if applyManagedAgentPushEvent(event) {
+      return
+    }
+
     switch event.kind {
     case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
       break
-    case .codexRunUpdated(let run):
-      applyCodexRun(run)
-    case .codexApprovalRequested(let payload):
-      applyCodexApprovalRequested(payload)
-    case .agentTuiUpdated(let tui):
-      applyAgentTui(tui)
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return
@@ -253,7 +252,33 @@ extension HarnessMonitorStore {
       }
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
+    case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
+      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
+      break
     }
+  }
+
+  @discardableResult
+  private func applyManagedAgentPushEvent(_ event: DaemonPushEvent) -> Bool {
+    switch event.kind {
+    case .codexRunUpdated(let run):
+      applyCodexRun(run)
+    case .codexApprovalRequested(let payload):
+      applyCodexApprovalRequested(payload)
+    case .agentTuiUpdated(let tui):
+      applyAgentTui(tui)
+    case .acpAgentUpdated(let snapshot):
+      applyAcpAgent(snapshot)
+    case .acpEvents(let payload):
+      applyAcpEvents(payload, recordedAt: event.recordedAt)
+    case .acpPermissionBatch(let batch):
+      applyAcpPermissionBatch(batch)
+    case .acpPermissionBatchRemoved(let batch):
+      removeAcpPermissionBatch(batch)
+    default:
+      return false
+    }
+    return true
   }
 
   func startManifestWatcher() {

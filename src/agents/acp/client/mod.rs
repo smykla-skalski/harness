@@ -281,27 +281,34 @@ impl HarnessAcpClient {
             }
             WriteDecision::DenyCheckFailed { reason } => Some(ClientError::write_denied(reason)),
         };
-        if let PermissionMode::Recording { log_path } = &self.permission_mode {
-            record_write_decision(log_path, request, policy_error.as_ref().map_or(Ok(()), Err));
-        }
         if let Some(error) = policy_error {
-            return Err(error);
+            let result = Err(error);
+            if let PermissionMode::Recording { log_path } = &self.permission_mode {
+                record_write_decision(log_path, request, result.as_ref().map(|_| ()));
+            }
+            return result;
         }
 
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                ClientError::write_denied(format!(
-                    "failed to create parent directory '{}': {e}",
-                    parent.display()
-                ))
+        let result = (|| {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|e| {
+                    ClientError::write_denied(format!(
+                        "failed to create parent directory '{}': {e}",
+                        parent.display()
+                    ))
+                })?;
+            }
+
+            fs::write(path, &request.content).map_err(|e| {
+                ClientError::write_denied(format!("failed to write '{}': {e}", path.display()))
             })?;
+
+            Ok(WriteTextFileResponse::new())
+        })();
+        if let PermissionMode::Recording { log_path } = &self.permission_mode {
+            record_write_decision(log_path, request, result.as_ref().map(|_| ()));
         }
-
-        fs::write(path, &request.content).map_err(|e| {
-            ClientError::write_denied(format!("failed to write '{}': {e}", path.display()))
-        })?;
-
-        Ok(WriteTextFileResponse::new())
+        result
     }
 
     /// Handle `terminal/create`.
