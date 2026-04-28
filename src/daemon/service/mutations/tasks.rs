@@ -80,12 +80,6 @@ pub fn assign_task(
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
         write_task_start_signals(&project_dir, &effects)?;
-        db.append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_task_assigned(task_id, &request.agent_id),
-            Some(&request.actor),
-            None,
-        ))?;
         append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
         db.merge_signal_records(
             session_id,
