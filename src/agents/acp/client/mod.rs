@@ -11,7 +11,7 @@
 //! below and a human-readable message. Agents SHOULD surface the message to
 //! the user and SHOULD NOT retry the same operation without user intervention.
 //!
-//! Rejection scenarios observed via ACTA spike:
+//! Rejection scenarios covered by the recovery contract:
 //!
 //! - **Denied write**: agent asks to write outside the run surface or to a
 //!   control file -> error `WRITE_DENIED` with path and reason. Agent shows
@@ -227,6 +227,14 @@ impl HarnessAcpClient {
 
     /// Handle `fs/write_text_file`.
     ///
+    /// Rejection-recovery contract: a denied write is terminal for that tool
+    /// call. The client returns a named JSON-RPC error (`WRITE_DENIED` for
+    /// surface/control/symlink failures, `BINARY_DENIED` for managed-cluster
+    /// binaries) with the rejected path and reason. The agent should surface
+    /// that message, stop retrying the same write, and either continue the
+    /// turn with the denied action omitted or ask the user for a different
+    /// path/action.
+    ///
     /// # Errors
     ///
     /// Returns `WRITE_DENIED` if the path escapes the run surface, targets a
@@ -297,6 +305,13 @@ impl HarnessAcpClient {
     }
 
     /// Handle `terminal/create`.
+    ///
+    /// Rejection-recovery contract: a denied terminal spawn is terminal for
+    /// that tool call. The client returns `TERMINAL_DENIED` for denied
+    /// commands, terminal-cap exhaustion, PTY allocation failure, or spawn
+    /// failure. The agent should surface the command and reason, stop retrying
+    /// the same terminal command without changed user intent, and continue the
+    /// turn with non-terminal alternatives where possible.
     ///
     /// # Errors
     ///
