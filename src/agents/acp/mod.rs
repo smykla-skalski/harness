@@ -9,3 +9,5 @@
 //! supervision, permission, and event-materialiser layers arrive in later
 //! chunks.
 pub mod catalog;
+pub mod client;
+pub mod permission;
