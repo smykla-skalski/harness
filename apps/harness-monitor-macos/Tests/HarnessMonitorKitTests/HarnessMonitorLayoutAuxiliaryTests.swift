@@ -228,6 +228,21 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
       #expect(measured.cols >= 60)
     }
   }
+
+  @MainActor
+  @Test("Terminal content width follows the negotiated column count")
+  func terminalContentWidthFollowsNegotiatedColumnCount() {
+    let narrow = AgentsWindowView.TerminalViewportSizing.contentWidth(
+      for: AgentTuiSize(rows: 20, cols: 88),
+      fontScale: 1
+    )
+    let wide = AgentsWindowView.TerminalViewportSizing.contentWidth(
+      for: AgentTuiSize(rows: 20, cols: 119),
+      fontScale: 1
+    )
+
+    #expect(wide > narrow)
+  }
 }
 
 @Suite("Interactive card hover state")
