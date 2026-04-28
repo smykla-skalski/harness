@@ -10,6 +10,8 @@ Normalizes:
   on the PBXProject `attributes` block.
 - target-level `DevelopmentTeam` / `ProvisioningStyle` metadata from
   `TargetAttributes`, so targets inherit signing cleanly from project settings.
+- macOS app-target `SystemCapabilities` metadata for disabled App Groups, so
+  Xcode does not keep re-suggesting "Enable Register App Groups".
 
 Tuist 4 does not expose the project-format fields via its DSL, and its
 generator still hardcodes an Xcode 14-era object version. The text is edited
@@ -40,6 +42,20 @@ ATTRIBUTES_BLOCK_RE = re.compile(
 TARGET_ATTRIBUTES_RE = re.compile(
     r"(\t\t\t\tTargetAttributes = \{\n)((?:\t{4,}[^\n]*\n)*?)(\t\t\t\t\};)"
 )
+
+PBX_NATIVE_TARGET_RE = re.compile(
+    r"\t\t([0-9A-F]{24}) /\* ([^*]+) \*/ = \{\n"
+    r"\t\t\tisa = PBXNativeTarget;\n"
+    r"((?:\t\t\t[^\n]*\n)*?)"
+    r"\t\t\};",
+)
+
+SYSTEM_CAPABILITIES_RE = re.compile(
+    r"(\t\t\t\t\t\tSystemCapabilities = \{\n)((?:\t{7,}[^\n]*\n)*?)(\t\t\t\t\t\t\};)"
+)
+
+DISABLED_MAC_APP_GROUP_TARGETS = frozenset({"HarnessMonitor", "HarnessMonitorUITestHost"})
+MAC_APP_GROUPS_CAPABILITY_KEY = "com.apple.ApplicationGroups.Mac"
 
 
 def upsert_project_attribute(text: str, key: str, value: str) -> str:
@@ -111,6 +127,97 @@ def strip_target_attribute_signing_metadata(text: str) -> str:
     return TARGET_ATTRIBUTES_RE.sub(replace, text, count=1)
 
 
+def capability_entry(capability_key: str, enabled: int) -> str:
+    return (
+        f"\t\t\t\t\t\t\t{capability_key} = {{\n"
+        f"\t\t\t\t\t\t\t\tenabled = {enabled};\n"
+        f"\t\t\t\t\t\t\t}};\n"
+    )
+
+
+def upsert_system_capability(target_body: str, capability_key: str, enabled: int) -> str:
+    entry = capability_entry(capability_key, enabled)
+    capability_re = re.compile(
+        rf"^\t{{7}}{re.escape(capability_key)} = \{{\n"
+        rf"\t{{8}}enabled = [01];\n"
+        rf"\t{{7}}\}};\n?",
+        re.MULTILINE,
+    )
+
+    def replace(match: re.Match[str]) -> str:
+        head, body, tail = match.group(1), match.group(2), match.group(3)
+        if capability_re.search(body):
+            body = capability_re.sub(entry, body, count=1)
+        else:
+            body = body.rstrip("\n") + "\n" if body and not body.endswith("\n") else body
+            body += entry
+        return head + body + tail
+
+    if SYSTEM_CAPABILITIES_RE.search(target_body):
+        return SYSTEM_CAPABILITIES_RE.sub(replace, target_body, count=1)
+
+    body = target_body.rstrip("\n") + "\n" if target_body and not target_body.endswith("\n") else target_body
+    return body + "\t\t\t\t\t\tSystemCapabilities = {\n" + entry + "\t\t\t\t\t\t};\n"
+
+
+def native_target_ids(text: str, target_names: set[str]) -> dict[str, str]:
+    target_ids: dict[str, str] = {}
+    for match in PBX_NATIVE_TARGET_RE.finditer(text):
+        target_id, target_name, body = match.group(1), match.group(2), match.group(3)
+        if target_name not in target_names:
+            continue
+        if 'productType = "com.apple.product-type.application";' not in body:
+            continue
+        target_ids[target_name] = target_id
+    return target_ids
+
+
+def upsert_target_system_capability(
+    text: str,
+    *,
+    target_id: str,
+    capability_key: str,
+    enabled: int,
+) -> str:
+    target_entry_re = re.compile(
+        rf"(\t\t\t\t\t{target_id} = \{{\n)((?:\t{{6,}}[^\n]*\n)*?)(\t\t\t\t\t\}};\n)"
+    )
+
+    def replace_target(match: re.Match[str]) -> str:
+        head, body, tail = match.group(1), match.group(2), match.group(3)
+        return head + upsert_system_capability(body, capability_key, enabled) + tail
+
+    updated, count = target_entry_re.subn(replace_target, text, count=1)
+    if count:
+        return updated
+
+    target_entry = (
+        f"\t\t\t\t\t{target_id} = {{\n"
+        f"\t\t\t\t\t\tSystemCapabilities = {{\n"
+        f"{capability_entry(capability_key, enabled)}"
+        f"\t\t\t\t\t\t}};\n"
+        f"\t\t\t\t\t}};\n"
+    )
+
+    def replace_target_attributes(match: re.Match[str]) -> str:
+        head, body, tail = match.group(1), match.group(2), match.group(3)
+        body = body.rstrip("\n") + "\n" if body and not body.endswith("\n") else body
+        return head + body + target_entry + tail
+
+    return TARGET_ATTRIBUTES_RE.sub(replace_target_attributes, text, count=1)
+
+
+def upsert_disabled_mac_app_group_metadata(text: str) -> str:
+    for target_id in native_target_ids(text, set(DISABLED_MAC_APP_GROUP_TARGETS)).values():
+        text = upsert_target_system_capability(
+            text,
+            target_id=target_id,
+            capability_key=MAC_APP_GROUPS_CAPABILITY_KEY,
+            enabled=0,
+        )
+    return text
+
+
 def patch_pbxproj(
     pbxproj_path: Path,
     last_upgrade: str,
@@ -127,6 +234,7 @@ def patch_pbxproj(
     text = upsert_project_attribute(text, "LastSwiftUpdateCheck", last_swift_update)
     text = upsert_project_attribute(text, "LastUpgradeCheck", last_upgrade)
     text = strip_target_attribute_signing_metadata(text)
+    text = upsert_disabled_mac_app_group_metadata(text)
     pbxproj_path.write_text(text)
 
 
