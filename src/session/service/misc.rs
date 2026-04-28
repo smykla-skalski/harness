@@ -27,12 +27,24 @@ pub(crate) fn next_task_id(tasks: &BTreeMap<String, WorkItem>) -> String {
     }
 }
 
-pub(crate) fn agent_status_label(status: AgentStatus) -> &'static str {
+/// Snake-case identifier used in DB rows and machine-readable contexts.
+#[must_use]
+pub fn agent_status_db_label(status: &AgentStatus) -> &'static str {
+    match status {
+        AgentStatus::Active => "active",
+        AgentStatus::Idle => "idle",
+        AgentStatus::AwaitingReview => "awaiting_review",
+        AgentStatus::Disconnected { .. } => "disconnected",
+        AgentStatus::Removed => "removed",
+    }
+}
+
+pub(crate) fn agent_status_label(status: &AgentStatus) -> &'static str {
     match status {
         AgentStatus::Active => "active",
         AgentStatus::Idle => "idle",
         AgentStatus::AwaitingReview => "awaiting review",
-        AgentStatus::Disconnected => "disconnected",
+        AgentStatus::Disconnected { .. } => "disconnected",
         AgentStatus::Removed => "removed",
     }
 }

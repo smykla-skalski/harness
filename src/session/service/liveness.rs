@@ -95,7 +95,7 @@ pub(crate) fn collect_agent_activity_from_state(
         if !agent.status.is_alive() {
             continue;
         }
-        let Some(agent_runtime) = runtime::runtime_for_name(&agent.runtime) else {
+        let Some(agent_runtime) = runtime::runtime_for_name(agent.runtime.runtime_name()) else {
             continue;
         };
         let agent_session_id = agent_runtime_session_id(session_id, agent);
@@ -106,7 +106,7 @@ pub(crate) fn collect_agent_activity_from_state(
             agent_id: agent.agent_id.clone(),
             last_activity,
             state_last_activity: agent.last_activity_at.clone(),
-            runtime_name: agent.runtime.clone(),
+            runtime_name: agent.runtime.to_string(),
             agent_session_id: agent.agent_session_id.clone(),
             has_pending_signals: has_pending_signals(agent_runtime, state, agent, &context_root),
         });
@@ -158,9 +158,9 @@ pub(crate) fn compute_agent_transition(
     let mut new_status = match liveness_from_timestamp(effective_activity, config) {
         LivenessStatus::Active => AgentStatus::Active,
         LivenessStatus::Idle => AgentStatus::Idle,
-        LivenessStatus::Unresponsive => AgentStatus::Disconnected,
+        LivenessStatus::Unresponsive => AgentStatus::disconnected_unknown(),
     };
-    if record.has_pending_signals && new_status == AgentStatus::Disconnected {
+    if record.has_pending_signals && new_status.is_disconnected() {
         new_status = AgentStatus::Idle;
     }
 
@@ -264,12 +264,14 @@ pub(crate) fn apply_single_transition(
         agent.last_activity_at = Some(timestamp.clone());
     }
 
-    let old_status = agent.status;
+    let old_status = agent.status.clone();
+    let was_disconnected = new_status.is_disconnected();
+    let became_idle = matches!(new_status, AgentStatus::Idle);
     agent.status = new_status;
     now.clone_into(&mut agent.updated_at);
     let was_leader = state.leader_id.as_deref() == Some(record.agent_id.as_str());
 
-    if new_status == AgentStatus::Disconnected {
+    if was_disconnected {
         release_agent_tasks(state, &record.agent_id, now);
         clear_pending_leader_transfer(state, &record.agent_id);
         if was_leader {
@@ -281,7 +283,7 @@ pub(crate) fn apply_single_transition(
             ?old_status,
             "agent disconnected by liveness sync"
         );
-    } else if new_status == AgentStatus::Idle {
+    } else if became_idle {
         result.idled.push(record.agent_id.clone());
         tracing::debug!(agent_id = record.agent_id, "agent transitioned to idle");
     }
@@ -292,15 +294,19 @@ pub(crate) fn apply_agent_disconnected(
     agent_id: &str,
     now: &str,
 ) -> bool {
-    let Some(current_status) = state.agents.get(agent_id).map(|agent| agent.status) else {
+    let Some(current_alive) = state
+        .agents
+        .get(agent_id)
+        .map(|agent| agent.status.is_alive())
+    else {
         return false;
     };
-    if !current_status.is_alive() {
+    if !current_alive {
         return false;
     }
 
     if let Some(agent) = state.agents.get_mut(agent_id) {
-        agent.status = AgentStatus::Disconnected;
+        agent.status = AgentStatus::disconnected_unknown();
         now.clone_into(&mut agent.updated_at);
         agent.last_activity_at = Some(now.to_string());
         agent.current_task_id = None;

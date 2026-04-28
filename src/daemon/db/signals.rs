@@ -267,9 +267,10 @@ impl DaemonDb {
             };
 
             let count: i64 = statement
-                .query_row(rusqlite::params![agent.runtime, agent_session_id], |row| {
-                    row.get(0)
-                })
+                .query_row(
+                    rusqlite::params![agent.runtime.runtime_name(), agent_session_id],
+                    |row| row.get(0),
+                )
                 .map_err(|error| db_error(format!("query shared runtime lookup: {error}")))?;
             if count > 1 {
                 return Ok(true);

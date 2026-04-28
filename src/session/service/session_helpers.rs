@@ -154,7 +154,7 @@ pub(crate) fn require_permission(
     if !agent.status.is_alive() {
         return Err(CliErrorKind::session_permission_denied(format!(
             "agent '{actor_id}' is {} in session '{}'",
-            agent_status_label(agent.status),
+            agent_status_label(&agent.status),
             state.session_id
         ))
         .into());
@@ -178,7 +178,7 @@ pub(crate) fn build_leave_signal_record(
     now: &str,
     action: &str,
 ) -> Result<LeaveSignalRecord, CliError> {
-    if runtime::runtime_for_name(&agent.runtime).is_none() {
+    if runtime::runtime_for_name(agent.runtime.runtime_name()).is_none() {
         return Err(leave_signal_delivery_error(
             action,
             &agent.agent_id,
@@ -192,7 +192,7 @@ pub(crate) fn build_leave_signal_record(
         .unwrap_or(&state.session_id)
         .to_string();
     Ok(LeaveSignalRecord {
-        runtime: agent.runtime.clone(),
+        runtime: agent.runtime.to_string(),
         agent_id: agent.agent_id.clone(),
         signal_session_id,
         signal: build_signal(
@@ -281,7 +281,7 @@ pub(crate) fn require_active_target_agent(
     if !agent.status.is_alive() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is {}",
-            agent_status_label(agent.status)
+            agent_status_label(&agent.status)
         ))
         .into());
     }
@@ -308,7 +308,7 @@ pub(crate) fn require_active_worker_target_agent(
     if !agent.status.accepts_assignment() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' is {} and cannot accept a new assignment",
-            agent_status_label(agent.status)
+            agent_status_label(&agent.status)
         ))
         .into());
     }

@@ -266,8 +266,9 @@ fn submit_for_review_file_path_emits_spawn_reviewer_to_leader_runtime_session() 
             .agent_session_id
             .as_deref()
             .expect("leader runtime session");
-        let leader_runtime = crate::agents::runtime::runtime_for_name(&leader_agent.runtime)
-            .expect("leader runtime");
+        let leader_runtime =
+            crate::agents::runtime::runtime_for_name(leader_agent.runtime.runtime_name())
+                .expect("leader runtime");
         let signal_dir = leader_runtime
             .signal_dir(project, leader_signal_session)
             .join("pending");

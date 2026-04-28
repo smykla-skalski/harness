@@ -326,7 +326,7 @@ fn post_task_create_allows_observer_in_leaderless_degraded_session() {
                         .agents
                         .get_mut(&previous_leader)
                         .expect("leader registration");
-                    leader.status = crate::session::types::AgentStatus::Disconnected;
+                    leader.status = crate::session::types::AgentStatus::disconnected_unknown();
                     async_db
                         .save_session_state(&resolved.project.project_id, &resolved.state)
                         .await

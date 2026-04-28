@@ -135,7 +135,7 @@ fn list_sessions_reconciles_orphaned_active_session_without_state_file() {
             persisted
                 .agents
                 .values()
-                .all(|agent| agent.status == AgentStatus::Disconnected)
+                .all(|agent| agent.status.is_disconnected())
         );
     });
 }
@@ -196,7 +196,7 @@ fn session_detail_async_reconciles_orphaned_active_session_without_state_file() 
                     .state
                     .agents
                     .values()
-                    .all(|agent| agent.status == AgentStatus::Disconnected)
+                    .all(|agent| agent.status.is_disconnected())
             );
         });
     });

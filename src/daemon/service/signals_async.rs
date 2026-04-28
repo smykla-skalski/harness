@@ -118,7 +118,7 @@ fn pending_signal_dir(
             "agent '{agent_id}' not found in session '{session_id}'"
         )))
     })?;
-    let runtime = runtime_for_agent(&agent.runtime)?;
+    let runtime = runtime_for_agent(agent.runtime.runtime_name())?;
     Ok(runtime.signal_dir(project_dir, signal_session_id_for_agent(session_id, agent)))
 }
 
@@ -147,7 +147,7 @@ fn write_signal_ack_artifact(
     let Some(agent) = resolved.state.agents.get(&request.agent_id) else {
         return Ok(());
     };
-    let runtime = runtime_for_agent(&agent.runtime)?;
+    let runtime = runtime_for_agent(agent.runtime.runtime_name())?;
     let signal_session_id = signal_session_id_for_agent(session_id, agent);
     write_signal_ack(
         &runtime.signal_dir(project_dir, signal_session_id),

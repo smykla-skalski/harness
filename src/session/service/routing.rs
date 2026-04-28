@@ -37,6 +37,7 @@ fn persona_distance(suggested: Option<&str>, agent: &AgentRegistration) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::kind::RuntimeKind;
     use crate::session::types::{
         AgentPersona, AgentStatus, PersonaSymbol, SessionRole, TaskSeverity, TaskSource,
         TaskStatus, WorkItem,
@@ -57,7 +58,7 @@ mod tests {
         AgentRegistration {
             agent_id: id.to_string(),
             name: id.to_string(),
-            runtime: "codex".to_string(),
+            runtime: RuntimeKind::from("codex"),
             role: SessionRole::Worker,
             capabilities: Vec::new(),
             joined_at: "now".to_string(),

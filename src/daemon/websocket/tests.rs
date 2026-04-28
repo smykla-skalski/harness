@@ -225,7 +225,7 @@ async fn seed_pending_signal(
         .get(agent_id)
         .expect("agent present")
         .clone();
-    let runtime = runtime_for_name(&agent.runtime).expect("runtime");
+    let runtime = runtime_for_name(agent.runtime.runtime_name()).expect("runtime");
     let signal = build_signal(
         actor_id,
         "inject_context",

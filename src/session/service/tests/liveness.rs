@@ -38,7 +38,7 @@ fn sync_liveness_transitions_stale_agent_to_disconnected() {
 
         let state = session_status("sync-1", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(worker.status, AgentStatus::Disconnected);
+        assert_eq!(worker.status, AgentStatus::disconnected_unknown());
 
         let leader = state.agents.get(&leader_id).expect("leader");
         assert_eq!(leader.status, AgentStatus::Active);
@@ -112,7 +112,7 @@ fn sync_liveness_uses_orchestration_session_fallback_for_legacy_agents() {
         let updated = session_status("sync-legacy", project).expect("updated");
         assert_eq!(
             updated.agents.get(&worker_id).expect("worker").status,
-            AgentStatus::Disconnected
+            AgentStatus::disconnected_unknown()
         );
     });
 }
@@ -145,7 +145,7 @@ fn sync_liveness_marks_session_leaderless_degraded_when_dead_leader_has_no_succe
         );
         assert_eq!(
             updated.agents.get(&leader_id).expect("leader agent").status,
-            AgentStatus::Disconnected
+            AgentStatus::disconnected_unknown()
         );
         assert_eq!(updated.metrics.agent_count, 0);
         assert_eq!(updated.metrics.active_agent_count, 0);
@@ -419,7 +419,7 @@ fn leave_session_marks_agent_disconnected() {
 
         let state = session_status("leave-1", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(worker.status, AgentStatus::Disconnected);
+        assert_eq!(worker.status, AgentStatus::disconnected_unknown());
 
         let task = state.tasks.get(&task.task_id).expect("task");
         assert_eq!(task.status, TaskStatus::Open, "task returned to open");
@@ -494,7 +494,7 @@ fn leave_session_marks_session_leaderless_degraded_without_successor() {
         );
         assert_eq!(
             updated.agents.get(&leader_id).expect("leader").status,
-            AgentStatus::Disconnected
+            AgentStatus::disconnected_unknown()
         );
     });
 }

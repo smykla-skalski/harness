@@ -35,7 +35,7 @@ pub(crate) fn maybe_emit_spawn_reviewer(
     let leader_id = state.leader_id.as_deref()?;
     let leader = state.agents.get(leader_id)?;
     Some(SessionSignalRecord {
-        runtime: leader.runtime.clone(),
+        runtime: leader.runtime.to_string(),
         agent_id: leader.agent_id.clone(),
         session_id: state.session_id.clone(),
         status: SessionSignalStatus::Pending,
@@ -55,6 +55,7 @@ pub(crate) fn maybe_emit_spawn_reviewer(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::kind::RuntimeKind;
     use crate::session::types::{
         AgentRegistration, AgentStatus, AwaitingReview, SessionMetrics, SessionPolicy, SessionRole,
         SessionState, SessionStatus, TaskSeverity, TaskSource, TaskStatus, WorkItem,
@@ -95,7 +96,7 @@ mod tests {
         AgentRegistration {
             agent_id: id.to_string(),
             name: id.to_string(),
-            runtime: runtime.to_string(),
+            runtime: RuntimeKind::from(runtime),
             role,
             capabilities: Vec::new(),
             joined_at: "now".to_string(),

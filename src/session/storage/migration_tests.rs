@@ -2,7 +2,7 @@ use serde_json::json;
 
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
-    migrate_v6_to_v7, migrate_v7_to_v8,
+    migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11,
 };
 use super::registry::{ProjectOriginRecord, merge_project_origin};
 
@@ -210,6 +210,92 @@ fn migrate_v7_to_v8_adds_layout_fields() {
     assert_eq!(migrated["shared_path"], json!(""));
     assert_eq!(migrated["origin_path"], json!(""));
     assert_eq!(migrated["branch_ref"], json!(""));
+}
+
+#[test]
+fn migrate_v10_to_v11_tags_runtime_and_disconnect_status() {
+    let migrated = migrate_v10_to_v11(json!({
+        "schema_version": 10,
+        "state_version": 3,
+        "session_id": "sess-1",
+        "title": "x",
+        "context": "y",
+        "status": "active",
+        "created_at": "t",
+        "updated_at": "t",
+        "agents": {
+            "a-claude": {
+                "agent_id": "a-claude",
+                "name": "Claude",
+                "runtime": "claude",
+                "role": "leader",
+                "joined_at": "t",
+                "updated_at": "t",
+                "status": "active"
+            },
+            "a-gone": {
+                "agent_id": "a-gone",
+                "name": "Worker",
+                "runtime": "codex",
+                "role": "worker",
+                "joined_at": "t",
+                "updated_at": "t",
+                "status": "disconnected"
+            },
+            "a-future": {
+                "agent_id": "a-future",
+                "name": "Future",
+                "runtime": "mystery-agent",
+                "role": "worker",
+                "joined_at": "t",
+                "updated_at": "t",
+                "status": "idle"
+            }
+        },
+        "tasks": {}
+    }))
+    .expect("migrate v10");
+
+    assert_eq!(migrated["schema_version"], json!(11));
+    assert_eq!(
+        migrated["agents"]["a-claude"]["runtime"],
+        json!({ "kind": "tui", "id": "claude" })
+    );
+    assert_eq!(migrated["agents"]["a-claude"]["status"], json!("active"));
+    assert_eq!(
+        migrated["agents"]["a-gone"]["status"],
+        json!({ "state": "disconnected", "reason": { "kind": "unknown" } })
+    );
+    assert_eq!(
+        migrated["agents"]["a-future"]["runtime"],
+        json!({ "kind": "acp", "id": "mystery-agent" })
+    );
+    assert_eq!(migrated["agents"]["a-future"]["status"], json!("idle"));
+}
+
+#[test]
+fn migrate_v10_to_v11_is_idempotent_on_already_tagged_state() {
+    let migrated = migrate_v10_to_v11(json!({
+        "schema_version": 10,
+        "agents": {
+            "a-already-tagged": {
+                "agent_id": "a-already-tagged",
+                "runtime": { "kind": "acp", "id": "copilot" },
+                "status": "active"
+            }
+        },
+        "tasks": {}
+    }))
+    .expect("migrate v10");
+
+    assert_eq!(
+        migrated["agents"]["a-already-tagged"]["runtime"],
+        json!({ "kind": "acp", "id": "copilot" })
+    );
+    assert_eq!(
+        migrated["agents"]["a-already-tagged"]["status"],
+        json!("active")
+    );
 }
 
 // TODO(b-task-8): is_worktree and worktree_name were removed from ProjectOriginRecord.
