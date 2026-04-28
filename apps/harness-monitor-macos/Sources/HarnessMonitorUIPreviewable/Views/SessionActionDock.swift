@@ -11,7 +11,6 @@ struct SessionActionDock: View {
   }
 
   let detail: SessionDetail
-  let createTask: () -> Void
   let inspectObserver: () -> Void
   let openAgents: () -> Void
 
@@ -39,16 +38,6 @@ struct SessionActionDock: View {
         maximumColumns: 5,
         spacing: HarnessMonitorTheme.sectionSpacing
       ) {
-        flowButton(
-          FlowButtonDetails(
-            title: "Task Flow",
-            subtitle: "Create new task in this session",
-            symbol: "checklist",
-            helpText: "Open the create-task sheet for this session.",
-            accessibilityID: HarnessMonitorAccessibility.createTaskOpenButton
-          ),
-          action: createTask,
-        )
         flowButton(
           FlowButtonDetails(
             title: "Observe Flow",
@@ -112,7 +101,6 @@ extension View {
 #Preview("Action flow") {
   SessionActionDock(
     detail: PreviewFixtures.detail,
-    createTask: {},
     inspectObserver: {},
     openAgents: {}
   )

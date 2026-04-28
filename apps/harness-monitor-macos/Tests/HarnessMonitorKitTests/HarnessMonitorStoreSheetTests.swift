@@ -65,6 +65,36 @@ struct HarnessMonitorStoreSheetTests {
     #expect(store.presentedSheet == nil)
   }
 
+  @Test("requestCreateTaskSheet sets the sheet when online with a selected session")
+  func requestCreateTaskSheetSetsSheet() async {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.requestCreateTaskSheet()
+
+    #expect(store.presentedSheet == .createTask(sessionID: PreviewFixtures.summary.sessionId))
+  }
+
+  @Test("requestCreateTaskSheet is blocked when session is read-only")
+  func requestCreateTaskSheetBlockedWhenReadOnly() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    store.requestCreateTaskSheet()
+
+    #expect(store.presentedSheet == nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
+  }
+
+  @Test("requestCreateTaskSheet does nothing without a selected session")
+  func requestCreateTaskSheetRequiresSelectedSession() async {
+    let store = await makeBootstrappedStore()
+
+    store.requestCreateTaskSheet()
+
+    #expect(store.presentedSheet == nil)
+    #expect(store.currentFailureFeedbackMessage != nil)
+  }
+
   @Test("PresentedSheet id is stable and unique per case")
   func presentedSheetIdIsStable() {
     let sheet1 = HarnessMonitorStore.PresentedSheet.sendSignal(agentID: "agent-a")

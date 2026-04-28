@@ -25,7 +25,7 @@ struct SessionCockpitView: View {
   }
 
   private func openCreateTaskSheet() {
-    store.presentedSheet = .createTask(sessionID: detail.session.sessionId)
+    store.requestCreateTaskSheet()
   }
 
   var body: some View {
@@ -44,14 +44,14 @@ struct SessionCockpitView: View {
             isSessionReadOnly: isSessionReadOnly,
             observeSelectedSession: { Task { await store.observeSelectedSession() } },
             requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-            inspectObserver: focusObserver
+            inspectObserver: focusObserver,
+            createTask: openCreateTaskSheet
           )
           SessionMetricGrid(
             metrics: detail.session.metrics
           )
           SessionActionDock(
             detail: detail,
-            createTask: openCreateTaskSheet,
             inspectObserver: focusObserver,
             openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
           )
