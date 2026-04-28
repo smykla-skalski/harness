@@ -6,6 +6,24 @@ use super::{
     task_status_label, touch_agent,
 };
 
+/// Apply a task drop onto a worker agent.
+///
+/// State ownership: this is the single canonical mutator that moves a task
+/// onto a worker. It always clears the prior `current_task_id` pointer that
+/// referenced the dropped task (regardless of whether the previous assignee
+/// equals the new target), runs `is_worker_free` to decide between the
+/// Started and Queued branches, and writes effects that downstream callers
+/// turn into signal files and audit log entries.
+///
+/// Signal delivery contract: producing a `TaskDropEffect::Started` means a
+/// task-start signal record is appended to the effects vector but not
+/// delivered. Callers (sync file path, daemon sync DB, daemon async DB) own
+/// fanning out the effects to the file system, the signal index, and the
+/// audit log via `write_task_start_signals` + `merge_signal_records`.
+/// Worker wake (TUI prompt) is the caller's responsibility too; the assign
+/// and drop paths do not yet wire `attempt_active_signal_delivery`, so a
+/// managed-TUI worker still wakes via the next signal-dir scan rather than
+/// an immediate kick.
 pub(crate) fn apply_drop_task_on_agent(
     state: &mut SessionState,
     task_id: &str,

@@ -24,7 +24,13 @@ pub struct AgentRegistration {
     /// Most recent observed activity for this agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_activity_at: Option<String>,
-    /// Current assigned work item, when present.
+    /// Task this agent currently holds.
+    ///
+    /// Set eagerly by `start_task_for_agent` when a task-start signal is sent
+    /// so subsequent drops on a different task are queued correctly. The
+    /// signal-ack handler reaffirms the same value when the worker actually
+    /// starts work, and `clear_agent_current_task` clears it on drop, ack
+    /// rejection, signal expiry, and disconnect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_task_id: Option<String>,
     /// Runtime delivery and transcript features for UI badges.

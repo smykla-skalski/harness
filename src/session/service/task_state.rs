@@ -57,11 +57,13 @@ pub(crate) fn apply_create_task(
 
 /// Assign a task to an agent.
 ///
-/// Assignment is the canonical Locked drop: the task transitions to the
-/// agent under a Locked queue policy, a task-start signal is produced when
-/// the worker is free, and the agent's `current_task_id` is set later by the
-/// signal ack rather than eagerly here. Sharing the drop code path keeps
-/// signal delivery consistent across the assign and drag-drop UI gestures.
+/// Assignment is the canonical Locked drop: it delegates to
+/// `apply_drop_task_on_agent` with `TaskQueuePolicy::Locked`. A task-start
+/// signal is produced when the worker is free; otherwise the task is queued
+/// against the worker. The agent's `current_task_id` is set eagerly by
+/// `start_task_for_agent` so a subsequent drop_task on a different task is
+/// queued correctly. Sharing the drop code path keeps signal delivery
+/// consistent across the assign and drag-drop UI gestures.
 pub(crate) fn apply_assign_task(
     state: &mut SessionState,
     task_id: &str,
