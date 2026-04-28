@@ -95,10 +95,7 @@ mod tests {
 
     fn with_clean_env<R>(body: impl FnOnce() -> R) -> R {
         temp_env::with_vars(
-            [
-                (SUITE_HOOKS_ENV, None::<&str>),
-                (ACP_ENV, None::<&str>),
-            ],
+            [(SUITE_HOOKS_ENV, None::<&str>), (ACP_ENV, None::<&str>)],
             body,
         )
     }
