@@ -155,13 +155,91 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public var id: String { agentId }
 }
 
+public struct AgentPendingUserPromptOption: Codable, Equatable, Sendable {
+  public let label: String
+  public let description: String
+
+  public init(label: String, description: String = "") {
+    self.label = label
+    self.description = description
+  }
+}
+
+public struct AgentPendingUserPromptQuestion: Codable, Equatable, Sendable {
+  public let question: String
+  public let header: String?
+  public let options: [AgentPendingUserPromptOption]
+  public let multiSelect: Bool
+
+  public init(
+    question: String,
+    header: String? = nil,
+    options: [AgentPendingUserPromptOption] = [],
+    multiSelect: Bool = false
+  ) {
+    self.question = question
+    self.header = header
+    self.options = options
+    self.multiSelect = multiSelect
+  }
+}
+
 public struct AgentPendingUserPrompt: Codable, Equatable, Sendable {
   public let toolName: String
-  public let message: String
+  public let waitingSince: String?
+  public let questions: [AgentPendingUserPromptQuestion]
 
-  public init(toolName: String, message: String) {
+  enum CodingKeys: String, CodingKey {
+    case toolName
+    case waitingSince
+    case questions
+    case message
+  }
+
+  public init(
+    toolName: String,
+    waitingSince: String? = nil,
+    questions: [AgentPendingUserPromptQuestion]
+  ) {
     self.toolName = toolName
-    self.message = message
+    self.waitingSince = waitingSince
+    self.questions = questions
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let toolName = try container.decode(String.self, forKey: .toolName)
+    let waitingSince = try container.decodeIfPresent(String.self, forKey: .waitingSince)
+    let questions: [AgentPendingUserPromptQuestion] =
+      if let decodedQuestions = try container.decodeIfPresent(
+        [AgentPendingUserPromptQuestion].self,
+        forKey: .questions
+      ),
+      !decodedQuestions.isEmpty
+      {
+        decodedQuestions
+      } else if let message = try container.decodeIfPresent(String.self, forKey: .message),
+        !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      {
+        [AgentPendingUserPromptQuestion(question: message)]
+      } else {
+        []
+      }
+
+    self.init(toolName: toolName, waitingSince: waitingSince, questions: questions)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(toolName, forKey: .toolName)
+    try container.encodeIfPresent(waitingSince, forKey: .waitingSince)
+    try container.encode(questions, forKey: .questions)
+  }
+
+  public var primaryQuestion: AgentPendingUserPromptQuestion? {
+    questions.first(where: {
+      !$0.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    })
   }
 }
 

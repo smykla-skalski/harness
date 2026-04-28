@@ -4,9 +4,8 @@ use super::super::index::{self, DiscoveredProject};
 use super::super::protocol::{AgentPendingUserPrompt, AgentToolActivitySummary};
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::errors::CliError;
+use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::session::types::SessionState;
-
-const USER_PROMPT_MESSAGE_KEYS: [&str; 3] = ["message", "prompt", "question"];
 
 #[derive(Debug, Clone)]
 struct PendingUserPromptInvocation {
@@ -75,6 +74,7 @@ pub(crate) fn agent_activity_summary_from_events(
                     tool_name,
                     invocation_id.as_deref(),
                     input,
+                    event.timestamp.as_deref(),
                 );
             }
             ConversationEventKind::ToolResult {
@@ -135,8 +135,9 @@ fn record_pending_user_prompt(
     tool_name: &str,
     invocation_id: Option<&str>,
     input: &Value,
+    timestamp: Option<&str>,
 ) {
-    let Some(prompt) = pending_user_prompt_from(tool_name, input) else {
+    let Some(prompt) = pending_user_prompt_from(tool_name, input, timestamp) else {
         return;
     };
 
@@ -174,21 +175,56 @@ fn clear_pending_user_prompt(
     }
 }
 
-fn pending_user_prompt_from(tool_name: &str, input: &Value) -> Option<AgentPendingUserPrompt> {
+fn pending_user_prompt_from(
+    tool_name: &str,
+    input: &Value,
+    timestamp: Option<&str>,
+) -> Option<AgentPendingUserPrompt> {
     if !is_user_prompt_tool(tool_name) {
         return None;
     }
 
+    let questions = extract_pending_user_prompt_questions(input)?;
+    let message = questions
+        .first()
+        .map(AskUserQuestionPrompt::question_head)
+        .map(ToOwned::to_owned);
+
     Some(AgentPendingUserPrompt {
         tool_name: tool_name.to_owned(),
-        message: extract_pending_user_prompt_message(input)?,
+        waiting_since: timestamp.map(ToOwned::to_owned),
+        questions,
+        message,
     })
 }
 
-fn extract_pending_user_prompt_message(input: &Value) -> Option<String> {
+fn extract_pending_user_prompt_questions(input: &Value) -> Option<Vec<AskUserQuestionPrompt>> {
+    if let Some(questions) = extract_canonical_prompt_questions(input) {
+        return Some(questions);
+    }
+
+    let question = extract_flat_prompt_question(input)?;
+    Some(vec![AskUserQuestionPrompt {
+        question,
+        header: None,
+        options: Vec::new(),
+        multi_select: false,
+    }])
+}
+
+fn extract_canonical_prompt_questions(input: &Value) -> Option<Vec<AskUserQuestionPrompt>> {
+    let Value::Object(object) = input else {
+        return None;
+    };
+    let questions = object.get("questions")?.clone();
+    let questions = serde_json::from_value::<Vec<AskUserQuestionPrompt>>(questions).ok()?;
+    (!questions.is_empty()).then_some(questions)
+}
+
+fn extract_flat_prompt_question(input: &Value) -> Option<String> {
     match input {
         Value::String(message) => trimmed_non_empty(message),
-        Value::Object(object) => USER_PROMPT_MESSAGE_KEYS
+        Value::Object(object) => ["message", "prompt", "question"]
             .iter()
             .find_map(|key| object.get(*key).and_then(Value::as_str))
             .and_then(trimmed_non_empty),
@@ -204,9 +240,12 @@ fn trimmed_non_empty(value: &str) -> Option<String> {
 fn is_user_prompt_tool(tool_name: &str) -> bool {
     let normalized: String = tool_name
         .chars()
-        .filter(|character| character.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .collect();
-    normalized.eq_ignore_ascii_case("askuser")
+    matches!(
+        normalized.to_ascii_lowercase().as_str(),
+        "askuser" | "askuserquestion"
+    )
 }
 
 #[cfg(test)]
@@ -225,15 +264,42 @@ mod tests {
             &[tool_invocation(
                 1,
                 "ask-1",
-                json!({ "message": "Approve the file write?" }),
+                "AskUserQuestion",
+                json!({
+                    "questions": [{
+                        "question": "Approve the file write?",
+                        "header": "Approval",
+                        "options": [
+                            { "label": "Allow", "description": "Proceed with the write" },
+                            { "label": "Deny", "description": "Stop before writing" }
+                        ],
+                        "multi_select": false
+                    }]
+                }),
             )],
         );
 
         let pending_prompt = summary
             .pending_user_prompt
             .expect("expected unresolved ask_user prompt");
-        assert_eq!(pending_prompt.tool_name, "ask_user");
-        assert_eq!(pending_prompt.message, "Approve the file write?");
+        assert_eq!(pending_prompt.tool_name, "AskUserQuestion");
+        assert_eq!(
+            pending_prompt.waiting_since.as_deref(),
+            Some("2026-04-28T08:00:01Z")
+        );
+        assert_eq!(
+            pending_prompt.message.as_deref(),
+            Some("Approve the file write?")
+        );
+        assert_eq!(pending_prompt.questions.len(), 1);
+        assert_eq!(
+            pending_prompt.questions[0].header.as_deref(),
+            Some("Approval")
+        );
+        assert_eq!(
+            pending_prompt.questions[0].option_labels(),
+            vec!["Allow", "Deny"]
+        );
     }
 
     #[test]
@@ -243,20 +309,59 @@ mod tests {
             "claude",
             None,
             &[
-                tool_invocation(1, "ask-1", json!({ "message": "Approve the file write?" })),
-                tool_result(2, "ask-1"),
+                tool_invocation(
+                    1,
+                    "ask-1",
+                    "AskUserQuestion",
+                    json!({
+                        "questions": [{
+                            "question": "Approve the file write?",
+                            "options": [{ "label": "Allow", "description": "Proceed with the write" }],
+                            "multi_select": false
+                        }]
+                    }),
+                ),
+                tool_result(2, "ask-1", "AskUserQuestion"),
             ],
         );
 
         assert!(summary.pending_user_prompt.is_none());
     }
 
-    fn tool_invocation(sequence: u64, invocation_id: &str, input: Value) -> ConversationEvent {
+    #[test]
+    fn flat_ask_user_invocation_still_surfaces_pending_prompt() {
+        let summary = agent_activity_summary_from_events(
+            "agent-alpha",
+            "claude",
+            None,
+            &[tool_invocation(
+                1,
+                "ask-2",
+                "ask_user",
+                json!({ "message": "Continue?" }),
+            )],
+        );
+
+        let pending_prompt = summary
+            .pending_user_prompt
+            .expect("expected legacy ask_user prompt");
+        assert_eq!(pending_prompt.tool_name, "ask_user");
+        assert_eq!(pending_prompt.message.as_deref(), Some("Continue?"));
+        assert_eq!(pending_prompt.questions.len(), 1);
+        assert!(pending_prompt.questions[0].options.is_empty());
+    }
+
+    fn tool_invocation(
+        sequence: u64,
+        invocation_id: &str,
+        tool_name: &str,
+        input: Value,
+    ) -> ConversationEvent {
         ConversationEvent {
             timestamp: Some(format!("2026-04-28T08:00:{sequence:02}Z")),
             sequence,
             kind: ConversationEventKind::ToolInvocation {
-                tool_name: "ask_user".into(),
+                tool_name: tool_name.into(),
                 category: "interaction".into(),
                 input,
                 invocation_id: Some(invocation_id.into()),
@@ -266,12 +371,12 @@ mod tests {
         }
     }
 
-    fn tool_result(sequence: u64, invocation_id: &str) -> ConversationEvent {
+    fn tool_result(sequence: u64, invocation_id: &str, tool_name: &str) -> ConversationEvent {
         ConversationEvent {
             timestamp: Some(format!("2026-04-28T08:00:{sequence:02}Z")),
             sequence,
             kind: ConversationEventKind::ToolResult {
-                tool_name: "ask_user".into(),
+                tool_name: tool_name.into(),
                 invocation_id: Some(invocation_id.into()),
                 output: json!({ "status": "answered" }),
                 is_error: false,

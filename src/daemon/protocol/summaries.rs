@@ -182,7 +182,12 @@ pub struct AgentPendingUserPrompt {
     pub tool_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting_since: Option<String>,
+    #[serde(default)]
     pub questions: Vec<AskUserQuestionPrompt>,
+    /// Compatibility summary for clients that still expect a single-line prompt
+    /// message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
