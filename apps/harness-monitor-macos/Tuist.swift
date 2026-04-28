@@ -5,9 +5,10 @@ let tuist = Tuist(
         compatibleXcodeVersions: .upToNextMajor("26.0"),
         swiftVersion: "6.2",
         generationOptions: .options(
-            resolveDependenciesWithSystemScm: false,
             disablePackageVersionLocking: false,
-            staticSideEffectsWarningTargets: .all
+            staticSideEffectsWarningTargets: .all,
+            disableSandbox: true,
+            includeGenerateScheme: false
         )
     )
 )
