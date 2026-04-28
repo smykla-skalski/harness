@@ -101,6 +101,10 @@ run = [
   "./scripts/install-aff-release.sh",
 ]
 
+[tasks."codex:install:council"]
+description = "Install the rendered council plugin into the local Codex cache and enable it from this repo"
+run = "./scripts/install-codex-council.sh"
+
 [tasks."cargo:local"]
 description = "Run cargo through the shared local wrapper (pass cargo args after --)"
 run = "./scripts/cargo-local.sh"
