@@ -15,6 +15,7 @@ mod signal_reconciliation;
 mod signals;
 mod state;
 mod task_assign;
+mod task_drop_property;
 mod task_drop_self_target;
 mod task_flow;
 
