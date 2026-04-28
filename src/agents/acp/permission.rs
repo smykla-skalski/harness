@@ -84,11 +84,27 @@ pub fn stdin_permission_gateway(
 ) -> io::Result<RequestPermissionResponse> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
+    let mut input = stdin.lock();
 
-    writeln!(stdout, "\n=== Permission Request ===")?;
-    writeln!(stdout, "Session: {}", request.session_id)?;
-    writeln!(stdout, "Tool call: {:?}", request.tool_call)?;
-    writeln!(stdout)?;
+    stdin_permission_gateway_from(request, &mut input, &mut stdout)
+}
+
+fn stdin_permission_gateway_from(
+    request: &RequestPermissionRequest,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<RequestPermissionResponse> {
+    writeln!(output, "\n=== Permission Request ===")?;
+    writeln!(output, "Session: {}", request.session_id)?;
+    writeln!(output, "Tool call: {:?}", request.tool_call)?;
+    writeln!(output)?;
+
+    if request.options.is_empty() {
+        writeln!(output, "No permission options supplied; cancelling.")?;
+        return Ok(RequestPermissionResponse::new(
+            RequestPermissionOutcome::Cancelled,
+        ));
+    }
 
     for (i, option) in request.options.iter().enumerate() {
         let kind_label = match option.kind {
@@ -98,14 +114,14 @@ pub fn stdin_permission_gateway(
             PermissionOptionKind::RejectAlways => "[reject always]",
             _ => "[unknown]",
         };
-        writeln!(stdout, "  {i}: {} {kind_label}", option.name)?;
+        writeln!(output, "  {i}: {} {kind_label}", option.name)?;
     }
-    writeln!(stdout)?;
-    write!(stdout, "Enter choice (0-{}): ", request.options.len() - 1)?;
-    stdout.flush()?;
+    writeln!(output)?;
+    write!(output, "Enter choice (0-{}): ", request.options.len() - 1)?;
+    output.flush()?;
 
     let mut line = String::new();
-    let bytes_read = stdin.lock().read_line(&mut line)?;
+    let bytes_read = input.read_line(&mut line)?;
     if bytes_read == 0 {
         return Ok(RequestPermissionResponse::new(
             RequestPermissionOutcome::Cancelled,
@@ -166,7 +182,20 @@ pub fn is_allow_outcome(outcome: &RequestPermissionOutcome, options: &[Permissio
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
+
+    fn permission_request() -> RequestPermissionRequest {
+        RequestPermissionRequest::new(
+            "session-1",
+            agent_client_protocol::schema::ToolCallUpdate::new(
+                "tool-1",
+                agent_client_protocol::schema::ToolCallUpdateFields::new(),
+            ),
+            standard_permission_options(),
+        )
+    }
 
     #[test]
     fn standard_options_have_expected_ids() {
@@ -206,5 +235,52 @@ mod tests {
             PermissionOptionId::new("disallow_once"),
         ));
         assert!(!is_allow_outcome(&selected, &options));
+    }
+
+    #[test]
+    fn stdin_gateway_selects_allow_option() {
+        let request = permission_request();
+        let mut input = Cursor::new(b"0\n");
+        let mut output = Vec::new();
+
+        let response =
+            stdin_permission_gateway_from(&request, &mut input, &mut output).expect("permission");
+
+        assert!(is_allow_outcome(&response.outcome, &request.options));
+        assert!(
+            String::from_utf8(output)
+                .expect("utf8 output")
+                .contains("Permission Request")
+        );
+    }
+
+    #[test]
+    fn stdin_gateway_invalid_choice_cancels() {
+        let request = permission_request();
+        let mut input = Cursor::new(b"not-a-choice\n");
+        let mut output = Vec::new();
+
+        let response =
+            stdin_permission_gateway_from(&request, &mut input, &mut output).expect("permission");
+
+        assert_eq!(response.outcome, RequestPermissionOutcome::Cancelled);
+    }
+
+    #[test]
+    fn stdin_gateway_empty_options_cancels_without_prompting_choice_range() {
+        let mut request = permission_request();
+        request.options.clear();
+        let mut input = Cursor::new(b"0\n");
+        let mut output = Vec::new();
+
+        let response =
+            stdin_permission_gateway_from(&request, &mut input, &mut output).expect("permission");
+
+        assert_eq!(response.outcome, RequestPermissionOutcome::Cancelled);
+        assert!(
+            String::from_utf8(output)
+                .expect("utf8 output")
+                .contains("No permission options supplied")
+        );
     }
 }
