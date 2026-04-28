@@ -65,17 +65,13 @@ pub(crate) async fn assign_task_async(
         })
         .await?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
-    let log = Some(session_service::log_task_assigned(
-        task_id,
-        &request.agent_id,
-    ));
     persist_task_signal_effects(
         async_db,
         &resolved,
         session_id,
         &request.actor,
         &effects,
-        log,
+        None,
         agent_tui_manager,
     )
     .await?;
