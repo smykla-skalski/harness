@@ -212,14 +212,15 @@ extension AgentsWindowView {
   }
 
   func liveSessionControls(_ tui: AgentTuiSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    let pendingPrompt = Self.pendingUserPrompt(for: tui, session: store.selectedSession)
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if let error = tui.error, !error.isEmpty {
         terminalError(error)
       }
-      if let pendingPrompt = Self.pendingUserPrompt(for: tui, session: store.selectedSession) {
+      if let pendingPrompt {
         terminalPendingUserPrompt(pendingPrompt)
       }
-      terminalInputControls(tui)
+      terminalInputControls(tui, pendingPrompt: pendingPrompt)
       terminalKeyControls(tui)
       terminalResizeControls()
       agentDetailForAgentID(tui.agentId)

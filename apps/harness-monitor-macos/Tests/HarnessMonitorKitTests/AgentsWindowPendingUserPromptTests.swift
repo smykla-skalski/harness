@@ -10,8 +10,18 @@ struct AgentsWindowPendingUserPromptTests {
   @Test("Resolves pending user prompt for the selected terminal agent")
   func resolvesPendingUserPromptForSelectedTerminalAgent() {
     let prompt = AgentPendingUserPrompt(
-      toolName: "ask_user",
-      message: "Approve the file write?"
+      toolName: "AskUserQuestion",
+      waitingSince: "2026-04-28T08:00:00Z",
+      questions: [
+        AgentPendingUserPromptQuestion(
+          question: "Approve the file write?",
+          header: "Approval",
+          options: [
+            AgentPendingUserPromptOption(label: "Allow", description: "Proceed"),
+            AgentPendingUserPromptOption(label: "Deny", description: "Stop"),
+          ]
+        )
+      ]
     )
     let activity = AgentToolActivitySummary(
       agentId: "agent-alpha",
@@ -19,9 +29,9 @@ struct AgentsWindowPendingUserPromptTests {
       toolInvocationCount: 1,
       toolResultCount: 0,
       toolErrorCount: 0,
-      latestToolName: "ask_user",
+      latestToolName: "AskUserQuestion",
       latestEventAt: "2026-04-28T08:00:00Z",
-      recentTools: ["ask_user"],
+      recentTools: ["AskUserQuestion"],
       pendingUserPrompt: prompt
     )
 
@@ -45,12 +55,17 @@ struct AgentsWindowPendingUserPromptTests {
       toolInvocationCount: 1,
       toolResultCount: 0,
       toolErrorCount: 0,
-      latestToolName: "ask_user",
+      latestToolName: "AskUserQuestion",
       latestEventAt: "2026-04-28T08:00:00Z",
-      recentTools: ["ask_user"],
+      recentTools: ["AskUserQuestion"],
       pendingUserPrompt: AgentPendingUserPrompt(
-        toolName: "ask_user",
-        message: "Approve the file write?"
+        toolName: "AskUserQuestion",
+        questions: [
+          AgentPendingUserPromptQuestion(
+            question: "Approve the file write?",
+            options: [AgentPendingUserPromptOption(label: "Allow")]
+          )
+        ]
       )
     )
 
