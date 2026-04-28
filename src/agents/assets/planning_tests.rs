@@ -51,6 +51,14 @@ fn harness_plugin_is_in_codex_marketplace() {
     assert!(rendered.contains("\"name\": \"harness\""));
     assert!(rendered.contains("\"source\": \"local\""));
     assert!(rendered.contains("\"path\": \"./plugins/harness\""));
+    assert!(
+        !rendered.contains("\"name\": \"council\""),
+        "council is installed globally and must not be advertised by repo-local marketplace"
+    );
+    assert!(
+        !rendered.contains("./plugins/council"),
+        "council is installed globally and must not point at repo-local plugin paths"
+    );
 }
 
 #[test]
@@ -190,19 +198,19 @@ fn plan_outputs_ignores_plugin_workspace_dirs_without_skill_definitions() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let repo_root = tmp.path();
     write(
-        &repo_root.join("agents/plugins/council/plugin.yaml"),
-        "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+        &repo_root.join("agents/plugins/demo/plugin.yaml"),
+        "name: demo\ndescription: Demo plugin\nversion: 1.0.0\n",
     );
     write(
-        &repo_root.join("agents/plugins/council/skills/council/skill.yaml"),
-        "name: council\ndescription: Council skill\n",
+        &repo_root.join("agents/plugins/demo/skills/demo/skill.yaml"),
+        "name: demo\ndescription: Demo skill\n",
     );
     write(
-        &repo_root.join("agents/plugins/council/skills/council/body.md"),
-        "# Council\n\nCanonical skill body.\n",
+        &repo_root.join("agents/plugins/demo/skills/demo/body.md"),
+        "# Demo\n\nCanonical skill body.\n",
     );
     write(
-        &repo_root.join("agents/plugins/council/skills/council-workspace/evals.md"),
+        &repo_root.join("agents/plugins/demo/skills/demo-workspace/evals.md"),
         "# Workspace artifacts live here.\n",
     );
 
@@ -212,27 +220,27 @@ fn plan_outputs_ignores_plugin_workspace_dirs_without_skill_definitions() {
     let manifest = repo_root
         .join(".claude")
         .join("plugins")
-        .join("council")
+        .join("demo")
         .join(".claude-plugin")
         .join("plugin.json");
     let skill = repo_root
         .join(".claude")
         .join("plugins")
-        .join("council")
+        .join("demo")
         .join("skills")
-        .join("council")
+        .join("demo")
         .join("SKILL.md");
     assert!(
         planned
             .iter()
             .any(|output| output.files.contains_key(&manifest)),
-        "council plugin manifest should be planned"
+        "demo plugin manifest should be planned"
     );
     let rendered = planned
         .iter()
         .find_map(|output| output.files.get(&skill))
-        .expect("council plugin skill should be planned");
-    assert!(rendered.contains("name: council"));
+        .expect("demo plugin skill should be planned");
+    assert!(rendered.contains("name: demo"));
 }
 
 #[test]
