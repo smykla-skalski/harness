@@ -21,6 +21,7 @@ use tracing::{debug, info, warn};
 use crate::agents::runtime::event::ConversationEvent;
 
 use super::events::materialise_batch;
+use super::program::resolve_program;
 use super::ring::{RingConfig, SessionRing};
 use super::supervision::AcpSessionSupervisor;
 
@@ -318,7 +319,8 @@ impl SpawnConfig {
         use std::os::unix::process::CommandExt;
         use std::process::Command;
 
-        let mut cmd = Command::new(&self.command);
+        let program = resolve_program(&self.command).unwrap_or_else(|| self.command.clone().into());
+        let mut cmd = Command::new(program);
         cmd.args(&self.args)
             .current_dir(&self.working_dir)
             .stdin(Stdio::piped())
@@ -350,7 +352,8 @@ impl SpawnConfig {
     pub fn spawn(&self) -> io::Result<Child> {
         use std::process::Command;
 
-        let mut cmd = Command::new(&self.command);
+        let program = resolve_program(&self.command).unwrap_or_else(|| self.command.clone().into());
+        let mut cmd = Command::new(program);
         cmd.args(&self.args)
             .current_dir(&self.working_dir)
             .stdin(Stdio::piped())
