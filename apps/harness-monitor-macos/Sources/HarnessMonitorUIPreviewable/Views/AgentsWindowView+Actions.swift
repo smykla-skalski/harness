@@ -3,6 +3,19 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  func updateDetailColumnGeometry(_ size: CGSize) {
+    viewModel.lastDetailColumnSize = size
+  }
+
+  func syncTerminalResizeControls(to size: AgentTuiSize) {
+    if viewModel.rows != size.rows {
+      viewModel.rows = size.rows
+    }
+    if viewModel.cols != size.cols {
+      viewModel.cols = size.cols
+    }
+  }
+
   static func initialSelection(
     displayState: AgentTuiDisplayState,
     selectedTerminalID: String?,
@@ -66,7 +79,17 @@ extension AgentsWindowView {
       switch viewModel.createMode {
       case .terminal:
         viewModel.startTuiPhase = "terminal"
-        let startSize = AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        let startSize =
+          viewModel.lastMeasuredViewportSize
+          ?? viewModel.lastDetailColumnSize.map {
+            TerminalViewportSizing.estimatedStartSize(
+              detailColumnSize: $0,
+              fontScale: fontScale,
+              fallbackRows: viewModel.rows
+            )
+          }
+          ?? AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
+        syncTerminalResizeControls(to: startSize)
         viewModel.expectedSize = startSize
         let catalog = viewModel.availableRuntimeModels.first {
           $0.runtime == viewModel.runtime.rawValue
@@ -254,25 +277,28 @@ extension AgentsWindowView {
     guard viewModel.selection.terminalID == tui.tuiId, tui.status.isActive else {
       return
     }
+    viewModel.lastMeasuredViewportPoints = viewportSize
     guard
       let measuredTerminalSize = TerminalViewportSizing.terminalSize(
         for: viewportSize,
         fontScale: fontScale
       )
     else {
+      viewModel.lastMeasuredViewportTerminalSize = nil
       return
     }
-    let resizeBaseline = viewModel.pendingViewportResizeTarget ?? tui.size
+    viewModel.lastMeasuredViewportTerminalSize = measuredTerminalSize
+    let resizeBaseline = TerminalViewportSizing.automaticResizeBaseline(
+      serverSize: tui.size,
+      pendingTarget: viewModel.pendingViewportResizeTarget,
+      expectedSize: viewModel.expectedSize
+    )
     let terminalSize = TerminalViewportSizing.stabilizedAutomaticSize(
       measured: measuredTerminalSize,
       baseline: resizeBaseline
     )
-    if viewModel.rows != terminalSize.rows {
-      viewModel.rows = terminalSize.rows
-    }
-    if viewModel.cols != terminalSize.cols {
-      viewModel.cols = terminalSize.cols
-    }
+    viewModel.lastMeasuredViewportSize = terminalSize
+    syncTerminalResizeControls(to: terminalSize)
     guard terminalSize != tui.size,
       terminalSize != viewModel.pendingViewportResizeTarget
     else {

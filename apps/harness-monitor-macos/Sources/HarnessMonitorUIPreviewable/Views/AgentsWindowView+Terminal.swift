@@ -25,19 +25,23 @@ extension AgentsWindowView {
   }
   func terminalViewport(_ tui: AgentTuiSnapshot) -> some View {
     let visibleRows = tui.screen.visibleRows()
-    return ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
-      AgentTuiTerminalOutputView(visibleRows: visibleRows)
+    return ZStack(alignment: .topLeading) {
+      RoundedRectangle(cornerRadius: 6)
+        .fill(.quaternary)
+
+      ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
+        AgentTuiTerminalOutputView(visibleRows: visibleRows)
+      }
+      .scaledFont(.system(.body, design: .monospaced))
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .padding(HarnessMonitorTheme.spacingMD)
     }
-    .scaledFont(.system(.body, design: .monospaced))
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(HarnessMonitorTheme.spacingMD)
     .frame(
       maxWidth: .infinity,
       minHeight: TerminalViewportSizing.minimumViewportHeight,
       idealHeight: TerminalViewportSizing.idealViewportHeight,
       maxHeight: tui.status.isActive ? .infinity : TerminalViewportSizing.idealViewportHeight
     )
-    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
     .onGeometryChange(for: CGSize.self) { proxy in
       proxy.size
     } action: { viewportSize in

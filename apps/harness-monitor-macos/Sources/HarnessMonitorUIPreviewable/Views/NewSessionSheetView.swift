@@ -106,17 +106,20 @@ struct NewSessionSheetView: View {
       }
 
       if let selectedBookmark {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
           Text("Path")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: true, vertical: false)
           Text(abbreviateHomePath(selectedBookmark.lastResolvedPath))
             .scaledFont(.caption.monospaced())
             .lineLimit(1)
             .truncationMode(.middle)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("Path: \(selectedBookmark.lastResolvedPath)"))
       } else {
         fieldHelp("Choose a Git project folder to start a session.")
       }

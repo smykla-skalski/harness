@@ -305,6 +305,41 @@ extension AgentsWindowView {
       width: HarnessMonitorTheme.spacingMD * 2,
       height: HarnessMonitorTheme.spacingMD * 2
     )
+    static let detailColumnHorizontalPadding = HarnessMonitorTheme.spacingLG * 2
+    static let detailColumnVerticalPadding = HarnessMonitorTheme.spacingLG * 2
+    static let liveSessionHeaderHeightEstimate: CGFloat = 80
+    static let defaultLiveViewportSplitFraction: CGFloat = 0.5
+    static func automaticResizeBaseline(
+      serverSize: AgentTuiSize,
+      pendingTarget: AgentTuiSize?,
+      expectedSize: AgentTuiSize?
+    ) -> AgentTuiSize {
+      pendingTarget ?? expectedSize ?? serverSize
+    }
+    @MainActor
+    static func estimatedStartSize(
+      detailColumnSize: CGSize,
+      fontScale: CGFloat,
+      fallbackRows: Int
+    ) -> AgentTuiSize {
+      let estimatedViewportWidth = max(detailColumnSize.width - detailColumnHorizontalPadding, 0)
+      let estimatedViewportHeight = max(
+        (
+          detailColumnSize.height
+            - detailColumnVerticalPadding
+            - liveSessionHeaderHeightEstimate
+        ) * defaultLiveViewportSplitFraction,
+        0
+      )
+      let estimatedCols = terminalColumns(for: estimatedViewportWidth, fontScale: fontScale)
+        ?? colRange.lowerBound
+      let estimatedRows = terminalRows(for: estimatedViewportHeight, fontScale: fontScale)
+        ?? fallbackRows
+      return AgentTuiSize(
+        rows: min(max(estimatedRows, rowRange.lowerBound), rowRange.upperBound),
+        cols: min(max(estimatedCols, colRange.lowerBound), colRange.upperBound)
+      )
+    }
     @MainActor
     static func terminalSize(for viewportSize: CGSize, fontScale: CGFloat) -> AgentTuiSize? {
       let cellSize = measuredCellSize(for: fontScale)
@@ -324,6 +359,32 @@ extension AgentsWindowView {
         rows: min(max(rawRows, rowRange.lowerBound), rowRange.upperBound),
         cols: min(max(rawCols, colRange.lowerBound), colRange.upperBound)
       )
+    }
+    @MainActor
+    static func terminalColumns(for viewportWidth: CGFloat, fontScale: CGFloat) -> Int? {
+      let usableWidth = viewportWidth - contentInsets.width
+      guard usableWidth >= minimumMeasuredContentWidth else {
+        return nil
+      }
+      let cellSize = measuredCellSize(for: fontScale)
+      let rawCols = Int(floor(usableWidth / cellSize.width))
+      guard rawCols > 0 else {
+        return nil
+      }
+      return rawCols
+    }
+    @MainActor
+    static func terminalRows(for viewportHeight: CGFloat, fontScale: CGFloat) -> Int? {
+      let usableHeight = viewportHeight - contentInsets.height
+      guard usableHeight >= minimumMeasuredContentHeight else {
+        return nil
+      }
+      let cellSize = measuredCellSize(for: fontScale)
+      let rawRows = Int(floor(usableHeight / cellSize.height))
+      guard rawRows > 0 else {
+        return nil
+      }
+      return rawRows
     }
     static func stabilizedAutomaticSize(
       measured: AgentTuiSize,
@@ -402,7 +463,11 @@ extension AgentsWindowView {
     var navigationForwardStack: [AgentTuiSheetSelection] = []
     var suppressHistoryRecording = false
     var windowNavigation = WindowNavigationState()
+    var lastDetailColumnSize: CGSize?
+    var lastMeasuredViewportPoints: CGSize?
+    var lastMeasuredViewportTerminalSize: AgentTuiSize?
     var pendingViewportResizeTarget: AgentTuiSize?
+    var lastMeasuredViewportSize: AgentTuiSize?
     var viewportResizeTask: Task<Void, Never>?
     var expectedSize: AgentTuiSize?
     var keySequenceBuffer = KeySequenceBuffer()

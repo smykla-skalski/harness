@@ -8,6 +8,7 @@ struct AgentTuiTerminalOutputView: View {
     if visibleRows.isEmpty {
       Text("No terminal output yet.")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
     } else {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(visibleRows) { row in
@@ -15,6 +16,7 @@ struct AgentTuiTerminalOutputView: View {
             .textSelection(.enabled)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }
