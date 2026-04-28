@@ -153,7 +153,7 @@ impl AcpAgentManagerHandle {
         let permissions =
             PermissionBridgeHandle::spawn(acp_id.clone(), session_id.to_string(), self.sender());
         let permission_mode = permissions.mode(PERMISSION_RESPONSE_DEADLINE);
-        let (events, receive_task, batcher_task) = spawn_protocol_task(
+        let protocol = spawn_protocol_task(
             &mut child,
             request,
             session_id.to_string(),
@@ -172,7 +172,7 @@ impl AcpAgentManagerHandle {
             self.sender(),
             acp_id.clone(),
             session_id.to_string(),
-            events,
+            protocol.events,
         );
 
         let now = utc_now();
@@ -197,10 +197,11 @@ impl AcpAgentManagerHandle {
             child,
             supervisor,
             permissions,
+            protocol.cancel,
             stderr_tail,
             ActiveAcpTasks {
-                protocol: receive_task,
-                batcher: batcher_task,
+                protocol: protocol.protocol,
+                batcher: protocol.batcher,
                 event: event_task,
             },
         ));

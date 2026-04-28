@@ -16,8 +16,10 @@ use crate::workspace::utc_now;
 
 use super::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
+use super::protocol::AcpCancelHandle;
 
 const STDERR_TAIL_LIMIT: usize = 16 * 1024;
+const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
 const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
 
 pub(super) struct ActiveAcpSession {
@@ -25,6 +27,7 @@ pub(super) struct ActiveAcpSession {
     child: Mutex<Option<Child>>,
     supervisor: Arc<AcpSessionSupervisor>,
     permissions: PermissionBridgeHandle,
+    cancel: AcpCancelHandle,
     stderr_tail: SharedStderrTail,
     protocol_task: Mutex<Option<JoinHandle<()>>>,
     batcher_task: Mutex<Option<JoinHandle<()>>>,
@@ -50,6 +53,7 @@ impl ActiveAcpSession {
         child: Child,
         supervisor: Arc<AcpSessionSupervisor>,
         permissions: PermissionBridgeHandle,
+        cancel: AcpCancelHandle,
         stderr_tail: SharedStderrTail,
         tasks: ActiveAcpTasks,
     ) -> Self {
@@ -58,6 +62,7 @@ impl ActiveAcpSession {
             child: Mutex::new(Some(child)),
             supervisor,
             permissions,
+            cancel,
             stderr_tail,
             protocol_task: Mutex::new(Some(tasks.protocol)),
             batcher_task: Mutex::new(Some(tasks.batcher)),
@@ -149,6 +154,7 @@ impl ActiveAcpSession {
     }
 
     pub(super) fn disconnect(&self, reason: DisconnectReason) -> usize {
+        self.request_cancel();
         let pending_permissions = self.permissions.shutdown_pending();
         self.abort_non_protocol_tasks();
         self.supervisor.mark_done();
@@ -202,11 +208,17 @@ impl ActiveAcpSession {
         }
         self.abort_non_protocol_tasks();
     }
+
+    fn request_cancel(&self) {
+        self.cancel.cancel();
+        thread::sleep(PROTOCOL_CANCEL_FLUSH_GRACE);
+    }
 }
 
 impl Drop for ActiveAcpSession {
     fn drop(&mut self) {
         let pending_permissions = self.permissions.shutdown_pending();
+        self.request_cancel();
         self.abort_tasks();
         self.kill_child(pending_permissions);
     }
