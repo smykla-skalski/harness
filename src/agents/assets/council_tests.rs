@@ -129,8 +129,24 @@ fn codex_council_plugin_uses_codex_native_orchestration() {
     assert!(rendered.contains("wait_agent"));
     assert!(rendered.contains("agent_type: default"));
     assert!(
-        rendered.contains("read `agents/<persona>.md`"),
-        "Codex council skill should brief generic subagents with persona files"
+        rendered.contains("read `plugins/council/agents/<persona>.md`"),
+        "Codex council skill should brief generic subagents with the rendered persona files"
+    );
+    assert!(
+        rendered.contains("agents/plugins/council/agents/<persona>.md"),
+        "Codex council skill should document the canonical persona source path"
+    );
+    assert!(
+        rendered.contains("do not send a setup-only spawn and rely on `followup_task`"),
+        "Codex council skill should require full reviewer tasking in the initial spawn message"
+    );
+    assert!(
+        rendered.contains("not answer with `ready`"),
+        "Codex council skill should tell reviewers not to stall with readiness responses"
+    );
+    assert!(
+        rendered.contains("not wait for more input"),
+        "Codex council skill should require reviewers to act on the initial assignment"
     );
     assert!(
         !rendered.contains("$ARGUMENTS"),
@@ -178,7 +194,9 @@ fn codex_council_skill_documents_canonical_codex_source_layout() {
         .expect("Codex council plugin skill should be planned");
 
     assert!(rendered.contains("agents/plugins/council/skills/council/codex/body.md"));
+    assert!(rendered.contains("agents/plugins/council/agents/<persona>.md"));
     assert!(rendered.contains("skills/codex/body.md"));
+    assert!(rendered.contains(".agents/skills/council/agents/<persona>.md"));
 }
 
 #[test]

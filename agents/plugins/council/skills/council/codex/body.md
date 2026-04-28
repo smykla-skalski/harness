@@ -9,8 +9,11 @@ If you need to inspect or debug this skill from repo files, keep the skill-name 
 - Canonical Codex variant: `agents/plugins/council/skills/council/codex/body.md`
 - Canonical base skill: `agents/plugins/council/skills/council/body.md`
 - Rendered Codex skill: `plugins/council/skills/council/SKILL.md`
+- Canonical persona source: `agents/plugins/council/agents/<persona>.md`
+- Rendered persona mirror: `plugins/council/agents/<persona>.md`
 
 Do not guess `skills/codex/body.md`. That path is wrong for this repo and for the rendered plugin mirrors; the variant always lives under `skills/council/codex/`.
+Do not read `.agents/skills/council/agents/<persona>.md` for persona content. That mirror does not hold the canonical persona Markdown roster for Codex council reviews.
 
 ## Mode Dispatch
 
@@ -105,7 +108,16 @@ Extended UX/Platform (11) - UI craft, accessibility, motion, macOS conventions, 
 
 1. Resolve `mode` and problem context. For file-backed requests, read the file before spawning reviewers. If `mode` is bare `core`, run auto-detect and announce the chosen profile (`core-eng`, `core-ux`, or `core-mix`) in one sentence so the user can override on the next call.
 2. Select personas from the matching roster: `core-eng` for the engineering 6, `core-ux` for the UX 6, `core-mix` for the 3+3 split, `all` for every persona deduped, and 3-6 focused personas for debate.
-3. For each selected persona, call `spawn_agent` with `agent_type: default` and a unique task name. The message must tell the subagent to read `agents/<persona>.md`, read any referenced dossier only if needed, review the supplied context through that persona's lens only, and return the Persona Output Contract below.
+3. For each selected persona, call `spawn_agent` with `agent_type: default` and a unique task name. Put the full assignment in the initial `spawn_agent` message; do not send a setup-only spawn and rely on `followup_task` for the real work. The message must be self-contained and tell the subagent to:
+   - read `plugins/council/agents/<persona>.md`, or `agents/plugins/council/agents/<persona>.md` if working from canonical sources
+   - read any referenced dossier only if needed
+   - perform the review immediately
+   - not answer with `ready`
+   - not wait for more input
+   - not modify files
+   - not spawn agents
+   - review the supplied context through that persona's lens only
+   - return only the Persona Output Contract below
 4. Use `wait_agent` until every reviewer has returned. If one reviewer fails, continue with the successful reviewers and call out the missing lens in the synthesis.
 5. Synthesize the returned reviews. Do not average the personas into bland consensus. The value is convergence across opposed lenses and named disagreement where constraints decide the tradeoff.
 
