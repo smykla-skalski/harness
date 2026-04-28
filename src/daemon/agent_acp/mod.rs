@@ -7,6 +7,7 @@
 mod active;
 mod manager;
 mod permission_bridge;
+mod pool_key;
 mod protocol;
 
 pub use manager::{

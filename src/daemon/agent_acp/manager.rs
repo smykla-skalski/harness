@@ -12,6 +12,7 @@ use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
 use crate::agents::kind::DisconnectReason;
+use crate::daemon::service;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
@@ -25,6 +26,7 @@ use super::active::{
     spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
 };
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
+use super::pool_key::AcpProcessPoolKey;
 use super::protocol::spawn_protocol_task;
 
 const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
@@ -51,6 +53,7 @@ pub struct AcpAgentSnapshot {
     pub pid: u32,
     pub pgid: i32,
     pub project_dir: String,
+    pub process_key: String,
     pub pending_permissions: usize,
     pub permission_queue_depth: usize,
     pub pending_permission_batches: Vec<AcpPermissionBatch>,
@@ -71,6 +74,7 @@ pub struct AcpAgentInspectSnapshot {
     pub display_name: String,
     pub pid: u32,
     pub pgid: i32,
+    pub process_key: String,
     pub uptime_ms: u64,
     pub last_update_at: String,
     pub last_client_call_at: Option<String>,
@@ -140,6 +144,11 @@ impl AcpAgentManagerHandle {
                 request.agent
             )))
         })?;
+        if service::sandboxed_from_env() {
+            return Err(
+                CliErrorKind::sandbox_feature_disabled("acp.local-spawn").into(),
+            );
+        }
         self.start_descriptor(session_id, request, descriptor)
     }
 
@@ -160,6 +169,7 @@ impl AcpAgentManagerHandle {
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
+        let process_key = AcpProcessPoolKey::from_spawn_inputs(descriptor, request, &project_dir);
 
         let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
         let supervisor = Arc::new(AcpSessionSupervisor::new(
@@ -207,6 +217,7 @@ impl AcpAgentManagerHandle {
             pid: supervisor.pid(),
             pgid: supervisor.pgid(),
             project_dir: project_dir.display().to_string(),
+            process_key: process_key.as_str().to_string(),
             pending_permissions: 0,
             permission_queue_depth: 0,
             pending_permission_batches: Vec::new(),

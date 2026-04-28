@@ -7,6 +7,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let transportChoices: [AgentCapabilityTransportChoice]
   let probe: AcpRuntimeProbe?
   let installHint: String?
+  let sandboxed: Bool
 
   var isEnabled: Bool {
     transportChoices.contains(where: isEnabled)
@@ -21,7 +22,11 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   }
 
   func normalizedSelection(for selection: AgentLaunchSelection) -> AgentLaunchSelection {
-    transportChoice(for: selection).id
+    let preferred = transportChoice(for: selection)
+    if isEnabled(preferred) {
+      return preferred.id
+    }
+    return transportChoices.first(where: isEnabled)?.id ?? transportChoices[0].id
   }
 
   func transportChoice(for selection: AgentLaunchSelection) -> AgentCapabilityTransportChoice {
@@ -33,7 +38,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     case .tui:
       true
     case .acp:
-      probe?.binaryPresent ?? true
+      !sandboxed && (probe?.binaryPresent ?? true)
     }
   }
 }
@@ -62,11 +67,18 @@ struct AgentCapabilityRow: View {
   }
 
   private var selectedChoice: AgentCapabilityTransportChoice {
-    option.transportChoice(for: selection)
+    option.transportChoice(for: normalizedSelection)
   }
 
   private var selectedChoiceIsEnabled: Bool {
     option.isEnabled(selectedChoice)
+  }
+
+  private var unavailableReason: String? {
+    if case .acp = selectedChoice.id, option.sandboxed {
+      return "Filesystem + terminal tools are unavailable while the daemon runs sandboxed."
+    }
+    return option.installHint
   }
 
   private var selectedChoiceIconName: String {
@@ -89,8 +101,8 @@ struct AgentCapabilityRow: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
-        if !selectedChoiceIsEnabled, let installHint = option.installHint {
-          Text(installHint)
+        if !selectedChoiceIsEnabled, let unavailableReason {
+          Text(unavailableReason)
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.caution)
             .lineLimit(2)
