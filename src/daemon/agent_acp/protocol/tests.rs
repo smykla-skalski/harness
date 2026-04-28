@@ -1,4 +1,128 @@
 use super::*;
+use std::process::Command;
+
+use agent_client_protocol::Channel;
+use agent_client_protocol::schema::{
+    AgentCapabilities, ContentChunk, InitializeResponse, NewSessionResponse, PromptResponse,
+    SessionUpdate, StopReason,
+};
+
+use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
+
+#[tokio::test]
+#[cfg(unix)]
+async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    let mut supervisor_child = Command::new("sleep")
+        .arg("60")
+        .spawn()
+        .expect("spawn supervisor child");
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig {
+            initialize_timeout: Duration::from_secs(1),
+            prompt_timeout: Duration::from_secs(1),
+            ..SupervisionConfig::default()
+        },
+    ));
+    let (client_transport, agent_transport) = Channel::duplex();
+    let agent_task = tokio::spawn(run_cookbook_style_agent(agent_transport));
+    let (notification_tx, mut notifications) = mpsc::channel(4);
+    let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let project_dir = project.path().to_path_buf();
+    let protocol_supervisor = Arc::clone(&supervisor);
+
+    let protocol_task = tokio::spawn(async move {
+        Client
+            .builder()
+            .name("harness-test")
+            .on_receive_notification(
+                async move |notification: SessionNotification, _connection| {
+                    notification_tx
+                        .send(notification)
+                        .await
+                        .map_err(|error| AcpError::new(-32603, format!("queue event: {error}")))?;
+                    Ok(())
+                },
+                agent_client_protocol::on_receive_notification!(),
+            )
+            .connect_with(client_transport, async move |connection| {
+                run_connection(
+                    connection,
+                    project_dir,
+                    Some("smoke the second descriptor".to_string()),
+                    protocol_supervisor,
+                    cancel_rx,
+                )
+                .await
+            })
+            .await
+    });
+
+    let notification = tokio::time::timeout(Duration::from_secs(2), notifications.recv())
+        .await
+        .expect("prompt turn should stream an event")
+        .expect("notification channel should stay open");
+    let SessionUpdate::AgentMessageChunk(chunk) = notification.update else {
+        panic!("expected agent message chunk");
+    };
+    let ContentBlock::Text(text) = chunk.content else {
+        panic!("expected text content");
+    };
+    assert_eq!(text.text, "second ACP descriptor smoke");
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
+
+    cancel_tx.send(()).expect("send cancel");
+    let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)
+        .await
+        .expect("protocol should stop after cancel")
+        .expect("protocol task should not panic");
+    protocol_result.expect("protocol should complete cleanly");
+
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+    agent_task.abort();
+    let _ = agent_task.await;
+}
+
+async fn run_cookbook_style_agent(transport: Channel) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("cookbook-style-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("cookbook-style-session"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: PromptRequest, responder, connection| {
+                connection.send_notification(SessionNotification::new(
+                    request.session_id,
+                    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                        TextContent::new("second ACP descriptor smoke"),
+                    ))),
+                ))?;
+                responder.respond(PromptResponse::new(StopReason::EndTurn))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
 
 #[test]
 fn disconnect_reason_maps_initialize_deadline() {
