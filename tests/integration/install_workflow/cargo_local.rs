@@ -34,14 +34,41 @@ fn cargo_local_script_falls_back_to_repo_local_tmpdir_when_tmpdir_is_missing() {
 
     let env = parse_env_output(&output.stdout);
     let tmpdir = env.get("TMPDIR").expect("TMPDIR line");
+    let common_repo_root = resolve_common_repo_root(&repo);
     assert_eq!(
         tmpdir,
-        &format!("{}/target/.cargo-local/tmp/local/", repo.display())
+        &format!(
+            "{}/target/.cargo-local/tmp/local/",
+            common_repo_root.display()
+        )
     );
     assert!(
         Path::new(tmpdir).is_dir(),
         "expected repo-local tmpdir to exist: {tmpdir}"
     );
+}
+
+fn resolve_common_repo_root(repo: &Path) -> PathBuf {
+    let Ok(output) = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .arg("rev-parse")
+        .arg("--path-format=absolute")
+        .arg("--git-common-dir")
+        .output()
+    else {
+        return repo.to_path_buf();
+    };
+    if !output.status.success() {
+        return repo.to_path_buf();
+    }
+    let common_git_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if common_git_dir.is_empty() {
+        return repo.to_path_buf();
+    }
+    Path::new(&common_git_dir)
+        .parent()
+        .map_or_else(|| repo.to_path_buf(), Path::to_path_buf)
 }
 
 #[test]
