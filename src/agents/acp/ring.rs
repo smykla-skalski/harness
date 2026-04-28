@@ -9,7 +9,6 @@
 //! `ConversationEvent`s. The ring reuses its internal buffer across batches to
 //! minimise allocations in the hot path.
 
-use std::mem;
 use std::time::{Duration, Instant};
 
 use agent_client_protocol::schema::{ContentChunk, SessionNotification, SessionUpdate};
@@ -129,11 +128,28 @@ impl SessionRing {
         false
     }
 
-    /// Drain the ring, returning the accumulated batch.
-    pub fn drain(&mut self) -> Vec<RawSessionUpdate> {
+    /// Borrow the accumulated batch without clearing it.
+    #[must_use]
+    pub fn updates(&self) -> &[RawSessionUpdate] {
+        &self.updates
+    }
+
+    /// Clear the current batch while preserving the backing allocation.
+    pub fn clear(&mut self) {
         self.accumulated_bytes = 0;
         self.batch_start = None;
-        mem::take(&mut self.updates)
+        self.updates.clear();
+    }
+
+    /// Clone and drain the ring, returning the accumulated batch.
+    ///
+    /// Production flush paths should prefer [`Self::updates`] plus
+    /// [`Self::clear`] so the ring's backing allocation is reused. This helper
+    /// remains for tests and callers that need an owned batch.
+    pub fn drain(&mut self) -> Vec<RawSessionUpdate> {
+        let batch = self.updates.clone();
+        self.clear();
+        batch
     }
 
     /// Number of updates currently in the ring.
@@ -152,6 +168,12 @@ impl SessionRing {
     #[must_use]
     pub fn accumulated_bytes(&self) -> usize {
         self.accumulated_bytes
+    }
+
+    /// Current backing allocation capacity.
+    #[must_use]
+    pub fn capacity(&self) -> usize {
+        self.updates.capacity()
     }
 
     /// Time since batch started, if any.
@@ -271,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn ring_drain_clears_and_preserves_capacity() {
+    fn ring_drain_clears_batch() {
         let mut ring = SessionRing::with_defaults();
         ring.push(make_text_notification("s", "a"));
         ring.push(make_text_notification("s", "b"));
@@ -281,6 +303,23 @@ mod tests {
         assert!(ring.is_empty());
         assert_eq!(ring.accumulated_bytes(), 0);
         assert!(ring.elapsed().is_none());
+    }
+
+    #[test]
+    fn ring_clear_preserves_backing_allocation() {
+        let mut ring = SessionRing::with_defaults();
+        let initial_capacity = ring.capacity();
+
+        ring.push(make_text_notification("s", "a"));
+        ring.push(make_text_notification("s", "b"));
+        let populated_capacity = ring.capacity();
+
+        ring.clear();
+
+        assert!(populated_capacity >= initial_capacity);
+        assert_eq!(ring.capacity(), populated_capacity);
+        assert!(ring.is_empty());
+        assert_eq!(ring.accumulated_bytes(), 0);
     }
 
     #[test]
