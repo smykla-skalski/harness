@@ -53,6 +53,7 @@ async fn start_list_stop_tracks_live_snapshot() {
             agent: "fake".to_string(),
             prompt: None,
             project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
         };
         let manager = manager();
         let descriptor = descriptor(&script);
@@ -69,6 +70,9 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert_eq!(inspected.agents[0].acp_id, snapshot.acp_id);
         assert_eq!(inspected.agents[0].agent_id, "fake");
         assert_eq!(inspected.agents[0].watchdog_state, "active");
+        assert_eq!(inspected.agents[0].permission_mode, "daemon_bridge");
+        assert_eq!(inspected.agents[0].permission_queue_depth, 0);
+        assert_eq!(inspected.agents[0].permission_log_path, None);
 
         let stopped = manager.stop(&snapshot.acp_id).expect("stop");
         assert!(matches!(
@@ -92,6 +96,7 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             agent: "fake".to_string(),
             prompt: None,
             project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
         };
         let manager = manager();
         let descriptor = descriptor(&script);
@@ -115,6 +120,52 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             panic!("expected disconnected status");
         };
         assert!(stderr_tail.expect("stderr tail").contains("boom"));
+    });
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn start_recording_mode_surfaces_log_path_in_inspect() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let xdg = temp.path().join("xdg");
+        temp_env::with_var("XDG_DATA_HOME", Some(&xdg), || {
+            let script = temp.path().join("fake-agent.sh");
+            write_executable(&script, "#!/bin/sh\nsleep 60\n");
+            let request = AcpAgentStartRequest {
+                agent: "fake".to_string(),
+                prompt: None,
+                project_dir: Some(temp.path().display().to_string()),
+                record_permissions: true,
+            };
+            let manager = manager();
+            let descriptor = descriptor(&script);
+            let snapshot = manager
+                .start_descriptor("sess-1", &request, &descriptor)
+                .expect("start");
+
+            assert_eq!(snapshot.permission_mode, "recording");
+            assert_eq!(
+                snapshot.permission_log_path.as_deref(),
+                Some(
+                    xdg.join("harness")
+                        .join("runs")
+                        .join("sess-1")
+                        .join("permission-log.ndjson")
+                        .to_str()
+                        .expect("utf8 log path")
+                )
+            );
+
+            let inspected = manager.inspect(Some("sess-1"));
+            assert_eq!(inspected.agents[0].permission_mode, "recording");
+            assert_eq!(
+                inspected.agents[0].permission_log_path,
+                snapshot.permission_log_path
+            );
+
+            manager.stop(&snapshot.acp_id).expect("stop");
+        });
     });
 }
 

@@ -54,7 +54,10 @@ use tokio::sync::mpsc::error::TrySendError;
 use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
-use super::permission::{PermissionMode, stdin_permission_gateway};
+use super::permission::{
+    PermissionMode, record_terminal_decision, record_write_decision, recording_permission_gateway,
+    stdin_permission_gateway,
+};
 use terminal::TerminalManager;
 
 /// JSON-RPC error code: write denied by policy.
@@ -254,39 +257,35 @@ impl HarnessAcpClient {
 
         let decision = evaluate_write(path, &ctx, &self.denied_binaries);
 
-        match decision {
-            WriteDecision::Allow => {}
-            WriteDecision::DenyControlFile { hint } => {
-                return Err(ClientError::write_denied(format!(
-                    "cannot write to control file '{}': {hint}",
-                    path.display()
-                )));
-            }
-            WriteDecision::DenyOutsideSurface => {
-                return Err(ClientError::write_denied(format!(
-                    "path '{}' is outside the run surface",
-                    path.display()
-                )));
-            }
-            WriteDecision::DenyTraversal => {
-                return Err(ClientError::write_denied(format!(
-                    "path '{}' escapes via traversal",
-                    path.display()
-                )));
-            }
-            WriteDecision::DenyBinary { name } => {
-                return Err(ClientError::binary_denied(&name));
-            }
+        let policy_error = match decision {
+            WriteDecision::Allow => None,
+            WriteDecision::DenyControlFile { hint } => Some(ClientError::write_denied(format!(
+                "cannot write to control file '{}': {hint}",
+                path.display()
+            ))),
+            WriteDecision::DenyOutsideSurface => Some(ClientError::write_denied(format!(
+                "path '{}' is outside the run surface",
+                path.display()
+            ))),
+            WriteDecision::DenyTraversal => Some(ClientError::write_denied(format!(
+                "path '{}' escapes via traversal",
+                path.display()
+            ))),
+            WriteDecision::DenyBinary { name } => Some(ClientError::binary_denied(&name)),
             WriteDecision::DenySymlinkEscape { resolved } => {
-                return Err(ClientError::write_denied(format!(
+                Some(ClientError::write_denied(format!(
                     "symlink '{}' escapes to '{}'",
                     path.display(),
                     resolved.display()
-                )));
+                )))
             }
-            WriteDecision::DenyCheckFailed { reason } => {
-                return Err(ClientError::write_denied(reason));
-            }
+            WriteDecision::DenyCheckFailed { reason } => Some(ClientError::write_denied(reason)),
+        };
+        if let PermissionMode::Recording { log_path } = &self.permission_mode {
+            record_write_decision(log_path, request, policy_error.as_ref().map_or(Ok(()), Err));
+        }
+        if let Some(error) = policy_error {
+            return Err(error);
         }
 
         if let Some(parent) = path.parent() {
@@ -322,7 +321,11 @@ impl HarnessAcpClient {
         &self,
         request: &CreateTerminalRequest,
     ) -> ClientResult<CreateTerminalResponse> {
-        self.terminals.handle_create(request, &self.denied_binaries)
+        let result = self.terminals.handle_create(request, &self.denied_binaries);
+        if let PermissionMode::Recording { log_path } = &self.permission_mode {
+            record_terminal_decision(log_path, request, result.as_ref().map(|_| ()));
+        }
+        result
     }
 
     /// Handle `terminal/output`.
@@ -389,10 +392,11 @@ impl HarnessAcpClient {
             PermissionMode::Stdin => stdin_permission_gateway(request).map_err(|e| {
                 ClientError::new(PERMISSION_TIMEOUT, format!("stdin permission failed: {e}"))
             }),
-            PermissionMode::Recording { .. } => Err(ClientError::new(
-                -32098,
-                "Recording permission mode not yet wired (Chunk 10)",
-            )),
+            PermissionMode::Recording { log_path } => {
+                recording_permission_gateway(log_path, request).map_err(|e| {
+                    ClientError::new(PERMISSION_TIMEOUT, format!("record permission failed: {e}"))
+                })
+            }
             PermissionMode::DaemonBridge { tx, deadline } => {
                 let (response_tx, response_rx) = sync_channel(1);
                 tx.try_send(super::permission::PermissionBridgeRequest {

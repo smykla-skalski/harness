@@ -113,6 +113,9 @@ pub struct AcpAgentStartArgs {
     /// Project directory. Defaults to the daemon's session project.
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
+    /// Record ACP permission decisions without granting permission requests.
+    #[arg(long)]
+    pub record_permissions: bool,
 }
 
 impl Execute for AcpAgentStartArgs {
@@ -124,6 +127,7 @@ impl Execute for AcpAgentStartArgs {
                 .project_dir
                 .as_deref()
                 .map(|hint| resolve_project_dir(Some(hint))),
+            record_permissions: self.record_permissions,
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
@@ -354,11 +358,13 @@ mod tests {
             "sess-1",
             "--prompt",
             "hello",
+            "--record-permissions",
         ])
         .expect("parse");
         assert_eq!(parsed.args.agent, "copilot");
         assert_eq!(parsed.args.session_id, "sess-1");
         assert_eq!(parsed.args.prompt.as_deref(), Some("hello"));
+        assert!(parsed.args.record_permissions);
     }
 
     #[test]
