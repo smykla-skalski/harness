@@ -100,11 +100,10 @@ extension HarnessMonitorStore {
     standaloneAcpPermissionBatches.removeAll { $0.acpId == snapshot.acpId }
     selectedAcpAgents = upsertingAcpAgent(
       snapshot.withPermissionBatches(
-        sortedAcpPermissionBatches(
-          mergedPermissionBatches(
-            primary: snapshot.pendingPermissionBatches,
-            secondary: pendingStandaloneBatches
-          )
+        mergedPermissionBatches(
+          primary: snapshot.pendingPermissionBatches,
+          secondary: pendingStandaloneBatches,
+          preferSecondary: false
         )
       ),
       into: selectedAcpAgents
@@ -121,11 +120,10 @@ extension HarnessMonitorStore {
         $0.acpId == snapshot.acpId
       }
       return snapshot.withPermissionBatches(
-        sortedAcpPermissionBatches(
-          mergedPermissionBatches(
-            primary: snapshot.pendingPermissionBatches,
-            secondary: pendingStandaloneBatches
-          )
+        mergedPermissionBatches(
+          primary: snapshot.pendingPermissionBatches,
+          secondary: pendingStandaloneBatches,
+          preferSecondary: false
         )
       )
     })
@@ -177,9 +175,7 @@ extension HarnessMonitorStore {
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
       guard snapshot.acpId == batch.acpId else { return snapshot }
       return snapshot.withPermissionBatches(
-        sortedAcpPermissionBatches(
-          mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
-        )
+        mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
       )
     }
     reconcilePresentedAcpPermissionBatch()
@@ -240,11 +236,17 @@ extension HarnessMonitorStore {
 
   private func mergedPermissionBatches(
     primary: [AcpPermissionBatch],
-    secondary: [AcpPermissionBatch]
+    secondary: [AcpPermissionBatch],
+    preferSecondary: Bool = true
   ) -> [AcpPermissionBatch] {
-    var byBatchID = Dictionary(uniqueKeysWithValues: primary.map { ($0.batchId, $0) })
-    for batch in secondary {
+    var byBatchID: [String: AcpPermissionBatch] = [:]
+    for batch in primary {
       byBatchID[batch.batchId] = batch
+    }
+    for batch in secondary {
+      if preferSecondary || byBatchID[batch.batchId] == nil {
+        byBatchID[batch.batchId] = batch
+      }
     }
     return Array(byBatchID.values)
   }
