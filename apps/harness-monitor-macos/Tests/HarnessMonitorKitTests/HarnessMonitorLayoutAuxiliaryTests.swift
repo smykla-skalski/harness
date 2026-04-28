@@ -136,6 +136,42 @@ struct ContentWindowToolbarModelTests {
 
 @Suite("Agents viewport auto-resize stabilization")
 struct AgentTuiViewportAutoResizeStabilizationTests {
+  @Test("Pending viewport resize target remains the baseline while the server catches up")
+  func pendingViewportResizeTargetRemainsBaselineWhileServerCatchesUp() {
+    let baseline = AgentsWindowView.TerminalViewportSizing.automaticResizeBaseline(
+      serverSize: AgentTuiSize(rows: 32, cols: 120),
+      pendingTarget: AgentTuiSize(rows: 48, cols: 136),
+      expectedSize: AgentTuiSize(rows: 48, cols: 136)
+    )
+
+    #expect(baseline == AgentTuiSize(rows: 48, cols: 136))
+  }
+
+  @Test("Expected viewport size stays authoritative across stale server snapshots")
+  func expectedViewportSizeStaysAuthoritativeAcrossStaleServerSnapshots() {
+    let baseline = AgentsWindowView.TerminalViewportSizing.automaticResizeBaseline(
+      serverSize: AgentTuiSize(rows: 32, cols: 120),
+      pendingTarget: nil,
+      expectedSize: AgentTuiSize(rows: 48, cols: 136)
+    )
+
+    #expect(baseline == AgentTuiSize(rows: 48, cols: 136))
+  }
+
+  @MainActor
+  @Test("Wide detail columns seed a container-derived terminal before the first live measurement")
+  func wideDetailColumnsSeedContainerDerivedTerminalBeforeFirstLiveMeasurement() {
+    let startSize = AgentsWindowView.TerminalViewportSizing.estimatedStartSize(
+      detailColumnSize: CGSize(width: 1320, height: 860),
+      fontScale: 1,
+      fallbackRows: 32
+    )
+
+    #expect(startSize.rows < 32)
+    #expect(startSize.rows >= 20)
+    #expect(startSize.cols > 140)
+  }
+
   @Test("Minor viewport jitter preserves the current terminal size")
   func minorViewportJitterPreservesCurrentTerminalSize() {
     let stabilized = AgentsWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
