@@ -2678,7 +2678,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "30.15.0"
+version = "30.15.1"
 dependencies = [
  "agent-client-protocol",
  "assert_cmd",
@@ -2753,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "30.15.0"
+version = "30.15.1"
 dependencies = [
  "assert_cmd",
  "harness",
