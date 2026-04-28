@@ -1,8 +1,8 @@
 use super::super::{
-    AgentRemoveRequest, CliError, RoleChangeRequest, SessionDetail,
-    append_leave_signal_logs_to_db, build_log_entry, effective_project_dir, index,
-    project_dir_for_db_session, refresh_signal_index_for_db, session_detail,
-    session_detail_from_daemon_db, session_not_found, session_service, slice, utc_now,
+    AgentRemoveRequest, CliError, RoleChangeRequest, SessionDetail, append_leave_signal_logs_to_db,
+    build_log_entry, effective_project_dir, index, project_dir_for_db_session,
+    refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
+    session_service, slice, utc_now,
 };
 
 /// Change an agent role through the shared session service.
