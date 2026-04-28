@@ -436,6 +436,7 @@ fn apply_prepared_runtime_transcript_resync_preserves_other_agents() {
                 latest_tool_name: Some("Read".into()),
                 latest_event_at: Some("2026-04-03T12:00:01Z".into()),
                 recent_tools: vec!["Read".into()],
+                pending_user_prompt: None,
             },
             daemon_protocol::AgentToolActivitySummary {
                 agent_id: "codex-worker".into(),
@@ -446,6 +447,7 @@ fn apply_prepared_runtime_transcript_resync_preserves_other_agents() {
                 latest_tool_name: Some("Write".into()),
                 latest_event_at: Some("2026-04-03T12:00:02Z".into()),
                 recent_tools: vec!["Write".into()],
+                pending_user_prompt: None,
             },
         ],
     )
