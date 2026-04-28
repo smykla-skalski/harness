@@ -167,15 +167,8 @@ fn parse_agents_prompt_submit() {
 }
 
 #[test]
-fn parse_agents_repo_policy() {
-    let cli =
-        Cli::try_parse_from(["harness", "agents", "repo-policy", "--agent", "codex"]).unwrap();
-    match cli.command {
-        Command::Agents {
-            command: AgentsCommand::RepoPolicy(AgentRepoPolicyArgs { agent }),
-        } => {
-            assert_eq!(agent, HookAgent::Codex);
-        }
-        _ => panic!("expected agents repo-policy command"),
-    }
+fn parse_agents_rejects_repo_policy_subcommand() {
+    let error = Cli::try_parse_from(["harness", "agents", "repo-policy", "--agent", "codex"])
+        .expect_err("repo-policy command should move out of harness");
+    assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
 }

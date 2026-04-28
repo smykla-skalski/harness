@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
@@ -12,7 +13,7 @@ use crate::hooks::protocol::context::{
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as session_service;
-use crate::session::types::SessionRole;
+use crate::session::types::{AgentStatus, SessionRole, SessionStatus};
 
 fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -27,7 +28,7 @@ fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
             ],
             || {
                 let project = tmp.path().join("project");
-                std::fs::create_dir_all(&project).expect("create project directory");
+                fs::create_dir_all(&project).expect("create project directory");
                 test_fn(&project);
             },
         );
@@ -50,7 +51,7 @@ fn with_temp_project_without_runtime_ids<F: FnOnce(&Path)>(project_name: &str, t
             ],
             || {
                 let project = tmp.path().join(project_name);
-                std::fs::create_dir_all(&project).expect("create project directory");
+                fs::create_dir_all(&project).expect("create project directory");
                 test_fn(&project);
             },
         );
@@ -123,7 +124,7 @@ fn session_start_preserves_pending_signals() {
 }
 
 #[test]
-fn session_start_injects_repo_policy_context() {
+fn session_start_no_longer_injects_repo_policy_context() {
     with_temp_project(|project| {
         let context = RUNTIME
             .block_on(session_start(
@@ -132,23 +133,24 @@ fn session_start_injects_repo_policy_context() {
                 Some("sess-policy".to_string()),
             ))
             .expect("session start")
-            .expect("repo policy context");
+            .is_none();
 
-        assert!(context.contains("mise tasks ls"));
-        assert!(context.contains("Every commit uses `-sS`"));
-        assert!(context.contains("Do not run raw `cargo`"));
+        assert!(
+            context,
+            "repo-policy session-start context should move out of harness"
+        );
     });
 }
 
 #[test]
 fn project_dir_for_context_unescapes_shell_escaped_cwd_when_original_path_is_missing() {
     with_temp_project_without_runtime_ids("project@team", |project| {
-        let escaped = project.to_string_lossy().replace("@", "\\@");
+        let escaped = project.to_string_lossy().replace('@', "\\@");
         let context = NormalizedHookContext {
             event: NormalizedEvent::AgentStop,
             session: SessionContext {
                 session_id: "gemini-runtime".into(),
-                cwd: Some(std::path::PathBuf::from(escaped)),
+                cwd: Some(PathBuf::from(escaped)),
                 transcript_path: None,
             },
             tool: None,
@@ -172,7 +174,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             Some("sess-gemini-late"),
         )
         .expect("start session");
-        let session_id = started.session_id.clone();
+        let session_id = started.session_id;
         let tui_id = "agent-tui-gemini-1";
         session_service::join_session(
             &session_id,
@@ -200,12 +202,12 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             "join should reproduce the missing runtime session id"
         );
 
-        let escaped = project.to_string_lossy().replace("@", "\\@");
+        let escaped = project.to_string_lossy().replace('@', "\\@");
         let context = NormalizedHookContext {
             event: NormalizedEvent::AgentStop,
             session: SessionContext {
                 session_id: "gemini-runtime-2152464d".into(),
-                cwd: Some(std::path::PathBuf::from(escaped)),
+                cwd: Some(PathBuf::from(escaped)),
                 transcript_path: None,
             },
             tool: None,
@@ -266,7 +268,7 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
             Some("sess-managed-end"),
         )
         .expect("start session");
-        let session_id = started.session_id.clone();
+        let session_id = started.session_id;
         let tui_id = "agent-tui-claude-1";
         session_service::join_session(
             &session_id,
@@ -332,14 +334,8 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
             leader.agent_session_id.as_deref(),
             Some("claude-runtime-session")
         );
-        assert_eq!(
-            leader.status,
-            crate::session::types::AgentStatus::Disconnected
-        );
-        assert_eq!(
-            updated.status,
-            crate::session::types::SessionStatus::LeaderlessDegraded
-        );
+        assert_eq!(leader.status, AgentStatus::Disconnected);
+        assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
         assert!(
             leader_id.is_none(),
             "leader session end should clear leader id"

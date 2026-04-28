@@ -3,7 +3,7 @@ use std::path::Path;
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
-use crate::agents::transport::{AgentPromptSubmitArgs, AgentRepoPolicyArgs};
+use crate::agents::transport::AgentPromptSubmitArgs;
 use crate::daemon::bridge::BridgeCapability;
 use crate::daemon::transport::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
 use crate::hooks::adapters::HookAgent;
@@ -12,7 +12,7 @@ use crate::run::{
     ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
     KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
 };
-use crate::session::transport::SessionObserveArgs;
+use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 
 #[path = "tests/create.rs"]
@@ -165,7 +165,7 @@ fn parse_session_observe_with_poll() {
     .unwrap();
     match cli.command {
         Command::Session {
-            command: crate::session::transport::SessionCommand::Observe(args),
+            command: SessionCommand::Observe(args),
         } => {
             assert_eq!(args.session_id, "sess-watch");
             assert_eq!(args.poll_interval, 5);
