@@ -6,10 +6,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
-    ContentBlock, CreateTerminalRequest, InitializeRequest, KillTerminalRequest, NewSessionRequest,
-    PromptRequest, ProtocolVersion, ReadTextFileRequest, ReleaseTerminalRequest,
-    RequestPermissionRequest, SessionNotification, TerminalOutputRequest, TextContent,
-    WaitForTerminalExitRequest, WriteTextFileRequest,
+    CancelNotification, ContentBlock, CreateTerminalRequest, InitializeRequest,
+    KillTerminalRequest, NewSessionRequest, PromptRequest, ProtocolVersion, ReadTextFileRequest,
+    ReleaseTerminalRequest, RequestPermissionRequest, SessionId, SessionNotification,
+    TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, Responder,
@@ -32,6 +32,24 @@ use super::manager::AcpAgentStartRequest;
 
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 
+#[derive(Clone)]
+pub(super) struct AcpCancelHandle {
+    tx: mpsc::UnboundedSender<()>,
+}
+
+impl AcpCancelHandle {
+    pub(super) fn cancel(&self) {
+        let _ = self.tx.send(());
+    }
+}
+
+pub(super) struct SpawnedAcpProtocol {
+    pub(super) events: mpsc::Receiver<EventBatch>,
+    pub(super) protocol: JoinHandle<()>,
+    pub(super) batcher: JoinHandle<()>,
+    pub(super) cancel: AcpCancelHandle,
+}
+
 pub(super) fn spawn_protocol_task(
     child: &mut Child,
     request: &AcpAgentStartRequest,
@@ -40,7 +58,7 @@ pub(super) fn spawn_protocol_task(
     project_dir: PathBuf,
     supervisor: &Arc<AcpSessionSupervisor>,
     permission_mode: PermissionMode,
-) -> io::Result<(mpsc::Receiver<EventBatch>, JoinHandle<()>, JoinHandle<()>)> {
+) -> io::Result<SpawnedAcpProtocol> {
     let stdin = child
         .stdin
         .take()
@@ -65,23 +83,26 @@ pub(super) fn spawn_protocol_task(
         managed_cluster_binaries(),
         permission_mode,
     ));
-    let protocol_task = tokio::spawn(run_protocol(
+    let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let protocol_task = tokio::spawn(run_protocol(RunProtocolArgs {
         stdin,
         stdout,
         project_dir,
-        request.prompt.clone(),
-        batcher.notifications,
+        prompt: request.prompt.clone(),
+        notifications: batcher.notifications,
         client,
-        Arc::clone(supervisor),
-    ));
-    Ok((batcher.events, protocol_task, batcher.task))
+        supervisor: Arc::clone(supervisor),
+        cancel_rx,
+    }));
+    Ok(SpawnedAcpProtocol {
+        events: batcher.events,
+        protocol: protocol_task,
+        batcher: batcher.task,
+        cancel: AcpCancelHandle { tx: cancel_tx },
+    })
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "ACP SDK requires one typed callback registration per request type"
-)]
-async fn run_protocol(
+struct RunProtocolArgs {
     stdin: ChildStdin,
     stdout: ChildStdout,
     project_dir: PathBuf,
@@ -89,7 +110,24 @@ async fn run_protocol(
     notifications: mpsc::Sender<SessionNotification>,
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
-) {
+    cancel_rx: mpsc::UnboundedReceiver<()>,
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "ACP SDK requires one typed callback registration per request type"
+)]
+async fn run_protocol(args: RunProtocolArgs) {
+    let RunProtocolArgs {
+        stdin,
+        stdout,
+        project_dir,
+        prompt,
+        notifications,
+        client,
+        supervisor,
+        cancel_rx,
+    } = args;
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let context = ProtocolContext {
         client,
@@ -171,7 +209,7 @@ async fn run_protocol(
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(transport, async move |connection| {
-            run_connection(connection, project_dir, prompt, supervisor).await
+            run_connection(connection, project_dir, prompt, supervisor, cancel_rx).await
         })
         .await;
     if let Err(error) = result {
@@ -184,10 +222,34 @@ async fn run_connection(
     project_dir: PathBuf,
     prompt: Option<String>,
     supervisor: Arc<AcpSessionSupervisor>,
+    mut cancel_rx: mpsc::UnboundedReceiver<()>,
 ) -> agent_client_protocol::Result<()> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
+    send_initialize(&connection, initialize_timeout).await?;
+    let session_id = send_new_session(&connection, project_dir).await?;
+
+    if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty())
+        && send_prompt_or_cancel(
+            &connection,
+            &mut cancel_rx,
+            session_id.clone(),
+            prompt_timeout,
+            prompt,
+        )
+        .await?
+    {
+        return Ok(());
+    }
+
+    wait_for_cancel(&connection, &mut cancel_rx, session_id).await
+}
+
+async fn send_initialize(
+    connection: &ConnectionTo<Agent>,
+    initialize_timeout: Duration,
+) -> agent_client_protocol::Result<()> {
     timeout(
         initialize_timeout,
         connection
@@ -196,25 +258,54 @@ async fn run_connection(
     )
     .await
     .map_err(|_| deadline_error("session/initialize", initialize_timeout))??;
+    Ok(())
+}
 
+async fn send_new_session(
+    connection: &ConnectionTo<Agent>,
+    project_dir: PathBuf,
+) -> agent_client_protocol::Result<SessionId> {
     let response = connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
         .await?;
+    Ok(response.session_id)
+}
 
-    if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
-        let request = PromptRequest::new(
-            response.session_id,
-            vec![ContentBlock::Text(TextContent::new(prompt))],
-        );
-        timeout(
-            prompt_timeout,
-            connection.send_request(request).block_task(),
-        )
-        .await
-        .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+async fn send_prompt_or_cancel(
+    connection: &ConnectionTo<Agent>,
+    cancel_rx: &mut mpsc::UnboundedReceiver<()>,
+    session_id: SessionId,
+    prompt_timeout: Duration,
+    prompt: String,
+) -> agent_client_protocol::Result<bool> {
+    let request = PromptRequest::new(
+        session_id.clone(),
+        vec![ContentBlock::Text(TextContent::new(prompt))],
+    );
+    tokio::select! {
+        result = timeout(prompt_timeout, connection.send_request(request).block_task()) => {
+            result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            Ok(false)
+        }
+        Some(()) = cancel_rx.recv() => {
+            send_cancel_notification(connection, session_id)?;
+            Ok(true)
+        }
     }
-    pending::<agent_client_protocol::Result<()>>().await
+}
+
+async fn wait_for_cancel(
+    connection: &ConnectionTo<Agent>,
+    cancel_rx: &mut mpsc::UnboundedReceiver<()>,
+    session_id: SessionId,
+) -> agent_client_protocol::Result<()> {
+    if cancel_rx.recv().await.is_some() {
+        send_cancel_notification(connection, session_id)?;
+        Ok(())
+    } else {
+        pending::<agent_client_protocol::Result<()>>().await
+    }
 }
 
 fn deadline_error(operation: &str, timeout_duration: Duration) -> AcpError {
@@ -225,6 +316,13 @@ fn deadline_error(operation: &str, timeout_duration: Duration) -> AcpError {
             timeout_duration.as_millis()
         ),
     )
+}
+
+fn send_cancel_notification(
+    connection: &ConnectionTo<Agent>,
+    session_id: SessionId,
+) -> agent_client_protocol::Result<()> {
+    connection.send_notification(CancelNotification::new(session_id))
 }
 
 #[derive(Clone)]
