@@ -1,0 +1,95 @@
+use std::io::{BufRead as _, BufReader, Write as _};
+use std::os::unix::net::UnixListener;
+use std::thread;
+
+use tempfile::tempdir;
+
+use super::{BridgeClient, BridgeResponse};
+use crate::daemon::bridge::core::BridgeAcpEventBuffer;
+use crate::daemon::protocol::StreamEvent;
+
+fn stream_event(event: &str, session_id: &str) -> StreamEvent {
+    StreamEvent {
+        event: event.to_string(),
+        recorded_at: "2026-04-28T00:00:00Z".to_string(),
+        session_id: Some(session_id.to_string()),
+        payload: serde_json::json!({ "session_id": session_id }),
+    }
+}
+
+#[test]
+fn acp_event_buffer_requires_resync_after_epoch_or_continuity_change() {
+    let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
+    buffer.push(stream_event("acp_agent_started", "sess-1"));
+
+    let initial = buffer.events_since(None, None, None);
+    assert_eq!(initial.bridge_epoch, "epoch-a");
+    assert_eq!(initial.continuity, 0);
+    assert!(!initial.requires_resync);
+
+    let stale_epoch = buffer.events_since(Some(1), Some("epoch-old"), Some(0));
+    assert!(stale_epoch.requires_resync);
+    assert!(!stale_epoch.truncated);
+
+    buffer.record_lag(3);
+    let continuity_break = buffer.events_since(Some(1), Some("epoch-a"), Some(0));
+    assert!(continuity_break.requires_resync);
+    assert!(!continuity_break.truncated);
+
+    let ahead_cursor = buffer.events_since(Some(99), Some("epoch-a"), Some(0));
+    assert!(ahead_cursor.requires_resync);
+    assert!(ahead_cursor.truncated);
+}
+
+#[test]
+fn acp_event_buffer_initial_sync_does_not_require_resync_after_quiet_restart() {
+    let buffer = BridgeAcpEventBuffer::new("epoch-b".to_string());
+
+    let initial = buffer.events_since(None, None, None);
+    assert_eq!(initial.bridge_epoch, "epoch-b");
+    assert_eq!(initial.continuity, 0);
+    assert!(!initial.requires_resync);
+    assert!(!initial.truncated);
+    assert!(initial.events.is_empty());
+}
+
+#[test]
+fn acp_event_buffer_flags_truncation_when_history_evicted_before_first_poll() {
+    let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
+    for idx in 0..(BridgeAcpEventBuffer::MAX_EVENTS as u64 + 1) {
+        buffer.push(stream_event("acp_agent_started", &format!("sess-{idx}")));
+    }
+
+    let initial = buffer.events_since(Some(0), Some("epoch-a"), Some(0));
+    assert!(initial.truncated);
+    assert!(initial.requires_resync);
+}
+
+#[test]
+fn agent_tui_attach_clears_rpc_timeouts_before_returning() {
+    let dir = tempdir().expect("tempdir");
+    let socket_path = dir.path().join("bridge.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind socket");
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut line = String::new();
+        BufReader::new(stream.try_clone().expect("clone server stream"))
+            .read_line(&mut line)
+            .expect("read request");
+        let response = serde_json::to_string(&BridgeResponse::empty_ok()).expect("serialize");
+        stream
+            .write_all(response.as_bytes())
+            .and_then(|()| stream.write_all(b"\n"))
+            .and_then(|()| stream.flush())
+            .expect("write response");
+    });
+
+    let client = BridgeClient {
+        socket_path,
+        token: "test-token".to_string(),
+    };
+    let stream = client.agent_tui_attach("tui-1").expect("attach");
+    assert_eq!(stream.read_timeout().expect("read timeout"), None);
+    assert_eq!(stream.write_timeout().expect("write timeout"), None);
+    server.join().expect("server thread");
+}

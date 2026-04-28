@@ -1,6 +1,9 @@
-use std::io::{BufRead, BufReader, Write as _};
+use std::io::{BufRead, BufReader, ErrorKind, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Instant;
+use std::time::Duration;
 
 use fs_err as fs;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -9,14 +12,20 @@ use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpPermissionDecision,
 };
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiSnapshot};
-use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 
+use super::acp_rpc::{
+    BridgeAcpEventsRequest, BridgeAcpEventsResponse, BridgeAcpGetRequest,
+    BridgeAcpInspectRequest, BridgeAcpListRequest, BridgeAcpResolvePermissionRequest,
+    BridgeAcpStartRequest,
+};
 use super::bridge_state::{LivenessMode, resolve_running_bridge};
 use super::core::{BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest, BridgeResponse};
 use super::detached::bridge_response_error;
 use super::helpers::parse_bridge_payload;
 use super::types::{AgentTuiStartSpec, BridgeCapability, BridgeState, BridgeStatusReport};
+
+const BRIDGE_RPC_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone)]
 pub struct BridgeClient {
@@ -86,6 +95,15 @@ impl BridgeClient {
                 self.socket_path.display()
             ))
         })?;
+        stream
+            .set_read_timeout(Some(BRIDGE_RPC_TIMEOUT))
+            .and_then(|()| stream.set_write_timeout(Some(BRIDGE_RPC_TIMEOUT)))
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "configure bridge RPC timeout {}: {error}",
+                    self.socket_path.display()
+                ))
+            })?;
         stream
             .write_all(payload.as_bytes())
             .and_then(|()| stream.write_all(b"\n"))
@@ -280,11 +298,18 @@ impl BridgeClient {
             .and_then(|()| stream.flush())
             .map_err(|error| CliErrorKind::workflow_io(format!("write bridge request: {error}")))?;
 
+        stream.set_nonblocking(true).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "configure bridge attach handshake {}: {error}",
+                self.socket_path.display()
+            ))
+        })?;
         let mut reader = stream
             .try_clone()
             .map_err(|error| CliErrorKind::workflow_io(format!("clone bridge stream: {error}")))?;
         let mut buf = Vec::new();
         let mut byte = [0u8; 1];
+        let deadline = Instant::now() + BRIDGE_RPC_TIMEOUT;
         loop {
             use std::io::Read;
             match reader.read(&mut byte) {
@@ -295,6 +320,16 @@ impl BridgeClient {
                     if b == b'\n' {
                         break;
                     }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    if Instant::now() >= deadline {
+                        return Err(CliErrorKind::workflow_io(format!(
+                            "read bridge response timed out after {}s",
+                            BRIDGE_RPC_TIMEOUT.as_secs()
+                        ))
+                        .into());
+                    }
+                    thread::sleep(Duration::from_millis(10));
                 }
                 Err(error) => {
                     return Err(CliErrorKind::workflow_io(format!(
@@ -313,6 +348,13 @@ impl BridgeClient {
         if !response.ok {
             return Err(bridge_response_error(response));
         }
+        stream.set_nonblocking(false).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "restore bridge attach blocking mode {}: {error}",
+                self.socket_path.display()
+            ))
+        })?;
+        clear_rpc_timeouts(&stream, &self.socket_path)?;
         Ok(stream)
     }
 
@@ -394,13 +436,37 @@ impl BridgeClient {
     pub(crate) fn acp_events_since(
         &self,
         after_seq: Option<u64>,
+        known_epoch: Option<&str>,
+        known_continuity: Option<u64>,
     ) -> Result<BridgeAcpEventsResponse, CliError> {
         self.typed_capability_request(
             BridgeCapability::Acp,
             "events_since",
-            &BridgeAcpEventsRequest { after_seq },
+            &BridgeAcpEventsRequest {
+                after_seq,
+                known_epoch: known_epoch.map(ToOwned::to_owned),
+                known_continuity,
+            },
         )
     }
+}
+
+fn clear_rpc_timeouts(stream: &UnixStream, socket_path: &std::path::Path) -> Result<(), CliError> {
+    for result in [
+        stream.set_read_timeout(None),
+        stream.set_write_timeout(None),
+    ] {
+        if let Err(error) = result {
+            if error.kind() != ErrorKind::InvalidInput {
+                return Err(CliErrorKind::workflow_io(format!(
+                    "clear bridge RPC timeout {}: {error}",
+                    socket_path.display()
+                ))
+                .into());
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -423,45 +489,4 @@ pub(super) struct BridgeInputRequest {
 pub(super) struct BridgeResizeRequest {
     pub(super) tui_id: String,
     pub(super) request: AgentTuiResizeRequest,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpStartRequest {
-    pub(super) session_id: String,
-    pub(super) request: AcpAgentStartRequest,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpListRequest {
-    pub(super) session_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpInspectRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) session_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpGetRequest {
-    pub(super) acp_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpResolvePermissionRequest {
-    pub(super) acp_id: String,
-    pub(super) batch_id: String,
-    pub(super) decision: AcpPermissionDecision,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct BridgeAcpEventsRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) after_seq: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BridgeAcpEventsResponse {
-    pub(crate) next_seq: u64,
-    pub(crate) events: Vec<StreamEvent>,
 }

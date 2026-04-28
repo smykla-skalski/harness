@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -62,6 +62,7 @@ pub struct AcpAgentInspectSnapshot {
     pub display_name: String,
     pub pid: u32,
     pub pgid: i32,
+    #[serde(default)]
     pub process_key: String,
     pub uptime_ms: u64,
     pub last_update_at: String,
@@ -94,6 +95,9 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
     pub(in crate::daemon::agent_acp) sandbox_event_poller_running: AtomicBool,
     pub(in crate::daemon::agent_acp) sandbox_event_cursor: Mutex<Option<u64>>,
+    pub(in crate::daemon::agent_acp) sandbox_event_epoch: Mutex<Option<String>>,
+    pub(in crate::daemon::agent_acp) sandbox_event_continuity: Mutex<Option<u64>>,
+    pub(in crate::daemon::agent_acp) sandbox_known_sessions: Mutex<BTreeSet<String>>,
 }
 
 impl AcpAgentManagerHandle {
@@ -109,6 +113,9 @@ impl AcpAgentManagerHandle {
                 sessions: Mutex::new(BTreeMap::new()),
                 sandbox_event_poller_running: AtomicBool::new(false),
                 sandbox_event_cursor: Mutex::new(None),
+                sandbox_event_epoch: Mutex::new(None),
+                sandbox_event_continuity: Mutex::new(None),
+                sandbox_known_sessions: Mutex::new(BTreeSet::new()),
             }),
         }
     }
@@ -297,11 +304,12 @@ impl AcpAgentManagerHandle {
     }
 
     #[must_use]
-    pub fn count_live_sessions(&self) -> usize {
+    pub fn count_live_sessions(&self) -> Result<usize, CliError> {
         if service::sandboxed_from_env() {
             return self.live_session_count_via_bridge();
         }
-        self.state
+        Ok(self
+            .state
             .sessions
             .lock()
             .expect("ACP sessions lock")
@@ -310,7 +318,7 @@ impl AcpAgentManagerHandle {
                 session.refresh();
                 !session.snapshot_with_live_counts().status.is_disconnected()
             })
-            .count()
+            .count())
     }
 
     fn session(&self, acp_id: &str) -> Result<Arc<ActiveAcpSession>, CliError> {

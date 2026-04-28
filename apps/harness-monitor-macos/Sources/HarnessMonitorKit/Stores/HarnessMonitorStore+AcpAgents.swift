@@ -3,7 +3,10 @@ import Foundation
 extension HarnessMonitorStore {
   public var pendingAcpPermissionBatches: [AcpPermissionBatch] {
     let selectedBatches = selectedAcpAgents.flatMap(\.pendingPermissionBatches)
-    return (selectedBatches + standaloneAcpPermissionBatches).sorted {
+    return mergedPermissionBatches(
+      primary: selectedBatches,
+      secondary: standaloneAcpPermissionBatches
+    ).sorted {
       if $0.createdAt != $1.createdAt {
         return $0.createdAt < $1.createdAt
       }
@@ -99,9 +102,33 @@ extension HarnessMonitorStore {
     }
     standaloneAcpPermissionBatches.removeAll { $0.acpId == snapshot.acpId }
     selectedAcpAgents = upsertingAcpAgent(
-      snapshot.withPermissionBatches(snapshot.pendingPermissionBatches + pendingStandaloneBatches),
+      snapshot.withPermissionBatches(
+        mergedPermissionBatches(
+          primary: snapshot.pendingPermissionBatches,
+          secondary: pendingStandaloneBatches
+        )
+      ),
       into: selectedAcpAgents
     )
+    reconcilePresentedAcpPermissionBatch()
+  }
+
+  func replaceAcpAgents(_ payload: AcpAgentsReconciledPayload) {
+    guard payload.sessionId == selectedSessionID else {
+      return
+    }
+    selectedAcpAgents = payload.agents.map { snapshot in
+      let pendingStandaloneBatches = standaloneAcpPermissionBatches.filter {
+        $0.acpId == snapshot.acpId
+      }
+      return snapshot.withPermissionBatches(
+        mergedPermissionBatches(
+          primary: snapshot.pendingPermissionBatches,
+          secondary: pendingStandaloneBatches
+        )
+      )
+    }
+    standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
     reconcilePresentedAcpPermissionBatch()
   }
 
@@ -148,7 +175,9 @@ extension HarnessMonitorStore {
     }
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
       guard snapshot.acpId == batch.acpId else { return snapshot }
-      return snapshot.withPermissionBatches(snapshot.pendingPermissionBatches + [batch])
+      return snapshot.withPermissionBatches(
+        mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
+      )
     }
     reconcilePresentedAcpPermissionBatch()
   }
@@ -200,6 +229,19 @@ extension HarnessMonitorStore {
       }
       return $0.acpId < $1.acpId
     }
+  }
+
+  private func mergedPermissionBatches(
+    primary: [AcpPermissionBatch],
+    secondary: [AcpPermissionBatch]
+  ) -> [AcpPermissionBatch] {
+    var merged = primary
+    var seen = Set(primary.map(\.batchId))
+    for batch in secondary where !seen.contains(batch.batchId) {
+      merged.append(batch)
+      seen.insert(batch.batchId)
+    }
+    return merged
   }
 
   private func upsertingAcpPermissionBatch(

@@ -12,17 +12,16 @@ use agent_client_protocol::schema::{
     TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
-    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Responder,
+    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode,
 };
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tokio::task::spawn_blocking;
 use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use crate::agents::acp::batcher::spawn_notification_batcher;
-use crate::agents::acp::client::{ClientError, ClientResult, HarnessAcpClient};
+use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
 use crate::agents::acp::permission::PermissionMode;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
@@ -30,9 +29,10 @@ use crate::agents::kind::DisconnectReason;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
+mod context;
 mod session_guard;
+use context::{ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result};
 use session_guard::SessionRouteGuard;
-
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 
 #[derive(Clone)]
@@ -45,7 +45,6 @@ impl AcpCancelHandle {
         let _ = self.tx.send(());
     }
 }
-
 pub(super) struct SpawnedAcpProtocol {
     pub(super) events: mpsc::Receiver<EventBatch>,
     pub(super) disconnects: mpsc::Receiver<DisconnectReason>,
@@ -53,7 +52,6 @@ pub(super) struct SpawnedAcpProtocol {
     pub(super) batcher: JoinHandle<()>,
     pub(super) cancel: AcpCancelHandle,
 }
-
 pub(super) fn spawn_protocol_task(
     child: &mut Child,
     request: &AcpAgentStartRequest,
@@ -76,7 +74,7 @@ pub(super) fn spawn_protocol_task(
 
     let batcher = spawn_notification_batcher(
         agent_name,
-        session_id,
+        session_id.clone(),
         Arc::clone(supervisor),
         ConnectionConfig::default(),
     );
@@ -135,11 +133,7 @@ async fn run_protocol(args: RunProtocolArgs) {
     } = args;
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let session_guard = Arc::new(SessionRouteGuard::default());
-    let context = ProtocolContext {
-        client,
-        supervisor: Arc::clone(&supervisor),
-        session_guard: Arc::clone(&session_guard),
-    };
+    let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
     let notification_guard = Arc::clone(&session_guard);
     let read_context = context.clone();
     let write_context = context.clone();
@@ -377,143 +371,6 @@ fn send_cancel_notification(
     session_id: SessionId,
 ) -> agent_client_protocol::Result<()> {
     connection.send_notification(CancelNotification::new(session_id))
-}
-
-#[derive(Clone)]
-struct ProtocolContext {
-    client: Arc<HarnessAcpClient>,
-    supervisor: Arc<AcpSessionSupervisor>,
-    session_guard: Arc<SessionRouteGuard>,
-}
-
-impl ProtocolContext {
-    fn read_text_file(
-        &self,
-        request: &ReadTextFileRequest,
-    ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_read_text_file(request)
-        })
-    }
-
-    fn write_text_file(
-        &self,
-        request: &WriteTextFileRequest,
-    ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_write_text_file(request)
-        })
-    }
-
-    fn create_terminal(
-        &self,
-        request: &CreateTerminalRequest,
-    ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_create_terminal(request)
-        })
-    }
-
-    fn terminal_output(
-        &self,
-        request: &TerminalOutputRequest,
-    ) -> ClientResult<<TerminalOutputRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_terminal_output(request)
-        })
-    }
-
-    fn release_terminal(
-        &self,
-        request: &ReleaseTerminalRequest,
-    ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_release_terminal(request)
-        })
-    }
-
-    fn wait_for_terminal_exit(
-        &self,
-        request: &WaitForTerminalExitRequest,
-    ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_wait_for_terminal_exit(request)
-        })
-    }
-
-    fn kill_terminal(
-        &self,
-        request: &KillTerminalRequest,
-    ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_kill_terminal(request)
-        })
-    }
-
-    async fn request_permission(
-        self,
-        request: RequestPermissionRequest,
-    ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
-    {
-        self.session_guard.ensure_known(&request.session_id)?;
-        spawn_blocking(move || {
-            with_client_call(&self.supervisor, || {
-                self.client.handle_request_permission(&request)
-            })
-        })
-        .await
-        .map_err(|error| ClientError::new(-32603, format!("join permission bridge: {error}")))?
-    }
-}
-
-async fn handle_permission_request(
-    request: RequestPermissionRequest,
-    responder: Responder<
-        <RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response,
-    >,
-    context: ProtocolContext,
-) -> agent_client_protocol::Result<()> {
-    let result = context.request_permission(request).await;
-    respond_client_result(responder, result)
-}
-
-fn with_client_call<T>(
-    supervisor: &AcpSessionSupervisor,
-    work: impl FnOnce() -> ClientResult<T>,
-) -> ClientResult<T> {
-    let _guard = supervisor.enter_client_call();
-    work()
-}
-
-fn respond_client_result<T>(
-    responder: Responder<T>,
-    result: ClientResult<T>,
-) -> agent_client_protocol::Result<()>
-where
-    T: agent_client_protocol::JsonRpcResponse,
-{
-    match result {
-        Ok(response) => responder.respond(response),
-        Err(error) => responder.respond_with_error(client_error_to_acp(error)),
-    }
-}
-
-fn client_error_to_acp(error: ClientError) -> AcpError {
-    AcpError::new(error.code, error.message)
 }
 
 #[cfg(test)]
