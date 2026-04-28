@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::{LazyLock, Mutex};
 use std::thread;
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::workspace::utc_now;
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};
+use super::program::resolve_program;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpRuntimeProbeResponse {
@@ -107,7 +109,9 @@ pub fn probe_descriptor(descriptor: &AcpAgentDescriptor) -> AcpRuntimeProbe {
 }
 
 fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
-    let mut child = Command::new(&descriptor.doctor_probe.command)
+    let program = resolve_program(&descriptor.doctor_probe.command)
+        .unwrap_or_else(|| PathBuf::from(&descriptor.doctor_probe.command));
+    let mut child = Command::new(program)
         .args(&descriptor.doctor_probe.args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
