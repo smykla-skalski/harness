@@ -119,6 +119,7 @@ async fn set_up_review_persistence_fixture(
             agent_id: worker_id.clone(),
         },
         &async_db,
+        None,
     )
     .await
     .expect("assign task");
@@ -131,6 +132,7 @@ async fn set_up_review_persistence_fixture(
             note: None,
         },
         &async_db,
+        None,
     )
     .await
     .expect("move task in_progress");
