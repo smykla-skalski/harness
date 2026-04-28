@@ -181,8 +181,8 @@ pub(super) fn migrate_v9_to_v10(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
-/// Chunk-2 migrator: rewrite legacy bare-string `runtime` and unit-tagged
-/// `status` shapes into the new tagged forms.
+/// Chunk-2 migrator: tag legacy bare-string `runtime` values and upgrade the
+/// only status variant that gained payload fields.
 ///
 /// - `runtime: "claude"` → `runtime: { "kind": "tui", "id": "claude" }` for
 ///   known TUI names; unknown legacy strings (forward-rolled state) become
@@ -190,8 +190,8 @@ pub(super) fn migrate_v9_to_v10(mut value: Value) -> Result<Value, CliError> {
 ///   load.
 /// - `status: "disconnected"` → `status: { "state": "disconnected", "reason":
 ///   { "kind": "unknown" } }`. Other status strings (`active`, `idle`,
-///   `awaiting_review`, `removed`) become `{ "state": "<value>" }` to match
-///   the new `#[serde(tag = "state")]` shape on `AgentStatus`.
+///   `awaiting_review`, `removed`) intentionally stay bare strings because
+///   they did not gain payload fields.
 pub(super) fn migrate_v10_to_v11(mut value: Value) -> Result<Value, CliError> {
     let Some(object) = value.as_object_mut() else {
         return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
