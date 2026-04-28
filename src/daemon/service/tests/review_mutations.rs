@@ -82,6 +82,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                         agent_id: worker_id.clone(),
                     },
                     &async_db,
+                None,
                 )
                 .await
                 .expect("assign task");
@@ -95,6 +96,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                         note: None,
                     },
                     &async_db,
+                None,
                 )
                 .await
                 .expect("move task in_progress");

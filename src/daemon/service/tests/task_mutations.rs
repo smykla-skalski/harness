@@ -166,6 +166,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                         agent_id: worker_id.clone(),
                     },
                     &async_db,
+                    None,
                 )
                 .await
                 .expect("assign task");
@@ -267,6 +268,7 @@ fn async_mutations_sync_file_backed_state() {
                         agent_id: worker_id.clone(),
                     },
                     &async_db,
+                    None,
                 )
                 .await
                 .expect("assign task");

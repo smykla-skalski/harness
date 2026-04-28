@@ -358,6 +358,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                             queue_policy: crate::session::types::TaskQueuePolicy::Locked,
                         },
                         &async_db,
+                        None,
                     )
                     .await
                     .expect("drop task");
