@@ -29,6 +29,43 @@ extension PreviewHarnessClientState {
     return snapshot
   }
 
+  func resolveAcpPermission(
+    agentID: String,
+    batchID: String,
+    decision _: AcpPermissionDecision
+  ) -> AcpAgentSnapshot? {
+    for (sessionID, agents) in acpAgentsBySessionID {
+      guard let index = agents.firstIndex(where: { $0.acpId == agentID }) else {
+        continue
+      }
+      let snapshot = agents[index]
+      let batches = snapshot.pendingPermissionBatches.filter { $0.batchId != batchID }
+      let updated = AcpAgentSnapshot(
+        acpId: snapshot.acpId,
+        sessionId: snapshot.sessionId,
+        agentId: snapshot.agentId,
+        displayName: snapshot.displayName,
+        status: snapshot.status,
+        pid: snapshot.pid,
+        pgid: snapshot.pgid,
+        projectDir: snapshot.projectDir,
+        pendingPermissions: batches.reduce(0) { $0 + $1.requests.count },
+        permissionQueueDepth: snapshot.permissionQueueDepth,
+        pendingPermissionBatches: batches,
+        terminalCount: snapshot.terminalCount,
+        createdAt: snapshot.createdAt,
+        updatedAt: Self.mutationTimestamp,
+        disconnectReason: snapshot.disconnectReason,
+        stderrTail: snapshot.stderrTail
+      )
+      var updatedAgents = agents
+      updatedAgents[index] = updated
+      acpAgentsBySessionID[sessionID] = updatedAgents
+      return updated
+    }
+    return nil
+  }
+
   func managedAgents(sessionID: String) -> [ManagedAgentSnapshot] {
     let terminals = (agentTuisBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.terminal)
     let codex = (codexRunsBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.codex)

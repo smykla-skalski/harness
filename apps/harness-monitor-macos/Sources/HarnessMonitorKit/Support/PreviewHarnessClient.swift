@@ -171,6 +171,23 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return .acp(await state.startAcpAgent(sessionID: sessionID, request: request))
   }
 
+  public func resolveManagedAcpPermission(
+    agentID: String,
+    batchID: String,
+    decision: AcpPermissionDecision
+  ) async throws -> ManagedAgentSnapshot {
+    try await performActionDelay()
+    let snapshot = await state.resolveAcpPermission(
+      agentID: agentID,
+      batchID: batchID,
+      decision: decision
+    )
+    guard let snapshot else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "ACP permission unavailable.")
+    }
+    return .acp(snapshot)
+  }
+
   public func resolveCodexApproval(
     runID: String,
     approvalID: String,

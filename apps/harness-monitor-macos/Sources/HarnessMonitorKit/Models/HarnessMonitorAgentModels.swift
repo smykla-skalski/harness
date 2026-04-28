@@ -248,7 +248,7 @@ public struct AgentPendingUserPrompt: Codable, Equatable, Sendable {
         [AgentPendingUserPromptQuestion].self,
         forKey: .questions
       ),
-      !decodedQuestions.isEmpty
+        !decodedQuestions.isEmpty
       {
         decodedQuestions
       } else if let message = try container.decodeIfPresent(String.self, forKey: .message),

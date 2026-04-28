@@ -313,6 +313,57 @@ emit_swift_compile_context() {
   fi
 }
 
+emit_swift_dia_diagnostics() {
+  local diagnostics_root diagnostics_file emitted files_file line output shown
+  diagnostics_root="$derive_data_path/Build/Intermediates.noindex"
+  if [[ ! -d "$diagnostics_root" ]]; then
+    return 0
+  fi
+
+  files_file="$(mktemp "${TMPDIR:-/tmp}/harness-xcodebuild-dia.XXXXXX")"
+  /usr/bin/find "$diagnostics_root" -type f -name '*.dia' -size +0c \
+    -exec /usr/bin/stat -f '%m %N' {} + 2>/dev/null \
+    | /usr/bin/sort -n \
+    | /usr/bin/tail -80 \
+    | /usr/bin/sed 's/^[0-9][0-9]* //' > "$files_file"
+
+  emitted=0
+  while IFS= read -r diagnostics_file; do
+    if [[ -z "$diagnostics_file" || ! -f "$diagnostics_file" ]]; then
+      continue
+    fi
+    output="$(
+      strings "$diagnostics_file" \
+        | /usr/bin/grep -E \
+          '(^/.*\.swift$|error:|warning:|note:|cannot |does not|no-usage|result of call|is unused|main actor|actor-isolated|overriding |overridden |requires an)' \
+        | /usr/bin/sed '/^DIAG$/d;/^C8< $/d' \
+        | /usr/bin/head -40 || true
+    )"
+    if [[ -z "$output" ]]; then
+      continue
+    fi
+    if (( emitted == 0 )); then
+      printf 'swift-diagnostics: extracted compiler diagnostics from .dia files\n' >&2
+    fi
+    emitted=$((emitted + 1))
+    printf 'swift-diagnostics: %s\n' "$diagnostics_file" >&2
+    shown=0
+    while IFS= read -r line; do
+      if [[ -n "$line" ]]; then
+        printf 'swift-diagnostics:   %s\n' "$line" >&2
+        shown=$((shown + 1))
+      fi
+      if (( shown >= 12 )); then
+        break
+      fi
+    done <<< "$output"
+    if (( emitted >= 8 )); then
+      break
+    fi
+  done < "$files_file"
+  /bin/rm -f "$files_file"
+}
+
 lock_owner_command() {
   local owner_pid="$1"
   /bin/ps -p "$owner_pid" -o command= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//'
@@ -408,6 +459,33 @@ emit_path_arg_vector() {
   emit_arg_vector "$label" "${path_args[@]}"
 }
 
+filter_xcodebuild_console_output() {
+  /usr/bin/awk '
+    /^note: Local cache/ { next }
+    /^note: L/ { next }
+    /^note: Replay cache/ { next }
+    /^note: Re/ { next }
+    /^note: R/ { next }
+    /^note: Using CAS/ { next }
+    /^note: Us/ { next }
+    /^note: U$/ { next }
+    /^note: Lo$/ { next }
+    /^note: Building targets in dependency order/ { next }
+    /^note: Target dependency graph / { next }
+    /^note: Using stub executor library / { next }
+    /^note: [0-9]+ hits \/ [0-9]+ cacheable tasks / { next }
+    /^Using cache binaries for the following targets:/ { next }
+    /^Loading and constructing the graph$/ { next }
+    /^It might take a while if the cache is empty$/ { next }
+    /^Generating workspace / { next }
+    /^Generating project / { next }
+    /^Total time taken: / { next }
+    /^✔ Success $/ { next }
+    /^  Project generated\. $/ { next }
+    { print }
+  '
+}
+
 emit_wrapper_failure_context() {
   local mapping
   emit_path_arg_vector "xcodebuild-wrapper: original path args:" "${original_args[@]}"
@@ -433,7 +511,9 @@ run_inner() {
     fmt_prefix+=(--junit-path "$(junit_report_path_for_run)")
   fi
   set +e
-  run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 | tee "$log_path"
+  run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 \
+    | tee "$log_path" \
+    | filter_xcodebuild_console_output
   local status="${PIPESTATUS[0]}"
   set -e
   return "$status"
@@ -461,6 +541,7 @@ run_once() {
 
   if (( status != 127 )) && log_needs_swift_compile_context "$log_path"; then
     emit_swift_compile_context
+    emit_swift_dia_diagnostics
   fi
 
   /bin/rm -f "$log_path"

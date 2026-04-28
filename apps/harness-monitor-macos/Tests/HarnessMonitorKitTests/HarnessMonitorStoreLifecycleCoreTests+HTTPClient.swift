@@ -27,12 +27,14 @@ extension HarnessMonitorStoreLifecycleCoreTests {
         == "/v1/sessions/sess-http-summary/timeline"
     )
     #expect(SummaryTimelineURLProtocol.lastRequestURL?.query == "scope=summary")
-    #expect(
-      SummaryTimelineURLProtocol.lastRequestHeaders?["X-Request-Id"]?.isEmpty == false
-    )
-    #expect(
-      SummaryTimelineURLProtocol.lastRequestHeaders?["traceparent"]?.isEmpty == false
-    )
+    #if HARNESS_FEATURE_OTEL
+      #expect(
+        SummaryTimelineURLProtocol.lastRequestHeaders?["X-Request-Id"]?.isEmpty == false
+      )
+      #expect(
+        SummaryTimelineURLProtocol.lastRequestHeaders?["traceparent"]?.isEmpty == false
+      )
+    #endif
   }
 
   @Test("API client timeline window adds viewport query parameters")

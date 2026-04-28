@@ -63,6 +63,12 @@ extension HarnessMonitorAPIClient {
     return try await send(request)
   }
 
+  func delete<Response: Decodable>(_ path: String) async throws -> Response {
+    var request = try makeRequest(path: path)
+    request.httpMethod = "DELETE"
+    return try await send(request)
+  }
+
   func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
     let method = request.httpMethod ?? "?"
     let path = request.url?.path ?? "?"

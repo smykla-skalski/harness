@@ -151,6 +151,30 @@ fn recording_write_logs_denial_aligned_with_policy() {
 }
 
 #[test]
+fn recording_write_logs_denial_when_allowed_path_fails_to_write() {
+    let (temp, client, log_path) = setup_recording_client();
+    let path = temp.path().join("artifacts/existing-dir");
+    fs::create_dir_all(&path).expect("create existing directory");
+    let request = WriteTextFileRequest::new("session-1", &path, "hello");
+
+    let error = client
+        .handle_write_text_file(&request)
+        .expect_err("cannot write file over directory");
+
+    assert_eq!(error.code, WRITE_DENIED);
+    let records = read_log(&log_path);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["operation"], "fs.write_text_file");
+    assert_eq!(records[0]["decision"], "denied");
+    assert!(
+        records[0]["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("failed to write")
+    );
+}
+
+#[test]
 fn read_within_working_dir_allowed() {
     let (temp, client) = setup_client();
     let path = temp.path().join("test.txt");

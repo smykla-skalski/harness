@@ -94,11 +94,18 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
   public let agent: String
   public let prompt: String?
   public let projectDir: String?
+  public let recordPermissions: Bool
 
-  public init(agent: String, prompt: String? = nil, projectDir: String? = nil) {
+  public init(
+    agent: String,
+    prompt: String? = nil,
+    projectDir: String? = nil,
+    recordPermissions: Bool = false
+  ) {
     self.agent = agent
     self.prompt = prompt
     self.projectDir = projectDir
+    self.recordPermissions = recordPermissions
   }
 }
 
@@ -121,9 +128,94 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
   public let lastUpdateAt: String
   public let lastClientCallAt: String?
   public let watchdogState: String
+  public let permissionMode: String
+  public let permissionLogPath: String?
   public let pendingPermissions: Int
+  public let permissionQueueDepth: Int
   public let terminalCount: Int
   public let promptDeadlineRemainingMs: UInt64
 
   public var id: String { acpId }
+
+  public init(
+    acpId: String,
+    sessionId: String,
+    agentId: String,
+    displayName: String,
+    pid: UInt32,
+    pgid: Int32,
+    uptimeMs: UInt64,
+    lastUpdateAt: String,
+    lastClientCallAt: String?,
+    watchdogState: String,
+    permissionMode: String = "",
+    permissionLogPath: String? = nil,
+    pendingPermissions: Int,
+    permissionQueueDepth: Int = 0,
+    terminalCount: Int,
+    promptDeadlineRemainingMs: UInt64
+  ) {
+    self.acpId = acpId
+    self.sessionId = sessionId
+    self.agentId = agentId
+    self.displayName = displayName
+    self.pid = pid
+    self.pgid = pgid
+    self.uptimeMs = uptimeMs
+    self.lastUpdateAt = lastUpdateAt
+    self.lastClientCallAt = lastClientCallAt
+    self.watchdogState = watchdogState
+    self.permissionMode = permissionMode
+    self.permissionLogPath = permissionLogPath
+    self.pendingPermissions = pendingPermissions
+    self.permissionQueueDepth = permissionQueueDepth
+    self.terminalCount = terminalCount
+    self.promptDeadlineRemainingMs = promptDeadlineRemainingMs
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case acpId
+    case sessionId
+    case agentId
+    case displayName
+    case pid
+    case pgid
+    case uptimeMs
+    case lastUpdateAt
+    case lastClientCallAt
+    case watchdogState
+    case permissionMode
+    case permissionLogPath
+    case pendingPermissions
+    case permissionQueueDepth
+    case terminalCount
+    case promptDeadlineRemainingMs
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    acpId = try container.decode(String.self, forKey: .acpId)
+    sessionId = try container.decode(String.self, forKey: .sessionId)
+    agentId = try container.decode(String.self, forKey: .agentId)
+    displayName = try container.decode(String.self, forKey: .displayName)
+    pid = try container.decode(UInt32.self, forKey: .pid)
+    pgid = try container.decode(Int32.self, forKey: .pgid)
+    uptimeMs = try container.decode(UInt64.self, forKey: .uptimeMs)
+    lastUpdateAt = try container.decode(String.self, forKey: .lastUpdateAt)
+    lastClientCallAt = try container.decodeIfPresent(String.self, forKey: .lastClientCallAt)
+    watchdogState = try container.decode(String.self, forKey: .watchdogState)
+    permissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode) ?? ""
+    permissionLogPath = try container.decodeIfPresent(String.self, forKey: .permissionLogPath)
+    pendingPermissions = try container.decode(Int.self, forKey: .pendingPermissions)
+    permissionQueueDepth =
+      try container.decodeIfPresent(
+        Int.self,
+        forKey: .permissionQueueDepth
+      ) ?? 0
+    terminalCount = try container.decode(Int.self, forKey: .terminalCount)
+    promptDeadlineRemainingMs = try container.decode(
+      UInt64.self,
+      forKey: .promptDeadlineRemainingMs
+    )
+  }
 }

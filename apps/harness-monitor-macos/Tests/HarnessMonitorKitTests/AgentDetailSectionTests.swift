@@ -86,7 +86,14 @@ struct AgentDetailSectionTests {
 
   @Test("Role picker includes a leader tag when the current agent role is leader")
   func rolePickerIncludesLeaderWhenCurrentAgentIsLeader() {
-    #expect(AgentDetailSection.rolePickerOptions(for: .worker) == [.observer, .worker, .reviewer, .improver])
+    #expect(
+      AgentDetailSection.rolePickerOptions(for: .worker) == [
+        .observer,
+        .worker,
+        .reviewer,
+        .improver,
+      ]
+    )
     #expect(AgentDetailSection.rolePickerOptions(for: .leader) == SessionRole.allCases)
   }
 

@@ -98,6 +98,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case managedAgentInput = "managed_agent.input"
   case managedAgentResize = "managed_agent.resize"
   case managedAgentStop = "managed_agent.stop"
+  case managedAgentStopAcp = "managed_agent.stop_acp"
   case managedAgentReady = "managed_agent.ready"
   case managedAgentSteerCodex = "managed_agent.steer_codex"
   case managedAgentInterruptCodex = "managed_agent.interrupt_codex"
