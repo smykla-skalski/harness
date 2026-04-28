@@ -16,6 +16,8 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
+use crate::agents::runtime::models::RuntimeModelCatalog;
+
 pub use tags::CapabilityTag;
 
 /// Doctor probe shape: how to ask whether the agent is installed and reachable.
@@ -51,6 +53,13 @@ pub struct AcpAgentDescriptor {
     pub launch_args: Vec<String>,
     /// Names of environment variables forwarded to the agent process.
     pub env_passthrough: Vec<String>,
+    /// Optional model catalog exposed by this ACP agent.
+    ///
+    /// Copilot has a curated model catalog today. Other ACP agents may expose
+    /// a single implicit model, so this remains optional until the config-file
+    /// merge path proves every descriptor needs model selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_catalog: Option<RuntimeModelCatalog>,
     /// Optional short instruction surfaced when the doctor probe reports the
     /// binary missing. `None` is allowed so user-defined entries (Chunk 13)
     /// can omit it.
@@ -69,11 +78,12 @@ static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> =
 
 /// Return every built-in descriptor in stable order.
 ///
-/// Returns a slice into a process-wide static so callers don't allocate to
-/// iterate. The user-defined merge layer (Chunk 13) layers on top of this list.
+/// The returned vector contains references into process-wide storage. Chunk
+/// 13's user-defined merge layer can append owned descriptors without changing
+/// the built-in registry shape.
 #[must_use]
-pub fn acp_agents() -> &'static [AcpAgentDescriptor] {
-    BUILTIN_DESCRIPTORS.as_slice()
+pub fn acp_agents() -> Vec<&'static AcpAgentDescriptor> {
+    BUILTIN_DESCRIPTORS.iter().collect()
 }
 
 /// Look up a built-in descriptor by [`AcpAgentDescriptor::id`].
@@ -96,6 +106,17 @@ mod tests {
         assert_eq!(copilot.display_name, "GitHub Copilot");
         assert_eq!(copilot.launch_command, "copilot");
         assert_eq!(copilot.launch_args, vec!["--acp", "--stdio"]);
+    }
+
+    #[test]
+    fn catalog_returns_static_descriptor_references() {
+        let agents = acp_agents();
+        let copilot = agents
+            .into_iter()
+            .find(|d| d.id == "copilot")
+            .expect("copilot descriptor in catalog");
+        let found = find_builtin("copilot").expect("found by id");
+        assert!(std::ptr::eq(copilot, found));
     }
 
     #[test]
@@ -126,6 +147,25 @@ mod tests {
         let parsed: AcpAgentDescriptor =
             serde_json::from_str(&json).expect("deserialise without install_hint");
         assert_eq!(parsed.install_hint, None);
+    }
+
+    #[test]
+    fn descriptor_defaults_model_catalog_when_absent() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_value(json).expect("deserialise descriptor without model catalog");
+        assert_eq!(parsed.model_catalog, None);
     }
 
     #[test]
