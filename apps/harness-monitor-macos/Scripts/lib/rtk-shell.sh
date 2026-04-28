@@ -25,7 +25,7 @@ run_tuist_xcodebuild_command() {
   fi
   tuist_bin="$(type -P tuist || true)"
   if [[ -z "$tuist_bin" ]]; then
-    echo "run_tuist_xcodebuild_command: tuist is not on PATH; pin it in .mise.toml" >&2
+    echo "run_tuist_xcodebuild_command: tuist is required for all Harness Monitor xcodebuild wrapper lanes; pin it in .mise.toml" >&2
     return 127
   fi
   (

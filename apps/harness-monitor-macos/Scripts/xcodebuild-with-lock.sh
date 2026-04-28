@@ -10,11 +10,16 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 CALLER_PWD="$(pwd -P)"
+# Path contract:
+# - every monitor lane uses `tuist xcodebuild` from the app root
+# - caller-provided relative path flags keep caller-PWD semantics even though
+#   Tuist changes the working directory internally
+# - the approved shared DerivedData aliases (`xcode-derived*`) resolve at the
+#   common repo root so linked worktrees share the same lock/cache domain
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 
-DEFAULT_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
 LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
 MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
@@ -25,7 +30,19 @@ TRANSIENT_DB_STATUS=200
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
+original_args=("$@")
 args=("$@")
+normalized_path_mappings=()
+
+record_normalized_path_mapping() {
+  local flag="$1"
+  local raw_path="$2"
+  local normalized_path="$3"
+  if [[ "$raw_path" != "$normalized_path" ]]; then
+    normalized_path_mappings+=("$flag $raw_path -> $normalized_path")
+  fi
+}
+
 resolve_invocation_relative_path() {
   local raw_path="$1"
   if [[ "$raw_path" == /* ]]; then
@@ -77,12 +94,14 @@ normalize_path_flag_value() {
 
 normalize_xcodebuild_path_args() {
   local -a normalized_args=()
-  local index arg
+  local index arg normalized_path
   for ((index = 0; index < ${#args[@]}; index += 1)); do
     arg="${args[index]}"
     if xcodebuild_flag_requires_path_value "$arg" \
         && (( index + 1 < ${#args[@]} )); then
-      normalized_args+=("$arg" "$(normalize_path_flag_value "$arg" "${args[index + 1]}")")
+      normalized_path="$(normalize_path_flag_value "$arg" "${args[index + 1]}")"
+      record_normalized_path_mapping "$arg" "${args[index + 1]}" "$normalized_path"
+      normalized_args+=("$arg" "$normalized_path")
       index=$((index + 1))
       continue
     fi
@@ -91,8 +110,17 @@ normalize_xcodebuild_path_args() {
   args=("${normalized_args[@]}")
 }
 
+normalize_default_derived_data_path() {
+  local raw_path normalized_path
+  raw_path="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
+  normalized_path="$(resolve_derived_data_path_arg "$raw_path")"
+  record_normalized_path_mapping "-derivedDataPath" "$raw_path" "$normalized_path"
+  printf '%s\n' "$normalized_path"
+}
+
 normalize_xcodebuild_path_args
 
+DEFAULT_DERIVED_DATA_PATH="$(normalize_default_derived_data_path)"
 derive_data_path="$DEFAULT_DERIVED_DATA_PATH"
 has_derived_data_path=0
 for ((index = 0; index < ${#args[@]}; index += 1)); do
@@ -321,6 +349,29 @@ junit_report_path_for_run() {
   printf '%s/junit-%s-%s.xml\n' "$JUNIT_REPORT_DIR" "$$" "$(date +%s)"
 }
 
+emit_arg_vector() {
+  local label="$1"
+  shift
+  local arg
+  printf '%s' "$label" >&2
+  for arg in "$@"; do
+    printf ' %q' "$arg" >&2
+  done
+  printf '\n' >&2
+}
+
+emit_wrapper_failure_context() {
+  local mapping
+  emit_arg_vector "xcodebuild-wrapper: original args:" "${original_args[@]}"
+  emit_arg_vector "xcodebuild-wrapper: normalized args:" "${args[@]}"
+  if (( ${#normalized_path_mappings[@]} == 0 )); then
+    return 0
+  fi
+  for mapping in "${normalized_path_mappings[@]}"; do
+    printf 'path-normalization: %s\n' "$mapping" >&2
+  done
+}
+
 run_inner() {
   local log_path="$1"
   local -a inner_args=("${args[@]}")
@@ -358,7 +409,9 @@ run_once() {
     return "$TRANSIENT_DB_STATUS"
   fi
 
-  if log_needs_swift_compile_context "$log_path"; then
+  emit_wrapper_failure_context
+
+  if (( status != 127 )) && log_needs_swift_compile_context "$log_path"; then
     emit_swift_compile_context
   fi
 
