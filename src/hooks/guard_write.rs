@@ -1,9 +1,11 @@
 use std::path::Path;
 
+use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use crate::create::{can_write, suite_create_path_allowed};
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
+use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::kernel::run_surface::{RunDir, RunFile};
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
@@ -61,6 +63,21 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let suite_dir = ctx.suite_dir();
     let suite_dir_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
 
+    // Check each path against the centralised write-surface policy first
+    if let Some(rd) = run_dir.as_deref() {
+        let denied = DeniedBinaries::from(managed_cluster_binaries());
+        let mut policy_ctx = WriteSurfaceContext::new(rd);
+        if let Some(sd) = suite_dir.as_deref() {
+            policy_ctx = policy_ctx.with_suite_dir(sd);
+        }
+        for raw_path in paths {
+            if let Some(result) = check_policy_decision(raw_path, &policy_ctx, &denied) {
+                return result;
+            }
+        }
+    }
+
+    // Context-aware checks (suite_fix state, etc.)
     for raw_path in paths {
         if let Some(result) = evaluate_runner_path(
             ctx,
@@ -74,6 +91,53 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     }
 
     HookResult::allow()
+}
+
+fn check_policy_decision(
+    path: &Path,
+    ctx: &WriteSurfaceContext<'_>,
+    denied: &DeniedBinaries,
+) -> Option<HookResult> {
+    match evaluate_write(path, ctx, denied) {
+        WriteDecision::Allow => None,
+        WriteDecision::DenyControlFile { hint } => {
+            let label = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+            Some(
+                HookMessage::runner_flow_required(
+                    "edit run control files",
+                    format!("{label} is harness-managed; {hint}"),
+                )
+                .into_result(),
+            )
+        }
+        WriteDecision::DenyOutsideSurface | WriteDecision::DenyTraversal => {
+            Some(HookMessage::write_outside_run(path.display().to_string()).into_result())
+        }
+        WriteDecision::DenyBinary { name } => Some(
+            HookMessage::runner_flow_required(
+                "write binary files",
+                format!("{name} is a denied cluster binary"),
+            )
+            .into_result(),
+        ),
+        WriteDecision::DenySymlinkEscape { resolved } => Some(
+            HookMessage::runner_flow_required(
+                "write symlinks",
+                format!(
+                    "symlink resolves outside run surface: {}",
+                    resolved.display()
+                ),
+            )
+            .into_result(),
+        ),
+        WriteDecision::DenyCheckFailed { reason } => Some(
+            HookMessage::runner_flow_required(
+                "write files",
+                format!("policy check failed: {reason}"),
+            )
+            .into_result(),
+        ),
+    }
 }
 
 fn file_label(path: &Path) -> &str {
