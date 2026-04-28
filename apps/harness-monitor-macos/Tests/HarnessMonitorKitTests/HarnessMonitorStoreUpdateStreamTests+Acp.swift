@@ -108,7 +108,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(presentedRequestIDs?.contains("request-extra") == true)
   }
 
-  @Test("ACP reconcile replaces stale selected agents and batches")
+  @Test("ACP reconcile replaces stale selected agents, clears stale batches, and restores canonical ordering")
   func acpReconcileReplacesStaleSelectedAgentsAndBatches() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-reconcile"
@@ -124,11 +124,24 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.replaceAcpAgents(
       AcpAgentsReconciledPayload(
         sessionId: "sess-acp-reconcile",
-        agents: [makeAcpSnapshot(acpID: "acp-fresh", sessionID: "sess-acp-reconcile", pendingBatches: [])]
+        agents: [
+          makeAcpSnapshot(
+            acpID: "zeta-agent",
+            sessionID: "sess-acp-reconcile",
+            displayName: "Zeta Agent",
+            pendingBatches: []
+          ),
+          makeAcpSnapshot(
+            acpID: "alpha-agent",
+            sessionID: "sess-acp-reconcile",
+            displayName: "Alpha Agent",
+            pendingBatches: []
+          ),
+        ]
       )
     )
 
-    #expect(store.selectedAcpAgents.map(\.acpId) == ["acp-fresh"])
+    #expect(store.selectedAcpAgents.map(\.acpId) == ["alpha-agent", "zeta-agent"])
     #expect(store.pendingAcpPermissionBatches.isEmpty)
   }
 
@@ -236,13 +249,14 @@ private func makeAcpPermissionBatch(
 private func makeAcpSnapshot(
   acpID: String,
   sessionID: String,
+  displayName: String = "Copilot",
   pendingBatches: [AcpPermissionBatch]
 ) -> AcpAgentSnapshot {
   AcpAgentSnapshot(
     acpId: acpID,
     sessionId: sessionID,
     agentId: "copilot",
-    displayName: "Copilot",
+    displayName: displayName,
     status: .active,
     pid: 12_345,
     pgid: 12_345,

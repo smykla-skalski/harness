@@ -37,7 +37,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   func isEnabled(_ choice: AgentCapabilityTransportChoice) -> Bool {
     switch choice.id {
     case .tui:
-      true
+      return true
     case .acp:
       if sandboxed {
         return acpHostBridgeReady
