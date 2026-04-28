@@ -102,7 +102,38 @@ extension PreviewHarnessClient {
         modelCatalog: nil,
         installHint: "Install GitHub Copilot CLI and sign in.",
         doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
-      )
+      ),
+      AcpAgentDescriptor(
+        id: "gemini",
+        displayName: "Gemini CLI",
+        capabilities: [
+          "fs.read",
+          "fs.write",
+          "terminal.spawn",
+          "streaming",
+          "multi-turn",
+          "requires-network",
+        ],
+        launchCommand: "gemini",
+        launchArgs: ["--acp"],
+        envPassthrough: [
+          "GEMINI_API_KEY",
+          "GOOGLE_API_KEY",
+          "GOOGLE_CLOUD_PROJECT",
+          "GOOGLE_CLOUD_LOCATION",
+          "GOOGLE_APPLICATION_CREDENTIALS",
+          "GOOGLE_GENAI_USE_VERTEXAI",
+          "GOOGLE_GENAI_API_VERSION",
+          "GOOGLE_GEMINI_BASE_URL",
+          "GOOGLE_VERTEX_BASE_URL",
+          "GEMINI_MODEL",
+          "GEMINI_CLI_HOME",
+          "GEMINI_CLI_TRUST_WORKSPACE",
+        ],
+        modelCatalog: nil,
+        installHint: "Install an ACP-capable Gemini CLI and authenticate.",
+        doctorProbe: AcpDoctorProbe(command: "gemini", args: ["--version"])
+      ),
     ]
   }
 
@@ -114,8 +145,15 @@ extension PreviewHarnessClient {
           displayName: "GitHub Copilot",
           binaryPresent: true,
           authState: .unknown,
+          version: "preview",
+        ),
+        AcpRuntimeProbe(
+          agentId: "gemini",
+          displayName: "Gemini CLI",
+          binaryPresent: true,
+          authState: .unknown,
           version: "preview"
-        )
+        ),
       ],
       checkedAt: "2026-04-28T00:00:00Z"
     )
