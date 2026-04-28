@@ -146,6 +146,7 @@ exit 1
                     "LOG_BIN": str(fake_log),
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_runner),
                     "TMPDIR": str(temp_root),
