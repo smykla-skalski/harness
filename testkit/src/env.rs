@@ -54,10 +54,12 @@ pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
     run_git(path, &["checkout", &default_branch]);
 }
 
+#[must_use]
 pub fn git_head_sha(repo_path: &Path, reference: &str) -> String {
     run_git_output(repo_path, &["rev-parse", reference])
 }
 
+#[must_use]
 pub fn git_branches_matching(repo_path: &Path, prefix: &str) -> Vec<String> {
     let output = run_git_output(repo_path, &["branch", "--list", &format!("{prefix}*")]);
     output
@@ -75,13 +77,12 @@ fn run_git(dir: &Path, args: &[&str]) {
         .output()
         .expect("run git command");
 
-    if !output.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn run_git_output(dir: &Path, args: &[&str]) -> String {
@@ -92,13 +93,12 @@ fn run_git_output(dir: &Path, args: &[&str]) -> String {
         .output()
         .expect("run git command");
 
-    if !output.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
