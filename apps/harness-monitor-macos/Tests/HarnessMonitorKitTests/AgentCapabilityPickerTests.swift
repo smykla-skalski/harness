@@ -114,7 +114,7 @@ struct AgentCapabilityPickerTests {
     #expect(copilot.isEnabled(copilot.transportChoice(for: .tui(.copilot))))
   }
 
-  @Test("sandboxed monitor keeps ACP transport enabled when ACP host bridge is ready")
+  @Test("sandboxed monitor keeps ACP transport enabled via host bridge even when local probe is missing")
   func sandboxedMonitorAllowsAcpTransportViaHostBridge() throws {
     let options = AgentsWindowView.agentCapabilityOptions(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
@@ -123,8 +123,8 @@ struct AgentCapabilityPickerTests {
           AcpRuntimeProbe(
             agentId: "copilot",
             displayName: "GitHub Copilot",
-            binaryPresent: true,
-            authState: .ready
+            binaryPresent: false,
+            authState: .unavailable
           )
         ],
         checkedAt: "2026-04-28T22:05:00Z"
