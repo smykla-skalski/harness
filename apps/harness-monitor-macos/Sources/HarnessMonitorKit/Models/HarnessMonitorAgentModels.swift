@@ -58,7 +58,18 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
-    let value = try container.decode(String.self)
+    if let value = try? container.decode(String.self) {
+      guard let status = Self(rawOrLegacyValue: value) else {
+        throw DecodingError.dataCorruptedError(
+          in: container,
+          debugDescription: "Invalid agent status: \(value)"
+        )
+      }
+      self = status
+      return
+    }
+    let tagged = try decoder.container(keyedBy: TaggedCodingKeys.self)
+    let value = try tagged.decode(String.self, forKey: .state)
     guard let status = Self(rawOrLegacyValue: value) else {
       throw DecodingError.dataCorruptedError(
         in: container,
@@ -73,6 +84,10 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
     try container.encode(rawValue)
   }
 
+  private enum TaggedCodingKeys: String, CodingKey {
+    case state
+  }
+
   public var title: String {
     switch self {
     case .active:
@@ -85,6 +100,24 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
       "Disconnected"
     case .removed:
       "Removed"
+    }
+  }
+}
+
+public struct AgentDisconnectReason: Codable, Equatable, Sendable {
+  public let kind: String
+  public let code: Int?
+  public let signal: Int?
+
+  public var isRestartable: Bool {
+    switch kind {
+    case "process_exited", "stdio_closed", "initialize_timeout", "prompt_timeout", "watchdog_fired",
+      "oom_killed":
+      true
+    case "user_cancelled", "daemon_shutdown", "unknown":
+      false
+    default:
+      false
     }
   }
 }

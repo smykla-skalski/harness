@@ -1,3 +1,4 @@
+use crate::daemon::agent_acp::AcpAgentStartRequest;
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
@@ -358,6 +359,17 @@ impl DaemonClient {
         )
     }
 
+    pub fn start_acp_managed_agent(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+    ) -> Result<ManagedAgentSnapshot, CliError> {
+        self.post(
+            &format!("/v1/sessions/{session_id}/managed-agents/acp"),
+            request,
+        )
+    }
+
     pub fn send_managed_terminal_input(
         &self,
         agent_id: &str,
@@ -377,6 +389,10 @@ impl DaemonClient {
     pub fn stop_managed_terminal(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
         let body = serde_json::json!({});
         self.post(&format!("/v1/managed-agents/{agent_id}/stop"), &body)
+    }
+
+    pub fn stop_acp_managed_agent(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
+        self.delete(&format!("/v1/managed-agents/{agent_id}"))
     }
 
     pub fn signal_managed_terminal_ready(&self, agent_id: &str) -> Result<(), CliError> {

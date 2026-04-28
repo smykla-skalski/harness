@@ -3,17 +3,19 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use agent_client_protocol::schema::{
-    CreateTerminalRequest, ReadTextFileRequest, WriteTextFileRequest,
+    CreateTerminalRequest, ReadTextFileRequest, RequestPermissionRequest, ToolCallUpdate,
+    ToolCallUpdateFields, WriteTextFileRequest,
 };
 use tempfile::TempDir;
 
 use super::{
-    BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_TIMEOUT, READ_DENIED,
-    TERMINAL_DENIED, TERMINAL_NOT_FOUND, WRITE_DENIED,
+    BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_CAP_REACHED, PERMISSION_TIMEOUT,
+    READ_DENIED, TERMINAL_DENIED, TERMINAL_NOT_FOUND, WRITE_DENIED,
 };
-use crate::agents::acp::permission::PermissionMode;
+use crate::agents::acp::permission::{PermissionMode, standard_permission_options};
 
 fn setup_client() -> (TempDir, HarnessAcpClient) {
     let temp = TempDir::new().expect("create temp dir");
@@ -130,6 +132,32 @@ fn terminal_cap_enforced() {
 }
 
 #[test]
+fn closed_daemon_permission_bridge_returns_shutdown() {
+    let (temp, _) = setup_client();
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
+    drop(rx);
+    let client = HarnessAcpClient::new(
+        temp.path().to_path_buf(),
+        temp.path().to_path_buf(),
+        None,
+        BTreeSet::new(),
+        PermissionMode::DaemonBridge {
+            tx,
+            deadline: Duration::from_millis(1),
+        },
+    );
+    let tool_call = ToolCallUpdate::new("tool-a", ToolCallUpdateFields::new());
+    let request =
+        RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
+
+    let error = client
+        .handle_request_permission(&request)
+        .expect_err("closed bridge should fail");
+
+    assert_eq!(error.code, DAEMON_SHUTDOWN);
+}
+
+#[test]
 fn error_codes_are_distinct() {
     let codes = [
         WRITE_DENIED,
@@ -138,6 +166,7 @@ fn error_codes_are_distinct() {
         TERMINAL_NOT_FOUND,
         READ_DENIED,
         PERMISSION_TIMEOUT,
+        PERMISSION_CAP_REACHED,
         DAEMON_SHUTDOWN,
     ];
     let unique: BTreeSet<_> = codes.iter().collect();

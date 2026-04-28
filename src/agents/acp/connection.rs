@@ -4,6 +4,9 @@
 //! task. Implements fold + flush batching: reads until SDK reader returns Pending
 //! or accumulated 32 updates / 64 KiB / 5 ms, then sends one batch per channel.
 
+use std::env;
+use std::io;
+use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::sync::Arc;
 
@@ -11,6 +14,8 @@ use agent_client_protocol::schema::SessionNotification;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::ChildStdout;
 use tokio::sync::mpsc;
+use tokio::task::{JoinError, JoinHandle};
+use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
 use crate::agents::runtime::event::ConversationEvent;
@@ -55,12 +60,22 @@ pub struct AcpConnectionHandle {
     /// Receiver for event batches.
     pub events: mpsc::Receiver<EventBatch>,
     /// Join handle for the receive task.
-    task: tokio::task::JoinHandle<()>,
+    task: JoinHandle<()>,
 }
 
 impl AcpConnectionHandle {
+    /// Split the handle into its event receiver and receive-loop task.
+    #[must_use]
+    pub fn into_parts(self) -> (mpsc::Receiver<EventBatch>, JoinHandle<()>) {
+        (self.events, self.task)
+    }
+
     /// Wait for the receive loop to complete.
-    pub async fn join(self) -> Result<(), tokio::task::JoinError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`JoinError`] if the receive-loop task panics or is cancelled.
+    pub async fn join(self) -> Result<(), JoinError> {
         self.task.await
     }
 
@@ -74,6 +89,11 @@ impl AcpConnectionHandle {
 ///
 /// Reads NDJSON from the child's stdout, batches notifications using the ring
 /// buffer, and sends materialised events to the returned channel.
+///
+/// # Panics
+///
+/// Panics when the child was not spawned with piped stdout or when the stdout
+/// handle cannot be converted into Tokio's async process handle.
 #[must_use]
 pub fn spawn_receive_loop(
     child: &mut Child,
@@ -87,8 +107,7 @@ pub fn spawn_receive_loop(
         .take()
         .expect("child stdout not captured; spawn with Stdio::piped()");
 
-    let async_stdout =
-        tokio::process::ChildStdout::from_std(stdout).expect("failed to convert stdout to async");
+    let async_stdout = ChildStdout::from_std(stdout).expect("failed to convert stdout to async");
 
     let (tx, rx) = mpsc::channel(config.channel_buffer);
 
@@ -108,6 +127,10 @@ pub fn spawn_receive_loop(
 ///
 /// Reads lines from stdout, parses as `SessionNotification`, accumulates in the
 /// ring, and flushes batches to the channel.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tokio::select! and tracing macro expansion inflate this two-branch receive loop"
+)]
 async fn receive_loop(
     stdout: ChildStdout,
     tx: mpsc::Sender<EventBatch>,
@@ -133,39 +156,21 @@ async fn receive_loop(
             biased;
 
             result = reader.read_line(&mut line) => {
-                match result {
-                    Ok(0) => {
-                        debug!("ACP stdout closed");
-                        break;
-                    }
-                    Ok(_) => {
-                        supervisor.record_event();
-
-                        let trimmed = line.trim();
-                        if trimmed.is_empty() {
-                            continue;
-                        }
-
-                        match serde_json::from_str::<SessionNotification>(trimmed) {
-                            Ok(notif) => {
-                                let should_flush = ring.push(notif);
-                                if should_flush {
-                                    flush_ring(&mut ring, &tx, &agent_name, &session_id, &mut sequence).await;
-                                }
-                            }
-                            Err(e) => {
-                                debug!(line = %trimmed, error = %e, "failed to parse notification");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "error reading from ACP stdout");
-                        break;
-                    }
+                if !handle_read_result(
+                    result,
+                    &line,
+                    &supervisor,
+                    &mut ring,
+                    &tx,
+                    &agent_name,
+                    &session_id,
+                    &mut sequence,
+                ).await {
+                    break;
                 }
             }
 
-            () = tokio::time::sleep(flush_timeout), if !ring.is_empty() => {
+            () = sleep(flush_timeout), if !ring.is_empty() => {
                 flush_ring(&mut ring, &tx, &agent_name, &session_id, &mut sequence).await;
             }
         }
@@ -178,6 +183,73 @@ async fn receive_loop(
     info!(total_events = sequence, "ACP receive loop finished");
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "keeps the receive-loop branch explicit without bundling short-lived borrows"
+)]
+async fn handle_read_result(
+    result: io::Result<usize>,
+    line: &str,
+    supervisor: &AcpSessionSupervisor,
+    ring: &mut SessionRing,
+    tx: &mpsc::Sender<EventBatch>,
+    agent_name: &str,
+    session_id: &str,
+    sequence: &mut u64,
+) -> bool {
+    match result {
+        Ok(0) => {
+            debug!("ACP stdout closed");
+            false
+        }
+        Ok(_) => {
+            supervisor.record_event();
+            handle_notification_line(line.trim(), ring, tx, agent_name, session_id, sequence).await;
+            true
+        }
+        Err(error) => {
+            warn!(%error, "error reading from ACP stdout");
+            false
+        }
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn handle_notification_line(
+    trimmed: &str,
+    ring: &mut SessionRing,
+    tx: &mpsc::Sender<EventBatch>,
+    agent_name: &str,
+    session_id: &str,
+    sequence: &mut u64,
+) {
+    if trimmed.is_empty() {
+        return;
+    }
+
+    match serde_json::from_str::<SessionNotification>(trimmed) {
+        Ok(notification) => {
+            if ring.push(notification) {
+                flush_ring(ring, tx, agent_name, session_id, sequence).await;
+            }
+        }
+        Err(error) => {
+            debug!(line = %trimmed, %error, "failed to parse notification");
+        }
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn flush_ring(
     ring: &mut SessionRing,
     tx: &mpsc::Sender<EventBatch>,
@@ -185,27 +257,37 @@ async fn flush_ring(
     session_id: &str,
     sequence: &mut u64,
 ) {
-    let batch = ring.drain();
-    let raw_count = batch.len();
-
-    if raw_count == 0 {
-        return;
-    }
-
-    let (events, next_seq) = materialise_batch(batch, agent_name, session_id, *sequence);
-    *sequence = next_seq;
-
-    let event_batch = EventBatch { events, raw_count };
-
-    if tx.send(event_batch).await.is_err() {
+    if let Some(batch) = next_event_batch(ring, agent_name, session_id, sequence)
+        && tx.send(batch).await.is_err()
+    {
         debug!("event receiver dropped; stopping flush");
     }
+}
+
+fn next_event_batch(
+    ring: &mut SessionRing,
+    agent_name: &str,
+    session_id: &str,
+    sequence: &mut u64,
+) -> Option<EventBatch> {
+    let batch = ring.drain();
+    let raw_count = batch.len();
+    if raw_count == 0 {
+        return None;
+    }
+    let (events, next_seq) = materialise_batch(batch, agent_name, session_id, *sequence);
+    *sequence = next_seq;
+    Some(EventBatch { events, raw_count })
 }
 
 /// Parse a single NDJSON line into a `SessionNotification`.
 ///
 /// Exposed for benchmarking.
-pub fn parse_notification(line: &str) -> Result<SessionNotification, serde_json::Error> {
+///
+/// # Errors
+///
+/// Returns [`serde_json::Error`] if the line is not a valid ACP notification.
+pub fn parse_notification(line: &str) -> serde_json::Result<SessionNotification> {
     serde_json::from_str(line)
 }
 
@@ -219,7 +301,7 @@ pub struct SpawnConfig {
     /// Environment variables to pass through.
     pub env_passthrough: Vec<String>,
     /// Working directory.
-    pub working_dir: std::path::PathBuf,
+    pub working_dir: PathBuf,
 }
 
 impl SpawnConfig {
@@ -232,7 +314,7 @@ impl SpawnConfig {
     /// Returns an error if the process fails to spawn.
     #[cfg(unix)]
     #[allow(unsafe_code)]
-    pub fn spawn(&self) -> std::io::Result<Child> {
+    pub fn spawn(&self) -> io::Result<Child> {
         use std::os::unix::process::CommandExt;
         use std::process::Command;
 
@@ -244,7 +326,7 @@ impl SpawnConfig {
             .stderr(Stdio::piped());
 
         for var in &self.env_passthrough {
-            if let Ok(val) = std::env::var(var) {
+            if let Ok(val) = env::var(var) {
                 cmd.env(var, val);
             }
         }
@@ -261,7 +343,11 @@ impl SpawnConfig {
 
     /// Spawn the child process with stdio piped (non-Unix).
     #[cfg(not(unix))]
-    pub fn spawn(&self) -> std::io::Result<Child> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process fails to spawn.
+    pub fn spawn(&self) -> io::Result<Child> {
         use std::process::Command;
 
         let mut cmd = Command::new(&self.command);
@@ -272,7 +358,7 @@ impl SpawnConfig {
             .stderr(Stdio::piped());
 
         for var in &self.env_passthrough {
-            if let Ok(val) = std::env::var(var) {
+            if let Ok(val) = env::var(var) {
                 cmd.env(var, val);
             }
         }

@@ -9,13 +9,14 @@
 //!
 //! - `catalog/` - static agent descriptors (Copilot, etc.) and config-file loader
 //! - `client/` - ACP `Client` impl handling fs/terminal/permission requests
-//! - `permission` - permission mode enum (Stdin, Recording, DaemonBridge)
+//! - `permission` - permission mode enum (`Stdin`, `Recording`, `DaemonBridge`)
 //! - `supervision/` - session lifecycle, watchdog, process-group reaping
 //! - `ring` - per-session bounded ring buffer with fold-flush thresholds
 //! - `connection` - receive loop on dedicated tokio task, NDJSON parsing
-//! - `events` - flush-boundary materialiser (SessionUpdate → ConversationEvent)
+//! - `events` - flush-boundary materialiser (`SessionUpdate` -> `ConversationEvent`)
 //! - `throughput_bench` - CI-gated performance benchmark
 
+pub mod batcher;
 pub mod catalog;
 pub mod client;
 pub mod connection;

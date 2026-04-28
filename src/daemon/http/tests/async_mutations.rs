@@ -1,11 +1,10 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
-use axum::Json;
-use axum::extract::State;
-use axum::http::StatusCode;
+use axum::{Json, extract::State, http::StatusCode};
 use tempfile::tempdir;
 use tokio::sync::broadcast;
 
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
@@ -67,6 +66,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
             async_db_slot.clone(),
             false,
         ),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender,
             db_slot,

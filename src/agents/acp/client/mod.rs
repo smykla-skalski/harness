@@ -39,6 +39,8 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::RecvTimeoutError;
+use std::sync::mpsc::sync_channel;
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
@@ -47,6 +49,7 @@ use agent_client_protocol::schema::{
     TerminalOutputResponse, WaitForTerminalExitRequest, WaitForTerminalExitResponse,
     WriteTextFileRequest, WriteTextFileResponse,
 };
+use tokio::sync::mpsc::error::TrySendError;
 
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
@@ -70,6 +73,9 @@ pub const READ_DENIED: i32 = -32005;
 
 /// JSON-RPC error code: permission timeout.
 pub const PERMISSION_TIMEOUT: i32 = -32006;
+
+/// JSON-RPC error code: permission bridge concurrency cap reached.
+pub const PERMISSION_CAP_REACHED: i32 = -32007;
 
 /// JSON-RPC error code: daemon shutdown in progress.
 pub const DAEMON_SHUTDOWN: i32 = -32099;
@@ -356,9 +362,9 @@ impl HarnessAcpClient {
     ///
     /// # Errors
     ///
-    /// Returns `PERMISSION_TIMEOUT` if the stdin gateway fails. Returns error
-    /// code `-32098` if called with `Recording` or `DaemonBridge` mode (not yet
-    /// wired in Chunks 10 and 7 respectively).
+    /// Returns `PERMISSION_TIMEOUT` if the stdin gateway fails or if the daemon
+    /// bridge response deadline expires. Returns `DAEMON_SHUTDOWN` if the
+    /// daemon bridge is gone.
     pub fn handle_request_permission(
         &self,
         request: &RequestPermissionRequest,
@@ -371,10 +377,34 @@ impl HarnessAcpClient {
                 -32098,
                 "Recording permission mode not yet wired (Chunk 10)",
             )),
-            PermissionMode::DaemonBridge { .. } => Err(ClientError::new(
-                -32098,
-                "DaemonBridge permission mode not yet wired (Chunk 7)",
-            )),
+            PermissionMode::DaemonBridge { tx, deadline } => {
+                let (response_tx, response_rx) = sync_channel(1);
+                tx.try_send(super::permission::PermissionBridgeRequest {
+                    request: request.clone(),
+                    response_tx,
+                })
+                .map_err(|error| match error {
+                    TrySendError::Full(_) => {
+                        ClientError::new(PERMISSION_CAP_REACHED, "permission bridge queue is full")
+                    }
+                    TrySendError::Closed(_) => {
+                        ClientError::new(DAEMON_SHUTDOWN, "permission bridge disconnected")
+                    }
+                })?;
+
+                match response_rx.recv_timeout(*deadline) {
+                    Ok(Ok(response)) => Ok(response),
+                    Ok(Err(error)) => Err(ClientError::new(error.code, error.message)),
+                    Err(RecvTimeoutError::Timeout) => Err(ClientError::new(
+                        PERMISSION_TIMEOUT,
+                        "permission response timed out",
+                    )),
+                    Err(RecvTimeoutError::Disconnected) => Err(ClientError::new(
+                        DAEMON_SHUTDOWN,
+                        "permission bridge disconnected",
+                    )),
+                }
+            }
         }
     }
 }

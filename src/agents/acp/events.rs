@@ -27,6 +27,7 @@ use super::ring::RawSessionUpdate;
 ///
 /// Each update is assigned a monotonic sequence number starting from
 /// `sequence_start`. Returns the events and the next sequence number.
+#[must_use]
 pub fn materialise_batch(
     batch: Vec<RawSessionUpdate>,
     agent: &str,
@@ -80,7 +81,7 @@ pub fn materialise_one(
 
         SessionUpdate::ToolCall(tc) => ConversationEventKind::ToolInvocation {
             tool_name: tc.title.clone(),
-            category: tool_kind_to_str(&tc.kind).to_string(),
+            category: tool_kind_to_str(tc.kind).to_string(),
             input: tc.raw_input.clone().unwrap_or(Value::Null),
             invocation_id: Some(tc.tool_call_id.0.to_string()),
         },
@@ -124,12 +125,6 @@ pub fn materialise_one(
             }
         }
 
-        SessionUpdate::AvailableCommandsUpdate(_)
-        | SessionUpdate::CurrentModeUpdate(_)
-        | SessionUpdate::ConfigOptionUpdate(_) => {
-            return None;
-        }
-
         _ => {
             return None;
         }
@@ -166,8 +161,8 @@ fn extract_text_content(block: &ContentBlock) -> String {
     }
 }
 
-/// Convert ToolKind to a string category.
-fn tool_kind_to_str(kind: &ToolKind) -> &'static str {
+/// Convert `ToolKind` to a string category.
+fn tool_kind_to_str(kind: ToolKind) -> &'static str {
     match kind {
         ToolKind::Read => "read",
         ToolKind::Edit => "edit",
@@ -178,7 +173,7 @@ fn tool_kind_to_str(kind: &ToolKind) -> &'static str {
         ToolKind::Think => "think",
         ToolKind::Fetch => "fetch",
         ToolKind::SwitchMode => "switch_mode",
-        ToolKind::Other | _ => "other",
+        _ => "other",
     }
 }
 

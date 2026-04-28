@@ -7,6 +7,8 @@
 //!
 //! Run with: `cargo bench --bench acp_throughput`
 
+use std::time::Instant;
+
 use agent_client_protocol::schema::{
     ContentBlock, ContentChunk, SessionId, SessionNotification, SessionUpdate, TextContent,
     ToolCall, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
@@ -20,6 +22,10 @@ use super::ring::{RingConfig, SessionRing};
 ///
 /// Returns a mix of message chunks, tool calls, and tool updates to simulate
 /// realistic agent output.
+///
+/// # Panics
+///
+/// Panics if one of the synthetic ACP notifications cannot be serialized.
 #[must_use]
 pub fn generate_synthetic_updates(count: usize) -> Vec<String> {
     let mut lines = Vec::with_capacity(count);
@@ -62,6 +68,7 @@ pub fn generate_synthetic_updates(count: usize) -> Vec<String> {
 }
 
 /// Benchmark: parse 5000 NDJSON lines.
+#[must_use]
 pub fn bench_parse_notifications(lines: &[String]) -> usize {
     let mut count = 0;
     for line in lines {
@@ -73,6 +80,7 @@ pub fn bench_parse_notifications(lines: &[String]) -> usize {
 }
 
 /// Benchmark: ring buffer push and flush.
+#[must_use]
 pub fn bench_ring_buffer(notifications: Vec<SessionNotification>) -> usize {
     let mut ring = SessionRing::new(RingConfig::default());
     let mut batch_count = 0;
@@ -92,20 +100,21 @@ pub fn bench_ring_buffer(notifications: Vec<SessionNotification>) -> usize {
     batch_count
 }
 
-/// Benchmark: full pipeline (parse → ring → materialise).
+/// Benchmark: full pipeline (parse -> ring -> materialise).
+#[must_use]
 pub fn bench_full_pipeline(lines: &[String]) -> (usize, usize) {
     let mut ring = SessionRing::new(RingConfig::default());
     let mut total_events = 0;
     let mut sequence: u64 = 0;
 
     for line in lines {
-        if let Ok(notif) = parse_notification(line) {
-            if ring.push(notif) {
-                let batch = ring.drain();
-                let (events, next_seq) = materialise_batch(batch, "bench", "sess", sequence);
-                total_events += events.len();
-                sequence = next_seq;
-            }
+        if let Ok(notif) = parse_notification(line)
+            && ring.push(notif)
+        {
+            let batch = ring.drain();
+            let (events, next_seq) = materialise_batch(batch, "bench", "sess", sequence);
+            total_events += events.len();
+            sequence = next_seq;
         }
     }
 
@@ -120,12 +129,12 @@ pub fn bench_full_pipeline(lines: &[String]) -> (usize, usize) {
 
 /// Run the benchmark and report timing.
 ///
-/// Returns (parsed_count, event_count, duration_ms).
+/// Returns (`parsed_count`, `event_count`, `duration_ms`).
 #[must_use]
 pub fn run_throughput_benchmark(update_count: usize) -> (usize, usize, f64) {
     let lines = generate_synthetic_updates(update_count);
 
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let (parsed, events) = bench_full_pipeline(&lines);
     let duration = start.elapsed();
 
@@ -139,7 +148,13 @@ pub fn run_throughput_benchmark(update_count: usize) -> (usize, usize, f64) {
 /// Threshold: ≤ 50 ms per 1000 events.
 #[must_use]
 pub fn check_threshold(update_count: usize, duration_ms: f64) -> bool {
-    let ms_per_1000 = (duration_ms / update_count as f64) * 1000.0;
+    let Ok(update_count) = u32::try_from(update_count) else {
+        return false;
+    };
+    if update_count == 0 {
+        return false;
+    }
+    let ms_per_1000 = (duration_ms / f64::from(update_count)) * 1000.0;
     ms_per_1000 <= 50.0
 }
 

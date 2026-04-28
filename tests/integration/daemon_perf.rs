@@ -6,6 +6,7 @@ use serde::Serialize;
 use tempfile::tempdir;
 use tokio::sync::{broadcast, watch};
 
+use harness::daemon::agent_acp::AcpAgentManagerHandle;
 use harness::daemon::codex_controller::CodexControllerHandle;
 use harness::daemon::db::DaemonDb;
 use harness::daemon::http::{DaemonHttpState, serve};
@@ -93,14 +94,15 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
     );
     let state = DaemonHttpState {
         token: token.clone(),
-        sender,
+        sender: sender.clone(),
         manifest,
         daemon_epoch: harness::workspace::utc_now(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(64))),
-        db: db_slot,
+        db: db_slot.clone(),
         async_db: harness::daemon::http::AsyncDaemonDbSlot::empty(),
         db_path: None,
         codex_controller,
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager,
     };
 

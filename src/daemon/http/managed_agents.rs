@@ -7,6 +7,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
+use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentListResponse,
@@ -31,7 +32,14 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
             http_paths::SESSION_MANAGED_AGENTS_CODEX,
             post(post_codex_agent_start),
         )
-        .route(http_paths::MANAGED_AGENT_DETAIL, get(get_managed_agent))
+        .route(
+            http_paths::SESSION_MANAGED_AGENTS_ACP,
+            post(post_acp_agent_start),
+        )
+        .route(
+            http_paths::MANAGED_AGENT_DETAIL,
+            get(get_managed_agent).delete(delete_acp_agent),
+        )
         .route(
             http_paths::MANAGED_AGENT_INPUT,
             post(post_terminal_agent_input),
@@ -63,6 +71,10 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::MANAGED_AGENT_APPROVAL,
             post(post_codex_agent_approval),
+        )
+        .route(
+            http_paths::MANAGED_AGENT_ACP_PERMISSION,
+            post(post_acp_permission),
         )
 }
 
@@ -153,6 +165,52 @@ async fn post_codex_agent_start(
     )
 }
 
+async fn post_acp_agent_start(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AcpAgentStartRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = state
+        .acp_agent_manager
+        .start(&session_id, &request)
+        .map(ManagedAgentSnapshot::Acp);
+    timed_json(
+        "POST",
+        http_paths::SESSION_MANAGED_AGENTS_ACP,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn delete_acp_agent(
+    Path(agent_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = ensure_acp_agent(&state, &agent_id)
+        .and_then(|()| state.acp_agent_manager.stop(&agent_id))
+        .map(ManagedAgentSnapshot::Acp);
+    timed_json(
+        "DELETE",
+        http_paths::MANAGED_AGENT_DELETE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
 async fn post_terminal_agent_input(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -209,9 +267,16 @@ async fn post_terminal_agent_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.stop(&agent_id))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = if state.acp_agent_manager.get(&agent_id).is_ok() {
+        state
+            .acp_agent_manager
+            .stop(&agent_id)
+            .map(ManagedAgentSnapshot::Acp)
+    } else {
+        ensure_terminal_agent(&state, &agent_id)
+            .and_then(|()| state.agent_tui_manager.stop(&agent_id))
+            .map(ManagedAgentSnapshot::Terminal)
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_STOP,
@@ -315,6 +380,33 @@ async fn post_codex_agent_approval(
     )
 }
 
+async fn post_acp_permission(
+    Path((agent_id, batch_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AcpPermissionDecision>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = ensure_acp_agent(&state, &agent_id)
+        .and_then(|()| {
+            state
+                .acp_agent_manager
+                .resolve_permission_batch(&agent_id, &batch_id, &request)
+        })
+        .map(ManagedAgentSnapshot::Acp);
+    timed_json(
+        "POST",
+        http_paths::MANAGED_AGENT_ACP_PERMISSION,
+        &request_id,
+        start,
+        result,
+    )
+}
+
 fn managed_agent_list_response(
     state: &DaemonHttpState,
     session_id: &str,
@@ -332,6 +424,13 @@ fn managed_agent_list_response(
                 .runs
                 .into_iter()
                 .map(ManagedAgentSnapshot::Codex),
+        )
+        .chain(
+            state
+                .acp_agent_manager
+                .list(session_id)?
+                .into_iter()
+                .map(ManagedAgentSnapshot::Acp),
         )
         .collect();
     agents.sort_by_key(|agent| {
@@ -351,10 +450,13 @@ fn managed_agent_snapshot(
     if let Ok(snapshot) = state.agent_tui_manager.get(agent_id) {
         return Ok(ManagedAgentSnapshot::Terminal(snapshot));
     }
+    if let Ok(snapshot) = state.codex_controller.run(agent_id) {
+        return Ok(ManagedAgentSnapshot::Codex(snapshot));
+    }
     state
-        .codex_controller
-        .run(agent_id)
-        .map(ManagedAgentSnapshot::Codex)
+        .acp_agent_manager
+        .get(agent_id)
+        .map(ManagedAgentSnapshot::Acp)
 }
 
 pub(crate) fn ensure_terminal_agent(
@@ -370,6 +472,12 @@ pub(crate) fn ensure_terminal_agent(
         ))
         .into());
     }
+    if state.acp_agent_manager.get(agent_id).is_ok() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed agent '{agent_id}' is an ACP session"
+        ))
+        .into());
+    }
     Err(CliErrorKind::session_not_active(format!("managed agent '{agent_id}' not found")).into())
 }
 
@@ -380,6 +488,31 @@ pub(crate) fn ensure_codex_agent(state: &DaemonHttpState, agent_id: &str) -> Res
     if state.agent_tui_manager.get(agent_id).is_ok() {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "managed agent '{agent_id}' is a terminal session"
+        ))
+        .into());
+    }
+    if state.acp_agent_manager.get(agent_id).is_ok() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed agent '{agent_id}' is an ACP session"
+        ))
+        .into());
+    }
+    Err(CliErrorKind::session_not_active(format!("managed agent '{agent_id}' not found")).into())
+}
+
+pub(crate) fn ensure_acp_agent(state: &DaemonHttpState, agent_id: &str) -> Result<(), CliError> {
+    if state.acp_agent_manager.get(agent_id).is_ok() {
+        return Ok(());
+    }
+    if state.agent_tui_manager.get(agent_id).is_ok() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed agent '{agent_id}' is a terminal session"
+        ))
+        .into());
+    }
+    if state.codex_controller.run(agent_id).is_ok() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed agent '{agent_id}' is a codex thread"
         ))
         .into());
     }

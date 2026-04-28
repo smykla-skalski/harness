@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::DaemonDb;
@@ -117,6 +118,7 @@ pub(super) fn test_http_state_with_db() -> DaemonHttpState {
             async_db.clone(),
             false,
         ),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender, db_slot, async_db, false,
         ),
@@ -152,6 +154,7 @@ fn test_http_state_with_sync_db_only(db_path: &std::path::Path) -> DaemonHttpSta
         async_db: super::AsyncDaemonDbSlot::from_inner(async_db),
         db_path: Some(db_path.to_path_buf()),
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
     }
 }

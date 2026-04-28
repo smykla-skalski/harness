@@ -5,6 +5,7 @@
 
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
+use std::sync::mpsc::SyncSender;
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
@@ -12,7 +13,6 @@ use agent_client_protocol::schema::{
     RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
 };
 use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
 
 /// How `session/request_permission` requests are resolved.
 ///
@@ -45,7 +45,30 @@ pub struct PermissionBridgeRequest {
     /// The original ACP request.
     pub request: RequestPermissionRequest,
     /// Channel to receive the user's response.
-    pub response_tx: oneshot::Sender<RequestPermissionResponse>,
+    pub response_tx: SyncSender<PermissionBridgeResult>,
+}
+
+/// Result sent back by the daemon permission bridge.
+pub type PermissionBridgeResult = Result<RequestPermissionResponse, PermissionBridgeError>;
+
+/// Structured bridge-side permission failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionBridgeError {
+    /// JSON-RPC error code to return to the ACP agent.
+    pub code: i32,
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl PermissionBridgeError {
+    /// Build a bridge error.
+    #[must_use]
+    pub fn new(code: i32, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
 }
 
 /// Ask for permission via stdin.
