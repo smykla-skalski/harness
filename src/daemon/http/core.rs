@@ -134,6 +134,7 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    state.acp_agent_manager.shutdown_all();
     timed_json(
         "POST",
         http_paths::DAEMON_STOP,

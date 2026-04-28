@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::{
     AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
@@ -114,6 +115,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             async_db.clone(),
             false,
         ),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(sender, db, async_db, false),
     }
 }
@@ -166,6 +168,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
         db_path,
         codex_controller,
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db.clone()),
         agent_tui_manager,
     }
 }

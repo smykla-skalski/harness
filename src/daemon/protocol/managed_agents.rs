@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::daemon::agent_acp::AcpAgentSnapshot;
 use crate::daemon::agent_tui::AgentTuiSnapshot;
 
 use super::CodexRunSnapshot;
@@ -9,6 +10,7 @@ use super::CodexRunSnapshot;
 pub enum ManagedAgentSnapshot {
     Terminal(AgentTuiSnapshot),
     Codex(CodexRunSnapshot),
+    Acp(AcpAgentSnapshot),
 }
 
 impl ManagedAgentSnapshot {
@@ -17,6 +19,7 @@ impl ManagedAgentSnapshot {
         match self {
             Self::Terminal(snapshot) => &snapshot.tui_id,
             Self::Codex(snapshot) => &snapshot.run_id,
+            Self::Acp(snapshot) => &snapshot.acp_id,
         }
     }
 
@@ -25,6 +28,7 @@ impl ManagedAgentSnapshot {
         match self {
             Self::Terminal(snapshot) => &snapshot.session_id,
             Self::Codex(snapshot) => &snapshot.session_id,
+            Self::Acp(snapshot) => &snapshot.session_id,
         }
     }
 
@@ -33,6 +37,7 @@ impl ManagedAgentSnapshot {
         match self {
             Self::Terminal(snapshot) => &snapshot.updated_at,
             Self::Codex(snapshot) => &snapshot.updated_at,
+            Self::Acp(snapshot) => &snapshot.updated_at,
         }
     }
 }

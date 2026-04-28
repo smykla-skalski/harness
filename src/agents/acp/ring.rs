@@ -9,9 +9,10 @@
 //! `ConversationEvent`s. The ring reuses its internal buffer across batches to
 //! minimise allocations in the hot path.
 
+use std::mem;
 use std::time::{Duration, Instant};
 
-use agent_client_protocol::schema::SessionNotification;
+use agent_client_protocol::schema::{ContentChunk, SessionNotification, SessionUpdate};
 
 /// Default maximum updates before flush.
 pub const DEFAULT_MAX_UPDATES: usize = 32;
@@ -119,10 +120,10 @@ impl SessionRing {
             return true;
         }
 
-        if let Some(start) = self.batch_start {
-            if start.elapsed() >= self.config.max_duration {
-                return true;
-            }
+        if let Some(start) = self.batch_start
+            && start.elapsed() >= self.config.max_duration
+        {
+            return true;
         }
 
         false
@@ -132,7 +133,7 @@ impl SessionRing {
     pub fn drain(&mut self) -> Vec<RawSessionUpdate> {
         self.accumulated_bytes = 0;
         self.batch_start = None;
-        std::mem::take(&mut self.updates)
+        mem::take(&mut self.updates)
     }
 
     /// Number of updates currently in the ring.
@@ -171,8 +172,6 @@ impl SessionRing {
 /// This is a rough estimate to avoid serializing in the hot path. We count
 /// string lengths and assume fixed overhead for enum tags and metadata.
 fn estimate_notification_size(notification: &SessionNotification) -> usize {
-    use agent_client_protocol::schema::SessionUpdate;
-
     let base = 64; // session_id + envelope overhead
 
     let update_size = match &notification.update {
@@ -185,23 +184,21 @@ fn estimate_notification_size(notification: &SessionNotification) -> usize {
         }
         SessionUpdate::ToolCallUpdate(tcu) => 32 + tcu.tool_call_id.0.len(),
         SessionUpdate::Plan(_) => 256,
-        SessionUpdate::AvailableCommandsUpdate(_) => 128,
-        SessionUpdate::CurrentModeUpdate(_) => 64,
-        SessionUpdate::ConfigOptionUpdate(_) => 128,
-        SessionUpdate::SessionInfoUpdate(_) => 128,
+        SessionUpdate::AvailableCommandsUpdate(_)
+        | SessionUpdate::ConfigOptionUpdate(_)
+        | SessionUpdate::SessionInfoUpdate(_) => 128,
         _ => 64,
     };
 
     base + update_size
 }
 
-fn estimate_content_chunk_size(chunk: &agent_client_protocol::schema::ContentChunk) -> usize {
+fn estimate_content_chunk_size(chunk: &ContentChunk) -> usize {
     use agent_client_protocol::schema::{ContentBlock, EmbeddedResourceResource};
 
     match &chunk.content {
         ContentBlock::Text(tc) => 32 + tc.text.len(),
-        ContentBlock::Image(_) => 256,
-        ContentBlock::Audio(_) => 256,
+        ContentBlock::Image(_) | ContentBlock::Audio(_) => 256,
         ContentBlock::ResourceLink(rl) => 64 + rl.uri.len(),
         ContentBlock::Resource(res) => match &res.resource {
             EmbeddedResourceResource::TextResourceContents(trc) => 128 + trc.uri.len(),

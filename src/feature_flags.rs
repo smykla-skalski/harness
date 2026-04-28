@@ -7,6 +7,8 @@
 //! - `HARNESS_FEATURE_SUITE_HOOKS=1` / `--enable-suite-hooks` re-enables the
 //!   suite lifecycle hooks: `guard-stop`, `context-agent`, `validate-agent`,
 //!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
+//! - `HARNESS_FEATURE_ACP=1` exposes ACP managed-agent start routes while the
+//!   permission UI is still landing. Chunk 11 flips this on by default.
 //!
 //! Resolution order: explicit CLI override (when supplied) wins over env vars,
 //! env vars over the disabled-by-default baseline. Truthy values match the
@@ -25,6 +27,14 @@ use crate::workspace::normalized_env_value;
 
 /// Env var that re-enables suite-lifecycle hooks in generated configs.
 pub const SUITE_HOOKS_ENV: &str = "HARNESS_FEATURE_SUITE_HOOKS";
+/// Env var that enables ACP managed-agent runtime routes before the modal ships.
+pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
+
+/// Whether ACP managed-agent routes are enabled.
+#[must_use]
+pub fn acp_enabled_from_env() -> bool {
+    env_truthy(ACP_ENV)
+}
 
 /// Toggles for the optional hook families written into runtime configs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -84,7 +94,13 @@ mod tests {
     use super::*;
 
     fn with_clean_env<R>(body: impl FnOnce() -> R) -> R {
-        temp_env::with_vars([(SUITE_HOOKS_ENV, None::<&str>)], body)
+        temp_env::with_vars(
+            [
+                (SUITE_HOOKS_ENV, None::<&str>),
+                (ACP_ENV, None::<&str>),
+            ],
+            body,
+        )
     }
 
     #[test]
@@ -92,6 +108,7 @@ mod tests {
         with_clean_env(|| {
             let flags = RuntimeHookFlags::from_env();
             assert!(!flags.suite_hooks);
+            assert!(!acp_enabled_from_env());
         });
     }
 
@@ -137,6 +154,16 @@ mod tests {
         with_clean_env(|| {
             let flags = RuntimeHookFlags::resolve(Some(true));
             assert!(flags.suite_hooks);
+        });
+    }
+
+    #[test]
+    fn acp_flag_uses_same_truthy_env_convention() {
+        temp_env::with_var(ACP_ENV, Some("1"), || {
+            assert!(acp_enabled_from_env());
+        });
+        temp_env::with_var(ACP_ENV, Some("false"), || {
+            assert!(!acp_enabled_from_env());
         });
     }
 }

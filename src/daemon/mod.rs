@@ -20,6 +20,7 @@ use std::net::IpAddr;
 
 use axum::http::Uri;
 
+pub mod agent_acp;
 pub mod agent_tui;
 pub mod bridge;
 pub mod client;

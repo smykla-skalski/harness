@@ -338,6 +338,14 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_MANAGED_AGENTS_ACP,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_START_ACP,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENT_DETAIL,
         parity: HttpRouteParity::Rpc {
@@ -406,6 +414,22 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
         path: http_paths::MANAGED_AGENT_APPROVAL,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::MANAGED_AGENT_RESOLVE_CODEX_APPROVAL,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::MANAGED_AGENT_ACP_PERMISSION,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Delete,
+        path: http_paths::MANAGED_AGENT_DELETE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_STOP_ACP,
         },
         swift_client_exposed: true,
     },

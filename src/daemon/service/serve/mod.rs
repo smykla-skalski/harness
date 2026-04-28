@@ -1,11 +1,13 @@
 mod binary_stamp;
 
 use super::{
-    Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind, DaemonHttpState,
-    DaemonManifest, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME,
-    OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast,
-    env, http, index, log_sandbox_startup, process_id, state, tokio_watch, utc_now, watch,
+    AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind,
+    DaemonHttpState, DaemonManifest, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex,
+    OBSERVE_RUNTIME, OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener,
+    bridge, broadcast, env, http, index, log_sandbox_startup, process_id, state, tokio_watch,
+    utc_now, watch,
 };
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
@@ -82,12 +84,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         async_db.clone(),
         config.sandboxed,
     );
-    let agent_tui_manager = super::agent_tui::AgentTuiManagerHandle::new_with_async_db(
+    let agent_tui_manager = AgentTuiManagerHandle::new_with_async_db(
         sender.clone(),
         db.clone(),
         async_db.clone(),
         config.sandboxed,
     );
+    let acp_agent_manager = AcpAgentManagerHandle::new(sender.clone(), db.clone());
     let _bridge_watcher = bridge::spawn_manifest_watcher();
 
     let app_state = DaemonHttpState {
@@ -101,6 +104,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         db_path: Some(state::daemon_root().join("harness.db")),
         codex_controller,
         agent_tui_manager,
+        acp_agent_manager,
     };
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
