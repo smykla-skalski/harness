@@ -306,6 +306,21 @@ pub struct SpawnConfig {
 }
 
 impl SpawnConfig {
+    #[must_use]
+    pub fn resolved_command_for_identity(&self) -> String {
+        resolve_program(&self.command)
+            .unwrap_or_else(|| self.command.clone().into())
+            .display()
+            .to_string()
+    }
+
+    #[must_use]
+    pub fn effective_env_for_identity(&self) -> Vec<(String, String)> {
+        let mut values = env::vars().collect::<Vec<_>>();
+        values.sort_by(|left, right| left.0.cmp(&right.0));
+        values
+    }
+
     /// Spawn the child process with stdio piped.
     ///
     /// On Unix, sets up a new process group via `setsid(2)` in the pre-exec hook.

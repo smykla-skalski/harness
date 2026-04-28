@@ -171,6 +171,106 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
     });
 }
 
+#[tokio::test]
+#[cfg(unix)]
+async fn process_key_changes_when_permission_mode_changes() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let script = temp.path().join("fake-agent.sh");
+        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        let descriptor = descriptor(&script);
+        let manager = manager();
+        let base = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: None,
+            project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
+        };
+        let recording = AcpAgentStartRequest {
+            record_permissions: true,
+            ..base.clone()
+        };
+
+        let first = manager
+            .start_descriptor("sess-1", &base, &descriptor)
+            .expect("start first");
+        let second = manager
+            .start_descriptor("sess-2", &recording, &descriptor)
+            .expect("start second");
+        assert_ne!(first.process_key, second.process_key);
+        manager.stop(&first.acp_id).expect("stop first");
+        manager.stop(&second.acp_id).expect("stop second");
+    });
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn process_key_changes_when_project_root_changes() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let root_a = temp.path().join("a");
+        let root_b = temp.path().join("b");
+        fs::create_dir_all(&root_a).expect("mkdir a");
+        fs::create_dir_all(&root_b).expect("mkdir b");
+        let script = temp.path().join("fake-agent.sh");
+        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        let descriptor = descriptor(&script);
+        let manager = manager();
+        let first = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: None,
+            project_dir: Some(root_a.display().to_string()),
+            record_permissions: false,
+        };
+        let second = AcpAgentStartRequest {
+            project_dir: Some(root_b.display().to_string()),
+            ..first.clone()
+        };
+
+        let one = manager
+            .start_descriptor("sess-1", &first, &descriptor)
+            .expect("start one");
+        let two = manager
+            .start_descriptor("sess-2", &second, &descriptor)
+            .expect("start two");
+        assert_ne!(one.process_key, two.process_key);
+        manager.stop(&one.acp_id).expect("stop one");
+        manager.stop(&two.acp_id).expect("stop two");
+    });
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn process_key_stable_for_unlisted_env_drift() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let script = temp.path().join("fake-agent.sh");
+        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        let descriptor = descriptor(&script);
+        let manager = manager();
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: None,
+            project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
+        };
+
+        let first = temp_env::with_var("HARNESS_TEST_NOISE", Some("a"), || {
+            manager
+                .start_descriptor("sess-1", &request, &descriptor)
+                .expect("start first")
+        });
+        let second = temp_env::with_var("HARNESS_TEST_NOISE", Some("b"), || {
+            manager
+                .start_descriptor("sess-2", &request, &descriptor)
+                .expect("start second")
+        });
+        assert_eq!(first.process_key, second.process_key);
+        manager.stop(&first.acp_id).expect("stop first");
+        manager.stop(&second.acp_id).expect("stop second");
+    });
+}
+
 #[test]
 fn default_permission_cap_matches_plan() {
     assert_eq!(DEFAULT_PERMISSION_CAP, 8);

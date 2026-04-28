@@ -166,10 +166,10 @@ impl AcpAgentManagerHandle {
             env_passthrough: descriptor.env_passthrough.clone(),
             working_dir: project_dir.clone(),
         };
+        let process_key = AcpProcessPoolKey::from_spawn_inputs(descriptor, request, &spawn, &project_dir);
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
-        let process_key = AcpProcessPoolKey::from_spawn_inputs(descriptor, request, &project_dir);
 
         let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
         let supervisor = Arc::new(AcpSessionSupervisor::new(
