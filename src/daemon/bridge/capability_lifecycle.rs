@@ -188,7 +188,7 @@ impl BridgeServer {
     }
 
     pub(super) fn ensure_acp_can_disable(&self, force: bool) -> Result<(), CliError> {
-        let active_sessions = self.acp_agent_manager.count_live_sessions();
+        let active_sessions = self.acp_agent_manager.count_live_sessions()?;
         if active_sessions > 0 && !force {
             return Err(CliErrorKind::session_agent_conflict(format!(
                 "acp capability has {active_sessions} active session(s); rerun with --force to stop them first"

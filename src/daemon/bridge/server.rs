@@ -2,26 +2,37 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process::id as process_id;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use serde_json::Value;
+use tokio::runtime::{Builder, Runtime};
+use tokio::sync::broadcast;
+use uuid::Uuid;
 
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
+use super::acp_rpc::{
+    BridgeAcpEventsRequest, BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest,
+    BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
+};
 use super::bridge_state::{write_bridge_config, write_bridge_state};
 use super::client::{
     BridgeAttachRequest, BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest,
 };
 use super::core::{
-    BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope, BridgeHandleResult, BridgeReconfigureSpec,
-    BridgeRequest, BridgeResponse, ResolvedBridgeConfig,
+    BridgeAcpEventBuffer, BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope,
+    BridgeHandleResult, BridgeReconfigureSpec, BridgeRequest, BridgeResponse,
+    ResolvedBridgeConfig,
 };
 use super::helpers::{parse_bridge_payload, resolve_bridge_config, uptime_from_started_at};
 use super::types::{
-    AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
-    BridgeState, BridgeStatusReport, PersistedBridgeConfig,
+    AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI,
+    BRIDGE_CAPABILITY_CODEX, BridgeCapability, BridgeState, BridgeStatusReport,
+    PersistedBridgeConfig,
 };
 
 pub(super) struct BridgeServer {
@@ -34,6 +45,9 @@ pub(super) struct BridgeServer {
     pub(super) capabilities: Mutex<BTreeMap<String, HostBridgeCapabilityManifest>>,
     pub(super) active_tuis: Mutex<BTreeMap<String, BridgeActiveTui>>,
     pub(super) codex: Mutex<Option<BridgeCodexProcess>>,
+    pub(super) acp_runtime: Mutex<Runtime>,
+    pub(super) acp_agent_manager: AcpAgentManagerHandle,
+    pub(super) acp_events: Arc<Mutex<BridgeAcpEventBuffer>>,
     pub(super) shutdown: AtomicBool,
 }
 
@@ -44,6 +58,33 @@ impl BridgeServer {
         desired_config: PersistedBridgeConfig,
         capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
     ) -> Self {
+        let acp_runtime = Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("build ACP bridge runtime");
+        let (acp_sender, mut acp_receiver) = tokio::sync::broadcast::channel::<StreamEvent>(256);
+        let acp_events = Arc::new(Mutex::new(BridgeAcpEventBuffer::new(format!(
+            "bridge-{}",
+            Uuid::new_v4()
+        ))));
+        let acp_events_sink = Arc::clone(&acp_events);
+        acp_runtime.spawn(async move {
+            loop {
+                match acp_receiver.recv().await {
+                    Ok(event) => {
+                        if let Ok(mut buffer) = acp_events_sink.lock() {
+                            buffer.push(event);
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        if let Ok(mut buffer) = acp_events_sink.lock() {
+                            buffer.record_lag(skipped);
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        });
         Self {
             token,
             socket_path,
@@ -54,6 +95,9 @@ impl BridgeServer {
             capabilities: Mutex::new(capabilities),
             active_tuis: Mutex::new(BTreeMap::new()),
             codex: Mutex::new(None),
+            acp_runtime: Mutex::new(acp_runtime),
+            acp_agent_manager: AcpAgentManagerHandle::new(acp_sender, Arc::new(OnceLock::new())),
+            acp_events,
             shutdown: AtomicBool::new(false),
         }
     }
@@ -185,6 +229,7 @@ impl BridgeServer {
     ) -> Result<BridgeHandleResult, CliError> {
         match capability {
             BRIDGE_CAPABILITY_AGENT_TUI => self.handle_agent_tui(action, payload),
+            BRIDGE_CAPABILITY_ACP => self.handle_acp(action, payload),
             BRIDGE_CAPABILITY_CODEX => Err(CliErrorKind::workflow_parse(format!(
                 "bridge capability '{capability}' does not support '{action}' operations"
             ))
@@ -252,6 +297,62 @@ impl BridgeServer {
             }
             _ => Err(CliErrorKind::workflow_parse(format!(
                 "unsupported agent-tui bridge action '{action}'"
+            ))
+            .into()),
+        }
+    }
+
+    pub(super) fn handle_acp(
+        &self,
+        action: &str,
+        payload: Value,
+    ) -> Result<BridgeHandleResult, CliError> {
+        match action {
+            "start" => {
+                let request: BridgeAcpStartRequest = parse_bridge_payload(payload)?;
+                let snapshot = self.start_acp(&request.session_id, &request.request)?;
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
+            "list" => {
+                let request: BridgeAcpListRequest = parse_bridge_payload(payload)?;
+                let snapshots = self.list_acp(&request.session_id)?;
+                Ok(BridgeResponse::ok_payload(&snapshots)?.into())
+            }
+            "inspect" => {
+                let request: BridgeAcpInspectRequest = parse_bridge_payload(payload)?;
+                let response = self.inspect_acp(request.session_id.as_deref())?;
+                Ok(BridgeResponse::ok_payload(&response)?.into())
+            }
+            "get" => {
+                let request: BridgeAcpGetRequest = parse_bridge_payload(payload)?;
+                let snapshot = self.get_acp(&request.acp_id)?;
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
+            "stop" => {
+                let request: BridgeAcpGetRequest = parse_bridge_payload(payload)?;
+                let snapshot = self.stop_acp(&request.acp_id)?;
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
+            "resolve_permission" => {
+                let request: BridgeAcpResolvePermissionRequest = parse_bridge_payload(payload)?;
+                let snapshot = self.resolve_acp_permission(
+                    &request.acp_id,
+                    &request.batch_id,
+                    &request.decision,
+                )?;
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
+            "events_since" => {
+                let request: BridgeAcpEventsRequest = parse_bridge_payload(payload)?;
+                let response = self.acp_events_since(
+                    request.after_seq,
+                    request.known_epoch.as_deref(),
+                    request.known_continuity,
+                )?;
+                Ok(BridgeResponse::ok_payload(&response)?.into())
+            }
+            _ => Err(CliErrorKind::workflow_parse(format!(
+                "unsupported acp bridge action '{action}'"
             ))
             .into()),
         }

@@ -46,7 +46,8 @@ struct AgentCapabilityPickerTests {
       ],
       probe: nil,
       installHint: nil,
-      sandboxed: false
+      sandboxed: false,
+      acpHostBridgeReady: true
     )
 
     #expect(option.normalizedSelection(for: .tui(.codex)) == .tui(.gemini))
@@ -78,7 +79,8 @@ struct AgentCapabilityPickerTests {
         authState: .unavailable
       ),
       installHint: "Install Gemini",
-      sandboxed: false
+      sandboxed: false,
+      acpHostBridgeReady: true
     )
 
     #expect(option.isEnabled)
@@ -102,13 +104,38 @@ struct AgentCapabilityPickerTests {
         ],
         checkedAt: "2026-04-28T22:00:00Z"
       ),
-      sandboxed: true
+      sandboxed: true,
+      acpHostBridgeReady: false
     )
 
     let copilot = try #require(options.first { $0.id == AgentTuiRuntime.copilot.rawValue })
     #expect(copilot.normalizedSelection(for: .acp("copilot")) == .tui(.copilot))
     #expect(!copilot.isEnabled(copilot.transportChoice(for: .acp("copilot"))))
     #expect(copilot.isEnabled(copilot.transportChoice(for: .tui(.copilot))))
+  }
+
+  @Test("sandboxed monitor keeps ACP transport enabled when ACP host bridge is ready")
+  func sandboxedMonitorAllowsAcpTransportViaHostBridge() throws {
+    let options = AgentsWindowView.agentCapabilityOptions(
+      acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "copilot",
+            displayName: "GitHub Copilot",
+            binaryPresent: true,
+            authState: .ready
+          )
+        ],
+        checkedAt: "2026-04-28T22:05:00Z"
+      ),
+      sandboxed: true,
+      acpHostBridgeReady: true
+    )
+
+    let copilot = try #require(options.first { $0.id == AgentTuiRuntime.copilot.rawValue })
+    #expect(copilot.normalizedSelection(for: .acp("copilot")) == .acp("copilot"))
+    #expect(copilot.isEnabled(copilot.transportChoice(for: .acp("copilot"))))
   }
 
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {

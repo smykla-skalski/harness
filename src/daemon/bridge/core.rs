@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Arc;
@@ -11,6 +11,7 @@ use crate::daemon::agent_tui::{
     AgentTuiAttachState, AgentTuiInputWorker, AgentTuiLaunchProfile, AgentTuiProcess,
     AgentTuiSnapshotContext, AgentTuiStatus,
 };
+use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::types::{BridgeCapability, PersistedBridgeConfig};
@@ -264,5 +265,87 @@ impl BridgeReconfigureSpec {
         };
         request.validate()?;
         Ok(request)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpEventsResponse {
+    pub(super) bridge_epoch: String,
+    pub(super) continuity: u64,
+    pub(super) next_seq: u64,
+    pub(super) truncated: bool,
+    pub(super) requires_resync: bool,
+    pub(super) events: Vec<StreamEvent>,
+}
+
+#[derive(Debug)]
+pub(super) struct BridgeAcpEventBuffer {
+    bridge_epoch: String,
+    next_seq: u64,
+    continuity: u64,
+    events: VecDeque<(u64, StreamEvent)>,
+}
+
+impl BridgeAcpEventBuffer {
+    pub(super) const MAX_EVENTS: usize = 512;
+
+    #[must_use]
+    pub(super) fn new(bridge_epoch: String) -> Self {
+        Self {
+            bridge_epoch,
+            next_seq: 0,
+            continuity: 0,
+            events: VecDeque::new(),
+        }
+    }
+
+    // ACP host sessions emit live daemon push events. Sandboxed daemons cannot
+    // subscribe directly, so the host bridge keeps a short replay window and
+    // sandboxed peers poll by sequence number after reconnect or startup.
+    pub(super) fn push(&mut self, event: StreamEvent) {
+        self.next_seq = self.next_seq.saturating_add(1);
+        self.events.push_back((self.next_seq, event));
+        while self.events.len() > Self::MAX_EVENTS {
+            let _ = self.events.pop_front();
+        }
+    }
+
+    pub(super) fn record_lag(&mut self, skipped: u64) {
+        if skipped == 0 {
+            return;
+        }
+        self.continuity = self.continuity.saturating_add(1);
+    }
+
+    #[must_use]
+    pub(super) fn events_since(
+        &self,
+        after_seq: Option<u64>,
+        known_epoch: Option<&str>,
+        known_continuity: Option<u64>,
+    ) -> BridgeAcpEventsResponse {
+        let after_seq = after_seq.unwrap_or_default();
+        let oldest_seq = self.events.front().map_or(self.next_seq, |(seq, _)| *seq);
+        let evicted_history = self.next_seq > self.events.len() as u64;
+        let truncated = after_seq > self.next_seq
+            || (after_seq == 0 && evicted_history)
+            || (after_seq > 0 && after_seq < oldest_seq.saturating_sub(1));
+        let epoch_changed = known_epoch.is_some_and(|epoch| epoch != self.bridge_epoch);
+        let continuity_changed =
+            known_continuity.is_some_and(|continuity| continuity != self.continuity);
+        let events = self
+            .events
+            .iter()
+            .filter(|(seq, _)| *seq > after_seq)
+            .map(|(_, event)| event.clone())
+            .collect();
+        BridgeAcpEventsResponse {
+            bridge_epoch: self.bridge_epoch.clone(),
+            continuity: self.continuity,
+            next_seq: self.next_seq,
+            truncated,
+            requires_resync: truncated || epoch_changed || continuity_changed,
+            events,
+        }
     }
 }

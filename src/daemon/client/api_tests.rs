@@ -320,6 +320,7 @@ fn acp_inspect_gets_optional_session_filter() {
             "display_name": "GitHub Copilot",
             "pid": 42,
             "pgid": 42,
+            "process_key": "sess-1:copilot",
             "uptime_ms": 10,
             "last_update_at": "2026-04-28T00:00:00Z",
             "last_client_call_at": null,

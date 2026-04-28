@@ -8,6 +8,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let probe: AcpRuntimeProbe?
   let installHint: String?
   let sandboxed: Bool
+  let acpHostBridgeReady: Bool
 
   var isEnabled: Bool {
     transportChoices.contains(where: isEnabled)
@@ -38,7 +39,10 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     case .tui:
       true
     case .acp:
-      !sandboxed && (probe?.binaryPresent ?? true)
+      if sandboxed {
+        return acpHostBridgeReady
+      }
+      return probe?.binaryPresent ?? true
     }
   }
 }
@@ -75,8 +79,8 @@ struct AgentCapabilityRow: View {
   }
 
   private var unavailableReason: String? {
-    if case .acp = selectedChoice.id, option.sandboxed {
-      return "Filesystem + terminal tools are unavailable while the daemon runs sandboxed."
+    if case .acp = selectedChoice.id, option.sandboxed, !option.acpHostBridgeReady {
+      return "Filesystem + terminal tools require the ACP host bridge while the daemon runs sandboxed."
     }
     return option.installHint
   }

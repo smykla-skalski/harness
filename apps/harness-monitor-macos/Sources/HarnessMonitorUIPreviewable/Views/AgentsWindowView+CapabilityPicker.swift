@@ -15,14 +15,16 @@ extension AgentsWindowView {
     Self.agentCapabilityOptions(
       acpAgents: viewModel.availableAcpAgents,
       runtimeProbeResults: viewModel.runtimeProbeResults,
-      sandboxed: store.daemonStatus?.manifest?.sandboxed == true
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
     )
   }
 
   static func agentCapabilityOptions(
     acpAgents: [AcpAgentDescriptor],
     runtimeProbeResults: AcpRuntimeProbeResponse?,
-    sandboxed: Bool = false
+    sandboxed: Bool = false,
+    acpHostBridgeReady: Bool = true
   ) -> [AgentCapabilityOption] {
     var rows: [AgentCapabilityOption] = AgentTuiRuntime.allCases.map { runtime in
       let descriptor = acpAgents.first { representsSameCapability($0, as: runtime) }
@@ -34,7 +36,8 @@ extension AgentsWindowView {
           probeResult(for: $0, runtimeProbeResults: runtimeProbeResults)
         },
         installHint: descriptor?.installHint,
-        sandboxed: sandboxed
+        sandboxed: sandboxed,
+        acpHostBridgeReady: acpHostBridgeReady
       )
     }
     for descriptor in acpAgents
@@ -55,7 +58,8 @@ extension AgentsWindowView {
           ],
           probe: probeResult(for: descriptor, runtimeProbeResults: runtimeProbeResults),
           installHint: descriptor.installHint,
-          sandboxed: sandboxed
+          sandboxed: sandboxed,
+          acpHostBridgeReady: acpHostBridgeReady
         )
       )
     }

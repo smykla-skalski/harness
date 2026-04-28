@@ -16,6 +16,7 @@ use super::helpers::{merged_persisted_config, resolve_bridge_config, uptime_from
 pub const BRIDGE_LAUNCH_AGENT_LABEL: &str = "io.harness.bridge";
 pub const BRIDGE_CAPABILITY_CODEX: &str = "codex";
 pub const BRIDGE_CAPABILITY_AGENT_TUI: &str = "agent-tui";
+pub const BRIDGE_CAPABILITY_ACP: &str = "acp";
 pub const DEFAULT_CODEX_BRIDGE_PORT: u16 = 4500;
 pub const CODEX_BRIDGE_PORT_ENV: &str = "HARNESS_CODEX_WS_PORT";
 
@@ -40,6 +41,7 @@ pub enum BridgeCapability {
     #[serde(rename = "agent-tui")]
     #[value(name = "agent-tui")]
     AgentTui,
+    Acp,
 }
 
 impl BridgeCapability {
@@ -48,6 +50,7 @@ impl BridgeCapability {
         match self {
             Self::Codex => BRIDGE_CAPABILITY_CODEX,
             Self::AgentTui => BRIDGE_CAPABILITY_AGENT_TUI,
+            Self::Acp => BRIDGE_CAPABILITY_ACP,
         }
     }
 
@@ -56,6 +59,7 @@ impl BridgeCapability {
         match self {
             Self::Codex => "codex.host-bridge",
             Self::AgentTui => "agent-tui.host-bridge",
+            Self::Acp => "acp.host-bridge",
         }
     }
 
@@ -64,6 +68,7 @@ impl BridgeCapability {
         match name {
             BRIDGE_CAPABILITY_CODEX => Some(Self::Codex),
             BRIDGE_CAPABILITY_AGENT_TUI => Some(Self::AgentTui),
+            BRIDGE_CAPABILITY_ACP => Some(Self::Acp),
             _ => None,
         }
     }
@@ -71,7 +76,11 @@ impl BridgeCapability {
 
 #[must_use]
 pub fn compiled_capabilities() -> BTreeSet<BridgeCapability> {
-    [BridgeCapability::Codex, BridgeCapability::AgentTui]
+    [
+        BridgeCapability::Codex,
+        BridgeCapability::AgentTui,
+        BridgeCapability::Acp,
+    ]
         .into_iter()
         .collect()
 }
