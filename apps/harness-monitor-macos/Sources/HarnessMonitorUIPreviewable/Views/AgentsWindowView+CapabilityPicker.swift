@@ -12,21 +12,32 @@ extension AgentsWindowView {
   }
 
   var agentCapabilityOptions: [AgentCapabilityOption] {
+    Self.agentCapabilityOptions(
+      acpAgents: viewModel.availableAcpAgents,
+      runtimeProbeResults: viewModel.runtimeProbeResults
+    )
+  }
+
+  static func agentCapabilityOptions(
+    acpAgents: [AcpAgentDescriptor],
+    runtimeProbeResults: AcpRuntimeProbeResponse?
+  ) -> [AgentCapabilityOption] {
     var rows: [AgentCapabilityOption] = AgentTuiRuntime.allCases.map { runtime in
-      let descriptor = viewModel.availableAcpAgents.first {
-        normalizedAgentName($0.displayName) == normalizedAgentName(runtime.title)
-      }
+      let descriptor = acpAgents.first { representsSameCapability($0, as: runtime) }
       return AgentCapabilityOption(
         id: runtime.rawValue,
         title: runtime.title,
         transportChoices: transportChoices(runtime: runtime, descriptor: descriptor),
-        probe: descriptor.flatMap(probeResult(for:)),
+        probe: descriptor.flatMap {
+          probeResult(for: $0, runtimeProbeResults: runtimeProbeResults)
+        },
         installHint: descriptor?.installHint
       )
     }
-    for descriptor in viewModel.availableAcpAgents
+    for descriptor in acpAgents
     where !rows.contains(where: {
-      normalizedAgentName($0.title) == normalizedAgentName(descriptor.displayName)
+      $0.id == descriptor.id
+        || canonicalCapabilityName($0.title) == canonicalCapabilityName(descriptor.displayName)
     }) {
       rows.append(
         AgentCapabilityOption(
@@ -39,7 +50,7 @@ extension AgentsWindowView {
               capabilities: descriptor.capabilities
             )
           ],
-          probe: probeResult(for: descriptor),
+          probe: probeResult(for: descriptor, runtimeProbeResults: runtimeProbeResults),
           installHint: descriptor.installHint
         )
       )
@@ -47,7 +58,7 @@ extension AgentsWindowView {
     return rows
   }
 
-  func transportChoices(
+  static func transportChoices(
     runtime: AgentTuiRuntime,
     descriptor: AcpAgentDescriptor?
   ) -> [AgentCapabilityTransportChoice] {
@@ -70,14 +81,30 @@ extension AgentsWindowView {
     return choices
   }
 
-  func probeResult(for descriptor: AcpAgentDescriptor) -> AcpRuntimeProbe? {
-    viewModel.runtimeProbeResults?.probes.first { $0.agentId == descriptor.id }
+  static func probeResult(
+    for descriptor: AcpAgentDescriptor,
+    runtimeProbeResults: AcpRuntimeProbeResponse?
+  ) -> AcpRuntimeProbe? {
+    runtimeProbeResults?.probes.first { $0.agentId == descriptor.id }
   }
 
-  func normalizedAgentName(_ value: String) -> String {
-    value
+  private static func representsSameCapability(
+    _ descriptor: AcpAgentDescriptor,
+    as runtime: AgentTuiRuntime
+  ) -> Bool {
+    descriptor.id == runtime.rawValue
+      || canonicalCapabilityName(descriptor.displayName) == canonicalCapabilityName(runtime.title)
+  }
+
+  private static func canonicalCapabilityName(_ value: String) -> String {
+    let ignoredTokens: Set<String> = ["agent", "cli", "github", "google"]
+    let tokens =
+      value
       .lowercased()
-      .replacingOccurrences(of: "github ", with: "")
-      .replacingOccurrences(of: " ", with: "")
+      .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+      .map(String.init)
+      .filter { !ignoredTokens.contains($0) }
+
+    return tokens.joined()
   }
 }
