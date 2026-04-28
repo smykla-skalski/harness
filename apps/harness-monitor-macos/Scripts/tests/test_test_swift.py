@@ -115,6 +115,18 @@ if printf '%s\\n' "$@" | /usr/bin/grep -q 'build-for-testing'; then
 fi
 """,
             )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_runner}" "$@"
+""",
+            )
             write_executable(fake_log, "#!/bin/bash\nset -euo pipefail\n")
             write_executable(
                 fake_bin / "rtk",
@@ -165,10 +177,10 @@ exit 1
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 5)
         self.assertEqual(calls[0], ["build-for-testing"])
-        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[2])
         self.assertIn("-enumerate-tests", calls[2])
-        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[4])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
@@ -209,10 +221,10 @@ exit 1
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 5)
-        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[2])
         self.assertIn("-enumerate-tests", calls[2])
-        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[4])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
@@ -232,14 +244,14 @@ exit 1
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 5)
-        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[1], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[2])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests",
             calls[2],
         )
         self.assertIn("-enumerate-tests", calls[2])
-        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST=0"])
+        self.assertEqual(calls[3], ["HARNESS_MONITOR_USE_TUIST_TEST="])
         self.assertIn("test-without-building", calls[4])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests/"
