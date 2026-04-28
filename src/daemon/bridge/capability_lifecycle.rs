@@ -13,7 +13,8 @@ use super::helpers::{launch_agent_plist_path, render_launch_agent_plist, stringi
 use super::runtime::{spawn_codex_monitor, spawn_codex_process};
 use super::server::BridgeServer;
 use super::types::{
-    BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability, PersistedBridgeConfig,
+    BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
+    BridgeCapability, PersistedBridgeConfig,
 };
 
 impl BridgeServer {
@@ -82,11 +83,16 @@ impl BridgeServer {
         match capability {
             BridgeCapability::Codex => self.enable_codex(config),
             BridgeCapability::AgentTui => self.enable_agent_tui(),
+            BridgeCapability::Acp => self.enable_acp(),
         }
     }
 
     pub(super) fn enable_agent_tui(&self) -> Result<(), CliError> {
         self.update_agent_tui_metadata()
+    }
+
+    pub(super) fn enable_acp(&self) -> Result<(), CliError> {
+        self.update_acp_metadata()
     }
 
     pub(super) fn enable_codex(
@@ -111,6 +117,7 @@ impl BridgeServer {
         match capability {
             BridgeCapability::Codex => Ok(()),
             BridgeCapability::AgentTui => self.ensure_agent_tui_can_disable(force),
+            BridgeCapability::Acp => self.ensure_acp_can_disable(force),
         }
     }
 
@@ -122,6 +129,7 @@ impl BridgeServer {
         match capability {
             BridgeCapability::Codex => self.disable_codex(),
             BridgeCapability::AgentTui => self.disable_agent_tui(force),
+            BridgeCapability::Acp => self.disable_acp(force),
         }
     }
 
@@ -156,6 +164,18 @@ impl BridgeServer {
         self.persist_state()
     }
 
+    pub(super) fn disable_acp(&self, force: bool) -> Result<(), CliError> {
+        self.ensure_acp_can_disable(force)?;
+        if force {
+            let inspect = self.inspect_acp(None)?;
+            for agent in inspect.agents {
+                let _ = self.stop_acp(&agent.acp_id)?;
+            }
+        }
+        self.capabilities()?.remove(BRIDGE_CAPABILITY_ACP);
+        self.persist_state()
+    }
+
     pub(super) fn ensure_agent_tui_can_disable(&self, force: bool) -> Result<(), CliError> {
         let active_sessions = self.active_tuis()?.len();
         if active_sessions > 0 && !force {
@@ -163,6 +183,17 @@ impl BridgeServer {
             "agent-tui capability has {active_sessions} active session(s); rerun with --force to stop them first"
         ))
         .into());
+        }
+        Ok(())
+    }
+
+    pub(super) fn ensure_acp_can_disable(&self, force: bool) -> Result<(), CliError> {
+        let active_sessions = self.acp_agent_manager.count_live_sessions();
+        if active_sessions > 0 && !force {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "acp capability has {active_sessions} active session(s); rerun with --force to stop them first"
+            ))
+            .into());
         }
         Ok(())
     }
@@ -178,6 +209,7 @@ impl BridgeServer {
         match capability {
             BridgeCapability::Codex => self.codex_requires_restart(),
             BridgeCapability::AgentTui => Ok(false),
+            BridgeCapability::Acp => Ok(false),
         }
     }
 
@@ -225,6 +257,10 @@ impl BridgeServer {
             let _ = process.child.wait();
             codex.take();
         }
+        let _ = self.with_acp_runtime(|| {
+            self.acp_agent_manager.shutdown_all();
+            Ok(())
+        });
     }
 
     pub(super) fn capabilities(

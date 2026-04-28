@@ -1,35 +1,23 @@
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use uuid::Uuid;
 
-use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
-use crate::agents::acp::connection::SpawnConfig;
-use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
-use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
+use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
-use crate::daemon::service;
 use crate::daemon::db::DaemonDb;
-use crate::daemon::index;
+use crate::daemon::service;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::session::types::AgentStatus;
-use crate::workspace::utc_now;
+use super::active::ActiveAcpSession;
+use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 
-use super::active::{
-    ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
-    spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
-};
-use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
-use super::pool_key::AcpProcessPoolKey;
-use super::protocol::spawn_protocol_task;
-
-const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
+pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -97,13 +85,15 @@ pub struct AcpAgentInspectResponse {
 
 #[derive(Clone)]
 pub struct AcpAgentManagerHandle {
-    state: Arc<AcpAgentManagerState>,
+    pub(in crate::daemon::agent_acp) state: Arc<AcpAgentManagerState>,
 }
 
-struct AcpAgentManagerState {
-    sender: broadcast::Sender<StreamEvent>,
-    db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
+pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
+    pub(in crate::daemon::agent_acp) sender: broadcast::Sender<StreamEvent>,
+    pub(in crate::daemon::agent_acp) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    pub(in crate::daemon::agent_acp) sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
+    pub(in crate::daemon::agent_acp) sandbox_event_poller_running: AtomicBool,
+    pub(in crate::daemon::agent_acp) sandbox_event_cursor: Mutex<Option<u64>>,
 }
 
 impl AcpAgentManagerHandle {
@@ -117,6 +107,8 @@ impl AcpAgentManagerHandle {
                 sender,
                 db,
                 sessions: Mutex::new(BTreeMap::new()),
+                sandbox_event_poller_running: AtomicBool::new(false),
+                sandbox_event_cursor: Mutex::new(None),
             }),
         }
     }
@@ -145,122 +137,9 @@ impl AcpAgentManagerHandle {
             )))
         })?;
         if service::sandboxed_from_env() {
-            return Err(
-                CliErrorKind::sandbox_feature_disabled("acp.local-spawn").into(),
-            );
+            return self.start_via_bridge(session_id, request);
         }
         self.start_descriptor(session_id, request, descriptor)
-    }
-
-    pub(crate) fn start_descriptor(
-        &self,
-        session_id: &str,
-        request: &AcpAgentStartRequest,
-        descriptor: &AcpAgentDescriptor,
-    ) -> Result<AcpAgentSnapshot, CliError> {
-        let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
-        let acp_id = format!("agent-acp-{}", Uuid::new_v4());
-        let spawn = SpawnConfig {
-            command: descriptor.launch_command.clone(),
-            args: descriptor.launch_args.clone(),
-            env_passthrough: descriptor.env_passthrough.clone(),
-            working_dir: project_dir.clone(),
-        };
-        let process_key = AcpProcessPoolKey::from_spawn_inputs(descriptor, request, &spawn, &project_dir);
-        let mut child = spawn.spawn().map_err(|error| {
-            CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
-        })?;
-
-        let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
-        let supervisor = Arc::new(AcpSessionSupervisor::new(
-            &child,
-            SupervisionConfig::default().with_prompt_timeout(descriptor.prompt_timeout_seconds),
-        ));
-        let permissions =
-            PermissionBridgeHandle::spawn(acp_id.clone(), session_id.to_string(), self.sender());
-        let permission_log_path = request
-            .record_permissions
-            .then(|| recording_log_path_for_session(session_id));
-        let permission_mode = permission_log_path.clone().map_or_else(
-            || permissions.mode(PERMISSION_RESPONSE_DEADLINE),
-            |log_path| PermissionMode::Recording { log_path },
-        );
-        let protocol = spawn_protocol_task(
-            &mut child,
-            request,
-            session_id.to_string(),
-            descriptor.display_name.clone(),
-            project_dir.clone(),
-            &supervisor,
-            permission_mode,
-        )
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "attach ACP protocol for '{}': {error}",
-                descriptor.id
-            ))
-        })?;
-        let event_task = spawn_event_forwarder(
-            self.sender(),
-            acp_id.clone(),
-            session_id.to_string(),
-            protocol.events,
-        );
-
-        let now = utc_now();
-        let snapshot = AcpAgentSnapshot {
-            acp_id: acp_id.clone(),
-            session_id: session_id.to_string(),
-            agent_id: descriptor.id.clone(),
-            display_name: descriptor.display_name.clone(),
-            status: AgentStatus::Active,
-            pid: supervisor.pid(),
-            pgid: supervisor.pgid(),
-            project_dir: project_dir.display().to_string(),
-            process_key: process_key.as_str().to_string(),
-            pending_permissions: 0,
-            permission_queue_depth: 0,
-            pending_permission_batches: Vec::new(),
-            permission_mode: if request.record_permissions {
-                "recording".to_string()
-            } else {
-                "daemon_bridge".to_string()
-            },
-            permission_log_path: permission_log_path.map(|path| path.display().to_string()),
-            terminal_count: 0,
-            created_at: now.clone(),
-            updated_at: now,
-        };
-        let active = Arc::new(ActiveAcpSession::new(
-            snapshot.clone(),
-            child,
-            Arc::clone(&supervisor),
-            permissions,
-            protocol.cancel,
-            stderr_tail,
-            ActiveAcpTasks {
-                protocol: protocol.protocol,
-                batcher: protocol.batcher,
-                event: event_task,
-            },
-        ));
-        active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
-            self.sender(),
-            Arc::downgrade(&active),
-            protocol.disconnects,
-        ));
-        active.set_watchdog_task(spawn_watchdog_forwarder(
-            self.sender(),
-            Arc::downgrade(&active),
-            supervisor,
-        ));
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .insert(acp_id, active);
-        self.broadcast("acp_agent_started", &snapshot);
-        Ok(snapshot)
     }
 
     /// Resolve a pending ACP permission batch and return the updated snapshot.
@@ -273,6 +152,9 @@ impl AcpAgentManagerHandle {
         batch_id: &str,
         decision: &AcpPermissionDecision,
     ) -> Result<AcpAgentSnapshot, CliError> {
+        if service::sandboxed_from_env() {
+            return self.resolve_permission_batch_via_bridge(acp_id, batch_id, decision);
+        }
         let session = self.session(acp_id)?;
         if !session.resolve_permission_batch(batch_id, decision) {
             return Err(CliErrorKind::session_not_active(format!(
@@ -290,6 +172,9 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when a live refresh fails.
     pub fn list(&self, session_id: &str) -> Result<Vec<AcpAgentSnapshot>, CliError> {
+        if service::sandboxed_from_env() {
+            return self.list_via_bridge(session_id);
+        }
         let sessions = self.sessions_for(session_id);
         let mut snapshots = Vec::with_capacity(sessions.len());
         for session in sessions {
@@ -310,6 +195,9 @@ impl AcpAgentManagerHandle {
     /// Panics if the ACP sessions mutex is poisoned.
     #[must_use]
     pub fn inspect(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
+        if service::sandboxed_from_env() {
+            return self.inspect_via_bridge(session_id);
+        }
         let sessions = self
             .state
             .sessions
@@ -339,6 +227,9 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn get(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
+        if service::sandboxed_from_env() {
+            return self.get_via_bridge(acp_id);
+        }
         let session = self.session(acp_id)?;
         session.refresh();
         Ok(session.snapshot_with_live_counts())
@@ -349,6 +240,9 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
+        if service::sandboxed_from_env() {
+            return self.stop_via_bridge(acp_id);
+        }
         let session = self.session(acp_id)?;
         let pending_permissions = session.disconnect(DisconnectReason::UserCancelled);
         session.kill_child(pending_permissions);
@@ -362,6 +256,10 @@ impl AcpAgentManagerHandle {
     /// # Panics
     /// Panics if the ACP sessions mutex is poisoned.
     pub fn shutdown_all(&self) {
+        if service::sandboxed_from_env() {
+            self.shutdown_all_via_bridge();
+            return;
+        }
         let sessions: Vec<_> = self
             .state
             .sessions
@@ -378,6 +276,9 @@ impl AcpAgentManagerHandle {
 
     #[must_use]
     pub fn pending_permission_count(&self, acp_id: &str) -> Option<usize> {
+        if service::sandboxed_from_env() {
+            return self.pending_permission_count_via_bridge(acp_id);
+        }
         let sessions = self.state.sessions.lock().ok()?;
         sessions
             .get(acp_id)
@@ -386,10 +287,30 @@ impl AcpAgentManagerHandle {
 
     #[must_use]
     pub fn pending_permission_batches(&self, acp_id: &str) -> Option<Vec<AcpPermissionBatch>> {
+        if service::sandboxed_from_env() {
+            return self.pending_permission_batches_via_bridge(acp_id);
+        }
         let sessions = self.state.sessions.lock().ok()?;
         sessions
             .get(acp_id)
             .map(|session| session.pending_permission_batches())
+    }
+
+    #[must_use]
+    pub fn count_live_sessions(&self) -> usize {
+        if service::sandboxed_from_env() {
+            return self.live_session_count_via_bridge();
+        }
+        self.state
+            .sessions
+            .lock()
+            .expect("ACP sessions lock")
+            .values()
+            .filter(|session| {
+                session.refresh();
+                !session.snapshot_with_live_counts().status.is_disconnected()
+            })
+            .count()
     }
 
     fn session(&self, acp_id: &str) -> Result<Arc<ActiveAcpSession>, CliError> {
@@ -415,81 +336,6 @@ impl AcpAgentManagerHandle {
             .collect()
     }
 
-    fn sender(&self) -> broadcast::Sender<StreamEvent> {
-        self.state.sender.clone()
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
-    fn broadcast(&self, event: &str, payload: &impl Serialize) {
-        let Some(stream_event) = stream_event(event, payload) else {
-            tracing::warn!(event, "failed to serialize ACP manager event");
-            return;
-        };
-        let _ = self.state.sender.send(stream_event);
-    }
-
-    fn resolve_project_dir(
-        &self,
-        session_id: &str,
-        requested: Option<&str>,
-    ) -> Result<PathBuf, CliError> {
-        if let Some(path) = requested.filter(|value| !value.trim().is_empty()) {
-            return Ok(PathBuf::from(path));
-        }
-        if let Some(path) = self.project_dir_from_db(session_id)? {
-            return Ok(PathBuf::from(path));
-        }
-        let resolved = index::resolve_session(session_id)?;
-        Ok(preferred_project_dir(
-            &resolved.state.worktree_path,
-            resolved.project.project_dir.as_deref(),
-            resolved.project.repository_root.as_deref(),
-            &resolved.project.context_root,
-        ))
-    }
-
-    fn project_dir_from_db(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        let Some(db) = self.state.db.get() else {
-            return Ok(None);
-        };
-        let db = db.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
-        })?;
-        db.project_dir_for_session(session_id)
-    }
-}
-
-fn stream_event(event: &str, payload: &impl Serialize) -> Option<StreamEvent> {
-    let payload = serde_json::to_value(payload).ok()?;
-    let session_id = payload
-        .get("session_id")
-        .and_then(serde_json::Value::as_str)
-        .map(ToOwned::to_owned);
-    Some(StreamEvent {
-        event: event.to_string(),
-        recorded_at: utc_now(),
-        session_id,
-        payload,
-    })
-}
-
-fn preferred_project_dir(
-    worktree_path: &Path,
-    project_dir: Option<&Path>,
-    repository_root: Option<&Path>,
-    context_root: &Path,
-) -> PathBuf {
-    if worktree_path.as_os_str().is_empty() {
-        project_dir
-            .or(repository_root)
-            .unwrap_or(context_root)
-            .to_path_buf()
-    } else {
-        worktree_path.to_path_buf()
-    }
 }
 
 #[cfg(test)]
