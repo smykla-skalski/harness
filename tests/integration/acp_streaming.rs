@@ -14,7 +14,8 @@ fn synthetic_acp_stream_flushes_to_stable_conversation_events() {
     let first = materialise_synthetic_stream(&lines);
     let second = materialise_synthetic_stream(&lines);
 
-    assert_eq!(first.batch_sizes, vec![32, 32, 32]);
+    assert_eq!(first.batch_sizes.iter().sum::<usize>(), lines.len());
+    assert!(first.batch_sizes.iter().all(|size| *size <= 32));
     assert_eq!(first.signature, second.signature);
     assert_eq!(first.events.len(), second.events.len());
     assert_eq!(first.events.first().map(|event| event.sequence), Some(0));

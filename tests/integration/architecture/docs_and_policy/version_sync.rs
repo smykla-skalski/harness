@@ -305,12 +305,14 @@ fn version_script_syncs_generated_monitor_pbxproj_when_present() {
             .join("apps/harness-monitor-macos/HarnessMonitor.xcodeproj/project.pbxproj"),
     )
     .expect("patched generated pbxproj");
+    let expected_marketing = format!("MARKETING_VERSION = {};", env!("CARGO_PKG_VERSION"));
+    let expected_current = format!("CURRENT_PROJECT_VERSION = {};", env!("CARGO_PKG_VERSION"));
     assert!(
-        patched.contains("MARKETING_VERSION = 30.15.0;"),
+        patched.contains(&expected_marketing),
         "version.sh sync should update generated MARKETING_VERSION entries"
     );
     assert!(
-        patched.contains("CURRENT_PROJECT_VERSION = 30.15.0;"),
+        patched.contains(&expected_current),
         "version.sh sync should update generated CURRENT_PROJECT_VERSION entries"
     );
 }
