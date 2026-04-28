@@ -2,9 +2,10 @@ use std::process::ExitCode;
 
 use harness::app::cli;
 use harness::errors;
+use harness::telemetry::init_tracing_subscriber;
 
 fn main() -> ExitCode {
-    let telemetry_guard = match harness::telemetry::init_tracing_subscriber() {
+    let telemetry_guard = match init_tracing_subscriber() {
         Ok(guard) => guard,
         Err(error) => {
             eprintln!("{}", errors::render_error(&error));

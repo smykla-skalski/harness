@@ -14,8 +14,8 @@ pub(super) use mutations::{
     post_task_queue_policy, post_task_update,
 };
 pub(super) use review::{
-    post_task_arbitrate, post_task_claim_review, post_task_respond_review, post_task_submit_review,
-    post_task_submit_for_review,
+    post_task_arbitrate, post_task_claim_review, post_task_respond_review,
+    post_task_submit_for_review, post_task_submit_review,
 };
 
 pub(super) fn task_routes() -> Router<DaemonHttpState> {
