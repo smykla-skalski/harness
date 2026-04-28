@@ -17,6 +17,7 @@ use crate::session::service::{
 };
 use crate::session::storage as session_storage;
 use crate::session::types::{SessionState, TaskStatus};
+use crate::workspace::layout::SessionLayout;
 use crate::workspace::utc_now;
 
 use super::review_submit_txn::{apply_submit_review_in_txn, prepare_submit_review};
@@ -197,14 +198,24 @@ pub(crate) async fn submit_review_async(
 ) -> Result<SessionDetail, CliError> {
     let resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
-    // Append to reviews.jsonl + reload OUTSIDE the SQLite immediate txn so
-    // the writer lock is not held across disk I/O. Crash-recovery is via
-    // `rebuild_task_reviews` on daemon start.
-    let prepared = validate_and_prepare_review(&resolved, session_id, task_id, request, &now)?;
-    let (prev_status, new_status) = async_db
+    let layout = review_layout(&resolved, session_id)?;
+    let (prev_status, new_status, prepared) = async_db
         .update_session_state_immediate(session_id, |state| {
             state.state_version += 1;
-            apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)
+            validate_submit_review(state, task_id, &request.actor)?;
+            let prepared = prepare_submit_review(
+                state,
+                task_id,
+                &request.actor,
+                request.verdict,
+                &request.summary,
+                &request.points,
+                &layout,
+                &now,
+            )?;
+            let (prev_status, new_status) =
+                apply_submit_review_in_txn(state, task_id, &request.actor, &prepared, &now)?;
+            Ok((prev_status, new_status, prepared))
         })
         .await?;
     finalize_submit_review_async(
@@ -245,30 +256,16 @@ async fn finalize_submit_review_async(
     bump_async(async_db, session_id).await
 }
 
-fn validate_and_prepare_review(
+fn review_layout(
     resolved: &daemon_index::ResolvedSession,
     session_id: &str,
-    task_id: &str,
-    request: &TaskSubmitReviewRequest,
-    now: &str,
-) -> Result<super::review_submit_txn::PreparedSubmitReview, CliError> {
+) -> Result<SessionLayout, CliError> {
     let project_dir = resolved
         .project
         .project_dir
         .clone()
         .ok_or_else(|| session_not_found(session_id))?;
-    let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
-    validate_submit_review(&resolved.state, task_id, &request.actor)?;
-    prepare_submit_review(
-        &resolved.state,
-        task_id,
-        &request.actor,
-        request.verdict,
-        &request.summary,
-        &request.points,
-        &layout,
-        now,
-    )
+    session_storage::layout_from_project_dir(&project_dir, session_id)
 }
 
 async fn append_task_status_change_log(
