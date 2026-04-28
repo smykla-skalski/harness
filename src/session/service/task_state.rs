@@ -61,7 +61,7 @@ pub(crate) fn apply_create_task(
 /// `apply_drop_task_on_agent` with `TaskQueuePolicy::Locked`. A task-start
 /// signal is produced when the worker is free; otherwise the task is queued
 /// against the worker. The agent's `current_task_id` is set eagerly by
-/// `start_task_for_agent` so a subsequent drop_task on a different task is
+/// `start_task_for_agent` so a subsequent `drop_task` on a different task is
 /// queued correctly. Sharing the drop code path keeps signal delivery
 /// consistent across the assign and drag-drop UI gestures.
 pub(crate) fn apply_assign_task(
