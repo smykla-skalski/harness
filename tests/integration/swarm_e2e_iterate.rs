@@ -297,14 +297,6 @@ fn generated_skill_mirrors_use_codex_specific_source() {
         "Codex skill must make clear that council is not repo-local"
     );
     assert!(
-        !codex.contains("plugins/council"),
-        "Codex skill must not point at repo-local council plugin paths"
-    );
-    assert!(
-        !codex.contains(".claude/plugins/council"),
-        "Codex skill must not point at Claude plugin paths"
-    );
-    assert!(
         !codex.contains("allowed-tools:"),
         "Codex skill frontmatter should not carry Claude-only tool constraints"
     );

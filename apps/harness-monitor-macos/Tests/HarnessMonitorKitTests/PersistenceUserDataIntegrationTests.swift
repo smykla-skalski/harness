@@ -105,7 +105,7 @@ struct PersistenceUserDataIntegrationTests {
     let ended = await store.endSelectedSession()
     #expect(ended)
 
-    try await Task.sleep(for: .milliseconds(50))
+    await store.flushPendingCacheWrite()
     let cached = await store.loadCachedSessionList()
     let summary = cached?.sessions.first { $0.sessionId == sessionID }
     #expect(summary?.status == .ended)

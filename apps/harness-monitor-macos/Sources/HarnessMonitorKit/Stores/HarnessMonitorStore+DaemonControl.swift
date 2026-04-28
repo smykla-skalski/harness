@@ -230,6 +230,7 @@ extension HarnessMonitorStore {
 
     do {
       _ = try await daemonController.stopDaemon()
+      await flushPendingCacheWrite()
       stopAllStreams()
       stopManifestWatcher()
       client = nil

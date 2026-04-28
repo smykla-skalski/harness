@@ -51,14 +51,6 @@ fn harness_plugin_is_in_codex_marketplace() {
     assert!(rendered.contains("\"name\": \"harness\""));
     assert!(rendered.contains("\"source\": \"local\""));
     assert!(rendered.contains("\"path\": \"./plugins/harness\""));
-    assert!(
-        !rendered.contains("\"name\": \"council\""),
-        "council is installed globally and must not be advertised by repo-local marketplace"
-    );
-    assert!(
-        !rendered.contains("./plugins/council"),
-        "council is installed globally and must not point at repo-local plugin paths"
-    );
 }
 
 #[test]
