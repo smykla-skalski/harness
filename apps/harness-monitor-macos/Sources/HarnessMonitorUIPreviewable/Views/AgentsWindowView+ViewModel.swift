@@ -386,6 +386,10 @@ extension AgentsWindowView {
       }
       return rawRows
     }
+    @MainActor
+    static func contentWidth(for terminalSize: AgentTuiSize, fontScale: CGFloat) -> CGFloat {
+      CGFloat(terminalSize.cols) * measuredCellSize(for: fontScale).width
+    }
     static func stabilizedAutomaticSize(
       measured: AgentTuiSize,
       baseline: AgentTuiSize
