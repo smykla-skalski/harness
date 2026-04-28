@@ -32,6 +32,7 @@
 //!   response carries `RequestPermissionOutcome::Cancelled`. Agent stops
 //!   the turn.
 
+mod permission_gate;
 mod terminal;
 
 use std::collections::BTreeSet;
@@ -55,9 +56,10 @@ use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
 use super::permission::{
-    PermissionMode, record_terminal_decision, record_write_decision, recording_permission_gateway,
-    stdin_permission_gateway,
+    PermissionMode, is_allow_outcome, record_terminal_decision, record_write_decision,
+    recording_permission_gateway, stdin_permission_gateway,
 };
+use permission_gate::{terminal_permission_request, write_permission_request};
 use terminal::TerminalManager;
 
 /// JSON-RPC error code: write denied by policy.
@@ -289,6 +291,15 @@ impl HarnessAcpClient {
             return result;
         }
 
+        self.require_permission(&write_permission_request(request))
+            .map_err(|error| {
+                if error.is_permission_gateway_error() {
+                    error
+                } else {
+                    ClientError::write_denied(error.message)
+                }
+            })?;
+
         let result = (|| {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|e| {
@@ -328,6 +339,23 @@ impl HarnessAcpClient {
         &self,
         request: &CreateTerminalRequest,
     ) -> ClientResult<CreateTerminalResponse> {
+        let validation = self
+            .terminals
+            .validate_create_request(request, &self.denied_binaries);
+        if let Err(error) = validation {
+            if let PermissionMode::Recording { log_path } = &self.permission_mode {
+                record_terminal_decision(log_path, request, Err(&error));
+            }
+            return Err(error);
+        }
+        self.require_permission(&terminal_permission_request(request))
+            .map_err(|error| {
+                if error.is_permission_gateway_error() {
+                    error
+                } else {
+                    ClientError::terminal_denied(error.message)
+                }
+            })?;
         let result = self.terminals.handle_create(request, &self.denied_binaries);
         if let PermissionMode::Recording { log_path } = &self.permission_mode {
             record_terminal_decision(log_path, request, result.as_ref().map(|_| ()));
@@ -408,6 +436,7 @@ impl HarnessAcpClient {
                 let (response_tx, response_rx) = sync_channel(1);
                 tx.try_send(super::permission::PermissionBridgeRequest {
                     request: request.clone(),
+                    deadline: *deadline,
                     response_tx,
                 })
                 .map_err(|error| match error {
@@ -433,6 +462,35 @@ impl HarnessAcpClient {
                 }
             }
         }
+    }
+
+    pub(super) fn require_permission(
+        &self,
+        request: &RequestPermissionRequest,
+    ) -> ClientResult<()> {
+        if matches!(self.permission_mode, PermissionMode::Recording { .. }) {
+            return Ok(());
+        }
+
+        let options = request.options.clone();
+        let response = self.handle_request_permission(request)?;
+        if is_allow_outcome(&response.outcome, &options) {
+            Ok(())
+        } else {
+            Err(ClientError::new(
+                WRITE_DENIED,
+                "permission denied by user or cancelled",
+            ))
+        }
+    }
+}
+
+impl ClientError {
+    pub(super) fn is_permission_gateway_error(&self) -> bool {
+        matches!(
+            self.code,
+            PERMISSION_TIMEOUT | DAEMON_SHUTDOWN | PERMISSION_CAP_REACHED
+        )
     }
 }
 

@@ -16,7 +16,7 @@ use tokio::sync::{Notify, broadcast::Sender as BroadcastSender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use crate::agents::acp::client::{DAEMON_SHUTDOWN, PERMISSION_CAP_REACHED};
+use crate::agents::acp::client::{DAEMON_SHUTDOWN, PERMISSION_CAP_REACHED, PERMISSION_TIMEOUT};
 use crate::agents::acp::permission::{
     PermissionBridgeError, PermissionBridgeRequest, PermissionBridgeResult, PermissionMode,
 };
@@ -345,22 +345,26 @@ fn enqueue_or_reject_batch(
     if accepted.is_empty() {
         return;
     }
-    let batch = enqueue_batch_locked(state, &mut pending, accepted);
+    let (batch, deadline) = enqueue_batch_locked(state, &mut pending, accepted);
     drop(pending);
+    let batch_id = batch.batch_id.clone();
     state.broadcast("acp_permission_requested", &batch);
+    spawn_batch_expiration(Arc::clone(state), batch_id, deadline);
 }
 
 fn enqueue_batch_locked(
     state: &PermissionBridgeState,
     pending: &mut BTreeMap<String, PendingBatch>,
     requests: Vec<PermissionBridgeRequest>,
-) -> AcpPermissionBatch {
+) -> (AcpPermissionBatch, Duration) {
     let (batch_id, sequence) = state.next_batch_id();
     let created_at = utc_now();
     let mut items = Vec::with_capacity(requests.len());
     let mut responders = Vec::with_capacity(requests.len());
+    let mut deadline = Duration::MAX;
 
     for (index, request) in requests.into_iter().enumerate() {
+        deadline = deadline.min(request.deadline);
         let request_id = format!("{batch_id}:{index}");
         let tool_call = serde_json::to_value(&request.request.tool_call).unwrap_or(Value::Null);
         items.push(AcpPermissionItem {
@@ -391,7 +395,30 @@ fn enqueue_batch_locked(
             responders,
         },
     );
-    batch
+    (batch, deadline)
+}
+
+fn spawn_batch_expiration(state: Arc<PermissionBridgeState>, batch_id: String, deadline: Duration) {
+    tokio::spawn(async move {
+        sleep(deadline).await;
+        expire_batch(&state, &batch_id);
+    });
+}
+
+fn expire_batch(state: &PermissionBridgeState, batch_id: &str) {
+    let pending = state
+        .pending
+        .lock()
+        .expect("permission bridge pending lock")
+        .remove(batch_id);
+    let Some(pending) = pending else {
+        return;
+    };
+    let error = permission_timeout_error();
+    for responder in pending.responders {
+        let _ = responder.response_tx.send(Err(error.clone()));
+    }
+    state.broadcast("acp_permission_timeout", &pending.batch);
 }
 
 fn reject_request(response_tx: &SyncSender<PermissionBridgeResult>, error: PermissionBridgeError) {
@@ -419,6 +446,10 @@ fn permission_cap_error(cap: usize) -> PermissionBridgeError {
         PERMISSION_CAP_REACHED,
         format!("permission concurrency cap reached ({cap})"),
     )
+}
+
+fn permission_timeout_error() -> PermissionBridgeError {
+    PermissionBridgeError::new(PERMISSION_TIMEOUT, "permission response timed out")
 }
 
 fn response_for_options(options: &[PermissionOption], allow: bool) -> RequestPermissionResponse {

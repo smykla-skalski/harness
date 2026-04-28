@@ -21,6 +21,7 @@ fn permission_request(
     (
         PermissionBridgeRequest {
             request,
+            deadline: Duration::from_secs(30),
             response_tx: tx,
         },
         rx,
@@ -127,4 +128,34 @@ async fn shutdown_errors_pending_requests() {
         .expect("shutdown response")
         .expect_err("shutdown error");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
+}
+
+#[tokio::test]
+async fn timeout_removes_pending_batch_and_broadcasts_removal() {
+    let (sender, mut receiver) = broadcast::channel(8);
+    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let (mut request, rx) = permission_request("tool-a");
+    request.deadline = Duration::from_millis(10);
+
+    bridge.tx.send(request).await.expect("send request");
+    tokio::time::sleep(Duration::from_millis(30)).await;
+
+    let received = tokio::time::timeout(
+        Duration::from_millis(100),
+        tokio::task::spawn_blocking(move || rx.recv()),
+    )
+    .await
+    .expect("timeout response should arrive")
+    .expect("timeout response wait should not panic");
+    let error = received
+        .expect("timeout response")
+        .expect_err("permission timeout");
+    assert_eq!(error.code, PERMISSION_TIMEOUT);
+    assert_eq!(bridge.pending_permission_count(), 0);
+    let saw_timeout = (0..4).any(|_| {
+        receiver
+            .try_recv()
+            .is_ok_and(|event| event.event == "acp_permission_timeout")
+    });
+    assert!(saw_timeout, "timeout should broadcast removal event");
 }
