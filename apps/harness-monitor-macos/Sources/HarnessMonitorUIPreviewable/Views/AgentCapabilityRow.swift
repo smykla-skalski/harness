@@ -9,16 +9,32 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let installHint: String?
 
   var isEnabled: Bool {
-    probe?.binaryPresent ?? true
+    transportChoices.contains(where: isEnabled)
   }
 
   var statusText: String {
-    guard let probe else { return "Ready" }
-    return probe.binaryPresent ? "Ready" : "Install required"
+    isEnabled ? "Ready" : "Install required"
   }
 
   var accessibilityLabel: String {
     "\(title), \(statusText.lowercased())"
+  }
+
+  func normalizedSelection(for selection: AgentLaunchSelection) -> AgentLaunchSelection {
+    transportChoice(for: selection).id
+  }
+
+  func transportChoice(for selection: AgentLaunchSelection) -> AgentCapabilityTransportChoice {
+    transportChoices.first { $0.id == selection } ?? transportChoices[0]
+  }
+
+  func isEnabled(_ choice: AgentCapabilityTransportChoice) -> Bool {
+    switch choice.id {
+    case .tui:
+      true
+    case .acp:
+      probe?.binaryPresent ?? true
+    }
   }
 }
 
@@ -41,8 +57,27 @@ struct AgentCapabilityRow: View {
   let option: AgentCapabilityOption
   @Binding var selection: AgentLaunchSelection
 
+  private var normalizedSelection: AgentLaunchSelection {
+    option.normalizedSelection(for: selection)
+  }
+
   private var selectedChoice: AgentCapabilityTransportChoice {
-    option.transportChoices.first { $0.id == selection } ?? option.transportChoices[0]
+    option.transportChoice(for: selection)
+  }
+
+  private var selectedChoiceIsEnabled: Bool {
+    option.isEnabled(selectedChoice)
+  }
+
+  private var selectedChoiceIconName: String {
+    normalizedSelection == selectedChoice.id ? "checkmark.circle.fill" : "circle"
+  }
+
+  private var pickerSelection: Binding<AgentLaunchSelection> {
+    Binding(
+      get: { normalizedSelection },
+      set: { selection = $0 }
+    )
   }
 
   var body: some View {
@@ -54,7 +89,7 @@ struct AgentCapabilityRow: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
-        if !option.isEnabled, let installHint = option.installHint {
+        if !selectedChoiceIsEnabled, let installHint = option.installHint {
           Text(installHint)
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.caution)
@@ -63,9 +98,11 @@ struct AgentCapabilityRow: View {
       }
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       if option.transportChoices.count > 1 {
-        Picker("Capability", selection: $selection) {
+        Picker("Capability", selection: pickerSelection) {
           ForEach(option.transportChoices) { choice in
-            Text(choice.title).tag(choice.id)
+            Text(choice.title)
+              .tag(choice.id)
+              .disabled(!option.isEnabled(choice))
           }
         }
         .pickerStyle(.menu)
@@ -77,10 +114,10 @@ struct AgentCapabilityRow: View {
         Button {
           selection = selectedChoice.id
         } label: {
-          Image(systemName: selection == selectedChoice.id ? "checkmark.circle.fill" : "circle")
+          Image(systemName: selectedChoiceIconName)
         }
         .harnessActionButtonStyle(variant: .bordered, tint: nil)
-        .disabled(!option.isEnabled)
+        .disabled(!selectedChoiceIsEnabled)
         .accessibilityLabel(option.title)
         .accessibilityValue(option.statusText)
       }
