@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use crate::hooks::adapters::HookAgent;
 use super::AgentAssetTarget;
 use super::model::repo_root;
 use super::planning::{plan_outputs, plan_outputs_with_gemini_commands_legacy};
+use crate::hooks::adapters::HookAgent;
 
 fn write(path: &Path, content: &str) {
     if let Some(parent) = path.parent() {
@@ -29,7 +29,9 @@ fn copilot_generation_includes_repo_hook_config() {
     assert!(hook_output.contains("\"version\": 1"));
     assert!(hook_output.contains("\"userPromptSubmitted\""));
     assert!(
-        hook_output.contains("\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\"")
+        hook_output.contains(
+            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""
+        )
     );
 }
 
