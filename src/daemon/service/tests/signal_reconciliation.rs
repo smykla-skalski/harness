@@ -99,7 +99,11 @@ fn task_start_ack_db_direct_starts_work_only_after_delivery() {
             .iter()
             .find(|agent| agent.agent_id == worker_id)
             .expect("worker");
-        assert!(worker.current_task_id.is_none());
+        assert_eq!(
+            worker.current_task_id.as_deref(),
+            Some(task_id.as_str()),
+            "current_task_id is locked on this task while the start signal is in flight"
+        );
         assert!(
             !db.load_session_log(&state.session_id)
                 .expect("session log")

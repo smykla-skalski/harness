@@ -6,7 +6,7 @@ use super::{
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
     generate_signal_id, next_task_id, protocol, rank_workers_for_task, refresh_session,
-    require_active, require_active_worker_target_agent, require_permission,
+    require_active, require_permission,
     require_task_creation_state, start_next_locked_task_for_worker, start_task_for_agent,
     task_not_found, task_status_label, touch_agent,
 };
@@ -56,52 +56,29 @@ pub(crate) fn apply_create_task(
 }
 
 /// Assign a task to an agent.
+///
+/// Assignment is the canonical Locked drop: the task transitions to the
+/// agent under a Locked queue policy, a task-start signal is produced when
+/// the worker is free, and the agent's `current_task_id` is set later by the
+/// signal ack rather than eagerly here. Sharing the drop code path keeps
+/// signal delivery consistent across the assign and drag-drop UI gestures.
 pub(crate) fn apply_assign_task(
     state: &mut SessionState,
     task_id: &str,
     agent_id: &str,
     actor_id: &str,
     now: &str,
-) -> Result<(), CliError> {
+) -> Result<Vec<TaskDropEffect>, CliError> {
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::AssignTask)?;
-    require_active_worker_target_agent(state, agent_id)?;
-
-    let task = state
-        .tasks
-        .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?;
-    reject_generic_mutation_on_review_state(task_id, task, "reassigned")?;
-    let previous_assignee = state
-        .tasks
-        .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?
-        .assigned_to
-        .clone();
-    if let Some(previous_assignee) = previous_assignee.as_deref() {
-        clear_agent_current_task(state, previous_assignee, task_id, now);
-    }
-
-    let task = state
-        .tasks
-        .get_mut(task_id)
-        .ok_or_else(|| task_not_found(task_id))?;
-    task.assigned_to = Some(agent_id.to_string());
-    task.status = TaskStatus::Open;
-    task.queue_policy = TaskQueuePolicy::Locked;
-    task.queued_at = None;
-    task.updated_at = now.to_string();
-    task.blocked_reason = None;
-    task.completed_at = None;
-
-    if let Some(agent) = state.agents.get_mut(agent_id) {
-        agent.current_task_id = Some(task_id.to_string());
-        agent.updated_at = now.to_string();
-    }
-
-    touch_agent(state, actor_id, now);
-    refresh_session(state, now);
-    Ok(())
+    apply_drop_task_on_agent(
+        state,
+        task_id,
+        agent_id,
+        TaskQueuePolicy::Locked,
+        actor_id,
+        now,
+    )
 }
 
 /// Drop a task onto an extensible session target. The first target action is

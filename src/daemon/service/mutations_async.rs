@@ -192,7 +192,7 @@ pub(crate) async fn assign_task_async(
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
-    async_db
+    let effects = async_db
         .update_session_state_immediate(session_id, |state| {
             session_service::apply_assign_task(
                 state,
@@ -203,16 +203,10 @@ pub(crate) async fn assign_task_async(
             )
         })
         .await?;
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_task_assigned(task_id, &request.agent_id),
-            Some(&request.actor),
-            None,
-        ))
+    let resolved = resolved_session_for_mutation(async_db, session_id).await?;
+    let log = Some(session_service::log_task_assigned(task_id, &request.agent_id));
+    persist_task_signal_effects(async_db, &resolved, session_id, &request.actor, &effects, log)
         .await?;
-    bump_session(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 

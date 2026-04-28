@@ -66,23 +66,31 @@ pub fn assign_task(
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-        session_service::apply_assign_task(
+        let now = utc_now();
+        let project_dir = project_dir_for_db_session(db, session_id)?;
+        let effects = session_service::apply_assign_task(
             &mut state,
             task_id,
             &request.agent_id,
             &request.actor,
-            &utc_now(),
+            &now,
         )?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
+        write_task_start_signals(&project_dir, &effects)?;
         db.append_log_entry(&build_log_entry(
             session_id,
             session_service::log_task_assigned(task_id, &request.agent_id),
             Some(&request.actor),
             None,
         ))?;
+        append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
+        db.merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, &effects),
+        )?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail_from_daemon_db(session_id, db);
