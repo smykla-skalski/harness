@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
@@ -78,6 +79,7 @@ pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,
     pub manifest: Option<DaemonManifest>,
     pub launch_agent: LaunchAgentStatus,
+    pub acp_runtime_probe: AcpRuntimeProbeResponse,
     pub workspace: DaemonDiagnostics,
     pub recent_events: Vec<DaemonAuditEvent>,
 }

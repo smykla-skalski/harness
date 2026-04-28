@@ -1,18 +1,43 @@
 //! Permission gateway modes for ACP `session/request_permission`.
 //!
 //! No trait, no abstraction: the gateway is a direct `match` at the call site.
-//! `DaemonBridge` arm is wired in Chunk 7; `Recording` arm in Chunk 10.
+//! `Recording` captures dogfood data without granting permissions.
 
+use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::SyncSender;
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
-    PermissionOption, PermissionOptionId, PermissionOptionKind, RequestPermissionOutcome,
-    RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
+    CreateTerminalRequest, PermissionOption, PermissionOptionId, PermissionOptionKind,
+    RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
+    SelectedPermissionOutcome, WriteTextFileRequest,
 };
+use serde::Serialize;
+use serde_json::json;
 use tokio::sync::mpsc::Sender;
+
+use crate::workspace::{harness_data_root, utc_now};
+
+use super::client::ClientError;
+
+/// File name used for ACP dogfood permission logs.
+pub const PERMISSION_LOG_FILE: &str = "permission-log.ndjson";
+
+/// Recording-mode operation name.
+pub const OPERATION_REQUEST_PERMISSION: &str = "session.request_permission";
+/// Recording-mode operation name.
+pub const OPERATION_WRITE_TEXT_FILE: &str = "fs.write_text_file";
+/// Recording-mode operation name.
+pub const OPERATION_CREATE_TERMINAL: &str = "terminal.create";
+
+/// Recording-mode decision value.
+pub const DECISION_ALLOWED: &str = "allowed";
+/// Recording-mode decision value.
+pub const DECISION_DENIED: &str = "denied";
+/// Recording-mode decision value.
+pub const DECISION_RECORDED_REJECT: &str = "recorded_reject";
 
 /// How `session/request_permission` requests are resolved.
 ///
@@ -37,6 +62,15 @@ pub enum PermissionMode {
     },
     /// Reads permission responses from stdin. For headless CLI.
     Stdin,
+}
+
+/// Resolve the recording-mode log path for an ACP session.
+#[must_use]
+pub fn recording_log_path_for_session(session_id: &str) -> PathBuf {
+    harness_data_root()
+        .join("runs")
+        .join(session_id)
+        .join(PERMISSION_LOG_FILE)
 }
 
 /// Request sent over the daemon bridge channel.
@@ -87,6 +121,156 @@ pub fn stdin_permission_gateway(
     let mut input = stdin.lock();
 
     stdin_permission_gateway_from(request, &mut input, &mut stdout)
+}
+
+/// Record and reject a permission request without blocking.
+///
+/// # Errors
+///
+/// Returns an I/O error if the structured log cannot be appended.
+pub fn recording_permission_gateway(
+    log_path: &Path,
+    request: &RequestPermissionRequest,
+) -> io::Result<RequestPermissionResponse> {
+    append_record(
+        log_path,
+        &PermissionLogRecord {
+            timestamp: utc_now(),
+            session_id: request.session_id.to_string(),
+            operation: OPERATION_REQUEST_PERMISSION,
+            decision: DECISION_RECORDED_REJECT,
+            reason: Some("recording mode never approves session/request_permission"),
+            would_ask: json!({
+                "toolCall": request.tool_call,
+                "options": request.options,
+            }),
+            runtime: json!({
+                "outcome": "reject_once",
+            }),
+        },
+    )?;
+    Ok(recording_reject_response(request))
+}
+
+/// Record a write decision.
+pub fn record_write_decision(
+    log_path: &Path,
+    request: &WriteTextFileRequest,
+    decision: Result<(), &ClientError>,
+) {
+    let (decision_label, reason) = match decision {
+        Ok(()) => (DECISION_ALLOWED, None),
+        Err(error) => (DECISION_DENIED, Some(error.message.as_str())),
+    };
+    append_record_or_warn(
+        log_path,
+        &PermissionLogRecord {
+            timestamp: utc_now(),
+            session_id: request.session_id.to_string(),
+            operation: OPERATION_WRITE_TEXT_FILE,
+            decision: decision_label,
+            reason,
+            would_ask: json!({
+                "path": request.path,
+                "contentBytes": request.content.len(),
+            }),
+            runtime: json!({
+                "policyDecision": decision_label,
+            }),
+        },
+    );
+}
+
+/// Record a terminal-create decision.
+pub fn record_terminal_decision(
+    log_path: &Path,
+    request: &CreateTerminalRequest,
+    decision: Result<(), &ClientError>,
+) {
+    let (decision_label, reason) = match decision {
+        Ok(()) => (DECISION_ALLOWED, None),
+        Err(error) => (DECISION_DENIED, Some(error.message.as_str())),
+    };
+    append_record_or_warn(
+        log_path,
+        &PermissionLogRecord {
+            timestamp: utc_now(),
+            session_id: request.session_id.to_string(),
+            operation: OPERATION_CREATE_TERMINAL,
+            decision: decision_label,
+            reason,
+            would_ask: json!({
+                "command": request.command,
+                "args": request.args,
+                "cwd": request.cwd,
+            }),
+            runtime: json!({
+                "policyDecision": decision_label,
+            }),
+        },
+    );
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PermissionLogRecord<'a> {
+    timestamp: String,
+    session_id: String,
+    operation: &'static str,
+    decision: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'a str>,
+    would_ask: serde_json::Value,
+    runtime: serde_json::Value,
+}
+
+fn append_record_or_warn(log_path: &Path, record: &PermissionLogRecord<'_>) {
+    append_record(log_path, record).unwrap_or_else(|error| warn_append_error(log_path, &error));
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_append_error(log_path: &Path, error: &io::Error) {
+    tracing::warn!(
+        path = %log_path.display(),
+        %error,
+        "failed to append ACP permission recording"
+    );
+}
+
+fn append_record(log_path: &Path, record: &PermissionLogRecord<'_>) -> io::Result<()> {
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)?;
+    serde_json::to_writer(&mut file, record).map_err(io::Error::other)?;
+    writeln!(file)?;
+    Ok(())
+}
+
+fn recording_reject_response(request: &RequestPermissionRequest) -> RequestPermissionResponse {
+    request
+        .options
+        .iter()
+        .find(|option| {
+            matches!(
+                option.kind,
+                PermissionOptionKind::RejectOnce | PermissionOptionKind::RejectAlways
+            )
+        })
+        .map_or_else(
+            || RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled),
+            |option| {
+                RequestPermissionResponse::new(RequestPermissionOutcome::Selected(
+                    SelectedPermissionOutcome::new(option.option_id.clone()),
+                ))
+            },
+        )
 }
 
 fn stdin_permission_gateway_from(

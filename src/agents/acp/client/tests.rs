@@ -9,9 +9,10 @@ use std::time::{Duration, Instant};
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, KillTerminalRequest, ReadTextFileRequest, ReleaseTerminalRequest,
-    RequestPermissionRequest, TerminalOutputRequest, ToolCallUpdate, ToolCallUpdateFields,
-    WaitForTerminalExitRequest, WriteTextFileRequest,
+    RequestPermissionOutcome, RequestPermissionRequest, TerminalOutputRequest, ToolCallUpdate,
+    ToolCallUpdateFields, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
+use serde_json::Value;
 use tempfile::TempDir;
 
 use super::{
@@ -35,6 +36,39 @@ fn setup_client() -> (TempDir, HarnessAcpClient) {
     let client = HarnessAcpClient::new(working_dir, run_dir, None, denied, PermissionMode::Stdin);
 
     (temp, client)
+}
+
+fn setup_recording_client() -> (TempDir, HarnessAcpClient, PathBuf) {
+    let temp = TempDir::new().expect("create temp dir");
+    let run_dir = temp.path().to_path_buf();
+    let working_dir = temp.path().to_path_buf();
+    let log_path = run_dir.join("permission-log.ndjson");
+
+    fs::create_dir_all(run_dir.join("artifacts")).expect("create artifacts");
+    fs::create_dir_all(run_dir.join("commands")).expect("create commands");
+
+    let mut denied = BTreeSet::new();
+    denied.insert("kubectl".to_string());
+
+    let client = HarnessAcpClient::new(
+        working_dir,
+        run_dir,
+        None,
+        denied,
+        PermissionMode::Recording {
+            log_path: log_path.clone(),
+        },
+    );
+
+    (temp, client, log_path)
+}
+
+fn read_log(path: &PathBuf) -> Vec<Value> {
+    fs::read_to_string(path)
+        .expect("permission log")
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("json line"))
+        .collect()
 }
 
 #[test]
@@ -76,6 +110,47 @@ fn write_denied_binary_rejected() {
 }
 
 #[test]
+fn recording_write_logs_policy_decision_and_still_writes_when_allowed() {
+    let (temp, client, log_path) = setup_recording_client();
+    let path = temp.path().join("artifacts/test.txt");
+    let request = WriteTextFileRequest::new("session-1", &path, "hello");
+
+    client
+        .handle_write_text_file(&request)
+        .expect("write allowed");
+
+    let records = read_log(&log_path);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["operation"], "fs.write_text_file");
+    assert_eq!(records[0]["decision"], "allowed");
+    assert_eq!(records[0]["wouldAsk"]["path"], path.display().to_string());
+    assert_eq!(fs::read_to_string(path).expect("written file"), "hello");
+}
+
+#[test]
+fn recording_write_logs_denial_aligned_with_policy() {
+    let (temp, client, log_path) = setup_recording_client();
+    let path = temp.path().join("artifacts/kubectl");
+    let request = WriteTextFileRequest::new("session-1", &path, "#!/bin/sh");
+
+    let error = client
+        .handle_write_text_file(&request)
+        .expect_err("denied binary");
+
+    assert_eq!(error.code, BINARY_DENIED);
+    let records = read_log(&log_path);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["operation"], "fs.write_text_file");
+    assert_eq!(records[0]["decision"], "denied");
+    assert!(
+        records[0]["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("kubectl")
+    );
+}
+
+#[test]
 fn read_within_working_dir_allowed() {
     let (temp, client) = setup_client();
     let path = temp.path().join("test.txt");
@@ -113,6 +188,23 @@ fn terminal_denied_binary_rejected() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert_eq!(err.code, TERMINAL_DENIED);
+}
+
+#[test]
+fn recording_terminal_logs_denial_without_changing_runtime_decision() {
+    let (_temp, client, log_path) = setup_recording_client();
+    let request = CreateTerminalRequest::new("session-1", "kubectl");
+
+    let error = client
+        .handle_create_terminal(&request)
+        .expect_err("terminal denied");
+
+    assert_eq!(error.code, TERMINAL_DENIED);
+    let records = read_log(&log_path);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["operation"], "terminal.create");
+    assert_eq!(records[0]["decision"], "denied");
+    assert_eq!(records[0]["wouldAsk"]["command"], "kubectl");
 }
 
 #[test]
@@ -338,6 +430,29 @@ fn closed_daemon_permission_bridge_returns_shutdown() {
         .expect_err("closed bridge should fail");
 
     assert_eq!(error.code, DAEMON_SHUTDOWN);
+}
+
+#[test]
+fn recording_permission_request_never_blocks_or_approves() {
+    let (_temp, client, log_path) = setup_recording_client();
+    let tool_call = ToolCallUpdate::new("tool-a", ToolCallUpdateFields::new());
+    let request =
+        RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
+
+    let response = client
+        .handle_request_permission(&request)
+        .expect("record permission");
+
+    assert!(matches!(
+        response.outcome,
+        RequestPermissionOutcome::Selected(ref selected)
+            if selected.option_id.0.as_ref() == "reject_once"
+    ));
+    let records = read_log(&log_path);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["operation"], "session.request_permission");
+    assert_eq!(records[0]["decision"], "recorded_reject");
+    assert_eq!(records[0]["wouldAsk"]["toolCall"]["toolCallId"], "tool-a");
 }
 
 #[test]

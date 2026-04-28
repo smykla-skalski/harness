@@ -35,6 +35,14 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
                 manifest.endpoint
             );
             assert_eq!(report.health.expect("health").session_count, 0);
+            assert!(
+                report
+                    .acp_runtime_probe
+                    .probes
+                    .iter()
+                    .any(|probe| probe.agent_id == "copilot"),
+                "diagnostics should include ACP runtime probe results"
+            );
             assert!(report.workspace.events_path.ends_with("events.jsonl"));
             assert!(
                 report
