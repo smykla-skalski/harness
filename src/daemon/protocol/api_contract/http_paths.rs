@@ -43,6 +43,7 @@ pub const SESSION_MANAGED_AGENTS: &str = "/v1/sessions/{session_id}/managed-agen
 pub const SESSION_MANAGED_AGENTS_TERMINAL: &str =
     "/v1/sessions/{session_id}/managed-agents/terminal";
 pub const SESSION_MANAGED_AGENTS_CODEX: &str = "/v1/sessions/{session_id}/managed-agents/codex";
+pub const SESSION_MANAGED_AGENTS_ACP: &str = "/v1/sessions/{session_id}/managed-agents/acp";
 pub const MANAGED_AGENT_DETAIL: &str = "/v1/managed-agents/{agent_id}";
 pub const MANAGED_AGENT_INPUT: &str = "/v1/managed-agents/{agent_id}/input";
 pub const MANAGED_AGENT_RESIZE: &str = "/v1/managed-agents/{agent_id}/resize";
@@ -52,6 +53,9 @@ pub const MANAGED_AGENT_ATTACH: &str = "/v1/managed-agents/{agent_id}/attach";
 pub const MANAGED_AGENT_STEER: &str = "/v1/managed-agents/{agent_id}/steer";
 pub const MANAGED_AGENT_INTERRUPT: &str = "/v1/managed-agents/{agent_id}/interrupt";
 pub const MANAGED_AGENT_APPROVAL: &str = "/v1/managed-agents/{agent_id}/approvals/{approval_id}";
+pub const MANAGED_AGENT_ACP_PERMISSION: &str =
+    "/v1/managed-agents/{agent_id}/permission-batches/{batch_id}";
+pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{agent_id}";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";
 pub const SESSION_SIGNAL_CANCEL: &str = "/v1/sessions/{session_id}/signal-cancel";
 pub const SESSION_SIGNAL_ACK: &str = "/v1/sessions/{session_id}/signal-ack";

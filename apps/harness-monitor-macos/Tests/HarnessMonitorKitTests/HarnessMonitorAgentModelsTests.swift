@@ -26,6 +26,65 @@ struct HarnessMonitorAgentModelsTests {
     #expect(status == .idle)
   }
 
+  @Test("AgentStatus decodes disconnected object")
+  func agentStatusDecodesDisconnectedObject() throws {
+    let data = Data(#"{"state":"disconnected","reason":{"kind":"daemon_shutdown"}}"#.utf8)
+    let status = try decoder.decode(AgentStatus.self, from: data)
+    #expect(status == .disconnected)
+  }
+
+  @Test("ManagedAgentSnapshot decodes ACP snapshot")
+  func managedAgentSnapshotDecodesAcp() throws {
+    let data = Data(
+      #"""
+      {
+        "kind": "acp",
+        "snapshot": {
+          "acp_id": "acp-1",
+          "session_id": "session-1",
+          "agent_id": "copilot",
+          "display_name": "Copilot",
+          "status": {
+            "state": "disconnected",
+            "reason": { "kind": "process_exited", "code": 1 },
+            "stderr_tail": "boom"
+          },
+          "pid": 42,
+          "pgid": 42,
+          "project_dir": "/tmp/project",
+          "pending_permissions": 1,
+          "permission_queue_depth": 1,
+          "pending_permission_batches": [
+            {
+              "batch_id": "batch-1",
+              "acp_id": "acp-1",
+              "session_id": "session-1",
+              "created_at": "2026-04-28T00:00:00Z",
+              "requests": [
+                {
+                  "request_id": "request-1",
+                  "session_id": "session-1",
+                  "tool_call": { "name": "write_file" },
+                  "options": []
+                }
+              ]
+            }
+          ],
+          "terminal_count": 0,
+          "created_at": "2026-04-28T00:00:00Z",
+          "updated_at": "2026-04-28T00:00:01Z"
+        }
+      }
+      """#.utf8
+    )
+    let snapshot = try decoder.decode(ManagedAgentSnapshot.self, from: data)
+    #expect(snapshot.agentId == "acp-1")
+    #expect(snapshot.acp?.status == .disconnected)
+    #expect(snapshot.acp?.disconnectReason?.kind == "process_exited")
+    #expect(snapshot.acp?.isRestartable == true)
+    #expect(snapshot.acp?.stderrTail == "boom")
+  }
+
   @Test("AgentStatus encodes idle snake case")
   func agentStatusEncodesIdle() throws {
     let data = try encoder.encode(AgentStatus.awaitingReview)

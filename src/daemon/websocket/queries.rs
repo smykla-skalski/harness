@@ -40,7 +40,7 @@ async fn dispatch_daemon_read_query(
     match request.method.as_str() {
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
         ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
-        ws_methods::DAEMON_STOP => Some(dispatch_query(&request.id, service::request_shutdown)),
+        ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
         ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
         ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
@@ -49,6 +49,11 @@ async fn dispatch_daemon_read_query(
         }
         _ => None,
     }
+}
+
+fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    state.acp_agent_manager.shutdown_all();
+    dispatch_query(request_id, service::request_shutdown)
 }
 
 async fn dispatch_session_read_query(
@@ -202,6 +207,13 @@ fn dispatch_session_managed_agents_query(
         }
     };
     agents.extend(codex_agents);
+    let acp_agents = match state.acp_agent_manager.list(&session_id) {
+        Ok(response) => response.into_iter().map(ManagedAgentSnapshot::Acp),
+        Err(error) => {
+            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
+        }
+    };
+    agents.extend(acp_agents);
     agents.sort_by_key(|agent| {
         (
             Reverse(agent.updated_at().to_string()),
@@ -220,12 +232,15 @@ fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpSt
     if let Ok(snapshot) = state.agent_tui_manager.get(&agent_id) {
         return dispatch_query_result(&request.id, Ok(ManagedAgentSnapshot::Terminal(snapshot)));
     }
+    if let Ok(snapshot) = state.codex_controller.run(&agent_id) {
+        return dispatch_query_result(&request.id, Ok(ManagedAgentSnapshot::Codex(snapshot)));
+    }
     dispatch_query_result(
         &request.id,
         state
-            .codex_controller
-            .run(&agent_id)
-            .map(ManagedAgentSnapshot::Codex),
+            .acp_agent_manager
+            .get(&agent_id)
+            .map(ManagedAgentSnapshot::Acp),
     )
 }
 

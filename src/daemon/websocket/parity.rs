@@ -1,10 +1,11 @@
 use serde_json::json;
 
+use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::db::ensure_shared_db;
 use crate::daemon::http::{
-    DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_codex_agent,
-    ensure_terminal_agent, record_adopt_in_db,
+    DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
+    ensure_codex_agent, ensure_terminal_agent, record_adopt_in_db,
 };
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRuntimeSessionRegistrationRequest,
@@ -31,9 +32,10 @@ mod voice;
 pub(crate) use self::managed_agents::{
     dispatch_managed_agent_input, dispatch_managed_agent_interrupt_codex,
     dispatch_managed_agent_ready, dispatch_managed_agent_resize,
-    dispatch_managed_agent_resolve_codex_approval, dispatch_managed_agent_start_codex,
+    dispatch_managed_agent_resolve_acp_permission, dispatch_managed_agent_resolve_codex_approval,
+    dispatch_managed_agent_start_acp, dispatch_managed_agent_start_codex,
     dispatch_managed_agent_start_terminal, dispatch_managed_agent_steer_codex,
-    dispatch_managed_agent_stop,
+    dispatch_managed_agent_stop, dispatch_managed_agent_stop_acp,
 };
 pub(crate) use self::voice::{
     dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,

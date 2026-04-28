@@ -1,8 +1,9 @@
 use super::{
-    CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, DaemonHttpState,
-    ManagedAgentSnapshot, WsRequest, WsResponse, bind_control_plane_actor_value,
-    dispatch_managed_agent_response, ensure_codex_agent, ensure_terminal_agent, error_response,
-    extract_session_id, extract_string_param,
+    AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,
+    CodexSteerRequest, DaemonHttpState, ManagedAgentSnapshot, WsRequest, WsResponse,
+    bind_control_plane_actor_value, dispatch_managed_agent_response, ensure_acp_agent,
+    ensure_codex_agent, ensure_terminal_agent, error_response, extract_session_id,
+    extract_string_param,
 };
 
 pub(crate) async fn dispatch_managed_agent_start_terminal(
@@ -52,6 +53,30 @@ pub(crate) async fn dispatch_managed_agent_start_codex(
         .codex_controller
         .start_run(&session_id, &body)
         .map(ManagedAgentSnapshot::Codex);
+    dispatch_managed_agent_response(request, state, result).await
+}
+
+pub(crate) async fn dispatch_managed_agent_start_acp(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+    let body: AcpAgentStartRequest = match serde_json::from_value(request.params.clone()) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("failed to parse request params: {error}"),
+            );
+        }
+    };
+    let result = state
+        .acp_agent_manager
+        .start(&session_id, &body)
+        .map(ManagedAgentSnapshot::Acp);
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -108,9 +133,16 @@ pub(crate) async fn dispatch_managed_agent_stop(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
-    let result = ensure_terminal_agent(state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.stop(&agent_id))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = if state.acp_agent_manager.get(&agent_id).is_ok() {
+        state
+            .acp_agent_manager
+            .stop(&agent_id)
+            .map(ManagedAgentSnapshot::Acp)
+    } else {
+        ensure_terminal_agent(state, &agent_id)
+            .and_then(|()| state.agent_tui_manager.stop(&agent_id))
+            .map(ManagedAgentSnapshot::Terminal)
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -190,5 +222,48 @@ pub(crate) async fn dispatch_managed_agent_resolve_codex_approval(
                 .resolve_approval(&agent_id, &approval_id, &body)
         })
         .map(ManagedAgentSnapshot::Codex);
+    dispatch_managed_agent_response(request, state, result).await
+}
+
+pub(crate) async fn dispatch_managed_agent_stop_acp(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
+    };
+    let result = ensure_acp_agent(state, &agent_id)
+        .and_then(|()| state.acp_agent_manager.stop(&agent_id))
+        .map(ManagedAgentSnapshot::Acp);
+    dispatch_managed_agent_response(request, state, result).await
+}
+
+pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
+    };
+    let Some(batch_id) = extract_string_param(&request.params, "batch_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing batch_id");
+    };
+    let decision: AcpPermissionDecision = match serde_json::from_value(request.params.clone()) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("failed to parse request params: {error}"),
+            );
+        }
+    };
+    let result = ensure_acp_agent(state, &agent_id)
+        .and_then(|()| {
+            state
+                .acp_agent_manager
+                .resolve_permission_batch(&agent_id, &batch_id, &decision)
+        })
+        .map(ManagedAgentSnapshot::Acp);
     dispatch_managed_agent_response(request, state, result).await
 }

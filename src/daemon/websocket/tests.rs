@@ -14,6 +14,7 @@ use super::test_support::{
     seed_sample_timeline, test_http_state_with_async_db_timeline, test_http_state_with_db,
 };
 use crate::agents::runtime::runtime_for_name;
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
@@ -73,6 +74,7 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
             async_db_slot.clone(),
             false,
         ),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender,
             db_slot,
@@ -119,6 +121,7 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
         async_db: AsyncDaemonDbSlot::from_inner(async_db_slot),
         db_path: Some(db_path.to_path_buf()),
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
     }
 }

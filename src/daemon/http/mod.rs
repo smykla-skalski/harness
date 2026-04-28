@@ -17,6 +17,7 @@ use tokio::task::block_in_place;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
@@ -43,7 +44,7 @@ mod tests;
 mod voice;
 
 pub(crate) use auth::require_auth;
-pub(crate) use managed_agents::{ensure_codex_agent, ensure_terminal_agent};
+pub(crate) use managed_agents::{ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent};
 pub(crate) use response::error_status_and_body;
 pub(crate) use sessions_adopt::{
     adopt_session, adoption_error_status_and_body, record_adopt_in_db,
@@ -150,6 +151,7 @@ pub struct DaemonHttpState {
     pub db_path: Option<PathBuf>,
     pub codex_controller: CodexControllerHandle,
     pub agent_tui_manager: AgentTuiManagerHandle,
+    pub acp_agent_manager: AcpAgentManagerHandle,
 }
 
 /// Serve the daemon's HTTP API.
