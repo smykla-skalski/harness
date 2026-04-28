@@ -211,6 +211,13 @@ public enum HarnessMonitorAccessibility {
   public static let agentsCodexContextField = "harness.window.agents.codex.context"
   public static let agentsCodexModePicker = "harness.window.agents.codex.mode"
   public static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
+  public static func agentCapabilityRow(_ identifier: String) -> String {
+    "harness.window.agents.capability.\(slug(identifier))"
+  }
+  public static let toolCallTimeline = "harness.window.agents.tool-call-timeline"
+  public static func toolCallTimelineRow(_ identifier: String) -> String {
+    "\(toolCallTimeline).row.\(slug(identifier))"
+  }
   public static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
   public static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
   public static let agentsCodexFinalMessage = "harness.window.agents.codex.final"

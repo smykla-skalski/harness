@@ -32,6 +32,13 @@ extension HarnessMonitorClientProtocol {
     .codex(try await startCodexRun(sessionID: sessionID, request: request))
   }
 
+  public func startManagedAcpAgent(
+    sessionID _: String,
+    request _: AcpAgentStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable.")
+  }
+
   public func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest
