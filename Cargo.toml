@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "testkit"]
+members = [".", "aff", "testkit"]
 
 [package]
 name = "harness"
