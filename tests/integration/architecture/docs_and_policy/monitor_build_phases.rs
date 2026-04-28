@@ -41,8 +41,8 @@ fn previewable_and_app_targets_package_monitor_asset_catalog() {
     );
     assert!(
         previewable.contains("resources: [")
-            && previewable.contains("\"Sources/HarnessMonitor/Assets.xcassets\""),
-        "HarnessMonitorUIPreviewable should package the shared asset catalog so theme colors resolve from the framework bundle"
+            && previewable.contains("\"Sources/HarnessMonitorUIPreviewable/Assets.xcassets\""),
+        "HarnessMonitorUIPreviewable should package its previewable asset catalog so theme colors resolve from the framework bundle"
     );
 
     let monitor_app = section_between(
@@ -134,7 +134,7 @@ fn monitor_app_uses_literal_bundle_identifier_for_capabilities_ui() {
 }
 
 #[test]
-fn monitor_targets_keep_the_pre_tuist_unmanaged_app_group_flow() {
+fn monitor_targets_disable_xcode_managed_app_group_registration() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
 
@@ -144,8 +144,8 @@ fn monitor_targets_keep_the_pre_tuist_unmanaged_app_group_flow() {
         "private let monitorAppTarget: Target = .target(",
     );
     assert!(
-        !monitor_app.contains("\"REGISTER_APP_GROUPS\":"),
-        "HarnessMonitor should keep the pre-Tuist TeamID-prefixed macOS app-group flow and must not ask Xcode to register portal-managed app groups"
+        monitor_app.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
+        "HarnessMonitor should keep local macOS app-group ownership and must explicitly disable Xcode-managed app-group registration"
     );
 
     let ui_test_host = section_between(
@@ -154,7 +154,7 @@ fn monitor_targets_keep_the_pre_tuist_unmanaged_app_group_flow() {
         "private let uiTestHostTarget: Target = .target(",
     );
     assert!(
-        !ui_test_host.contains("\"REGISTER_APP_GROUPS\":"),
-        "HarnessMonitorUITestHost should not request Xcode-managed app-group registration because it does not declare any app-group entitlement"
+        ui_test_host.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
+        "HarnessMonitorUITestHost should also disable Xcode-managed app-group registration so Xcode stops re-recommending the portal-managed app-group flow"
     );
 }
