@@ -9,7 +9,7 @@ extension AgentsWindowView {
   ) -> AgentPendingUserPrompt? {
     guard
       let prompt = session?.agentActivity.first(where: { $0.agentId == tui.agentId })?.pendingUserPrompt,
-      !prompt.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      prompt.primaryQuestion != nil
     else {
       return nil
     }
@@ -100,8 +100,13 @@ extension AgentsWindowView {
       }
     }
   }
-  func terminalInputControls(_ tui: AgentTuiSnapshot) -> some View {
+  func terminalInputControls(
+    _ tui: AgentTuiSnapshot,
+    pendingPrompt: AgentPendingUserPrompt? = nil
+  ) -> some View {
     @Bindable var viewModel = viewModel
+    let placeholder =
+      pendingPrompt == nil ? "Text to send to the TUI" : "Answer the pending prompt"
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Input")
         .scaledFont(.caption.bold())
@@ -132,11 +137,13 @@ extension AgentsWindowView {
       }
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         multilineEditor(
-          placeholder: "Text to send to the TUI",
+          placeholder: placeholder,
           text: $viewModel.inputText,
           field: .input,
           minHeight: 72,
           accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputField,
+          accessibilityLabel: Self.pendingPromptInputAccessibilityLabel(pendingPrompt),
+          accessibilityHint: Self.pendingPromptInputAccessibilityHint(pendingPrompt),
           onCommandReturn: { sendInput(to: tui) }
         )
         HarnessMonitorActionButton(
@@ -147,6 +154,8 @@ extension AgentsWindowView {
           sendInput(to: tui)
         }
         .disabled(!canSend)
+        .accessibilityLabel(Self.pendingPromptSendAccessibilityLabel(pendingPrompt))
+        .accessibilityHint(Self.pendingPromptSendAccessibilityHint(pendingPrompt))
         .accessibilityTestProbe(
           HarnessMonitorAccessibility.agentTuiSendButton,
           label: "Send"
@@ -159,9 +168,36 @@ extension AgentsWindowView {
       Label("User input required", systemImage: "questionmark.bubble.fill")
         .scaledFont(.headline)
         .foregroundStyle(.orange)
-      Text(prompt.message)
-        .scaledFont(.subheadline)
-        .textSelection(.enabled)
+        .accessibilityAddTraits(.isHeader)
+      if let waitingSince = prompt.waitingSince, !waitingSince.isEmpty {
+        Text("Waiting since \(waitingSince)")
+          .scaledFont(.footnote.monospacedDigit())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      ForEach(Array(prompt.questions.enumerated()), id: \.offset) { _, question in
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          if let header = question.header, !header.isEmpty {
+            Text(header)
+              .scaledFont(.caption.bold())
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+          Text(question.question)
+            .scaledFont(.subheadline)
+            .textSelection(.enabled)
+          if !question.options.isEmpty {
+            VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+              Text(question.multiSelect ? "Available choices (choose one or more)" : "Available choices")
+                .scaledFont(.caption.bold())
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
+                Text(Self.pendingPromptOptionText(option))
+                  .scaledFont(.footnote)
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              }
+            }
+          }
+        }
+      }
       Text("This terminal agent is paused until you respond with the controls below.")
         .scaledFont(.footnote)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -169,6 +205,8 @@ extension AgentsWindowView {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityLabel(Self.pendingPromptAccessibilitySummary(prompt))
+    .accessibilityHint("Use the input field below to answer the pending user prompt.")
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPendingUserPrompt)
   }
@@ -272,6 +310,8 @@ extension AgentsWindowView {
     field: Field,
     minHeight: CGFloat,
     accessibilityIdentifier: String,
+    accessibilityLabel: String? = nil,
+    accessibilityHint: String? = nil,
     onCommandReturn: (() -> Void)? = nil
   ) -> some View {
     ZStack(alignment: .topLeading) {
@@ -293,6 +333,8 @@ extension AgentsWindowView {
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
         .focused(focusedFieldBinding, equals: field)
+        .accessibilityLabel(accessibilityLabel ?? placeholder)
+        .accessibilityHint(accessibilityHint ?? "")
         .accessibilityIdentifier(accessibilityIdentifier)
         .background {
           if let onCommandReturn {
@@ -310,7 +352,66 @@ extension AgentsWindowView {
     }
     .accessibilityFrameMarker(accessibilityIdentifier)
     .accessibilityElement(children: .contain)
+    .accessibilityLabel(accessibilityLabel ?? placeholder)
+    .accessibilityHint(accessibilityHint ?? "")
     .accessibilityIdentifier(accessibilityIdentifier)
+  }
+
+  static func pendingPromptOptionText(_ option: AgentPendingUserPromptOption) -> String {
+    if option.description.isEmpty {
+      "- \(option.label)"
+    } else {
+      "- \(option.label): \(option.description)"
+    }
+  }
+
+  static func pendingPromptAccessibilitySummary(_ prompt: AgentPendingUserPrompt) -> String {
+    let questions = prompt.questions.map { question in
+      if question.options.isEmpty {
+        return question.question
+      }
+
+      let options = question.options.map(\.label).joined(separator: ", ")
+      return "\(question.question) Options: \(options)."
+    }
+    return (["User input required"] + questions).joined(separator: " ")
+  }
+
+  static func pendingPromptInputAccessibilityLabel(_ prompt: AgentPendingUserPrompt?) -> String {
+    guard let question = prompt?.primaryQuestion else {
+      return "Text to send to the terminal agent"
+    }
+    return "Response to \(pendingPromptQuestionHead(question.question))"
+  }
+
+  static func pendingPromptInputAccessibilityHint(_ prompt: AgentPendingUserPrompt?) -> String {
+    guard prompt != nil else {
+      return "Sends text input to the terminal agent."
+    }
+    return "Answers the pending user prompt shown above."
+  }
+
+  static func pendingPromptSendAccessibilityLabel(_ prompt: AgentPendingUserPrompt?) -> String {
+    prompt == nil ? "Send" : "Send response"
+  }
+
+  static func pendingPromptSendAccessibilityHint(_ prompt: AgentPendingUserPrompt?) -> String {
+    guard prompt != nil else {
+      return "Sends the current text input to the terminal agent."
+    }
+    return "Sends your answer to the pending user prompt."
+  }
+
+  static func pendingPromptQuestionHead(_ question: String) -> String {
+    if let firstLine = question
+      .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+      .first?
+      .trimmingCharacters(in: .whitespacesAndNewlines),
+      !firstLine.isEmpty
+    {
+      return firstLine
+    }
+    return "the pending user prompt"
   }
   var agentTuiUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {

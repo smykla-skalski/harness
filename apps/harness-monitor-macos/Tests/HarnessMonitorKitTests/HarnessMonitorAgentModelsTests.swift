@@ -8,6 +8,10 @@ struct HarnessMonitorAgentModelsTests {
   private let decoder = JSONDecoder()
   private let encoder = JSONEncoder()
 
+  init() {
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+  }
+
   @Test("AgentStatus decodes awaiting_review snake case")
   func agentStatusDecodesAwaitingReview() throws {
     let data = Data("\"awaiting_review\"".utf8)
@@ -87,5 +91,33 @@ struct HarnessMonitorAgentModelsTests {
     )
     #expect(auto.isAutoSpawned)
     #expect(!manual.isAutoSpawned)
+  }
+
+  @Test("AgentPendingUserPrompt decodes canonical ask-user questions")
+  func agentPendingUserPromptDecodesCanonicalQuestions() throws {
+    let data = Data(
+      """
+      {
+        "tool_name": "AskUserQuestion",
+        "waiting_since": "2026-04-28T08:00:01Z",
+        "questions": [{
+          "question": "Approve the file write?",
+          "header": "Approval",
+          "options": [
+            { "label": "Allow", "description": "Proceed with the write" },
+            { "label": "Deny", "description": "Stop before writing" }
+          ],
+          "multi_select": false
+        }]
+      }
+      """.utf8
+    )
+
+    let prompt = try decoder.decode(AgentPendingUserPrompt.self, from: data)
+
+    #expect(prompt.toolName == "AskUserQuestion")
+    #expect(prompt.waitingSince == "2026-04-28T08:00:01Z")
+    #expect(prompt.primaryQuestion?.header == "Approval")
+    #expect(prompt.primaryQuestion?.options.map(\.label) == ["Allow", "Deny"])
   }
 }

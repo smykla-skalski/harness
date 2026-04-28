@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 
@@ -118,8 +119,18 @@ struct CachedModelsDetailTests {
       latestEventAt: "2026-03-28T14:00:00Z",
       recentTools: ["Read", "Write", "Bash"],
       pendingUserPrompt: AgentPendingUserPrompt(
-        toolName: "ask_user",
-        message: "Approve the file write?"
+        toolName: "AskUserQuestion",
+        waitingSince: "2026-03-28T14:00:00Z",
+        questions: [
+          AgentPendingUserPromptQuestion(
+            question: "Approve the file write?",
+            header: "Approval",
+            options: [
+              AgentPendingUserPromptOption(label: "Allow", description: "Proceed"),
+              AgentPendingUserPromptOption(label: "Deny", description: "Stop"),
+            ]
+          )
+        ]
       )
     )
 
@@ -133,6 +144,40 @@ struct CachedModelsDetailTests {
 
     let restored = fetched[0].toAgentToolActivitySummary()
     #expect(restored == original)
+  }
+
+  @Test("CachedAgentActivity restores legacy pending prompt payloads")
+  func agentActivityLegacyPendingPromptPayload() throws {
+    let payload = """
+      {
+        "recentTools": ["Read", "Write"],
+        "pendingUserPrompt": {
+          "toolName": "ask_user",
+          "message": "Approve the file write?"
+        }
+      }
+      """
+    let cached = CachedAgentActivity(
+      agentId: "agent-1",
+      runtime: "claude",
+      toolInvocationCount: 2,
+      toolResultCount: 1,
+      toolErrorCount: 0,
+      latestToolName: "ask_user",
+      latestEventAt: "2026-03-28T14:00:00Z",
+      recentToolsData: Data(payload.utf8)
+    )
+    container.mainContext.insert(cached)
+    try container.mainContext.save()
+
+    let descriptor = FetchDescriptor<CachedAgentActivity>()
+    let fetched = try container.mainContext.fetch(descriptor)
+    #expect(fetched.count == 1)
+
+    let restored = fetched[0].toAgentToolActivitySummary()
+    #expect(restored.pendingUserPrompt?.toolName == "ask_user")
+    #expect(restored.pendingUserPrompt?.primaryQuestion?.question == "Approve the file write?")
+    #expect(restored.pendingUserPrompt?.questions.count == 1)
   }
 
   @Test("CachedAgentActivity restores legacy recent-tools payloads")
