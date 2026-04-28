@@ -101,12 +101,17 @@ extension HarnessMonitorStore {
     }
     guard let client else { return false }
 
-    return await mutateAgentTui(using: client, actionName: actionName) {
+    return await mutateAgentTui(
+      using: client,
+      actionName: actionName,
+      mutation: {
       try await client.sendAgentTuiInput(
         tuiID: tuiID,
         request: request
       )
-    }
+      },
+      staleTuiID: tuiID
+    )
   }
 
   @discardableResult
@@ -147,12 +152,17 @@ extension HarnessMonitorStore {
       return false
     }
 
-    return await mutateAgentTui(using: client, actionName: actionName) {
+    return await mutateAgentTui(
+      using: client,
+      actionName: actionName,
+      mutation: {
       try await client.resizeAgentTui(
         tuiID: tuiID,
         request: AgentTuiResizeRequest(rows: rows, cols: cols)
       )
-    }
+      },
+      staleTuiID: tuiID
+    )
   }
 
   @discardableResult
@@ -160,9 +170,14 @@ extension HarnessMonitorStore {
     let actionName = "Agents stopped"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
 
-    return await mutateAgentTui(using: action.client, actionName: actionName) {
+    return await mutateAgentTui(
+      using: action.client,
+      actionName: actionName,
+      mutation: {
       try await action.client.stopAgentTui(tuiID: tuiID)
-    }
+      },
+      staleTuiID: tuiID
+    )
   }
 
   public func selectAgentTui(tuiID: String?) {
@@ -268,14 +283,15 @@ extension HarnessMonitorStore {
       applyAgentTui(measuredTui.value)
       return true
     } catch {
-      return applyAgentTuiError(error, selectedSessionID: selectedSessionID)
+      return applyAgentTuiError(error, selectedSessionID: selectedSessionID, staleTuiID: tuiID)
     }
   }
   private func mutateAgentTui(
     using client: any HarnessMonitorClientProtocol,
     actionName: String? = nil,
     selectUpdatedSnapshot: Bool = false,
-    mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot
+    mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot,
+    staleTuiID: String? = nil
   ) async -> Bool {
     do {
       let measuredTui = try await Self.measureOperation {
@@ -293,14 +309,22 @@ extension HarnessMonitorStore {
       }
       return true
     } catch {
-      return applyAgentTuiError(error, selectedSessionID: selectedSessionID)
+      return applyAgentTuiError(
+        error,
+        selectedSessionID: selectedSessionID,
+        staleTuiID: staleTuiID
+      )
     }
   }
   private func applyAgentTuiError(
     _ error: any Error,
-    selectedSessionID: String?
+    selectedSessionID: String?,
+    staleTuiID: String? = nil
   ) -> Bool {
     guard selectedSessionID == self.selectedSessionID else {
+      return false
+    }
+    if let staleTuiID, reconcileStaleManagedAgentError(error, tuiID: staleTuiID) {
       return false
     }
     if let apiError = error as? HarnessMonitorAPIError,
@@ -390,8 +414,40 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.warning(
         "terminal agent post-action refresh failed for \(tuiId, privacy: .public): \(err, privacy: .public)"
       )
+      if reconcileStaleManagedAgentError(error, tuiID: baseline.tuiId) {
+        return true
+      }
       return true
     }
+  }
+  private func reconcileStaleManagedAgentError(
+    _ error: any Error,
+    tuiID: String
+  ) -> Bool {
+    guard isStaleManagedAgentError(error, tuiID: tuiID) else {
+      return false
+    }
+    cancelAgentTuiActionRefresh(for: tuiID)
+    let remainingTuis = selectedAgentTuis.filter { $0.tuiId != tuiID }
+    assignAgentTuis(remainingTuis, selected: preferredAgentTui(from: remainingTuis))
+    return true
+  }
+  private func isStaleManagedAgentError(
+    _ error: any Error,
+    tuiID: String
+  ) -> Bool {
+    guard let apiError = error as? HarnessMonitorAPIError,
+      case .server(let code, _) = apiError,
+      code == 400 || code == 404
+    else {
+      return false
+    }
+    let message = apiError.serverMessage ?? error.localizedDescription
+    return
+      apiError.serverSemanticCode == "KSRCLI090"
+      || message.contains("managed agent '\(tuiID)' not found")
+      || message.contains("terminal agent '\(tuiID)' not found")
+      || message.contains("terminal agent '\(tuiID)' is not active")
   }
   private func preferredAgentTui(from tuis: [AgentTuiSnapshot]) -> AgentTuiSnapshot? {
     if let selectedTuiID = selectedAgentTui?.tuiId,
