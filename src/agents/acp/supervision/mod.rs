@@ -17,9 +17,9 @@
 #![allow(unsafe_code)]
 
 use std::process::Child;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -170,9 +170,9 @@ impl AcpSessionSupervisor {
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
     fn exit_client_call(&self) {
-        let result = self.in_flight_calls.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
-            n.checked_sub(1)
-        });
+        let result = self
+            .in_flight_calls
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if result.is_err() {
             warn!("exit_client_call without matching enter; counter already at 0");
         }
@@ -318,7 +318,10 @@ pub fn kill_process_group(pgid: i32, child: &mut Child) {
             debug!(pgid, ?status, "process exited after SIGTERM");
         }
         Ok(None) => {
-            warn!(pgid, "process did not exit within grace period; sending SIGKILL");
+            warn!(
+                pgid,
+                "process did not exit within grace period; sending SIGKILL"
+            );
             unsafe {
                 libc::killpg(pgid, libc::SIGKILL);
             }
@@ -350,9 +353,7 @@ pub fn kill_process_group(_pgid: i32, child: &mut Child) {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-pub async fn watchdog_loop(
-    supervisor: Arc<AcpSessionSupervisor>,
-) -> Option<DisconnectReason> {
+pub async fn watchdog_loop(supervisor: Arc<AcpSessionSupervisor>) -> Option<DisconnectReason> {
     loop {
         match supervisor.watchdog_state() {
             WatchdogState::Done => return None,

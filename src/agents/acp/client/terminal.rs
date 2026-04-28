@@ -222,10 +222,7 @@ impl TerminalManager {
     /// # Errors
     ///
     /// Returns `TERMINAL_NOT_FOUND` if the terminal id is unknown.
-    pub fn handle_kill(
-        &self,
-        request: &KillTerminalRequest,
-    ) -> ClientResult<KillTerminalResponse> {
+    pub fn handle_kill(&self, request: &KillTerminalRequest) -> ClientResult<KillTerminalResponse> {
         let terminal_id = request.terminal_id.0.as_ref();
 
         let mut terminals = self.terminals.lock().unwrap();

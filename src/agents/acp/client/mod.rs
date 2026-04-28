@@ -115,7 +115,10 @@ impl ClientError {
 
     #[must_use]
     pub fn terminal_not_found(terminal_id: &TerminalId) -> Self {
-        Self::new(TERMINAL_NOT_FOUND, format!("terminal '{terminal_id}' not found"))
+        Self::new(
+            TERMINAL_NOT_FOUND,
+            format!("terminal '{terminal_id}' not found"),
+        )
     }
 
     #[must_use]
@@ -361,17 +364,17 @@ impl HarnessAcpClient {
         request: &RequestPermissionRequest,
     ) -> ClientResult<RequestPermissionResponse> {
         match &self.permission_mode {
-            PermissionMode::Stdin => {
-                stdin_permission_gateway(request).map_err(|e| {
-                    ClientError::new(PERMISSION_TIMEOUT, format!("stdin permission failed: {e}"))
-                })
-            }
-            PermissionMode::Recording { .. } => {
-                Err(ClientError::new(-32098, "Recording permission mode not yet wired (Chunk 10)"))
-            }
-            PermissionMode::DaemonBridge { .. } => {
-                Err(ClientError::new(-32098, "DaemonBridge permission mode not yet wired (Chunk 7)"))
-            }
+            PermissionMode::Stdin => stdin_permission_gateway(request).map_err(|e| {
+                ClientError::new(PERMISSION_TIMEOUT, format!("stdin permission failed: {e}"))
+            }),
+            PermissionMode::Recording { .. } => Err(ClientError::new(
+                -32098,
+                "Recording permission mode not yet wired (Chunk 10)",
+            )),
+            PermissionMode::DaemonBridge { .. } => Err(ClientError::new(
+                -32098,
+                "DaemonBridge permission mode not yet wired (Chunk 7)",
+            )),
         }
     }
 }
