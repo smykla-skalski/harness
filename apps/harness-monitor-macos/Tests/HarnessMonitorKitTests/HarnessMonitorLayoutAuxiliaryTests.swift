@@ -140,7 +140,7 @@ struct ContentWindowToolbarModelTests {
 struct AgentTuiViewportAutoResizeStabilizationTests {
   @Test("Pending viewport resize target remains the baseline while the server catches up")
   func pendingViewportResizeTargetRemainsBaselineWhileServerCatchesUp() {
-    let baseline = AgentsWindowView.TerminalViewportSizing.automaticResizeBaseline(
+    let baseline = TerminalViewportSizing.automaticResizeBaseline(
       serverSize: AgentTuiSize(rows: 32, cols: 120),
       pendingTarget: AgentTuiSize(rows: 48, cols: 136),
       expectedSize: AgentTuiSize(rows: 48, cols: 136)
@@ -151,7 +151,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
 
   @Test("Expected viewport size stays authoritative across stale server snapshots")
   func expectedViewportSizeStaysAuthoritativeAcrossStaleServerSnapshots() {
-    let baseline = AgentsWindowView.TerminalViewportSizing.automaticResizeBaseline(
+    let baseline = TerminalViewportSizing.automaticResizeBaseline(
       serverSize: AgentTuiSize(rows: 32, cols: 120),
       pendingTarget: nil,
       expectedSize: AgentTuiSize(rows: 48, cols: 136)
@@ -163,7 +163,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Wide detail columns seed a container-derived terminal before the first live measurement")
   func wideDetailColumnsSeedContainerDerivedTerminalBeforeFirstLiveMeasurement() {
-    let startSize = AgentsWindowView.TerminalViewportSizing.estimatedStartSize(
+    let startSize = TerminalViewportSizing.estimatedStartSize(
       detailColumnSize: CGSize(width: 1320, height: 860),
       fontScale: 1,
       fallbackRows: 32
@@ -176,7 +176,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
 
   @Test("Minor viewport jitter preserves the current terminal size")
   func minorViewportJitterPreservesCurrentTerminalSize() {
-    let stabilized = AgentsWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+    let stabilized = TerminalViewportSizing.stabilizedAutomaticSize(
       measured: AgentTuiSize(rows: 49, cols: 122),
       baseline: AgentTuiSize(rows: 48, cols: 120)
     )
@@ -186,7 +186,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
 
   @Test("Meaningful viewport changes still auto-resize the terminal")
   func meaningfulViewportChangesStillAutoResizeTheTerminal() {
-    let stabilized = AgentsWindowView.TerminalViewportSizing.stabilizedAutomaticSize(
+    let stabilized = TerminalViewportSizing.stabilizedAutomaticSize(
       measured: AgentTuiSize(rows: 52, cols: 126),
       baseline: AgentTuiSize(rows: 48, cols: 120)
     )
@@ -197,7 +197,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Zero-size viewports do not auto-resize to the row/col minimum")
   func zeroSizeViewportsDoNotAutoResizeToMinimum() {
-    let collapsed = AgentsWindowView.TerminalViewportSizing.terminalSize(
+    let collapsed = TerminalViewportSizing.terminalSize(
       for: CGSize(width: 0, height: 0),
       fontScale: 1
     )
@@ -208,7 +208,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Tiny transient viewports bail out instead of snapping to 9x20")
   func tinyTransientViewportsBailOut() {
-    let tiny = AgentsWindowView.TerminalViewportSizing.terminalSize(
+    let tiny = TerminalViewportSizing.terminalSize(
       for: CGSize(width: 40, height: 30),
       fontScale: 1
     )
@@ -219,7 +219,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("A usable viewport still produces a measured terminal size")
   func usableViewportProducesMeasuredSize() {
-    let measured = AgentsWindowView.TerminalViewportSizing.terminalSize(
+    let measured = TerminalViewportSizing.terminalSize(
       for: CGSize(width: 900, height: 600),
       fontScale: 1
     )
@@ -234,11 +234,11 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   @MainActor
   @Test("Terminal content width follows the negotiated column count")
   func terminalContentWidthFollowsNegotiatedColumnCount() {
-    let narrow = AgentsWindowView.TerminalViewportSizing.contentWidth(
+    let narrow = TerminalViewportSizing.contentWidth(
       for: AgentTuiSize(rows: 20, cols: 88),
       fontScale: 1
     )
-    let wide = AgentsWindowView.TerminalViewportSizing.contentWidth(
+    let wide = TerminalViewportSizing.contentWidth(
       for: AgentTuiSize(rows: 20, cols: 119),
       fontScale: 1
     )
@@ -251,7 +251,7 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
   func terminalContentWidthMatchesRenderedMonospacedGridAdvance() {
     let cols = 120
     let fontScale: CGFloat = 1
-    let measured = AgentsWindowView.TerminalViewportSizing.contentWidth(
+    let measured = TerminalViewportSizing.contentWidth(
       for: AgentTuiSize(rows: 20, cols: cols),
       fontScale: fontScale
     )

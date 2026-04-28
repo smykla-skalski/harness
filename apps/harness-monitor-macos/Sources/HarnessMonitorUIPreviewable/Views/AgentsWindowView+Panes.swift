@@ -41,11 +41,11 @@ extension AgentsWindowView {
       }
       .onGeometryChange(for: CGSize.self) { proxy in
         proxy.size
-        } action: { detailSize in
-          updateDetailColumnGeometry(detailSize)
-        }
-        .id(scrollContainerIdentity)
-        .overlay { agentsStateMarkerOverlay() }
+      } action: { detailSize in
+        updateDetailColumnGeometry(detailSize)
+      }
+      .id(scrollContainerIdentity)
+      .overlay { agentsStateMarkerOverlay() }
     }
   }
 
@@ -184,6 +184,9 @@ extension AgentsWindowView {
         codexApprovalsSection(approvalItems, run: run)
       }
       if run.status.isActive {
+        ToolCallTimelineView(entries: store.timeline) {
+          interruptCodexRun(run)
+        }
         codexContextSection(run)
       }
     }

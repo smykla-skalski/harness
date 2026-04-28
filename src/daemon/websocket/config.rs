@@ -7,6 +7,7 @@
 use axum::extract::ws::Message;
 use serde_json::Value;
 
+use crate::agents::acp::{catalog, probe};
 use crate::agents::runtime::models;
 use crate::daemon::protocol::{WS_CONFIG_EVENT, WsConfigPayload, WsPushEvent};
 use crate::session::persona;
@@ -21,6 +22,8 @@ pub fn build_config_payload() -> WsConfigPayload {
     WsConfigPayload {
         personas: persona::all(),
         runtime_models: models::all_catalogs(),
+        acp_agents: catalog::acp_agents().into_iter().cloned().collect(),
+        runtime_probe: Some(probe::probe_acp_agents_cached()),
     }
 }
 
@@ -96,5 +99,7 @@ mod tests {
             serde_json::from_value(push.payload).expect("deserialize config payload");
         assert!(!payload.personas.is_empty());
         assert!(!payload.runtime_models.is_empty());
+        assert!(!payload.acp_agents.is_empty());
+        assert!(payload.runtime_probe.is_some());
     }
 }

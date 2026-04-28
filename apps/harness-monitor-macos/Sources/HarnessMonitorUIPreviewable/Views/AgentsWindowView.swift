@@ -115,10 +115,6 @@ public struct AgentsWindowView: View {
       .filter { !$0.isEmpty }
   }
 
-  var canStartTerminal: Bool {
-    !viewModel.isSubmitting && viewModel.rows > 0 && viewModel.cols > 0
-  }
-
   var canStartCodex: Bool {
     !viewModel.isSubmitting && !trimmedCodexPrompt.isEmpty
   }
@@ -288,21 +284,6 @@ public struct AgentsWindowView: View {
     }
   }
 
-  var scrollContainerIdentity: String {
-    switch viewModel.selection {
-    case .create:
-      "create"
-    case .terminal(let sessionID):
-      "terminal:\(sessionID)"
-    case .codex(let runID):
-      "codex:\(runID)"
-    case .agent(let agentID):
-      "agent:\(agentID)"
-    case .task(let taskID):
-      "task:\(taskID)"
-    }
-  }
-
   public var body: some View {
     @Bindable var viewModel = viewModel
     let displayState = displayState
@@ -341,20 +322,7 @@ public struct AgentsWindowView: View {
       )
       navigationBridge.update(viewModel.windowNavigation)
       await Task.yield()
-      async let tuiRefresh = store.refreshSelectedAgentTuis()
-      async let codexRefresh = store.refreshSelectedCodexRuns()
-      async let personas = store.fetchPersonas()
-      async let runtimeModels = store.fetchRuntimeModelCatalogs()
-      let loadedPersonas = await personas
-      let loadedRuntimeModels = await runtimeModels
-      _ = await tuiRefresh
-      _ = await codexRefresh
-      if viewModel.availablePersonas != loadedPersonas {
-        viewModel.availablePersonas = loadedPersonas
-      }
-      if viewModel.availableRuntimeModels != loadedRuntimeModels {
-        viewModel.availableRuntimeModels = loadedRuntimeModels
-      }
+      await loadAgentPickerCatalogs()
       refreshDisplayState()
       reconcileSheetState(afterRefresh: true)
       consumePendingAgentsWindowSelection()

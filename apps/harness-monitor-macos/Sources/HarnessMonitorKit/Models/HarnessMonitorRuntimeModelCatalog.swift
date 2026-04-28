@@ -96,10 +96,30 @@ public struct RuntimeModelCatalog: Codable, Equatable, Identifiable, Sendable {
 public struct MonitorConfiguration: Codable, Equatable, Sendable {
   public let personas: [AgentPersona]
   public let runtimeModels: [RuntimeModelCatalog]
+  public let acpAgents: [AcpAgentDescriptor]
+  public let runtimeProbe: AcpRuntimeProbeResponse?
 
-  public init(personas: [AgentPersona], runtimeModels: [RuntimeModelCatalog]) {
+  public init(
+    personas: [AgentPersona],
+    runtimeModels: [RuntimeModelCatalog],
+    acpAgents: [AcpAgentDescriptor] = [],
+    runtimeProbe: AcpRuntimeProbeResponse? = nil
+  ) {
     self.personas = personas
     self.runtimeModels = runtimeModels
+    self.acpAgents = acpAgents
+    self.runtimeProbe = runtimeProbe
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    personas = try container.decode([AgentPersona].self, forKey: .personas)
+    runtimeModels = try container.decode([RuntimeModelCatalog].self, forKey: .runtimeModels)
+    acpAgents = try container.decodeIfPresent([AcpAgentDescriptor].self, forKey: .acpAgents) ?? []
+    runtimeProbe = try container.decodeIfPresent(
+      AcpRuntimeProbeResponse.self,
+      forKey: .runtimeProbe
+    )
   }
 
   public func catalog(forRuntime runtime: String) -> RuntimeModelCatalog? {

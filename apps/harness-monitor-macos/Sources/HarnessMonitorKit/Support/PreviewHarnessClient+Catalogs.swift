@@ -1,6 +1,15 @@
 import Foundation
 
 extension PreviewHarnessClient {
+  public func configuration() async throws -> MonitorConfiguration {
+    MonitorConfiguration(
+      personas: try await personas(),
+      runtimeModels: try await runtimeModelCatalogs(),
+      acpAgents: try await acpAgentDescriptors(),
+      runtimeProbe: try await runtimeProbeResults()
+    )
+  }
+
   public func personas() async throws -> [AgentPersona] {
     [
       AgentPersona(
@@ -79,5 +88,36 @@ extension PreviewHarnessClient {
         cheapestFastest: "claude-haiku-4-5"
       ),
     ]
+  }
+
+  public func acpAgentDescriptors() async throws -> [AcpAgentDescriptor] {
+    [
+      AcpAgentDescriptor(
+        id: "copilot",
+        displayName: "GitHub Copilot",
+        capabilities: ["fs.read", "fs.write", "terminal.spawn", "streaming", "multi-turn"],
+        launchCommand: "copilot",
+        launchArgs: ["--acp", "--stdio"],
+        envPassthrough: ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"],
+        modelCatalog: nil,
+        installHint: "Install GitHub Copilot CLI and sign in.",
+        doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
+      )
+    ]
+  }
+
+  public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
+    AcpRuntimeProbeResponse(
+      probes: [
+        AcpRuntimeProbe(
+          agentId: "copilot",
+          displayName: "GitHub Copilot",
+          binaryPresent: true,
+          authState: .unknown,
+          version: "preview"
+        )
+      ],
+      checkedAt: "2026-04-28T00:00:00Z"
+    )
   }
 }

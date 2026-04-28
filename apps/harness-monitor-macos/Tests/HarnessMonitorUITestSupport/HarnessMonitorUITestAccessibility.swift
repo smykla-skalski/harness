@@ -259,6 +259,10 @@ enum HarnessMonitorUITestAccessibility {
   static let agentsCodexContextField = "harness.window.agents.codex.context"
   static let agentsCodexModePicker = "harness.window.agents.codex.mode"
   static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
+  static func agentCapabilityRow(_ identifier: String) -> String {
+    "harness.window.agents.capability.\(slug(identifier))"
+  }
+  static let toolCallTimeline = "harness.window.agents.tool-call-timeline"
   static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
   static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
   static let agentsCodexFinalMessage = "harness.window.agents.codex.final"

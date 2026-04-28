@@ -23,24 +23,6 @@ extension AgentsWindowView {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiLaunchPane)
   }
 
-  var createPaneDescription: String {
-    switch viewModel.createMode {
-    case .terminal:
-      if displayState.hasAgentTuis {
-        "Open terminal-backed agents stay pinned in the sidebar so you can launch "
-          + "another agent without losing the active viewport."
-      } else {
-        "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
-      }
-    case .codex:
-      if displayState.hasCodexRuns {
-        "Codex threads stay pinned in the sidebar so you can continue active work without losing context."
-      } else {
-        "Start a Codex thread to investigate, patch, or route approvals from the same Agents window."
-      }
-    }
-  }
-
   @ViewBuilder var createPaneBanners: some View {
     if viewModel.createMode == .terminal && displayState.agentTuiUnavailable {
       Section { agentTuiUnavailableBanner }
@@ -79,6 +61,7 @@ extension AgentsWindowView {
 
   var terminalRuntimeSection: some View {
     @Bindable var formModel = viewModel
+    let selection = formModel.selectedLaunchSelection
     let catalog = terminalRuntimeCatalog(formModel)
     let modelBinding = Binding<String>(
       get: {
@@ -107,68 +90,73 @@ extension AgentsWindowView {
       set: { formModel.selectedTerminalEffortByRuntime[formModel.runtime] = $0 }
     )
     return Section {
-      Picker("Runtime", selection: $formModel.runtime) {
-        ForEach(AgentTuiRuntime.allCases) { runtime in
-          Text(runtime.title)
-            .tag(runtime)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentTuiRuntimePicker,
-                option: runtime.title
-              )
+      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        ForEach(agentCapabilityOptions) { option in
+          AgentCapabilityRow(
+            option: option,
+            selection: Binding(
+              get: { formModel.selectedLaunchSelection },
+              set: { newValue in
+                formModel.selectedLaunchSelection = newValue
+                if case .tui(let runtime) = newValue {
+                  formModel.runtime = runtime
+                }
+              }
             )
+          )
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityRow(option.id))
         }
       }
-      .pickerStyle(.segmented)
-      .harnessNativeFormControl()
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)
 
-      Picker("Model", selection: modelBinding) {
-        ForEach(catalogModels) { model in
-          Text(model.displayName)
-            .tag(model.id)
+      if case .tui = selection {
+        Picker("Model", selection: modelBinding) {
+          ForEach(catalogModels) { model in
+            Text(model.displayName)
+              .tag(model.id)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentsModelPicker,
+                  option: model.displayName
+                )
+              )
+          }
+          Text("Custom...")
+            .tag(RuntimeCustomModel.tag)
             .accessibilityIdentifier(
               HarnessMonitorAccessibility.segmentedOption(
                 HarnessMonitorAccessibility.agentsModelPicker,
-                option: model.displayName
+                option: "Custom"
               )
             )
         }
-        Text("Custom...")
-          .tag(RuntimeCustomModel.tag)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.segmentedOption(
-              HarnessMonitorAccessibility.agentsModelPicker,
-              option: "Custom"
-            )
-          )
-      }
-      .pickerStyle(.menu)
-      .harnessNativeFormControl()
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsModelPicker).frame")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsModelPicker)
+        .pickerStyle(.menu)
+        .harnessNativeFormControl()
+        .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsModelPicker).frame")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentsModelPicker)
 
-      if modelBinding.wrappedValue == RuntimeCustomModel.tag {
-        TextField("Provider-specific model id", text: customModelBinding)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCustomModelField)
-      }
-
-      Picker("Effort", selection: effortBinding) {
-        ForEach(effortValues, id: \.self) { level in
-          Text(level.capitalized)
-            .tag(level)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentsEffortPicker,
-                option: level
-              )
-            )
+        if modelBinding.wrappedValue == RuntimeCustomModel.tag {
+          TextField("Provider-specific model id", text: customModelBinding)
+            .harnessNativeFormControl()
+            .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCustomModelField)
         }
+
+        Picker("Effort", selection: effortBinding) {
+          ForEach(effortValues, id: \.self) { level in
+            Text(level.capitalized)
+              .tag(level)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentsEffortPicker,
+                  option: level
+                )
+              )
+          }
+        }
+        .pickerStyle(.segmented)
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentsEffortPicker)
       }
-      .pickerStyle(.segmented)
-      .harnessNativeFormControl()
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsEffortPicker)
 
       Picker("Role", selection: $formModel.selectedRole) {
         ForEach(SessionRole.allCases, id: \.self) { role in
@@ -188,7 +176,7 @@ extension AgentsWindowView {
 
       inlinePersonaPicker
     } header: {
-      Text("Runtime")
+      Text("Agent")
     }
   }
 
@@ -246,7 +234,7 @@ extension AgentsWindowView {
   var terminalLaunchSection: some View {
     Section {
       HarnessMonitorActionButton(
-        title: "Start \(viewModel.runtime.title)",
+        title: "Start \(selectedAgentLaunchTitle)",
         variant: .prominent,
         accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
         fillsWidth: true

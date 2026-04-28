@@ -7,11 +7,13 @@ actor PreviewHarnessClientState {
   private var detailsBySessionID: [String: SessionDetail]
   private var coreDetailsBySessionID: [String: SessionDetail]
   private var timelinesBySessionID: [String: [TimelineEntry]]
-  private var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+  var agentTuisBySessionID: [String: [AgentTuiSnapshot]]
+  var acpAgentsBySessionID: [String: [AcpAgentSnapshot]]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]]
   private var nextAgentTuiSequence: Int
   private var nextCodexRunSequence: Int
-  private let fallbackDetail: SessionDetail?
+  var nextAcpAgentSequence: Int
+  let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
 
   init(fixtures: PreviewHarnessClient.Fixtures) {
@@ -20,6 +22,7 @@ actor PreviewHarnessClientState {
     self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
     self.timelinesBySessionID = fixtures.timelinesBySessionID
     self.agentTuisBySessionID = fixtures.agentTuisBySessionID
+    self.acpAgentsBySessionID = [:]
     self.codexRunsBySessionID = fixtures.codexRunsBySessionID
     self.nextAgentTuiSequence = max(
       fixtures.agentTuisBySessionID.values.flatMap(\.self).count,
@@ -29,6 +32,7 @@ actor PreviewHarnessClientState {
       fixtures.codexRunsBySessionID.values.flatMap(\.self).count,
       0
     )
+    self.nextAcpAgentSequence = 0
     self.fallbackDetail = fixtures.detail
     self.fallbackTimeline = fixtures.timeline
   }
