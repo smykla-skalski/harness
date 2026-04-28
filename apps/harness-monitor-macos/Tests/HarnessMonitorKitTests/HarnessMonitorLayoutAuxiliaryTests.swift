@@ -1,6 +1,6 @@
 import AppKit
-import CoreText
 import CoreGraphics
+import CoreText
 import Foundation
 import Testing
 

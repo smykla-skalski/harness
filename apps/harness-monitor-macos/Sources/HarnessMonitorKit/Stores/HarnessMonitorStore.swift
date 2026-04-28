@@ -64,6 +64,14 @@ public final class HarnessMonitorStore {
       guard oldValue != selectedAgentTui else { return }
     }
   }
+  public var selectedAcpAgents: [AcpAgentSnapshot] = [] {
+    didSet {
+      guard oldValue != selectedAcpAgents else { return }
+    }
+  }
+  var standaloneAcpPermissionBatches: [AcpPermissionBatch] = []
+  public var presentingAcpPermissionBatch: AcpPermissionBatch?
+  public var resolvingAcpPermissionBatchID: String?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }

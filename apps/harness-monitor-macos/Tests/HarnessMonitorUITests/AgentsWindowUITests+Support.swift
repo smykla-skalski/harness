@@ -3,7 +3,10 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-extension AgentsWindowUITests {
+protocol AgentsWindowUITestSupporting: AnyObject {}
+
+@MainActor
+extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
   func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {

@@ -21,6 +21,10 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case codexRunUpdated(CodexRunSnapshot)
     case codexApprovalRequested(CodexApprovalRequestedPayload)
     case agentTuiUpdated(AgentTuiSnapshot)
+    case acpAgentUpdated(AcpAgentSnapshot)
+    case acpEvents(AcpEventBatchPayload)
+    case acpPermissionBatch(AcpPermissionBatch)
+    case acpPermissionBatchRemoved(AcpPermissionBatch)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -73,6 +77,10 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     guard let sessionId = streamEvent.sessionId else {
       throw HarnessMonitorPushEventError.missingSessionID(streamEvent.event)
     }
+    if let acpEvent = try makeAcpSessionScopedEvent(from: streamEvent, sessionId: sessionId) {
+      return acpEvent
+    }
+
     let at = streamEvent.recordedAt
     switch streamEvent.event {
     case "session_updated":
@@ -115,6 +123,42 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .unknown(eventName: streamEvent.event, payload: streamEvent.payload)
       )
+    }
+  }
+
+  private static func makeAcpSessionScopedEvent(
+    from streamEvent: StreamEvent,
+    sessionId: String
+  ) throws -> Self? {
+    let at = streamEvent.recordedAt
+    switch streamEvent.event {
+    case "acp_agent_started", "acp_agent_updated", "acp_agent_stopped", "acp_agent_failed",
+      "acp_permission_batch_resolved":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpAgentUpdated(try streamEvent.decodePayload(as: AcpAgentSnapshot.self))
+      )
+    case "acp_events":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpEvents(try streamEvent.decodePayload(as: AcpEventBatchPayload.self))
+      )
+    case "acp_permission_requested":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpPermissionBatch(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
+      )
+    case "acp_permission_resolved", "acp_permission_shutdown":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpPermissionBatchRemoved(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
+      )
+    default:
+      return nil
     }
   }
 

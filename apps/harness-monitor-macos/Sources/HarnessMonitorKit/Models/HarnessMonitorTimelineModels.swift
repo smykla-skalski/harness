@@ -176,6 +176,119 @@ public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
   public let extensionsPending: Bool?
 }
 
+public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
+  public let acpId: String
+  public let sessionId: String
+  public let rawCount: Int
+  public let events: [AcpConversationEvent]
+
+  public init(
+    acpId: String,
+    sessionId: String,
+    rawCount: Int,
+    events: [AcpConversationEvent]
+  ) {
+    self.acpId = acpId
+    self.sessionId = sessionId
+    self.rawCount = rawCount
+    self.events = events
+  }
+}
+
+public struct AcpConversationEvent: Codable, Equatable, Sendable {
+  public let timestamp: String?
+  public let sequence: UInt64
+  public let kind: JSONValue
+  public let agent: String
+  public let sessionId: String
+
+  public init(
+    timestamp: String?,
+    sequence: UInt64,
+    kind: JSONValue,
+    agent: String,
+    sessionId: String
+  ) {
+    self.timestamp = timestamp
+    self.sequence = sequence
+    self.kind = kind
+    self.agent = agent
+    self.sessionId = sessionId
+  }
+}
+
+extension AcpEventBatchPayload {
+  public func timelineEntries(fallbackRecordedAt: String) -> [TimelineEntry] {
+    events
+      .filter { $0.sessionId == sessionId }
+      .compactMap { event in
+        event.timelineEntry(acpID: acpId, fallbackRecordedAt: fallbackRecordedAt)
+      }
+  }
+}
+
+extension AcpConversationEvent {
+  fileprivate func timelineEntry(acpID: String, fallbackRecordedAt: String) -> TimelineEntry? {
+    guard case .object(let event) = kind,
+      let type = event.stringValue(for: "type")
+    else {
+      return nil
+    }
+    let isError = event.boolValue(for: "is_error") ?? false
+    let entryKind: String
+    switch type {
+    case "tool_invocation":
+      entryKind = "tool_invocation"
+    case "tool_result", "tool_result_error":
+      entryKind = isError || type == "tool_result_error" ? "tool_result_error" : "tool_result"
+    default:
+      return nil
+    }
+
+    let toolName = event.stringValue(for: "tool_name") ?? "Tool"
+    let actor = agent.isEmpty ? acpID : agent
+    let summary: String =
+      switch entryKind {
+      case "tool_invocation":
+        "\(actor) invoked \(toolName)"
+      case "tool_result_error":
+        "\(actor) received an error from \(toolName)"
+      default:
+        "\(actor) received a result from \(toolName)"
+      }
+
+    return TimelineEntry(
+      entryId: "acp-\(actor)-\(entryKind)-\(sequence)",
+      recordedAt: timestamp ?? fallbackRecordedAt,
+      kind: entryKind,
+      sessionId: sessionId,
+      agentId: actor,
+      taskId: nil,
+      summary: summary,
+      payload: .object([
+        "runtime": .string("acp"),
+        "event": kind,
+      ])
+    )
+  }
+}
+
+extension [String: JSONValue] {
+  fileprivate func stringValue(for key: String) -> String? {
+    guard case .string(let value)? = self[key] else {
+      return nil
+    }
+    return value
+  }
+
+  fileprivate func boolValue(for key: String) -> Bool? {
+    guard case .bool(let value)? = self[key] else {
+      return nil
+    }
+    return value
+  }
+}
+
 public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
   public let event: String
   public let recordedAt: String

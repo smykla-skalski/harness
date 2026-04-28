@@ -405,6 +405,7 @@ public struct AgentsWindowView: View {
       }
       navigationBridge.update(WindowNavigationState())
     }
+    .acpPermissionPresentation(store: store)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
   }

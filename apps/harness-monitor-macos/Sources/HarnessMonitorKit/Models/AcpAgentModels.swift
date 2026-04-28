@@ -7,12 +7,56 @@ public struct AcpPermissionItem: Codable, Equatable, Sendable {
   public let options: [JSONValue]
 }
 
-public struct AcpPermissionBatch: Codable, Equatable, Sendable {
+public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public let batchId: String
   public let acpId: String
   public let sessionId: String
   public let requests: [AcpPermissionItem]
   public let createdAt: String
+
+  public var id: String { batchId }
+}
+
+public enum AcpPermissionDecision: Codable, Equatable, Sendable {
+  case approveAll
+  case approveSome([String])
+  case denyAll
+
+  private enum CodingKeys: String, CodingKey {
+    case decision
+    case requestIds
+  }
+
+  private enum Decision: String, Codable {
+    case approveAll = "approve_all"
+    case approveSome = "approve_some"
+    case denyAll = "deny_all"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    switch try container.decode(Decision.self, forKey: .decision) {
+    case .approveAll:
+      self = .approveAll
+    case .approveSome:
+      self = .approveSome(try container.decode([String].self, forKey: .requestIds))
+    case .denyAll:
+      self = .denyAll
+    }
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .approveAll:
+      try container.encode(Decision.approveAll, forKey: .decision)
+    case .approveSome(let requestIDs):
+      try container.encode(Decision.approveSome, forKey: .decision)
+      try container.encode(requestIDs, forKey: .requestIds)
+    case .denyAll:
+      try container.encode(Decision.denyAll, forKey: .decision)
+    }
+  }
 }
 
 public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
