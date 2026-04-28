@@ -58,45 +58,26 @@ fn parse_bootstrap_enable_suite_hooks_flag() {
         panic!("expected bootstrap command");
     };
     assert!(args.enable_suite_hooks);
-    assert!(!args.enable_repo_policy);
 }
 
 #[test]
-fn parse_bootstrap_enable_repo_policy_flag() {
-    let cli =
-        Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-repo-policy"]).unwrap();
-    let Command::Setup {
-        command: SetupCommand::Bootstrap(args),
-    } = cli.command
-    else {
-        panic!("expected bootstrap command");
-    };
-    assert!(args.enable_repo_policy);
-    assert!(!args.enable_suite_hooks);
+fn parse_bootstrap_rejects_enable_repo_policy_flag() {
+    let error = Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-repo-policy"])
+        .expect_err("repo-policy flag should move out of harness");
+    assert_eq!(error.kind(), ErrorKind::UnknownArgument);
 }
 
 #[test]
-fn parse_agents_generate_enable_flags() {
-    let cli = Cli::try_parse_from([
+fn parse_agents_generate_rejects_enable_repo_policy_flag() {
+    let error = Cli::try_parse_from([
         "harness",
         "setup",
         "agents",
         "generate",
-        "--enable-suite-hooks",
         "--enable-repo-policy",
     ])
-    .unwrap();
-    let Command::Setup {
-        command:
-            SetupCommand::Agents {
-                command: AgentsSetupCommand::Generate(args),
-            },
-    } = cli.command
-    else {
-        panic!("expected agents generate command");
-    };
-    assert!(args.hook_flags.enable_suite_hooks);
-    assert!(args.hook_flags.enable_repo_policy);
+    .expect_err("repo-policy flag should move out of harness");
+    assert_eq!(error.kind(), ErrorKind::UnknownArgument);
 }
 
 #[test]

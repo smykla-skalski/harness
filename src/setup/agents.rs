@@ -46,23 +46,17 @@ pub struct GenerateAgentHookFlags {
     /// suite workflow is unfinished. Equivalent to `HARNESS_FEATURE_SUITE_HOOKS=1`.
     #[arg(long)]
     pub enable_suite_hooks: bool,
-    /// Re-enable the `repo-policy` pre-tool hook that warns about raw
-    /// `cargo`/`xcodebuild` usage in mise-driven repos. Off by default.
-    /// Equivalent to `HARNESS_FEATURE_REPO_POLICY=1`.
-    #[arg(long)]
-    pub enable_repo_policy: bool,
 }
 
 impl Execute for GenerateAgentAssetsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let suite = self.hook_flags.enable_suite_hooks.then_some(true);
-        let repo_policy = self.hook_flags.enable_repo_policy.then_some(true);
         generate_agent_assets_with_skipped_runtime_hooks(
             self.target,
             self.check,
             &self.skip_runtime_hooks,
             self.include_gemini_commands,
-            RuntimeHookFlags::resolve(suite, repo_policy),
+            RuntimeHookFlags::resolve(suite),
         )
     }
 }

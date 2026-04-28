@@ -60,14 +60,6 @@ fn shared_runtime_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRe
         NormalizedEvent::UserPromptSubmit,
         None,
     )];
-    if flags.repo_policy {
-        hooks.push(command_registration(
-            "repo-policy",
-            repo_policy_command(agent),
-            NormalizedEvent::BeforeToolUse,
-            Some(".*"),
-        ));
-    }
     hooks.push(hook_registration(
         agent,
         "tool-guard",
@@ -107,14 +99,6 @@ fn shared_runtime_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRe
 
 fn claude_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
     let mut hooks = Vec::new();
-    if flags.repo_policy {
-        hooks.push(command_registration(
-            "repo-policy",
-            repo_policy_command(agent),
-            NormalizedEvent::BeforeToolUse,
-            Some(".*"),
-        ));
-    }
     hooks.push(hook_registration(
         agent,
         "tool-guard",
@@ -160,14 +144,6 @@ fn claude_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistrati
 
 fn gemini_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
     let mut hooks = Vec::new();
-    if flags.repo_policy {
-        hooks.push(command_registration(
-            "repo-policy",
-            repo_policy_command(agent),
-            NormalizedEvent::BeforeToolUse,
-            Some(".*"),
-        ));
-    }
     hooks.push(hook_registration(
         agent,
         "tool-guard",
@@ -206,14 +182,6 @@ fn copilot_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistrat
         NormalizedEvent::UserPromptSubmit,
         None,
     )];
-    if flags.repo_policy {
-        hooks.push(command_registration(
-            "repo-policy",
-            repo_policy_command(agent),
-            NormalizedEvent::BeforeToolUse,
-            None,
-        ));
-    }
     hooks.push(hook_registration(
         agent,
         "tool-guard",
@@ -274,13 +242,6 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
     }
 }
 
-fn repo_policy_command(agent: HookAgent) -> String {
-    format!(
-        "harness agents repo-policy --agent {}",
-        adapter_for(agent).name()
-    )
-}
-
 fn hook_registration(
     agent: HookAgent,
     name: &'static str,
@@ -320,65 +281,86 @@ mod tests {
         regs.iter().map(|r| r.name).collect()
     }
 
+    fn assert_contains_all(collected: &[&str], expected: &[&str]) {
+        for name in expected {
+            assert!(collected.contains(name), "missing hook {name}");
+        }
+    }
+
+    fn assert_contains_none(collected: &[&str], forbidden: &[&str]) {
+        for name in forbidden {
+            assert!(!collected.contains(name), "unexpected hook {name}");
+        }
+    }
+
     #[test]
     fn defaults_omit_suite_and_repo_policy_hooks_for_claude() {
         let regs = process_agent_registrations(HookAgent::Claude, RuntimeHookFlags::default());
         let collected = names(&regs);
-        assert!(!collected.contains(&"guard-stop"));
-        assert!(!collected.contains(&"context-agent"));
-        assert!(!collected.contains(&"validate-agent"));
-        assert!(!collected.contains(&"tool-failure"));
-        assert!(!collected.contains(&"repo-policy"));
-        // Lifecycle and tool-guard/tool-result must still be present.
-        assert!(collected.contains(&"session-start"));
-        assert!(collected.contains(&"tool-guard"));
-        assert!(collected.contains(&"tool-result"));
+        assert_contains_none(
+            &collected,
+            &[
+                "guard-stop",
+                "context-agent",
+                "validate-agent",
+                "tool-failure",
+                "repo-policy",
+            ],
+        );
+        assert_contains_all(&collected, &["session-start", "tool-guard", "tool-result"]);
     }
 
     #[test]
     fn defaults_omit_suite_and_repo_policy_hooks_for_codex() {
         let regs = process_agent_registrations(HookAgent::Codex, RuntimeHookFlags::default());
         let collected = names(&regs);
-        assert!(!collected.contains(&"guard-stop"));
-        assert!(!collected.contains(&"context-agent"));
-        assert!(!collected.contains(&"validate-agent"));
-        assert!(!collected.contains(&"repo-policy"));
-        assert!(collected.contains(&"prompt-submit"));
-        assert!(collected.contains(&"tool-guard"));
+        assert_contains_none(
+            &collected,
+            &[
+                "guard-stop",
+                "context-agent",
+                "validate-agent",
+                "repo-policy",
+            ],
+        );
+        assert_contains_all(&collected, &["prompt-submit", "tool-guard"]);
     }
 
     #[test]
     fn enabling_only_suite_hooks_keeps_repo_policy_off() {
-        let flags = RuntimeHookFlags {
-            suite_hooks: true,
-            repo_policy: false,
-        };
+        let flags = RuntimeHookFlags { suite_hooks: true };
         let regs = process_agent_registrations(HookAgent::Claude, flags);
         let collected = names(&regs);
-        assert!(collected.contains(&"guard-stop"));
-        assert!(collected.contains(&"context-agent"));
-        assert!(collected.contains(&"validate-agent"));
-        assert!(collected.contains(&"tool-failure"));
-        assert!(!collected.contains(&"repo-policy"));
+        assert_contains_all(
+            &collected,
+            &[
+                "guard-stop",
+                "context-agent",
+                "validate-agent",
+                "tool-failure",
+            ],
+        );
+        assert_contains_none(&collected, &["repo-policy"]);
     }
 
     #[test]
-    fn enabling_only_repo_policy_keeps_suite_hooks_off() {
-        let flags = RuntimeHookFlags {
-            suite_hooks: false,
-            repo_policy: true,
-        };
-        let regs = process_agent_registrations(HookAgent::Claude, flags);
+    fn repo_policy_flag_is_ignored_by_harness_registrations() {
+        let regs = process_agent_registrations(HookAgent::Claude, RuntimeHookFlags::default());
         let collected = names(&regs);
-        assert!(collected.contains(&"repo-policy"));
-        assert!(!collected.contains(&"guard-stop"));
-        assert!(!collected.contains(&"context-agent"));
-        assert!(!collected.contains(&"validate-agent"));
-        assert!(!collected.contains(&"tool-failure"));
+        assert_contains_none(
+            &collected,
+            &[
+                "repo-policy",
+                "guard-stop",
+                "context-agent",
+                "validate-agent",
+                "tool-failure",
+            ],
+        );
     }
 
     #[test]
-    fn all_enabled_matches_legacy_baseline_for_each_agent() {
+    fn all_enabled_harness_registrations_never_include_repo_policy() {
         for agent in [
             HookAgent::Claude,
             HookAgent::Codex,
@@ -389,32 +371,11 @@ mod tests {
         ] {
             let regs = process_agent_registrations(agent, RuntimeHookFlags::all_enabled());
             let collected = names(&regs);
-            assert!(
-                collected.contains(&"tool-guard"),
-                "{agent:?} missing tool-guard"
-            );
-            assert!(
-                collected.contains(&"tool-result"),
-                "{agent:?} missing tool-result"
-            );
-            assert!(
-                collected.contains(&"repo-policy"),
-                "{agent:?} missing repo-policy"
-            );
-            assert!(
-                collected.contains(&"guard-stop"),
-                "{agent:?} missing guard-stop"
-            );
+            assert_contains_all(&collected, &["tool-guard", "tool-result", "guard-stop"]);
+            assert_contains_none(&collected, &["repo-policy"]);
             // Gemini does not emit subagent gates in the legacy baseline.
             if !matches!(agent, HookAgent::Gemini | HookAgent::Copilot) {
-                assert!(
-                    collected.contains(&"context-agent"),
-                    "{agent:?} missing context-agent"
-                );
-                assert!(
-                    collected.contains(&"validate-agent"),
-                    "{agent:?} missing validate-agent"
-                );
+                assert_contains_all(&collected, &["context-agent", "validate-agent"]);
             }
         }
     }

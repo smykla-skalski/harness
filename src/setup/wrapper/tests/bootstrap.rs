@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
@@ -65,25 +65,68 @@ fn claude_lifecycle_commands_match_hook_template() {
 #[test]
 fn build_codex_config_includes_notify_and_hooks_flag() {
     let config = build_codex_config();
-    assert!(config.contains("\"audit-turn\""));
-    assert!(config.contains("codex_hooks = true"));
-    assert!(!config.contains("[hooks]"));
-    assert!(!config.contains("session_start = ["));
-    assert!(!config.contains("pre_compact = ["));
-    assert!(!config.contains("session_end = ["));
-    assert!(config.contains("Hook definitions stay in hooks.json"));
+    assert_contains_all(
+        &config,
+        &[
+            "\"audit-turn\"",
+            "codex_hooks = true",
+            "Hook definitions stay in hooks.json",
+        ],
+    );
+    assert_contains_none(
+        &config,
+        &[
+            "[hooks]",
+            "session_start = [",
+            "pre_compact = [",
+            "session_end = [",
+        ],
+    );
 }
 
 fn assert_codex_hooks(hooks: &str) {
-    assert!(hooks.contains("\"Stop\""));
-    assert!(hooks.contains("\"UserPromptSubmit\""));
-    assert!(hooks.contains("\"PreToolUse\""));
-    assert!(hooks.contains("\"PostToolUse\""));
-    assert!(hooks.contains("\"SubagentStart\""));
-    assert!(hooks.contains("\"SubagentStop\""));
-    assert!(hooks.contains("repo-policy"));
-    assert!(hooks.contains("tool-guard"));
-    assert!(hooks.contains("tool-result"));
+    assert_contains_all(
+        hooks,
+        &[
+            "\"Stop\"",
+            "\"UserPromptSubmit\"",
+            "\"PreToolUse\"",
+            "\"PostToolUse\"",
+            "\"SubagentStart\"",
+            "\"SubagentStop\"",
+            "tool-guard",
+            "tool-result",
+        ],
+    );
+    assert_contains_none(hooks, &["repo-policy"]);
+}
+
+fn assert_contains_all(haystack: &str, needles: &[&str]) {
+    for needle in needles {
+        assert!(
+            haystack.contains(needle),
+            "missing expected fragment {needle}"
+        );
+    }
+}
+
+fn assert_contains_none(haystack: &str, needles: &[&str]) {
+    for needle in needles {
+        assert!(
+            !haystack.contains(needle),
+            "unexpected fragment present {needle}"
+        );
+    }
+}
+
+fn assert_written_paths(written: &[PathBuf], expected: &[&Path]) {
+    for path in expected {
+        assert!(
+            written.iter().any(|written_path| written_path == *path),
+            "missing written path {}",
+            path.display()
+        );
+    }
 }
 
 #[test]
@@ -102,17 +145,14 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let hooks_path = dir.path().join(".codex").join("hooks.json");
     let config_path = dir.path().join(".codex").join("config.toml");
 
-    assert!(written.contains(&plugin_skill));
-    assert!(written.contains(&hooks_path));
-    assert!(written.contains(&config_path));
+    assert_written_paths(&written, &[&plugin_skill, &hooks_path, &config_path]);
 
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: harness"));
+    assert_contains_all(&skill, &["name: harness"]);
     assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
     let config = fs::read_to_string(config_path).unwrap();
-    assert!(config.contains("\"audit-turn\""));
-    assert!(config.contains("codex_hooks = true"));
-    assert!(!config.contains("[hooks]"));
+    assert_contains_all(&config, &["\"audit-turn\"", "codex_hooks = true"]);
+    assert_contains_none(&config, &["[hooks]"]);
 }
 
 #[test]
@@ -242,21 +282,22 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     assert!(written.contains(&config_path));
     assert!(written.contains(&plugin_skill));
     let config = fs::read_to_string(config_path).unwrap();
-    assert!(config.contains("\"version\": 1"));
-    assert!(config.contains("\"preToolUse\""));
-    assert!(config.contains("\"userPromptSubmitted\""));
-    assert!(config.contains("repo-policy"));
-    assert!(
-        config.contains(
-            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""
-        )
+    assert_contains_all(
+        &config,
+        &[
+            "\"version\": 1",
+            "\"preToolUse\"",
+            "\"userPromptSubmitted\"",
+            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\"",
+        ],
     );
+    assert_contains_none(&config, &["repo-policy"]);
     let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: harness"));
+    assert_contains_all(&skill, &["name: harness"]);
 }
 
 #[test]
-fn rebootstrap_replaces_gated_hooks_with_default_off_shape() {
+fn harness_bootstrap_never_includes_repo_policy_even_with_all_enabled_flags() {
     let dir = tempfile::tempdir().unwrap();
     write_agent_bootstrap(
         dir.path(),
@@ -269,23 +310,10 @@ fn rebootstrap_replaces_gated_hooks_with_default_off_shape() {
     let settings_path = dir.path().join(".claude").join("settings.json");
     let baseline = fs::read_to_string(&settings_path).unwrap();
     assert!(baseline.contains("guard-stop"));
-    assert!(baseline.contains("repo-policy"));
-
-    write_agent_bootstrap(
-        dir.path(),
-        HookAgent::Claude,
-        false,
-        &[],
-        RuntimeHookFlags::default(),
-    )
-    .unwrap();
-    let migrated = fs::read_to_string(&settings_path).unwrap();
-    assert!(!migrated.contains("guard-stop"));
-    assert!(!migrated.contains("context-agent"));
-    assert!(!migrated.contains("validate-agent"));
-    assert!(!migrated.contains("tool-failure"));
-    assert!(!migrated.contains("repo-policy"));
-    assert!(migrated.contains("tool-guard"));
+    assert!(
+        !baseline.contains("repo-policy"),
+        "harness bootstrap should stop generating repo-policy hooks"
+    );
 }
 
 #[test]
