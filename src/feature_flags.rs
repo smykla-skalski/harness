@@ -7,8 +7,8 @@
 //! - `HARNESS_FEATURE_SUITE_HOOKS=1` / `--enable-suite-hooks` re-enables the
 //!   suite lifecycle hooks: `guard-stop`, `context-agent`, `validate-agent`,
 //!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
-//! - `HARNESS_FEATURE_ACP=1` exposes ACP managed-agent start routes while the
-//!   blocking permission modal finishes landing.
+//! - `HARNESS_FEATURE_ACP=0` disables ACP managed-agent start routes. ACP is
+//!   enabled by default now that the blocking permission modal has landed.
 //!
 //! Resolution order: explicit CLI override (when supplied) wins over env vars,
 //! env vars over the disabled-by-default baseline. Truthy values match the
@@ -33,7 +33,7 @@ pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 /// Whether ACP managed-agent routes are enabled.
 #[must_use]
 pub fn acp_enabled_from_env() -> bool {
-    env_truthy(ACP_ENV)
+    normalized_env_value(ACP_ENV).is_none_or(|value| env_value_truthy(&value))
 }
 
 /// Toggles for the optional hook families written into runtime configs.
@@ -80,11 +80,12 @@ impl RuntimeHookFlags {
 }
 
 fn env_truthy(name: &str) -> bool {
+    normalized_env_value(name).is_some_and(|value| env_value_truthy(&value))
+}
+
+fn env_value_truthy(value: &str) -> bool {
     matches!(
-        normalized_env_value(name)
-            .unwrap_or_default()
-            .to_ascii_lowercase()
-            .as_str(),
+        value.to_ascii_lowercase().as_str(),
         "1" | "true" | "yes" | "on"
     )
 }
@@ -105,7 +106,7 @@ mod tests {
         with_clean_env(|| {
             let flags = RuntimeHookFlags::from_env();
             assert!(!flags.suite_hooks);
-            assert!(!acp_enabled_from_env());
+            assert!(acp_enabled_from_env());
         });
     }
 

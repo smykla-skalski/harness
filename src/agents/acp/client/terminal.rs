@@ -104,17 +104,11 @@ impl TerminalManager {
         request: &CreateTerminalRequest,
         denied_binaries: &DeniedBinaries,
     ) -> ClientResult<CreateTerminalResponse> {
-        let command = &request.command;
-
-        if let Some(name) = denied_binary_name(command, &request.args, denied_binaries) {
-            return Err(ClientError::terminal_denied(format!(
-                "denied binary '{name}': use harness commands instead"
-            )));
-        }
+        self.validate_create_request(request, denied_binaries)?;
 
         self.reserve_slot()?;
 
-        let (terminal_id, state) = match self.spawn_terminal(request, command) {
+        let (terminal_id, state) = match self.spawn_terminal(request, &request.command) {
             Ok(terminal) => terminal,
             Err(error) => {
                 self.release_slot();
@@ -128,6 +122,27 @@ impl TerminalManager {
         }
 
         Ok(CreateTerminalResponse::new(TerminalId::new(terminal_id)))
+    }
+
+    pub(super) fn validate_create_request(
+        &self,
+        request: &CreateTerminalRequest,
+        denied_binaries: &DeniedBinaries,
+    ) -> ClientResult<()> {
+        if let Some(name) = denied_binary_name(&request.command, &request.args, denied_binaries) {
+            return Err(ClientError::terminal_denied(format!(
+                "denied binary '{name}': use harness commands instead"
+            )));
+        }
+
+        if *self.active_slots.lock().unwrap() >= self.cap {
+            return Err(ClientError::terminal_denied(format!(
+                "terminal cap reached ({})",
+                self.cap
+            )));
+        }
+
+        Ok(())
     }
 
     fn spawn_terminal(

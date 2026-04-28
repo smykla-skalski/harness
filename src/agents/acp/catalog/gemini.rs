@@ -4,7 +4,7 @@
 //! deliberately catalog-only: Gemini exercises the same supervision,
 //! permission, and filesystem policy paths as every other ACP agent.
 
-use super::{tags, AcpAgentDescriptor, DoctorProbe};
+use super::{AcpAgentDescriptor, DoctorProbe, tags};
 use crate::agents::runtime::models;
 
 const GEMINI_ID: &str = "gemini";
@@ -109,9 +109,11 @@ mod tests {
         let descriptor = descriptor();
         let catalog = descriptor.model_catalog.expect("gemini model catalog");
         assert_eq!(catalog.runtime, "gemini");
-        assert!(catalog
-            .models
-            .iter()
-            .any(|model| model.id == catalog.default));
+        assert!(
+            catalog
+                .models
+                .iter()
+                .any(|model| model.id == catalog.default)
+        );
     }
 }

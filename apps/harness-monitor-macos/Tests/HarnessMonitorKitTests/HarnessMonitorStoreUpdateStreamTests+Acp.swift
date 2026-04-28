@@ -68,6 +68,46 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.presentingAcpPermissionBatch?.batchId == "batch-2")
   }
 
+  @Test("ACP permission batch with same id refreshes presented request set")
+  func acpPermissionBatchWithSameIDRefreshesPresentedRequestSet() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-permission"
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-permission",
+        pendingBatches: []
+      )
+    )
+    let first = makeAcpPermissionBatch(
+      batchID: "batch-1",
+      acpID: "acp-1",
+      sessionID: "sess-acp-permission",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    let replacement = AcpPermissionBatch(
+      batchId: "batch-1",
+      acpId: "acp-1",
+      sessionId: "sess-acp-permission",
+      requests: first.requests + [
+        AcpPermissionItem(
+          requestId: "request-extra",
+          sessionId: "sess-acp-permission",
+          toolCall: .object(["kind": .string("terminal.create")]),
+          options: []
+        )
+      ],
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+
+    store.applyAcpPermissionBatch(first)
+    store.applyAcpPermissionBatch(replacement)
+
+    #expect(store.pendingAcpPermissionBatches.count == 1)
+    let presentedRequestIDs = store.presentingAcpPermissionBatch?.requests.map(\.requestId)
+    #expect(presentedRequestIDs?.contains("request-extra") == true)
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()

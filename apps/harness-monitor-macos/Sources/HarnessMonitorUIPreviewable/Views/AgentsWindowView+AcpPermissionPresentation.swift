@@ -20,6 +20,7 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
           await store.resolveAcpPermission(batch: batch, decision: decision)
         }
       }
+      .interactiveDismissDisabled(true)
     }
   }
 
@@ -27,7 +28,9 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
     Binding {
       store.presentingAcpPermissionBatch
     } set: { batch in
-      store.presentingAcpPermissionBatch = batch
+      if let batch {
+        store.presentingAcpPermissionBatch = batch
+      }
     }
   }
 }

@@ -44,6 +44,31 @@ struct WebSocketProtocolAcpTests {
     #expect(batch.requests.first?.requestId == "request-1")
   }
 
+  @Test("Daemon push event decodes ACP permission timeout as removal")
+  func daemonPushEventDecodesAcpPermissionTimeoutAsRemoval() throws {
+    let json = """
+      {
+        "event": "acp_permission_timeout",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:05:00Z",
+        "payload": {
+          "batch_id": "batch-1",
+          "acp_id": "acp-1",
+          "session_id": "session-1",
+          "created_at": "2026-04-28T00:00:00Z",
+          "requests": []
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpPermissionBatchRemoved(let batch) = event.kind else {
+      Issue.record("Expected ACP permission removal, got \(event.kind)")
+      return
+    }
+    #expect(batch.batchId == "batch-1")
+  }
+
   @Test("Daemon push event decodes ACP events into timeline entries")
   func daemonPushEventDecodesAcpEventsIntoTimelineEntries() throws {
     let json = """

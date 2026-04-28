@@ -56,7 +56,9 @@ fn acp_client(run_dir: &Path) -> HarnessAcpClient {
         run_dir.to_path_buf(),
         None,
         denied_binary_names(),
-        PermissionMode::Stdin,
+        PermissionMode::Recording {
+            log_path: run_dir.join("policy-drift-permissions.ndjson"),
+        },
     )
 }
 

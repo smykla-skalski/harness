@@ -111,6 +111,15 @@ public enum HarnessMonitorPreviewStoreFactory {
         .tuis
       store.selectedAgentTuis = sortedAgentTuis
       store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
+      if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+        == "1"
+      {
+        let pendingBatch = previewAcpPermissionBatch(sessionID: selectedSessionID)
+        store.selectedAcpAgents = [
+          previewAcpAgentSnapshot(sessionID: selectedSessionID, pendingBatch: pendingBatch)
+        ]
+        store.presentingAcpPermissionBatch = pendingBatch
+      }
     }
     store.isSelectionLoading = false
     store.isShowingCachedData = configuration.isShowingCachedData
@@ -118,6 +127,57 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.lastPersistedSnapshotAt = configuration.lastPersistedSnapshotAt
     store.synchronizeActionActor()
     return store
+  }
+
+  private static func previewAcpAgentSnapshot(
+    sessionID: String,
+    pendingBatch: AcpPermissionBatch
+  ) -> AcpAgentSnapshot {
+    AcpAgentSnapshot(
+      acpId: pendingBatch.acpId,
+      sessionId: sessionID,
+      agentId: "copilot",
+      displayName: "GitHub Copilot",
+      status: .active,
+      pid: 41_001,
+      pgid: 41_001,
+      projectDir: "/Users/example/Projects/harness",
+      pendingPermissions: pendingBatch.requests.count,
+      permissionQueueDepth: 0,
+      pendingPermissionBatches: [pendingBatch],
+      terminalCount: 0,
+      createdAt: PreviewHarnessClientState.mutationTimestamp,
+      updatedAt: PreviewHarnessClientState.mutationTimestamp
+    )
+  }
+
+  private static func previewAcpPermissionBatch(sessionID: String) -> AcpPermissionBatch {
+    AcpPermissionBatch(
+      batchId: "preview-acp-permission-1",
+      acpId: "preview-managed-agent-1",
+      sessionId: sessionID,
+      requests: [
+        AcpPermissionItem(
+          requestId: "preview-request-write",
+          sessionId: sessionID,
+          toolCall: .object([
+            "kind": .string("fs.write_text_file"),
+            "path": .string("Sources/App.swift"),
+          ]),
+          options: []
+        ),
+        AcpPermissionItem(
+          requestId: "preview-request-terminal",
+          sessionId: sessionID,
+          toolCall: .object([
+            "kind": .string("terminal.create"),
+            "command": .string("swift test"),
+          ]),
+          options: []
+        ),
+      ],
+      createdAt: PreviewHarnessClientState.mutationTimestamp
+    )
   }
 }
 

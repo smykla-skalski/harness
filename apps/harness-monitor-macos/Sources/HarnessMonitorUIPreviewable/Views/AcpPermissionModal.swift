@@ -28,6 +28,10 @@ struct AcpPermissionModal: View {
       Text(summary)
         .scaledFont(.body)
         .accessibilityLabel(summary)
+      Text(selectionSummary)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityIdentifier("harness.acp-permission.selection-summary")
 
       ScrollView {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -62,6 +66,7 @@ struct AcpPermissionModal: View {
         }
         .keyboardShortcut(.cancelAction)
         .focused($denyFocused)
+        .disabled(isResolving)
         Spacer()
         Button("Approve Selected") {
           resolve(.approveSome(Array(selectedRequestIDs).sorted()))
@@ -78,7 +83,11 @@ struct AcpPermissionModal: View {
     .frame(width: 520)
     .onAppear {
       denyFocused = true
-      AccessibilityNotification.Announcement(summary).post()
+      AccessibilityNotification.Announcement(accessibilityAnnouncement).post()
+    }
+    .onChange(of: requestSignature) { _, _ in
+      selectedRequestIDs = Set(batch.requests.map(\.requestId))
+      AccessibilityNotification.Announcement(accessibilityAnnouncement).post()
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.acp-permission.modal")
@@ -92,6 +101,19 @@ struct AcpPermissionModal: View {
     let count = batch.requests.count
     let suffix = count == 1 ? "action" : "actions"
     return "\(batch.acpId) wants approval for \(count) \(suffix)."
+  }
+
+  private var selectionSummary: String {
+    "\(selectedRequestIDs.count) of \(batch.requests.count) selected"
+  }
+
+  private var requestSignature: String {
+    batch.requests.map(\.requestId).joined(separator: "|")
+  }
+
+  private var accessibilityAnnouncement: String {
+    let details = batch.requests.map(permissionDetail(for:)).joined(separator: ", ")
+    return details.isEmpty ? summary : "\(summary) \(details)"
   }
 
   private func updateSelection(_ requestID: String, isSelected: Bool) {

@@ -1,5 +1,7 @@
 //! Tests for ACP client handlers.
 
+mod bridge;
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -33,7 +35,15 @@ fn setup_client() -> (TempDir, HarnessAcpClient) {
     denied.insert("kubectl".to_string());
     denied.insert("kumactl".to_string());
 
-    let client = HarnessAcpClient::new(working_dir, run_dir, None, denied, PermissionMode::Stdin);
+    let client = HarnessAcpClient::new(
+        working_dir,
+        run_dir.clone(),
+        None,
+        denied,
+        PermissionMode::Recording {
+            log_path: run_dir.join("permission-log.ndjson"),
+        },
+    );
 
     (temp, client)
 }

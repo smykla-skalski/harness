@@ -6,6 +6,10 @@ extension PreviewHarnessClientState {
     request: AcpAgentStartRequest
   ) -> AcpAgentSnapshot {
     nextAcpAgentSequence += 1
+    let permissionBatches = previewPermissionBatches(
+      sessionID: sessionID,
+      acpID: "preview-managed-agent-\(nextAcpAgentSequence)"
+    )
     let snapshot = AcpAgentSnapshot(
       acpId: "preview-managed-agent-\(nextAcpAgentSequence)",
       sessionId: sessionID,
@@ -16,9 +20,9 @@ extension PreviewHarnessClientState {
       pgid: Int32(40_000 + nextAcpAgentSequence),
       projectDir: request.projectDir ?? fallbackDetail?.session.projectDir
         ?? "/Users/example/Projects/harness",
-      pendingPermissions: 0,
+      pendingPermissions: permissionBatches.reduce(0) { $0 + $1.requests.count },
       permissionQueueDepth: 0,
-      pendingPermissionBatches: [],
+      pendingPermissionBatches: permissionBatches,
       terminalCount: 0,
       createdAt: Self.mutationTimestamp,
       updatedAt: Self.mutationTimestamp
@@ -63,6 +67,28 @@ extension PreviewHarnessClientState {
       acpAgentsBySessionID[sessionID] = updatedAgents
       return updated
     }
+    let seedsPermission =
+      ProcessInfo.processInfo.environment[
+        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
+      ] == "1"
+    if seedsPermission, let sessionID = fallbackDetail?.session.sessionId {
+      return AcpAgentSnapshot(
+        acpId: agentID,
+        sessionId: sessionID,
+        agentId: "copilot",
+        displayName: "GitHub Copilot",
+        status: .active,
+        pid: 41_001,
+        pgid: 41_001,
+        projectDir: fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+        pendingPermissions: 0,
+        permissionQueueDepth: 0,
+        pendingPermissionBatches: [],
+        terminalCount: 0,
+        createdAt: Self.mutationTimestamp,
+        updatedAt: Self.mutationTimestamp
+      )
+    }
     return nil
   }
 
@@ -71,5 +97,44 @@ extension PreviewHarnessClientState {
     let codex = (codexRunsBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.codex)
     let acp = (acpAgentsBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.acp)
     return terminals + codex + acp
+  }
+
+  private func previewPermissionBatches(
+    sessionID: String,
+    acpID: String
+  ) -> [AcpPermissionBatch] {
+    guard
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
+    else {
+      return []
+    }
+    return [
+      AcpPermissionBatch(
+        batchId: "preview-acp-permission-1",
+        acpId: acpID,
+        sessionId: sessionID,
+        requests: [
+          AcpPermissionItem(
+            requestId: "preview-request-write",
+            sessionId: sessionID,
+            toolCall: .object([
+              "kind": .string("fs.write_text_file"),
+              "path": .string("Sources/App.swift"),
+            ]),
+            options: []
+          ),
+          AcpPermissionItem(
+            requestId: "preview-request-terminal",
+            sessionId: sessionID,
+            toolCall: .object([
+              "kind": .string("terminal.create"),
+              "command": .string("swift test"),
+            ]),
+            options: []
+          ),
+        ],
+        createdAt: Self.mutationTimestamp
+      )
+    ]
   }
 }
