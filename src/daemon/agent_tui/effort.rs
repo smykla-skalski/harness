@@ -27,58 +27,70 @@ pub(super) fn apply_effort_to_profile(
     allow_custom: bool,
 ) -> Result<(), CliError> {
     if !allow_custom {
-        let catalog = models::catalog_for(&profile.runtime).ok_or_else(|| {
-            CliErrorKind::workflow_parse(format!("unknown runtime '{}'", profile.runtime))
-        })?;
-        let model_id = model.unwrap_or(catalog.default.as_str());
-        let model_entry = catalog
-            .models
-            .iter()
-            .find(|entry| entry.id == model_id)
-            .ok_or_else(|| {
-                CliErrorKind::workflow_parse(format!(
-                    "model '{model_id}' is not valid for runtime '{}'",
-                    profile.runtime
-                ))
-            })?;
-        if !model_entry.supports_effort() {
-            return Err(CliErrorKind::workflow_parse(format!(
-                "model '{model_id}' does not support an effort level"
-            ))
-            .into());
-        }
-        if !model_entry
-            .effort_values
-            .iter()
-            .any(|value| value == effort)
-        {
-            return Err(CliErrorKind::workflow_parse(format!(
-                "effort '{effort}' is not valid for model '{model_id}': valid values are {}",
-                model_entry.effort_values.join(", ")
-            ))
-            .into());
-        }
+        validate_effort_against_catalog(&profile.runtime, model, effort)?;
     }
+    let args = resolve_effort_args(&profile.runtime, effort)?;
+    profile.argv.extend(args);
+    Ok(())
+}
 
-    let Some(runtime_adapter) = runtime_for_name(&profile.runtime) else {
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn resolve_effort_args(runtime: &str, effort: &str) -> Result<Vec<String>, CliError> {
+    let Some(runtime_adapter) = runtime_for_name(runtime) else {
         return Err(CliErrorKind::workflow_parse(format!(
-            "unsupported terminal agent runtime '{}'",
-            profile.runtime
+            "unsupported terminal agent runtime '{runtime}'"
         ))
         .into());
     };
 
-    let Some(flag) = runtime_adapter.effort_flag() else {
+    let args = runtime_adapter.effort_args(effort);
+    if args.is_empty() {
         tracing::warn!(
-            runtime = %profile.runtime,
+            %runtime,
             requested_effort = %effort,
             "runtime does not accept an effort flag; ignoring requested effort"
         );
-        return Ok(());
-    };
+    }
+    Ok(args)
+}
 
-    profile.argv.push(flag.to_string());
-    profile.argv.push(effort.to_string());
+fn validate_effort_against_catalog(
+    runtime: &str,
+    model: Option<&str>,
+    effort: &str,
+) -> Result<(), CliError> {
+    let catalog = models::catalog_for(runtime)
+        .ok_or_else(|| CliErrorKind::workflow_parse(format!("unknown runtime '{runtime}'")))?;
+    let model_id = model.unwrap_or(catalog.default.as_str());
+    let model_entry = catalog
+        .models
+        .iter()
+        .find(|entry| entry.id == model_id)
+        .ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "model '{model_id}' is not valid for runtime '{runtime}'"
+            ))
+        })?;
+    if !model_entry.supports_effort() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "model '{model_id}' does not support an effort level"
+        ))
+        .into());
+    }
+    if !model_entry
+        .effort_values
+        .iter()
+        .any(|value| value == effort)
+    {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "effort '{effort}' is not valid for model '{model_id}': valid values are {}",
+            model_entry.effort_values.join(", ")
+        ))
+        .into());
+    }
     Ok(())
 }
 
@@ -122,8 +134,8 @@ mod tests {
                 "codex".to_string(),
                 "--model".to_string(),
                 "gpt-5.5".to_string(),
-                "--reasoning-effort".to_string(),
-                "medium".to_string(),
+                "-c".to_string(),
+                "model_reasoning_effort=medium".to_string(),
             ]
         );
     }
@@ -156,8 +168,8 @@ mod tests {
                 "codex".to_string(),
                 "--model".to_string(),
                 "gpt-5.3-codex-spark".to_string(),
-                "--reasoning-effort".to_string(),
-                "medium".to_string(),
+                "-c".to_string(),
+                "model_reasoning_effort=medium".to_string(),
             ]
         );
     }
@@ -184,8 +196,8 @@ mod tests {
             profile.argv,
             vec![
                 "codex".to_string(),
-                "--reasoning-effort".to_string(),
-                "low".to_string(),
+                "-c".to_string(),
+                "model_reasoning_effort=low".to_string(),
             ]
         );
     }
@@ -219,8 +231,8 @@ mod tests {
                 "codex".to_string(),
                 "--model".to_string(),
                 "gpt-6-private".to_string(),
-                "--reasoning-effort".to_string(),
-                "maximum".to_string(),
+                "-c".to_string(),
+                "model_reasoning_effort=maximum".to_string(),
             ]
         );
     }
@@ -297,8 +309,17 @@ mod tests {
     }
 
     #[test]
-    fn codex_effort_env_is_empty_because_flag_based() {
+    fn codex_effort_env_is_empty_because_config_based() {
         let codex = runtime_for_name("codex").expect("codex runtime");
         assert!(codex.effort_env("medium").is_empty());
+    }
+
+    #[test]
+    fn codex_effort_args_uses_config_override() {
+        let codex = runtime_for_name("codex").expect("codex runtime");
+        assert_eq!(
+            codex.effort_args("high"),
+            vec!["-c".to_string(), "model_reasoning_effort=high".to_string()]
+        );
     }
 }
