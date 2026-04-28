@@ -131,6 +131,11 @@ pub(crate) fn start_task_for_agent(
     task.updated_at = now.to_string();
 
     if let Some(agent) = state.agents.get_mut(agent_id) {
+        // Eagerly mark the agent as occupied by this task so a subsequent
+        // drop_task on a different task is queued and a re-drop of this same
+        // task is detected by the cleared-pointer path above. The signal-ack
+        // handler reaffirms this pointer when the worker actually starts.
+        agent.current_task_id = Some(task_id.to_string());
         agent.updated_at = now.to_string();
     }
 

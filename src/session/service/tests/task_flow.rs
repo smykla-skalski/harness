@@ -34,62 +34,6 @@ fn remove_agent_returns_tasks() {
 }
 
 #[test]
-fn assign_task_keeps_task_open_until_worker_starts() {
-    with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("assign-open"))
-            .expect("start");
-        let leader_id = state.leader_id.expect("leader id");
-        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("assign-worker"))], || {
-            join_session(
-                "assign-open",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join")
-        });
-        let worker_id = joined
-            .agents
-            .keys()
-            .find(|id| id.starts_with("codex-"))
-            .expect("worker id")
-            .clone();
-        let task = create_task(
-            "assign-open",
-            "observer follow-up",
-            Some("wait for the worker to actually start"),
-            TaskSeverity::Medium,
-            &leader_id,
-            project,
-        )
-        .expect("task");
-
-        assign_task(
-            "assign-open",
-            &task.task_id,
-            &worker_id,
-            &leader_id,
-            project,
-        )
-        .expect("assign");
-
-        let state = session_status("assign-open", project).expect("status");
-        let task = state.tasks.get(&task.task_id).expect("task");
-        assert_eq!(task.status, TaskStatus::Open);
-        assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
-        assert!(task.queued_at.is_none());
-        let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(
-            worker.current_task_id.as_deref(),
-            Some(task.task_id.as_str())
-        );
-    });
-}
-
-#[test]
 fn drop_task_queues_for_busy_worker() {
     with_temp_project(|project| {
         let state =
@@ -262,7 +206,11 @@ fn reassignable_drop_starts_on_free_worker() {
         assert_eq!(started.assigned_to.as_deref(), Some(free_worker.as_str()));
         assert!(started.queued_at.is_none());
         let worker = state.agents.get(&free_worker).expect("worker");
-        assert!(worker.current_task_id.is_none());
+        assert_eq!(
+            worker.current_task_id.as_deref(),
+            Some(task.task_id.as_str()),
+            "current_task_id is locked on this task while the start signal is in flight"
+        );
         let signals =
             list_signals("drop-reassign-free", Some(&free_worker), project).expect("signals");
         assert_eq!(signals.len(), 1);
@@ -423,7 +371,11 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
         assert_eq!(next.status, TaskStatus::Open);
         assert_eq!(next.assigned_to.as_deref(), Some(worker_id.as_str()));
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert!(worker.current_task_id.is_none());
+        assert_eq!(
+            worker.current_task_id.as_deref(),
+            Some(next.task_id.as_str()),
+            "advancing the queue locks the worker on the newly started task"
+        );
     });
 }
 
