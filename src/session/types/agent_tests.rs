@@ -1,4 +1,8 @@
 use clap::ValueEnum;
+use serde_json::json;
+
+use crate::agents::kind::{DisconnectReason, RuntimeKind};
+use crate::hooks::adapters::HookAgent;
 
 use super::test_support::{agent_registration, persona};
 use super::{AgentPersona, AgentRegistration, AgentStatus, PersonaSymbol, SessionRole};
@@ -15,6 +19,39 @@ fn idle_agent_status_serde_round_trip() {
     assert_eq!(status, AgentStatus::Idle);
     let serialized = serde_json::to_string(&status).expect("serializes");
     assert_eq!(serialized, r#""idle""#);
+}
+
+#[test]
+fn disconnected_agent_status_serializes_reason_and_stderr_tail() {
+    let status = AgentStatus::Disconnected {
+        reason: DisconnectReason::ProcessExited {
+            code: Some(137),
+            signal: None,
+        },
+        stderr_tail: Some("killed".to_string()),
+    };
+
+    let serialized = serde_json::to_value(&status).expect("serializes disconnected status");
+
+    assert_eq!(
+        serialized,
+        json!({
+            "state": "disconnected",
+            "reason": {
+                "kind": "process_exited",
+                "code": 137
+            },
+            "stderr_tail": "killed"
+        })
+    );
+}
+
+#[test]
+fn legacy_disconnected_agent_status_deserializes_with_unknown_reason() {
+    let status: AgentStatus =
+        serde_json::from_str(r#""disconnected""#).expect("deserializes legacy disconnected");
+
+    assert_eq!(status, AgentStatus::disconnected_unknown());
 }
 
 #[test]
@@ -90,6 +127,7 @@ fn agent_registration_without_persona_deserializes() {
     }"#;
     let reg: AgentRegistration = serde_json::from_str(json).expect("deserializes");
     assert_eq!(reg.agent_id, "a1");
+    assert_eq!(reg.runtime, RuntimeKind::Tui(HookAgent::Codex));
     assert!(
         reg.persona.is_none(),
         "missing persona should default to None"
@@ -134,4 +172,13 @@ fn agent_registration_persona_skipped_when_none() {
         !json.contains("persona"),
         "persona key should be omitted when None"
     );
+}
+
+#[test]
+fn agent_registration_runtime_serializes_as_tagged_kind() {
+    let reg = agent_registration("a1", "codex", SessionRole::Worker, AgentStatus::Active);
+
+    let json = serde_json::to_value(&reg).expect("serializes registration");
+
+    assert_eq!(json["runtime"], json!({ "kind": "tui", "id": "codex" }));
 }
