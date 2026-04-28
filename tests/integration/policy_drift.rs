@@ -1,10 +1,10 @@
 // Policy drift integration test.
 //
 // Catches divergence between the free-function write-surface policy
-// (`agents::policy::evaluate_write`) and the TUI hook handler
-// (`hooks::guard_write`). Both call sites must produce identical decisions
-// for the same inputs; when they diverge, either the policy needs updating
-// or the hook needs refactoring to call the shared function.
+// (`agents::policy::evaluate_write`), the TUI hook handler (`hooks::guard_write`),
+// and the ACP `Client::write_text_file` handler. All call sites must produce
+// identical decisions for the same inputs; when they diverge, either the policy
+// needs updating or one call site has drifted off the shared function.
 //
 // Fixture set: the nasty-input cases that tend to expose policy drift:
 // - `..` traversal
@@ -13,15 +13,15 @@
 // - file inside denied dir
 // - canonical-vs-non-canonical paths
 //
-// When ACP `Client::write_text_file` lands (Chunk 4), extend this test to
-// also drive the ACP path through the same fixtures.
-
 use std::collections::BTreeSet;
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
+use agent_client_protocol::schema::WriteTextFileRequest;
+use harness::agents::acp::client::HarnessAcpClient;
+use harness::agents::acp::permission::PermissionMode;
 use harness::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use harness::hooks::guard_write;
 use harness::hooks::hook_result::Decision;
@@ -39,12 +39,25 @@ struct DriftFixture {
     setup: Option<Box<dyn Fn(&Path, &Path) + Send + Sync>>,
 }
 
-fn denied_binaries() -> DeniedBinaries {
-    let names: BTreeSet<String> = ["kubectl", "kumactl", "helm", "docker", "k3d"]
+fn denied_binary_names() -> BTreeSet<String> {
+    ["kubectl", "kumactl", "helm", "docker", "k3d"]
         .iter()
         .map(|s| (*s).to_string())
-        .collect();
-    DeniedBinaries::new(names)
+        .collect()
+}
+
+fn denied_binaries() -> DeniedBinaries {
+    DeniedBinaries::new(denied_binary_names())
+}
+
+fn acp_client(run_dir: &Path) -> HarnessAcpClient {
+    HarnessAcpClient::new(
+        run_dir.to_path_buf(),
+        run_dir.to_path_buf(),
+        None,
+        denied_binary_names(),
+        PermissionMode::Stdin,
+    )
 }
 
 fn make_fixtures(run_dir: &Path, outside: &Path) -> Vec<DriftFixture> {
@@ -109,7 +122,7 @@ fn make_fixtures(run_dir: &Path, outside: &Path) -> Vec<DriftFixture> {
         // Outside surface
         DriftFixture {
             name: "outside_absolute",
-            path: PathBuf::from("/tmp/evil.txt"),
+            path: outside.join("evil.txt"),
             expected_allow: false,
             setup: None,
         },
@@ -149,6 +162,12 @@ fn make_fixtures(run_dir: &Path, outside: &Path) -> Vec<DriftFixture> {
         DriftFixture {
             name: "root_file_not_allowed",
             path: run_dir.join("random.txt"),
+            expected_allow: false,
+            setup: None,
+        },
+        DriftFixture {
+            name: "file_inside_denied_dir",
+            path: run_dir.join("reports/generated.md"),
             expected_allow: false,
             setup: None,
         },
@@ -210,7 +229,19 @@ fn test_hook(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &s
     );
 }
 
-/// Run both policy and hook against the same fixture, assert agreement.
+/// Test the ACP handler and verify it agrees with the policy.
+fn test_acp_client(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &str) {
+    let client = acp_client(run_dir);
+    let request = WriteTextFileRequest::new("policy-drift", path, "policy drift fixture");
+    let result = client.handle_write_text_file(&request);
+    assert_eq!(
+        result.is_ok(),
+        expected_allow,
+        "acp drift: fixture '{fixture_name}' expected allow={expected_allow}, got {result:?}",
+    );
+}
+
+/// Run policy, hook, and ACP handler against the same fixture, assert agreement.
 fn assert_no_drift(
     fixture: &DriftFixture,
     run_dir: &Path,
@@ -233,10 +264,13 @@ fn assert_no_drift(
 
     // Test hook handler
     test_hook(&fixture.path, run_dir, fixture.expected_allow, fixture.name);
+
+    // Test ACP handler
+    test_acp_client(&fixture.path, run_dir, fixture.expected_allow, fixture.name);
 }
 
 #[test]
-fn policy_and_hook_produce_identical_decisions() {
+fn policy_hook_and_acp_produce_identical_decisions() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let outside = tmp.path().join("outside");
@@ -252,7 +286,7 @@ fn policy_and_hook_produce_identical_decisions() {
 
 #[cfg(unix)]
 #[test]
-fn policy_and_hook_agree_on_symlink_escape() {
+fn policy_hook_and_acp_agree_on_symlink_escape() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let outside = tmp.path().join("outside");
