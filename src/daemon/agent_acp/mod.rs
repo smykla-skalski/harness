@@ -5,10 +5,12 @@
 //! PTY-oriented `agent_tui` manager.
 
 mod active;
+mod local_runtime;
 mod manager;
 mod permission_bridge;
 mod pool_key;
 mod protocol;
+mod sandbox_proxy;
 
 pub use manager::{
     AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle, AcpAgentSnapshot,

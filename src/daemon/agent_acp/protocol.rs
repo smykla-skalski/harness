@@ -30,6 +30,8 @@ use crate::agents::kind::DisconnectReason;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
+mod session_guard;
+use session_guard::SessionRouteGuard;
 
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 
@@ -132,10 +134,13 @@ async fn run_protocol(args: RunProtocolArgs) {
         disconnect_tx,
     } = args;
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
+    let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext {
         client,
         supervisor: Arc::clone(&supervisor),
+        session_guard: Arc::clone(&session_guard),
     };
+    let notification_guard = Arc::clone(&session_guard);
     let read_context = context.clone();
     let write_context = context.clone();
     let create_terminal_context = context.clone();
@@ -149,6 +154,9 @@ async fn run_protocol(args: RunProtocolArgs) {
         .name("harness")
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
+                if let Err(error) = notification_guard.ensure_known(&notification.session_id) {
+                    return Err(client_error_to_acp(error));
+                }
                 notifications
                     .send(notification)
                     .await
@@ -212,7 +220,15 @@ async fn run_protocol(args: RunProtocolArgs) {
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(transport, async move |connection| {
-            run_connection(connection, project_dir, prompt, supervisor, cancel_rx).await
+            run_connection(
+                connection,
+                project_dir,
+                prompt,
+                supervisor,
+                cancel_rx,
+                session_guard,
+            )
+            .await
         })
         .await;
     report_protocol_result(result, disconnect_tx).await;
@@ -259,12 +275,14 @@ async fn run_connection(
     prompt: Option<String>,
     supervisor: Arc<AcpSessionSupervisor>,
     mut cancel_rx: mpsc::UnboundedReceiver<()>,
+    session_guard: Arc<SessionRouteGuard>,
 ) -> agent_client_protocol::Result<()> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
     send_initialize(&connection, initialize_timeout).await?;
     let session_id = send_new_session(&connection, project_dir).await?;
+    session_guard.set_expected(session_id.clone());
 
     if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty())
         && send_prompt_or_cancel(
@@ -365,6 +383,7 @@ fn send_cancel_notification(
 struct ProtocolContext {
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
+    session_guard: Arc<SessionRouteGuard>,
 }
 
 impl ProtocolContext {
@@ -373,6 +392,7 @@ impl ProtocolContext {
         request: &ReadTextFileRequest,
     ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_read_text_file(request)
         })
@@ -383,6 +403,7 @@ impl ProtocolContext {
         request: &WriteTextFileRequest,
     ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_write_text_file(request)
         })
@@ -393,6 +414,7 @@ impl ProtocolContext {
         request: &CreateTerminalRequest,
     ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_create_terminal(request)
         })
@@ -403,6 +425,7 @@ impl ProtocolContext {
         request: &TerminalOutputRequest,
     ) -> ClientResult<<TerminalOutputRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_terminal_output(request)
         })
@@ -413,6 +436,7 @@ impl ProtocolContext {
         request: &ReleaseTerminalRequest,
     ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_release_terminal(request)
         })
@@ -423,6 +447,7 @@ impl ProtocolContext {
         request: &WaitForTerminalExitRequest,
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_wait_for_terminal_exit(request)
         })
@@ -433,6 +458,7 @@ impl ProtocolContext {
         request: &KillTerminalRequest,
     ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_kill_terminal(request)
         })
@@ -443,6 +469,7 @@ impl ProtocolContext {
         request: RequestPermissionRequest,
     ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
+        self.session_guard.ensure_known(&request.session_id)?;
         spawn_blocking(move || {
             with_client_call(&self.supervisor, || {
                 self.client.handle_request_permission(&request)

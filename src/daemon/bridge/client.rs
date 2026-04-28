@@ -5,7 +5,11 @@ use std::path::PathBuf;
 use fs_err as fs;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
+use crate::daemon::agent_acp::{
+    AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpPermissionDecision,
+};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiSnapshot};
+use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{LivenessMode, resolve_running_bridge};
@@ -311,6 +315,92 @@ impl BridgeClient {
         }
         Ok(stream)
     }
+
+    pub fn acp_start(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+    ) -> Result<AcpAgentSnapshot, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "start",
+            &BridgeAcpStartRequest {
+                session_id: session_id.to_string(),
+                request: request.clone(),
+            },
+        )
+    }
+
+    pub fn acp_list(&self, session_id: &str) -> Result<Vec<AcpAgentSnapshot>, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "list",
+            &BridgeAcpListRequest {
+                session_id: session_id.to_string(),
+            },
+        )
+    }
+
+    pub fn acp_inspect(
+        &self,
+        session_id: Option<&str>,
+    ) -> Result<AcpAgentInspectResponse, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "inspect",
+            &BridgeAcpInspectRequest {
+                session_id: session_id.map(ToOwned::to_owned),
+            },
+        )
+    }
+
+    pub fn acp_get(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "get",
+            &BridgeAcpGetRequest {
+                acp_id: acp_id.to_string(),
+            },
+        )
+    }
+
+    pub fn acp_stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "stop",
+            &BridgeAcpGetRequest {
+                acp_id: acp_id.to_string(),
+            },
+        )
+    }
+
+    pub fn acp_resolve_permission(
+        &self,
+        acp_id: &str,
+        batch_id: &str,
+        decision: &AcpPermissionDecision,
+    ) -> Result<AcpAgentSnapshot, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "resolve_permission",
+            &BridgeAcpResolvePermissionRequest {
+                acp_id: acp_id.to_string(),
+                batch_id: batch_id.to_string(),
+                decision: decision.clone(),
+            },
+        )
+    }
+
+    pub(crate) fn acp_events_since(
+        &self,
+        after_seq: Option<u64>,
+    ) -> Result<BridgeAcpEventsResponse, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "events_since",
+            &BridgeAcpEventsRequest { after_seq },
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -333,4 +423,45 @@ pub(super) struct BridgeInputRequest {
 pub(super) struct BridgeResizeRequest {
     pub(super) tui_id: String,
     pub(super) request: AgentTuiResizeRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpStartRequest {
+    pub(super) session_id: String,
+    pub(super) request: AcpAgentStartRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpListRequest {
+    pub(super) session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpInspectRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpGetRequest {
+    pub(super) acp_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpResolvePermissionRequest {
+    pub(super) acp_id: String,
+    pub(super) batch_id: String,
+    pub(super) decision: AcpPermissionDecision,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpEventsRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) after_seq: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct BridgeAcpEventsResponse {
+    pub(crate) next_seq: u64,
+    pub(crate) events: Vec<StreamEvent>,
 }

@@ -53,6 +53,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     Some("smoke the second descriptor".to_string()),
                     protocol_supervisor,
                     cancel_rx,
+                    Arc::new(SessionRouteGuard::default()),
                 )
                 .await
             })
@@ -152,4 +153,33 @@ fn disconnect_reason_keeps_non_deadline_errors_as_stdio_closed() {
         disconnect_reason_from_error(&error),
         DisconnectReason::StdioClosed
     );
+}
+
+#[test]
+fn session_route_guard_rejects_before_initialization() {
+    let guard = SessionRouteGuard::default();
+    let error = guard
+        .ensure_known(&SessionId::new("acp-session-1"))
+        .expect_err("guard should reject before initialization");
+    assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
+}
+
+#[test]
+fn session_route_guard_rejects_stale_session_id() {
+    let guard = SessionRouteGuard::default();
+    guard.set_expected(SessionId::new("acp-session-1"));
+    let error = guard
+        .ensure_known(&SessionId::new("acp-session-2"))
+        .expect_err("guard should reject unknown session id");
+    assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
+}
+
+#[test]
+fn session_route_guard_accepts_expected_session_id() {
+    let guard = SessionRouteGuard::default();
+    let session_id = SessionId::new("acp-session-1");
+    guard.set_expected(session_id.clone());
+    guard
+        .ensure_known(&session_id)
+        .expect("guard should accept expected session id");
 }
