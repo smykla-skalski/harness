@@ -27,6 +27,15 @@ import sys
 from pathlib import Path
 
 PROJECT_OBJECT_VERSION_RE = re.compile(r"^(\tobjectVersion = )\d+;$", re.MULTILINE)
+SEMVER_FRAGMENT = r"\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?"
+MARKETING_VERSION_RE = re.compile(
+    rf"^(?P<prefix>\t+MARKETING_VERSION = ){SEMVER_FRAGMENT};$",
+    re.MULTILINE,
+)
+CURRENT_PROJECT_VERSION_RE = re.compile(
+    rf"^(?P<prefix>\t+CURRENT_PROJECT_VERSION = ){SEMVER_FRAGMENT};$",
+    re.MULTILINE,
+)
 
 PBXPROJECT_BLOCK_RE = re.compile(
     r"(\t\t[0-9A-F]{24} /\* Project object \*/ = \{\n"
@@ -218,12 +227,31 @@ def upsert_disabled_mac_app_group_metadata(text: str) -> str:
     return text
 
 
+def normalize_generated_versions(
+    text: str,
+    *,
+    marketing_version: str | None,
+    current_project_version: str | None,
+) -> str:
+    if marketing_version:
+        text = MARKETING_VERSION_RE.sub(rf"\g<prefix>{marketing_version};", text)
+    if current_project_version:
+        text = CURRENT_PROJECT_VERSION_RE.sub(
+            rf"\g<prefix>{current_project_version};",
+            text,
+        )
+    return text
+
+
 def patch_pbxproj(
     pbxproj_path: Path,
     last_upgrade: str,
     last_swift_update: str,
     object_version: str,
     preferred_project_object_version: str,
+    *,
+    marketing_version: str | None = None,
+    current_project_version: str | None = None,
 ) -> None:
     text = pbxproj_path.read_text()
     text = normalize_project_format(
@@ -235,6 +263,11 @@ def patch_pbxproj(
     text = upsert_project_attribute(text, "LastUpgradeCheck", last_upgrade)
     text = strip_target_attribute_signing_metadata(text)
     text = upsert_disabled_mac_app_group_metadata(text)
+    text = normalize_generated_versions(
+        text,
+        marketing_version=marketing_version,
+        current_project_version=current_project_version,
+    )
     pbxproj_path.write_text(text)
 
 
@@ -245,6 +278,8 @@ def main() -> int:
     object_version = os.environ["HARNESS_MONITOR_PROJECT_OBJECT_VERSION"]
     preferred_project_object_version = os.environ["HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION"]
     repo_root = Path(os.environ["HARNESS_MONITOR_REPO_ROOT"])
+    marketing_version = os.environ.get("HARNESS_MONITOR_MARKETING_VERSION")
+    current_project_version = os.environ.get("HARNESS_MONITOR_CURRENT_PROJECT_VERSION")
 
     patch_pbxproj(
         main_pbxproj,
@@ -252,6 +287,8 @@ def main() -> int:
         last_swift_update,
         object_version,
         preferred_project_object_version,
+        marketing_version=marketing_version,
+        current_project_version=current_project_version,
     )
 
     # Tuist generates standalone xcodeprojs for external SPM packages it
