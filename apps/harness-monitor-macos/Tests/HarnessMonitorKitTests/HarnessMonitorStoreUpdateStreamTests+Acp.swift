@@ -145,6 +145,46 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.pendingAcpPermissionBatches.isEmpty)
   }
 
+  @Test("ACP reconcile keeps snapshot batch authoritative over stale standalone cache")
+  func acpReconcilePrefersSnapshotBatchOverStandaloneCache() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-reconcile"
+
+    let stale = makeAcpPermissionBatch(
+      batchID: "batch-1",
+      acpID: "acp-1",
+      sessionID: "sess-acp-reconcile",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    store.applyAcpPermissionBatch(stale)
+
+    let fresh = AcpPermissionBatch(
+      batchId: "batch-1",
+      acpId: "acp-1",
+      sessionId: "sess-acp-reconcile",
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-fresh",
+          sessionId: "sess-acp-reconcile",
+          toolCall: .object(["kind": .string("write")]),
+          options: [.string("allow")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:02Z"
+    )
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-reconcile",
+        agents: [makeAcpSnapshot(acpID: "acp-1", sessionID: "sess-acp-reconcile", pendingBatches: [fresh])]
+      )
+    )
+
+    #expect(store.standaloneAcpPermissionBatches.isEmpty)
+    let requests = store.selectedAcpAgents.first?.pendingPermissionBatches.first?.requests.map(\.requestId)
+    #expect(requests == ["request-fresh"])
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()

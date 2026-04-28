@@ -170,6 +170,8 @@ impl AcpAgentManagerHandle {
                                 continue;
                             }
                         }
+                        // After authoritative reconcile, replay only timeline batches.
+                        // State-mutating ACP events can be stale relative to reconcile.
                         replay_events = replay_safe_resync_events(replay_events);
                     }
                     self.set_sandbox_event_epoch(Some(response_epoch));
