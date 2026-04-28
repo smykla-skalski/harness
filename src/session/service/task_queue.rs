@@ -28,9 +28,14 @@ pub(crate) fn apply_drop_task_on_agent(
         .ok_or_else(|| task_not_found(task_id))?
         .assigned_to
         .clone();
-    if let Some(previous_assignee) = previous_assignee.as_deref()
-        && previous_assignee != agent_id
-    {
+    if let Some(previous_assignee) = previous_assignee.as_deref() {
+        // Clear the current_task_id pointer regardless of whether the previous
+        // assignee was a different agent or the same one we are dropping onto:
+        // the pointer reflects "this task is owned" and the drop is the
+        // canonical way to (re-)deliver it. Leaving the pointer set when the
+        // target equals the previous assignee makes is_worker_free below treat
+        // the agent as busy with this same task, which queues the task behind
+        // itself instead of starting it.
         clear_agent_current_task(state, previous_assignee, task_id, now);
     }
 
