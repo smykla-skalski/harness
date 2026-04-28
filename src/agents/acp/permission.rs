@@ -128,20 +128,15 @@ pub fn standard_permission_options() -> Vec<PermissionOption> {
 /// Uses the permission option kind, not the option ID string, to avoid
 /// fragile substring matching (e.g., `disallow_once` would match `allow`).
 #[must_use]
-pub fn is_allow_outcome(
-    outcome: &RequestPermissionOutcome,
-    options: &[PermissionOption],
-) -> bool {
+pub fn is_allow_outcome(outcome: &RequestPermissionOutcome, options: &[PermissionOption]) -> bool {
     match outcome {
-        RequestPermissionOutcome::Selected(selected) => {
-            options.iter().any(|opt| {
-                opt.option_id == selected.option_id
-                    && matches!(
-                        opt.kind,
-                        PermissionOptionKind::AllowOnce | PermissionOptionKind::AllowAlways
-                    )
-            })
-        }
+        RequestPermissionOutcome::Selected(selected) => options.iter().any(|opt| {
+            opt.option_id == selected.option_id
+                && matches!(
+                    opt.kind,
+                    PermissionOptionKind::AllowOnce | PermissionOptionKind::AllowAlways
+                )
+        }),
         RequestPermissionOutcome::Cancelled | _ => false,
     }
 }
