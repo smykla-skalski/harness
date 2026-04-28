@@ -140,6 +140,10 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: CodexRunRequest
   ) async throws -> ManagedAgentSnapshot
+  func startManagedAcpAgent(
+    sessionID: String,
+    request: AcpAgentStartRequest
+  ) async throws -> ManagedAgentSnapshot
   func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest
@@ -159,6 +163,9 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     approvalID: String,
     request: CodexApprovalDecisionRequest
   ) async throws -> ManagedAgentSnapshot
+  func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse
+  func acpAgentDescriptors() async throws -> [AcpAgentDescriptor]
+  func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse
   func codexRuns(sessionID: String) async throws -> CodexRunListResponse
   func codexRun(runID: String) async throws -> CodexRunSnapshot
   func startCodexRun(
@@ -341,6 +348,18 @@ extension HarnessMonitorClientProtocol {
 
   public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
     []
+  }
+
+  public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
+    AcpRuntimeProbeResponse(probes: [], checkedAt: "")
+  }
+
+  public func acpAgentDescriptors() async throws -> [AcpAgentDescriptor] {
+    []
+  }
+
+  public func acpInspect(sessionID _: String?) async throws -> AcpAgentInspectResponse {
+    AcpAgentInspectResponse(agents: [])
   }
 
   public func configuration() async throws -> MonitorConfiguration {

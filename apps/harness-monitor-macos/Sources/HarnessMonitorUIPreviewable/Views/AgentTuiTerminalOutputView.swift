@@ -11,7 +11,7 @@ struct AgentTuiTerminalOutputView: View {
     guard !wrapLines else {
       return nil
     }
-    return AgentsWindowView.TerminalViewportSizing.contentWidth(
+    return TerminalViewportSizing.contentWidth(
       for: terminalSize,
       fontScale: fontScale
     )

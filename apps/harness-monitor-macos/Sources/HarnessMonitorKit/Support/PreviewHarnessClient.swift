@@ -163,6 +163,14 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     }
   }
 
+  public func startManagedAcpAgent(
+    sessionID: String,
+    request: AcpAgentStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    try await performActionDelay()
+    return .acp(await state.startAcpAgent(sessionID: sessionID, request: request))
+  }
+
   public func resolveCodexApproval(
     runID: String,
     approvalID: String,

@@ -216,6 +216,15 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func startManagedAcpAgent(
+    sessionID: String,
+    request: AcpAgentStartRequest
+  ) async throws -> ManagedAgentSnapshot {
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await rpc(method: .managedAgentStartAcp, params: params)
+    return try decode(value)
+  }
+
   public func sendManagedAgentInput(
     agentID: String,
     request: AgentTuiInputRequest
@@ -325,6 +334,27 @@ extension WebSocketTransport {
 
   public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
     try await configuration().runtimeModels
+  }
+
+  public func acpAgentDescriptors() async throws -> [AcpAgentDescriptor] {
+    try await configuration().acpAgents
+  }
+
+  public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
+    if let cached = try await configuration().runtimeProbe {
+      return cached
+    }
+    let value = try await rpc(method: .runtimesProbe)
+    return try decode(value)
+  }
+
+  public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
+    var params: [String: JSONValue] = [:]
+    if let sessionID {
+      params["session_id"] = .string(sessionID)
+    }
+    let value = try await rpc(method: .managedAgentAcpInspect, params: .object(params))
+    return try decode(value)
   }
 
   public func configuration() async throws -> MonitorConfiguration {

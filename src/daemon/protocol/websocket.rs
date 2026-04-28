@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+use crate::agents::acp::catalog::AcpAgentDescriptor;
+use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::agents::runtime::models::RuntimeModelCatalog;
+use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::session::types::AgentPersona;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,10 +69,24 @@ pub struct WsChunkFrame {
 pub struct WsConfigPayload {
     pub personas: Vec<AgentPersona>,
     pub runtime_models: Vec<RuntimeModelCatalog>,
+    #[serde(default)]
+    pub acp_agents: Vec<AcpAgentDescriptor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_probe: Option<AcpRuntimeProbeResponse>,
 }
 
 /// Event name used for the initial configuration push.
 pub const WS_CONFIG_EVENT: &str = "config";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WsRuntimeProbeUpdate {
+    pub probe: AcpRuntimeProbeResponse,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WsAcpInspect {
+    pub inspect: AcpAgentInspectResponse,
+}
 
 #[cfg(test)]
 mod tests {
