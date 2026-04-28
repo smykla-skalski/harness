@@ -132,6 +132,7 @@ impl ActiveAcpSession {
             display_name: snapshot.display_name,
             pid: snapshot.pid,
             pgid: snapshot.pgid,
+            process_key: snapshot.process_key,
             uptime_ms: u64::try_from(self.started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
             last_update_at: snapshot.updated_at,
             last_client_call_at: self.supervisor.last_client_call_at(),

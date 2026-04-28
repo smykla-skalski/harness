@@ -45,7 +45,8 @@ struct AgentCapabilityPickerTests {
         ),
       ],
       probe: nil,
-      installHint: nil
+      installHint: nil,
+      sandboxed: false
     )
 
     #expect(option.normalizedSelection(for: .tui(.codex)) == .tui(.gemini))
@@ -76,13 +77,38 @@ struct AgentCapabilityPickerTests {
         binaryPresent: false,
         authState: .unavailable
       ),
-      installHint: "Install Gemini"
+      installHint: "Install Gemini",
+      sandboxed: false
     )
 
     #expect(option.isEnabled)
     #expect(option.statusText == "Ready")
     #expect(option.isEnabled(option.transportChoice(for: .tui(.gemini))))
     #expect(!option.isEnabled(option.transportChoice(for: .acp("gemini"))))
+  }
+
+  @Test("sandboxed monitor disables ACP transport even when binary exists")
+  func sandboxedMonitorDisablesAcpTransport() throws {
+    let options = AgentsWindowView.agentCapabilityOptions(
+      acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "copilot",
+            displayName: "GitHub Copilot",
+            binaryPresent: true,
+            authState: .ready
+          )
+        ],
+        checkedAt: "2026-04-28T22:00:00Z"
+      ),
+      sandboxed: true
+    )
+
+    let copilot = try #require(options.first { $0.id == AgentTuiRuntime.copilot.rawValue })
+    #expect(copilot.normalizedSelection(for: .acp("copilot")) == .tui(.copilot))
+    #expect(!copilot.isEnabled(copilot.transportChoice(for: .acp("copilot"))))
+    #expect(copilot.isEnabled(copilot.transportChoice(for: .tui(.copilot))))
   }
 
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
