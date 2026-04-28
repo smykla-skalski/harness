@@ -21,8 +21,10 @@ impl AgentRuntime for CodexRuntime {
         "codex"
     }
 
-    fn effort_flag(&self) -> Option<&'static str> {
-        Some("--reasoning-effort")
+    fn effort_args(&self, effort: &str) -> Vec<String> {
+        // Codex does not expose a `--reasoning-effort` flag; effort is
+        // injected as a config override: `-c model_reasoning_effort=<value>`.
+        vec!["-c".to_string(), format!("model_reasoning_effort={effort}")]
     }
 
     fn discover_native_log(
