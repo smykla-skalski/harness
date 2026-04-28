@@ -7,9 +7,14 @@ extension AgentsWindowView {
     case .tui:
       return viewModel.rows > 0 && viewModel.cols > 0
     case .acp(let id):
-      let descriptor = viewModel.availableAcpAgents.first { $0.id == id }
-      let probe = viewModel.runtimeProbeResults?.probes.first { $0.agentId == id }
-      return descriptor != nil && (probe?.binaryPresent ?? true)
+      guard
+        let option = agentCapabilityOptions.first(where: { option in
+          option.transportChoices.contains { $0.id == .acp(id) }
+        })
+      else {
+        return false
+      }
+      return option.isEnabled(option.transportChoice(for: .acp(id)))
     }
   }
 

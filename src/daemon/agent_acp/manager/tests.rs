@@ -73,6 +73,7 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert_eq!(inspected.agents[0].permission_mode, "daemon_bridge");
         assert_eq!(inspected.agents[0].permission_queue_depth, 0);
         assert_eq!(inspected.agents[0].permission_log_path, None);
+        assert!(!inspected.agents[0].process_key.is_empty());
 
         let stopped = manager.stop(&snapshot.acp_id).expect("stop");
         assert!(matches!(
@@ -163,6 +164,7 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
                 inspected.agents[0].permission_log_path,
                 snapshot.permission_log_path
             );
+            assert_eq!(inspected.agents[0].process_key, snapshot.process_key);
 
             manager.stop(&snapshot.acp_id).expect("stop");
         });
@@ -172,4 +174,29 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
 #[test]
 fn default_permission_cap_matches_plan() {
     assert_eq!(DEFAULT_PERMISSION_CAP, 8);
+}
+
+#[test]
+fn start_rejects_sandboxed_daemon_mode() {
+    temp_env::with_vars(
+        [
+            (feature_flags::ACP_ENV, Some("1")),
+            ("HARNESS_SANDBOXED", Some("1")),
+        ],
+        || {
+            let request = AcpAgentStartRequest {
+                agent: "copilot".to_string(),
+                prompt: None,
+                project_dir: None,
+                record_permissions: false,
+            };
+
+            let error = manager().start("sess-1", &request).expect_err("sandbox must refuse ACP");
+            let rendered = format!("{error}");
+            assert!(
+                rendered.contains("sandbox feature disabled: acp.local-spawn"),
+                "unexpected error: {rendered}"
+            );
+        },
+    );
 }

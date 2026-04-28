@@ -14,13 +14,15 @@ extension AgentsWindowView {
   var agentCapabilityOptions: [AgentCapabilityOption] {
     Self.agentCapabilityOptions(
       acpAgents: viewModel.availableAcpAgents,
-      runtimeProbeResults: viewModel.runtimeProbeResults
+      runtimeProbeResults: viewModel.runtimeProbeResults,
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true
     )
   }
 
   static func agentCapabilityOptions(
     acpAgents: [AcpAgentDescriptor],
-    runtimeProbeResults: AcpRuntimeProbeResponse?
+    runtimeProbeResults: AcpRuntimeProbeResponse?,
+    sandboxed: Bool = false
   ) -> [AgentCapabilityOption] {
     var rows: [AgentCapabilityOption] = AgentTuiRuntime.allCases.map { runtime in
       let descriptor = acpAgents.first { representsSameCapability($0, as: runtime) }
@@ -31,7 +33,8 @@ extension AgentsWindowView {
         probe: descriptor.flatMap {
           probeResult(for: $0, runtimeProbeResults: runtimeProbeResults)
         },
-        installHint: descriptor?.installHint
+        installHint: descriptor?.installHint,
+        sandboxed: sandboxed
       )
     }
     for descriptor in acpAgents
@@ -51,7 +54,8 @@ extension AgentsWindowView {
             )
           ],
           probe: probeResult(for: descriptor, runtimeProbeResults: runtimeProbeResults),
-          installHint: descriptor.installHint
+          installHint: descriptor.installHint,
+          sandboxed: sandboxed
         )
       )
     }
