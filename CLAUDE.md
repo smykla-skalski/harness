@@ -29,6 +29,8 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
+Before any commit, run `/council` on the intended diff and address material findings before `git commit -sS`.
+
 For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` - it covers the Tuist project layout, exact `xcodebuild` destination rules (`platform=macOS,arch=$(uname -m),name=My Mac` for local macOS lanes), SwiftUI/UX rules, performance measurement, and daemon modes.
 
 ## Agent asset architecture
@@ -61,9 +63,10 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - **Blocking**: `guard-stop` (prevents session end if run incomplete, **off by default**)
 - **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
 - **Failure enrichment**: `enrich-failure` / `tool-failure` (**off by default**)
-- **Repo-policy pre-tool**: warns about raw `cargo`/`xcodebuild` use (**off by default**)
 
-The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the `repo-policy` pre-tool hook are gated by `HARNESS_FEATURE_SUITE_HOOKS` and `HARNESS_FEATURE_REPO_POLICY` (or the matching `--enable-suite-hooks` / `--enable-repo-policy` CLI flags on `harness setup bootstrap` and `harness setup agents generate`). Both default to off while the underlying features are unfinished. CLI flag wins over env var. Resolution lives in `src/feature_flags.rs::RuntimeHookFlags`. Bootstrap emits an `info!` line per regenerated config naming any omitted family.
+The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated by `HARNESS_FEATURE_SUITE_HOOKS` (or the matching `--enable-suite-hooks` CLI flag on `harness setup bootstrap` and `harness setup agents generate`). They default to off while the underlying features are unfinished. CLI flag wins over env var. Resolution lives in `src/feature_flags.rs::RuntimeHookFlags`. Bootstrap emits an `info!` line per regenerated config naming the omitted family.
+
+Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep the flows separate: use `mise run setup:bootstrap`, `mise run setup:agents:generate`, and `mise run check:agent-assets` for harness-owned outputs only. If you want aff-owned runtime hooks, run the separate manual `aff:*` mise tasks yourself.
 
 **Hook landing rule**: a new hook lands with its handler doing observable work, *or* behind a dated feature flag in `src/feature_flags.rs` with a tracking issue. Triggers without working handlers slow every tool call without producing signal.
 

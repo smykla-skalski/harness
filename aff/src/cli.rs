@@ -3,7 +3,7 @@ use std::io::{Read as _, stdin};
 use clap::{Args, Parser, Subcommand};
 
 use crate::hook_agent::HookAgent;
-use crate::{hook_render, repo_policy};
+use crate::{hook_render, repo_policy, setup};
 
 #[derive(Debug, Parser)]
 #[command(name = "aff")]
@@ -18,6 +18,7 @@ enum Command {
     RepoPolicy(RepoPolicyArgs),
     #[command(name = "session-start", hide = true)]
     SessionStart(SessionStartArgs),
+    Setup(SetupArgs),
 }
 
 #[derive(Debug, Args)]
@@ -32,6 +33,12 @@ struct SessionStartArgs {
     agent: HookAgent,
 }
 
+#[derive(Debug, Args)]
+struct SetupArgs {
+    #[command(subcommand)]
+    command: setup::SetupCommand,
+}
+
 pub fn run() -> Result<i32, String> {
     Cli::parse().execute()
 }
@@ -41,6 +48,7 @@ impl Cli {
         match self.command {
             Command::RepoPolicy(args) => args.execute(),
             Command::SessionStart(args) => args.execute(),
+            Command::Setup(args) => args.execute(),
         }
     }
 }
@@ -64,6 +72,12 @@ impl SessionStartArgs {
         )?;
         print!("{json}");
         Ok(0)
+    }
+}
+
+impl SetupArgs {
+    fn execute(self) -> Result<i32, String> {
+        setup::run(self.command)
     }
 }
 
