@@ -14,7 +14,7 @@ pub fn contract_up_then_down_succeeds(
     project_name: &str,
 ) {
     let up_result = orchestrator
-        .up(compose_file, project_name, Duration::from_secs(60))
+        .up(compose_file, project_name, Duration::from_mins(1))
         .expect("compose up should succeed");
     assert_eq!(up_result.returncode, 0);
 
