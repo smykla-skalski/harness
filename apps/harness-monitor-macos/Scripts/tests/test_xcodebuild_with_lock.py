@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import json
 import os
 import stat
 import subprocess
@@ -209,6 +210,25 @@ shift
             log,
         )
 
+    def test_rejects_legacy_tuist_opt_out_env_var(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={"HARNESS_MONITOR_USE_TUIST_TEST": "0"},
+        )
+
+        self.assertEqual(log, "")
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn(
+            "HARNESS_MONITOR_USE_TUIST_TEST is no longer supported",
+            completed.stderr,
+        )
+        self.assertIn(
+            "all Harness Monitor xcodebuild lanes already use Tuist",
+            completed.stderr,
+        )
+
     def test_runner_uses_absolute_xcodebuild_by_default(self) -> None:
         rtk_shell = RTK_SHELL_PATH.read_text()
 
@@ -308,6 +328,77 @@ printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
                 log,
             )
 
+    def test_normalizes_equals_form_path_flags_from_space_bearing_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            tool_log = temp_root / "tool.json"
+            caller_root = temp_root / "caller root"
+            caller_root.mkdir()
+            resolved_caller_root = caller_root.resolve()
+
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+/usr/bin/python3 - "{tool_log}" "$PWD" "$@" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+pwd = sys.argv[2]
+argv = sys.argv[3:]
+with path.open("w", encoding="utf-8") as handle:
+    json.dump({{"pwd": pwd, "argv": argv}}, handle)
+PY
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath=xcode-derived",
+                    "-workspace=apps/harness-monitor-macos/HarnessMonitor.xcworkspace",
+                    "-resultBundlePath=tmp/result bundle.xcresult",
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=caller_root,
+                env=env,
+            )
+
+            payload = json.loads(tool_log.read_text(encoding="utf-8"))
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(payload["pwd"], str(APP_ROOT))
+            self.assertEqual(
+                payload["argv"],
+                [
+                    "xcodebuild",
+                    f"-derivedDataPath={CHECKOUT_ROOT / 'xcode-derived'}",
+                    f"-workspace={resolved_caller_root / 'apps' / 'harness-monitor-macos' / 'HarnessMonitor.xcworkspace'}",
+                    f"-resultBundlePath={resolved_caller_root / 'tmp' / 'result bundle.xcresult'}",
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+            )
+
     def test_missing_tuist_reports_required_tool_and_normalized_paths(self) -> None:
         completed, _ = self.run_script(
             "-derivedDataPath",
@@ -347,6 +438,36 @@ printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
             completed.stderr,
         )
         self.assertNotIn("swift-compile-context:", completed.stderr)
+
+    def test_failure_diagnostics_only_echo_path_arguments(self) -> None:
+        completed, _ = self.run_script(
+            "-derivedDataPath",
+            "xcode-derived",
+            "-resultBundlePath",
+            "tmp/result bundle.xcresult",
+            "CUSTOM_SIGNING_TOKEN=top-secret",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            cwd=CHECKOUT_ROOT,
+            inject_derived_data_path=False,
+            include_tuist=False,
+        )
+
+        self.assertEqual(completed.returncode, 127)
+        self.assertIn("xcodebuild-wrapper: original path args:", completed.stderr)
+        self.assertIn("xcodebuild-wrapper: normalized path args:", completed.stderr)
+        self.assertIn(
+            "path-normalization: -derivedDataPath xcode-derived -> "
+            f"{CHECKOUT_ROOT / 'xcode-derived'}",
+            completed.stderr,
+        )
+        self.assertIn(
+            "path-normalization: -resultBundlePath tmp/result bundle.xcresult -> "
+            f"{CHECKOUT_ROOT / 'tmp/result bundle.xcresult'}",
+            completed.stderr,
+        )
+        self.assertNotIn("CUSTOM_SIGNING_TOKEN=top-secret", completed.stderr)
 
     def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
