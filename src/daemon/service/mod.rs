@@ -201,7 +201,6 @@ fn log_sandbox_startup(sandboxed: bool) {
     }
 }
 
-use crate::daemon::agent_tui;
 use crate::daemon::db;
 use crate::daemon::protocol;
 use crate::daemon::voice;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tokio::task;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::{HookAgent, adapter_for};
+use crate::hooks::adapters::{HookAgent, RenderedHookResponse, adapter_for};
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::exec::RUNTIME;
@@ -31,7 +31,7 @@ pub async fn session_start(
         storage::set_current_session_id(&project_dir, agent, &session_id)?;
         storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
         signal_managed_terminal_readiness_if_managed();
-        session_service::restore_compact_handoff(&project_dir)
+        session_start_context(&project_dir)
     })
     .await
     .map_err(|error| {
@@ -39,6 +39,14 @@ pub async fn session_start(
             "session-start join error: {error}"
         )))
     })?
+}
+
+fn session_start_context(project_dir: &Path) -> Result<Option<String>, CliError> {
+    let repo_policy = super::repo_policy::session_start_context();
+    let Some(compact_context) = session_service::restore_compact_handoff(project_dir)? else {
+        return Ok(Some(repo_policy.to_string()));
+    };
+    Ok(Some(format!("{compact_context}\n\n{repo_policy}")))
 }
 
 /// When running inside a daemon-managed TUI process, signal the daemon that
@@ -145,6 +153,13 @@ pub async fn prompt_submit(
             "prompt-submit join error: {error}"
         )))
     })?
+}
+
+pub(crate) fn repo_policy_pre_tool_use(
+    agent: HookAgent,
+    raw_payload: &[u8],
+) -> Option<RenderedHookResponse> {
+    super::repo_policy::pre_tool_use_output(agent, raw_payload)
 }
 
 /// Record a normalized hook event in the shared agent ledger.
