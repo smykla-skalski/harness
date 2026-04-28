@@ -10,6 +10,7 @@
 //! shape is wrong; rework before merging.
 
 pub mod copilot;
+pub mod gemini;
 pub mod tags;
 
 use std::sync::LazyLock;
@@ -74,7 +75,7 @@ pub struct AcpAgentDescriptor {
 }
 
 static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> =
-    LazyLock::new(|| vec![copilot::descriptor()]);
+    LazyLock::new(|| vec![copilot::descriptor(), gemini::descriptor()]);
 
 /// Return every built-in descriptor in stable order.
 ///
@@ -109,6 +110,18 @@ mod tests {
     }
 
     #[test]
+    fn catalog_contains_gemini() {
+        let agents = acp_agents();
+        let gemini = agents
+            .iter()
+            .find(|d| d.id == "gemini")
+            .expect("gemini descriptor in catalog");
+        assert_eq!(gemini.display_name, "Gemini CLI");
+        assert_eq!(gemini.launch_command, "gemini");
+        assert_eq!(gemini.launch_args, vec!["--acp"]);
+    }
+
+    #[test]
     fn catalog_returns_static_descriptor_references() {
         let agents = acp_agents();
         let copilot = agents
@@ -123,6 +136,12 @@ mod tests {
     fn find_builtin_returns_known_descriptor() {
         let descriptor = find_builtin("copilot").expect("found by id");
         assert_eq!(descriptor.id, "copilot");
+    }
+
+    #[test]
+    fn find_builtin_returns_second_descriptor() {
+        let descriptor = find_builtin("gemini").expect("found by id");
+        assert_eq!(descriptor.id, "gemini");
     }
 
     #[test]
@@ -192,5 +211,16 @@ mod tests {
                 "env passthrough missing {token}"
             );
         }
+    }
+
+    #[test]
+    fn descriptor_capabilities_differ_between_built_ins() {
+        let copilot = find_builtin("copilot").expect("copilot exists");
+        let gemini = find_builtin("gemini").expect("gemini exists");
+        assert_ne!(copilot.capabilities, gemini.capabilities);
+        assert!(gemini
+            .capabilities
+            .iter()
+            .any(|t| t == tags::REQUIRES_NETWORK));
     }
 }
