@@ -427,12 +427,12 @@ fn sync_plugin_cache_registers_in_installed_plugins() {
         .join("project")
         .join(".claude")
         .join("plugins")
-        .join("council");
+        .join("demo");
     let plugin_json_dir = plugin_dir.join(".claude-plugin");
     fs::create_dir_all(&plugin_json_dir).unwrap();
     fs::write(
         plugin_json_dir.join("plugin.json"),
-        r#"{"name":"council","version":"1.1.0","description":"council"}"#,
+        r#"{"name":"demo","version":"1.1.0","description":"demo"}"#,
     )
     .unwrap();
 
@@ -447,12 +447,12 @@ fn sync_plugin_cache_registers_in_installed_plugins() {
 
     let content = fs::read_to_string(&installed_path).unwrap();
     let parsed: Value = serde_json::from_str(&content).unwrap();
-    let entry = &parsed["plugins"]["council@harness"][0];
+    let entry = &parsed["plugins"]["demo@harness"][0];
     assert_eq!(entry["scope"], "user");
     assert_eq!(entry["version"], "1.1.0");
     let install_path = entry["installPath"].as_str().unwrap();
     assert!(
-        install_path.contains("/harness/council/"),
-        "installPath must contain /harness/council/, got: {install_path}"
+        install_path.contains("/harness/demo/"),
+        "installPath must contain /harness/demo/, got: {install_path}"
     );
 }
