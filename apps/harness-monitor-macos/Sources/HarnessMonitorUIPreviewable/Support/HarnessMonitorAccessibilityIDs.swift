@@ -157,6 +157,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentsStopButton = agentTuiStopButton
   public static let agentsRevealTranscriptButton = agentTuiRevealTranscriptButton
   public static let agentsRecoveryBanner = agentTuiRecoveryBanner
+  public static let agentsPendingUserPrompt = agentTuiPendingUserPrompt
   public static let agentsEnableBridgeButton = agentTuiEnableBridgeButton
   public static let agentsCopyCommandButton = agentTuiCopyCommandButton
   public static let agentsBackToCreateButton = agentTuiBackToCreateButton
@@ -189,6 +190,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
   public static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
   public static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
+  public static let agentTuiPendingUserPrompt = "harness.sheet.agent-tui.pending-user-prompt"
   public static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
   public static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
   public static let agentTuiBackToCreateButton = "harness.sheet.agent-tui.back-to-create"
