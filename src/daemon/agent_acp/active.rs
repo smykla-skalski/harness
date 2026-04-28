@@ -1,6 +1,6 @@
 use std::io::Read;
 use std::process::{Child, ChildStderr, ExitStatus};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -8,7 +8,7 @@ use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
 use crate::agents::acp::connection::EventBatch;
-use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
+use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::protocol::StreamEvent;
 use crate::session::types::AgentStatus;
@@ -32,6 +32,8 @@ pub(super) struct ActiveAcpSession {
     protocol_task: Mutex<Option<JoinHandle<()>>>,
     batcher_task: Mutex<Option<JoinHandle<()>>>,
     event_task: Mutex<Option<JoinHandle<()>>>,
+    protocol_disconnect_task: Mutex<Option<JoinHandle<()>>>,
+    watchdog_task: Mutex<Option<JoinHandle<()>>>,
     started_at: Instant,
 }
 
@@ -67,8 +69,21 @@ impl ActiveAcpSession {
             protocol_task: Mutex::new(Some(tasks.protocol)),
             batcher_task: Mutex::new(Some(tasks.batcher)),
             event_task: Mutex::new(Some(tasks.event)),
+            protocol_disconnect_task: Mutex::new(None),
+            watchdog_task: Mutex::new(None),
             started_at: Instant::now(),
         }
+    }
+
+    pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
+        *self
+            .protocol_disconnect_task
+            .lock()
+            .expect("ACP protocol disconnect task lock") = Some(task);
+    }
+
+    pub(super) fn set_watchdog_task(&self, task: JoinHandle<()>) {
+        *self.watchdog_task.lock().expect("ACP watchdog task lock") = Some(task);
     }
 
     pub(super) fn session_id(&self) -> String {
@@ -121,7 +136,10 @@ impl ActiveAcpSession {
             last_update_at: snapshot.updated_at,
             last_client_call_at: self.supervisor.last_client_call_at(),
             watchdog_state: self.supervisor.watchdog_state().as_str().to_string(),
+            permission_mode: snapshot.permission_mode,
+            permission_log_path: snapshot.permission_log_path,
             pending_permissions: snapshot.pending_permissions,
+            permission_queue_depth: snapshot.permission_queue_depth,
             terminal_count: snapshot.terminal_count,
             prompt_deadline_remaining_ms: u64::try_from(remaining.as_millis()).unwrap_or(u64::MAX),
         }
@@ -193,6 +211,22 @@ impl ActiveAcpSession {
             task.abort();
         }
         if let Some(task) = self.event_task.lock().expect("ACP event task lock").take() {
+            task.abort();
+        }
+        if let Some(task) = self
+            .protocol_disconnect_task
+            .lock()
+            .expect("ACP protocol disconnect task lock")
+            .take()
+        {
+            task.abort();
+        }
+        if let Some(task) = self
+            .watchdog_task
+            .lock()
+            .expect("ACP watchdog task lock")
+            .take()
+        {
             task.abort();
         }
     }
@@ -283,6 +317,53 @@ pub(super) fn spawn_event_forwarder(
             });
         }
     })
+}
+
+pub(super) fn spawn_protocol_disconnect_forwarder(
+    sender: broadcast::Sender<StreamEvent>,
+    active: Weak<ActiveAcpSession>,
+    mut disconnects: mpsc::Receiver<DisconnectReason>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let Some(reason) = disconnects.recv().await else {
+            return;
+        };
+        disconnect_active_session(&sender, &active, reason);
+    })
+}
+
+pub(super) fn spawn_watchdog_forwarder(
+    sender: broadcast::Sender<StreamEvent>,
+    active: Weak<ActiveAcpSession>,
+    supervisor: Arc<AcpSessionSupervisor>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let Some(reason) = watchdog_loop(supervisor).await else {
+            return;
+        };
+        disconnect_active_session(&sender, &active, reason);
+    })
+}
+
+fn disconnect_active_session(
+    sender: &broadcast::Sender<StreamEvent>,
+    active: &Weak<ActiveAcpSession>,
+    reason: DisconnectReason,
+) {
+    let Some(session) = active.upgrade() else {
+        return;
+    };
+    session.refresh();
+    let pending_permissions = session.disconnect(reason);
+    session.kill_child(pending_permissions);
+    let snapshot = session.snapshot_with_live_counts();
+    let payload = serde_json::to_value(&snapshot).unwrap_or_default();
+    let _ = sender.send(StreamEvent {
+        event: "acp_agent_disconnected".to_string(),
+        recorded_at: utc_now(),
+        session_id: Some(snapshot.session_id),
+        payload,
+    });
 }
 
 fn process_exit_reason(status: ExitStatus) -> DisconnectReason {

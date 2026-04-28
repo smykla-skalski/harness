@@ -269,6 +269,7 @@ impl AcpSessionSupervisor {
     pub fn mark_done(&self) {
         self.state
             .store(state_to_u64(WatchdogState::Done), Ordering::SeqCst);
+        self.watchdog_notify.notify_one();
     }
 
     /// Begin shutdown. Sets flag and returns whether this was the first call.

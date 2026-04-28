@@ -11,8 +11,8 @@ use agent_client_protocol::schema::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::broadcast::Sender as BroadcastSender;
 use tokio::sync::mpsc;
+use tokio::sync::{Notify, broadcast::Sender as BroadcastSender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
@@ -67,6 +67,7 @@ struct PermissionBridgeState {
     next_batch: AtomicU64,
     cap: usize,
     shutdown: AtomicBool,
+    shutdown_notify: Notify,
 }
 
 struct PendingBatch {
@@ -93,6 +94,7 @@ impl PermissionBridgeHandle {
             next_batch: AtomicU64::new(1),
             cap: DEFAULT_PERMISSION_CAP,
             shutdown: AtomicBool::new(false),
+            shutdown_notify: Notify::new(),
         });
         let worker_state = Arc::clone(&state);
         let worker = tokio::spawn(async move {
@@ -120,7 +122,7 @@ impl PermissionBridgeHandle {
 
     #[must_use]
     pub fn queue_depth(&self) -> usize {
-        self.pending_permission_count()
+        self.tx.max_capacity().saturating_sub(self.tx.capacity())
     }
 
     /// Return unresolved permission batches for daemon inspection.
@@ -169,18 +171,14 @@ impl PermissionBridgeHandle {
             self.state
                 .broadcast("acp_permission_shutdown", &batch.batch);
         }
-        let aborted_worker = if let Some(worker) = self
+        let worker_alive = self
             .worker
             .lock()
             .expect("permission bridge worker lock")
             .take()
-        {
-            worker.abort();
-            true
-        } else {
-            false
-        };
-        pending_count.max(usize::from(aborted_worker))
+            .is_some();
+        self.state.shutdown_notify.notify_waiters();
+        pending_count.max(usize::from(worker_alive))
     }
 
     /// Resolve a pending permission batch.
@@ -273,11 +271,46 @@ async fn permission_worker(
     mut rx: mpsc::Receiver<PermissionBridgeRequest>,
     state: Arc<PermissionBridgeState>,
 ) {
-    while let Some(first) = rx.recv().await {
-        let mut requests = vec![first];
-        sleep(COALESCE_WINDOW).await;
-        drain_concurrent_requests(&mut rx, &mut requests);
-        enqueue_or_reject_batch(&state, requests);
+    loop {
+        tokio::select! {
+            request = rx.recv() => {
+                let Some(first) = request else {
+                    return;
+                };
+                if state.shutdown.load(Ordering::SeqCst) {
+                    reject_requests(vec![first], &daemon_shutdown_error());
+                    reject_queued_requests(&mut rx);
+                    return;
+                }
+                if !process_permission_request(&mut rx, &state, first).await {
+                    return;
+                }
+            }
+            () = state.shutdown_notify.notified() => {
+                reject_queued_requests(&mut rx);
+                return;
+            }
+        }
+    }
+}
+
+async fn process_permission_request(
+    rx: &mut mpsc::Receiver<PermissionBridgeRequest>,
+    state: &Arc<PermissionBridgeState>,
+    first: PermissionBridgeRequest,
+) -> bool {
+    let mut requests = vec![first];
+    tokio::select! {
+        () = sleep(COALESCE_WINDOW) => {
+            drain_concurrent_requests(rx, &mut requests);
+            enqueue_or_reject_batch(state, requests);
+            true
+        }
+        () = state.shutdown_notify.notified() => {
+            reject_requests(requests, &daemon_shutdown_error());
+            reject_queued_requests(rx);
+            false
+        }
     }
 }
 
@@ -365,6 +398,18 @@ fn reject_request(response_tx: &SyncSender<PermissionBridgeResult>, error: Permi
     let _ = response_tx.send(Err(error));
 }
 
+fn reject_requests(requests: Vec<PermissionBridgeRequest>, error: &PermissionBridgeError) {
+    for request in requests {
+        reject_request(&request.response_tx, error.clone());
+    }
+}
+
+fn reject_queued_requests(rx: &mut mpsc::Receiver<PermissionBridgeRequest>) {
+    while let Ok(request) = rx.try_recv() {
+        reject_request(&request.response_tx, daemon_shutdown_error());
+    }
+}
+
 fn daemon_shutdown_error() -> PermissionBridgeError {
     PermissionBridgeError::new(DAEMON_SHUTDOWN, "daemon shutdown in progress")
 }
@@ -400,93 +445,4 @@ fn response_for_options(options: &[PermissionOption], allow: bool) -> RequestPer
 }
 
 #[cfg(test)]
-mod tests {
-    use std::sync::mpsc::sync_channel;
-
-    use agent_client_protocol::schema::{
-        RequestPermissionRequest, ToolCallUpdate, ToolCallUpdateFields,
-    };
-    use tokio::sync::broadcast;
-
-    use super::*;
-    use crate::agents::acp::permission::standard_permission_options;
-
-    fn permission_request(
-        id: &str,
-    ) -> (
-        PermissionBridgeRequest,
-        std::sync::mpsc::Receiver<PermissionBridgeResult>,
-    ) {
-        let (tx, rx) = sync_channel(1);
-        let tool_call = ToolCallUpdate::new(id.to_string(), ToolCallUpdateFields::new());
-        let request =
-            RequestPermissionRequest::new("acp-session", tool_call, standard_permission_options());
-        (
-            PermissionBridgeRequest {
-                request,
-                response_tx: tx,
-            },
-            rx,
-        )
-    }
-
-    #[tokio::test]
-    async fn coalesces_concurrent_requests_into_one_batch() {
-        let (sender, _) = broadcast::channel(8);
-        let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
-        let (req_a, rx_a) = permission_request("tool-a");
-        let (req_b, rx_b) = permission_request("tool-b");
-
-        bridge.tx.send(req_a).await.expect("send a");
-        bridge.tx.send(req_b).await.expect("send b");
-        tokio::time::sleep(Duration::from_millis(20)).await;
-
-        let batches = bridge.pending_batches();
-        assert_eq!(batches.len(), 1);
-        assert_eq!(batches[0].requests.len(), 2);
-        let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
-        assert!(rx_a.recv().expect("response a").is_ok());
-        assert!(rx_b.recv().expect("response b").is_ok());
-    }
-
-    #[tokio::test]
-    async fn rejects_past_cap() {
-        let (sender, _) = broadcast::channel(8);
-        let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
-        let mut receivers = Vec::new();
-
-        for i in 0..9 {
-            let (request, rx) = permission_request(&format!("tool-{i}"));
-            bridge.tx.send(request).await.expect("send request");
-            receivers.push(rx);
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-
-        assert_eq!(bridge.pending_permission_count(), DEFAULT_PERMISSION_CAP);
-        let rejected = receivers
-            .pop()
-            .expect("ninth receiver")
-            .recv()
-            .expect("ninth response")
-            .expect_err("ninth rejected");
-        assert_eq!(rejected.code, PERMISSION_CAP_REACHED);
-        bridge.shutdown_pending();
-    }
-
-    #[tokio::test]
-    async fn shutdown_errors_pending_requests() {
-        let (sender, _) = broadcast::channel(8);
-        let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
-        let (request, rx) = permission_request("tool-a");
-
-        bridge.tx.send(request).await.expect("send request");
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        bridge.shutdown_pending();
-
-        let error = rx
-            .recv()
-            .expect("shutdown response")
-            .expect_err("shutdown error");
-        assert_eq!(error.code, DAEMON_SHUTDOWN);
-    }
-}
+mod tests;

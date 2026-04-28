@@ -138,6 +138,30 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
     }
 }
 
+#[tokio::test]
+async fn watchdog_loop_returns_none_when_session_is_done() {
+    let mut config = SupervisionConfig::default();
+    config.watchdog_timeout = Duration::from_secs(60);
+
+    let child = spawn_sleep_child();
+    let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
+    let task = tokio::spawn(watchdog_loop(Arc::clone(&supervisor)));
+
+    supervisor.mark_done();
+
+    let reason = tokio::time::timeout(Duration::from_millis(100), task)
+        .await
+        .expect("watchdog should wake after done")
+        .expect("watchdog task should not panic");
+    assert_eq!(reason, None);
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Done);
+
+    #[cfg(unix)]
+    unsafe {
+        libc::killpg(supervisor.pgid(), libc::SIGKILL);
+    }
+}
+
 #[test]
 fn record_event_resets_watchdog() {
     let mut config = SupervisionConfig::default();

@@ -12,7 +12,7 @@ use agent_client_protocol::schema::{
     TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
-    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, Responder,
+    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Responder,
 };
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::mpsc;
@@ -26,6 +26,7 @@ use crate::agents::acp::client::{ClientError, ClientResult, HarnessAcpClient};
 use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
 use crate::agents::acp::permission::PermissionMode;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
+use crate::agents::kind::DisconnectReason;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
@@ -45,6 +46,7 @@ impl AcpCancelHandle {
 
 pub(super) struct SpawnedAcpProtocol {
     pub(super) events: mpsc::Receiver<EventBatch>,
+    pub(super) disconnects: mpsc::Receiver<DisconnectReason>,
     pub(super) protocol: JoinHandle<()>,
     pub(super) batcher: JoinHandle<()>,
     pub(super) cancel: AcpCancelHandle,
@@ -84,6 +86,7 @@ pub(super) fn spawn_protocol_task(
         permission_mode,
     ));
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (disconnect_tx, disconnects) = mpsc::channel(1);
     let protocol_task = tokio::spawn(run_protocol(RunProtocolArgs {
         stdin,
         stdout,
@@ -93,9 +96,11 @@ pub(super) fn spawn_protocol_task(
         client,
         supervisor: Arc::clone(supervisor),
         cancel_rx,
+        disconnect_tx,
     }));
     Ok(SpawnedAcpProtocol {
         events: batcher.events,
+        disconnects,
         protocol: protocol_task,
         batcher: batcher.task,
         cancel: AcpCancelHandle { tx: cancel_tx },
@@ -111,12 +116,9 @@ struct RunProtocolArgs {
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
+    disconnect_tx: mpsc::Sender<DisconnectReason>,
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "ACP SDK requires one typed callback registration per request type"
-)]
 async fn run_protocol(args: RunProtocolArgs) {
     let RunProtocolArgs {
         stdin,
@@ -127,6 +129,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         client,
         supervisor,
         cancel_rx,
+        disconnect_tx,
     } = args;
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let context = ProtocolContext {
@@ -212,8 +215,41 @@ async fn run_protocol(args: RunProtocolArgs) {
             run_connection(connection, project_dir, prompt, supervisor, cancel_rx).await
         })
         .await;
-    if let Err(error) = result {
-        tracing::warn!(%error, "ACP protocol task stopped");
+    report_protocol_result(result, disconnect_tx).await;
+}
+
+async fn report_protocol_result(
+    result: agent_client_protocol::Result<()>,
+    disconnect_tx: mpsc::Sender<DisconnectReason>,
+) {
+    let Err(error) = result else {
+        return;
+    };
+    warn_protocol_error(&error);
+    let _ = disconnect_tx
+        .send(disconnect_reason_from_error(&error))
+        .await;
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_protocol_error(error: &AcpError) {
+    tracing::warn!(%error, "ACP protocol task stopped");
+}
+
+fn disconnect_reason_from_error(error: &AcpError) -> DisconnectReason {
+    if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
+        && error.message.contains("session/initialize")
+    {
+        DisconnectReason::InitializeTimeout
+    } else if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
+        && error.message.contains("session/prompt")
+    {
+        DisconnectReason::PromptTimeout
+    } else {
+        DisconnectReason::StdioClosed
     }
 }
 
@@ -452,3 +488,6 @@ where
 fn client_error_to_acp(error: ClientError) -> AcpError {
     AcpError::new(error.code, error.message)
 }
+
+#[cfg(test)]
+mod tests;

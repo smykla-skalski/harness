@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::agents::acp::connection::SpawnConfig;
+use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::db::DaemonDb;
@@ -19,7 +20,10 @@ use crate::feature_flags;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
-use super::active::{ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder};
+use super::active::{
+    ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
+    spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
+};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
 use super::protocol::spawn_protocol_task;
 
@@ -33,6 +37,8 @@ pub struct AcpAgentStartRequest {
     pub prompt: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_dir: Option<String>,
+    #[serde(default)]
+    pub record_permissions: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -48,6 +54,10 @@ pub struct AcpAgentSnapshot {
     pub pending_permissions: usize,
     pub permission_queue_depth: usize,
     pub pending_permission_batches: Vec<AcpPermissionBatch>,
+    #[serde(default)]
+    pub permission_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_log_path: Option<String>,
     pub terminal_count: usize,
     pub created_at: String,
     pub updated_at: String,
@@ -65,7 +75,13 @@ pub struct AcpAgentInspectSnapshot {
     pub last_update_at: String,
     pub last_client_call_at: Option<String>,
     pub watchdog_state: String,
+    #[serde(default)]
+    pub permission_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_log_path: Option<String>,
     pub pending_permissions: usize,
+    #[serde(default)]
+    pub permission_queue_depth: usize,
     pub terminal_count: usize,
     pub prompt_deadline_remaining_ms: u64,
 }
@@ -152,7 +168,13 @@ impl AcpAgentManagerHandle {
         ));
         let permissions =
             PermissionBridgeHandle::spawn(acp_id.clone(), session_id.to_string(), self.sender());
-        let permission_mode = permissions.mode(PERMISSION_RESPONSE_DEADLINE);
+        let permission_log_path = request
+            .record_permissions
+            .then(|| recording_log_path_for_session(session_id));
+        let permission_mode = permission_log_path.clone().map_or_else(
+            || permissions.mode(PERMISSION_RESPONSE_DEADLINE),
+            |log_path| PermissionMode::Recording { log_path },
+        );
         let protocol = spawn_protocol_task(
             &mut child,
             request,
@@ -188,6 +210,12 @@ impl AcpAgentManagerHandle {
             pending_permissions: 0,
             permission_queue_depth: 0,
             pending_permission_batches: Vec::new(),
+            permission_mode: if request.record_permissions {
+                "recording".to_string()
+            } else {
+                "daemon_bridge".to_string()
+            },
+            permission_log_path: permission_log_path.map(|path| path.display().to_string()),
             terminal_count: 0,
             created_at: now.clone(),
             updated_at: now,
@@ -195,7 +223,7 @@ impl AcpAgentManagerHandle {
         let active = Arc::new(ActiveAcpSession::new(
             snapshot.clone(),
             child,
-            supervisor,
+            Arc::clone(&supervisor),
             permissions,
             protocol.cancel,
             stderr_tail,
@@ -204,6 +232,16 @@ impl AcpAgentManagerHandle {
                 batcher: protocol.batcher,
                 event: event_task,
             },
+        ));
+        active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
+            self.sender(),
+            Arc::downgrade(&active),
+            protocol.disconnects,
+        ));
+        active.set_watchdog_task(spawn_watchdog_forwarder(
+            self.sender(),
+            Arc::downgrade(&active),
+            supervisor,
         ));
         self.state
             .sessions

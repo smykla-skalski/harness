@@ -3,6 +3,7 @@ use super::{
     DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL, SetLogLevelRequest,
     StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
+use crate::agents::acp::probe::probe_acp_agents_cached;
 
 /// Build a point-in-time daemon status report.
 ///
@@ -102,6 +103,7 @@ pub fn diagnostics_report(
         health,
         manifest,
         launch_agent: launchd::launch_agent_status(),
+        acp_runtime_probe: probe_acp_agents_cached(),
         workspace: state::diagnostics()?,
         recent_events: state::read_recent_events(16)?,
     })
@@ -153,6 +155,7 @@ pub(crate) fn diagnostics_from_db(
         health,
         manifest,
         launch_agent,
+        acp_runtime_probe: probe_acp_agents_cached(),
         workspace,
         recent_events,
     })
@@ -177,6 +180,7 @@ async fn diagnostics_from_async_db(
         health,
         manifest,
         launch_agent,
+        acp_runtime_probe: probe_acp_agents_cached(),
         workspace,
         recent_events,
     })
