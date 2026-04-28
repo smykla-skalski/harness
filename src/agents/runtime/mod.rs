@@ -1,3 +1,13 @@
+//! TUI-wrapper runtimes for harness-hosted agents.
+//!
+//! Paradigm note (read this before adding a runtime): harness is moving from
+//! TUI-wrapper to agent-host. The runtimes in this module spawn a vendor TUI
+//! inside a portable-pty terminal and scrape its transcript. The new model
+//! lives in `crate::agents::acp` and speaks Agent Client Protocol over stdio,
+//! with harness servicing `fs/*`, `terminal/*`, and `session/request_permission`
+//! directly. `RuntimeKind` (Chunk 2) joins the two ends. Prefer adding new
+//! agents as ACP descriptors in `agents::acp::catalog` rather than as new TUI
+//! shells here.
 mod claude;
 mod codex;
 mod copilot;
