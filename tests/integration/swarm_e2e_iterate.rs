@@ -289,12 +289,16 @@ fn generated_skill_mirrors_use_codex_specific_source() {
     assert!(claude.contains("name: swarm-e2e-iterate"));
     assert!(codex.contains("name: swarm-e2e-iterate"));
     assert!(
-        codex.contains("spawn_agent"),
-        "Codex skill must describe the Codex subagent primitive"
+        codex.contains("Skill: council"),
+        "Codex skill must invoke the globally installed council skill"
     );
     assert!(
-        codex.contains("plugins/council/skills/council/SKILL.md"),
-        "Codex skill must point at the Codex-rendered council plugin"
+        codex.contains("globally installed council"),
+        "Codex skill must make clear that council is not repo-local"
+    );
+    assert!(
+        !codex.contains("plugins/council"),
+        "Codex skill must not point at repo-local council plugin paths"
     );
     assert!(
         !codex.contains(".claude/plugins/council"),

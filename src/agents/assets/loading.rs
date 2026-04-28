@@ -275,12 +275,12 @@ mod tests {
         let tmp = TempDir::new().expect("tempdir");
         let shared_root = tmp.path().join("agents/skills");
         write(
-            &shared_root.join("council/skill.yaml"),
-            "name: council\ndescription: Council skill\n",
+            &shared_root.join("demo/skill.yaml"),
+            "name: demo\ndescription: Demo skill\n",
         );
         write(
-            &shared_root.join("council/body.md"),
-            "# Council\n\nCanonical skill body.\n",
+            &shared_root.join("demo/body.md"),
+            "# Demo\n\nCanonical skill body.\n",
         );
         write(
             &shared_root.join("workspace/notes.md"),
@@ -290,7 +290,7 @@ mod tests {
         let skills = load_skill_sources(tmp.path()).expect("shared skill discovery succeeds");
 
         assert_eq!(skills.len(), 1);
-        assert_eq!(skills[0].source.name, "council");
+        assert_eq!(skills[0].source.name, "demo");
     }
 
     #[test]
@@ -298,8 +298,8 @@ mod tests {
         let tmp = TempDir::new().expect("tempdir");
         let shared_root = tmp.path().join("agents/skills");
         write(
-            &shared_root.join("council/skill.yaml"),
-            "name: council\ndescription: Council skill\n",
+            &shared_root.join("demo/skill.yaml"),
+            "name: demo\ndescription: Demo skill\n",
         );
 
         let error =
@@ -308,7 +308,7 @@ mod tests {
         let rendered = format!("{error:#}");
         assert!(rendered.contains("malformed skill directory"));
         assert!(rendered.contains("missing body.md"));
-        assert!(rendered.contains("agents/skills/council"));
+        assert!(rendered.contains("agents/skills/demo"));
     }
 
     #[test]
@@ -316,8 +316,8 @@ mod tests {
         let tmp = TempDir::new().expect("tempdir");
         let shared_root = tmp.path().join("agents/skills");
         write(
-            &shared_root.join("council/body.md"),
-            "# Council\n\nCanonical skill body.\n",
+            &shared_root.join("demo/body.md"),
+            "# Demo\n\nCanonical skill body.\n",
         );
 
         let error =
@@ -326,49 +326,49 @@ mod tests {
         let rendered = format!("{error:#}");
         assert!(rendered.contains("malformed skill directory"));
         assert!(rendered.contains("missing skill.yaml"));
-        assert!(rendered.contains("agents/skills/council"));
+        assert!(rendered.contains("agents/skills/demo"));
     }
 
     #[test]
     fn load_plugin_sources_ignores_plugin_skill_directories_without_skill_files() {
         let tmp = TempDir::new().expect("tempdir");
-        let plugin_root = tmp.path().join("agents/plugins/council");
+        let plugin_root = tmp.path().join("agents/plugins/demo");
         write(
             &plugin_root.join("plugin.yaml"),
-            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+            "name: demo\ndescription: Demo plugin\nversion: 1.0.0\n",
         );
         write(
-            &plugin_root.join("skills/council/skill.yaml"),
-            "name: council\ndescription: Council skill\n",
+            &plugin_root.join("skills/demo/skill.yaml"),
+            "name: demo\ndescription: Demo skill\n",
         );
         write(
-            &plugin_root.join("skills/council/body.md"),
-            "# Council\n\nCanonical skill body.\n",
+            &plugin_root.join("skills/demo/body.md"),
+            "# Demo\n\nCanonical skill body.\n",
         );
         write(
-            &plugin_root.join("skills/council-workspace/evals.md"),
+            &plugin_root.join("skills/demo-workspace/evals.md"),
             "# Workspace artifacts live here.\n",
         );
 
         let plugins = load_plugin_sources(tmp.path(), &[]).expect("plugin discovery succeeds");
 
         assert_eq!(plugins.len(), 1);
-        assert_eq!(plugins[0].source.name, "council");
+        assert_eq!(plugins[0].source.name, "demo");
         assert_eq!(plugins[0].skills.len(), 1);
-        assert_eq!(plugins[0].skills[0].source.name, "council");
+        assert_eq!(plugins[0].skills[0].source.name, "demo");
     }
 
     #[test]
     fn load_plugin_sources_errors_when_plugin_skill_directory_is_missing_body() {
         let tmp = TempDir::new().expect("tempdir");
-        let plugin_root = tmp.path().join("agents/plugins/council");
+        let plugin_root = tmp.path().join("agents/plugins/demo");
         write(
             &plugin_root.join("plugin.yaml"),
-            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+            "name: demo\ndescription: Demo plugin\nversion: 1.0.0\n",
         );
         write(
-            &plugin_root.join("skills/council/skill.yaml"),
-            "name: council\ndescription: Council skill\n",
+            &plugin_root.join("skills/demo/skill.yaml"),
+            "name: demo\ndescription: Demo skill\n",
         );
 
         let error = load_plugin_sources(tmp.path(), &[])
@@ -377,20 +377,20 @@ mod tests {
         let rendered = format!("{error:#}");
         assert!(rendered.contains("malformed skill directory"));
         assert!(rendered.contains("missing body.md"));
-        assert!(rendered.contains("agents/plugins/council/skills/council"));
+        assert!(rendered.contains("agents/plugins/demo/skills/demo"));
     }
 
     #[test]
     fn load_plugin_sources_errors_when_plugin_skill_directory_is_missing_skill_yaml() {
         let tmp = TempDir::new().expect("tempdir");
-        let plugin_root = tmp.path().join("agents/plugins/council");
+        let plugin_root = tmp.path().join("agents/plugins/demo");
         write(
             &plugin_root.join("plugin.yaml"),
-            "name: council\ndescription: Council plugin\nversion: 1.0.0\n",
+            "name: demo\ndescription: Demo plugin\nversion: 1.0.0\n",
         );
         write(
-            &plugin_root.join("skills/council/body.md"),
-            "# Council\n\nCanonical skill body.\n",
+            &plugin_root.join("skills/demo/body.md"),
+            "# Demo\n\nCanonical skill body.\n",
         );
 
         let error = load_plugin_sources(tmp.path(), &[])
@@ -399,6 +399,6 @@ mod tests {
         let rendered = format!("{error:#}");
         assert!(rendered.contains("malformed skill directory"));
         assert!(rendered.contains("missing skill.yaml"));
-        assert!(rendered.contains("agents/plugins/council/skills/council"));
+        assert!(rendered.contains("agents/plugins/demo/skills/demo"));
     }
 }

@@ -5,8 +5,6 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 
-#[cfg(test)]
-mod council_tests;
 mod files;
 mod loading;
 mod model;
