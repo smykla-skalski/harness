@@ -294,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_omit_suite_and_repo_policy_hooks_for_claude() {
+    fn defaults_omit_optional_suite_hooks_for_claude() {
         let regs = process_agent_registrations(HookAgent::Claude, RuntimeHookFlags::default());
         let collected = names(&regs);
         assert_contains_none(
@@ -304,30 +304,24 @@ mod tests {
                 "context-agent",
                 "validate-agent",
                 "tool-failure",
-                "repo-policy",
             ],
         );
         assert_contains_all(&collected, &["session-start", "tool-guard", "tool-result"]);
     }
 
     #[test]
-    fn defaults_omit_suite_and_repo_policy_hooks_for_codex() {
+    fn defaults_omit_optional_suite_hooks_for_codex() {
         let regs = process_agent_registrations(HookAgent::Codex, RuntimeHookFlags::default());
         let collected = names(&regs);
         assert_contains_none(
             &collected,
-            &[
-                "guard-stop",
-                "context-agent",
-                "validate-agent",
-                "repo-policy",
-            ],
+            &["guard-stop", "context-agent", "validate-agent"],
         );
         assert_contains_all(&collected, &["prompt-submit", "tool-guard"]);
     }
 
     #[test]
-    fn enabling_only_suite_hooks_keeps_repo_policy_off() {
+    fn enabling_suite_hooks_adds_their_registrations() {
         let flags = RuntimeHookFlags { suite_hooks: true };
         let regs = process_agent_registrations(HookAgent::Claude, flags);
         let collected = names(&regs);
@@ -340,27 +334,10 @@ mod tests {
                 "tool-failure",
             ],
         );
-        assert_contains_none(&collected, &["repo-policy"]);
     }
 
     #[test]
-    fn repo_policy_flag_is_ignored_by_harness_registrations() {
-        let regs = process_agent_registrations(HookAgent::Claude, RuntimeHookFlags::default());
-        let collected = names(&regs);
-        assert_contains_none(
-            &collected,
-            &[
-                "repo-policy",
-                "guard-stop",
-                "context-agent",
-                "validate-agent",
-                "tool-failure",
-            ],
-        );
-    }
-
-    #[test]
-    fn all_enabled_harness_registrations_never_include_repo_policy() {
+    fn all_enabled_harness_registrations_include_expected_suite_hooks() {
         for agent in [
             HookAgent::Claude,
             HookAgent::Codex,
@@ -372,7 +349,6 @@ mod tests {
             let regs = process_agent_registrations(agent, RuntimeHookFlags::all_enabled());
             let collected = names(&regs);
             assert_contains_all(&collected, &["tool-guard", "tool-result", "guard-stop"]);
-            assert_contains_none(&collected, &["repo-policy"]);
             // Gemini does not emit subagent gates in the legacy baseline.
             if !matches!(agent, HookAgent::Gemini | HookAgent::Copilot) {
                 assert_contains_all(&collected, &["context-agent", "validate-agent"]);

@@ -98,7 +98,6 @@ fn assert_codex_hooks(hooks: &str) {
             "tool-result",
         ],
     );
-    assert_contains_none(hooks, &["repo-policy"]);
 }
 
 fn assert_contains_all(haystack: &str, needles: &[&str]) {
@@ -291,13 +290,12 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
             "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\"",
         ],
     );
-    assert_contains_none(&config, &["repo-policy"]);
     let skill = fs::read_to_string(plugin_skill).unwrap();
     assert_contains_all(&skill, &["name: harness"]);
 }
 
 #[test]
-fn harness_bootstrap_never_includes_repo_policy_even_with_all_enabled_flags() {
+fn harness_bootstrap_only_adds_suite_hooks_when_all_enabled() {
     let dir = tempfile::tempdir().unwrap();
     write_agent_bootstrap(
         dir.path(),
@@ -310,14 +308,10 @@ fn harness_bootstrap_never_includes_repo_policy_even_with_all_enabled_flags() {
     let settings_path = dir.path().join(".claude").join("settings.json");
     let baseline = fs::read_to_string(&settings_path).unwrap();
     assert!(baseline.contains("guard-stop"));
-    assert!(
-        !baseline.contains("repo-policy"),
-        "harness bootstrap should stop generating repo-policy hooks"
-    );
 }
 
 #[test]
-fn default_flags_omit_suite_and_repo_policy_hooks_in_codex_hooks_json() {
+fn default_flags_omit_optional_suite_hooks_in_codex_hooks_json() {
     let dir = tempfile::tempdir().unwrap();
     write_agent_bootstrap(
         dir.path(),
@@ -328,7 +322,6 @@ fn default_flags_omit_suite_and_repo_policy_hooks_in_codex_hooks_json() {
     )
     .unwrap();
     let hooks = fs::read_to_string(dir.path().join(".codex").join("hooks.json")).unwrap();
-    assert!(!hooks.contains("repo-policy"));
     assert!(!hooks.contains("guard-stop"));
     assert!(!hooks.contains("context-agent"));
     assert!(!hooks.contains("validate-agent"));
@@ -337,7 +330,7 @@ fn default_flags_omit_suite_and_repo_policy_hooks_in_codex_hooks_json() {
 }
 
 #[test]
-fn default_flags_omit_suite_and_repo_policy_hooks_in_claude_settings_json() {
+fn default_flags_omit_optional_suite_hooks_in_claude_settings_json() {
     let dir = tempfile::tempdir().unwrap();
     write_agent_bootstrap(
         dir.path(),
@@ -348,7 +341,6 @@ fn default_flags_omit_suite_and_repo_policy_hooks_in_claude_settings_json() {
     )
     .unwrap();
     let settings = fs::read_to_string(dir.path().join(".claude").join("settings.json")).unwrap();
-    assert!(!settings.contains("repo-policy"));
     assert!(!settings.contains("guard-stop"));
     assert!(!settings.contains("context-agent"));
     assert!(!settings.contains("validate-agent"));

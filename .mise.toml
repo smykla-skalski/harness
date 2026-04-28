@@ -67,6 +67,18 @@ run = "./scripts/cargo-local.sh run --quiet -- setup agents generate"
 description = "Write runtime bootstrap configs and managed agent outputs (pass harness setup args after --)"
 run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
 
+[tasks."aff:check:agent-assets"]
+description = "Verify aff-owned runtime hook patches are in sync with current runtime configs"
+run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate --check"
+
+[tasks."aff:setup:agents:generate"]
+description = "Patch aff-owned runtime hooks into existing runtime configs (pass aff setup args after --)"
+run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate"
+
+[tasks."aff:setup:bootstrap"]
+description = "Patch aff-owned runtime hooks into existing bootstrap configs (pass aff setup args after --)"
+run = "./scripts/cargo-local.sh run --quiet -p aff -- setup bootstrap"
+
 [tasks.check]
 description = "Type-check without building"
 run = "./scripts/check.sh"
@@ -80,6 +92,13 @@ description = "Build release binary, sign it, install to ~/.local/bin, reconcile
 run = [
   "./scripts/cargo-local.sh build --release --features tokio-console",
   "./scripts/install-harness-release.sh",
+]
+
+[tasks."aff:install"]
+description = "Build the aff binary, sign it, install it to ~/.local/bin, and validate the installed binary"
+run = [
+  "./scripts/cargo-local.sh build --release -p aff",
+  "./scripts/install-aff-release.sh",
 ]
 
 [tasks."cargo:local"]

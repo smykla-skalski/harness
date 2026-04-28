@@ -165,10 +165,3 @@ fn parse_agents_prompt_submit() {
         _ => panic!("expected agents prompt-submit command"),
     }
 }
-
-#[test]
-fn parse_agents_rejects_repo_policy_subcommand() {
-    let error = Cli::try_parse_from(["harness", "agents", "repo-policy", "--agent", "codex"])
-        .expect_err("repo-policy command should move out of harness");
-    assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
-}

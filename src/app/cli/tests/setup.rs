@@ -61,26 +61,6 @@ fn parse_bootstrap_enable_suite_hooks_flag() {
 }
 
 #[test]
-fn parse_bootstrap_rejects_enable_repo_policy_flag() {
-    let error = Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-repo-policy"])
-        .expect_err("repo-policy flag should move out of harness");
-    assert_eq!(error.kind(), ErrorKind::UnknownArgument);
-}
-
-#[test]
-fn parse_agents_generate_rejects_enable_repo_policy_flag() {
-    let error = Cli::try_parse_from([
-        "harness",
-        "setup",
-        "agents",
-        "generate",
-        "--enable-repo-policy",
-    ])
-    .expect_err("repo-policy flag should move out of harness");
-    assert_eq!(error.kind(), ErrorKind::UnknownArgument);
-}
-
-#[test]
 fn parse_bootstrap_include_gemini_commands_flag() {
     let cli = Cli::try_parse_from(["harness", "setup", "bootstrap", "--include-gemini-commands"])
         .unwrap();

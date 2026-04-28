@@ -340,6 +340,7 @@ Constraints:\n\
 - Read-only system posture outside the working tree: before any local-machine mutation beyond repo files, stop and triage irreversible side effects.\n\
 - Git history is append-only: only new forward commits. No rebase, amend, reset, force-push, checkout, restore, or stash.\n\
 - Every commit uses `-sS`. After each commit, verify the signature and that the sign-off is exactly `Bart Smykla <bartek@smykla.com>`.\n\
+- Before every commit, run `/council` on the intended diff and address any material findings before `git commit -sS`.\n\
 - Before every commit, run the right build gate unless the change is only docs or version-sync noise: Rust -> `mise run check`; Swift -> `mise run monitor:macos:lint` plus the relevant build/test lane from `apps/harness-monitor-macos/CLAUDE.md`; cross-stack -> both gates.\n\
 - Investigate the real code path before fixing: map call sites, state flow, cross-process boundaries, and existing tests.\n\
 - Break work into the smallest independently committable chunks. Every chunk must leave the touched stacks buildable and test-passing.\n\

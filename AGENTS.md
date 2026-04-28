@@ -29,6 +29,8 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
+Before any commit, run `/council` on the intended diff and address material findings before `git commit -sS`.
+
 For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:macos:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
 
 Harness Monitor app validation expectations:
@@ -77,9 +79,10 @@ Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
 - **Unified tool lifecycle**: `tool-guard` (pre-tool policy dispatch), `tool-result` (post-tool verification and audit), `tool-failure` (failure enrichment and audit, **off by default**)
 - **Blocking**: `guard-stop` (prevents session end if run incomplete, **off by default**)
 - **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
-- **Repo policy pre-tool**: `repo-policy` (warns about raw `cargo`/`xcodebuild` instead of `mise run ...`, **off by default**)
 
-The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the `repo-policy` pre-tool hook are gated behind feature flags because the underlying suite workflow and repo-policy checker are unfinished and slow tool calls without producing useful guidance. Re-enable per invocation with `--enable-suite-hooks` / `--enable-repo-policy` on `harness setup bootstrap` or `harness setup agents generate`, or globally via `HARNESS_FEATURE_SUITE_HOOKS=1` / `HARNESS_FEATURE_REPO_POLICY=1`. CLI flag wins over env var; default is off. Bootstrap logs an `info!` line per regenerated config naming each omitted family.
+The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated behind the `HARNESS_FEATURE_SUITE_HOOKS` feature flag because the underlying suite workflow is unfinished and slow tool calls without producing useful guidance. Re-enable them per invocation with `--enable-suite-hooks` on `harness setup bootstrap` or `harness setup agents generate`, or globally via `HARNESS_FEATURE_SUITE_HOOKS=1`. CLI flag wins over env var; default is off. Bootstrap logs an `info!` line per regenerated config naming the omitted family.
+
+Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep the flows separate: use `mise run setup:bootstrap`, `mise run setup:agents:generate`, and `mise run check:agent-assets` for harness-owned outputs only. If you want aff-owned runtime hooks, run the separate manual `aff:*` mise tasks yourself.
 
 **Hook landing rule**: a new hook lands with its handler doing observable work, *or* behind a dated feature flag in `src/feature_flags.rs` with a tracking issue. Triggers without working handlers slow every tool call without producing signal — that is what the current `RuntimeHookFlags` exists to undo.
 

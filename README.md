@@ -51,16 +51,16 @@ CARGO_PROFILE_DEV_DEBUG=2 CARGO_PROFILE_TEST_DEBUG=2 mise run test:unit
 ### setup - environment and cluster preparation
 
 ```
-harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks] [--enable-repo-policy]
-harness setup agents generate [--check] [--target <all,claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks] [--enable-repo-policy]
+harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks]
+harness setup agents generate [--check] [--target <all,claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks]
 harness setup kuma <topology> <name> [flags]
 harness setup gateway [--kubeconfig <path>] [--repo-root <path>]
 harness setup capabilities
 ```
 
-`bootstrap` wires agent runtimes into the project. Without `--agents`, it installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. Both commands accept `--skip-runtime-hooks` to omit runtime hook config outputs for the listed runtimes without changing the rest of the generated assets. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
+`bootstrap` writes the harness-owned portion of the runtime wiring. Without `--agents`, bootstrap installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. Both commands accept `--skip-runtime-hooks` to omit runtime hook config outputs for the listed runtimes without changing the rest of the generated assets. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
 
-Two hook families are unfinished and gated off by default to keep tool calls fast: the **suite-lifecycle** hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the **repo-policy** pre-tool hook that warns about raw `cargo`/`xcodebuild` usage. Re-enable them per invocation with `--enable-suite-hooks` / `--enable-repo-policy`, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1` / `HARNESS_FEATURE_REPO_POLICY=1`. The CLI flag, when set, wins over the env var. Both default to off.
+The unfinished **suite-lifecycle** hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated off by default to keep tool calls fast. Re-enable them per invocation with `--enable-suite-hooks`, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag, when set, wins over the env var.
 
 Generation and bootstrap expose the session entrypoints as `harness:session:start` and `harness:session:join` across the supported agent surfaces. Codex also gets direct mirrors under `.agents/skills/`, because repo-local plugin bundles alone are not enough for Codex skill discovery.
 
@@ -252,16 +252,22 @@ Managed output roots (renderer-owned - do not edit directly):
 Each managed root contains an `AGENTS.md` marker emitted by the renderer. The source of truth is `agents/` (cross-runtime) and `local-skills/claude/` (Claude-only).
 
 ```bash
-harness setup agents generate        # render agents/ into host directories
-harness setup agents generate --check  # verify they are in sync
-harness setup agents generate --include-gemini-commands
-harness setup agents generate --skip-runtime-hooks copilot
-harness setup bootstrap                # wire every supported agent runtime
-harness setup bootstrap --include-gemini-commands
-harness setup bootstrap --agents codex # narrow to one runtime
-harness setup bootstrap --skip-runtime-hooks gemini,copilot
-harness setup bootstrap --enable-suite-hooks --enable-repo-policy   # opt back into gated hook families
-HARNESS_FEATURE_SUITE_HOOKS=1 harness setup bootstrap                # same, via env var
+mise run setup:agents:generate
+mise run check:agent-assets
+mise run setup:agents:generate -- --include-gemini-commands
+mise run setup:agents:generate -- --skip-runtime-hooks copilot
+mise run setup:bootstrap
+mise run setup:bootstrap -- --include-gemini-commands
+mise run setup:bootstrap -- --agents codex
+mise run setup:bootstrap -- --skip-runtime-hooks gemini,copilot
+mise run setup:bootstrap -- --enable-suite-hooks
+HARNESS_FEATURE_SUITE_HOOKS=1 mise run setup:bootstrap
+
+# aff-owned runtime hook wiring is manual and separate
+mise run aff:setup:bootstrap -- --agents codex
+mise run aff:setup:agents:generate -- --target codex
+mise run aff:check:agent-assets -- --target codex
+mise run aff:install
 ```
 
 ### Runtime

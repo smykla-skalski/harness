@@ -226,5 +226,7 @@ reconcile_shadowed_harness_binaries
 if [[ "${skip_codesign}" != "1" ]]; then
   command codesign --verify --strict --verbose=2 "${binary_path}" >/dev/null
 fi
+
 warn_shadowed_harness_binaries
+
 printf 'installed harness %s at %s\n' "${installed_version}" "${binary_path}"
