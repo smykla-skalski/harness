@@ -97,6 +97,7 @@ extension AgentsWindowView {
       Button("Back to create") {
         selectCreateTab()
       }
+      .id("agents.agent.\(agentID)")
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiBackToCreateButton)
     }
@@ -115,6 +116,7 @@ extension AgentsWindowView {
           terminalError(error)
         }
         terminalOutcome(tui)
+      .id("agents.agent.inline.\(agentID)")
         agentDetailForAgentID(tui.agentId)
       }
     }

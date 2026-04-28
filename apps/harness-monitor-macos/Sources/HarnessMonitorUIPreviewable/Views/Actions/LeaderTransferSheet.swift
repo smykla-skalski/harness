@@ -26,6 +26,20 @@ struct LeaderTransferSheet: View {
   private var areLeaderActionsAvailable: Bool {
     store.areSelectedLeaderActionsAvailable
   }
+  private var effectiveTransferLeaderID: String {
+    Self.normalizedTransferLeaderID(
+      draftID: transferLeaderID,
+      leaderID: detail?.session.leaderId,
+      pendingLeaderID: detail?.session.pendingLeaderTransfer?.newLeaderId,
+      availableAgentIDs: detail?.agents.map(\.agentId) ?? []
+    )
+  }
+  private var transferLeaderSelection: Binding<String> {
+    Binding(
+      get: { effectiveTransferLeaderID },
+      set: { transferLeaderID = $0 }
+    )
+  }
 
   private var transferButtonTitle: String {
     if let detail,
@@ -98,7 +112,7 @@ struct LeaderTransferSheet: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
-        Picker("New Leader", selection: $transferLeaderID) {
+        Picker("New Leader", selection: transferLeaderSelection) {
           if let leader = detail.agents.first(where: { $0.agentId == detail.session.leaderId }) {
             Text("\(leader.name) (current leader)")
               .foregroundStyle(.tertiary)
@@ -124,17 +138,17 @@ struct LeaderTransferSheet: View {
         title: transferButtonTitle,
         actionID: .transferLeader(
           sessionID: detail.session.sessionId,
-          newLeaderID: transferLeaderID
+          newLeaderID: effectiveTransferLeaderID
         ),
         store: store,
         variant: .prominent,
         tint: HarnessMonitorTheme.caution,
         isExternallyDisabled:
-          transferLeaderID.isEmpty
-          || transferLeaderID == detail.session.leaderId
+          effectiveTransferLeaderID.isEmpty
+          || effectiveTransferLeaderID == detail.session.leaderId
           || !areLeaderActionsAvailable,
         help:
-          transferLeaderID == detail.session.leaderId
+          effectiveTransferLeaderID == detail.session.leaderId
           ? "Select a different agent to transfer leadership to" : "",
         action: submitTransfer
       )
@@ -180,12 +194,28 @@ struct LeaderTransferSheet: View {
 
   private func transfer() async {
     let reason = transferReason.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !transferLeaderID.isEmpty else { return }
+    guard !effectiveTransferLeaderID.isEmpty else { return }
     let success = await store.transferLeader(
-      newLeaderID: transferLeaderID,
+      newLeaderID: effectiveTransferLeaderID,
       reason: reason.isEmpty ? nil : reason
     )
     if success { transferReason = "" }
+  }
+
+  static func normalizedTransferLeaderID(
+    draftID: String,
+    leaderID: String?,
+    pendingLeaderID: String?,
+    availableAgentIDs: [String]
+  ) -> String {
+    let eligibleAgentIDs = availableAgentIDs.filter { $0 != leaderID }
+    if let pendingLeaderID, eligibleAgentIDs.contains(pendingLeaderID) {
+      return pendingLeaderID
+    }
+    if eligibleAgentIDs.contains(draftID) {
+      return draftID
+    }
+    return eligibleAgentIDs.first ?? availableAgentIDs.first ?? ""
   }
 }
 
