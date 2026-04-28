@@ -12,6 +12,19 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 CHECKOUT_ROOT = APP_ROOT.parents[1]
+COMMON_REPO_ROOT = Path(
+    subprocess.check_output(
+        [
+            "git",
+            "-C",
+            str(CHECKOUT_ROOT),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ],
+        text=True,
+    ).strip()
+).parent
 SCRIPT_PATH = APP_ROOT / "Scripts" / "xcodebuild-with-lock.sh"
 RTK_SHELL_PATH = APP_ROOT / "Scripts" / "lib" / "rtk-shell.sh"
 
@@ -206,7 +219,7 @@ shift
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("TUIST=xcodebuild", log)
         self.assertIn(
-            f"XCODEBUILD=-derivedDataPath {CHECKOUT_ROOT / 'xcode-derived'}",
+            f"XCODEBUILD=-derivedDataPath {COMMON_REPO_ROOT / 'xcode-derived'}",
             log,
         )
 
@@ -322,7 +335,7 @@ printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
             log = tool_log.read_text() if tool_log.exists() else ""
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn(f"PWD={APP_ROOT}", log)
-            self.assertIn(f"-derivedDataPath {CHECKOUT_ROOT / 'xcode-derived'}", log)
+            self.assertIn(f"-derivedDataPath {COMMON_REPO_ROOT / 'xcode-derived'}", log)
             self.assertIn(
                 f"-workspace {APP_ROOT / 'HarnessMonitor.xcworkspace'}",
                 log,
@@ -390,7 +403,7 @@ PY
                 payload["argv"],
                 [
                     "xcodebuild",
-                    f"-derivedDataPath={CHECKOUT_ROOT / 'xcode-derived'}",
+                    f"-derivedDataPath={COMMON_REPO_ROOT / 'xcode-derived'}",
                     f"-workspace={resolved_caller_root / 'apps' / 'harness-monitor-macos' / 'HarnessMonitor.xcworkspace'}",
                     f"-resultBundlePath={resolved_caller_root / 'tmp' / 'result bundle.xcresult'}",
                     "-scheme",
@@ -423,7 +436,7 @@ PY
         )
         self.assertIn(
             "path-normalization: -derivedDataPath xcode-derived -> "
-            f"{CHECKOUT_ROOT / 'xcode-derived'}",
+            f"{COMMON_REPO_ROOT / 'xcode-derived'}",
             completed.stderr,
         )
         self.assertIn(
@@ -459,7 +472,7 @@ PY
         self.assertIn("xcodebuild-wrapper: normalized path args:", completed.stderr)
         self.assertIn(
             "path-normalization: -derivedDataPath xcode-derived -> "
-            f"{CHECKOUT_ROOT / 'xcode-derived'}",
+            f"{COMMON_REPO_ROOT / 'xcode-derived'}",
             completed.stderr,
         )
         self.assertIn(

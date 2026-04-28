@@ -160,10 +160,38 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 project_dir="$tmp_dir/project"
 data_home="$tmp_dir/data-home"
+fake_e2e_tool="$tmp_dir/harness-monitor-e2e"
 mkdir -p "$project_dir"
+cat >"$fake_e2e_tool" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ "${1:-}" == "inject-heuristic" ]] || exit 64
+shift
+project_dir=""
+while (( $# > 0 )); do
+  case "$1" in
+    --project-dir)
+      project_dir="$2"
+      shift 2
+      ;;
+    *)
+      shift 2
+      ;;
+  esac
+done
+log_path="$project_dir/raw.jsonl"
+mkdir -p "$(dirname -- "$log_path")"
+cat >"$log_path" <<'JSONL'
+{"timestamp":"2026-04-28T00:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use"}]}}
+{"timestamp":"2026-04-28T00:00:01Z","message":{"role":"user","content":[{"type":"tool_result","content":[{"text":"Traceback\nexample"}]}]}}
+JSONL
+printf '{"log_path":"%s"}\n' "$log_path"
+EOF
+chmod +x "$fake_e2e_tool"
 
 inject_output="$(
-  "$ROOT/scripts/e2e/inject-heuristic-log.sh" \
+  HARNESS_MONITOR_E2E_TOOL_BINARY="$fake_e2e_tool" "$ROOT/scripts/e2e/inject-heuristic-log.sh" \
     --agent "agent-1" \
     --code "python_traceback_output" \
     --runtime "codex" \
