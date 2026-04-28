@@ -6,15 +6,23 @@
 //! installation check needs.
 
 use super::{AcpAgentDescriptor, DoctorProbe, tags};
+use crate::agents::runtime::models;
+
+const COPILOT_ID: &str = "copilot";
 
 /// Construct the Copilot descriptor.
 ///
 /// Returns a fresh value; the catalog's `LazyLock<Vec<_>>` owns the canonical
 /// storage so every caller sees the same instance after first access.
+///
+/// # Panics
+/// Panics if the built-in runtime model registry is missing Copilot. That is a
+/// harness invariant breach: the first-party ACP descriptor and first-party
+/// model catalog must ship together.
 #[must_use]
 pub fn descriptor() -> AcpAgentDescriptor {
     AcpAgentDescriptor {
-        id: "copilot".to_owned(),
+        id: COPILOT_ID.to_owned(),
         display_name: "GitHub Copilot".to_owned(),
         capabilities: vec![
             tags::FS_READ.to_owned(),
@@ -30,6 +38,11 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "GH_TOKEN".to_owned(),
             "GITHUB_TOKEN".to_owned(),
         ],
+        model_catalog: Some(
+            models::catalog_for(COPILOT_ID)
+                .expect("built-in Copilot descriptor must have a model catalog")
+                .clone(),
+        ),
         install_hint: Some(
             "Install GitHub Copilot CLI: https://github.com/github/copilot-cli".to_owned(),
         ),
@@ -65,5 +78,18 @@ mod tests {
         let hint = descriptor.install_hint.as_deref().expect("hint present");
         assert!(hint.to_lowercase().contains("copilot"));
         assert!(hint.contains("github"));
+    }
+
+    #[test]
+    fn model_catalog_points_at_copilot_models() {
+        let descriptor = descriptor();
+        let catalog = descriptor.model_catalog.expect("copilot model catalog");
+        assert_eq!(catalog.runtime, "copilot");
+        assert!(
+            catalog
+                .models
+                .iter()
+                .any(|model| model.id == catalog.default)
+        );
     }
 }
