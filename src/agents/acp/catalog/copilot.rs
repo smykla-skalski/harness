@@ -37,6 +37,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             command: "copilot".to_owned(),
             args: vec!["--version".to_owned()],
         },
+        prompt_timeout_seconds: None,
     }
 }
 

@@ -58,6 +58,10 @@ pub struct AcpAgentDescriptor {
     pub install_hint: Option<String>,
     /// Probe used by `harness doctor` to test installation.
     pub doctor_probe: DoctorProbe,
+    /// Maximum time allowed for a single `session/prompt` call. `None` uses the
+    /// default of 10 minutes. Per-descriptor override for long-running agents.
+    #[serde(default)]
+    pub prompt_timeout_seconds: Option<u64>,
 }
 
 static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> =
