@@ -133,6 +133,11 @@ extension HarnessMonitorStore {
     }
   }
 
+  func flushPendingCacheWrite() async {
+    guard let task = pendingCacheWriteTask else { return }
+    await task.value
+  }
+
   func updatePersistedSessionMetadataAfterSave(insertedSessionCount: Int) {
     persistedSessionCount += insertedSessionCount
     lastPersistedSnapshotAt = .now

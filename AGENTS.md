@@ -29,8 +29,6 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-Before any commit, run `/council` on the intended diff and address material findings before `git commit -sS`.
-
 For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:macos:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
 
 Harness Monitor app validation expectations:
