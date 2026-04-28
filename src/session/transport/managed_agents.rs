@@ -10,8 +10,10 @@ mod terminal;
 
 pub use attach::ManagedAgentAttachArgs;
 pub use codex::{CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentSteerArgs};
+#[allow(unused_imports)]
 pub use start::{
-    CodexAgentStartArgs, SessionAgentStartCommand, SessionAgentsCommand, TerminalAgentStartArgs,
+    AcpAgentCommand, AcpAgentStartArgs, AcpInspectArgs, CodexAgentStartArgs,
+    SessionAgentStartCommand, SessionAgentsCommand, TerminalAgentStartArgs,
 };
 pub use terminal::{ManagedTerminalInputArgs, ManagedTerminalResizeArgs, ManagedTerminalStopArgs};
 

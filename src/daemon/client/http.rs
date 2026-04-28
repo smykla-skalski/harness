@@ -34,6 +34,34 @@ impl DaemonClient {
         process_response(response, "GET", path, &request_id, &start)
     }
 
+    pub(super) fn get_with_query<Res: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[(&str, &str)],
+    ) -> Result<Res, CliError> {
+        let request_id = Uuid::new_v4().to_string();
+        let start = Instant::now();
+        let url = format!("{}{path}", self.endpoint);
+        let span = client_request_span("GET", path, &request_id, &self.endpoint);
+        let _guard = span.enter();
+        record_trace_id(&span);
+        let propagation_headers = current_trace_headers();
+        let response = RUNTIME.block_on(async {
+            let mut request = self
+                .http
+                .get(&url)
+                .bearer_auth(&self.token)
+                .header("x-request-id", &request_id)
+                .query(query)
+                .timeout(MUTATION_TIMEOUT);
+            for (header, value) in &propagation_headers {
+                request = request.header(header, value);
+            }
+            request.send().await
+        });
+        process_response(response, "GET", path, &request_id, &start)
+    }
+
     /// GET that treats HTTP 404 as a distinct "endpoint absent" signal
     /// (returned as `Ok(None)`), used when the client wants to detect a
     /// missing new endpoint on an older daemon without conflating it with

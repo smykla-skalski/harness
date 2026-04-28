@@ -225,10 +225,12 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
             | ws_methods::PROJECTS
             | ws_methods::SESSIONS
             | ws_methods::RUNTIME_SESSION_RESOLVE
+            | ws_methods::RUNTIMES_PROBE
             | ws_methods::SESSION_DETAIL
             | ws_methods::SESSION_TIMELINE
             | ws_methods::SESSION_MANAGED_AGENTS
             | ws_methods::MANAGED_AGENT_DETAIL
+            | ws_methods::MANAGED_AGENTS_ACP_INSPECT
     ) {
         Some(dispatch_read_query(request, state).await)
     } else {

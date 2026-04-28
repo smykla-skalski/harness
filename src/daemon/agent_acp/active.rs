@@ -2,7 +2,7 @@ use std::io::Read;
 use std::process::{Child, ChildStderr, ExitStatus};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
@@ -14,7 +14,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
-use super::manager::AcpAgentSnapshot;
+use super::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
 
 const STDERR_TAIL_LIMIT: usize = 16 * 1024;
@@ -29,6 +29,7 @@ pub(super) struct ActiveAcpSession {
     protocol_task: Mutex<Option<JoinHandle<()>>>,
     batcher_task: Mutex<Option<JoinHandle<()>>>,
     event_task: Mutex<Option<JoinHandle<()>>>,
+    started_at: Instant,
 }
 
 pub(super) struct ActiveAcpTasks {
@@ -61,6 +62,7 @@ impl ActiveAcpSession {
             protocol_task: Mutex::new(Some(tasks.protocol)),
             batcher_task: Mutex::new(Some(tasks.batcher)),
             event_task: Mutex::new(Some(tasks.event)),
+            started_at: Instant::now(),
         }
     }
 
@@ -94,6 +96,30 @@ impl ActiveAcpSession {
         snapshot.permission_queue_depth = self.permissions.queue_depth();
         snapshot.pending_permission_batches = self.permissions.pending_batches();
         snapshot
+    }
+
+    pub(super) fn inspect_snapshot(&self) -> AcpAgentInspectSnapshot {
+        let snapshot = self.snapshot_with_live_counts();
+        let prompt_timeout = self.supervisor.config().prompt_timeout;
+        let elapsed_since_last_event = self.supervisor.elapsed_since_last_event();
+        let remaining = prompt_timeout
+            .checked_sub(elapsed_since_last_event)
+            .unwrap_or_default();
+        AcpAgentInspectSnapshot {
+            acp_id: snapshot.acp_id,
+            session_id: snapshot.session_id,
+            agent_id: snapshot.agent_id,
+            display_name: snapshot.display_name,
+            pid: snapshot.pid,
+            pgid: snapshot.pgid,
+            uptime_ms: u64::try_from(self.started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+            last_update_at: snapshot.updated_at,
+            last_client_call_at: self.supervisor.last_client_call_at(),
+            watchdog_state: self.supervisor.watchdog_state().as_str().to_string(),
+            pending_permissions: snapshot.pending_permissions,
+            terminal_count: snapshot.terminal_count,
+            prompt_deadline_remaining_ms: u64::try_from(remaining.as_millis()).unwrap_or(u64::MAX),
+        }
     }
 
     pub(super) fn refresh(&self) {

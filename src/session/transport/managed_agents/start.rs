@@ -1,6 +1,7 @@
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::agent_acp::AcpAgentStartRequest;
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::errors::CliError;
@@ -37,6 +38,11 @@ pub enum SessionAgentsCommand {
     Interrupt(super::codex::CodexAgentInterruptArgs),
     /// Resolve a managed Codex approval request.
     Approve(super::codex::CodexAgentApprovalArgs),
+    /// ACP agent lifecycle and observability commands.
+    Acp {
+        #[command(subcommand)]
+        command: AcpAgentCommand,
+    },
 }
 
 impl Execute for SessionAgentsCommand {
@@ -52,6 +58,7 @@ impl Execute for SessionAgentsCommand {
             Self::Steer(args) => args.execute(context),
             Self::Interrupt(args) => args.execute(context),
             Self::Approve(args) => args.execute(context),
+            Self::Acp { command } => command.execute(context),
         }
     }
 }
@@ -63,6 +70,8 @@ pub enum SessionAgentStartCommand {
     Terminal(TerminalAgentStartArgs),
     /// Start a structured Codex thread.
     Codex(CodexAgentStartArgs),
+    /// Start an ACP-backed agent session.
+    Acp(AcpAgentStartArgs),
 }
 
 impl Execute for SessionAgentStartCommand {
@@ -70,7 +79,70 @@ impl Execute for SessionAgentStartCommand {
         match self {
             Self::Terminal(args) => args.execute(context),
             Self::Codex(args) => args.execute(context),
+            Self::Acp(args) => args.execute(context),
         }
+    }
+}
+
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum AcpAgentCommand {
+    /// Inspect live ACP sessions.
+    Inspect(AcpInspectArgs),
+}
+
+impl Execute for AcpAgentCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Inspect(args) => args.execute(context),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AcpAgentStartArgs {
+    /// Session ID.
+    #[arg(long)]
+    pub session_id: String,
+    /// ACP descriptor ID to launch.
+    #[arg(long)]
+    pub agent: String,
+    /// Optional first prompt to submit after launch.
+    #[arg(long)]
+    pub prompt: Option<String>,
+    /// Project directory. Defaults to the daemon's session project.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for AcpAgentStartArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = AcpAgentStartRequest {
+            agent: self.agent.clone(),
+            prompt: self.prompt.clone(),
+            project_dir: self
+                .project_dir
+                .as_deref()
+                .map(|hint| resolve_project_dir(Some(hint))),
+        };
+        let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
+        print_json(&snapshot)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AcpInspectArgs {
+    /// Optional session ID filter. Omit to inspect every live ACP session.
+    #[arg(long)]
+    pub session_id: Option<String>,
+}
+
+impl Execute for AcpInspectArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response = daemon_client()?.inspect_acp_managed_agents(self.session_id.as_deref())?;
+        print_json(&response)?;
+        Ok(0)
     }
 }
 
@@ -219,6 +291,20 @@ mod tests {
         args: CodexAgentStartArgs,
     }
 
+    #[derive(clap::Parser, Debug)]
+    #[command(name = "acp")]
+    struct AcpParse {
+        #[command(flatten)]
+        args: AcpAgentStartArgs,
+    }
+
+    #[derive(clap::Parser, Debug)]
+    #[command(name = "inspect")]
+    struct AcpInspectParse {
+        #[command(flatten)]
+        args: AcpInspectArgs,
+    }
+
     #[test]
     fn terminal_cli_parses_effort_and_model_at_lowest_tier() {
         // E2E intent: cheapest/fastest codex model + lowest effort level so
@@ -256,6 +342,32 @@ mod tests {
             parsed.args.model.as_deref(),
             Some("claude-sonnet-5-0-private")
         );
+    }
+
+    #[test]
+    fn acp_start_cli_parses_agent_and_session_flags() {
+        let parsed = AcpParse::try_parse_from([
+            "acp",
+            "--agent",
+            "copilot",
+            "--session-id",
+            "sess-1",
+            "--prompt",
+            "hello",
+        ])
+        .expect("parse");
+        assert_eq!(parsed.args.agent, "copilot");
+        assert_eq!(parsed.args.session_id, "sess-1");
+        assert_eq!(parsed.args.prompt.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn acp_inspect_cli_accepts_optional_session_filter() {
+        let parsed =
+            AcpInspectParse::try_parse_from(["inspect", "--session-id", "sess-1"]).expect("parse");
+        assert_eq!(parsed.args.session_id.as_deref(), Some("sess-1"));
+        let parsed = AcpInspectParse::try_parse_from(["inspect"]).expect("parse");
+        assert_eq!(parsed.args.session_id, None);
     }
 
     #[test]

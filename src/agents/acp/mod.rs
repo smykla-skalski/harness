@@ -22,6 +22,7 @@ pub mod client;
 pub mod connection;
 pub mod events;
 pub mod permission;
+pub mod probe;
 pub mod ring;
 pub mod supervision;
 pub mod throughput_bench;

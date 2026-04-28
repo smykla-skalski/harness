@@ -28,6 +28,7 @@ use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
 use crate::agents::kind::DisconnectReason;
+use crate::workspace::utc_now;
 
 use super::client::DAEMON_SHUTDOWN;
 
@@ -124,6 +125,7 @@ pub struct AcpSessionSupervisor {
     in_flight_calls: AtomicU64,
     shutting_down: AtomicBool,
     last_event_at: Mutex<Instant>,
+    last_client_call_at: Mutex<Option<String>>,
     watchdog_notify: Notify,
 }
 
@@ -144,6 +146,7 @@ impl AcpSessionSupervisor {
             in_flight_calls: AtomicU64::new(0),
             shutting_down: AtomicBool::new(false),
             last_event_at: Mutex::new(Instant::now()),
+            last_client_call_at: Mutex::new(None),
             watchdog_notify: Notify::new(),
         }
     }
@@ -159,7 +162,14 @@ impl AcpSessionSupervisor {
     }
 
     /// Acquire a client-call guard. While held, the watchdog is paused.
+    ///
+    /// # Panics
+    /// Panics if the last-client-call mutex is poisoned.
     pub fn enter_client_call(&self) -> ClientCallGuard<'_> {
+        *self
+            .last_client_call_at
+            .lock()
+            .expect("last client call lock") = Some(utc_now());
         self.in_flight_calls.fetch_add(1, Ordering::SeqCst);
         self.update_watchdog_state();
         ClientCallGuard { supervisor: self }
@@ -204,6 +214,18 @@ impl AcpSessionSupervisor {
     #[must_use]
     pub fn in_flight_call_count(&self) -> u64 {
         self.in_flight_calls.load(Ordering::SeqCst)
+    }
+
+    /// Last time an agent-initiated client call began.
+    ///
+    /// # Panics
+    /// Panics if the last-client-call mutex is poisoned.
+    #[must_use]
+    pub fn last_client_call_at(&self) -> Option<String> {
+        self.last_client_call_at
+            .lock()
+            .expect("last client call lock")
+            .clone()
     }
 
     /// Process group id.

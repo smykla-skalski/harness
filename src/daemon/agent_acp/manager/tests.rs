@@ -64,6 +64,12 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].acp_id, snapshot.acp_id);
 
+        let inspected = manager.inspect(Some("sess-1"));
+        assert_eq!(inspected.agents.len(), 1);
+        assert_eq!(inspected.agents[0].acp_id, snapshot.acp_id);
+        assert_eq!(inspected.agents[0].agent_id, "fake");
+        assert_eq!(inspected.agents[0].watchdog_state, "active");
+
         let stopped = manager.stop(&snapshot.acp_id).expect("stop");
         assert!(matches!(
             stopped.status,

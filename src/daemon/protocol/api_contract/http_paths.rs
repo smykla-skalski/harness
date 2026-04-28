@@ -6,6 +6,7 @@ pub const BRIDGE_RECONFIGURE: &str = "/v1/bridge/reconfigure";
 pub const DAEMON_LOG_LEVEL: &str = "/v1/daemon/log-level";
 pub const PROJECTS: &str = "/v1/projects";
 pub const RUNTIME_SESSION_RESOLVE: &str = "/v1/runtime-sessions/resolve";
+pub const RUNTIMES_PROBE: &str = "/v1/runtimes/probe";
 pub const WS: &str = "/v1/ws";
 pub const STREAM: &str = "/v1/stream";
 pub const SESSIONS: &str = "/v1/sessions";
@@ -56,6 +57,7 @@ pub const MANAGED_AGENT_APPROVAL: &str = "/v1/managed-agents/{agent_id}/approval
 pub const MANAGED_AGENT_ACP_PERMISSION: &str =
     "/v1/managed-agents/{agent_id}/permission-batches/{batch_id}";
 pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{agent_id}";
+pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";
 pub const SESSION_SIGNAL_CANCEL: &str = "/v1/sessions/{session_id}/signal-cancel";
 pub const SESSION_SIGNAL_ACK: &str = "/v1/sessions/{session_id}/signal-ack";

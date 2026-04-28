@@ -1,8 +1,11 @@
 //! Tests for ACP session supervision.
 #![allow(unsafe_code)]
 
+use std::fs;
+use std::path::Path;
 use std::process::{Child, Command};
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use super::*;
 
@@ -27,6 +30,18 @@ fn spawn_sleep_child() -> Child {
             .spawn()
             .expect("spawn timeout")
     }
+}
+
+#[cfg(unix)]
+fn wait_for_file_marker(path: &Path, marker: &str) {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while Instant::now() < deadline {
+        if fs::read_to_string(path).is_ok_and(|content| content.contains(marker)) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    panic!("expected marker '{marker}' in {}", path.display());
 }
 
 #[test]
@@ -105,6 +120,24 @@ fn watchdog_fires_after_timeout() {
     }
 }
 
+#[tokio::test]
+async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
+    let mut config = SupervisionConfig::default();
+    config.watchdog_timeout = Duration::from_millis(10);
+
+    let child = spawn_sleep_child();
+    let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
+
+    let reason = watchdog_loop(Arc::clone(&supervisor)).await;
+    assert_eq!(reason, Some(DisconnectReason::WatchdogFired));
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
+
+    #[cfg(unix)]
+    unsafe {
+        libc::killpg(supervisor.pgid(), libc::SIGKILL);
+    }
+}
+
 #[test]
 fn record_event_resets_watchdog() {
     let mut config = SupervisionConfig::default();
@@ -144,6 +177,39 @@ fn kill_process_group_terminates_child() {
 
     let status = child.try_wait().expect("try_wait after kill");
     assert!(status.is_some(), "child should be dead");
+}
+
+#[test]
+#[cfg(unix)]
+fn kill_process_group_escalates_when_child_traps_sigterm() {
+    use std::os::unix::process::{CommandExt, ExitStatusExt};
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let log_path = temp.path().join("signal.log");
+    let mut command = Command::new("sh");
+    command
+        .arg("-c")
+        .arg(
+            "trap 'echo term >> \"$HARNESS_TEST_SIGNAL_LOG\"; while :; do sleep 1; done' TERM; \
+             echo ready >> \"$HARNESS_TEST_SIGNAL_LOG\"; while :; do sleep 1; done",
+        )
+        .env("HARNESS_TEST_SIGNAL_LOG", &log_path);
+    unsafe {
+        command.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
+    let mut child = command.spawn().expect("spawn trap child");
+    wait_for_file_marker(&log_path, "ready");
+
+    let pgid = child.id().cast_signed();
+    kill_process_group(pgid, &mut child);
+
+    let status = child.try_wait().expect("try_wait after kill");
+    let status = status.expect("child should be dead");
+    assert_eq!(status.signal(), Some(libc::SIGKILL));
+    wait_for_file_marker(&log_path, "term");
 }
 
 #[test]

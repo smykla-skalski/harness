@@ -75,6 +75,14 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::RUNTIMES_PROBE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::RUNTIMES_PROBE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::WS,
         parity: HttpRouteParity::Exempt {
             reason: "websocket upgrade transport is not an RPC endpoint",
@@ -430,6 +438,14 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
         path: http_paths::MANAGED_AGENT_DELETE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::MANAGED_AGENT_STOP_ACP,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::MANAGED_AGENTS_ACP_INSPECT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENTS_ACP_INSPECT,
         },
         swift_client_exposed: true,
     },

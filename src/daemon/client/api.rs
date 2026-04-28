@@ -1,4 +1,5 @@
-use crate::daemon::agent_acp::AcpAgentStartRequest;
+use crate::agents::acp::probe::AcpRuntimeProbeResponse;
+use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentStartRequest};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
@@ -393,6 +394,23 @@ impl DaemonClient {
 
     pub fn stop_acp_managed_agent(&self, agent_id: &str) -> Result<ManagedAgentSnapshot, CliError> {
         self.delete(&format!("/v1/managed-agents/{agent_id}"))
+    }
+
+    pub fn inspect_acp_managed_agents(
+        &self,
+        session_id: Option<&str>,
+    ) -> Result<AcpAgentInspectResponse, CliError> {
+        match session_id {
+            Some(session_id) => self.get_with_query(
+                "/v1/managed-agents/acp/inspect",
+                &[("session_id", session_id)],
+            ),
+            None => self.get("/v1/managed-agents/acp/inspect"),
+        }
+    }
+
+    pub fn runtime_probe_results(&self) -> Result<AcpRuntimeProbeResponse, CliError> {
+        self.get("/v1/runtimes/probe")
     }
 
     pub fn signal_managed_terminal_ready(&self, agent_id: &str) -> Result<(), CliError> {

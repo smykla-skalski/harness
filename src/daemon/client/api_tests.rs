@@ -85,6 +85,40 @@ fn spawn_post_mock(
     (endpoint, captured, handle)
 }
 
+fn spawn_get_mock(
+    response_status: &'static str,
+    response_body: String,
+) -> (String, Arc<Mutex<Captured>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured = Arc::new(Mutex::new(Captured {
+        path: String::new(),
+        body: String::new(),
+    }));
+    let captured_clone = Arc::clone(&captured);
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let request = read_http_request(&mut stream);
+        let first_line = request.lines().next().unwrap_or_default();
+        let path = first_line
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or_default()
+            .to_string();
+        *captured_clone.lock().expect("capture") = Captured {
+            path,
+            body: String::new(),
+        };
+        write_http_response(
+            &mut stream,
+            response_status,
+            "application/json",
+            &response_body,
+        );
+    });
+    (endpoint, captured, handle)
+}
+
 fn client_with(endpoint: String) -> DaemonClient {
     DaemonClient {
         endpoint,
@@ -249,4 +283,62 @@ fn improver_apply_posts_expected_path_and_returns_outcome() {
     assert!(captured.body.contains("\"issue_id\":\"issue-1\""));
     assert!(captured.body.contains("\"target\":\"skill\""));
     assert!(captured.body.contains("\"rel_path\":\"demo/SKILL.md\""));
+}
+
+#[test]
+fn runtime_probe_results_gets_probe_endpoint() {
+    let body = json!({
+        "probes": [{
+            "agent_id": "copilot",
+            "display_name": "GitHub Copilot",
+            "binary_present": false,
+            "auth_state": "unavailable",
+            "version": null,
+            "install_hint": "Install GitHub Copilot CLI"
+        }],
+        "checked_at": "2026-04-28T00:00:00Z"
+    })
+    .to_string();
+    let (endpoint, captured, handle) = spawn_get_mock("200 OK", body);
+    let client = client_with(endpoint);
+    let response = client.runtime_probe_results().expect("runtime probes");
+    assert_eq!(response.probes[0].agent_id, "copilot");
+    handle.join().expect("server thread");
+    assert_eq!(
+        captured.lock().expect("captured").path,
+        "/v1/runtimes/probe"
+    );
+}
+
+#[test]
+fn acp_inspect_gets_optional_session_filter() {
+    let body = json!({
+        "agents": [{
+            "acp_id": "agent-acp-1",
+            "session_id": "sess-1",
+            "agent_id": "copilot",
+            "display_name": "GitHub Copilot",
+            "pid": 42,
+            "pgid": 42,
+            "uptime_ms": 10,
+            "last_update_at": "2026-04-28T00:00:00Z",
+            "last_client_call_at": null,
+            "watchdog_state": "active",
+            "pending_permissions": 0,
+            "terminal_count": 0,
+            "prompt_deadline_remaining_ms": 600000
+        }]
+    })
+    .to_string();
+    let (endpoint, captured, handle) = spawn_get_mock("200 OK", body);
+    let client = client_with(endpoint);
+    let response = client
+        .inspect_acp_managed_agents(Some("sess-1"))
+        .expect("acp inspect");
+    assert_eq!(response.agents[0].acp_id, "agent-acp-1");
+    handle.join().expect("server thread");
+    assert_eq!(
+        captured.lock().expect("captured").path,
+        "/v1/managed-agents/acp/inspect?session_id=sess-1"
+    );
 }
