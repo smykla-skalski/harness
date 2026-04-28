@@ -26,6 +26,9 @@ class XcodebuildWithLockTests(unittest.TestCase):
         *args: str,
         extra_env: dict[str, str] | None = None,
         preexisting_lock_pid: int | None = None,
+        cwd: Path | None = None,
+        inject_derived_data_path: bool = True,
+        include_tuist: bool = True,
     ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -53,9 +56,10 @@ set -euo pipefail
 printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
 """,
             )
-            write_executable(
-                fake_bin / "tuist",
-                f"""#!/bin/bash
+            if include_tuist:
+                write_executable(
+                    fake_bin / "tuist",
+                    f"""#!/bin/bash
 set -euo pipefail
 printf 'TUIST_PWD=%s\\nTUIST=%s\\n' "$PWD" "$*" >> "{tool_log}"
 if [[ "${{1:-}}" != "xcodebuild" ]]; then
@@ -65,12 +69,13 @@ fi
 shift
 "{fake_bin / "xcodebuild"}" "$@"
 """,
-            )
+                )
 
             env = os.environ.copy()
             env.update(
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -78,18 +83,17 @@ shift
             )
             env.update(extra_env or {})
 
+            command = ["bash", str(SCRIPT_PATH)]
+            if inject_derived_data_path:
+                command.extend(["-derivedDataPath", str(derived_data_path)])
+            command.extend(args)
             completed = subprocess.run(
-                [
-                    "bash",
-                    str(SCRIPT_PATH),
-                    "-derivedDataPath",
-                    str(derived_data_path),
-                    *args,
-                ],
+                command,
                 check=False,
                 capture_output=True,
                 text=True,
                 env=env,
+                cwd=cwd,
             )
             log = tool_log.read_text() if tool_log.exists() else ""
             return completed, log
@@ -161,6 +165,7 @@ shift
             env.update(
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "TMPDIR": str(temp_root),
@@ -186,6 +191,23 @@ shift
             self.assertIn(f"TUIST_PWD={APP_ROOT}", log)
             self.assertIn(f"XCODEBUILD=-derivedDataPath {derived_data_path}", log)
             self.assertIn("-scheme HarnessMonitor build", log)
+
+    def test_normalizes_relative_env_derived_data_alias_when_flag_missing(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={"XCODEBUILD_DERIVED_DATA_PATH": "xcode-derived"},
+            cwd=CHECKOUT_ROOT,
+            inject_derived_data_path=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
+        self.assertIn(
+            f"XCODEBUILD=-derivedDataPath {CHECKOUT_ROOT / 'xcode-derived'}",
+            log,
+        )
 
     def test_runner_uses_absolute_xcodebuild_by_default(self) -> None:
         rtk_shell = RTK_SHELL_PATH.read_text()
@@ -252,6 +274,7 @@ printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
             env.update(
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "TMPDIR": str(temp_root),
                 }
@@ -284,6 +307,46 @@ printf 'PWD=%s\\nARGS=%s\\n' "$PWD" "$*" > "{tool_log}"
                 f"-workspace {APP_ROOT / 'HarnessMonitor.xcworkspace'}",
                 log,
             )
+
+    def test_missing_tuist_reports_required_tool_and_normalized_paths(self) -> None:
+        completed, _ = self.run_script(
+            "-derivedDataPath",
+            "xcode-derived",
+            "-workspace",
+            "apps/harness-monitor-macos/HarnessMonitor.xcworkspace",
+            "-resultBundlePath",
+            "tmp/harness-monitor.xcresult",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            cwd=CHECKOUT_ROOT,
+            inject_derived_data_path=False,
+            include_tuist=False,
+        )
+
+        combined_output = completed.stdout + completed.stderr
+        self.assertEqual(completed.returncode, 127)
+        self.assertIn(
+            "tuist is required for all Harness Monitor xcodebuild wrapper lanes",
+            combined_output,
+        )
+        self.assertIn(
+            "path-normalization: -derivedDataPath xcode-derived -> "
+            f"{CHECKOUT_ROOT / 'xcode-derived'}",
+            completed.stderr,
+        )
+        self.assertIn(
+            "path-normalization: -workspace apps/harness-monitor-macos/"
+            "HarnessMonitor.xcworkspace -> "
+            f"{APP_ROOT / 'HarnessMonitor.xcworkspace'}",
+            completed.stderr,
+        )
+        self.assertIn(
+            "path-normalization: -resultBundlePath tmp/harness-monitor.xcresult -> "
+            f"{CHECKOUT_ROOT / 'tmp/harness-monitor.xcresult'}",
+            completed.stderr,
+        )
+        self.assertNotIn("swift-compile-context:", completed.stderr)
 
     def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -326,6 +389,7 @@ shift
             env.update(
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -421,6 +485,7 @@ shift
             env.update(
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
