@@ -131,6 +131,9 @@ extension RecordingHarnessClient {
   }
 
   func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {
+    if let error = configuredAgentTuiReadError(id: tuiID) {
+      throw error
+    }
     if let tui = dequeueConfiguredAgentTuiReadSnapshot(id: tuiID) {
       return tui
     }
@@ -182,6 +185,9 @@ extension RecordingHarnessClient {
   ) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.sendAgentTuiInput(tuiID: tuiID, request: request))
+    if let error = configuredAgentTuiInputError(id: tuiID) {
+      throw error
+    }
     guard let tui = configuredAgentTui(id: tuiID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
@@ -221,6 +227,9 @@ extension RecordingHarnessClient {
   ) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.resizeAgentTui(tuiID: tuiID, rows: request.rows, cols: request.cols))
+    if let error = configuredAgentTuiResizeError(id: tuiID) {
+      throw error
+    }
     guard let tui = configuredAgentTui(id: tuiID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
@@ -240,6 +249,9 @@ extension RecordingHarnessClient {
   func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.stopAgentTui(tuiID: tuiID))
+    if let error = configuredAgentTuiStopError(id: tuiID) {
+      throw error
+    }
     guard let tui = configuredAgentTui(id: tuiID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Agents unavailable.")
     }
