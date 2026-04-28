@@ -10,6 +10,7 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 CALLER_PWD="$(pwd -P)"
+LEGACY_TUIST_OPT_OUT="${HARNESS_MONITOR_USE_TUIST_TEST:-}"
 # Path contract:
 # - every monitor lane uses `tuist xcodebuild` from the app root
 # - caller-provided relative path flags keep caller-PWD semantics even though
@@ -19,6 +20,13 @@ CALLER_PWD="$(pwd -P)"
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
+
+if [[ -n "$LEGACY_TUIST_OPT_OUT" ]]; then
+  printf '%s\n' \
+    'HARNESS_MONITOR_USE_TUIST_TEST is no longer supported; all Harness Monitor xcodebuild lanes already use Tuist' \
+    >&2
+  exit 1
+fi
 
 LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
 LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
@@ -94,7 +102,7 @@ normalize_path_flag_value() {
 
 normalize_xcodebuild_path_args() {
   local -a normalized_args=()
-  local index arg normalized_path
+  local index arg flag normalized_path raw_path
   for ((index = 0; index < ${#args[@]}; index += 1)); do
     arg="${args[index]}"
     if xcodebuild_flag_requires_path_value "$arg" \
@@ -104,6 +112,16 @@ normalize_xcodebuild_path_args() {
       normalized_args+=("$arg" "$normalized_path")
       index=$((index + 1))
       continue
+    fi
+    if [[ "$arg" == *=* ]]; then
+      flag="${arg%%=*}"
+      if xcodebuild_flag_requires_path_value "$flag"; then
+        raw_path="${arg#*=}"
+        normalized_path="$(normalize_path_flag_value "$flag" "$raw_path")"
+        record_normalized_path_mapping "$flag" "$raw_path" "$normalized_path"
+        normalized_args+=("${flag}=${normalized_path}")
+        continue
+      fi
     fi
     normalized_args+=("$arg")
   done
@@ -126,6 +144,9 @@ has_derived_data_path=0
 for ((index = 0; index < ${#args[@]}; index += 1)); do
   if [[ "${args[index]}" == "-derivedDataPath" ]] && (( index + 1 < ${#args[@]} )); then
     derive_data_path="${args[index + 1]}"
+    has_derived_data_path=1
+  elif [[ "${args[index]}" == -derivedDataPath=* ]]; then
+    derive_data_path="${args[index]#*=}"
     has_derived_data_path=1
   fi
 done
@@ -360,10 +381,37 @@ emit_arg_vector() {
   printf '\n' >&2
 }
 
+emit_path_arg_vector() {
+  local label="$1"
+  shift
+  local -a path_args=()
+  local -a source_args=("$@")
+  local index arg flag
+  for ((index = 0; index < ${#source_args[@]}; index += 1)); do
+    arg="${source_args[index]}"
+    if xcodebuild_flag_requires_path_value "$arg" \
+        && (( index + 1 < ${#source_args[@]} )); then
+      path_args+=("$arg" "${source_args[index + 1]}")
+      index=$((index + 1))
+      continue
+    fi
+    if [[ "$arg" == *=* ]]; then
+      flag="${arg%%=*}"
+      if xcodebuild_flag_requires_path_value "$flag"; then
+        path_args+=("$arg")
+      fi
+    fi
+  done
+  if (( ${#path_args[@]} == 0 )); then
+    return 0
+  fi
+  emit_arg_vector "$label" "${path_args[@]}"
+}
+
 emit_wrapper_failure_context() {
   local mapping
-  emit_arg_vector "xcodebuild-wrapper: original args:" "${original_args[@]}"
-  emit_arg_vector "xcodebuild-wrapper: normalized args:" "${args[@]}"
+  emit_path_arg_vector "xcodebuild-wrapper: original path args:" "${original_args[@]}"
+  emit_path_arg_vector "xcodebuild-wrapper: normalized path args:" "${args[@]}"
   if (( ${#normalized_path_mappings[@]} == 0 )); then
     return 0
   fi
