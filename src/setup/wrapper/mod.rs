@@ -15,8 +15,8 @@ use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
 
-mod install;
 mod codex_marketplace;
+mod install;
 mod plugin_cache;
 mod registrations;
 
@@ -25,8 +25,8 @@ mod tests;
 
 pub use install::{choose_install_dir_with_home, install_wrapper};
 
-use install::path_candidates;
 use codex_marketplace::sync_codex_council_marketplace;
+use install::path_candidates;
 use plugin_cache::sync_plugin_cache;
 use registrations::{build_codex_config, process_agent_registrations};
 

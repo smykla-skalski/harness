@@ -51,7 +51,11 @@ fn sync_repo_symlink(target: &Path, link_path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn sync_codex_config(config_path: &Path, marketplace_path: &Path, now: &str) -> Result<(), CliError> {
+fn sync_codex_config(
+    config_path: &Path,
+    marketplace_path: &Path,
+    now: &str,
+) -> Result<(), CliError> {
     let existing = fs::read_to_string(config_path).unwrap_or_default();
     let (mut base, removed) = strip_sections(
         &existing,
@@ -200,7 +204,12 @@ source = "/Users/example/codex-marketplaces/council"
         sync_codex_council_marketplace(&project, &home).expect("sync succeeds");
 
         let link = codex_marketplace_link(&home);
-        assert!(fs::symlink_metadata(&link).expect("metadata").file_type().is_symlink());
+        assert!(
+            fs::symlink_metadata(&link)
+                .expect("metadata")
+                .file_type()
+                .is_symlink()
+        );
         assert_eq!(fs::read_link(&link).expect("read link"), project);
 
         let config = fs::read_to_string(home.join(".codex").join("config.toml")).expect("config");
