@@ -95,6 +95,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                             queue_policy: crate::session::types::TaskQueuePolicy::Locked,
                         },
                         &async_db,
+                        None,
                     )
                     .await
                     .expect("drop first task");
@@ -119,6 +120,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                             queue_policy: crate::session::types::TaskQueuePolicy::Locked,
                         },
                         &async_db,
+                        None,
                     )
                     .await
                     .expect("queue second task");
@@ -131,6 +133,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                             queue_policy: crate::session::types::TaskQueuePolicy::ReassignWhenFree,
                         },
                         &async_db,
+                        None,
                     )
                     .await
                     .expect("update queue policy");
@@ -153,6 +156,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                             note: Some("completed asynchronously".into()),
                         },
                         &async_db,
+                        None,
                     )
                     .await
                     .expect("complete first task");

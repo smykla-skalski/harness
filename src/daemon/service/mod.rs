@@ -273,6 +273,7 @@ pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,
 };
+pub(crate) use signals::try_wake_started_workers;
 pub use signals::{cancel_signal, send_signal};
 pub use status::{
     diagnostics_report, get_log_level, health_response, request_shutdown, set_log_level,

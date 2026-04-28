@@ -1,9 +1,9 @@
 use crate::daemon::index::ResolvedSession;
 
 use super::{
-    CliError, SessionTransition, build_log_entry, effective_project_dir, session_not_found,
-    session_service, snapshot, sync_file_state_for_resolved, task_drop_effect_signal_records,
-    write_task_start_signals,
+    AgentTuiManagerHandle, CliError, SessionTransition, build_log_entry, effective_project_dir,
+    session_not_found, session_service, snapshot, sync_file_state_for_resolved,
+    task_drop_effect_signal_records, try_wake_started_workers, write_task_start_signals,
 };
 
 mod agents;
@@ -107,6 +107,7 @@ async fn persist_task_signal_effects(
     actor_id: &str,
     effects: &[session_service::TaskDropEffect],
     extra_transition: Option<SessionTransition>,
+    agent_tui_manager: Option<&AgentTuiManagerHandle>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
     sync_file_state_for_resolved(resolved)?;
@@ -121,6 +122,14 @@ async fn persist_task_signal_effects(
             &task_drop_effect_signal_records(session_id, effects),
         )
         .await?;
+    try_wake_started_workers(
+        &resolved.state,
+        effects,
+        session_id,
+        &project_dir,
+        None,
+        agent_tui_manager,
+    );
     bump_session(async_db, session_id).await
 }
 

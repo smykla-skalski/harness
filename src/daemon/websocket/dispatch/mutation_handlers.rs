@@ -42,13 +42,26 @@ pub(super) async fn dispatch_task_assign(
         state,
         |session_id, task_id, params, db| {
             let body: TaskAssignRequest = serde_json::from_value(params)?;
-            service::assign_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            service::assign_task(
+                &session_id,
+                &task_id,
+                &body,
+                db,
+                Some(&state.agent_tui_manager),
+            )
+            .map_err(Into::into)
         },
         |session_id, task_id, params, async_db| async move {
             let body: TaskAssignRequest = serde_json::from_value(params)?;
-            service::assign_task_async(&session_id, &task_id, &body, &async_db)
-                .await
-                .map_err(Into::into)
+            service::assign_task_async(
+                &session_id,
+                &task_id,
+                &body,
+                &async_db,
+                Some(&state.agent_tui_manager),
+            )
+            .await
+            .map_err(Into::into)
         },
     )
     .await
@@ -60,13 +73,26 @@ pub(super) async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpSt
         state,
         |session_id, task_id, params, db| {
             let body: TaskDropRequest = serde_json::from_value(params)?;
-            service::drop_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            service::drop_task(
+                &session_id,
+                &task_id,
+                &body,
+                db,
+                Some(&state.agent_tui_manager),
+            )
+            .map_err(Into::into)
         },
         |session_id, task_id, params, async_db| async move {
             let body: TaskDropRequest = serde_json::from_value(params)?;
-            service::drop_task_async(&session_id, &task_id, &body, &async_db)
-                .await
-                .map_err(Into::into)
+            service::drop_task_async(
+                &session_id,
+                &task_id,
+                &body,
+                &async_db,
+                Some(&state.agent_tui_manager),
+            )
+            .await
+            .map_err(Into::into)
         },
     )
     .await
@@ -81,13 +107,26 @@ pub(super) async fn dispatch_task_queue_policy(
         state,
         |session_id, task_id, params, db| {
             let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
-            service::update_task_queue_policy(&session_id, &task_id, &body, db).map_err(Into::into)
+            service::update_task_queue_policy(
+                &session_id,
+                &task_id,
+                &body,
+                db,
+                Some(&state.agent_tui_manager),
+            )
+            .map_err(Into::into)
         },
         |session_id, task_id, params, async_db| async move {
             let body: TaskQueuePolicyRequest = serde_json::from_value(params)?;
-            service::update_task_queue_policy_async(&session_id, &task_id, &body, &async_db)
-                .await
-                .map_err(Into::into)
+            service::update_task_queue_policy_async(
+                &session_id,
+                &task_id,
+                &body,
+                &async_db,
+                Some(&state.agent_tui_manager),
+            )
+            .await
+            .map_err(Into::into)
         },
     )
     .await
@@ -102,13 +141,26 @@ pub(super) async fn dispatch_task_update(
         state,
         |session_id, task_id, params, db| {
             let body: TaskUpdateRequest = serde_json::from_value(params)?;
-            service::update_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            service::update_task(
+                &session_id,
+                &task_id,
+                &body,
+                db,
+                Some(&state.agent_tui_manager),
+            )
+            .map_err(Into::into)
         },
         |session_id, task_id, params, async_db| async move {
             let body: TaskUpdateRequest = serde_json::from_value(params)?;
-            service::update_task_async(&session_id, &task_id, &body, &async_db)
-                .await
-                .map_err(Into::into)
+            service::update_task_async(
+                &session_id,
+                &task_id,
+                &body,
+                &async_db,
+                Some(&state.agent_tui_manager),
+            )
+            .await
+            .map_err(Into::into)
         },
     )
     .await

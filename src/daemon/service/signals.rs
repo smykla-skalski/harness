@@ -1,11 +1,11 @@
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, ActiveSignalDelivery,
     AgentRegistration, AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake,
-    Path, PathBuf, SessionDetail, SignalAck, SignalSendRequest, acknowledged_signal_record,
-    agents_runtime, build_log_entry, build_signal_ack, effective_project_dir, index,
-    pending_signal_record, project_dir_for_db_session, record_signal_ack,
-    refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
-    session_service, state, thread, utc_now,
+    Path, PathBuf, SessionDetail, SessionState, SignalAck, SignalSendRequest,
+    acknowledged_signal_record, agents_runtime, build_log_entry, build_signal_ack,
+    effective_project_dir, index, pending_signal_record, project_dir_for_db_session,
+    record_signal_ack, refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db,
+    session_not_found, session_service, state, thread, utc_now,
 };
 
 /// Send a signal through the shared session service.
@@ -349,6 +349,50 @@ pub(crate) fn log_active_signal_delivery_timeout(
         timeout_ms = ACTIVE_SIGNAL_ACK_TIMEOUT.as_millis(),
         "active TUI signal delivery timed out"
     );
+}
+
+/// Best-effort active wake for `Started` task-drop effects.
+///
+/// For each `TaskDropEffect::Started`, look up the worker's TUI id and try to
+/// prompt the managed runtime so it picks the new task up immediately rather
+/// than on its next signal-dir scan. Failures are logged and ignored: the
+/// pending signal record was already merged by the caller, so the worker will
+/// still pick the signal up via its periodic poll.
+pub(crate) fn try_wake_started_workers(
+    state: &SessionState,
+    effects: &[session_service::TaskDropEffect],
+    session_id: &str,
+    project_dir: &Path,
+    db: Option<&super::db::DaemonDb>,
+    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+) {
+    let Some(manager) = agent_tui_manager else {
+        return;
+    };
+    for effect in effects {
+        let session_service::TaskDropEffect::Started(record) = effect else {
+            continue;
+        };
+        let Some(runtime) = agents_runtime::runtime_for_name(&record.runtime) else {
+            continue;
+        };
+        let tui_id = state
+            .agents
+            .get(&record.agent_id)
+            .and_then(agent_tui_id_for_registration);
+        let _ = attempt_active_signal_delivery(
+            &ActiveSignalDelivery {
+                session_id,
+                agent_id: &record.agent_id,
+                signal: &record.signal,
+                runtime,
+                project_dir,
+                signal_session_id: &record.signal_session_id,
+                db,
+            },
+            managed_tui_wake(tui_id, Some(manager)),
+        );
+    }
 }
 
 pub(crate) fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
