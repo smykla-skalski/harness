@@ -175,11 +175,25 @@ pub trait AgentRuntime: Send + Sync {
     /// CLI flag this runtime accepts to override the reasoning/thinking
     /// effort level for a session.
     ///
-    /// Returns `Some("--reasoning-effort")` for runtimes whose CLI exposes
-    /// effort directly (codex). Runtimes that configure effort via API body,
-    /// config file, environment variable, or not at all return `None`.
+    /// Runtimes that configure effort via a simple `--flag value` pair return
+    /// the flag name. Runtimes that use a compound config override (codex) or
+    /// environment variables return `None` and override `effort_args` instead.
     fn effort_flag(&self) -> Option<&'static str> {
         None
+    }
+
+    /// CLI arguments to inject for effort level selection at spawn time.
+    ///
+    /// The default implementation derives the argument slice from
+    /// `effort_flag()`: `[flag, effort]` when a flag is present, or an empty
+    /// slice when `effort_flag()` returns `None`. Runtimes that need a
+    /// different argument shape (e.g. codex uses `-c model_reasoning_effort=<value>`)
+    /// override this method directly.
+    fn effort_args(&self, effort: &str) -> Vec<String> {
+        match self.effort_flag() {
+            Some(flag) => vec![flag.to_string(), effort.to_string()],
+            None => Vec::new(),
+        }
     }
 
     /// Environment variables this runtime consumes to receive the effort
