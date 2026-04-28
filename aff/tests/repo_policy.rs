@@ -13,6 +13,13 @@ fn session_start_context_mentions_mise_and_signing_requirements() {
 }
 
 #[test]
+fn session_start_context_requires_council_before_commit() {
+    let context = session_start_context();
+    assert!(context.contains("/council"));
+    assert!(context.contains("Before every commit"));
+}
+
+#[test]
 fn denies_raw_cargo_with_task_replacement() {
     let reason = manual_command_denial_reason("cargo test --lib cli::tests")
         .expect("command should parse")

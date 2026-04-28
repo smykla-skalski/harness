@@ -124,9 +124,9 @@ fn session_start_preserves_pending_signals() {
 }
 
 #[test]
-fn session_start_no_longer_injects_repo_policy_context() {
+fn session_start_returns_no_additional_context_without_compact_handoff() {
     with_temp_project(|project| {
-        let context = RUNTIME
+        let has_context = RUNTIME
             .block_on(session_start(
                 HookAgent::Claude,
                 project.to_path_buf(),
@@ -136,8 +136,8 @@ fn session_start_no_longer_injects_repo_policy_context() {
             .is_none();
 
         assert!(
-            context,
-            "repo-policy session-start context should move out of harness"
+            has_context,
+            "session-start should stay silent when there is no compact handoff to restore"
         );
     });
 }
