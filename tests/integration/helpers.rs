@@ -108,12 +108,15 @@ impl Drop for ManagedChild {
         // pollution and leaked hosts.
         #[cfg(target_os = "macos")]
         {
-                // Try graceful AppleScript quit for both UI testing host and shipping app
+            // Try graceful AppleScript quit for both UI testing host and shipping app
             let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args(&["-e", "tell application \"Harness Monitor UI Testing\" to quit"]) 
+                .args(&[
+                    "-e",
+                    "tell application \"Harness Monitor UI Testing\" to quit",
+                ])
                 .status();
             let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args(&["-e", "tell application \"Harness Monitor\" to quit"]) 
+                .args(&["-e", "tell application \"Harness Monitor\" to quit"])
                 .status();
 
             // Short wait to allow graceful shutdown

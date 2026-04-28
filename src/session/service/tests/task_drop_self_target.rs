@@ -4,22 +4,22 @@ use super::*;
 fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
     with_temp_project(|project| {
         let session_id = "drop-self-target";
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some(session_id))
-                .expect("start");
+        let state = start_active_session("test", "", project, Some("claude"), Some(session_id))
+            .expect("start");
         let leader_id = state.leader_id.expect("leader id");
-        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("self-target-worker"))], || {
-            join_session(
-                session_id,
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join")
-        });
+        let joined =
+            temp_env::with_vars([("CODEX_SESSION_ID", Some("self-target-worker"))], || {
+                join_session(
+                    session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join")
+            });
         let worker_id = joined
             .agents
             .keys()
