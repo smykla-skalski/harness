@@ -30,7 +30,12 @@ extension AgentsWindowView {
         .fill(.quaternary)
 
       ScrollView(viewModel.wrapLines ? .vertical : [.horizontal, .vertical]) {
-        AgentTuiTerminalOutputView(visibleRows: visibleRows)
+        AgentTuiTerminalOutputView(
+          visibleRows: visibleRows,
+          terminalSize: tui.size,
+          wrapLines: viewModel.wrapLines,
+          fontScale: fontScale
+        )
       }
       .scaledFont(.system(.body, design: .monospaced))
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
