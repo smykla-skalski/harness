@@ -22,18 +22,22 @@ impl SessionRouteGuard {
             .lock()
             .expect("session route guard lock")
             .clone();
-        match expected {
-            Some(session_id) if &session_id == incoming => Ok(()),
-            Some(session_id) => Err(ClientError::new(
+        if let Some(session_id) = expected.clone()
+            && &session_id == incoming
+        {
+            return Ok(());
+        }
+        if let Some(expected) = expected {
+            return Err(ClientError::new(
                 ACP_STALE_SESSION_ID,
                 format!(
-                    "stale or unknown ACP session_id '{incoming}' (expected '{session_id}')"
+                    "stale or unknown ACP session_id '{incoming}' (expected '{expected}')"
                 ),
-            )),
-            None => Err(ClientError::new(
+            ));
+        }
+        Err(ClientError::new(
                 ACP_STALE_SESSION_ID,
                 "ACP session routing not initialized yet",
-            )),
-        }
+            ))
     }
 }

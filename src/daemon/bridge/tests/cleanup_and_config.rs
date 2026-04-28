@@ -55,6 +55,7 @@ fn compiled_capabilities_default_to_all_known_entries() {
     let capabilities = compiled_capabilities();
     assert!(capabilities.contains(&BridgeCapability::Codex));
     assert!(capabilities.contains(&BridgeCapability::AgentTui));
+    assert!(capabilities.contains(&BridgeCapability::Acp));
 }
 
 #[test]

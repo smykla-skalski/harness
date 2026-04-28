@@ -33,6 +33,7 @@ use super::{
 };
 
 mod cleanup_and_config;
+mod acp;
 mod legacy_server;
 mod liveness;
 mod locks;
@@ -51,6 +52,7 @@ fn bridge_round_trip_smoke_covers_public_surface() {
         let capabilities = compiled_capabilities();
         assert!(capabilities.contains(&BridgeCapability::Codex));
         assert!(capabilities.contains(&BridgeCapability::AgentTui));
+        assert!(capabilities.contains(&BridgeCapability::Acp));
 
         let _server = LegacyBridgeServer::start(
             legacy_codex_capabilities(),

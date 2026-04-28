@@ -1,3 +1,5 @@
+mod agent_acp;
+mod acp_rpc;
 mod agent_tui;
 mod bridge_state;
 mod capability_lifecycle;
@@ -24,7 +26,8 @@ pub use commands::BridgeCommand;
 pub use control::{reconfigure_bridge, spawn_manifest_watcher, stop_bridge};
 pub(crate) use runtime::probe_codex_readiness;
 pub use types::{
-    AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
+    AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI,
+    BRIDGE_CAPABILITY_CODEX,
     BRIDGE_LAUNCH_AGENT_LABEL, BridgeCapability, BridgeConfigArgs, BridgeInstallLaunchAgentArgs,
     BridgeReconfigureArgs, BridgeRemoveLaunchAgentArgs, BridgeStartArgs, BridgeState,
     BridgeStatusArgs, BridgeStatusReport, BridgeStopArgs, CODEX_BRIDGE_PORT_ENV,

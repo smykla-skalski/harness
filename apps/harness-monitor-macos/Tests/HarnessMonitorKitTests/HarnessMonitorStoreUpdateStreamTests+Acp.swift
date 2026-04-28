@@ -108,6 +108,30 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(presentedRequestIDs?.contains("request-extra") == true)
   }
 
+  @Test("ACP reconcile replaces stale selected agents and batches")
+  func acpReconcileReplacesStaleSelectedAgentsAndBatches() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-reconcile"
+    let staleBatch = makeAcpPermissionBatch(
+      batchID: "batch-stale",
+      acpID: "acp-stale",
+      sessionID: "sess-acp-reconcile",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    store.applyAcpAgent(makeAcpSnapshot(acpID: "acp-stale", sessionID: "sess-acp-reconcile", pendingBatches: [staleBatch]))
+    store.applyAcpPermissionBatch(staleBatch)
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-reconcile",
+        agents: [makeAcpSnapshot(acpID: "acp-fresh", sessionID: "sess-acp-reconcile", pendingBatches: [])]
+      )
+    )
+
+    #expect(store.selectedAcpAgents.map(\.acpId) == ["acp-fresh"])
+    #expect(store.pendingAcpPermissionBatches.isEmpty)
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()

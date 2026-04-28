@@ -4,8 +4,7 @@ use crate::daemon::agent_acp::{
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};
 
-use super::core::{BridgeAcpEventsResponse, BridgeAcpMetadata};
-use super::helpers::stringify_metadata_map;
+use super::core::BridgeAcpEventsResponse;
 use super::server::BridgeServer;
 use super::types::{BRIDGE_CAPABILITY_ACP, BridgeCapability};
 
@@ -62,23 +61,22 @@ impl BridgeServer {
     pub(super) fn acp_events_since(
         &self,
         after_seq: Option<u64>,
+        known_epoch: Option<&str>,
+        known_continuity: Option<u64>,
     ) -> Result<BridgeAcpEventsResponse, CliError> {
         let buffer = self.acp_events.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("bridge ACP event buffer lock poisoned: {error}"))
         })?;
-        Ok(buffer.events_since(after_seq))
+        Ok(buffer.events_since(after_seq, known_epoch, known_continuity))
     }
 
     pub(super) fn update_acp_metadata(&self) -> Result<(), CliError> {
-        let metadata = BridgeAcpMetadata {
-            active_sessions: self.acp_agent_manager.count_live_sessions(),
-        };
         let manifest = HostBridgeCapabilityManifest {
             enabled: true,
             healthy: true,
             transport: "unix".to_string(),
             endpoint: Some(self.socket_path.display().to_string()),
-            metadata: stringify_metadata_map(&metadata),
+            metadata: Default::default(),
         };
         self.capabilities()?
             .insert(BRIDGE_CAPABILITY_ACP.to_string(), manifest);
@@ -92,7 +90,8 @@ impl BridgeServer {
         let runtime = self.acp_runtime.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("bridge ACP runtime lock poisoned: {error}"))
         })?;
-        runtime.block_on(async move { action() })
+        let _guard = runtime.enter();
+        action()
     }
 
     fn ensure_acp_capability(&self) -> Result<(), CliError> {
