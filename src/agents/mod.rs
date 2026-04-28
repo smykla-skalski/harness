@@ -1,3 +1,4 @@
+pub mod acp;
 pub mod assets;
 pub mod runtime;
 pub mod service;
