@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import HarnessMonitorKit
 import Observation
 import SwiftUI
@@ -411,12 +412,20 @@ extension AgentsWindowView {
     private static func measuredCellSize(for fontScale: CGFloat) -> CGSize {
       let pointSize = 13 * max(fontScale, 0.78)
       let font = NSFont.monospacedSystemFont(ofSize: pointSize, weight: .regular)
-      let width = max(
-        ceil(("W" as NSString).size(withAttributes: [.font: font]).width),
-        1
-      )
+      let width = max(monospacedGlyphAdvance(for: font) ?? 0, 1)
       let height = max(ceil(font.ascender - font.descender + font.leading), 1)
       return CGSize(width: width, height: height)
+    }
+    private static func monospacedGlyphAdvance(for font: NSFont) -> CGFloat? {
+      var character: UniChar = 87
+      var glyph = CGGlyph()
+      guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) else {
+        return ("W" as NSString).size(withAttributes: [.font: font]).width
+      }
+
+      var advance = CGSize.zero
+      CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
+      return advance.width
     }
     private static func stabilizedDimension(
       measured: Int,

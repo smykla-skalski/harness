@@ -1,3 +1,5 @@
+import AppKit
+import CoreText
 import CoreGraphics
 import Foundation
 import Testing
@@ -242,6 +244,29 @@ struct AgentTuiViewportAutoResizeStabilizationTests {
     )
 
     #expect(wide > narrow)
+  }
+
+  @MainActor
+  @Test("Terminal content width matches the rendered monospaced grid advance")
+  func terminalContentWidthMatchesRenderedMonospacedGridAdvance() {
+    let cols = 120
+    let fontScale: CGFloat = 1
+    let measured = AgentsWindowView.TerminalViewportSizing.contentWidth(
+      for: AgentTuiSize(rows: 20, cols: cols),
+      fontScale: fontScale
+    )
+    let font = NSFont.monospacedSystemFont(
+      ofSize: 13 * max(fontScale, 0.78),
+      weight: .regular
+    )
+    var character: UniChar = 87
+    var glyph = CGGlyph()
+    #expect(CTFontGetGlyphsForCharacters(font, &character, &glyph, 1))
+    var advance = CGSize.zero
+    CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &advance, 1)
+    let expected = advance.width * CGFloat(cols)
+
+    #expect(abs(measured - expected) < 1)
   }
 }
 
