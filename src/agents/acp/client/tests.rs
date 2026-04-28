@@ -9,11 +9,11 @@ use agent_client_protocol::schema::{
 };
 use tempfile::TempDir;
 
-use crate::agents::acp::permission::PermissionMode;
 use super::{
-    HarnessAcpClient, BINARY_DENIED, DAEMON_SHUTDOWN, PERMISSION_TIMEOUT, READ_DENIED,
+    BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_TIMEOUT, READ_DENIED,
     TERMINAL_DENIED, TERMINAL_NOT_FOUND, WRITE_DENIED,
 };
+use crate::agents::acp::permission::PermissionMode;
 
 fn setup_client() -> (TempDir, HarnessAcpClient) {
     let temp = TempDir::new().expect("create temp dir");
@@ -115,14 +115,12 @@ fn terminal_cap_enforced() {
     let (_temp, client) = setup_client();
 
     for i in 0..16 {
-        let request =
-            CreateTerminalRequest::new("test-session", "echo").args(vec![format!("{i}")]);
+        let request = CreateTerminalRequest::new("test-session", "echo").args(vec![format!("{i}")]);
         let result = client.handle_create_terminal(&request);
         assert!(result.is_ok(), "terminal {i} should succeed");
     }
 
-    let request =
-        CreateTerminalRequest::new("test-session", "echo").args(vec!["17".to_string()]);
+    let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["17".to_string()]);
     let result = client.handle_create_terminal(&request);
 
     assert!(result.is_err());
