@@ -9,6 +9,7 @@
 
 # Local scratch
 /tmp/
+/.cache/
 /_artifacts/
 /output/
 /.playwright-cli/

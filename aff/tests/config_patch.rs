@@ -62,7 +62,10 @@ fn assert_aff_commands(config: &str, agent: &str, expect_pretool: bool) {
     if expect_pretool {
         assert!(config.contains(&repo_policy), "missing repo-policy command");
     } else {
-        assert!(!config.contains(&repo_policy), "unexpected repo-policy command");
+        assert!(
+            !config.contains(&repo_policy),
+            "unexpected repo-policy command"
+        );
     }
     assert!(
         config.contains(&session_start),
