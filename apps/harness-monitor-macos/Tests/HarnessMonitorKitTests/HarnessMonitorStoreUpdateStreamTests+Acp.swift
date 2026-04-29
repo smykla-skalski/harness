@@ -59,7 +59,9 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.applyAcpPermissionBatch(newer)
     store.applyAcpPermissionBatch(older)
 
-    #expect(store.pendingAcpPermissionBatches.map(\.batchId) == ["batch-1", "batch-2"])
+    #expect(
+      store.pendingAcpPermissionBatches.map(\.batchId) == ["batch-1", "batch-2"]
+    )
     #expect(store.presentingAcpPermissionBatch?.batchId == "batch-1")
 
     store.removeAcpPermissionBatch(older)
@@ -108,7 +110,9 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(presentedRequestIDs?.contains("request-extra") == true)
   }
 
-  @Test("ACP reconcile replaces stale selected agents, clears stale batches, and restores canonical ordering")
+  @Test(
+    "ACP reconcile replaces stale selected agents, clears stale batches, and restores canonical ordering"
+  )
   func acpReconcileReplacesStaleSelectedAgentsAndBatches() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-reconcile"
@@ -118,7 +122,13 @@ extension HarnessMonitorStoreUpdateStreamTests {
       sessionID: "sess-acp-reconcile",
       createdAt: "2026-04-28T00:00:01Z"
     )
-    store.applyAcpAgent(makeAcpSnapshot(acpID: "acp-stale", sessionID: "sess-acp-reconcile", pendingBatches: [staleBatch]))
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-stale",
+        sessionID: "sess-acp-reconcile",
+        pendingBatches: [staleBatch]
+      )
+    )
     store.applyAcpPermissionBatch(staleBatch)
 
     store.replaceAcpAgents(
@@ -176,12 +186,19 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.replaceAcpAgents(
       AcpAgentsReconciledPayload(
         sessionId: "sess-acp-reconcile",
-        agents: [makeAcpSnapshot(acpID: "acp-1", sessionID: "sess-acp-reconcile", pendingBatches: [fresh])]
+        agents: [
+          makeAcpSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-reconcile",
+            pendingBatches: [fresh]
+          )
+        ]
       )
     )
 
     #expect(store.standaloneAcpPermissionBatches.isEmpty)
-    let requests = store.selectedAcpAgents.first?.pendingPermissionBatches.first?.requests.map(\.requestId)
+    let requests =
+      store.selectedAcpAgents.first?.pendingPermissionBatches.first?.requests.map(\.requestId)
     #expect(requests == ["request-fresh"])
   }
 
@@ -213,7 +230,11 @@ extension HarnessMonitorStoreUpdateStreamTests {
       createdAt: "2026-04-28T00:00:02Z"
     )
     store.applyAcpAgent(
-      makeAcpSnapshot(acpID: "acp-1", sessionID: "sess-acp-precedence", pendingBatches: [fresh])
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-precedence",
+        pendingBatches: [fresh]
+      )
     )
 
     #expect(store.pendingAcpPermissionBatches.count == 1)
