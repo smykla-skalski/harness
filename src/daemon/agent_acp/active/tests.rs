@@ -11,6 +11,9 @@ fn process_incident_event_maps_process_exit() {
     assert_eq!(event.payload["kind"], "process_exit");
     assert_eq!(event.payload["reason_kind"], "process_exited");
     assert_eq!(event.payload["exit_code"], 7);
+    assert_eq!(event.payload["restart_applied"], false);
+    assert_eq!(event.payload["backoff_applied"], false);
+    assert_eq!(event.payload["quarantine_applied"], false);
     assert_eq!(
         event.payload["affected_logical_session_ids"],
         serde_json::json!(["sess-1"])
