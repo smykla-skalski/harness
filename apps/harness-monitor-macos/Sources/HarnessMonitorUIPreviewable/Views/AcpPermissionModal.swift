@@ -2,22 +2,27 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct AcpPermissionModal: View {
+  @Bindable var store: HarnessMonitorStore
   let batch: AcpPermissionBatch
-  let isResolving: Bool
-  let resolve: (AcpPermissionDecision) -> Void
 
-  @State private var selectedRequestIDs: Set<String>
-  @FocusState private var denyFocused: Bool
+  private var payload: AcpPermissionDecisionPayload {
+    store.acpPermissionDecisionPayload(for: batch)
+  }
 
-  init(
-    batch: AcpPermissionBatch,
-    isResolving: Bool,
-    resolve: @escaping (AcpPermissionDecision) -> Void
-  ) {
-    self.batch = batch
-    self.isResolving = isResolving
-    self.resolve = resolve
-    _selectedRequestIDs = State(initialValue: Set(batch.requests.map(\.requestId)))
+  private var decisionID: String {
+    payload.decisionID
+  }
+
+  private var resolutionState: BatchResolutionState {
+    store.acpPermissionResolutionState(for: decisionID) ?? payload.defaultResolutionState
+  }
+
+  private var isResolving: Bool {
+    resolutionState.isSubmitting || store.resolvingAcpPermissionBatchID == batch.batchId
+  }
+
+  private var selectionSummary: String {
+    payload.selectionSummary(resolutionState: resolutionState)
   }
 
   var body: some View {
@@ -25,137 +30,108 @@ struct AcpPermissionModal: View {
       Text(title)
         .scaledFont(.title3.weight(.semibold))
         .accessibilityAddTraits(.isHeader)
-      Text(summary)
+      Text(payload.summary)
         .scaledFont(.body)
-        .accessibilityLabel(summary)
-      Text(selectionSummary)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalSelectionSummary)
+        .accessibilityLabel(payload.summary)
 
-      ScrollView {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(batch.requests, id: \.requestId) { request in
-            Toggle(
-              isOn: Binding {
-                selectedRequestIDs.contains(request.requestId)
-              } set: { isSelected in
-                updateSelection(request.requestId, isSelected: isSelected)
-              }
-            ) {
-              VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-                Text(permissionTitle(for: request))
-                  .scaledFont(.body.weight(.medium))
-                Text(permissionDetail(for: request))
-                  .scaledFont(.caption)
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                  .lineLimit(3)
-              }
-            }
-            .toggleStyle(.checkbox)
-            .disabled(isResolving)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.acpPermissionModalItem(request.requestId)
-            )
-          }
-        }
+      AcpPermissionDecisionPanel(
+        payload: payload,
+        resolutionState: resolutionState,
+        isResolving: isResolving,
+        selectionSummaryAccessibilityID: HarnessMonitorAccessibility.acpPermissionModalSelectionSummary,
+        panelAccessibilityID: HarnessMonitorAccessibility.acpPermissionModal,
+        requestAccessibilityID: HarnessMonitorAccessibility.acpPermissionModalItem
+      ) { requestID, isSelected in
+        store.setAcpPermissionRequestSelection(
+          decisionID: decisionID,
+          requestID: requestID,
+          isSelected: isSelected
+        )
       }
-      .frame(maxHeight: 220)
 
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button("Deny All") {
-          resolve(.denyAll)
-        }
-        .keyboardShortcut(.cancelAction)
-        .focused($denyFocused)
-        .disabled(isResolving)
-        Spacer()
-        Button("Approve Selected") {
-          resolve(.approveSome(Array(selectedRequestIDs).sorted()))
-        }
-        .disabled(selectedRequestIDs.isEmpty || isResolving)
-        Button("Approve All") {
-          resolve(.approveAll)
-        }
-        .keyboardShortcut(.defaultAction)
-        .disabled(isResolving)
-      }
+      actionRow
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(width: 520)
     .onAppear {
-      denyFocused = true
-      AccessibilityNotification.Announcement(accessibilityAnnouncement).post()
+      AccessibilityNotification.Announcement(openingAnnouncement).post()
     }
-    .onChange(of: requestSignature) { _, _ in
-      selectedRequestIDs = Set(batch.requests.map(\.requestId))
-      AccessibilityNotification.Announcement(accessibilityAnnouncement).post()
+    .onChange(of: selectionSummary) { oldValue, newValue in
+      guard oldValue != newValue else {
+        return
+      }
+      AccessibilityNotification.Announcement(selectionChangeAnnouncement).post()
     }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModal)
   }
 
   private var title: String {
-    batch.requests.count == 1 ? "Agent permission required" : "Agent permissions required"
+    payload.requestCount == 1 ? "Agent permission required" : "Agent permissions required"
   }
 
-  private var summary: String {
-    let count = batch.requests.count
-    let suffix = count == 1 ? "action" : "actions"
-    return "\(batch.acpId) wants approval for \(count) \(suffix)."
+  private var openingAnnouncement: String {
+    if let error = payload.renderError {
+      return "\(title). \(payload.summary) \(error.message)"
+    }
+    return "\(title). \(payload.summary) \(selectionSummary)"
   }
 
-  private var selectionSummary: String {
-    "\(selectedRequestIDs.count) of \(batch.requests.count) selected"
+  private var selectionChangeAnnouncement: String {
+    "Selection updated. \(selectionSummary)"
   }
 
-  private var requestSignature: String {
-    batch.requests.map(\.requestId).joined(separator: "|")
-  }
+  @ViewBuilder
+  private var actionRow: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if payload.isRenderable {
+        Button(payload.requestCount == 1 ? "Deny" : "Deny All") {
+          resolve(actionID: payload.requestCount == 1
+            ? AcpPermissionDecisionActionID.deny
+            : AcpPermissionDecisionActionID.denyAll)
+        }
+        .keyboardShortcut(.cancelAction)
+        .disabled(isResolving)
 
-  private var accessibilityAnnouncement: String {
-    let details = batch.requests.map(permissionDetail(for:)).joined(separator: ", ")
-    return details.isEmpty ? summary : "\(summary) \(details)"
-  }
+        Spacer()
 
-  private func updateSelection(_ requestID: String, isSelected: Bool) {
-    if isSelected {
-      selectedRequestIDs.insert(requestID)
-    } else {
-      selectedRequestIDs.remove(requestID)
+        if payload.requestCount == 1 {
+          Button("Approve") {
+            resolve(actionID: AcpPermissionDecisionActionID.approve)
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(isResolving)
+        } else {
+          Button("Approve Selected") {
+            resolve(actionID: AcpPermissionDecisionActionID.approveSelected)
+          }
+          .disabled(
+            isResolving
+              || payload.isActionDisabled(
+                AcpPermissionDecisionActionID.approveSelected,
+                resolutionState: resolutionState
+              )
+          )
+          Button("Approve All") {
+            resolve(actionID: AcpPermissionDecisionActionID.approveAll)
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(isResolving)
+        }
+      } else {
+        Spacer()
+        Button("Close") {
+          store.presentingAcpPermissionBatch = nil
+        }
+        .keyboardShortcut(.defaultAction)
+      }
     }
   }
 
-  private func permissionTitle(for request: AcpPermissionItem) -> String {
-    valueLabel(request.toolCall, key: "kind")
-      ?? valueLabel(request.toolCall, key: "name")
-      ?? valueLabel(request.toolCall, key: "tool")
-      ?? "Tool call"
-  }
-
-  private func permissionDetail(for request: AcpPermissionItem) -> String {
-    valueLabel(request.toolCall, key: "path")
-      ?? valueLabel(request.toolCall, key: "command")
-      ?? compactJSON(request.toolCall)
-  }
-
-  private func valueLabel(_ value: JSONValue, key: String) -> String? {
-    guard case .object(let object) = value, case .string(let string)? = object[key],
-      !string.isEmpty
-    else {
-      return nil
+  private func resolve(actionID: String) {
+    Task {
+      await store.submitAcpPermissionDecisionAction(
+        decisionID: decisionID,
+        actionID: actionID
+      )
     }
-    return string
-  }
-
-  private func compactJSON(_ value: JSONValue) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    guard let data = try? encoder.encode(value),
-      let text = String(data: data, encoding: .utf8)
-    else {
-      return "Permission request"
-    }
-    return text
   }
 }

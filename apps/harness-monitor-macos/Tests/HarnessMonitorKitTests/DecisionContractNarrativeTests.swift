@@ -28,60 +28,81 @@ struct DecisionContractNarrativeTests {
   @Test("Narrative index names the concrete contract owners")
   func narrativeIndexNamesConcreteContractOwners() throws {
     let contract = try decisionContract()
+    func entry(_ lines: String...) -> String {
+      lines.joined(separator: " ")
+    }
 
     let expectedEntries = [
-      [
+      entry(
         "- `AcpPermissionDecision` in `Models/AcpAgentModels.swift`:",
-        "approve, deny, and partial-approve semantics for ACP permission batches.",
-      ].joined(separator: " "),
-      [
+        "approve, deny, and partial-approve semantics for ACP permission batches."
+      ),
+      entry(
+        "- `AcpPermissionDecisionPayload` in",
+        "`Supervisor/Decision/AcpPermissionDecision.swift`:",
+        "deterministic ACP decision ids, semantic payload validation, and",
+        "non-renderable fallback content for ACP Decisions rows."
+      ),
+      entry(
         "- `AcpPermissionBatch` in `Models/AcpAgentModels.swift`:",
         "one queue element carries `1...N` permission items and uses `batchId`",
-        "as the idempotency key.",
-      ].joined(separator: " "),
-      [
+        "as the idempotency key."
+      ),
+      entry(
+        "- `BatchResolutionState` in `Models/BatchResolutionState.swift`:",
+        "shared per-request toggle and submission state for the Decisions",
+        "detail pane and the compatibility ACP modal."
+      ),
+      entry(
         "- `SupervisorEvent` in `Supervisor/Audit/SupervisorEvent.swift`:",
         "current persisted audit-entry carrier, including the payload slot",
-        "for approve-some request arrays and future `uiAnnotation` race notes.",
-      ].joined(separator: " "),
-      [
+        "for approve-some request arrays and future `uiAnnotation` race notes."
+      ),
+      entry(
         "- `Decision` in `Supervisor/Decision/Decision.swift`:",
-        "queue-level goal, sticky-selection policy, and toggle-lifetime policy.",
-      ].joined(separator: " "),
-      [
+        "queue-level goal, sticky-selection policy, and toggle-lifetime policy."
+      ),
+      entry(
         "- `HarnessMonitorStore.pendingAcpPermissionBatches` and",
         "`reconcilePresentedAcpPermissionBatch` in",
         "`Stores/HarnessMonitorStore+AcpAgents.swift`:",
-        "selected-session queue projection and sticky presentation behavior.",
-      ].joined(separator: " "),
-      [
+        "selected-session queue projection and sticky presentation behavior."
+      ),
+      entry(
+        "- `HarnessMonitorStore.reconcileAcpPermissionDecisions` and",
+        "`resolveAcpPermissionDecision` in",
+        "`Stores/HarnessMonitorStore+AcpAgents.swift`:",
+        "DecisionStore materialization, shared selection-state upkeep, and",
+        "daemon resolution bridging for ACP decisions."
+      ),
+      entry(
         "- `HarnessMonitorStore.applyAcpPermissionBatch`,",
         "`removeAcpPermissionBatch`, `shouldReplacePermissionBatch`, and",
         "`sortedAcpPermissionBatches` in",
         "`Stores/HarnessMonitorStore+AcpAgents.swift`:",
-        "batch upsert/removal, replay replacement, and oldest-first queue order.",
-      ].joined(separator: " "),
-      [
+        "batch upsert/removal, replay replacement, and oldest-first queue order."
+      ),
+      entry(
         "- `HarnessMonitorStore.applyAcpEvents` in",
         "`Stores/HarnessMonitorStore+AcpAgents.swift`:",
-        "Swift-side event application boundary after decode.",
-      ].joined(separator: " "),
-      [
+        "Swift-side event application boundary after decode."
+      ),
+      entry(
         "- `DaemonPushEvent.Kind.acpPermissionBatchRemoved` in",
         "`Models/HarnessMonitorDaemonPushEvent.swift`:",
-        "timeout and daemon-shutdown removals for ACP batches.",
-      ].joined(separator: " "),
-      [
+        "resolved, timeout, and daemon-shutdown removals for ACP batches."
+      ),
+      entry(
         "- `AcpEventBatchPayload` in `Models/HarnessMonitorTimelineModels.swift`:",
         "confirms UI-7 coalescing stays in-process Swift code and does not",
-        "require a daemon wire-format change.",
-      ].joined(separator: " "),
-      [
+        "require a daemon wire-format change."
+      ),
+      entry(
         "- `AcpAgentsReconciledPayload` in",
         "`Models/HarnessMonitorDaemonPushEvent.swift`:",
         "confirms reconcile snapshots already exist in-tree and remain",
-        "authoritative.",
-      ].joined(separator: " "),
+        "authoritative."
+      ),
     ]
 
     for entry in expectedEntries {
@@ -103,5 +124,9 @@ struct DecisionContractNarrativeTests {
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorKit/Models")
       .appendingPathComponent("Decision.contract.md")
     return try String(contentsOf: contractURL, encoding: .utf8)
+  }
+
+  private func entry(_ parts: String...) -> String {
+    parts.joined(separator: " ")
   }
 }
