@@ -8,8 +8,13 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+readonly COMMON_REPO_ROOT
 STALE_SCAN_ROOT="$ROOT"
-export STALE_SCAN_ROOT
+STALE_SCAN_COMMON_REPO_ROOT="$COMMON_REPO_ROOT"
+export STALE_SCAN_ROOT STALE_SCAN_COMMON_REPO_ROOT
 # shellcheck source=scripts/lib/stale-scan.sh
 source "$ROOT/scripts/lib/stale-scan.sh"
 
@@ -24,6 +29,58 @@ signal_pids() {
     [[ -n "$pid" ]] || continue
     kill "-$signal" "$pid" 2>/dev/null || true
   done
+}
+
+emit_pid_block() {
+  local label="$1"
+  local pids="$2"
+  [[ -n "$pids" ]] || return 0
+  echo "$label" >&2
+  local pid desc
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    desc="$(stale_scan_pid_describe "$pid")"
+    [[ -n "$desc" ]] || desc="$pid  ?  (no ps entry)"
+    echo "  - $desc" >&2
+  done <<<"$pids"
+}
+
+cleanup_stale_lease() {
+  if declare -F lease_lock_cleanup >/dev/null; then
+    lease_lock_cleanup
+  fi
+}
+
+acquire_stale_cleanup_lease() {
+  if [[ "${HARNESS_STALE_CLEANUP_LEASE_HELD:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  # shellcheck source=scripts/lib/lease-lock.sh
+  LEASE_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
+  LEASE_LOCK_RESOURCE="stale-state-cleanup:${COMMON_REPO_ROOT}"
+  LEASE_LOCK_WAITER_ID="clean-stale-$$"
+  source "$ROOT/scripts/lib/lease-lock.sh"
+  trap cleanup_stale_lease EXIT
+  lease_lock_acquire
+}
+
+block_live_repo_gate_helpers() {
+  local repo_gate_pids
+  if [[ "${HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  stale_scan_refresh_ps
+  repo_gate_pids="$(stale_scan_repo_gate_pids "$$")"
+  if [[ -z "$repo_gate_pids" ]]; then
+    return 0
+  fi
+
+  echo "error: clean:stale blocked while repo-local gate helpers are still running" >&2
+  echo "shared cleanup must not overlap active repo-local build/check helpers" >&2
+  emit_pid_block "repo-local gate helpers still running:" "$repo_gate_pids"
+  exit 1
 }
 
 quit_monitor_app() {
@@ -67,7 +124,7 @@ kill_orphan_harness_processes() {
   signal_pids KILL "${pids[@]}"
 }
 
-remove_orphan_monitor_wrapper_lock_dirs() {
+orphan_monitor_wrapper_lock_dirs() {
   local pids=("$@")
   local pid desc derived_data_path
   for pid in "${pids[@]}"; do
@@ -76,27 +133,43 @@ remove_orphan_monitor_wrapper_lock_dirs() {
     [[ -n "$desc" ]] || continue
     derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$desc")"
     [[ -n "$derived_data_path" ]] || continue
-    if [[ -d "$derived_data_path/.xcodebuild.lock" ]]; then
-      rm -rf "$derived_data_path/.xcodebuild.lock"
+    printf '%s\n' "$derived_data_path/.xcodebuild.lock"
+  done
+}
+
+remove_orphan_monitor_wrapper_lock_dirs() {
+  local lock_dirs=("$@")
+  local lock_dir
+  for lock_dir in "${lock_dirs[@]}"; do
+    [[ -n "$lock_dir" && -d "$lock_dir" ]] || continue
+    if stale_scan_xcodebuild_lock_has_live_work "$lock_dir"; then
+      echo "skipping $lock_dir; lock metadata still points to live xcodebuild work"
+      continue
     fi
+    rm -rf "$lock_dir"
   done
 }
 
 kill_orphan_monitor_wrapper_processes() {
   stale_scan_refresh_ps
   local pids=()
-  local pid
+  local lock_dirs=()
+  local pid lock_dir
   while IFS= read -r pid; do
     [[ -n "$pid" ]] && pids+=("$pid")
   done < <(stale_scan_orphan_monitor_wrapper_pids)
   (( ${#pids[@]} > 0 )) || return 0
+
+  while IFS= read -r lock_dir; do
+    [[ -n "$lock_dir" ]] && lock_dirs+=("$lock_dir")
+  done < <(orphan_monitor_wrapper_lock_dirs "${pids[@]}")
 
   echo "killing orphan xcodebuild wrapper shells..."
   signal_pids TERM "${pids[@]}"
   sleep 1
   signal_pids KILL "${pids[@]}"
   stale_scan_refresh_ps
-  remove_orphan_monitor_wrapper_lock_dirs "${pids[@]}"
+  remove_orphan_monitor_wrapper_lock_dirs "${lock_dirs[@]}"
 }
 
 kill_live_harness_processes() {
@@ -238,6 +311,9 @@ remove_stale_swarm_e2e_worktrees() {
     done
   fi
 }
+
+acquire_stale_cleanup_lease
+block_live_repo_gate_helpers
 
 quit_monitor_app
 stop_launchd_daemon

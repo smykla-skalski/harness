@@ -123,7 +123,9 @@ run_xcodebuild_with_formatter() {
     cleanup_captured_log=1
   fi
 
-  if ! launch_xcodebuild_command_capture "$captured_log_path" "$use_tuist" "$@"; then
+  if launch_xcodebuild_command_capture "$captured_log_path" "$use_tuist" "$@"; then
+    :
+  else
     local launch_status="$?"
     if (( cleanup_captured_log == 1 )); then
       /bin/rm -f "$captured_log_path"
@@ -131,6 +133,9 @@ run_xcodebuild_with_formatter() {
     return "$launch_status"
   fi
   xcodebuild_pid="$RUN_XCODEBUILD_CAPTURE_PID"
+  if declare -F harness_monitor_record_xcodebuild_capture_pid >/dev/null; then
+    harness_monitor_record_xcodebuild_capture_pid "$xcodebuild_pid"
+  fi
 
   set +e
   wait "$xcodebuild_pid"
@@ -224,6 +229,42 @@ descendant_process_pids() {
           walk(root_pid)
         }
       '
+}
+
+xcodebuild_mutator_pid() {
+  local capture_pid="$1"
+  local attempts="${2:-20}"
+  local delay="${3:-0.05}"
+  local attempt=0
+  local descendant_pid descendant_command capture_command
+
+  while (( attempt < attempts )); do
+    if kill -0 "$capture_pid" 2>/dev/null; then
+      while IFS= read -r descendant_pid; do
+        [[ -n "$descendant_pid" ]] || continue
+        descendant_command="$(ps -p "$descendant_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
+        case "$descendant_command" in
+          *"/xcodebuild "*|*"/xcodebuild"|xcodebuild\ *|xcodebuild)
+            printf '%s\n' "$descendant_pid"
+            return 0
+            ;;
+        esac
+      done < <(descendant_process_pids "$capture_pid")
+
+      capture_command="$(ps -p "$capture_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
+      case "$capture_command" in
+        *"/xcodebuild "*|*"/xcodebuild"|xcodebuild\ *|xcodebuild)
+          printf '%s\n' "$capture_pid"
+          return 0
+          ;;
+      esac
+    fi
+
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+
+  printf '%s\n' "$capture_pid"
 }
 
 terminate_descendant_processes() {
