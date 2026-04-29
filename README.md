@@ -370,9 +370,9 @@ If `harness run repair` still leaves blocking findings, start a fresh tracked ru
 
 ```bash
 mise run version:check
-mise run check                       # default aggregate: harness + aff quality gates
-mise run harness:check               # harness-only quality gates (opt-in; not run by default)
-mise run aff:check                   # aff-only quality gates (opt-in; not run by default)
+mise run check                       # default harness quality gates
+mise run harness:check               # harness-only quality gates (same gates as default check)
+mise run aff:check                   # aff-only quality gates (manual; not run by default)
 mise run test                        # default aggregate: harness + aff fast tests
 mise run test:unit                   # harness unit tests (opt-in; not run by default)
 mise run test:integration            # harness integration tests (opt-in; not run by default)
