@@ -5,8 +5,10 @@ use std::thread;
 use tempfile::tempdir;
 
 use super::{BridgeClient, BridgeResponse};
+use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
 use crate::daemon::bridge::core::BridgeAcpEventBuffer;
 use crate::daemon::protocol::StreamEvent;
+use crate::errors::{CliError, CliErrorKind};
 
 fn stream_event(event: &str, session_id: &str) -> StreamEvent {
     StreamEvent {
@@ -141,5 +143,74 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
     assert_eq!(response.continuity, 3);
     assert_eq!(response.next_seq, 8);
     assert!(!response.requires_resync);
+    server.join().expect("server thread");
+}
+
+#[test]
+fn bridge_client_acp_methods_use_expected_capability_actions() {
+    let dir = tempdir().expect("tempdir");
+    let socket_path = dir.path().join("bridge.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind socket");
+    let server = thread::spawn(move || {
+        let expected = [
+            ("start", serde_json::json!({ "session_id": "sess-1" })),
+            ("list", serde_json::json!({ "session_id": "sess-1" })),
+            ("inspect", serde_json::json!({ "session_id": "sess-1" })),
+            ("get", serde_json::json!({ "acp_id": "acp-1" })),
+            ("stop", serde_json::json!({ "acp_id": "acp-1" })),
+            (
+                "resolve_permission",
+                serde_json::json!({
+                    "acp_id": "acp-1",
+                    "batch_id": "batch-1",
+                    "decision": {
+                        "decision": "deny_all"
+                    }
+                }),
+            ),
+        ];
+        for (action, payload_assert) in expected {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().expect("clone server stream"))
+                .read_line(&mut line)
+                .expect("read request");
+            let request: serde_json::Value = serde_json::from_str(&line).expect("decode envelope");
+            assert_eq!(request["request"]["operation"], "capability");
+            assert_eq!(request["request"]["capability"], "acp");
+            assert_eq!(request["request"]["action"], action);
+            for (key, value) in payload_assert.as_object().expect("payload object") {
+                assert_eq!(&request["request"]["payload"][key], value);
+            }
+            let response = BridgeResponse::error(&CliError::from(CliErrorKind::workflow_parse(
+                "expected test failure",
+            )));
+            let serialized = serde_json::to_string(&response).expect("serialize");
+            stream
+                .write_all(serialized.as_bytes())
+                .and_then(|()| stream.write_all(b"\n"))
+                .and_then(|()| stream.flush())
+                .expect("write response");
+        }
+    });
+
+    let client = BridgeClient {
+        socket_path,
+        token: "test-token".to_string(),
+    };
+    let start_request = AcpAgentStartRequest {
+        agent: "claude".to_string(),
+        prompt: Some("hello".to_string()),
+        project_dir: Some("/tmp/project".to_string()),
+        record_permissions: false,
+    };
+    assert!(client.acp_start("sess-1", &start_request).is_err());
+    assert!(client.acp_list("sess-1").is_err());
+    assert!(client.acp_inspect(Some("sess-1")).is_err());
+    assert!(client.acp_get("acp-1").is_err());
+    assert!(client.acp_stop("acp-1").is_err());
+    assert!(client
+        .acp_resolve_permission("acp-1", "batch-1", &AcpPermissionDecision::DenyAll)
+        .is_err());
     server.join().expect("server thread");
 }
