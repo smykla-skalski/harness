@@ -345,6 +345,22 @@ fn start_rejects_sandboxed_daemon_mode() {
     );
 }
 
+#[test]
+fn process_fault_policy_env_toggle_parsing() {
+    temp_env::with_var("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("0"), || {
+        assert!(!process_fault_policy_enabled());
+    });
+    temp_env::with_var("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("false"), || {
+        assert!(!process_fault_policy_enabled());
+    });
+    temp_env::with_var("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("off"), || {
+        assert!(!process_fault_policy_enabled());
+    });
+    temp_env::with_var("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("1"), || {
+        assert!(process_fault_policy_enabled());
+    });
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn repeated_process_faults_quarantine_process_key() {
@@ -440,4 +456,38 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
             .expect("start after backoff window");
         let _ = wait_until_disconnected(&manager, &restarted.acp_id);
     });
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement() {
+    temp_env::with_vars(
+        [
+            (feature_flags::ACP_ENV, Some("1")),
+            ("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("0")),
+        ],
+        || {
+            let temp = TempDir::new().expect("temp");
+            let script = temp.path().join("failing-agent.sh");
+            write_executable(&script, "#!/bin/sh\nexit 7\n");
+            let descriptor = descriptor(&script);
+            let manager = manager();
+            let request = AcpAgentStartRequest {
+                agent: "fake".to_string(),
+                prompt: None,
+                project_dir: Some(temp.path().display().to_string()),
+                record_permissions: false,
+            };
+
+            let first = manager
+                .start_descriptor("sess-1", &request, &descriptor)
+                .expect("start first");
+            let _ = wait_until_disconnected(&manager, &first.acp_id);
+
+            let second = manager
+                .start_descriptor("sess-2", &request, &descriptor)
+                .expect("start second without backoff block");
+            let _ = wait_until_disconnected(&manager, &second.acp_id);
+        },
+    );
 }
