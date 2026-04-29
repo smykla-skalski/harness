@@ -210,6 +210,43 @@ fn pool_key_mismatch_incident_events_fan_out_by_session() {
     assert_eq!(events[0].payload["kind"], "pool_key_mismatch");
 }
 
+#[test]
+fn pool_key_mismatch_dedupe_emits_only_on_change() {
+    let (sender, mut rx) = tokio::sync::broadcast::channel::<StreamEvent>(16);
+    let mut seen = BTreeMap::<String, Vec<String>>::new();
+    let session_id = "sess-1".to_string();
+    let process_keys = vec!["pk-a".to_string(), "pk-b".to_string()];
+
+    let changed = seen.get(&session_id) != Some(&process_keys);
+    seen.insert(session_id.clone(), process_keys.clone());
+    if changed {
+        emit_pool_key_mismatch_incidents(
+            &sender,
+            &AcpPoolKeyMismatchIncidentPayload {
+                kind: "pool_key_mismatch".to_string(),
+                observed_process_keys: process_keys.clone(),
+                affected_logical_session_ids: vec![session_id.clone()],
+            },
+        );
+    }
+    let changed = seen.get(&session_id) != Some(&process_keys);
+    seen.insert(session_id.clone(), process_keys.clone());
+    if changed {
+        emit_pool_key_mismatch_incidents(
+            &sender,
+            &AcpPoolKeyMismatchIncidentPayload {
+                kind: "pool_key_mismatch".to_string(),
+                observed_process_keys: process_keys,
+                affected_logical_session_ids: vec![session_id],
+            },
+        );
+    }
+
+    let first = rx.try_recv().expect("first incident");
+    assert_eq!(first.event, "acp_process_incident");
+    assert!(rx.try_recv().is_err(), "second identical incident must be deduped");
+}
+
 fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnapshot {
     AcpAgentInspectSnapshot {
         acp_id: format!("{session_id}-{process_key}"),
