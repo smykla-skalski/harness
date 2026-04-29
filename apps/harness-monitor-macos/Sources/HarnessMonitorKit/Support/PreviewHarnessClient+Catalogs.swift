@@ -138,19 +138,25 @@ extension PreviewHarnessClient {
   }
 
   public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
-    AcpRuntimeProbeResponse(
+    let missingBinaryAgentIDs = Set(
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_MISSING_BINARIES"]?
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty } ?? []
+    )
+    return AcpRuntimeProbeResponse(
       probes: [
         AcpRuntimeProbe(
           agentId: "copilot",
           displayName: "GitHub Copilot",
-          binaryPresent: true,
+          binaryPresent: !missingBinaryAgentIDs.contains("copilot"),
           authState: .unknown,
           version: "preview",
         ),
         AcpRuntimeProbe(
           agentId: "gemini",
           displayName: "Gemini CLI",
-          binaryPresent: true,
+          binaryPresent: !missingBinaryAgentIDs.contains("gemini"),
           authState: .unknown,
           version: "preview"
         ),

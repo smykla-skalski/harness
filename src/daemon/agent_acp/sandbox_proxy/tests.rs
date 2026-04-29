@@ -47,6 +47,24 @@ fn replay_safe_resync_events_keeps_process_incidents() {
     assert_eq!(filtered[0].event, "acp_process_incident");
 }
 
+#[test]
+fn dedupe_incident_replays_drops_identical_process_incidents() {
+    let repeated = StreamEvent {
+        event: "acp_process_incident".to_string(),
+        recorded_at: "2026-04-29T00:00:00Z".to_string(),
+        session_id: Some("sess-1".to_string()),
+        payload: serde_json::json!({
+            "kind": "process_exit",
+            "process_key": "pk",
+        }),
+    };
+    let filtered =
+        dedupe_incident_replays(vec![repeated.clone(), repeated, stream_event("acp_events")]);
+    assert_eq!(filtered.len(), 2);
+    assert_eq!(filtered[0].event, "acp_process_incident");
+    assert_eq!(filtered[1].event, "acp_events");
+}
+
 fn stream_event(event: &str) -> StreamEvent {
     StreamEvent {
         event: event.to_string(),

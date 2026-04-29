@@ -24,6 +24,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpAgentUpdated(AcpAgentSnapshot)
     case acpAgentsReconciled(AcpAgentsReconciledPayload)
     case acpEvents(AcpEventBatchPayload)
+    case acpProcessIncident(AcpProcessIncidentPayload)
+    case acpBridgeResyncIncident(AcpBridgeResyncIncidentPayload)
     case acpPermissionBatch(AcpPermissionBatch)
     case acpPermissionBatchRemoved(AcpPermissionBatch)
     case unknown(eventName: String, payload: JSONValue)
@@ -68,6 +70,14 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: nil,
         kind: .logLevelChanged(try streamEvent.decodePayload(as: LogLevelResponse.self))
+      )
+    case "acp_bridge_resync_incident":
+      return Self(
+        recordedAt: at,
+        sessionId: streamEvent.sessionId,
+        kind: .acpBridgeResyncIncident(
+          try streamEvent.decodePayload(as: AcpBridgeResyncIncidentPayload.self)
+        )
       )
     default:
       return try Self.makeSessionScopedEvent(from: streamEvent)
@@ -154,6 +164,14 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpEvents(try streamEvent.decodePayload(as: AcpEventBatchPayload.self))
       )
+    case "acp_process_incident":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpProcessIncident(
+          try streamEvent.decodePayload(as: AcpProcessIncidentPayload.self)
+        )
+      )
     case "acp_permission_requested":
       return Self(
         recordedAt: at,
@@ -228,4 +246,25 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
 public struct AcpAgentsReconciledPayload: Codable, Equatable, Sendable {
   public let sessionId: String
   public let agents: [AcpAgentSnapshot]
+}
+
+public struct AcpProcessIncidentPayload: Codable, Equatable, Sendable {
+  public let kind: String
+  public let reasonKind: String
+  public let processKey: String
+  public let pid: UInt32
+  public let pgid: Int32
+  public let exitCode: Int32?
+  public let exitSignal: Int32?
+  public let stderrTail: String?
+  public let affectedLogicalSessionIds: [String]
+}
+
+public struct AcpBridgeResyncIncidentPayload: Codable, Equatable, Sendable {
+  public let kind: String
+  public let bridgeEpoch: String
+  public let continuity: UInt64
+  public let nextSeq: UInt64
+  public let truncated: Bool
+  public let affectedLogicalSessionIds: [String]
 }
