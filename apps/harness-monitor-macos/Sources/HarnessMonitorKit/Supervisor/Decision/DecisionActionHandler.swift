@@ -43,6 +43,16 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
         throw StoreDecisionActionError.missingDecision(decisionID)
       }
       let decisionSnapshot = DecisionActionSnapshot(decision: decision)
+      if decisionSnapshot.ruleID == AcpPermissionDecisionPayload.ruleID,
+        let actionID = outcome.chosenActionID
+      {
+        _ = await store.submitAcpPermissionDecisionAction(
+          decisionID: decisionID,
+          actionID: actionID,
+          decisionStore: self.decisions
+        )
+        return
+      }
       let action = Self.suggestedAction(
         in: decisionSnapshot.suggestedActionsJSON,
         matching: outcome.chosenActionID
@@ -117,31 +127,36 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     for decision: DecisionActionSnapshot,
     store: HarnessMonitorStore
   ) async throws {
-    guard action.kind == .custom, decision.ruleID == "codex-approval" else {
+    guard action.kind == .custom else {
       return
     }
-    let payload = try JSONDecoder().decode(
-      CodexApprovalSuggestedActionPayload.self,
-      from: Data(action.payloadJSON.utf8)
-    )
-    guard let remoteDecision = CodexApprovalDecision(rawValue: payload.decision) else {
-      throw StoreDecisionActionError.invalidCodexPayload
-    }
-    guard let client = await MainActor.run(body: { store.client }) else {
-      throw StoreDecisionActionError.missingClient
-    }
-    let runID = try await resolveCodexRunID(
-      decision: decision,
-      payload: payload,
-      store: store
-    )
-    let updatedRun = try await client.resolveCodexApproval(
-      runID: runID,
-      approvalID: payload.approvalID,
-      request: CodexApprovalDecisionRequest(decision: remoteDecision)
-    )
-    await MainActor.run {
-      store.applyCodexRun(updatedRun)
+    switch decision.ruleID {
+    case "codex-approval":
+      let payload = try JSONDecoder().decode(
+        CodexApprovalSuggestedActionPayload.self,
+        from: Data(action.payloadJSON.utf8)
+      )
+      guard let remoteDecision = CodexApprovalDecision(rawValue: payload.decision) else {
+        throw StoreDecisionActionError.invalidCodexPayload
+      }
+      guard let client = await MainActor.run(body: { store.client }) else {
+        throw StoreDecisionActionError.missingClient
+      }
+      let runID = try await resolveCodexRunID(
+        decision: decision,
+        payload: payload,
+        store: store
+      )
+      let updatedRun = try await client.resolveCodexApproval(
+        runID: runID,
+        approvalID: payload.approvalID,
+        request: CodexApprovalDecisionRequest(decision: remoteDecision)
+      )
+      await MainActor.run {
+        store.applyCodexRun(updatedRun)
+      }
+    default:
+      return
     }
   }
 

@@ -67,6 +67,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureResolvedAcpSnapshot(_ snapshot: AcpAgentSnapshot, for agentID: String) {
+    lock.withLock {
+      resolvedAcpSnapshotsByAgentID[agentID] = snapshot
+    }
+  }
+
   func configureSessions(
     summaries: [SessionSummary],
     detailsByID: [String: SessionDetail],

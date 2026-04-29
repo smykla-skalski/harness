@@ -68,8 +68,40 @@ extension HarnessMonitorStore {
     batch: AcpPermissionBatch,
     decision: AcpPermissionDecision
   ) async -> Bool {
+    let resolved = await performAcpPermissionResolution(
+      batch: batch,
+      decision: decision
+    )
+    if resolved {
+      presentSuccessFeedback("Permission resolved")
+    }
+    return resolved
+  }
+
+  @discardableResult
+  public func submitAcpPermissionDecisionAction(
+    decisionID: String,
+    actionID: String,
+    decisionStore: DecisionStore? = nil
+  ) async -> Bool {
+    await withSupervisorAutoActionsSuppressed {
+      await self.resolveAcpPermissionDecision(
+        decisionID: decisionID,
+        actionID: actionID,
+        decisionStore: decisionStore
+      )
+    }
+  }
+
+  @discardableResult
+  private func performAcpPermissionResolution(
+    batch: AcpPermissionBatch,
+    decision: AcpPermissionDecision
+  ) async -> Bool {
     let actionName = "Permission resolved"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard let action = prepareSessionAction(named: actionName, sessionID: batch.sessionId) else {
+      return false
+    }
     resolvingAcpPermissionBatchID = batch.batchId
     defer { resolvingAcpPermissionBatchID = nil }
     do {
@@ -87,7 +119,118 @@ extension HarnessMonitorStore {
       if presentingAcpPermissionBatch?.batchId == batch.batchId {
         presentingAcpPermissionBatch = nil
       }
-      presentSuccessFeedback(actionName)
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  public func acpPermissionDecisionID(for batchID: String) -> String {
+    AcpPermissionDecisionPayload.decisionID(for: batchID)
+  }
+
+  public func acpPermissionDecisionPayload(
+    for batch: AcpPermissionBatch
+  ) -> AcpPermissionDecisionPayload {
+    let decisionID = acpPermissionDecisionID(for: batch.batchId)
+    if let payload = acpPermissionDecisionPayloadsByDecisionID[decisionID] {
+      return payload
+    }
+    return makeAcpPermissionDecisionPayload(for: batch)
+  }
+
+  public func acpPermissionDecisionPayload(for decisionID: String) -> AcpPermissionDecisionPayload? {
+    acpPermissionDecisionPayloadsByDecisionID[decisionID]
+  }
+
+  public func acpPermissionResolutionState(for decisionID: String) -> BatchResolutionState? {
+    acpPermissionResolutionStateByDecisionID[decisionID]
+  }
+
+  public func setAcpPermissionRequestSelection(
+    decisionID: String,
+    requestID: String,
+    isSelected: Bool
+  ) {
+    guard var state = acpPermissionResolutionStateByDecisionID[decisionID]
+      ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
+    else {
+      return
+    }
+    state.setSelected(isSelected, for: requestID)
+    acpPermissionResolutionStateByDecisionID[decisionID] = state
+  }
+
+  public func clearAcpPermissionResolutionState() {
+    acpPermissionResolutionStateByDecisionID = [:]
+  }
+
+  @discardableResult
+  public func resolveAcpPermissionDecision(
+    decisionID: String,
+    actionID: String,
+    decisionStore: DecisionStore? = nil
+  ) async -> Bool {
+    let activeDecisionStore = decisionStore ?? supervisorDecisionStore
+    let payload: AcpPermissionDecisionPayload
+    do {
+      guard let resolvedPayload = try await resolveAcpPermissionPayload(
+        decisionID: decisionID,
+        decisionStore: activeDecisionStore
+      ) else {
+        presentFailureFeedback("ACP permission decision is no longer available.")
+        return false
+      }
+      payload = resolvedPayload
+    } catch {
+      reportAcpPermissionDecisionStoreFailure(
+        operation: "load",
+        decisionID: decisionID,
+        error: error
+      )
+      presentFailureFeedback(
+        "ACP permission decision could not be loaded from the Decisions queue. Refresh the session and try again."
+      )
+      return false
+    }
+
+    do {
+      let result = try payload.actionDecision(
+        for: actionID,
+        resolutionState: acpPermissionResolutionStateByDecisionID[decisionID]
+      )
+      markAcpPermissionDecisionSubmission(decisionID: decisionID, submittedAt: Date())
+      let resolved = await performAcpPermissionResolution(
+        batch: payload.rawBatch,
+        decision: result.decision
+      )
+      guard resolved else {
+        markAcpPermissionDecisionSubmission(decisionID: decisionID, submittedAt: nil)
+        return false
+      }
+      var needsDecisionStoreResync = false
+      if let activeDecisionStore {
+        do {
+          try await activeDecisionStore.resolve(id: decisionID, outcome: result.outcome)
+        } catch {
+          needsDecisionStoreResync = true
+          reportAcpPermissionDecisionStoreFailure(
+            operation: "resolve",
+            decisionID: decisionID,
+            error: error
+          )
+          presentFailureFeedback(
+            "ACP permission resolved, but the Decisions queue did not record the change. Refresh the session and try again."
+          )
+        }
+      }
+      removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+      if needsDecisionStoreResync {
+        scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+      } else {
+        presentSuccessFeedback("Permission resolved")
+      }
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
@@ -115,6 +258,7 @@ extension HarnessMonitorStore {
       into: selectedAcpAgents
     )
     reconcilePresentedAcpPermissionBatch()
+    reconcileAcpPermissionDecisions()
   }
 
   func replaceAcpAgents(
@@ -144,6 +288,7 @@ extension HarnessMonitorStore {
     reconcilePresentedAcpPermissionBatch(
       allowAutoPresentation: allowAutoPresentation || hadPresentedBatch
     )
+    reconcileAcpPermissionDecisions()
   }
 
   /// Apply an already-decoded ACP event push to the in-memory timeline.
@@ -269,6 +414,7 @@ extension HarnessMonitorStore {
         into: standaloneAcpPermissionBatches
       )
       reconcilePresentedAcpPermissionBatch()
+      reconcileAcpPermissionDecisions()
       return
     }
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
@@ -278,10 +424,11 @@ extension HarnessMonitorStore {
           primary: snapshot.pendingPermissionBatches,
           secondary: [batch],
           preferSecondary: false
-          )
+        )
       )
     }
     reconcilePresentedAcpPermissionBatch()
+    reconcileAcpPermissionDecisions()
   }
 
   func removeAcpPermissionBatch(_ batch: AcpPermissionBatch) {
@@ -295,6 +442,7 @@ extension HarnessMonitorStore {
       presentingAcpPermissionBatch = nil
     }
     reconcilePresentedAcpPermissionBatch()
+    reconcileAcpPermissionDecisions()
   }
 
   func resetSelectedAcpAgents() {
@@ -302,6 +450,10 @@ extension HarnessMonitorStore {
     standaloneAcpPermissionBatches = []
     presentingAcpPermissionBatch = nil
     resolvingAcpPermissionBatchID = nil
+    acpPermissionDecisionPayloadsByDecisionID = [:]
+    acpPermissionResolutionStateByDecisionID = [:]
+    acpPermissionDecisionSyncTask?.cancel()
+    acpPermissionDecisionSyncTask = nil
   }
 
   func refreshAcpAgents(
@@ -346,6 +498,38 @@ extension HarnessMonitorStore {
     presentingAcpPermissionBatch != nil
       || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
         == "1"
+  }
+
+  func reconcileAcpPermissionDecisions() {
+    let previousPayloads = acpPermissionDecisionPayloadsByDecisionID
+    var nextPayloads: [String: AcpPermissionDecisionPayload] = [:]
+    var nextResolutionState: [String: BatchResolutionState] = [:]
+
+    for batch in pendingAcpPermissionBatches {
+      let payload = makeAcpPermissionDecisionPayload(for: batch)
+      nextPayloads[payload.decisionID] = payload
+      let requestIDs = payload.renderableBatch?.requests.map(\.id) ?? []
+      let state = (acpPermissionResolutionStateByDecisionID[payload.decisionID]
+        ?? payload.defaultResolutionState)
+        .rebased(to: requestIDs)
+      nextResolutionState[payload.decisionID] = state
+    }
+
+    if let resolvingBatchID = resolvingAcpPermissionBatchID,
+      let resolvingPayload = previousPayloads.values.first(where: {
+        $0.rawBatch.batchId == resolvingBatchID
+      })
+    {
+      nextPayloads[resolvingPayload.decisionID] = resolvingPayload
+      nextResolutionState[resolvingPayload.decisionID] =
+        acpPermissionResolutionStateByDecisionID[resolvingPayload.decisionID]
+        ?? resolvingPayload.defaultResolutionState
+    }
+
+    let staleDecisionIDs = Set(previousPayloads.keys).subtracting(nextPayloads.keys)
+    acpPermissionDecisionPayloadsByDecisionID = nextPayloads
+    acpPermissionResolutionStateByDecisionID = nextResolutionState
+    scheduleAcpPermissionDecisionSync(staleDecisionIDs: staleDecisionIDs)
   }
 
   /// Preserve the currently presented batch whenever that batch is still pending and actively
@@ -455,8 +639,148 @@ extension HarnessMonitorStore {
         if $0.recordedAt != $1.recordedAt {
           return $0.recordedAt > $1.recordedAt
         }
-      return $0.entryId < $1.entryId
+        return $0.entryId < $1.entryId
       }
+  }
+
+  private func makeAcpPermissionDecisionPayload(
+    for batch: AcpPermissionBatch
+  ) -> AcpPermissionDecisionPayload {
+    if let snapshot = selectedAcpAgents.first(where: { $0.acpId == batch.acpId }) {
+      return AcpPermissionDecisionPayload.make(
+        batch: batch,
+        agentID: snapshot.agentId,
+        agentName: snapshot.displayName
+      )
+    }
+    return AcpPermissionDecisionPayload.make(
+      batch: batch,
+      agentID: batch.acpId,
+      agentName: batch.acpId
+    )
+  }
+
+  private func resolveAcpPermissionPayload(
+    decisionID: String,
+    decisionStore: DecisionStore?
+  ) async throws -> AcpPermissionDecisionPayload? {
+    if let payload = acpPermissionDecisionPayloadsByDecisionID[decisionID] {
+      return payload
+    }
+    guard let decisionStore else {
+      return nil
+    }
+    guard let decision = try await decisionStore.decision(id: decisionID) else {
+      return nil
+    }
+    guard let payload = AcpPermissionDecisionPayload.decode(from: decision) else {
+      return nil
+    }
+    acpPermissionDecisionPayloadsByDecisionID[decisionID] = payload
+    if acpPermissionResolutionStateByDecisionID[decisionID] == nil {
+      acpPermissionResolutionStateByDecisionID[decisionID] = payload.defaultResolutionState
+    }
+    return payload
+  }
+
+  private func markAcpPermissionDecisionSubmission(
+    decisionID: String,
+    submittedAt: Date?
+  ) {
+    guard var state = acpPermissionResolutionStateByDecisionID[decisionID]
+      ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
+    else {
+      return
+    }
+    state.submittedAt = submittedAt
+    acpPermissionResolutionStateByDecisionID[decisionID] = state
+  }
+
+  private func removeAcpPermissionDecisionArtifacts(decisionID: String) {
+    acpPermissionDecisionPayloadsByDecisionID.removeValue(forKey: decisionID)
+    acpPermissionResolutionStateByDecisionID.removeValue(forKey: decisionID)
+  }
+
+  private func scheduleAcpPermissionDecisionSync(staleDecisionIDs: Set<String>) {
+    acpPermissionDecisionSyncTask?.cancel()
+    guard let decisionStore = supervisorDecisionStore else {
+      return
+    }
+    let payloads = acpPermissionDecisionPayloadsByDecisionID.values.sorted {
+      if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
+        return $0.rawBatch.createdAt < $1.rawBatch.createdAt
+      }
+      return $0.decisionID < $1.decisionID
+    }
+    acpPermissionDecisionSyncTask = Task { @MainActor in
+      var didPresentFailure = false
+      let reportFailure: @MainActor (String, String?, any Error) -> Void = { operation, decisionID, error in
+        self.reportAcpPermissionDecisionStoreFailure(
+          operation: operation,
+          decisionID: decisionID,
+          error: error
+        )
+        if !didPresentFailure {
+          self.presentFailureFeedback(
+            "ACP decisions fell out of sync with the Decisions queue. Refresh the session and try again."
+          )
+          didPresentFailure = true
+        }
+      }
+      for payload in payloads {
+        guard !Task.isCancelled else {
+          return
+        }
+        do {
+          try await decisionStore.upsertOpen(payload.decisionDraft)
+        } catch {
+          reportFailure("upsert", payload.decisionID, error)
+        }
+      }
+      guard !Task.isCancelled else {
+        return
+      }
+      let activeDecisionIDs = Set(payloads.map(\.decisionID))
+      let openDecisions: [Decision]
+      do {
+        openDecisions = try await decisionStore.openDecisions()
+      } catch {
+        reportFailure("list-open", nil, error)
+        return
+      }
+      let staleACPDecisionIDs = Set(
+        openDecisions
+          .filter { $0.ruleID == AcpPermissionDecisionPayload.ruleID }
+          .map(\.id)
+      )
+        .subtracting(activeDecisionIDs)
+        .union(staleDecisionIDs)
+      for decisionID in staleACPDecisionIDs.sorted() {
+        guard !Task.isCancelled else {
+          return
+        }
+        do {
+          try await decisionStore.dismiss(id: decisionID)
+        } catch {
+          reportFailure("dismiss", decisionID, error)
+        }
+      }
+    }
+  }
+
+  private func reportAcpPermissionDecisionStoreFailure(
+    operation: String,
+    decisionID: String?,
+    error: any Error
+  ) {
+    let resolvedDecisionID = decisionID ?? "none"
+    HarnessMonitorLogger.store.error(
+      """
+      ACP decision store operation failed: operation=\(operation, privacy: .public); \
+      decisionID=\(resolvedDecisionID, privacy: .public); \
+      error=\(error.localizedDescription, privacy: .public)
+      """
+    )
   }
 
   private func applyAcpTimelineEntries(_ entries: [TimelineEntry]) {

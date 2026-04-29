@@ -132,6 +132,7 @@ public enum HarnessMonitorPreviewStoreFactory {
         {
           store.presentingAcpPermissionBatch = pendingBatch
         }
+        store.reconcileAcpPermissionDecisions()
       }
     }
     store.isSelectionLoading = false

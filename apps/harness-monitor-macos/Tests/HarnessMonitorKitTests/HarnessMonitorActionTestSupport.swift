@@ -102,6 +102,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       approvalID: String,
       decision: CodexApprovalDecision
     )
+    case resolveAcpPermission(
+      agentID: String,
+      batchID: String,
+      decision: AcpPermissionDecision
+    )
     case sendSignal(sessionID: String, agentID: String, command: String, actor: String)
     case cancelSignal(sessionID: String, agentID: String, signalID: String, actor: String)
     case startCodexRun(
@@ -188,6 +193,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var timelineWindowErrorsBySessionID: [String: any Error] = [:]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
+  var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuisDelaysBySessionID: [String: Duration] = [:]
   var agentTuiInputErrorsByID: [String: any Error] = [:]

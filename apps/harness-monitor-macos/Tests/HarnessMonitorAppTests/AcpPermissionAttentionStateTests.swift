@@ -51,16 +51,9 @@ struct AcpPermissionAttentionStateTests {
         ]
       )
     )
-    store.supervisorOpenDecisions = [
-      makeDecision(
-        id: "decision-old",
-        agentID: "worker-codex",
-        createdAt: 10
-      )
-    ]
     #expect(store.acpPermissionAttentionEvents.count == 1)
     #expect(
-      store.acpPermissionAttentionEvents.first?.decisionID == "decision-old"
+      store.acpPermissionAttentionEvents.first?.decisionID == "acp-permission:batch-1"
     )
 
     state.reconcile(store: store)
@@ -93,26 +86,6 @@ struct AcpPermissionAttentionStateTests {
       createdAt: "2026-04-28T00:00:00Z",
       updatedAt: "2026-04-28T00:00:00Z"
     )
-  }
-
-  private func makeDecision(
-    id: String,
-    agentID: String,
-    createdAt: TimeInterval
-  ) -> Decision {
-    let decision = Decision(
-      id: id,
-      severity: .warn,
-      ruleID: "stuck-agent",
-      sessionID: "sess-acp-attention",
-      agentID: agentID,
-      taskID: nil,
-      summary: "Decision \(id)",
-      contextJSON: "{}",
-      suggestedActionsJSON: "[]"
-    )
-    decision.createdAt = Date(timeIntervalSince1970: createdAt)
-    return decision
   }
 
   private func waitForNotificationDelivery(

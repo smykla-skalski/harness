@@ -50,12 +50,10 @@ extension HarnessMonitorStore {
       let count = sortedBatches.reduce(into: 0) { partialResult, batch in
         partialResult += batch.requests.count
       }
-      guard
-        count > 0,
-        let oldestDecisionID = oldestOpenDecisionID(for: snapshot.agentId)
-      else {
+      guard count > 0 else {
         continue
       }
+      let oldestDecisionID = acpPermissionDecisionID(for: oldestBatch.batchId)
       byAgentID[snapshot.agentId] = AcpDecisionAttention(
         count: count,
         oldestBatchID: oldestBatch.batchId,
@@ -108,7 +106,7 @@ extension HarnessMonitorStore {
   }
 
   public func oldestDecisionID(for agentID: String) -> String? {
-    oldestOpenDecisionID(for: agentID)
+    acpDecisionAttentionSnapshot.byAgentID[agentID]?.oldestDecisionID
   }
 
   @discardableResult
@@ -116,17 +114,5 @@ extension HarnessMonitorStore {
     let selectedID = oldestDecisionID(for: agentID)
     supervisorSelectedDecisionID = selectedID
     return selectedID
-  }
-
-  private func oldestOpenDecisionID(for agentID: String) -> String? {
-    supervisorOpenDecisions
-      .filter { $0.agentID == agentID }
-      .min { lhs, rhs in
-        if lhs.createdAt != rhs.createdAt {
-          return lhs.createdAt < rhs.createdAt
-        }
-        return lhs.id < rhs.id
-      }?
-      .id
   }
 }
