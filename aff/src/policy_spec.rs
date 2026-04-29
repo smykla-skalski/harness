@@ -1,9 +1,5 @@
 use std::sync::LazyLock;
 
-pub(crate) struct TaskFamilySpec {
-    pub(crate) name: &'static str,
-}
-
 #[cfg(test)]
 pub(crate) struct EnforcementExample {
     pub(crate) command: &'static str,
@@ -47,61 +43,31 @@ pub(crate) struct WordRoute {
     pub(crate) passthrough_start: Option<usize>,
 }
 
-pub(crate) const TASK_FAMILY_SPECS: &[TaskFamilySpec] = &[
-    TaskFamilySpec { name: "check" },
-    TaskFamilySpec { name: "test" },
-    TaskFamilySpec {
-        name: "check:scripts",
-    },
-    TaskFamilySpec {
-        name: "cargo:local",
-    },
-    TaskFamilySpec { name: "setup:*" },
-    TaskFamilySpec { name: "version:*" },
-    TaskFamilySpec {
-        name: "monitor:macos:*",
-    },
-    TaskFamilySpec {
-        name: "observability:*",
-    },
-    TaskFamilySpec {
-        name: "host-metrics:*",
-    },
-    TaskFamilySpec { name: "mcp:*" },
-    TaskFamilySpec { name: "preview:*" },
-    TaskFamilySpec {
-        name: "check:stale",
-    },
-    TaskFamilySpec {
-        name: "clean:stale",
-    },
-];
-
 #[cfg(test)]
 pub(crate) const ENFORCEMENT_EXAMPLES: &[EnforcementExample] = &[
     EnforcementExample {
         command: "cargo test --lib cli::tests",
-        replacement: "mise run cargo:local -- test --lib cli::tests",
+        replacement: "mise cargo:local -- test --lib cli::tests",
     },
     EnforcementExample {
         command: "harness setup bootstrap --agents codex",
-        replacement: "mise run setup:bootstrap -- --agents codex",
+        replacement: "mise setup:bootstrap -- --agents codex",
     },
     EnforcementExample {
         command: "./scripts/version.sh check",
-        replacement: "mise run version:check",
+        replacement: "mise version:check",
     },
     EnforcementExample {
-        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:macos:test'",
-        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:macos:test",
+        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise monitor:macos:test'",
+        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise monitor:macos:test",
     },
     EnforcementExample {
         command: "./scripts/observability.sh stop && ./scripts/observability.sh start",
-        replacement: "mise run observability:restart",
+        replacement: "mise observability:restart",
     },
     EnforcementExample {
         command: "./scripts/host-metrics.sh logs",
-        replacement: "mise run host-metrics:logs",
+        replacement: "mise host-metrics:logs",
     },
 ];
 
@@ -321,35 +287,6 @@ pub(crate) const HARNESS_ROUTES: &[WordRoute] = &[
 ];
 
 pub(crate) static SESSION_START_CONTEXT: LazyLock<String> = LazyLock::new(|| {
-    let task_families = TASK_FAMILY_SPECS
-        .iter()
-        .map(|spec| format!("`{}`", spec.name))
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    format!(
-        "Repo policy:\n\
-- Discover supported workflows with `mise tasks ls`.\n\
-- Run repo-supported logic only through `mise run <task>` or `mise run <task> -- <args>`.\n\
-- Run `mise` commands directly. Do not wrap them in `bash -lc`, `zsh -lc`, `rtk env`, `env`, or similar shells/wrappers.\n\
-- Canonical task families here are {task_families}.\n\
-- Do not run repo scripts directly. Do not run raw `cargo`, raw `xcodebuild`, or other manual command paths when a `mise` task already covers that workflow.\n\
-\n\
-Constraints:\n\
-- Elevated permissions: every action carries weight; triage before acting.\n\
-- Read-only system posture outside the working tree: before any local-machine mutation beyond repo files, stop and triage irreversible side effects.\n\
-- Git history is append-only: only new forward commits. No rebase, amend, reset, force-push, checkout, restore, or stash.\n\
-- Every commit uses `-sS`. After each commit, verify the signature and that the sign-off is exactly `Bart Smykla <bartek@smykla.com>`.\n\
-- Before every commit, run the right build gate unless the change is only docs or version-sync noise: Rust -> `mise run check`; Swift -> `mise run monitor:macos:lint` plus the relevant build/test lane from `apps/harness-monitor-macos/CLAUDE.md`; cross-stack -> both gates.\n\
-- Investigate the real code path before fixing: map call sites, state flow, cross-process boundaries, and existing tests.\n\
-- Break work into the smallest independently committable chunks. Every chunk must leave the touched stacks buildable and test-passing.\n\
-- For each chunk: write or tighten the test first and confirm red, implement the fix, confirm green, run the right gate, verify runtime behavior when it matters, commit with `-sS`, verify signature/sign-off, then continue.\n\
-- After the last chunk, rerun every touched gate and resolve anything still open.\n\
-- The session is not done until every part of the task is done. Do not stop early.\n\
-- Use descriptive names, correct comments or none, remove dead code, keep functions under 100 lines, and keep important logic near the top of files.\n\
-- Use native APIs and idiomatic code. Long-term fixes only. Do not suppress, silence, or work around the issue.\n\
-- Check for performance regressions when touching hot paths, actors, async state machines, concurrency, or shared state.\n\
-- Parallel agent awareness: if another agent owns a file, switch scope. If blocked for 5 minutes, ask the user and wait.\n\
-- If 1Password is unavailable when commit signing is needed, hard stop and wait. Do not bypass 1Password or use a different key.\n"
-    )
+    "Repo policy: Use `mise tasks ls` to discover workflows and `mise <task>` for all logic. Run `mise` directly without wrappers. Avoid raw `cargo` or `xcodebuild`. Constraints: Triage before acting as every action carries weight. Maintain read-only posture outside the working tree unless explicitly approved by user. Git history is append-only; no rebase, amend, or force-push. Use `git commit -sS` and verify sign-off is `Bart Smykla <bartek@smykla.com>`. Run build gates (Rust: `mise harness:check` for harness, `mise aff:check` for aff, Swift: `monitor:macos:lint` + lane) before committing unless the change is docs, version-sync, or tiny noise. Investigate call sites and state flow before fixing. Break work into small chunks. For each chunk: test first, implement, verify, run gate if significant, commit `-sS`, and verify. After the last chunk, ensure all touched gates pass unless final changes were trivial noise. Do not stop until the task is fully done. Rust files must be under 520 lines with functions under 100 lines and logic at the top. Module paths must have max 2 segments (e.g., `path::Path` OK, `std::path::Path` NO); use `use`. Use descriptive names and idiomatic code without suppressions. Check for performance regressions on hot paths. If blocked by another agent for 5 minutes, ask the user. Hard stop if 1Password is unavailable"
+        .to_string()
 });
