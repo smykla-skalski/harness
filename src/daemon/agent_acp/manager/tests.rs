@@ -384,6 +384,7 @@ async fn repeated_process_faults_quarantine_process_key() {
                     saw_quarantine_applied = true;
                 }
             }
+            std::thread::sleep(Duration::from_millis(1100));
         }
         assert!(saw_quarantine_applied, "expected quarantine-applied incident");
 
@@ -394,5 +395,42 @@ async fn repeated_process_faults_quarantine_process_key() {
             format!("{error}").contains("quarantined"),
             "unexpected error: {error}"
         );
+    });
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn recent_process_fault_applies_backoff_before_next_start() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let script = temp.path().join("failing-agent.sh");
+        write_executable(&script, "#!/bin/sh\nexit 7\n");
+        let descriptor = descriptor(&script);
+        let manager = manager();
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: None,
+            project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
+        };
+
+        let first = manager
+            .start_descriptor("sess-1", &request, &descriptor)
+            .expect("start first failing session");
+        let _ = wait_until_disconnected(&manager, &first.acp_id);
+
+        let error = manager
+            .start_descriptor("sess-2", &request, &descriptor)
+            .expect_err("immediate restart should be backoff-blocked");
+        assert!(
+            format!("{error}").contains("backoff"),
+            "unexpected error: {error}"
+        );
+
+        std::thread::sleep(Duration::from_millis(1100));
+        let restarted = manager
+            .start_descriptor("sess-3", &request, &descriptor)
+            .expect("start after backoff window");
+        let _ = wait_until_disconnected(&manager, &restarted.acp_id);
     });
 }
