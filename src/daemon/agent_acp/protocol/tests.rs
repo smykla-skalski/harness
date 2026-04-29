@@ -146,12 +146,22 @@ fn disconnect_reason_maps_prompt_deadline() {
 }
 
 #[test]
-fn disconnect_reason_keeps_non_deadline_errors_as_stdio_closed() {
+fn disconnect_reason_keeps_non_transport_internal_errors_as_stdio_closed() {
     let error = AcpError::new(-32603, "session/prompt internal failure");
 
     assert_eq!(
         disconnect_reason_from_error(&error),
         DisconnectReason::StdioClosed
+    );
+}
+
+#[test]
+fn disconnect_reason_maps_transport_closed_errors() {
+    let error = AcpError::new(-32603, "transport connection closed");
+
+    assert_eq!(
+        disconnect_reason_from_error(&error),
+        DisconnectReason::TransportClosed
     );
 }
 
@@ -162,24 +172,47 @@ fn session_route_guard_rejects_before_initialization() {
         .ensure_known(&SessionId::new("acp-session-1"))
         .expect_err("guard should reject before initialization");
     assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
+    assert!(
+        error.message.contains("stale_session_id"),
+        "unexpected message: {}",
+        error.message
+    );
 }
 
 #[test]
 fn session_route_guard_rejects_stale_session_id() {
     let guard = SessionRouteGuard::default();
-    guard.set_expected(SessionId::new("acp-session-1"));
+    guard.start_session(SessionId::new("acp-session-1"));
     let error = guard
         .ensure_known(&SessionId::new("acp-session-2"))
         .expect_err("guard should reject unknown session id");
     assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
+    assert!(
+        error.message.contains("stale_session_id"),
+        "unexpected message: {}",
+        error.message
+    );
 }
 
 #[test]
 fn session_route_guard_accepts_expected_session_id() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
-    guard.set_expected(session_id.clone());
+    guard.start_session(session_id.clone());
     guard
         .ensure_known(&session_id)
         .expect("guard should accept expected session id");
+}
+
+#[test]
+fn session_route_guard_rejects_after_session_end() {
+    let guard = SessionRouteGuard::default();
+    let session_id = SessionId::new("acp-session-1");
+    guard.start_session(session_id.clone());
+    guard.stop_session(&session_id);
+    let error = guard
+        .ensure_known(&session_id)
+        .expect_err("guard should reject removed session id");
+    assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
+    assert!(error.message.contains("already ended"));
 }
