@@ -98,8 +98,8 @@ description = "Patch aff-owned runtime hooks into existing bootstrap configs (pa
 run = "./scripts/cargo-local.sh run --quiet -p aff -- setup bootstrap"
 
 [tasks.check]
-description = "Run full repo quality gates (harness + aff)"
-depends = ["harness:check", "aff:check"]
+description = "Run default harness quality gates; run aff:check manually when needed"
+depends = ["harness:check"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"

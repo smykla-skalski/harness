@@ -13,9 +13,9 @@ Discover supported workflows with `rtk mise tasks ls` and run repo logic only th
 ## Build and test commands
 
 ```bash
-mise run check                 # default aggregate quality gate: harness + aff
-mise run harness:check         # harness-only quality gate (opt-in; not default)
-mise run aff:check             # aff-only quality gate (opt-in; not default)
+mise run check                 # default harness quality gate
+mise run harness:check         # harness-only quality gate (same gates as default check)
+mise run aff:check             # aff-only quality gate (manual; not default)
 mise run test                  # default aggregate fast tests: harness + aff
 mise run test:unit             # unit tests only
 mise run test:integration      # integration tests only
