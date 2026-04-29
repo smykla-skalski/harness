@@ -112,8 +112,12 @@ struct NewSessionSheetView: View {
 
   private var tabSelector: some View {
     Picker("Session sheet section", selection: $selectedTab) {
-      Text(SheetTab.create.title).tag(SheetTab.create)
-      Text(SheetTab.runtime.title).tag(SheetTab.runtime)
+      Text(SheetTab.create.title)
+        .tag(SheetTab.create)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateTab)
+      Text(SheetTab.runtime.title)
+        .tag(SheetTab.runtime)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionRuntimeTab)
     }
     .pickerStyle(.segmented)
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTabPicker)
