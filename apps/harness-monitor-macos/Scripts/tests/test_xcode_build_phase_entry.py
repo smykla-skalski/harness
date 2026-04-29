@@ -23,20 +23,22 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
     def test_build_phases_route_bash_scripts_through_xcode_build_phase_entry(self) -> None:
         source = BUILD_PHASES_SOURCE.read_text()
 
+        self.assertIn("scriptPhaseBody(", source)
+        self.assertIn(".spotlight-build-artifacts.noindex/apps/harness-monitor-macos", source)
         self.assertIn(
-            '/bin/sh "$SRCROOT/Scripts/lib/xcode-build-phase-entry.sh" "$SRCROOT/Scripts/build-daemon-agent.sh"',
+            'script: "build-daemon-agent.sh"',
             source,
         )
         self.assertIn(
-            '/bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"',
+            'script: "bundle-daemon-agent.sh"',
             source,
         )
         self.assertIn(
-            '/bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/inject-build-provenance.sh" \\(variant.rawValue)',
+            'script: "inject-build-provenance.sh"',
             source,
         )
         self.assertIn(
-            '/bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"',
+            'script: "strip-test-xattrs.sh"',
             source,
         )
         self.assertNotIn("Helpers/harness.cstemp", source)

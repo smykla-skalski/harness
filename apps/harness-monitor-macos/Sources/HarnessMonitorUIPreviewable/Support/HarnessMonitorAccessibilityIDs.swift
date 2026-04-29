@@ -95,6 +95,8 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
   public static let preferencesAcpNotificationStatus = "harness.preferences.acp.status"
   public static let preferencesAcpNotificationStatusState = "harness.preferences.acp.status.state"
+  public static let preferencesAcpVerboseToolCallAnnouncements =
+    "harness.preferences.acp.verbose-tool-call-announcements"
   public static let preferencesAcpOpenSystemSettings =
     "harness.preferences.acp.open-system-settings"
   public static let preferencesNotificationsPresetPicker =

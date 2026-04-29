@@ -1,43 +1,49 @@
 import ProjectDescription
 
 public enum BuildPhases {
+    private static func scriptPhaseBody(
+        projectVariable: String,
+        script: String,
+        arguments: String = ""
+    ) -> String {
+        """
+        set -euo pipefail
+        project_dir="${\(projectVariable):-}"
+        if [ ! -f "$project_dir/Scripts/lib/xcode-build-phase-entry.sh" ]; then
+          case "$project_dir" in
+            */.spotlight-build-artifacts.noindex/apps/harness-monitor-macos)
+              checkout_root="${project_dir%%/.spotlight-build-artifacts.noindex/*}"
+              project_dir="$checkout_root/apps/harness-monitor-macos"
+              ;;
+          esac
+        fi
+        /bin/sh "$project_dir/Scripts/lib/xcode-build-phase-entry.sh" "$project_dir/Scripts/\(script)"\(arguments)
+        """
+    }
+
     public static func daemonBuildPreAction() -> ExecutionAction {
         .executionAction(
             title: "Build harness daemon (parallel)",
-            scriptText: """
-            set -euo pipefail
-            /bin/sh "$SRCROOT/Scripts/lib/xcode-build-phase-entry.sh" "$SRCROOT/Scripts/build-daemon-agent.sh"
-            """,
+            scriptText: scriptPhaseBody(
+                projectVariable: "SRCROOT",
+                script: "build-daemon-agent.sh"
+            ),
             target: .target("HarnessMonitor")
         )
     }
 
     public static func bundleDaemonAgent() -> TargetScript {
         .post(
-            script: """
-            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/bundle-daemon-agent.sh"
-            """,
+            script: scriptPhaseBody(
+                projectVariable: "PROJECT_DIR",
+                script: "bundle-daemon-agent.sh"
+            ),
             name: "Bundle Daemon Agent",
-            inputPaths: [
-                "$(PROJECT_DIR)/../../Cargo.toml",
-                "$(PROJECT_DIR)/../../Cargo.lock",
-                "$(PROJECT_DIR)/../../build.rs",
-                "$(PROJECT_DIR)/../../src",
-                "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
-                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
-                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
-                "$(PROJECT_DIR)/Scripts/build-daemon-agent.sh",
-                "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
-                "$(PROJECT_DIR)/Scripts/lib/daemon-bundle-env.sh",
-                "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh",
-                "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
-                "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh"
-            ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
             ],
-            basedOnDependencyAnalysis: true
+            basedOnDependencyAnalysis: false
         )
     }
 
@@ -71,23 +77,25 @@ public enum BuildPhases {
 
     public static func clearGatekeeperMetadata(variant: ProvenanceVariant) -> TargetScript {
         .post(
-            script: """
-            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/inject-build-provenance.sh" \(variant.rawValue)
-            """,
+            script: scriptPhaseBody(
+                projectVariable: "PROJECT_DIR",
+                script: "inject-build-provenance.sh",
+                arguments: " \(variant.rawValue)"
+            ),
             name: "Clear Gatekeeper Metadata",
-            inputPaths: variant.inputPaths.map { .glob(.path($0)) },
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist"
             ],
-            basedOnDependencyAnalysis: true
+            basedOnDependencyAnalysis: false
         )
     }
 
     public static func stripTestBundleXattrs() -> TargetScript {
         .post(
-            script: """
-            /bin/sh "$PROJECT_DIR/Scripts/lib/xcode-build-phase-entry.sh" "$PROJECT_DIR/Scripts/strip-test-xattrs.sh"
-            """,
+            script: scriptPhaseBody(
+                projectVariable: "PROJECT_DIR",
+                script: "strip-test-xattrs.sh"
+            ),
             name: "Clear Gatekeeper Metadata",
             inputPaths: [
                 "$(PROJECT_DIR)/Scripts/strip-test-xattrs.sh",

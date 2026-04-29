@@ -69,10 +69,11 @@ struct HarnessMonitorAppConfiguration {
       launchMode: launchMode,
       initialThemeMode: uiTestOverrides.themeMode,
       isUITesting: isUITesting,
-      defersInitialMainWindowContentUntilBootstrap: shouldDeferInitialMainWindowContentUntilBootstrap(
-        isUITesting: isUITesting,
-        hasPerfScenario: perfScenario != nil
-      ),
+      defersInitialMainWindowContentUntilBootstrap:
+        shouldDeferInitialMainWindowContentUntilBootstrap(
+          isUITesting: isUITesting,
+          hasPerfScenario: perfScenario != nil
+        ),
       mainWindowDefaultSize: HarnessMonitorUITestWindowDefaults.mainWindowSize(
         environment: resolvedEnvironment,
         isUITesting: isUITesting

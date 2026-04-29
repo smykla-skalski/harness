@@ -199,6 +199,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return .acp(snapshot)
   }
 
+  public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
+    await state.acpInspect(sessionID: sessionID)
+  }
+
   public func resolveCodexApproval(
     runID: String,
     approvalID: String,

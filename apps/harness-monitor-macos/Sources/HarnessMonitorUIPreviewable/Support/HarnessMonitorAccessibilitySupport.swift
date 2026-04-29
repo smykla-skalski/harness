@@ -94,6 +94,11 @@ public struct AccessibilityTextMarker: View {
   }
 }
 
+public enum HarnessMonitorAccessibilityLiveRegion {
+  case polite
+  case assertive
+}
+
 private struct AccessibilityFrameMarkerModifier: ViewModifier {
   let identifier: String
 
@@ -131,6 +136,12 @@ private struct AccessibilityProbeModifier: ViewModifier {
 }
 
 extension View {
+  public func accessibilityLiveRegion(
+    _ region: HarnessMonitorAccessibilityLiveRegion
+  ) -> some View {
+    speechAnnouncementsQueued(region == .polite)
+  }
+
   public func accessibilityFrameMarker(_ identifier: String) -> some View {
     modifier(AccessibilityFrameMarkerModifier(identifier: identifier))
   }

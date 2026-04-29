@@ -88,6 +88,18 @@ final class PreferencesSupervisorNotificationsViewModelTests: XCTestCase {
     }
   }
 
+  func test_verboseToolCallAnnouncementsDefaultAndPersistence() {
+    let userDefaults = makeUserDefaults()
+    let viewModel = PreferencesSupervisorNotificationsViewModel(userDefaults: userDefaults)
+
+    XCTAssertFalse(viewModel.verboseToolCallAnnouncementsEnabled)
+
+    viewModel.setVerboseToolCallAnnouncementsEnabled(true)
+
+    let reloaded = PreferencesSupervisorNotificationsViewModel(userDefaults: userDefaults)
+    XCTAssertTrue(reloaded.verboseToolCallAnnouncementsEnabled)
+  }
+
   private func makeUserDefaults() -> UserDefaults {
     let suiteName = "PreferencesSupervisorNotificationsViewModelTests.\(UUID().uuidString)"
     let userDefaults = UserDefaults(suiteName: suiteName)!

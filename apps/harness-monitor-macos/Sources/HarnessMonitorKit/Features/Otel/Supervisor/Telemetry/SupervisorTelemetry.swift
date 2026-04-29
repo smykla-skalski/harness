@@ -1,5 +1,4 @@
 import Foundation
-
 import OpenTelemetryApi
 
 /// Span-name constants and telemetry accessors for the Monitor supervisor loop. Phase 1 ships

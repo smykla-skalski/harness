@@ -195,6 +195,12 @@ extension HarnessMonitorStore {
           }
           _ = await self.refreshAcpAgents(using: client, sessionID: sessionID)
         }
+        group.addTask { [weak self] in
+          guard let self, !Task.isCancelled else {
+            return
+          }
+          _ = await self.refreshAcpInspect(using: client, sessionID: sessionID)
+        }
       }
 
       guard !Task.isCancelled, self.isCurrentSessionLoad(requestID, sessionID: sessionID) else {

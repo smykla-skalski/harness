@@ -53,7 +53,8 @@ struct AgentsSidebar: View {
       if !externalAgents.isEmpty {
         Section("Agents") {
           ForEach(externalAgents) { agent in
-            let pendingDecisionBadgeID = HarnessMonitorAccessibility
+            let pendingDecisionBadgeID =
+              HarnessMonitorAccessibility
               .agentPendingDecisionBadge(agent.agentId)
             let pendingDecisionAttention = pendingDecisionAttention[agent.agentId]
             if let attention = pendingDecisionAttention {

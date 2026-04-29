@@ -2,6 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
+
 struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
@@ -39,51 +40,51 @@ struct HarnessMonitorWindowRootView: View {
 
   var body: some View {
     rootContent
-    .writingToolsBehavior(.disabled)
-    .frame(minWidth: 900, minHeight: 600)
-    .modifier(
-      OptionalInstantFocusRingModifier(
-        isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+      .writingToolsBehavior(.disabled)
+      .frame(minWidth: 900, minHeight: 600)
+      .modifier(
+        OptionalInstantFocusRingModifier(
+          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+        )
       )
-    )
-    .modifier(
-      HarnessMonitorSceneAppearanceModifier(
-        themeMode: $themeMode,
-        appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
+      .modifier(
+        HarnessMonitorSceneAppearanceModifier(
+          themeMode: $themeMode,
+          appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
+        )
       )
-    )
-    .modifier(PinchToZoomTextSizeModifier())
-    .modifier(
-      HarnessMonitorWindowBackdropModifier(
-        mode: backdropMode,
-        backgroundImage: backgroundImage
+      .modifier(PinchToZoomTextSizeModifier())
+      .modifier(
+        HarnessMonitorWindowBackdropModifier(
+          mode: backdropMode,
+          backgroundImage: backgroundImage
+        )
       )
-    )
-    .modifier(
-      WindowCommandScopeTrackingModifier(
-        scope: .main,
-        routingState: windowCommandRouting
+      .modifier(
+        WindowCommandScopeTrackingModifier(
+          scope: .main,
+          routingState: windowCommandRouting
+        )
       )
-    )
-    .modifier(HarnessMonitorUITestAnimationModifier())
-    .acpPermissionAttentionScene(
-      store: store,
-      notifications: notifications,
-      attentionState: acpAttentionState,
-      windowID: HarnessMonitorWindowID.main
-    )
-    .modifier(SupervisorUITestForceTickModifier(store: store))
-    .task(id: shouldShowBootstrapPlaceholder) {
-      await bootstrapDeferredContentIfNeeded()
-    }
-    .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
-      guard requestID != handledSettingsOpenRequestID else {
-        return
+      .modifier(HarnessMonitorUITestAnimationModifier())
+      .acpPermissionAttentionScene(
+        store: store,
+        notifications: notifications,
+        attentionState: acpAttentionState,
+        windowID: HarnessMonitorWindowID.main
+      )
+      .modifier(SupervisorUITestForceTickModifier(store: store))
+      .task(id: shouldShowBootstrapPlaceholder) {
+        await bootstrapDeferredContentIfNeeded()
       }
-      handledSettingsOpenRequestID = requestID
-      preferencesSelectedSection = .notifications
-      openWindow(id: HarnessMonitorWindowID.preferences)
-    }
+      .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
+        guard requestID != handledSettingsOpenRequestID else {
+          return
+        }
+        handledSettingsOpenRequestID = requestID
+        preferencesSelectedSection = .notifications
+        openWindow(id: HarnessMonitorWindowID.preferences)
+      }
   }
 
   @ViewBuilder private var rootContent: some View {
@@ -413,9 +414,11 @@ final class AcpPermissionAttentionState {
       self.activeToast = nil
     }
 
-    guard let nextAttention = store.acpPermissionAttentionEvents.first(where: {
-      !handledBatchIDs.contains($0.batchID) && !deliveringBatchIDs.contains($0.batchID)
-    }) else {
+    guard
+      let nextAttention = store.acpPermissionAttentionEvents.first(where: {
+        !handledBatchIDs.contains($0.batchID) && !deliveringBatchIDs.contains($0.batchID)
+      })
+    else {
       return
     }
 
@@ -565,7 +568,8 @@ final class AcpPermissionAttentionState {
   private static func decisionsWindow() -> NSWindow? {
     NSApplication.shared.windows.first { window in
       let identifier = window.identifier?.rawValue ?? ""
-      return KeyWindowObserver.matchesWindowID(identifier, expected: HarnessMonitorWindowID.decisions)
+      return KeyWindowObserver.matchesWindowID(
+        identifier, expected: HarnessMonitorWindowID.decisions)
     }
   }
 
@@ -636,15 +640,13 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
           )
           .padding(.top, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingLG)
-          .transition(
-            reduceMotion
-              ? .opacity
-              : .move(edge: .top).combined(with: .opacity)
-          )
+          .allowsHitTesting(true)
+          .zIndex(1_000)
+          .transition(AcpPermissionAttentionMotionPolicy.transition(reduceMotion: reduceMotion))
         }
       }
       .animation(
-        reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.18),
+        AcpPermissionAttentionMotionPolicy.animation(reduceMotion: reduceMotion),
         value: attentionState.activeToast?.batchID
       )
       .overlay {
@@ -664,6 +666,21 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
           openWindow: openWindow
         )
       }
+  }
+}
+
+enum AcpPermissionAttentionMotionPolicy {
+  static func transition(reduceMotion: Bool) -> AnyTransition {
+    reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity)
+  }
+
+  static func animation(reduceMotion: Bool) -> Animation? {
+    reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.18)
+  }
+
+  static func markerText(reduceMotion: Bool) -> String {
+    reduceMotion
+      ? "transition=opacity animation=none" : "transition=move-top-opacity animation=spring"
   }
 }
 

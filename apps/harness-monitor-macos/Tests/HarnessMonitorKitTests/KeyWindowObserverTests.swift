@@ -27,6 +27,27 @@ struct KeyWindowObserverTests {
     )
   }
 
+  @Test("snapshot prefers background delivery when windows cannot receive focus")
+  func snapshotPrefersBackgroundDeliveryForMissingFocusableWindows() {
+    #expect(
+      KeyWindowSnapshot(
+        keyWindowIdentifier: "main",
+        isAppActive: true,
+        appIsHidden: false,
+        hasVisibleNonMiniaturizedWindows: false
+      ).prefersUserNotificationDelivery
+    )
+
+    #expect(
+      KeyWindowSnapshot(
+        keyWindowIdentifier: nil,
+        isAppActive: true,
+        appIsHidden: false,
+        hasVisibleNonMiniaturizedWindows: true
+      ).prefersUserNotificationDelivery
+    )
+  }
+
   @Test("observer refreshes from window lifecycle notifications")
   func observerRefreshesFromNotifications() {
     let notificationCenter = NotificationCenter()
