@@ -25,7 +25,11 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionsWindow = "harness.decisions.window"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"
+  static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
   static let decisionDetailTabs = "harness.decisions.detail.tabs"
+  static let decisionAcpPanel = "harness.decisions.context.acp"
+  static let decisionAcpSelectionSummary = "harness.decisions.context.acp.selection-summary"
+  static let decisionAcpError = "harness.decisions.context.acp.error"
   static let decisionAuditTrail = "harness.decisions.audit"
   static let decisionInspector = "harness.decisions.inspector"
   static let decisionInspectorMetadata = "harness.decisions.inspector.metadata"
@@ -35,11 +39,19 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
   static let decisionsObserverPanel = "harness.decisions.observer.panel"
   static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"
+  static let acpPermissionModal = "harness.acp-permission.modal"
+  static let acpPermissionModalSelectionSummary = "harness.acp-permission.selection-summary"
   static func decisionRow(_ id: String) -> String {
     "harness.decisions.row.\(slug(id))"
   }
   static func decisionAction(_ id: String) -> String {
     "harness.decisions.action.\(slug(id))"
+  }
+  static func decisionAcpRequest(_ id: String) -> String {
+    "harness.decisions.context.acp.request.\(slug(id))"
+  }
+  static func acpPermissionModalItem(_ id: String) -> String {
+    "harness.acp-permission.item.\(slug(id))"
   }
   static let sessionHeaderCard = "harness.session.header"
   static let sessionHeaderCardFrame = "harness.session.header.frame"
@@ -124,6 +136,7 @@ enum HarnessMonitorUITestAccessibility {
   static let preferencesGeneralSection = "harness.preferences.section.general"
   static let preferencesAppearanceSection = "harness.preferences.section.appearance"
   static let preferencesNotificationsSection = "harness.preferences.section.notifications"
+  static let preferencesSupervisorSection = "harness.preferences.section.supervisor"
   static let preferencesVoiceSection = "harness.preferences.section.voice"
   static let preferencesConnectionSection = "harness.preferences.section.connection"
   static let preferencesDatabaseSection = "harness.preferences.section.database"
@@ -144,6 +157,9 @@ enum HarnessMonitorUITestAccessibility {
     "harness.preferences.voice.pending-transcript-limit"
   static let preferencesVoiceStatus = "harness.preferences.voice.status"
   static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
+  static let preferencesAcpNotificationStatus = "harness.preferences.acp.status"
+  static let preferencesAcpNotificationStatusState = "harness.preferences.acp.status.state"
+  static let preferencesAcpOpenSystemSettings = "harness.preferences.acp.open-system-settings"
   static let preferencesNotificationsPresetPicker = "harness.preferences.notifications.preset"
   static let preferencesNotificationsCategoryPicker = "harness.preferences.notifications.category"
   static let preferencesNotificationsSoundPicker = "harness.preferences.notifications.sound"
@@ -187,6 +203,11 @@ enum HarnessMonitorUITestAccessibility {
   static let actionToast = "harness.action-toast"
   static let actionToastFrame = "harness.action-toast.frame"
   static let actionToastCloseButton = "harness.action-toast.close"
+  static let acpPermissionToast = "harness.acp-permission.toast"
+  static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"
+  static let acpPermissionToastState = "harness.acp-permission.toast.state"
+  static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
+  static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"
   static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"
   static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
@@ -215,7 +236,10 @@ enum HarnessMonitorUITestAccessibility {
   static func newSessionCapabilityProbe(_ identifier: String) -> String {
     "harness.new-session.capability.\(slug(identifier)).probe"
   }
-  static func newSessionCapabilityTransportButton(_ identifier: String, transportID: String) -> String {
+  static func newSessionCapabilityTransportButton(
+    _ identifier: String,
+    transportID: String
+  ) -> String {
     "harness.new-session.capability.\(slug(identifier)).transport.\(slug(transportID))"
   }
   static let voiceInputPopover = "harness.voice-input.popover"

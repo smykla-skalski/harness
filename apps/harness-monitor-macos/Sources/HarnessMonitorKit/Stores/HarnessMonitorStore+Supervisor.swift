@@ -99,6 +99,11 @@ extension HarnessMonitorStore {
     supervisorObserverFocusTick &+= 1
   }
 
+  public func requestPrimaryDecisionActionFocus(decisionID: String) {
+    supervisorPrimaryActionFocusDecisionID = decisionID
+    supervisorPrimaryActionFocusRequestTick &+= 1
+  }
+
   public var isSupervisorRunInBackgroundEnabled: Bool {
     let storedValue =
       UserDefaults.standard.object(
@@ -267,6 +272,7 @@ extension HarnessMonitorStore {
     supervisorToolbarSlice.stop()
     supervisorOpenDecisions = []
     supervisorSelectedDecisionID = nil
+    supervisorPrimaryActionFocusDecisionID = nil
     supervisorBindings.pendingDecisionsBadgeSync?(0)
     if let controller = supervisorBindings.notificationController {
       await controller.resetBadge()

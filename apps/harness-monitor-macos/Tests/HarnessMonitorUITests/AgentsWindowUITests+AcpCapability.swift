@@ -86,22 +86,69 @@ extension AgentsWindowUITests {
     )
     openAgentsWindow(in: app)
 
-    let modal = element(in: app, identifier: "harness.acp-permission.modal")
+    let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
     XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
-    XCTAssertTrue(app.staticTexts["2 of 2 selected"].exists)
     XCTAssertTrue(
-      element(in: app, identifier: "harness.acp-permission.item.preview-request-write").exists
+      waitForElement(button(in: app, title: "Approve Selected"), timeout: Self.actionTimeout)
     )
     XCTAssertTrue(
-      element(in: app, identifier: "harness.acp-permission.item.preview-request-terminal").exists
+      waitForElement(
+        element(in: app, identifier: Accessibility.acpPermissionModalItem("preview-request-write")),
+        timeout: Self.actionTimeout
+      )
+    )
+    XCTAssertTrue(
+      waitForElement(
+        element(
+          in: app,
+          identifier: Accessibility.acpPermissionModalItem("preview-request-terminal")
+        ),
+        timeout: Self.actionTimeout
+      )
+    )
+  }
+
+  func testDecisionPanelAndModalShareSelectionState() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1",
+        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
+      ]
     )
 
-    tapButton(in: app, title: "Approve Selected")
+    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+
+    let acpDecisionID = "acp-permission:preview-acp-permission-1"
+    let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+    XCTAssertTrue(waitForElement(decisionRow, timeout: Self.uiTimeout))
+    tapButton(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+
+    let acpPanel = element(in: app, identifier: Accessibility.decisionAcpPanel)
+    XCTAssertTrue(waitForElement(acpPanel, timeout: Self.actionTimeout))
+
+    let terminalToggle = element(
+      in: app,
+      identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
+    )
+    XCTAssertTrue(waitForElement(terminalToggle, timeout: Self.actionTimeout))
+    tapElement(in: app, identifier: Accessibility.decisionAcpRequest("preview-request-terminal"))
+
+    let selectionSummary = element(in: app, identifier: Accessibility.decisionAcpSelectionSummary)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        !modal.exists
+        selectionSummary.exists && selectionSummary.label.contains("1 of 2 selected")
+      }
+    )
+
+    openAgentsWindow(in: app)
+
+    let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
+    XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        selectionSummary.exists && selectionSummary.label.contains("1 of 2 selected")
       },
-      "Approving the coalesced batch should resolve and dismiss the modal"
+      "The legacy ACP modal should mirror the shared selection state from the Decisions window"
     )
   }
 }
