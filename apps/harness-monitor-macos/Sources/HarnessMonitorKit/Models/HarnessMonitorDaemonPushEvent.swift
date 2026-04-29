@@ -219,6 +219,12 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   }
 }
 
+/// Authoritative ACP agent snapshot set for one session.
+///
+/// UI-0 contract: this payload already exists in-tree and is the authoritative replacement source
+/// for selected-session ACP state. Future Decisions-window integration may change presentation,
+/// but it must continue to treat reconcile pushes as snapshot authority rather than a second queue
+/// alongside incremental permission events.
 public struct AcpAgentsReconciledPayload: Codable, Equatable, Sendable {
   public let sessionId: String
   public let agents: [AcpAgentSnapshot]

@@ -176,6 +176,15 @@ public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
   public let extensionsPending: Bool?
 }
 
+/// Wire-format ACP event envelope received from the daemon.
+///
+/// UI-0 contract:
+/// - This payload is already the canonical daemon boundary for ACP timeline updates; the planned
+///   UI-7 coalescer is strictly an in-process Swift concern and must not require a wire change.
+/// - `rawCount` records how many upstream daemon events were folded into this push so overflow
+///   logs can describe loss in terms of dropped raw events instead of opaque UI rows.
+/// - `events` preserve daemon emission order. Any future coalescer may drop oldest entries under
+///   pressure, but retained entries must keep this relative order.
 public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
   public let acpId: String
   public let sessionId: String
@@ -218,6 +227,11 @@ public struct AcpConversationEvent: Codable, Equatable, Sendable {
 }
 
 extension AcpEventBatchPayload {
+  /// Materialise timeline rows from the raw daemon payload without mutating ordering semantics.
+  ///
+  /// UI-0 contract: this transform is payload-only. Any future buffering, overflow, or
+  /// `drop-oldest` policy belongs after decode and before store mutation so the wire contract
+  /// stays stable across UI-only refactors.
   public func timelineEntries(fallbackRecordedAt: String) -> [TimelineEntry] {
     events
       .filter { $0.sessionId == sessionId }
