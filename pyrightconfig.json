@@ -1,0 +1,22 @@
+{
+  "include": [
+    "scripts",
+    "agents/shared",
+    "resources/observability",
+    "apps/harness-monitor-macos/Scripts"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "target",
+    "xcode-derived",
+    "xcode-derived-e2e",
+    "xcode-derived-instruments",
+    "tmp",
+    "output",
+    "vendor",
+    "apps/harness-monitor-macos/Tuist",
+    "apps/harness-monitor-macos/build",
+    "apps/harness-monitor-macos/tmp",
+    "apps/harness-monitor-macos/xcode-derived"
+  ]
+}

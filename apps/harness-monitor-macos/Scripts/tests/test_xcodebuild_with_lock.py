@@ -161,6 +161,7 @@ shift
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -228,6 +229,7 @@ shift
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -265,6 +267,85 @@ shift
             self.assertFalse(lock_owner_file.exists(), "wrapper must release shared lease owner metadata on termination")
             with self.assertRaises(ProcessLookupError):
                 os.kill(child_pid, 0)
+
+    def test_records_xcodebuild_child_as_mutator_when_tuist_stays_alive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            child_pid_path = temp_root / "child.pid"
+            tuist_pid_path = temp_root / "tuist.pid"
+
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "$$" > "{child_pid_path}"
+trap 'exit 0' TERM INT HUP
+while true; do
+  sleep 1
+done
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "$$" > "{tuist_pid_path}"
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@" &
+child_pid="$!"
+wait "$child_pid"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
+                }
+            )
+
+            process = subprocess.Popen(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+
+            runtime_file = derived_data_path / ".xcodebuild.lock" / "owner" / "runtime.env"
+            self.wait_for_path(runtime_file)
+            self.wait_for_path(child_pid_path)
+            self.wait_for_path(tuist_pid_path)
+
+            child_pid = child_pid_path.read_text().strip()
+            tuist_pid = tuist_pid_path.read_text().strip()
+            runtime_text = runtime_file.read_text()
+
+            self.assertIn(f"LOCK_MUTATOR_PID={child_pid}", runtime_text)
+            self.assertNotIn(f"LOCK_MUTATOR_PID={tuist_pid}", runtime_text)
+
+            process.send_signal(signal.SIGTERM)
+            process.communicate(timeout=10)
 
     def test_reports_lock_owner_while_waiting_for_shared_derived_data(self) -> None:
         sleeper = subprocess.Popen(["/bin/sleep", "10"])

@@ -12,6 +12,13 @@ if [[ -z "${STALE_SCAN_ROOT:-}" ]]; then
   return 1
 fi
 
+STALE_SCAN_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$STALE_SCAN_LIB_DIR/common-repo-root.sh"
+# shellcheck source=scripts/lib/process-state.sh
+source "$STALE_SCAN_LIB_DIR/process-state.sh"
+STALE_SCAN_COMMON_REPO_ROOT="${STALE_SCAN_COMMON_REPO_ROOT:-$(resolve_common_repo_root "$STALE_SCAN_ROOT")}"
+
 # shellcheck disable=SC2034  # consumed by scripts that source this lib
 readonly STALE_SCAN_APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
 # shellcheck disable=SC2034  # consumed by scripts that source this lib
@@ -159,10 +166,18 @@ stale_scan_process_cwd() {
   lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
 }
 
-# Gate-helper pids whose cwd is inside STALE_SCAN_ROOT and which are not in
-# the reference_pid's ancestor chain (so we never flag ourselves).
+# Gate-helper pids whose cwd is in the same common-root domain and which are
+# not in the reference_pid's ancestor chain (so we never flag ourselves).
 # All membership checks use herestrings to avoid `printf | grep -q` SIGPIPE
 # races under pipefail.
+stale_scan_process_in_common_repo_root() {
+  local path="$1"
+  local path_common_root
+  [[ -n "$path" ]] || return 1
+  path_common_root="$(resolve_common_repo_root "$path" 2>/dev/null || true)"
+  [[ -n "$path_common_root" && "$path_common_root" == "$STALE_SCAN_COMMON_REPO_ROOT" ]]
+}
+
 stale_scan_repo_gate_pids() {
   local reference_pid="${1:-$$}"
   local current_lineage pid cwd
@@ -174,16 +189,80 @@ stale_scan_repo_gate_pids() {
       continue
     fi
     cwd="$(stale_scan_process_cwd "$pid")"
-    if [[ "$cwd" == "$STALE_SCAN_ROOT" || "$cwd" == "$STALE_SCAN_ROOT/"* ]]; then
+    if stale_scan_process_in_common_repo_root "$cwd"; then
       echo "$pid"
     fi
   done < <(stale_scan_matching_pids gate)
 }
 
-# All stale /tmp bridge artifacts (.sock, .pid, .lock siblings).
+stale_scan_metadata_value() {
+  local metadata_file="$1"
+  local key="$2"
+  [[ -f "$metadata_file" ]] || return 1
+  sed -n "s/^${key}=//p" "$metadata_file" | head -n 1
+}
+
+stale_scan_lock_process_alive_from_file() {
+  local metadata_file="$1"
+  local pid_key="$2"
+  local start_key="$3"
+  local command_key="$4"
+  local process_pid process_start process_command
+
+  process_pid="$(stale_scan_metadata_value "$metadata_file" "$pid_key" || true)"
+  [[ "$process_pid" =~ ^[0-9]+$ ]] || return 1
+  process_start="$(stale_scan_metadata_value "$metadata_file" "$start_key" || true)"
+  process_command="$(stale_scan_metadata_value "$metadata_file" "$command_key" || true)"
+  process_state_identity_matches "$process_pid" "$process_start" "$process_command"
+}
+
+stale_scan_xcodebuild_lock_has_live_work() {
+  local lock_path="$1"
+  local owner_file="$lock_path/owner/lease.env"
+  local runtime_file="$lock_path/owner/runtime.env"
+  local local_hostname owner_hostname runtime_hostname
+
+  local_hostname="$(process_state_hostname)"
+  owner_hostname="$(stale_scan_metadata_value "$owner_file" LOCK_HOSTNAME || true)"
+  runtime_hostname="$(stale_scan_metadata_value "$runtime_file" LOCK_HOSTNAME || true)"
+
+  if [[ -n "$owner_hostname" && "$owner_hostname" != "$local_hostname" ]]; then
+    return 0
+  fi
+  if [[ -n "$runtime_hostname" && "$runtime_hostname" != "$local_hostname" ]]; then
+    return 0
+  fi
+
+  if stale_scan_lock_process_alive_from_file \
+      "$owner_file" \
+      LOCK_PID \
+      LOCK_PROCESS_START \
+      LOCK_COMMAND; then
+    return 0
+  fi
+
+  stale_scan_lock_process_alive_from_file \
+    "$runtime_file" \
+    LOCK_MUTATOR_PID \
+    LOCK_MUTATOR_PROCESS_START \
+    LOCK_MUTATOR_COMMAND
+}
+
+# All stale bridge artifacts (.sock, .pid, .lock siblings). Production scans
+# /tmp; tests may override the root to avoid ambient host cleanup races.
+stale_scan_tmp_bridge_root() {
+  printf '%s\n' "${HARNESS_STALE_SCAN_TMP_ROOT:-/tmp}"
+}
+
 stale_scan_tmp_bridge_artifacts() {
+  local bridge_tmp_root
+  bridge_tmp_root="$(stale_scan_tmp_bridge_root)"
   shopt -s nullglob
-  local artifacts=(/tmp/h-bridge-*.sock /tmp/h-bridge-*.pid /tmp/h-bridge-*.lock)
+  local artifacts=(
+    "$bridge_tmp_root"/h-bridge-*.sock
+    "$bridge_tmp_root"/h-bridge-*.pid
+    "$bridge_tmp_root"/h-bridge-*.lock
+  )
   shopt -u nullglob
   (( ${#artifacts[@]} == 0 )) && return 0
   printf '%s\n' "${artifacts[@]}"

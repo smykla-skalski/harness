@@ -19,13 +19,18 @@ if [[ -z "${LEASE_LOCK_RESOURCE:-}" ]]; then
   return 1
 fi
 
+LEASE_LOCK_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/process-state.sh
+source "$LEASE_LOCK_LIB_DIR/process-state.sh"
 LEASE_LOCK_HEARTBEAT_SECONDS="${LEASE_LOCK_HEARTBEAT_SECONDS:-30}"
 LEASE_LOCK_TIMEOUT_SECONDS="${LEASE_LOCK_TIMEOUT_SECONDS:-90}"
 LEASE_LOCK_POLL_SECONDS="${LEASE_LOCK_POLL_SECONDS:-1}"
-LEASE_LOCK_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LEASE_LOCK_OWNER_STALE_AFTER_SECONDS="${LEASE_LOCK_OWNER_STALE_AFTER_SECONDS:-$LEASE_LOCK_TIMEOUT_SECONDS}"
+LEASE_LOCK_WAITER_TIMEOUT_SECONDS="${LEASE_LOCK_WAITER_TIMEOUT_SECONDS:-$((LEASE_LOCK_OWNER_STALE_AFTER_SECONDS + LEASE_LOCK_POLL_SECONDS + 1))}"
 LEASE_LOCK_OWNER_DIR="$LEASE_LOCK_DIR/owner"
 LEASE_LOCK_OWNER_FILE="$LEASE_LOCK_OWNER_DIR/lease.env"
 LEASE_LOCK_OWNER_HEARTBEAT_FILE="$LEASE_LOCK_OWNER_DIR/heartbeat"
+LEASE_LOCK_OWNER_RUNTIME_FILE="$LEASE_LOCK_OWNER_DIR/runtime.env"
 LEASE_LOCK_WAITERS_DIR="$LEASE_LOCK_DIR/waiters"
 LEASE_LOCK_WAITER_ID="${LEASE_LOCK_WAITER_ID:-$$}"
 LEASE_LOCK_HEARTBEAT_HELPER="$LEASE_LOCK_LIB_DIR/lease-lock-heartbeat.sh"
@@ -38,7 +43,7 @@ LEASE_LOCK_OWNS_LOCK=0
 LEASE_LOCK_REGISTERED_WAITER=0
 
 lease_lock_hostname() {
-  /bin/hostname
+  process_state_hostname
 }
 
 lease_lock_agent_id() {
@@ -60,12 +65,17 @@ lease_lock_agent_id() {
 lease_lock_command_string() {
   local target_pid="${1:-$$}"
   local command_string
-  command_string="$(ps -p "$target_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
+  command_string="$(process_state_command_string "$target_pid" || true)"
   if [[ -n "$command_string" ]]; then
-    printf '%s\n' "$command_string" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//'
+    printf '%s\n' "$command_string"
     return 0
   fi
   printf '%s\n' "${0##*/}"
+}
+
+lease_lock_process_start_string() {
+  local target_pid="${1:-$$}"
+  process_state_start_string "$target_pid"
 }
 
 lease_lock_now_epoch() {
@@ -80,7 +90,7 @@ lease_lock_next_due_epoch() {
 lease_lock_is_expired_epoch() {
   local last_heartbeat_epoch="$1"
   local now_epoch="$2"
-  (( now_epoch - last_heartbeat_epoch > LEASE_LOCK_TIMEOUT_SECONDS ))
+  (( now_epoch - last_heartbeat_epoch > LEASE_LOCK_OWNER_STALE_AFTER_SECONDS ))
 }
 
 lease_lock_atomic_write_file() {
@@ -98,6 +108,10 @@ lease_lock_write_metadata_file() {
   local last_heartbeat_epoch="$4"
   local next_due_epoch="$5"
   local state="$6"
+  local process_pid process_start
+
+  process_pid="${LEASE_LOCK_PROCESS_PID:-$$}"
+  process_start="$(lease_lock_process_start_string "$process_pid" || true)"
 
   lease_lock_atomic_write_file "$target_path" <<EOF
 LOCK_PROTOCOL_VERSION=1
@@ -105,17 +119,52 @@ LOCK_RESOURCE=${LEASE_LOCK_RESOURCE}
 LOCK_ROLE=${role}
 LOCK_OWNER_ID=${owner_id}
 LOCK_AGENT_ID=$(lease_lock_agent_id)
-LOCK_PID=${LEASE_LOCK_PROCESS_PID:-$$}
+LOCK_PID=${process_pid}
 LOCK_HOSTNAME=$(lease_lock_hostname)
 LOCK_REPO_ROOT=${PWD}
-LOCK_COMMAND=$(lease_lock_command_string)
+LOCK_COMMAND=$(lease_lock_command_string "$process_pid")
+LOCK_PROCESS_START=${process_start}
 LOCK_ACQUIRED_AT_EPOCH=${LEASE_LOCK_ACQUIRED_AT_EPOCH:-$last_heartbeat_epoch}
 LOCK_HEARTBEAT_EVERY_SEC=${LEASE_LOCK_HEARTBEAT_SECONDS}
-LOCK_LEASE_TIMEOUT_SEC=${LEASE_LOCK_TIMEOUT_SECONDS}
+LOCK_OWNER_STALE_AFTER_SEC=${LEASE_LOCK_OWNER_STALE_AFTER_SECONDS}
+LOCK_WAITER_TIMEOUT_SEC=${LEASE_LOCK_WAITER_TIMEOUT_SECONDS}
+LOCK_LEASE_TIMEOUT_SEC=${LEASE_LOCK_OWNER_STALE_AFTER_SECONDS}
 LOCK_LAST_HEARTBEAT_EPOCH=${last_heartbeat_epoch}
 LOCK_NEXT_HEARTBEAT_DUE_EPOCH=${next_due_epoch}
 LOCK_STATE=${state}
 EOF
+}
+
+lease_lock_metadata_value_from_file() {
+  local metadata_file="$1"
+  local key="$2"
+  [[ -f "$metadata_file" ]] || return 1
+  sed -n "s/^${key}=//p" "$metadata_file" | head -n 1
+}
+
+lease_lock_write_runtime_metadata_file() {
+  local mutator_pid="$1"
+  local mutator_command mutator_process_start
+
+  [[ "$mutator_pid" =~ ^[0-9]+$ ]] || return 1
+  mutator_command="$(lease_lock_command_string "$mutator_pid")"
+  mutator_process_start="$(lease_lock_process_start_string "$mutator_pid" || true)"
+
+  lease_lock_atomic_write_file "$LEASE_LOCK_OWNER_RUNTIME_FILE" <<EOF
+LOCK_RUNTIME_VERSION=1
+LOCK_RESOURCE=${LEASE_LOCK_RESOURCE}
+LOCK_HOSTNAME=$(lease_lock_hostname)
+LOCK_COMMON_REPO_ROOT=${LEASE_LOCK_COMMON_REPO_ROOT:-}
+LOCK_MUTATOR_PID=${mutator_pid}
+LOCK_MUTATOR_COMMAND=${mutator_command}
+LOCK_MUTATOR_PROCESS_START=${mutator_process_start}
+EOF
+}
+
+lease_lock_record_mutator_process() {
+  local mutator_pid="$1"
+  (( LEASE_LOCK_OWNS_LOCK == 1 )) || return 1
+  lease_lock_write_runtime_metadata_file "$mutator_pid"
 }
 
 lease_lock_touch_heartbeat() {
@@ -151,6 +200,8 @@ lease_lock_start_heartbeat() {
     return 1
   fi
   env LEASE_LOCK_TIMEOUT_SECONDS="$LEASE_LOCK_TIMEOUT_SECONDS" \
+      LEASE_LOCK_OWNER_STALE_AFTER_SECONDS="$LEASE_LOCK_OWNER_STALE_AFTER_SECONDS" \
+      LEASE_LOCK_WAITER_TIMEOUT_SECONDS="$LEASE_LOCK_WAITER_TIMEOUT_SECONDS" \
     "$LEASE_LOCK_HEARTBEAT_HELPER" \
       "$process_pid" \
       "$LEASE_LOCK_HEARTBEAT_SECONDS" \
@@ -179,34 +230,62 @@ lease_lock_owner_last_heartbeat_epoch() {
 }
 
 lease_lock_owner_metadata_value() {
-  local key="$1"
-  [[ -f "$LEASE_LOCK_OWNER_FILE" ]] || return 1
-  sed -n "s/^${key}=//p" "$LEASE_LOCK_OWNER_FILE" | head -n 1
+  lease_lock_metadata_value_from_file "$LEASE_LOCK_OWNER_FILE" "$1"
+}
+
+lease_lock_owner_runtime_value() {
+  lease_lock_metadata_value_from_file "$LEASE_LOCK_OWNER_RUNTIME_FILE" "$1"
+}
+
+lease_lock_process_alive_from_file() {
+  local metadata_file="$1"
+  local pid_key="$2"
+  local start_key="$3"
+  local command_key="$4"
+  local process_pid process_start process_command
+
+  process_pid="$(lease_lock_metadata_value_from_file "$metadata_file" "$pid_key" || true)"
+  [[ "$process_pid" =~ ^[0-9]+$ ]] || return 1
+  process_start="$(lease_lock_metadata_value_from_file "$metadata_file" "$start_key" || true)"
+  process_command="$(lease_lock_metadata_value_from_file "$metadata_file" "$command_key" || true)"
+  process_state_identity_matches "$process_pid" "$process_start" "$process_command"
 }
 
 lease_lock_owner_process_alive() {
-  local owner_pid owner_hostname owner_command current_command
-  owner_pid="$(lease_lock_owner_metadata_value LOCK_PID || true)"
-  [[ "$owner_pid" =~ ^[0-9]+$ ]] || return 1
+  local owner_hostname runtime_hostname
 
   owner_hostname="$(lease_lock_owner_metadata_value LOCK_HOSTNAME || true)"
   if [[ -n "$owner_hostname" && "$owner_hostname" != "$(lease_lock_hostname)" ]]; then
-    return 1
+    return 0
   fi
 
-  kill -0 "$owner_pid" 2>/dev/null || return 1
+  if lease_lock_process_alive_from_file \
+      "$LEASE_LOCK_OWNER_FILE" \
+      LOCK_PID \
+      LOCK_PROCESS_START \
+      LOCK_COMMAND; then
+    return 0
+  fi
 
-  owner_command="$(lease_lock_owner_metadata_value LOCK_COMMAND || true)"
-  [[ -n "$owner_command" ]] || return 0
-  current_command="$(lease_lock_command_string "$owner_pid" || true)"
-  [[ -n "$current_command" && "$current_command" == "$owner_command" ]]
+  runtime_hostname="$(lease_lock_owner_runtime_value LOCK_HOSTNAME || true)"
+  if [[ -n "$runtime_hostname" && "$runtime_hostname" != "$(lease_lock_hostname)" ]]; then
+    return 0
+  fi
+
+  lease_lock_process_alive_from_file \
+    "$LEASE_LOCK_OWNER_RUNTIME_FILE" \
+    LOCK_MUTATOR_PID \
+    LOCK_MUTATOR_PROCESS_START \
+    LOCK_MUTATOR_COMMAND
 }
 
 lease_lock_owner_summary() {
+  local owner_summary mutator_pid mutator_command
+
   if [[ ! -f "$LEASE_LOCK_OWNER_FILE" ]]; then
     return 1
   fi
-  awk -F= '
+  owner_summary="$(awk -F= '
     /^LOCK_OWNER_ID=/ { owner_id = $2 }
     /^LOCK_AGENT_ID=/ { agent_id = $2 }
     /^LOCK_PID=/ { pid = $2 }
@@ -219,7 +298,19 @@ lease_lock_owner_summary() {
           owner_id, agent_id, pid, last, next_due, command
       }
     }
-  ' "$LEASE_LOCK_OWNER_FILE"
+  ' "$LEASE_LOCK_OWNER_FILE")"
+  [[ -n "$owner_summary" ]] || return 1
+
+  mutator_pid="$(lease_lock_owner_runtime_value LOCK_MUTATOR_PID || true)"
+  mutator_command="$(lease_lock_owner_runtime_value LOCK_MUTATOR_COMMAND || true)"
+  if [[ "$mutator_pid" =~ ^[0-9]+$ ]]; then
+    owner_summary="${owner_summary%$'\n'} mutator_pid=${mutator_pid}"
+    if [[ -n "$mutator_command" ]]; then
+      owner_summary="${owner_summary} mutator_command=${mutator_command}"
+    fi
+  fi
+
+  printf '%s\n' "$owner_summary"
 }
 
 lease_lock_waiter_count() {
@@ -364,7 +455,7 @@ lease_lock_acquire() {
     fi
 
     now_epoch="$(lease_lock_now_epoch)"
-    if (( now_epoch - started_at >= LEASE_LOCK_TIMEOUT_SECONDS )); then
+    if (( now_epoch - started_at >= LEASE_LOCK_WAITER_TIMEOUT_SECONDS )); then
       printf 'Timed out waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
       return 1
     fi
