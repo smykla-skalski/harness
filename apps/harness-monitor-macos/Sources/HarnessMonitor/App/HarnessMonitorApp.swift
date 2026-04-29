@@ -16,6 +16,7 @@ struct HarnessMonitorApp: App {
   private let defersInitialMainWindowContentUntilBootstrap: Bool
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
+  private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
   @State private var showOpenFolder = false
@@ -72,9 +73,13 @@ struct HarnessMonitorApp: App {
         return controller
       }()
     self.notificationController = notificationController
+    pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
     store.bindSupervisorNotifications(notificationController)
+    store.bindPendingDecisionsBadgeSync { [pendingDecisionsDockBadgeController] count in
+      pendingDecisionsDockBadgeController.sync(count: count)
+    }
     _store = State(initialValue: store)
     _agentsNavigationBridge = State(initialValue: AgentsWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
@@ -126,7 +131,7 @@ struct HarnessMonitorApp: App {
         store: store,
         displayState: store.commandsDisplayState
       )
-      WindowMenuCommands()
+      WindowMenuCommands(supervisorToolbarSlice: store.supervisorToolbarSlice)
     }
   }
 

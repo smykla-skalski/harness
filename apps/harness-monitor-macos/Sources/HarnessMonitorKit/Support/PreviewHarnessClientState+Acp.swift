@@ -71,21 +71,29 @@ extension PreviewHarnessClientState {
       ProcessInfo.processInfo.environment[
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
       ] == "1"
-    if seedsPermission, let sessionID = fallbackDetail?.session.sessionId {
+        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+    if seedsPermission,
+      let detail = fallbackDetail,
+      !detail.session.sessionId.isEmpty
+    {
+      let seededSnapshot = Self.seededAcpAgentSnapshot(
+        sessionID: detail.session.sessionId,
+        projectDir: detail.session.projectDir ?? "/Users/example/Projects/harness"
+      )
       return AcpAgentSnapshot(
-        acpId: agentID,
-        sessionId: sessionID,
-        agentId: "copilot",
-        displayName: "GitHub Copilot",
-        status: .active,
-        pid: 41_001,
-        pgid: 41_001,
-        projectDir: fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+        acpId: seededSnapshot.acpId,
+        sessionId: seededSnapshot.sessionId,
+        agentId: seededSnapshot.agentId,
+        displayName: seededSnapshot.displayName,
+        status: seededSnapshot.status,
+        pid: seededSnapshot.pid,
+        pgid: seededSnapshot.pgid,
+        projectDir: seededSnapshot.projectDir,
         pendingPermissions: 0,
-        permissionQueueDepth: 0,
+        permissionQueueDepth: seededSnapshot.permissionQueueDepth,
         pendingPermissionBatches: [],
-        terminalCount: 0,
-        createdAt: Self.mutationTimestamp,
+        terminalCount: seededSnapshot.terminalCount,
+        createdAt: seededSnapshot.createdAt,
         updatedAt: Self.mutationTimestamp
       )
     }
@@ -104,7 +112,9 @@ extension PreviewHarnessClientState {
     acpID: String
   ) -> [AcpPermissionBatch] {
     guard
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+          == "1"
     else {
       return []
     }

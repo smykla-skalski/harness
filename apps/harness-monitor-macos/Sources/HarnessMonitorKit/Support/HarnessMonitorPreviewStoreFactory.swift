@@ -111,14 +111,20 @@ public enum HarnessMonitorPreviewStoreFactory {
         .tuis
       store.selectedAgentTuis = sortedAgentTuis
       store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
-      if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-        == "1"
-      {
+      let seedsPendingAcp =
+        ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+          == "1"
+      if seedsPendingAcp {
         let pendingBatch = previewAcpPermissionBatch(sessionID: selectedSessionID)
         store.selectedAcpAgents = [
           previewAcpAgentSnapshot(sessionID: selectedSessionID, pendingBatch: pendingBatch)
         ]
-        store.presentingAcpPermissionBatch = pendingBatch
+        if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+          == "1"
+        {
+          store.presentingAcpPermissionBatch = pendingBatch
+        }
       }
     }
     store.isSelectionLoading = false
@@ -136,8 +142,8 @@ public enum HarnessMonitorPreviewStoreFactory {
     AcpAgentSnapshot(
       acpId: pendingBatch.acpId,
       sessionId: sessionID,
-      agentId: "copilot",
-      displayName: "GitHub Copilot",
+      agentId: "worker-codex",
+      displayName: "worker-codex",
       status: .active,
       pid: 41_001,
       pgid: 41_001,

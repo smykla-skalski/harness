@@ -148,6 +148,17 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return run
   }
 
+  public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
+    ManagedAgentListResponse(agents: await state.managedAgents(sessionID: sessionID))
+  }
+
+  public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    guard let snapshot = await state.managedAgent(agentID: agentID) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Managed agent unavailable.")
+    }
+    return snapshot
+  }
+
   public func startCodexRun(
     sessionID: String,
     request: CodexRunRequest

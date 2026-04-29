@@ -1,6 +1,8 @@
 extension HarnessMonitorAccessibility {
   public static let agentsWindow = "harness.agents.window"
   public static let agentsWindowDetailCard = "harness.agents.detail-card"
+  public static let agentsWindowDetailAwaitingDecisionState =
+    "harness.agents.detail.awaiting-decision.state"
   public static let agentsWindowDetailSignalCommand = "harness.agents.detail.signal-command"
   public static let agentsWindowDetailSignalMessage = "harness.agents.detail.signal-message"
   public static let agentsWindowDetailSignalAction = "harness.agents.detail.signal-action"
@@ -14,5 +16,17 @@ extension HarnessMonitorAccessibility {
 
   public static func agentTuiExternalTab(_ agentID: String) -> String {
     "harness.sheet.agent-tui.external-tab.\(slug(agentID))"
+  }
+
+  public static func agentPendingDecisionBadge(_ agentID: String) -> String {
+    "harness.sheet.agent-tui.pending-decision-badge.\(slug(agentID))"
+  }
+
+  public static func agentDetailAwaitingDecisionStrip(_ agentID: String) -> String {
+    "harness.agents.detail.awaiting-decision.\(slug(agentID))"
+  }
+
+  public static func agentDetailOpenDecisionsButton(_ agentID: String) -> String {
+    "harness.agents.detail.awaiting-decision.open.\(slug(agentID))"
   }
 }

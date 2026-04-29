@@ -407,13 +407,14 @@ func makeAcpPermissionBatch(
 func makeAcpSnapshot(
   acpID: String,
   sessionID: String,
+  agentID: String = "copilot",
   displayName: String = "Copilot",
   pendingBatches: [AcpPermissionBatch]
 ) -> AcpAgentSnapshot {
   AcpAgentSnapshot(
     acpId: acpID,
     sessionId: sessionID,
-    agentId: "copilot",
+    agentId: agentID,
     displayName: displayName,
     status: .active,
     pid: 12_345,

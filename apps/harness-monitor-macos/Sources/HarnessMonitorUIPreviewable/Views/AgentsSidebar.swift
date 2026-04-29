@@ -8,6 +8,8 @@ struct AgentsSidebar: View {
   let codexRuns: [CodexRunSnapshot]
   let codexTitlesByID: [String: String]
   let externalAgents: [AgentRegistration]
+  let pendingDecisionAttention: [String: AcpDecisionAttention]
+  let openPendingDecisions: (String) -> Void
   let tasks: [WorkItem]
   let refresh: () -> Void
   @Environment(\.fontScale)
@@ -51,29 +53,75 @@ struct AgentsSidebar: View {
       if !externalAgents.isEmpty {
         Section("Agents") {
           ForEach(externalAgents) { agent in
-            HStack(spacing: HarnessMonitorTheme.spacingSM) {
-              Image(systemName: "person.crop.circle")
-                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(agent.name)
-                  .scaledFont(.body)
-                Text("\(agent.runtime) • \(agent.role.title)")
-                  .scaledFont(.caption)
+            let pendingDecisionBadgeID = HarnessMonitorAccessibility
+              .agentPendingDecisionBadge(agent.agentId)
+            let pendingDecisionAttention = pendingDecisionAttention[agent.agentId]
+            if let attention = pendingDecisionAttention {
+              HStack(spacing: HarnessMonitorTheme.spacingSM) {
+                Image(systemName: "person.crop.circle")
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(agent.name)
+                    .scaledFont(.body)
+                  Text("\(agent.runtime) • \(agent.role.title)")
+                    .scaledFont(.caption)
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                }
+                Spacer(minLength: HarnessMonitorTheme.spacingSM)
+                AgentAttentionBadge(
+                  count: attention.count,
+                  accessibilityIdentifier: HarnessMonitorUITestEnvironment
+                    .accessibilityMarkersEnabled ? nil : pendingDecisionBadgeID
+                ) {
+                  openPendingDecisions(agent.agentId)
+                }
+                .harnessUITestValue(
+                  "count=\(attention.count) batch=\(attention.oldestBatchID)"
+                )
               }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .topTrailing) {
-              if agent.isAutoSpawned {
-                AutoSpawnedBadgeView(agentID: agent.agentId)
-                  .allowsHitTesting(false)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .overlay(alignment: .topTrailing) {
+                if agent.isAutoSpawned {
+                  AutoSpawnedBadgeView(agentID: agent.agentId)
+                    .allowsHitTesting(false)
+                }
               }
+              .padding(.vertical, rowPadding)
+              .tag(AgentTuiSheetSelection.agent(agent.agentId))
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
+              )
+              .accessibilityTestProbe(
+                pendingDecisionBadgeID,
+                label: "Pending decisions",
+                value: "count=\(attention.count) batch=\(attention.oldestBatchID)"
+              )
+            } else {
+              HStack(spacing: HarnessMonitorTheme.spacingSM) {
+                Image(systemName: "person.crop.circle")
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(agent.name)
+                    .scaledFont(.body)
+                  Text("\(agent.runtime) • \(agent.role.title)")
+                    .scaledFont(.caption)
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                }
+                Spacer(minLength: HarnessMonitorTheme.spacingSM)
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .overlay(alignment: .topTrailing) {
+                if agent.isAutoSpawned {
+                  AutoSpawnedBadgeView(agentID: agent.agentId)
+                    .allowsHitTesting(false)
+                }
+              }
+              .padding(.vertical, rowPadding)
+              .tag(AgentTuiSheetSelection.agent(agent.agentId))
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
+              )
             }
-            .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.agent(agent.agentId))
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
-            )
           }
         }
       }
