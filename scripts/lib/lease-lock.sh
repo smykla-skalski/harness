@@ -1,0 +1,374 @@
+#!/usr/bin/env bash
+# Shared lease/heartbeat lock helper for multi-agent local coordination.
+# Consumers must set:
+#   LEASE_LOCK_DIR       absolute path to the lock root
+#   LEASE_LOCK_RESOURCE  human-readable resource name
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  printf 'error: lease-lock.sh must be sourced, not executed directly\n' >&2
+  exit 1
+fi
+
+if [[ -z "${LEASE_LOCK_DIR:-}" ]]; then
+  printf 'error: LEASE_LOCK_DIR must be set before sourcing lease-lock.sh\n' >&2
+  return 1
+fi
+
+if [[ -z "${LEASE_LOCK_RESOURCE:-}" ]]; then
+  printf 'error: LEASE_LOCK_RESOURCE must be set before sourcing lease-lock.sh\n' >&2
+  return 1
+fi
+
+LEASE_LOCK_HEARTBEAT_SECONDS="${LEASE_LOCK_HEARTBEAT_SECONDS:-30}"
+LEASE_LOCK_TIMEOUT_SECONDS="${LEASE_LOCK_TIMEOUT_SECONDS:-90}"
+LEASE_LOCK_POLL_SECONDS="${LEASE_LOCK_POLL_SECONDS:-1}"
+LEASE_LOCK_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LEASE_LOCK_OWNER_DIR="$LEASE_LOCK_DIR/owner"
+LEASE_LOCK_OWNER_FILE="$LEASE_LOCK_OWNER_DIR/lease.env"
+LEASE_LOCK_OWNER_HEARTBEAT_FILE="$LEASE_LOCK_OWNER_DIR/heartbeat"
+LEASE_LOCK_WAITERS_DIR="$LEASE_LOCK_DIR/waiters"
+LEASE_LOCK_WAITER_ID="${LEASE_LOCK_WAITER_ID:-$$}"
+LEASE_LOCK_HEARTBEAT_HELPER="$LEASE_LOCK_LIB_DIR/lease-lock-heartbeat.sh"
+LEASE_LOCK_OWNER_ID=""
+LEASE_LOCK_WAITER_FILE="$LEASE_LOCK_WAITERS_DIR/${LEASE_LOCK_WAITER_ID}.env"
+LEASE_LOCK_HEARTBEAT_PID=""
+LEASE_LOCK_WAITER_HEARTBEAT_PID=""
+LEASE_LOCK_LAST_STARTED_HEARTBEAT_PID=""
+LEASE_LOCK_OWNS_LOCK=0
+LEASE_LOCK_REGISTERED_WAITER=0
+
+lease_lock_hostname() {
+  /bin/hostname
+}
+
+lease_lock_agent_id() {
+  if [[ -n "${HARNESS_AGENT_ID:-}" ]]; then
+    printf '%s\n' "$HARNESS_AGENT_ID"
+    return 0
+  fi
+  if [[ -n "${CODEX_SESSION_ID:-}" ]]; then
+    printf 'codex:%s\n' "$CODEX_SESSION_ID"
+    return 0
+  fi
+  if [[ -n "${CLAUDE_SESSION_ID:-}" ]]; then
+    printf 'claude:%s\n' "$CLAUDE_SESSION_ID"
+    return 0
+  fi
+  printf 'pid:%s@%s\n' "$$" "$(lease_lock_hostname)"
+}
+
+lease_lock_command_string() {
+  local target_pid="${1:-$$}"
+  local command_string
+  command_string="$(ps -p "$target_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
+  if [[ -n "$command_string" ]]; then
+    printf '%s\n' "$command_string" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//'
+    return 0
+  fi
+  printf '%s\n' "${0##*/}"
+}
+
+lease_lock_now_epoch() {
+  date +%s
+}
+
+lease_lock_next_due_epoch() {
+  local now_epoch="$1"
+  printf '%s\n' "$((now_epoch + LEASE_LOCK_HEARTBEAT_SECONDS))"
+}
+
+lease_lock_is_expired_epoch() {
+  local last_heartbeat_epoch="$1"
+  local now_epoch="$2"
+  (( now_epoch - last_heartbeat_epoch > LEASE_LOCK_TIMEOUT_SECONDS ))
+}
+
+lease_lock_atomic_write_file() {
+  local target_path="$1"
+  local temp_path
+  temp_path="${target_path}.tmp.$$"
+  /bin/cat >"$temp_path"
+  /bin/mv -f "$temp_path" "$target_path"
+}
+
+lease_lock_write_metadata_file() {
+  local target_path="$1"
+  local owner_id="$2"
+  local role="$3"
+  local last_heartbeat_epoch="$4"
+  local next_due_epoch="$5"
+  local state="$6"
+
+  lease_lock_atomic_write_file "$target_path" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=${LEASE_LOCK_RESOURCE}
+LOCK_ROLE=${role}
+LOCK_OWNER_ID=${owner_id}
+LOCK_AGENT_ID=$(lease_lock_agent_id)
+LOCK_PID=${LEASE_LOCK_PROCESS_PID:-$$}
+LOCK_HOSTNAME=$(lease_lock_hostname)
+LOCK_REPO_ROOT=${PWD}
+LOCK_COMMAND=$(lease_lock_command_string)
+LOCK_ACQUIRED_AT_EPOCH=${LEASE_LOCK_ACQUIRED_AT_EPOCH:-$last_heartbeat_epoch}
+LOCK_HEARTBEAT_EVERY_SEC=${LEASE_LOCK_HEARTBEAT_SECONDS}
+LOCK_LEASE_TIMEOUT_SEC=${LEASE_LOCK_TIMEOUT_SECONDS}
+LOCK_LAST_HEARTBEAT_EPOCH=${last_heartbeat_epoch}
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=${next_due_epoch}
+LOCK_STATE=${state}
+EOF
+}
+
+lease_lock_touch_heartbeat() {
+  local heartbeat_file="$1"
+  local metadata_file="$2"
+  local owner_id="$3"
+  local role="$4"
+  local state="$5"
+  local now_epoch next_due_epoch
+  now_epoch="$(lease_lock_now_epoch)"
+  next_due_epoch="$(lease_lock_next_due_epoch "$now_epoch")"
+  lease_lock_atomic_write_file "$heartbeat_file" <<EOF
+$now_epoch
+EOF
+  lease_lock_write_metadata_file \
+    "$metadata_file" \
+    "$owner_id" \
+    "$role" \
+    "$now_epoch" \
+    "$next_due_epoch" \
+    "$state"
+}
+
+lease_lock_start_heartbeat() {
+  local heartbeat_file="$1"
+  local metadata_file="$2"
+  local owner_id="$3"
+  local role="$4"
+  local state="$5"
+  local process_pid="${6:-$$}"
+  if [[ ! -x "$LEASE_LOCK_HEARTBEAT_HELPER" ]]; then
+    printf 'lease-lock heartbeat helper is not executable: %s\n' "$LEASE_LOCK_HEARTBEAT_HELPER" >&2
+    return 1
+  fi
+  env LEASE_LOCK_TIMEOUT_SECONDS="$LEASE_LOCK_TIMEOUT_SECONDS" \
+    "$LEASE_LOCK_HEARTBEAT_HELPER" \
+      "$process_pid" \
+      "$LEASE_LOCK_HEARTBEAT_SECONDS" \
+      "$heartbeat_file" \
+      "$metadata_file" \
+      "$owner_id" \
+      "$role" \
+      "$state" \
+      "$LEASE_LOCK_RESOURCE" \
+      "$process_pid" \
+      "${LEASE_LOCK_ACQUIRED_AT_EPOCH:-$(lease_lock_now_epoch)}" \
+      "$PWD" >/dev/null 2>&1 &
+  LEASE_LOCK_LAST_STARTED_HEARTBEAT_PID="$!"
+}
+
+lease_lock_owner_last_heartbeat_epoch() {
+  if [[ -f "$LEASE_LOCK_OWNER_HEARTBEAT_FILE" ]]; then
+    /bin/cat "$LEASE_LOCK_OWNER_HEARTBEAT_FILE" 2>/dev/null || true
+    return 0
+  fi
+  if [[ -f "$LEASE_LOCK_OWNER_FILE" ]]; then
+    sed -n 's/^LOCK_LAST_HEARTBEAT_EPOCH=//p' "$LEASE_LOCK_OWNER_FILE" | head -n 1
+    return 0
+  fi
+  return 1
+}
+
+lease_lock_owner_metadata_value() {
+  local key="$1"
+  [[ -f "$LEASE_LOCK_OWNER_FILE" ]] || return 1
+  sed -n "s/^${key}=//p" "$LEASE_LOCK_OWNER_FILE" | head -n 1
+}
+
+lease_lock_owner_process_alive() {
+  local owner_pid owner_hostname owner_command current_command
+  owner_pid="$(lease_lock_owner_metadata_value LOCK_PID || true)"
+  [[ "$owner_pid" =~ ^[0-9]+$ ]] || return 1
+
+  owner_hostname="$(lease_lock_owner_metadata_value LOCK_HOSTNAME || true)"
+  if [[ -n "$owner_hostname" && "$owner_hostname" != "$(lease_lock_hostname)" ]]; then
+    return 1
+  fi
+
+  kill -0 "$owner_pid" 2>/dev/null || return 1
+
+  owner_command="$(lease_lock_owner_metadata_value LOCK_COMMAND || true)"
+  [[ -n "$owner_command" ]] || return 0
+  current_command="$(lease_lock_command_string "$owner_pid" || true)"
+  [[ -n "$current_command" && "$current_command" == "$owner_command" ]]
+}
+
+lease_lock_owner_summary() {
+  if [[ ! -f "$LEASE_LOCK_OWNER_FILE" ]]; then
+    return 1
+  fi
+  awk -F= '
+    /^LOCK_OWNER_ID=/ { owner_id = $2 }
+    /^LOCK_AGENT_ID=/ { agent_id = $2 }
+    /^LOCK_PID=/ { pid = $2 }
+    /^LOCK_COMMAND=/ { command = substr($0, index($0, "=") + 1) }
+    /^LOCK_LAST_HEARTBEAT_EPOCH=/ { last = $2 }
+    /^LOCK_NEXT_HEARTBEAT_DUE_EPOCH=/ { next_due = $2 }
+    END {
+      if (owner_id != "") {
+        printf "owner_id=%s agent=%s pid=%s last_heartbeat=%s next_due=%s command=%s\n",
+          owner_id, agent_id, pid, last, next_due, command
+      }
+    }
+  ' "$LEASE_LOCK_OWNER_FILE"
+}
+
+lease_lock_waiter_count() {
+  if [[ ! -d "$LEASE_LOCK_WAITERS_DIR" ]]; then
+    printf '0\n'
+    return 0
+  fi
+  find "$LEASE_LOCK_WAITERS_DIR" -type f -name '*.env' | wc -l | tr -d ' '
+}
+
+lease_lock_remove_waiter() {
+  if (( LEASE_LOCK_REGISTERED_WAITER == 1 )); then
+    /bin/rm -f "$LEASE_LOCK_WAITER_FILE" "$LEASE_LOCK_WAITER_FILE.heartbeat"
+    LEASE_LOCK_REGISTERED_WAITER=0
+  fi
+}
+
+lease_lock_stop_waiter_heartbeat() {
+  if [[ -n "$LEASE_LOCK_WAITER_HEARTBEAT_PID" ]]; then
+    kill "$LEASE_LOCK_WAITER_HEARTBEAT_PID" 2>/dev/null || true
+    wait "$LEASE_LOCK_WAITER_HEARTBEAT_PID" 2>/dev/null || true
+    LEASE_LOCK_WAITER_HEARTBEAT_PID=""
+  fi
+}
+
+lease_lock_stop_owner_heartbeat() {
+  if [[ -n "$LEASE_LOCK_HEARTBEAT_PID" ]]; then
+    kill "$LEASE_LOCK_HEARTBEAT_PID" 2>/dev/null || true
+    wait "$LEASE_LOCK_HEARTBEAT_PID" 2>/dev/null || true
+    LEASE_LOCK_HEARTBEAT_PID=""
+  fi
+}
+
+lease_lock_cleanup() {
+  lease_lock_stop_waiter_heartbeat
+  lease_lock_remove_waiter
+  lease_lock_stop_owner_heartbeat
+  if (( LEASE_LOCK_OWNS_LOCK == 1 )); then
+    /bin/rm -rf "$LEASE_LOCK_OWNER_DIR"
+    LEASE_LOCK_OWNS_LOCK=0
+  fi
+}
+
+lease_lock_register_waiter() {
+  /bin/mkdir -p "$LEASE_LOCK_WAITERS_DIR"
+  LEASE_LOCK_ACQUIRED_AT_EPOCH="$(lease_lock_now_epoch)"
+  LEASE_LOCK_PROCESS_PID="$$"
+  lease_lock_touch_heartbeat \
+    "$LEASE_LOCK_WAITER_FILE.heartbeat" \
+    "$LEASE_LOCK_WAITER_FILE" \
+    "$LEASE_LOCK_WAITER_ID" \
+    "waiter" \
+    "waiting"
+  lease_lock_start_heartbeat \
+    "$LEASE_LOCK_WAITER_FILE.heartbeat" \
+    "$LEASE_LOCK_WAITER_FILE" \
+    "$LEASE_LOCK_WAITER_ID" \
+    "waiter" \
+    "waiting" \
+    "$$"
+  LEASE_LOCK_WAITER_HEARTBEAT_PID="$LEASE_LOCK_LAST_STARTED_HEARTBEAT_PID"
+  LEASE_LOCK_REGISTERED_WAITER=1
+}
+
+lease_lock_unregister_waiter() {
+  lease_lock_stop_waiter_heartbeat
+  /bin/rm -f "$LEASE_LOCK_WAITER_FILE" "$LEASE_LOCK_WAITER_FILE.heartbeat"
+  LEASE_LOCK_REGISTERED_WAITER=0
+}
+
+lease_lock_try_acquire_owner_dir() {
+  if /bin/mkdir "$LEASE_LOCK_OWNER_DIR" 2>/dev/null; then
+    LEASE_LOCK_OWNER_ID="${LEASE_LOCK_OWNER_ID:-$$-$(lease_lock_now_epoch)}"
+    LEASE_LOCK_ACQUIRED_AT_EPOCH="$(lease_lock_now_epoch)"
+    LEASE_LOCK_PROCESS_PID="$$"
+    lease_lock_touch_heartbeat \
+      "$LEASE_LOCK_OWNER_HEARTBEAT_FILE" \
+      "$LEASE_LOCK_OWNER_FILE" \
+      "$LEASE_LOCK_OWNER_ID" \
+      "owner" \
+      "holding"
+    lease_lock_start_heartbeat \
+      "$LEASE_LOCK_OWNER_HEARTBEAT_FILE" \
+      "$LEASE_LOCK_OWNER_FILE" \
+      "$LEASE_LOCK_OWNER_ID" \
+      "owner" \
+      "holding" \
+      "$$"
+    LEASE_LOCK_HEARTBEAT_PID="$LEASE_LOCK_LAST_STARTED_HEARTBEAT_PID"
+    LEASE_LOCK_OWNS_LOCK=1
+    return 0
+  fi
+  return 1
+}
+
+lease_lock_try_reclaim_stale_owner() {
+  local now_epoch owner_last_heartbeat reclaim_dir
+  [[ -d "$LEASE_LOCK_OWNER_DIR" ]] || return 1
+  owner_last_heartbeat="$(lease_lock_owner_last_heartbeat_epoch || true)"
+  [[ -n "$owner_last_heartbeat" ]] || owner_last_heartbeat=0
+  now_epoch="$(lease_lock_now_epoch)"
+  if ! lease_lock_is_expired_epoch "$owner_last_heartbeat" "$now_epoch"; then
+    return 1
+  fi
+
+  # Treat a stalled heartbeat helper as degraded, not dead, while the recorded
+  # owner process is still alive on this host. That prevents overlapping owners
+  # from reclaiming the lease during transient heartbeat gaps.
+  if lease_lock_owner_process_alive; then
+    return 1
+  fi
+
+  reclaim_dir="${LEASE_LOCK_DIR}/reclaimed-${LEASE_LOCK_WAITER_ID}-${now_epoch}"
+  if /bin/mv "$LEASE_LOCK_OWNER_DIR" "$reclaim_dir" 2>/dev/null; then
+    /bin/rm -rf "$reclaim_dir"
+    return 0
+  fi
+  return 1
+}
+
+lease_lock_acquire() {
+  local started_at now_epoch last_reported_summary
+  /bin/mkdir -p "$LEASE_LOCK_WAITERS_DIR"
+  lease_lock_register_waiter
+  started_at="$(lease_lock_now_epoch)"
+  last_reported_summary=""
+  while ! lease_lock_try_acquire_owner_dir; do
+    if lease_lock_try_reclaim_stale_owner; then
+      continue
+    fi
+
+    local owner_summary waiter_count
+    owner_summary="$(lease_lock_owner_summary || true)"
+    waiter_count="$(lease_lock_waiter_count)"
+    if [[ "$owner_summary" != "$last_reported_summary" ]]; then
+      printf 'Waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
+      if [[ -n "$owner_summary" ]]; then
+        printf 'lease owner: %s\n' "$owner_summary" >&2
+      fi
+      printf 'active waiters: %s\n' "$waiter_count" >&2
+      last_reported_summary="$owner_summary"
+    fi
+
+    now_epoch="$(lease_lock_now_epoch)"
+    if (( now_epoch - started_at >= LEASE_LOCK_TIMEOUT_SECONDS )); then
+      printf 'Timed out waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
+      return 1
+    fi
+    sleep "$LEASE_LOCK_POLL_SECONDS"
+  done
+  lease_lock_unregister_waiter
+}

@@ -20,6 +20,9 @@ LEGACY_TUIST_OPT_OUT="${HARNESS_MONITOR_USE_TUIST_TEST:-}"
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
+# shellcheck source=scripts/lib/lease-lock.sh
+LEASE_LOCK_DIR=""
+LEASE_LOCK_RESOURCE=""
 
 STALE_CHECK_SCRIPT="$SCRIPT_CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 RUN_STARTED_AT_EPOCH="$(date +%s)"
@@ -31,14 +34,15 @@ if [[ -n "$LEGACY_TUIST_OPT_OUT" ]]; then
   exit 1
 fi
 
-LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_TIMEOUT_SECONDS:-900}"
-LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
 MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
 REGENERATE_AFTER_SUCCESS="${HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD:-0}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-2}"
 JUNIT_REPORT_DIR="${HARNESS_MONITOR_JUNIT_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
 FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
 TRANSIENT_DB_STATUS=200
+LEASE_LOCK_HEARTBEAT_SECONDS="${XCODEBUILD_LOCK_HEARTBEAT_SECONDS:-30}"
+LEASE_LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
+LEASE_LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS:-90}"
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
@@ -159,47 +163,24 @@ if (( has_derived_data_path == 0 )); then
 fi
 
 lock_path="$derive_data_path/.xcodebuild.lock"
-legacy_lock_pid_file="$lock_path/pid"
-lock_path_owned_by_self=0
+LEASE_LOCK_DIR="$lock_path"
+LEASE_LOCK_RESOURCE="xcodebuild:${derive_data_path}"
+source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/lease-lock.sh"
 
 current_lock_owner_pid() {
-  if [[ -f "$lock_path" ]]; then
-    /bin/cat "$lock_path" 2>/dev/null || true
+  if [[ -f "$LEASE_LOCK_OWNER_FILE" ]]; then
+    sed -n 's/^LOCK_PID=//p' "$LEASE_LOCK_OWNER_FILE" | head -n 1
     return 0
   fi
-
-  if [[ -f "$legacy_lock_pid_file" ]]; then
-    /bin/cat "$legacy_lock_pid_file" 2>/dev/null || true
-    return 0
-  fi
-
   return 1
 }
 
 remove_lock_path() {
-  if [[ -d "$lock_path" ]]; then
-    /bin/rm -rf "$lock_path"
-    return 0
-  fi
-
-  /bin/rm -f "$lock_path"
+  /bin/rm -rf "$lock_path"
 }
 
 cleanup_lock() {
-  if [[ ! -e "$lock_path" ]]; then
-    return 0
-  fi
-
-  if (( lock_path_owned_by_self == 1 )); then
-    remove_lock_path
-    return 0
-  fi
-
-  local owner_pid
-  owner_pid="$(current_lock_owner_pid || true)"
-  if [[ "$owner_pid" == "$$" ]]; then
-    remove_lock_path
-  fi
+  lease_lock_cleanup
 }
 
 cleanup_descendants_and_lock() {
@@ -208,17 +189,6 @@ cleanup_descendants_and_lock() {
   terminate_descendant_processes "$$"
   cleanup_lock
   exit "$status"
-}
-
-run_background_and_wait() {
-  local child_pid status
-  set +e
-  "$@" &
-  child_pid=$!
-  wait "$child_pid"
-  status=$?
-  set -e
-  return "$status"
 }
 
 is_db_transient_failure() {
@@ -537,73 +507,9 @@ lock_owner_command() {
   /bin/ps -p "$owner_pid" -o command= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//'
 }
 
-recover_legacy_lock_dir_if_stale() {
-  if [[ ! -d "$lock_path" ]]; then
-    return 1
-  fi
-
-  if [[ ! -f "$legacy_lock_pid_file" ]]; then
-    remove_lock_path
-    return 0
-  fi
-
-  local owner_pid
-  owner_pid="$(/bin/cat "$legacy_lock_pid_file" 2>/dev/null || true)"
-  if [[ -z "$owner_pid" ]]; then
-    remove_lock_path
-    return 0
-  fi
-  if [[ -n "$owner_pid" ]] && kill -0 "$owner_pid" 2>/dev/null; then
-    return 1
-  fi
-
-  remove_lock_path
-  return 0
-}
-
 acquire_lock() {
-  local started_at now owner_pid owner_command last_reported_owner
   /bin/mkdir -p "$derive_data_path"
-  started_at="$(date +%s)"
-  last_reported_owner=""
-  while ! /usr/bin/shlock -f "$lock_path" -p "$$"; do
-    owner_pid=""
-    if recover_legacy_lock_dir_if_stale; then
-      continue
-    fi
-
-    if [[ -f "$lock_path" ]]; then
-      owner_pid="$(/bin/cat "$lock_path" 2>/dev/null || true)"
-      if [[ -z "$owner_pid" ]]; then
-        remove_lock_path
-        continue
-      fi
-      if [[ -n "$owner_pid" ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
-        remove_lock_path
-        continue
-      fi
-    fi
-
-    if [[ "$owner_pid" != "$last_reported_owner" ]]; then
-      printf 'Waiting for xcodebuild lock at %s\n' "$lock_path" >&2
-      if [[ -n "$owner_pid" ]]; then
-        printf 'lock owner pid: %s\n' "$owner_pid" >&2
-        owner_command="$(lock_owner_command "$owner_pid" || true)"
-        if [[ -n "$owner_command" ]]; then
-          printf 'lock owner command: %s\n' "$owner_command" >&2
-        fi
-      fi
-      last_reported_owner="$owner_pid"
-    fi
-
-    now="$(date +%s)"
-    if (( now - started_at >= LOCK_TIMEOUT_SECONDS )); then
-      printf 'Timed out waiting for xcodebuild lock at %s\n' "$lock_path" >&2
-      exit 1
-    fi
-    sleep "$LOCK_POLL_SECONDS"
-  done
-  lock_path_owned_by_self=1
+  lease_lock_acquire
 }
 
 build_test_action_args() {
@@ -726,11 +632,11 @@ run_inner() {
   fi
   set +e
   XCODEBUILD_RAW_LOG_PATH="$raw_log_path" \
-    run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 \
-    | tee "$log_path" \
-    | filter_xcodebuild_console_output
-  local status="${PIPESTATUS[0]}"
+    run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" \
+    >"$log_path" 2>&1
+  local status="$?"
   set -e
+  filter_xcodebuild_console_output <"$log_path"
   return "$status"
 }
 
@@ -738,8 +644,10 @@ run_once() {
   local log_path raw_log_path status report_path report_base console_copy raw_copy
   log_path="$(create_temp_log_path)"
   raw_log_path="$(create_temp_log_path)"
-  run_background_and_wait run_inner "$log_path" "$raw_log_path"
+  set +e
+  run_inner "$log_path" "$raw_log_path"
   status=$?
+  set -e
 
   if (( status == 0 )); then
     normalize_shared_schemes_after_xcodebuild

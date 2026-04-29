@@ -64,8 +64,32 @@ class XcodebuildWithLockTests(unittest.TestCase):
             tool_log = temp_root / "tool.log"
 
             if preexisting_lock_pid is not None:
-                derived_data_path.mkdir(parents=True, exist_ok=True)
-                (derived_data_path / ".xcodebuild.lock").write_text(f"{preexisting_lock_pid}\n")
+                lock_owner_dir = derived_data_path / ".xcodebuild.lock" / "owner"
+                lock_owner_dir.mkdir(parents=True, exist_ok=True)
+                now_epoch = int(time.time())
+                (lock_owner_dir / "heartbeat").write_text(f"{now_epoch}\n")
+                (lock_owner_dir / "lease.env").write_text(
+                    "\n".join(
+                        [
+                            "LOCK_PROTOCOL_VERSION=1",
+                            f"LOCK_RESOURCE=xcodebuild:{derived_data_path}",
+                            "LOCK_ROLE=owner",
+                            f"LOCK_OWNER_ID=test-owner-{preexisting_lock_pid}",
+                            f"LOCK_AGENT_ID=pid:{preexisting_lock_pid}@test-host",
+                            f"LOCK_PID={preexisting_lock_pid}",
+                            "LOCK_HOSTNAME=test-host",
+                            f"LOCK_REPO_ROOT={temp_root}",
+                            "LOCK_COMMAND=/bin/sleep 10",
+                            f"LOCK_ACQUIRED_AT_EPOCH={now_epoch}",
+                            "LOCK_HEARTBEAT_EVERY_SEC=30",
+                            "LOCK_LEASE_TIMEOUT_SEC=90",
+                            f"LOCK_LAST_HEARTBEAT_EPOCH={now_epoch}",
+                            f"LOCK_NEXT_HEARTBEAT_DUE_EPOCH={now_epoch + 30}",
+                            "LOCK_STATE=holding",
+                            "",
+                        ]
+                    )
+                )
             elif preexisting_empty_lock:
                 (derived_data_path / ".xcodebuild.lock").mkdir(parents=True)
 
@@ -228,9 +252,9 @@ shift
                 env=env,
             )
 
-            lock_file = derived_data_path / ".xcodebuild.lock"
-            self.wait_for_path(lock_file)
-            self.assertTrue(lock_file.is_file(), "wrapper must publish the shared lock as a PID file")
+            lock_owner_file = derived_data_path / ".xcodebuild.lock" / "owner" / "lease.env"
+            self.wait_for_path(lock_owner_file)
+            self.assertTrue(lock_owner_file.is_file(), "wrapper must publish shared lease owner metadata")
             self.wait_for_path(child_pid_path)
 
             child_pid = int(child_pid_path.read_text().strip())
@@ -238,7 +262,7 @@ shift
             stdout, stderr = process.communicate(timeout=10)
 
             self.assertEqual(process.returncode, 143, stdout + stderr)
-            self.assertFalse(lock_file.exists(), "wrapper must release the shared lock on termination")
+            self.assertFalse(lock_owner_file.exists(), "wrapper must release shared lease owner metadata on termination")
             with self.assertRaises(ProcessLookupError):
                 os.kill(child_pid, 0)
 
@@ -250,7 +274,7 @@ shift
                 "HarnessMonitor",
                 "build",
                 extra_env={
-                    "XCODEBUILD_LOCK_TIMEOUT_SECONDS": "1",
+                    "XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS": "1",
                     "XCODEBUILD_LOCK_POLL_SECONDS": "1",
                 },
                 preexisting_lock_pid=sleeper.pid,
@@ -260,10 +284,11 @@ shift
             sleeper.wait(timeout=5)
 
         self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("Waiting for xcodebuild lock at", completed.stderr)
-        self.assertIn(f"lock owner pid: {sleeper.pid}", completed.stderr)
-        self.assertIn("lock owner command:", completed.stderr)
-        self.assertIn("Timed out waiting for xcodebuild lock at", completed.stderr)
+        self.assertIn("Waiting for xcodebuild:", completed.stderr)
+        self.assertIn("lease owner:", completed.stderr)
+        self.assertIn(f"pid={sleeper.pid}", completed.stderr)
+        self.assertIn("command=/bin/sleep 10", completed.stderr)
+        self.assertIn("Timed out waiting for xcodebuild:", completed.stderr)
         self.assertEqual(log, "")
 
     def test_recovers_empty_lock_directory_without_waiting_for_timeout(self) -> None:
@@ -272,7 +297,7 @@ shift
             "HarnessMonitor",
             "build",
             extra_env={
-                "XCODEBUILD_LOCK_TIMEOUT_SECONDS": "1",
+                "XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS": "1",
                 "XCODEBUILD_LOCK_POLL_SECONDS": "1",
             },
             preexisting_empty_lock=True,

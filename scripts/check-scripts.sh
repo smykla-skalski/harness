@@ -75,6 +75,7 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
 fi
 
 run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
+run_quiet_step "lease-lock shell tests" bash "$ROOT/scripts/tests/test-lease-lock.sh"
 run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
 run_quiet_step "stale-scan shell tests" "$ROOT/scripts/tests/test-stale-scan.sh"
 run_quiet_step "swarm e2e contract shell tests" "$ROOT/scripts/tests/test-e2e-swarm-contract.sh"

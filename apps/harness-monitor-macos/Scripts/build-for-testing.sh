@@ -10,6 +10,7 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
+STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
@@ -23,15 +24,17 @@ cleanup_script_descendants() {
   exit "$status"
 }
 
-run_background_and_wait() {
-  local child_pid status
-  set +e
-  "$@" &
-  child_pid=$!
-  wait "$child_pid"
-  status=$?
-  set -e
-  return "$status"
+run_stale_preflight() {
+  if [[ "${HARNESS_SKIP_STALE_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  if [[ ! -x "$STALE_CHECK_SCRIPT" ]]; then
+    echo "stale-check script is not executable: $STALE_CHECK_SCRIPT" >&2
+    exit 1
+  fi
+
+  "$STALE_CHECK_SCRIPT"
 }
 
 # Unit and app-test builds exercise Swift code and do not need the embedded
@@ -59,14 +62,16 @@ if [ ! -x "${GENERATE_PROJECT_SCRIPT}" ]; then
   exit 1
 fi
 
+run_stale_preflight
+
 trap 'cleanup_script_descendants $?' EXIT
 trap 'cleanup_script_descendants 130' INT
 trap 'cleanup_script_descendants 143' TERM
 trap 'cleanup_script_descendants 129' HUP
 
-run_background_and_wait "$GENERATE_PROJECT_SCRIPT"
+"$GENERATE_PROJECT_SCRIPT"
 
-exec "$XCODEBUILD_RUNNER" \
+exec env HARNESS_SKIP_STALE_CHECK=1 "$XCODEBUILD_RUNNER" \
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
