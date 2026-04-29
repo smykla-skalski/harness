@@ -21,7 +21,7 @@ use tokio::time::sleep;
 use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
-use crate::agents::acp::batcher::spawn_notification_batcher;
+use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
 use crate::agents::acp::permission::PermissionMode;
@@ -35,7 +35,7 @@ mod session_guard;
 use context::{
     ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result,
 };
-use session_guard::SessionRouteGuard;
+use session_guard::{RouteTarget, SessionRouteGuard};
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
 
@@ -56,15 +56,30 @@ pub(super) struct SpawnedAcpProtocol {
     pub(super) batcher: JoinHandle<()>,
     pub(super) cancel: AcpCancelHandle,
 }
+
+pub(super) struct SpawnProtocolInput<'a> {
+    pub request: &'a AcpAgentStartRequest,
+    pub acp_id: &'a str,
+    pub session_id: &'a str,
+    pub agent_name: String,
+    pub project_dir: PathBuf,
+    pub supervisor: &'a Arc<AcpSessionSupervisor>,
+    pub permission_mode: PermissionMode,
+}
+
 pub(super) fn spawn_protocol_task(
     child: &mut Child,
-    request: &AcpAgentStartRequest,
-    session_id: &str,
-    agent_name: String,
-    project_dir: PathBuf,
-    supervisor: &Arc<AcpSessionSupervisor>,
-    permission_mode: PermissionMode,
+    input: SpawnProtocolInput<'_>,
 ) -> io::Result<SpawnedAcpProtocol> {
+    let SpawnProtocolInput {
+        request,
+        acp_id,
+        session_id,
+        agent_name,
+        project_dir,
+        supervisor,
+        permission_mode,
+    } = input;
     let stdin = child
         .stdin
         .take()
@@ -78,7 +93,6 @@ pub(super) fn spawn_protocol_task(
 
     let batcher = spawn_notification_batcher(
         agent_name,
-        session_id.to_string(),
         Arc::clone(supervisor),
         ConnectionConfig::default(),
     );
@@ -96,6 +110,8 @@ pub(super) fn spawn_protocol_task(
         stdout,
         project_dir,
         prompt: request.prompt.clone(),
+        acp_id: acp_id.to_string(),
+        session_id: session_id.to_string(),
         notifications: batcher.notifications,
         client,
         supervisor: Arc::clone(supervisor),
@@ -116,7 +132,9 @@ struct RunProtocolArgs {
     stdout: ChildStdout,
     project_dir: PathBuf,
     prompt: Option<String>,
-    notifications: mpsc::Sender<SessionNotification>,
+    acp_id: String,
+    session_id: String,
+    notifications: mpsc::Sender<RoutedSessionNotification>,
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
@@ -133,6 +151,8 @@ async fn run_protocol(args: RunProtocolArgs) {
         stdout,
         project_dir,
         prompt,
+        acp_id,
+        session_id,
         notifications,
         client,
         supervisor,
@@ -156,18 +176,26 @@ async fn run_protocol(args: RunProtocolArgs) {
         .name("harness")
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
-                if let Err(error) = notification_guard.ensure_known(&notification.session_id) {
-                    if error.message.contains("already ended") {
-                        tracing::debug!(
-                            session_id = %notification.session_id,
-                            "dropping late ACP notification after session shutdown"
-                        );
-                        return Ok(());
+                let target = match notification_guard.ensure_known(&notification.session_id) {
+                    Ok(target) => target,
+                    Err(error) => {
+                        if error.message.contains("already ended") {
+                            tracing::debug!(
+                                session_id = %notification.session_id,
+                                "dropping late ACP notification after session shutdown"
+                            );
+                            return Ok(());
+                        }
+                        return Err(client_error_to_acp(error));
                     }
-                    return Err(client_error_to_acp(error));
-                }
+                };
+                let routed = RoutedSessionNotification {
+                    acp_id: target.acp_id,
+                    session_id: target.session_id,
+                    notification,
+                };
                 notifications
-                    .send(notification)
+                    .send(routed)
                     .await
                     .map_err(|error| AcpError::new(-32603, format!("queue ACP event: {error}")))?;
                 Ok(())
@@ -229,14 +257,16 @@ async fn run_protocol(args: RunProtocolArgs) {
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(transport, async move |connection| {
-            run_connection(
+            run_connection(RunConnectionArgs {
                 connection,
                 project_dir,
                 prompt,
+                acp_id,
+                session_id,
                 supervisor,
                 cancel_rx,
                 session_guard,
-            )
+            })
             .await
         })
         .await;
@@ -288,26 +318,29 @@ fn is_transport_closed_error(error: &AcpError) -> bool {
         || message.contains("unexpected eof")
 }
 
-async fn run_connection(
-    connection: ConnectionTo<Agent>,
-    project_dir: PathBuf,
-    prompt: Option<String>,
-    supervisor: Arc<AcpSessionSupervisor>,
-    mut cancel_rx: mpsc::UnboundedReceiver<()>,
-    session_guard: Arc<SessionRouteGuard>,
-) -> AcpResult<()> {
+async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
+    let RunConnectionArgs {
+        connection,
+        project_dir,
+        prompt,
+        acp_id,
+        session_id,
+        supervisor,
+        mut cancel_rx,
+        session_guard,
+    } = args;
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
     send_initialize(&connection, initialize_timeout).await?;
-    let session_id = send_new_session(&connection, project_dir).await?;
-    session_guard.start_session(session_id.clone());
+    let acp_session_id = send_new_session(&connection, project_dir).await?;
+    session_guard.start_session(&acp_session_id, RouteTarget { acp_id, session_id });
     let run_result = async {
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
             let cancelled = send_prompt_or_cancel(
                 &connection,
                 &mut cancel_rx,
-                session_id.clone(),
+                acp_session_id.clone(),
                 prompt_timeout,
                 prompt,
             )
@@ -316,15 +349,26 @@ async fn run_connection(
                 return Ok(());
             }
         }
-        wait_for_cancel(&connection, &mut cancel_rx, session_id.clone()).await
+        wait_for_cancel(&connection, &mut cancel_rx, acp_session_id.clone()).await
     }
     .await;
     // Keep route validation active for a short grace window after we have
     // requested cancel so in-flight notifications are not immediately marked
     // stale while transport shutdown is still propagating.
     sleep(SESSION_ROUTE_DRAIN_GRACE).await;
-    session_guard.stop_session(&session_id);
+    session_guard.stop_session(&acp_session_id);
     run_result
+}
+
+struct RunConnectionArgs {
+    connection: ConnectionTo<Agent>,
+    project_dir: PathBuf,
+    prompt: Option<String>,
+    acp_id: String,
+    session_id: String,
+    supervisor: Arc<AcpSessionSupervisor>,
+    cancel_rx: mpsc::UnboundedReceiver<()>,
+    session_guard: Arc<SessionRouteGuard>,
 }
 
 async fn send_initialize(
