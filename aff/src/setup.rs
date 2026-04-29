@@ -14,7 +14,7 @@ pub enum SetupCommand {
 
 #[derive(Debug, Clone, Args)]
 pub struct SetupBootstrapArgs {
-    /// Project directory whose runtime configs should be patched after harness bootstrap.
+    /// Project directory whose runtime configs should be patched.
     #[arg(long)]
     pub project_dir: Option<String>,
     /// Agents to patch. Defaults to every supported runtime.
@@ -47,7 +47,7 @@ pub struct GenerateRuntimeHooksArgs {
     /// Fail if aff-owned runtime hook entries differ from the on-disk files.
     #[arg(long)]
     pub check: bool,
-    /// Project directory whose runtime configs should be patched after harness generation.
+    /// Project directory whose runtime configs should be patched.
     #[arg(long)]
     pub project_dir: Option<String>,
     /// Limit aff runtime patching to a single target.
