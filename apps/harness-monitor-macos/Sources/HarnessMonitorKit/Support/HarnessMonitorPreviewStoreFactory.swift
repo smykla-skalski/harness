@@ -94,6 +94,13 @@ public enum HarnessMonitorPreviewStoreFactory {
       projects: configuration.fixtures.projects,
       sessions: configuration.fixtures.sessions
     )
+    store.client = PreviewHarnessClient(
+      fixtures: configuration.fixtures,
+      isLaunchAgentInstalled: !configuration.fixtures.sessions.isEmpty,
+      hostBridgeState: PreviewHostBridgeState(override: hostBridgeOverride),
+      actionDelay: actionDelay,
+      codexStartBehavior: codexStartBehavior
+    )
     store.bookmarkedSessionIds = configuration.bookmarkedSessionIDs
     store.sessionFilter = configuration.sessionFilter
     store.selectedSessionID = configuration.selectedSessionID

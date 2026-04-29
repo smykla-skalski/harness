@@ -110,6 +110,26 @@ enum HarnessMonitorNotificationRequestFactory {
     return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
   }
 
+  static func makeAcpPermissionRequest(
+    agentName: String,
+    decisionID: String
+  ) -> UNNotificationRequest {
+    let content = UNMutableNotificationContent()
+    content.title = "Harness Monitor"
+    content.subtitle = "Agent permission required"
+    content.body = "Permission requested by \(agentName). Open the Decisions window."
+    content.threadIdentifier = HarnessMonitorAcpPermissionNotificationID.threadIdentifier
+    content.categoryIdentifier = HarnessMonitorAcpPermissionNotificationID.categoryIdentifier
+    content.interruptionLevel = .timeSensitive
+    content.relevanceScore = 1
+    content.sound = .default
+    content.userInfo = [
+      HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID
+    ]
+    let identifier = "\(HarnessMonitorAcpPermissionNotificationID.requestPrefix)\(decisionID)"
+    return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+  }
+
   /// Convenience helper mirroring `makeSupervisorRequest` that produces a
   /// `HarnessMonitorNotificationDraft` for surfaces that still use the Preferences draft flow
   /// (for example, the debug "Send test supervisor notification" affordance).
@@ -201,6 +221,14 @@ enum HarnessMonitorNotificationRequestFactory {
         intentIdentifiers: [],
         hiddenPreviewsBodyPlaceholder: "Harness Monitor notification",
         categorySummaryFormat: "%u Harness Monitor notifications",
+        options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
+      ),
+      UNNotificationCategory(
+        identifier: HarnessMonitorAcpPermissionNotificationID.categoryIdentifier,
+        actions: [open],
+        intentIdentifiers: [],
+        hiddenPreviewsBodyPlaceholder: "Harness Monitor permission request",
+        categorySummaryFormat: "%u Harness Monitor permission requests",
         options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
       ),
     ]
@@ -297,6 +325,12 @@ public enum HarnessMonitorSupervisorNotificationID {
     case .critical: "io.harnessmonitor.supervisor.category.critical"
     }
   }
+}
+
+public enum HarnessMonitorAcpPermissionNotificationID {
+  public static let threadIdentifier = "io.harnessmonitor.acp.permission"
+  public static let requestPrefix = "io.harnessmonitor.acp.permission."
+  public static let categoryIdentifier = "io.harnessmonitor.acp.permission.category"
 }
 
 extension DecisionSeverity {

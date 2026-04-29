@@ -117,9 +117,7 @@ public final class KeyWindowObserver {
     guard let keyWindowIdentifier = snapshot.keyWindowIdentifier else {
       return false
     }
-    return keyWindowIdentifier == windowID
-      || keyWindowIdentifier.contains(windowID)
-      || windowID.contains(keyWindowIdentifier)
+    return Self.matchesWindowID(keyWindowIdentifier, expected: windowID)
   }
 
   private func beginObserving() {
@@ -160,5 +158,18 @@ public final class KeyWindowObserver {
       appIsHidden: application.isHidden,
       hasVisibleNonMiniaturizedWindows: hasVisibleNonMiniaturizedWindows
     )
+  }
+
+  public static func matchesWindowID(_ actual: String, expected: String) -> Bool {
+    guard !expected.isEmpty else {
+      return false
+    }
+    if actual == expected {
+      return true
+    }
+    let separators = CharacterSet.alphanumerics.inverted
+    return actual
+      .components(separatedBy: separators)
+      .contains(expected)
   }
 }

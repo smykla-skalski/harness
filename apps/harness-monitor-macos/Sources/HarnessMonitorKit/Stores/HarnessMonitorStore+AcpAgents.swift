@@ -278,7 +278,7 @@ extension HarnessMonitorStore {
           primary: snapshot.pendingPermissionBatches,
           secondary: [batch],
           preferSecondary: false
-        )
+          )
       )
     }
     reconcilePresentedAcpPermissionBatch()
@@ -455,7 +455,7 @@ extension HarnessMonitorStore {
         if $0.recordedAt != $1.recordedAt {
           return $0.recordedAt > $1.recordedAt
         }
-        return $0.entryId < $1.entryId
+      return $0.entryId < $1.entryId
       }
   }
 
