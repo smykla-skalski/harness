@@ -406,7 +406,8 @@ scenario_end_to_end_detection() {
 
   local output status=0
   # Unset auto-clean so the planted artifact causes the script to fail, not self-heal.
-  output="$(env -u HARNESS_CHECK_AUTOCLEAN "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+  output="$(env -u HARNESS_CHECK_AUTOCLEAN HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
     fail "expected exit 1 from check script, got $status (output: $output)"
@@ -813,7 +814,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if [[ -e "$marker" ]]; then
@@ -854,7 +855,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -890,7 +891,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -915,7 +916,8 @@ scenario_end_to_end_without_autoclean() {
   TMP_MARKERS+=("$marker")
 
   local output status=0
-  output="$(env -u HARNESS_CHECK_AUTOCLEAN "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+  output="$(env -u HARNESS_CHECK_AUTOCLEAN HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
     fail "expected exit 1; got $status"
@@ -952,7 +954,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -977,7 +979,61 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 33: swarm e2e worktree parser only reports branches created by the
+# Scenario 33: HARNESS_CHECK_AUTOCLEAN=1 must refuse to auto-clean when the
+# checkout is busy with live repo-local gate helpers. That state is contention,
+# not stale pollution, so the gate should fail without invoking clean:stale.
+# ---------------------------------------------------------------------------
+scenario_autoclean_refuses_live_repo_gate_helpers() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 refuses to auto-clean live repo gate helpers"
+
+  pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
+  # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
+  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  local sibling_pid=$!
+  popd >/dev/null || { fail "popd failed"; return; }
+  SPAWNED_PIDS+=("$sibling_pid")
+  wait_for_pid_registered "$sibling_pid" || { fail "sibling pid never registered"; return; }
+  sleep 0.3
+
+  local clean_script="$SANDBOX/fake-clean-busy-$RUN_ID.sh"
+  local clean_marker="$SANDBOX/fake-clean-busy-$RUN_ID.was-run"
+  cat >"$clean_script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+touch "$clean_marker"
+echo "fake clean should not run"
+EOF
+  chmod +x "$clean_script"
+
+  local output status=0
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+    "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
+
+  if (( status != 1 )); then
+    fail "expected exit 1 for busy checkout; got $status (output: $output)"
+    return
+  fi
+  if [[ -e "$clean_marker" ]]; then
+    fail "fake clean ran despite busy repo gate helper"
+    return
+  fi
+  if ! grep -Fq -- "auto-clean refused because live processes still own repo state" <<<"$output"; then
+    fail "expected busy-checkout refusal message; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "repo-local gate helpers still running" <<<"$output"; then
+    fail "expected repo gate helper blocker listed; output: $output"
+    return
+  fi
+  if grep -Fq -- "fake clean should not run" <<<"$output"; then
+    fail "unexpected fake clean output surfaced: $output"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 34: swarm e2e worktree parser only reports branches created by the
 # full-flow e2e harness. User/session worktrees under harness/* are preserved.
 # ---------------------------------------------------------------------------
 scenario_swarm_e2e_worktree_parser() {
@@ -997,7 +1053,7 @@ scenario_swarm_e2e_worktree_parser() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 34: clean-stale swarm cleanup must noop cleanly when no e2e-owned
+# Scenario 35: clean-stale swarm cleanup must noop cleanly when no e2e-owned
 # worktrees or branches are present. The production script runs under `set -u`,
 # so empty arrays must be length-guarded before "${arr[@]}" iteration.
 # ---------------------------------------------------------------------------
@@ -1066,6 +1122,7 @@ run_all() {
   scenario_autoclean_clean_script_fails
   scenario_end_to_end_without_autoclean
   scenario_autoclean_congestion_partial
+  scenario_autoclean_refuses_live_repo_gate_helpers
   scenario_swarm_e2e_worktree_parser
   scenario_swarm_e2e_cleanup_empty_lists
 }

@@ -20,8 +20,12 @@ readonly RESET_HINT="run 'mise run clean:stale' to reset (or re-run with HARNESS
 # Allow tests to redirect autoclean to a sandbox-safe stub. Production runs
 # always resolve this to scripts/clean-stale-state.sh.
 readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
+# Test-only escape hatch so the stale-scan suite can exercise artifact
+# autoclean paths without tripping over its own long-lived fake gate workers.
+readonly IGNORE_REPO_GATE_HELPERS="${HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS:-0}"
 
 stale_lines=()
+autoclean_blockers=()
 
 append_pid_block() {
   local label="$1"
@@ -51,6 +55,7 @@ append_path_block() {
 collect_stale_lines() {
   stale_scan_refresh_ps
   stale_lines=()
+  autoclean_blockers=()
 
   # 1. Orphan cargo-built harness daemon/bridge processes from any target dir
   #    (covers debug, release, and dev/<triple>/{debug,release}).
@@ -61,15 +66,20 @@ collect_stale_lines() {
   # 2. Repo-local gate workers still rooted in this checkout.
   local repo_gate_workers
   repo_gate_workers="$(stale_scan_repo_gate_pids "$$")"
-  append_pid_block "repo-local gate helpers still running" "$repo_gate_workers"
+  if [[ "$IGNORE_REPO_GATE_HELPERS" != "1" ]]; then
+    append_pid_block "repo-local gate helpers still running" "$repo_gate_workers"
+    [[ -n "$repo_gate_workers" ]] && autoclean_blockers+=("repo-local gate helpers still running")
+  fi
 
   # 3. Live installed harness daemon/bridge processes only count as stale
   #    when they still hold the well-known locks under the real Harness roots.
   local group_lock_holders app_support_lock_holders
   group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
   append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
+  [[ -n "$group_lock_holders" ]] && autoclean_blockers+=("live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT")
   app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
   append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
+  [[ -n "$app_support_lock_holders" ]] && autoclean_blockers+=("live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT")
 
   # 4. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
   #    anything in /tmp is from before the sandbox fix or from an unsandboxed
@@ -122,6 +132,7 @@ collect_stale_lines() {
   port="$(stale_scan_codex_ws_port)"
   foreign_ws="$(stale_scan_foreign_tcp_listeners "$port")"
   append_pid_block "non-harness processes listening on Codex WS port $port" "$foreign_ws"
+  [[ -n "$foreign_ws" ]] && autoclean_blockers+=("non-harness processes listening on Codex WS port $port")
 
   # 8. launchd agent drift (program path gone but service still loaded).
   local drift_line
@@ -143,6 +154,17 @@ report_stale() {
   } >&2
 }
 
+report_autoclean_blockers() {
+  {
+    echo "error: auto-clean refused because live processes still own repo state"
+    local blocker
+    for blocker in "${autoclean_blockers[@]}"; do
+      echo "  - $blocker"
+    done
+    echo "wait for the active run to finish or clean manually"
+  } >&2
+}
+
 # Xcode UI silently recreates its default DerivedData HarnessMonitor bundle
 # as part of indexing whenever the project is open, so checking that path
 # here would fail on every CLI run that follows an IDE session. CLI builds
@@ -155,6 +177,11 @@ if (( ${#stale_lines[@]} == 0 )); then
 fi
 
 if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
+  if (( ${#autoclean_blockers[@]} > 0 )); then
+    report_autoclean_blockers
+    report_stale
+    exit 1
+  fi
   {
     echo "check:stale detected pollution; HARNESS_CHECK_AUTOCLEAN=1 is set, running clean:stale..."
     echo "--- initial pollution ---"
