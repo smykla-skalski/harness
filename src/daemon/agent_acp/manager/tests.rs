@@ -362,6 +362,7 @@ async fn repeated_process_faults_quarantine_process_key() {
         };
 
         let mut saw_quarantine_applied = false;
+        let mut saw_backoff_applied = false;
         for idx in 1..=3 {
             let snapshot = manager
                 .start_descriptor(&format!("sess-{idx}"), &request, &descriptor)
@@ -379,6 +380,11 @@ async fn repeated_process_faults_quarantine_process_key() {
                     continue;
                 };
                 if event.event == "acp_process_incident"
+                    && event.payload["backoff_applied"] == serde_json::Value::Bool(true)
+                {
+                    saw_backoff_applied = true;
+                }
+                if event.event == "acp_process_incident"
                     && event.payload["quarantine_applied"] == serde_json::Value::Bool(true)
                 {
                     saw_quarantine_applied = true;
@@ -386,6 +392,7 @@ async fn repeated_process_faults_quarantine_process_key() {
             }
             std::thread::sleep(Duration::from_millis(1100));
         }
+        assert!(saw_backoff_applied, "expected backoff-applied incident");
         assert!(saw_quarantine_applied, "expected quarantine-applied incident");
 
         let error = manager
