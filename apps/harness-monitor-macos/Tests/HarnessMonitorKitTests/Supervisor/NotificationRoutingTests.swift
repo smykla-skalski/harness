@@ -66,6 +66,28 @@ final class NotificationRoutingTests: XCTestCase {
     }
   }
 
+  func test_acpPermissionRequest_carriesDecisionIDAndCategory() {
+    let decisionID = "codex-approval:sess-7:acp-open"
+    let request = HarnessMonitorNotificationRequestFactory.makeAcpPermissionRequest(
+      agentName: "Worker Codex",
+      decisionID: decisionID
+    )
+
+    XCTAssertEqual(
+      request.content.categoryIdentifier,
+      HarnessMonitorAcpPermissionNotificationID.categoryIdentifier
+    )
+    XCTAssertEqual(
+      request.content.threadIdentifier,
+      HarnessMonitorAcpPermissionNotificationID.threadIdentifier
+    )
+    XCTAssertEqual(request.content.interruptionLevel, .timeSensitive)
+    XCTAssertTrue(request.content.body.contains("Worker Codex"))
+    let decodedID =
+      request.content.userInfo[HarnessMonitorSupervisorNotificationID.decisionIDKey] as? String
+    XCTAssertEqual(decodedID, decisionID)
+  }
+
   func test_tapOpenAction_publishesDecisionRequestedID() async throws {
     let controller = makeController()
     let decisionID = "codex-approval:sess-7:appr-open"
@@ -81,6 +103,24 @@ final class NotificationRoutingTests: XCTestCase {
     XCTAssertNil(controller.decisionRequestedID)
     controller.handleNotificationResponseForTesting(response)
     XCTAssertEqual(controller.decisionRequestedID, decisionID)
+  }
+
+  func test_tapAcpPermissionOpenAction_publishesDecisionRequestedID() {
+    let controller = makeController()
+    let decisionID = "codex-approval:sess-7:acp-open"
+    let request = HarnessMonitorNotificationRequestFactory.makeAcpPermissionRequest(
+      agentName: "Worker Codex",
+      decisionID: decisionID
+    )
+    let response = TestNotificationResponseFactory.make(
+      request: request,
+      actionIdentifier: HarnessMonitorNotificationActionID.open
+    )
+
+    controller.handleNotificationResponseForTesting(response)
+
+    XCTAssertEqual(controller.decisionRequestedID, decisionID)
+    XCTAssertEqual(controller.decisionRequestTick, 1)
   }
 
   func test_tapDefaultAction_publishesDecisionRequestedID() async throws {
@@ -171,6 +211,60 @@ final class NotificationRoutingTests: XCTestCase {
     )
   }
 
+  func test_deliverAcpPermissionRequest_schedulesWhenAuthorized() async {
+    let center = TestNotificationCenter()
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: .preview
+    )
+
+    let didSchedule = await controller.deliverAcpPermissionRequest(
+      AcpPermissionAttentionEvent(
+        batchID: "batch-1",
+        decisionID: "decision-1",
+        agentID: "worker-codex",
+        agentName: "Worker Codex",
+        requestCount: 2,
+        createdAt: "2026-04-28T00:00:01Z"
+      )
+    )
+
+    XCTAssertTrue(didSchedule)
+    let pendingRequests = await center.pendingNotificationRequests()
+    XCTAssertEqual(pendingRequests.count, 1)
+    XCTAssertEqual(
+      pendingRequests.first?.identifier,
+      "\(HarnessMonitorAcpPermissionNotificationID.requestPrefix)decision-1"
+    )
+  }
+
+  func test_deliverAcpPermissionRequest_skipsWhenDenied() async {
+    let center = TestNotificationCenter()
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: AcpPermissionUserNotifications.previewSettingsSnapshot(
+        environment: [
+          AcpPermissionUserNotifications.previewAuthorizationEnvironmentKey: "denied"
+        ]
+      )
+    )
+
+    let didSchedule = await controller.deliverAcpPermissionRequest(
+      AcpPermissionAttentionEvent(
+        batchID: "batch-1",
+        decisionID: "decision-1",
+        agentID: "worker-codex",
+        agentName: "Worker Codex",
+        requestCount: 2,
+        createdAt: "2026-04-28T00:00:01Z"
+      )
+    )
+
+    XCTAssertFalse(didSchedule)
+    let pendingRequests = await center.pendingNotificationRequests()
+    XCTAssertTrue(pendingRequests.isEmpty)
+  }
+
   private func makeSupervisorRequest(
     decisionID: String,
     severity: DecisionSeverity
@@ -206,6 +300,8 @@ private final class TestNotificationCenter: HarnessMonitorUserNotificationCenter
   @unchecked Sendable
 {
   var delegate: UNUserNotificationCenterDelegate?
+  private var pendingRequests: [UNNotificationRequest] = []
+  private var categories: Set<UNNotificationCategory> = []
 
   func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
     true
@@ -215,14 +311,14 @@ private final class TestNotificationCenter: HarnessMonitorUserNotificationCenter
     fatalError("notificationSettings() should not be called in NotificationRoutingTests")
   }
 
-  func pendingNotificationRequests() async -> [UNNotificationRequest] { [] }
+  func pendingNotificationRequests() async -> [UNNotificationRequest] { pendingRequests }
 
   func deliveredNotifications() async -> [UNNotification] { [] }
 
-  func notificationCategories() async -> Set<UNNotificationCategory> { [] }
+  func notificationCategories() async -> Set<UNNotificationCategory> { categories }
 
   func add(_ request: UNNotificationRequest) async throws {
-    _ = request
+    pendingRequests.append(request)
   }
 
   func removeAllPendingNotificationRequests() {}
@@ -234,7 +330,7 @@ private final class TestNotificationCenter: HarnessMonitorUserNotificationCenter
   }
 
   func setNotificationCategories(_ categories: Set<UNNotificationCategory>) {
-    _ = categories
+    self.categories = categories
   }
 }
 

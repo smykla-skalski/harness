@@ -17,6 +17,7 @@ public actor DecisionStore {
   public struct DecisionEvent: Sendable, Hashable {
     public enum Kind: String, Sendable {
       case inserted
+      case updated
       case snoozed
       case resolved
       case expired
@@ -93,6 +94,32 @@ public actor DecisionStore {
     yield(.init(kind: .inserted, decisionID: draft.id))
   }
 
+  public func upsertOpen(_ draft: DecisionDraft) async throws {
+    let eventKind: DecisionEvent.Kind? = try withMutationContext { context in
+      if let decision = try fetchDecision(id: draft.id, context: context) {
+        guard apply(draft, to: decision, reopen: true) else {
+          return nil
+        }
+        return DecisionEvent.Kind.updated
+      }
+      let model = Decision(
+        id: draft.id,
+        severity: draft.severity,
+        ruleID: draft.ruleID,
+        sessionID: draft.sessionID,
+        agentID: draft.agentID,
+        taskID: draft.taskID,
+        summary: draft.summary,
+        contextJSON: draft.contextJSON,
+        suggestedActionsJSON: draft.suggestedActionsJSON
+      )
+      context.insert(model)
+      return DecisionEvent.Kind.inserted
+    }
+    guard let eventKind else { return }
+    yield(.init(kind: eventKind, decisionID: draft.id))
+  }
+
   nonisolated public func openDecisions() async throws -> [Decision] {
     try withReadContext { context in
       let descriptor = FetchDescriptor<Decision>(
@@ -124,8 +151,11 @@ public actor DecisionStore {
   public func resolve(id: String, outcome: DecisionOutcome) async throws {
     let updated = try withMutationContext { context in
       guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      guard isUnresolved(decision) else { return false }
+      let encodedOutcome = try encodeOutcome(outcome)
       decision.statusRaw = Status.resolved
-      decision.resolutionJSON = try encodeOutcome(outcome)
+      decision.resolutionJSON = encodedOutcome
+      decision.snoozedUntil = nil
       return true
     }
     guard updated else { return }
@@ -151,7 +181,9 @@ public actor DecisionStore {
   public func dismiss(id: String) async throws {
     let updated = try withMutationContext { context in
       guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      guard isUnresolved(decision) else { return false }
       decision.statusRaw = Status.dismissed
+      decision.snoozedUntil = nil
       return true
     }
     guard updated else { return }
@@ -191,6 +223,53 @@ public actor DecisionStore {
 
   nonisolated private func isUnresolved(_ decision: Decision) -> Bool {
     decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed
+  }
+
+  nonisolated private func apply(
+    _ draft: DecisionDraft,
+    to decision: Decision,
+    reopen: Bool
+  ) -> Bool {
+    var changed = false
+    if decision.severityRaw != draft.severity.rawValue {
+      decision.severityRaw = draft.severity.rawValue
+      changed = true
+    }
+    if decision.ruleID != draft.ruleID {
+      decision.ruleID = draft.ruleID
+      changed = true
+    }
+    if decision.sessionID != draft.sessionID {
+      decision.sessionID = draft.sessionID
+      changed = true
+    }
+    if decision.agentID != draft.agentID {
+      decision.agentID = draft.agentID
+      changed = true
+    }
+    if decision.taskID != draft.taskID {
+      decision.taskID = draft.taskID
+      changed = true
+    }
+    if decision.summary != draft.summary {
+      decision.summary = draft.summary
+      changed = true
+    }
+    if decision.contextJSON != draft.contextJSON {
+      decision.contextJSON = draft.contextJSON
+      changed = true
+    }
+    if decision.suggestedActionsJSON != draft.suggestedActionsJSON {
+      decision.suggestedActionsJSON = draft.suggestedActionsJSON
+      changed = true
+    }
+    if reopen, decision.statusRaw != Status.open {
+      decision.statusRaw = Status.open
+      decision.snoozedUntil = nil
+      decision.resolutionJSON = nil
+      changed = true
+    }
+    return changed
   }
 
   private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {

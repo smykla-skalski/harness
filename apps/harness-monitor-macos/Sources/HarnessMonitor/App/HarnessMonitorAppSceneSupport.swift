@@ -373,7 +373,12 @@ final class AcpPermissionAttentionState {
   @ObservationIgnored private let notifications: HarnessMonitorUserNotificationController
   @ObservationIgnored private let previewContextOverride: PreviewContextOverride?
   @ObservationIgnored private var handledBatchIDs: Set<String> = []
+  @ObservationIgnored private var deliveringBatchIDs: Set<String> = []
   @ObservationIgnored private var handledDecisionRequestTick = 0
+  private var routeEventTick = 0
+  private var lastRouteSource = "none"
+  private var lastRouteDecisionID: String?
+  private var lastRouteBatchID: String?
 
   init(
     keyWindowObserver: KeyWindowObserver,
@@ -391,15 +396,25 @@ final class AcpPermissionAttentionState {
     ].joined(separator: ",")
   }
 
+  var routeStateText: String {
+    [
+      "source=\(lastRouteSource)",
+      "decision=\(lastRouteDecisionID ?? "nil")",
+      "batch=\(lastRouteBatchID ?? "nil")",
+      "tick=\(routeEventTick)",
+    ].joined(separator: " ")
+  }
+
   func reconcile(store: HarnessMonitorStore) {
     let currentBatchIDs = Set(store.acpPermissionAttentionEvents.map(\.batchID))
     handledBatchIDs.formIntersection(currentBatchIDs)
+    deliveringBatchIDs.formIntersection(currentBatchIDs)
     if let activeToast, !currentBatchIDs.contains(activeToast.batchID) {
       self.activeToast = nil
     }
 
     guard let nextAttention = store.acpPermissionAttentionEvents.first(where: {
-      !handledBatchIDs.contains($0.batchID)
+      !handledBatchIDs.contains($0.batchID) && !deliveringBatchIDs.contains($0.batchID)
     }) else {
       return
     }
@@ -414,7 +429,9 @@ final class AcpPermissionAttentionState {
 
     if prefersUserNotificationDelivery {
       activeToast = nil
+      deliveringBatchIDs.insert(nextAttention.batchID)
       Task { @MainActor in
+        defer { deliveringBatchIDs.remove(nextAttention.batchID) }
         if await notifications.deliverAcpPermissionRequest(nextAttention) {
           handledBatchIDs.insert(nextAttention.batchID)
         }
@@ -431,10 +448,21 @@ final class AcpPermissionAttentionState {
   }
 
   func showsToast(in windowID: String) -> Bool {
-    guard activeToast != nil else {
+    guard activeToast != nil, !prefersUserNotificationDelivery else {
       return false
     }
-    return !prefersUserNotificationDelivery && keyWindowObserver.isKey(windowID: windowID)
+    switch previewContextOverride {
+    case .foreground:
+      if keyWindowObserver.isKey(windowID: windowID) {
+        return true
+      }
+      return keyWindowObserver.snapshot.keyWindowIdentifier == nil
+        && windowID == HarnessMonitorWindowID.main
+    case .hidden:
+      return false
+    case nil:
+      return keyWindowObserver.isKey(windowID: windowID)
+    }
   }
 
   func routeActiveToast(
@@ -444,12 +472,17 @@ final class AcpPermissionAttentionState {
     guard let attention = activeToast else {
       return
     }
-    activeToast = nil
+    publishRouteEvent(
+      source: "toast",
+      decisionID: attention.decisionID,
+      batchID: attention.batchID
+    )
     routeToDecision(
       decisionID: attention.decisionID,
       store: store,
       openWindow: openWindow
     )
+    activeToast = nil
   }
 
   func routeNotificationRequestIfNeeded(
@@ -462,6 +495,11 @@ final class AcpPermissionAttentionState {
       return
     }
     handledDecisionRequestTick = notifications.decisionRequestTick
+    publishRouteEvent(
+      source: "notification",
+      decisionID: decisionID,
+      batchID: nil
+    )
     routeToDecision(
       decisionID: decisionID,
       store: store,
@@ -492,18 +530,27 @@ final class AcpPermissionAttentionState {
     return selectedDecisionID != attention.decisionID
   }
 
+  private func publishRouteEvent(source: String, decisionID: String, batchID: String?) {
+    routeEventTick += 1
+    lastRouteSource = source
+    lastRouteDecisionID = decisionID
+    lastRouteBatchID = batchID
+  }
+
   private func routeToDecision(
     decisionID: String,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openWindow: OpenWindowAction,
+    activatesApp: Bool = true
   ) {
     store.supervisorSelectedDecisionID = decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
-    Self.activateHarnessMonitorApp()
+    if activatesApp {
+      Self.activateHarnessMonitorApp()
+    }
     openWindow(id: HarnessMonitorWindowID.decisions)
     Task { @MainActor in
-      await Task.yield()
-      Self.decisionsWindow()?.makeKeyAndOrderFront(nil)
+      await Self.focusDecisionsWindow()
     }
   }
 
@@ -518,7 +565,18 @@ final class AcpPermissionAttentionState {
   private static func decisionsWindow() -> NSWindow? {
     NSApplication.shared.windows.first { window in
       let identifier = window.identifier?.rawValue ?? ""
-      return identifier.contains(HarnessMonitorWindowID.decisions)
+      return KeyWindowObserver.matchesWindowID(identifier, expected: HarnessMonitorWindowID.decisions)
+    }
+  }
+
+  private static func focusDecisionsWindow() async {
+    for _ in 0..<3 {
+      await Task.yield()
+      guard let window = decisionsWindow() else {
+        continue
+      }
+      window.makeKeyAndOrderFront(nil)
+      return
     }
   }
 
@@ -589,6 +647,14 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
         reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.18),
         value: attentionState.activeToast?.batchID
       )
+      .overlay {
+        if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.acpPermissionToastRouteState,
+            text: attentionState.routeStateText
+          )
+        }
+      }
       .task(id: observationKey) {
         attentionState.reconcile(store: store)
       }

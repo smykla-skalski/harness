@@ -4,6 +4,7 @@ import SwiftUI
 public struct PreferencesSupervisorNotificationsPane: View {
   let notifications: HarnessMonitorUserNotificationController
   @State private var viewModel: PreferencesSupervisorNotificationsViewModel
+  @Environment(\.openURL) private var openURL
 
   public init(
     notifications: HarnessMonitorUserNotificationController,
@@ -17,6 +18,7 @@ public struct PreferencesSupervisorNotificationsPane: View {
 
   public var body: some View {
     Form {
+      acpStatusSection
       Section {
         LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
         LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
@@ -43,6 +45,47 @@ public struct PreferencesSupervisorNotificationsPane: View {
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.preferencesSupervisorPane("notifications")
     )
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.preferencesAcpNotificationStatusState,
+        text: "authorization=\(acpAuthorizationStatus.rawValue)"
+      )
+    }
+  }
+
+  private var acpAuthorizationStatus: AcpPermissionNotificationAuthorizationStatus {
+    AcpPermissionUserNotifications.authorizationStatus(
+      from: notifications.settingsSnapshot
+    )
+  }
+
+  @ViewBuilder private var acpStatusSection: some View {
+    Section {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        LabeledContent("Background ACP alerts", value: acpAuthorizationStatus.displayTitle)
+        Text(acpAuthorizationStatus.detailText)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        if acpAuthorizationStatus.showsSystemSettingsLink,
+          let settingsURL = AcpPermissionUserNotifications.systemSettingsURL
+        {
+          HarnessMonitorActionButton(
+            title: "Open System Settings",
+            tint: .secondary,
+            variant: .bordered,
+            accessibilityIdentifier: HarnessMonitorAccessibility.preferencesAcpOpenSystemSettings
+          ) {
+            openURL(settingsURL)
+          }
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesAcpNotificationStatus)
+    } header: {
+      Text("ACP Attention")
+    } footer: {
+      Text("Notification Center delivery is optional. Dock, badge, and Decisions routes stay available when system permission is denied.")
+    }
   }
 }
 

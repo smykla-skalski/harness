@@ -16,6 +16,14 @@ public struct AcpPermissionAttentionToastView: View {
     return "\(attention.requestCount) permission requests are waiting."
   }
 
+  private var stateMarkerText: String {
+    [
+      "batch=\(attention.batchID)",
+      "decision=\(attention.decisionID)",
+      "agent=\(attention.agentID)",
+    ].joined(separator: " ")
+  }
+
   public init(
     attention: AcpPermissionAttentionEvent,
     openDecisions: @escaping @MainActor @Sendable () -> Void,
@@ -45,12 +53,14 @@ public struct AcpPermissionAttentionToastView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        HarnessMonitorActionButton(
-          title: "Open Decisions",
-          variant: .prominent,
-          accessibilityIdentifier: HarnessMonitorAccessibility.acpPermissionToastActionButton,
-          action: { openDecisions() }
-        )
+        Button("Open Decisions") {
+          openDecisions()
+        }
+        .harnessActionButtonStyle(variant: .prominent)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionToastActionButton)
+        .accessibilityFrameMarker("\(HarnessMonitorAccessibility.acpPermissionToastActionButton).frame")
 
         Button {
           dismiss()
@@ -77,14 +87,12 @@ public struct AcpPermissionAttentionToastView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionToast)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.acpPermissionToastFrame)
-    .accessibilityTestProbe(
-      HarnessMonitorAccessibility.acpPermissionToastState,
-      value: [
-        "batch=\(attention.batchID)",
-        "decision=\(attention.decisionID)",
-        "agent=\(attention.agentID)",
-      ].joined(separator: " ")
-    )
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.acpPermissionToastState,
+        text: stateMarkerText
+      )
+    }
     .onAppear {
       AccessibilityNotification.Announcement(attention.toastMessage).post()
     }
