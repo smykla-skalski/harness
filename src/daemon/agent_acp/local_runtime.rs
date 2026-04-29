@@ -23,6 +23,7 @@ use super::active::{
 };
 use super::manager::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, PERMISSION_RESPONSE_DEADLINE,
+    process_fault_policy_enabled,
 };
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
@@ -50,7 +51,9 @@ impl AcpAgentManagerHandle {
             &spawn,
             &project_dir,
         );
-        self.ensure_process_key_start_allowed(process_key.as_str())?;
+        if process_fault_policy_enabled() {
+            self.ensure_process_key_start_allowed(process_key.as_str())?;
+        }
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
