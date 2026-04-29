@@ -35,9 +35,7 @@ mod context;
 mod session_guard;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
-use context::{
-    ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result,
-};
+use context::{ProtocolContext, handle_permission_request, respond_client_result};
 use session_guard::{RouteTarget, SessionRouteGuard};
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
@@ -177,29 +175,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         .name("harness")
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
-                let target = match notification_guard.ensure_known(&notification.session_id) {
-                    Ok(target) => target,
-                    Err(error) => {
-                        if error.message.contains("already ended") {
-                            tracing::debug!(
-                                session_id = %notification.session_id,
-                                "dropping late ACP notification after session shutdown"
-                            );
-                            return Ok(());
-                        }
-                        return Err(client_error_to_acp(error));
-                    }
-                };
-                let routed = RoutedSessionNotification {
-                    acp_id: target.acp_id,
-                    session_id: target.session_id,
-                    notification,
-                };
-                notifications
-                    .send(routed)
-                    .await
-                    .map_err(|error| AcpError::new(-32603, format!("queue ACP event: {error}")))?;
-                Ok(())
+                route_session_notification(&notification_guard, &notifications, notification).await
             },
             agent_client_protocol::on_receive_notification!(),
         )
@@ -274,6 +250,51 @@ async fn run_protocol(args: RunProtocolArgs) {
         })
         .await;
     report_protocol_result(result, disconnect_tx).await;
+}
+
+async fn route_session_notification(
+    notification_guard: &SessionRouteGuard,
+    notifications: &mpsc::Sender<RoutedSessionNotification>,
+    notification: SessionNotification,
+) -> AcpResult<()> {
+    let Some(routed) = routed_session_notification(notification_guard, notification) else {
+        return Ok(());
+    };
+    notifications
+        .send(routed)
+        .await
+        .map_err(|error| AcpError::new(-32603, format!("queue ACP event: {error}")))?;
+    Ok(())
+}
+
+fn routed_session_notification(
+    notification_guard: &SessionRouteGuard,
+    notification: SessionNotification,
+) -> Option<RoutedSessionNotification> {
+    let target = match notification_guard.ensure_known(&notification.session_id) {
+        Ok(target) => target,
+        Err(route_error) => {
+            log_unroutable_notification(&notification.session_id, route_error.reason.as_str());
+            return None;
+        }
+    };
+    Some(RoutedSessionNotification {
+        acp_id: target.acp_id,
+        session_id: target.session_id,
+        notification,
+    })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_unroutable_notification(session_id: &SessionId, reason: &str) {
+    tracing::debug!(
+        session_id = %session_id,
+        reason,
+        "dropping unroutable ACP notification"
+    );
 }
 
 async fn report_protocol_result(
