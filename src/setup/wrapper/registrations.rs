@@ -217,10 +217,8 @@ pub(super) fn build_codex_config() -> String {
     concat!(
         "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
         "\n",
-        "# Enable official Codex hooks loaded from the adjacent .codex/hooks.json file.\n",
-        "# Hook definitions stay in hooks.json; config.toml only turns the engine on.\n",
         "[features]\n",
-        "codex_hooks = true\n"
+        "codex_hooks = true\n",
     )
     .to_string()
 }

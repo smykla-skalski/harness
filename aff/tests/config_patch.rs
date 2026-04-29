@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 
 use assert_cmd::Command;
-use predicates::str::contains;
 use tempfile::tempdir;
 
 fn write_file(path: &Path, contents: &str) {
@@ -14,6 +13,15 @@ fn write_file(path: &Path, contents: &str) {
 
 fn read_file(path: &Path) -> String {
     fs::read_to_string(path).expect("read patched config")
+}
+
+fn codex_config() -> &'static str {
+    concat!(
+        "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
+        "\n",
+        "[features]\n",
+        "codex_hooks = true\n",
+    )
 }
 
 fn assert_single_aff_commands(config: &str, agent: &str) {
@@ -89,39 +97,10 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
 }
 
 #[test]
-fn bootstrap_patches_codex_hooks_with_aff_hooks() {
+fn bootstrap_preserves_codex_config() {
     let dir = tempdir().expect("tempdir");
-    let hooks_path = dir.path().join(".codex").join("hooks.json");
-    write_file(
-        &hooks_path,
-        r#"{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "harness hook --agent codex suite:run tool-guard",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "harness agents session-start --agent codex --project-dir \"$PWD\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
-}"#,
-    );
+    let config_path = dir.path().join(".codex").join("config.toml");
+    write_file(&config_path, codex_config());
 
     Command::cargo_bin("aff")
         .expect("aff binary")
@@ -136,9 +115,8 @@ fn bootstrap_patches_codex_hooks_with_aff_hooks() {
         .assert()
         .success();
 
-    let updated = read_file(&hooks_path);
-    assert!(updated.contains("harness hook --agent codex suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "codex");
+    let updated = read_file(&config_path);
+    assert_eq!(updated, codex_config());
 }
 
 #[test]
@@ -328,28 +306,10 @@ fn bootstrap_patches_opencode_hooks_with_aff_hooks() {
 }
 
 #[test]
-fn generate_check_detects_and_then_accepts_aff_runtime_hooks() {
+fn generate_check_accepts_codex_config_without_aff_patch() {
     let dir = tempdir().expect("tempdir");
-    let hooks_path = dir.path().join(".codex").join("hooks.json");
-    write_file(
-        &hooks_path,
-        r#"{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "harness hook --agent codex suite:run tool-guard",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
-}"#,
-    );
+    let config_path = dir.path().join(".codex").join("config.toml");
+    write_file(&config_path, codex_config());
 
     Command::cargo_bin("aff")
         .expect("aff binary")
@@ -364,8 +324,7 @@ fn generate_check_detects_and_then_accepts_aff_runtime_hooks() {
             "codex",
         ])
         .assert()
-        .failure()
-        .stderr(contains(".codex/hooks.json"));
+        .success();
 
     Command::cargo_bin("aff")
         .expect("aff binary")
@@ -395,4 +354,6 @@ fn generate_check_detects_and_then_accepts_aff_runtime_hooks() {
         ])
         .assert()
         .success();
+
+    assert_eq!(read_file(&config_path), codex_config());
 }

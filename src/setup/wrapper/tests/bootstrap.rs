@@ -63,15 +63,11 @@ fn claude_lifecycle_commands_match_hook_template() {
 }
 
 #[test]
-fn build_codex_config_includes_notify_and_hooks_flag() {
+fn build_codex_config_includes_notify() {
     let config = build_codex_config();
     assert_contains_all(
         &config,
-        &[
-            "\"audit-turn\"",
-            "codex_hooks = true",
-            "Hook definitions stay in hooks.json",
-        ],
+        &["\"audit-turn\"", "[features]", "codex_hooks = true"],
     );
     assert_contains_none(
         &config,
@@ -80,22 +76,6 @@ fn build_codex_config_includes_notify_and_hooks_flag() {
             "session_start = [",
             "pre_compact = [",
             "session_end = [",
-        ],
-    );
-}
-
-fn assert_codex_hooks(hooks: &str) {
-    assert_contains_all(
-        hooks,
-        &[
-            "\"Stop\"",
-            "\"UserPromptSubmit\"",
-            "\"PreToolUse\"",
-            "\"PostToolUse\"",
-            "\"SubagentStart\"",
-            "\"SubagentStop\"",
-            "tool-guard",
-            "tool-result",
         ],
     );
 }
@@ -141,17 +121,17 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
         .join("skills")
         .join("harness")
         .join("SKILL.md");
-    let hooks_path = dir.path().join(".codex").join("hooks.json");
     let config_path = dir.path().join(".codex").join("config.toml");
 
-    assert_written_paths(&written, &[&plugin_skill, &hooks_path, &config_path]);
+    assert_written_paths(&written, &[&plugin_skill, &config_path]);
 
     let skill = fs::read_to_string(plugin_skill).unwrap();
     assert_contains_all(&skill, &["name: harness"]);
-    assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
     let config = fs::read_to_string(config_path).unwrap();
-    assert_contains_all(&config, &["\"audit-turn\"", "codex_hooks = true"]);
-    assert_contains_none(&config, &["[hooks]"]);
+    assert_contains_all(
+        &config,
+        &["\"audit-turn\"", "[features]", "codex_hooks = true"],
+    );
 }
 
 #[test]
@@ -308,25 +288,6 @@ fn harness_bootstrap_only_adds_suite_hooks_when_all_enabled() {
     let settings_path = dir.path().join(".claude").join("settings.json");
     let baseline = fs::read_to_string(&settings_path).unwrap();
     assert!(baseline.contains("guard-stop"));
-}
-
-#[test]
-fn default_flags_omit_optional_suite_hooks_in_codex_hooks_json() {
-    let dir = tempfile::tempdir().unwrap();
-    write_agent_bootstrap(
-        dir.path(),
-        HookAgent::Codex,
-        false,
-        &[],
-        RuntimeHookFlags::default(),
-    )
-    .unwrap();
-    let hooks = fs::read_to_string(dir.path().join(".codex").join("hooks.json")).unwrap();
-    assert!(!hooks.contains("guard-stop"));
-    assert!(!hooks.contains("context-agent"));
-    assert!(!hooks.contains("validate-agent"));
-    assert!(hooks.contains("tool-guard"));
-    assert!(hooks.contains("tool-result"));
 }
 
 #[test]
