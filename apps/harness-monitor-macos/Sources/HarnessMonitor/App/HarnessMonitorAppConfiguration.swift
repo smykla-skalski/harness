@@ -16,6 +16,7 @@ struct HarnessMonitorAppConfiguration {
   let launchMode: HarnessMonitorLaunchMode
   let initialThemeMode: HarnessMonitorThemeMode
   let isUITesting: Bool
+  let defersInitialMainWindowContentUntilBootstrap: Bool
   let mainWindowDefaultSize: CGSize
   let perfScenario: HarnessMonitorPerfScenario?
   let preferencesInitialSection: PreferencesSection
@@ -68,6 +69,10 @@ struct HarnessMonitorAppConfiguration {
       launchMode: launchMode,
       initialThemeMode: uiTestOverrides.themeMode,
       isUITesting: isUITesting,
+      defersInitialMainWindowContentUntilBootstrap: shouldDeferInitialMainWindowContentUntilBootstrap(
+        isUITesting: isUITesting,
+        hasPerfScenario: perfScenario != nil
+      ),
       mainWindowDefaultSize: HarnessMonitorUITestWindowDefaults.mainWindowSize(
         environment: resolvedEnvironment,
         isUITesting: isUITesting
@@ -108,6 +113,16 @@ struct HarnessMonitorAppConfiguration {
         from: environment.values[resetBackgroundRecentsOverrideKey]
       ) ?? false
     )
+  }
+
+  static func shouldDeferInitialMainWindowContentUntilBootstrap(
+    isUITesting: Bool,
+    hasPerfScenario: Bool = false,
+    bundleIdentifier: String? = Bundle.main.bundleIdentifier
+  ) -> Bool {
+    isUITesting
+      && !hasPerfScenario
+      && bundleIdentifier == uiTestingBundleIdentifier
   }
 
   private struct UITestOverrides {

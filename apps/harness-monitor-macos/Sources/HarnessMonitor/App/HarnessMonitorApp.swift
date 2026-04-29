@@ -13,6 +13,7 @@ struct HarnessMonitorApp: App {
   private let isUITesting: Bool
   private let isTestRun: Bool
   private let launchMode: HarnessMonitorLaunchMode
+  private let defersInitialMainWindowContentUntilBootstrap: Bool
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
   private let perfScenario: HarnessMonitorPerfScenario?
@@ -59,6 +60,8 @@ struct HarnessMonitorApp: App {
     isUITesting = configuration.isUITesting
     self.isTestRun = isTestRun
     launchMode = configuration.launchMode
+    defersInitialMainWindowContentUntilBootstrap =
+      configuration.defersInitialMainWindowContentUntilBootstrap
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
     let notificationController =
       isTestRun
@@ -76,9 +79,21 @@ struct HarnessMonitorApp: App {
     _agentsNavigationBridge = State(initialValue: AgentsWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
+    delegate.bind(store: store)
   }
 
   var body: some Scene {
+    mainWindowScene
+    settingsWindowScene
+    agentsWindowScene
+    decisionsWindowScene
+  }
+
+  private var allowsWindowRestoration: Bool {
+    launchMode == .live && !isTestRun
+  }
+
+  private var mainWindowScene: some Scene {
     WindowGroup("Harness Monitor", id: HarnessMonitorWindowID.main) {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
@@ -113,7 +128,9 @@ struct HarnessMonitorApp: App {
       )
       WindowMenuCommands()
     }
+  }
 
+  private var settingsWindowScene: some Scene {
     Window("Settings", id: HarnessMonitorWindowID.preferences) {
       HarnessMonitorSettingsRootView(
         store: store,
@@ -128,7 +145,9 @@ struct HarnessMonitorApp: App {
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+  }
 
+  private var agentsWindowScene: some Scene {
     Window("Agents", id: HarnessMonitorWindowID.agents) {
       AgentsWindowRootView(
         store: store,
@@ -142,7 +161,9 @@ struct HarnessMonitorApp: App {
     .windowStyle(.titleBar)
     .defaultSize(width: 980, height: 620)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+  }
 
+  private var decisionsWindowScene: some Scene {
     Window("Decisions", id: HarnessMonitorWindowID.decisions) {
       DecisionsWindowView(store: store)
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
@@ -151,10 +172,6 @@ struct HarnessMonitorApp: App {
     .windowStyle(.titleBar)
     .defaultSize(width: 900, height: 640)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-  }
-
-  private var allowsWindowRestoration: Bool {
-    launchMode == .live && !isTestRun
   }
 
   @ViewBuilder private var mainWindowContent: some View {
@@ -167,7 +184,8 @@ struct HarnessMonitorApp: App {
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
-          perfScenario: perfScenario
+          perfScenario: perfScenario,
+          defersInitialContentUntilBootstrap: defersInitialMainWindowContentUntilBootstrap
         )
         .modelContainer(container)
       } else {
@@ -178,7 +196,8 @@ struct HarnessMonitorApp: App {
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
-          perfScenario: perfScenario
+          perfScenario: perfScenario,
+          defersInitialContentUntilBootstrap: defersInitialMainWindowContentUntilBootstrap
         )
       }
     }

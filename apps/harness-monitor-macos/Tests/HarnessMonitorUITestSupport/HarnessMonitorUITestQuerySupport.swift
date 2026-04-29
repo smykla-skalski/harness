@@ -32,6 +32,12 @@ extension HarnessMonitorUITestCase {
     return mainWindow.exists ? mainWindow : app.windows.firstMatch
   }
 
+  func appChromeRoot(in app: XCUIApplication) -> XCUIElement {
+    app.descendants(matching: .any)
+      .matching(identifier: HarnessMonitorUITestAccessibility.appChromeRoot)
+      .firstMatch
+  }
+
   func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
     let primaryWindow = mainWindow(in: app)
     if primaryWindow.exists, primaryWindow.frame.contains(element.frame) {

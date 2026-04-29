@@ -53,11 +53,23 @@ extension HarnessMonitorUITestCase {
       trace=\(diagnosticsTracePath() ?? "unavailable")
       """
     )
+    let contentReady = waitForLaunchContent(app, mode: mode)
+    XCTAssertTrue(
+      contentReady,
+      """
+      UI-test host never finished loading app chrome.
+      mode=\(mode)
+      trace=\(diagnosticsTracePath() ?? "unavailable")
+      """
+    )
     if Self.reuseLaunchedApp {
       Self.cachedLaunchedApp = app
     }
     if windowReady {
       recordDiagnosticsTrace(event: "launch.window-ready", app: app, details: ["mode": mode])
+    }
+    if contentReady {
+      recordDiagnosticsTrace(event: "launch.content-ready", app: app, details: ["mode": mode])
     }
     return app
   }
@@ -77,6 +89,11 @@ extension HarnessMonitorUITestCase {
       details: ["mode": mode]
     )
     cached.activate()
+    recordDiagnosticsTrace(
+      event: "launch.reuse.activate",
+      app: cached,
+      details: ["mode": mode]
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         cached.state == .runningForeground
@@ -87,13 +104,20 @@ extension HarnessMonitorUITestCase {
 
   private func waitForLaunchForeground(_ app: XCUIApplication, mode: String) -> Bool {
     let foregroundReady = waitUntil(timeout: Self.uiTimeout) {
-      if app.state != .runningForeground {
-        app.activate()
-      }
-
       return app.state == .runningForeground || self.mainWindow(in: app).exists
     }
     if !foregroundReady {
+      recordDiagnosticsTrace(
+        event: "launch.foreground.activate-fallback",
+        app: app,
+        details: ["mode": mode]
+      )
+      app.activate()
+      if waitUntil(timeout: Self.fastActionTimeout, condition: {
+        app.state == .runningForeground || self.mainWindow(in: app).exists
+      }) {
+        return true
+      }
       recordDiagnosticsTrace(
         event: "launch.foreground.timeout",
         app: app,
@@ -106,7 +130,6 @@ extension HarnessMonitorUITestCase {
   private func waitForLaunchWindow(_ app: XCUIApplication, mode: String) -> Bool {
     let windowReady = waitUntil(timeout: Self.uiTimeout) {
       let window = self.mainWindow(in: app)
-      app.activate()
       return
         window.exists
         && window.frame.width > 0
@@ -114,11 +137,46 @@ extension HarnessMonitorUITestCase {
     }
     if !windowReady {
       recordDiagnosticsTrace(
+        event: "launch.window.activate-fallback",
+        app: app,
+        details: ["mode": mode]
+      )
+      app.activate()
+      if waitUntil(timeout: Self.fastActionTimeout, condition: {
+        let window = self.mainWindow(in: app)
+        return
+          window.exists
+          && window.frame.width > 0
+          && window.frame.height > 0
+      }) {
+        return true
+      }
+      recordDiagnosticsTrace(
         event: "launch.window.timeout",
         app: app,
         details: ["mode": mode]
       )
     }
     return windowReady
+  }
+
+  private func waitForLaunchContent(_ app: XCUIApplication, mode: String) -> Bool {
+    let contentReady = waitUntil(timeout: Self.uiTimeout) {
+      let window = self.mainWindow(in: app)
+      let appChrome = self.appChromeRoot(in: app)
+      return
+        window.exists
+        && window.frame.width > 0
+        && window.frame.height > 0
+        && appChrome.exists
+    }
+    if !contentReady {
+      recordDiagnosticsTrace(
+        event: "launch.content.timeout",
+        app: app,
+        details: ["mode": mode]
+      )
+    }
+    return contentReady
   }
 }
