@@ -183,7 +183,7 @@ impl AcpAgentManagerHandle {
         let session = self.session(acp_id)?;
         if !session.resolve_permission_batch(batch_id, decision) {
             return Err(CliErrorKind::session_not_active(format!(
-                "ACP permission batch '{batch_id}' not found"
+                "permission_batch_stale: ACP permission batch '{batch_id}' is not pending for session '{acp_id}'"
             ))
             .into());
         }
