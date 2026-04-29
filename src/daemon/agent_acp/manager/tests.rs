@@ -15,6 +15,14 @@ fn manager() -> AcpAgentManagerHandle {
     AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()))
 }
 
+fn manager_with_events() -> (AcpAgentManagerHandle, broadcast::Receiver<crate::daemon::protocol::StreamEvent>) {
+    let (sender, receiver) = broadcast::channel(64);
+    (
+        AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new())),
+        receiver,
+    )
+}
+
 fn descriptor(command: &Path) -> AcpAgentDescriptor {
     AcpAgentDescriptor {
         id: "fake".to_string(),
@@ -100,7 +108,7 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             project_dir: Some(temp.path().display().to_string()),
             record_permissions: false,
         };
-        let manager = manager();
+        let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
         let snapshot = manager
             .start_descriptor("sess-1", &request, &descriptor)
@@ -132,6 +140,13 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             panic!("expected disconnected status");
         };
         assert!(stderr_tail.expect("stderr tail").contains("boom"));
+        let saw_process_incident = (0..32).any(|_| {
+            match events.try_recv() {
+                Ok(event) => event.event == "acp_process_incident",
+                Err(_) => false,
+            }
+        });
+        assert!(saw_process_incident, "expected acp_process_incident event");
     });
 }
 
