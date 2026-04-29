@@ -55,20 +55,26 @@ fn codex_hooks() -> &'static str {
 }"#
 }
 
-fn assert_single_aff_commands(config: &str, agent: &str) {
+fn assert_aff_commands(config: &str, agent: &str, expect_pretool: bool) {
     let repo_policy = format!("aff repo-policy --agent {agent}");
     let session_start = format!("aff session-start --agent {agent}");
 
-    assert!(config.contains(&repo_policy), "missing repo-policy command");
+    if expect_pretool {
+        assert!(config.contains(&repo_policy), "missing repo-policy command");
+    } else {
+        assert!(!config.contains(&repo_policy), "unexpected repo-policy command");
+    }
     assert!(
         config.contains(&session_start),
         "missing session-start command"
     );
-    assert_eq!(
-        config.matches(&repo_policy).count(),
-        1,
-        "repo-policy duplicated"
-    );
+    if expect_pretool {
+        assert_eq!(
+            config.matches(&repo_policy).count(),
+            1,
+            "repo-policy duplicated"
+        );
+    }
     assert_eq!(
         config.matches(&session_start).count(),
         1,
@@ -123,8 +129,8 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
         .success();
 
     let updated = read_file(&settings_path);
-    assert!(updated.contains("harness hook --agent claude suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "claude");
+    assert!(!updated.contains("harness hook --agent claude suite:run tool-guard"));
+    assert_aff_commands(&updated, "claude", false);
 }
 
 #[test]
@@ -150,8 +156,35 @@ fn bootstrap_patches_codex_hooks_with_aff_hooks() {
 
     assert_eq!(read_file(&config_path), codex_config());
     let updated = read_file(&hooks_path);
+    assert!(!updated.contains("harness hook --agent codex suite:run tool-guard"));
+    assert_aff_commands(&updated, "codex", false);
+}
+
+#[test]
+fn bootstrap_can_opt_in_to_pretool_hooks() {
+    let dir = tempdir().expect("tempdir");
+    let config_path = dir.path().join(".codex").join("config.toml");
+    let hooks_path = dir.path().join(".codex").join("hooks.json");
+    write_file(&config_path, codex_config());
+    write_file(&hooks_path, codex_hooks());
+
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .args([
+            "setup",
+            "bootstrap",
+            "--project-dir",
+            dir.path().to_str().expect("path"),
+            "--agents",
+            "codex",
+            "--install-pretool-hooks",
+        ])
+        .assert()
+        .success();
+
+    let updated = read_file(&hooks_path);
     assert!(updated.contains("harness hook --agent codex suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "codex");
+    assert_aff_commands(&updated, "codex", true);
 }
 
 #[test]
@@ -203,8 +236,8 @@ fn bootstrap_patches_gemini_settings_with_aff_hooks() {
         .success();
 
     let updated = read_file(&settings_path);
-    assert!(updated.contains("harness hook --agent gemini suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "gemini");
+    assert!(!updated.contains("harness hook --agent gemini suite:run tool-guard"));
+    assert_aff_commands(&updated, "gemini", false);
 }
 
 #[test]
@@ -254,8 +287,8 @@ fn bootstrap_patches_copilot_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&config_path);
-    assert!(updated.contains("harness hook --agent copilot suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "copilot");
+    assert!(!updated.contains("harness hook --agent copilot suite:run tool-guard"));
+    assert_aff_commands(&updated, "copilot", false);
 }
 
 #[test]
@@ -295,8 +328,8 @@ fn bootstrap_patches_vibe_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(updated.contains("harness hook --agent vibe suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "vibe");
+    assert!(!updated.contains("harness hook --agent vibe suite:run tool-guard"));
+    assert_aff_commands(&updated, "vibe", false);
 }
 
 #[test]
@@ -336,8 +369,8 @@ fn bootstrap_patches_opencode_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(updated.contains("harness hook --agent opencode suite:run tool-guard"));
-    assert_single_aff_commands(&updated, "opencode");
+    assert!(!updated.contains("harness hook --agent opencode suite:run tool-guard"));
+    assert_aff_commands(&updated, "opencode", false);
 }
 
 #[test]
@@ -392,5 +425,5 @@ fn generate_check_patches_codex_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert_single_aff_commands(&updated, "codex");
+    assert_aff_commands(&updated, "codex", false);
 }
