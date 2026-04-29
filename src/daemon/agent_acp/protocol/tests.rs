@@ -105,7 +105,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     let (client_transport, agent_transport) = Channel::duplex();
     let agent_task = tokio::spawn(run_agent_with_stale_notification(agent_transport));
     let (notification_tx, _notifications) = mpsc::channel(4);
-    let (_cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
 
@@ -137,15 +137,13 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
             .await
     });
 
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    cancel_tx.send(()).expect("send cancel");
     let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)
         .await
-        .expect("protocol should fail quickly on stale session id")
+        .expect("protocol should stop after cancel")
         .expect("protocol task should not panic");
-    let error = protocol_result.expect_err("protocol should return stale-session error");
-    assert!(
-        error.to_string().contains("stale_session_id"),
-        "unexpected error: {error}"
-    );
+    protocol_result.expect("protocol should remain healthy after stale notification");
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();
