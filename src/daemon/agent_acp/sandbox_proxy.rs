@@ -163,7 +163,14 @@ impl AcpAgentManagerHandle {
                             "ACP bridge event continuity changed; forcing authoritative resync"
                         );
                         match self.reconcile_sandbox_state(&bridge) {
-                            Ok(()) => idle_polls = 0,
+                            Ok(true) => idle_polls = 0,
+                            Ok(false) => {
+                                tracing::warn!(
+                                    "ACP sandbox reconcile incomplete after snapshot fetch failures; retrying without cursor advance"
+                                );
+                                thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
+                                continue;
+                            }
                             Err(error) => {
                                 tracing::warn!(%error, "ACP sandbox reconcile failed; retrying");
                                 thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
@@ -206,10 +213,11 @@ impl AcpAgentManagerHandle {
         }
     }
 
-    fn reconcile_sandbox_state(&self, bridge: &BridgeClient) -> Result<(), CliError> {
+    fn reconcile_sandbox_state(&self, bridge: &BridgeClient) -> Result<bool, CliError> {
         let inspect = bridge.acp_inspect(None)?;
         let mut agents_by_session = BTreeMap::<String, Vec<AcpAgentSnapshot>>::new();
         let mut current_sessions = BTreeSet::new();
+        let mut had_fetch_failures = false;
         for agent in inspect.agents {
             current_sessions.insert(agent.session_id.clone());
             match bridge.acp_get(&agent.acp_id) {
@@ -220,6 +228,7 @@ impl AcpAgentManagerHandle {
                         .push(snapshot);
                 }
                 Err(error) => {
+                    had_fetch_failures = true;
                     tracing::warn!(
                         %error,
                         session_id = %agent.session_id,
@@ -228,6 +237,9 @@ impl AcpAgentManagerHandle {
                     );
                 }
             }
+        }
+        if had_fetch_failures {
+            return Ok(false);
         }
         let reconciled_sessions = self
             .sandbox_known_sessions()
@@ -244,7 +256,7 @@ impl AcpAgentManagerHandle {
             }
         }
         self.set_sandbox_known_sessions(current_sessions);
-        Ok(())
+        Ok(true)
     }
 
     fn remember_sandbox_session(&self, session_id: &str) {
