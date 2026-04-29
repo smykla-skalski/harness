@@ -144,6 +144,7 @@ impl AcpAgentManagerHandle {
     fn run_sandbox_event_poller(&self) {
         let mut idle_polls = 0usize;
         let mut last_protocol_desync: Option<(String, u64, u64, bool, Vec<String>)> = None;
+        let mut last_pool_key_mismatch = BTreeMap::<String, Vec<String>>::new();
         loop {
             let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
                 Ok(bridge) => bridge,
@@ -191,7 +192,11 @@ impl AcpAgentManagerHandle {
                             emit_bridge_resync_incident(&self.sender(), &payload);
                             last_protocol_desync = Some(current_desync);
                         }
-                        match self.reconcile_sandbox_state(&bridge, inspect.ok()) {
+                        match self.reconcile_sandbox_state(
+                            &bridge,
+                            inspect.ok(),
+                            &mut last_pool_key_mismatch,
+                        ) {
                             Ok(true) => idle_polls = 0,
                             Ok(false) => {
                                 tracing::warn!(
@@ -253,6 +258,7 @@ impl AcpAgentManagerHandle {
         &self,
         bridge: &BridgeClient,
         inspect: Option<AcpAgentInspectResponse>,
+        last_pool_key_mismatch: &mut BTreeMap<String, Vec<String>>,
     ) -> Result<bool, CliError> {
         let inspect = inspect.unwrap_or(bridge.acp_inspect(None)?);
         let mut agents_by_session = BTreeMap::<String, Vec<AcpAgentSnapshot>>::new();
@@ -284,14 +290,20 @@ impl AcpAgentManagerHandle {
         for session_id in &current_sessions {
             let process_keys = distinct_process_keys_for_session(&inspect, session_id);
             if process_keys.len() > 1 {
-                emit_pool_key_mismatch_incidents(
-                    &self.sender(),
-                    &AcpPoolKeyMismatchIncidentPayload {
-                        kind: "pool_key_mismatch".to_string(),
-                        observed_process_keys: process_keys,
-                        affected_logical_session_ids: vec![session_id.clone()],
-                    },
-                );
+                let changed = last_pool_key_mismatch.get(session_id) != Some(&process_keys);
+                last_pool_key_mismatch.insert(session_id.clone(), process_keys.clone());
+                if changed {
+                    emit_pool_key_mismatch_incidents(
+                        &self.sender(),
+                        &AcpPoolKeyMismatchIncidentPayload {
+                            kind: "pool_key_mismatch".to_string(),
+                            observed_process_keys: process_keys,
+                            affected_logical_session_ids: vec![session_id.clone()],
+                        },
+                    );
+                }
+            } else {
+                last_pool_key_mismatch.remove(session_id);
             }
         }
         let reconciled_sessions = self
