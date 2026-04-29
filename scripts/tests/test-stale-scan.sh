@@ -23,6 +23,9 @@ source "$ROOT/scripts/lib/stale-scan.sh"
 
 RUN_ID="$$"
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/stale-scan-test-$RUN_ID.XXXXXX")"
+TMP_BRIDGE_ROOT="$SANDBOX/tmp-bridge"
+mkdir -p "$TMP_BRIDGE_ROOT"
+export HARNESS_STALE_SCAN_TMP_ROOT="$TMP_BRIDGE_ROOT"
 TMP_MARKERS=()
 SPAWNED_PIDS=()
 LAST_SPAWN_PID=""
@@ -168,6 +171,28 @@ spawn_labelled() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
+kill_spawned_repo_gate_fixtures() {
+  stale_scan_refresh_ps
+  local gate_pids pid
+  local remaining_pids=()
+  gate_pids="$(stale_scan_repo_gate_pids "$$")"
+
+  for pid in "${SPAWNED_PIDS[@]}"; do
+    [[ -n "$pid" ]] || continue
+    if [[ -n "$gate_pids" ]] && grep -Fxq -- "$pid" <<<"$gate_pids"; then
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      continue
+    fi
+    if kill -0 "$pid" 2>/dev/null; then
+      remaining_pids+=("$pid")
+    fi
+  done
+
+  SPAWNED_PIDS=("${remaining_pids[@]}")
+  stale_scan_refresh_ps
+}
+
 # Spawn a background process whose ps line contains a synthesized target-dir
 # harness invocation (e.g. "/sandbox/target/debug/harness daemon 300"), which
 # is exactly what the awk regex in stale_scan_matching_pids matches against.
@@ -294,7 +319,7 @@ scenario_test_runners_not_gate_bucket() {
 # ---------------------------------------------------------------------------
 scenario_tmp_artifacts() {
   start_test "tmp bridge artifacts sweep covers .sock/.pid/.lock"
-  local stem="/tmp/h-bridge-TEST-$RUN_ID"
+  local stem="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID"
   local sock="$stem.sock"
   local pid_file="$stem.pid"
   local lock_file="$stem.lock"
@@ -389,6 +414,54 @@ scenario_ancestor_exclusion() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 10b: gate helpers in sibling worktrees that share the same git
+# common-root must still block cleanup on shared DerivedData.
+# ---------------------------------------------------------------------------
+scenario_common_root_gate_helper_detection() {
+  start_test "common-root sibling gate helper is detected across worktrees"
+  local main_root="$SANDBOX/common-root-main"
+  local sibling_root="$SANDBOX/common-root-sibling"
+  local tracked_file="$main_root/README.md"
+  local branch_name="common-root-gate-$RUN_ID"
+  local saved_root saved_common_root gate_pids
+  local ok=1
+
+  mkdir -p "$main_root"
+  git -C "$main_root" init >/dev/null 2>&1 || { fail "git init failed"; return; }
+  printf 'common root test\n' >"$tracked_file"
+  git -C "$main_root" add README.md >/dev/null 2>&1 || { fail "git add failed"; return; }
+  git -C "$main_root" -c user.name='Test User' -c user.email='test@example.com' \
+    commit -m 'init' >/dev/null 2>&1 || { fail "git commit failed"; return; }
+  git -C "$main_root" branch "$branch_name" >/dev/null 2>&1 || { fail "git branch failed"; return; }
+  git -C "$main_root" worktree add "$sibling_root" "$branch_name" >/dev/null 2>&1 || {
+    fail "git worktree add failed"
+    return
+  }
+
+  pushd "$sibling_root" >/dev/null || { fail "pushd $sibling_root failed"; return; }
+  # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
+  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  local sibling_pid=$!
+  popd >/dev/null || { fail "popd failed"; return; }
+  SPAWNED_PIDS+=("$sibling_pid")
+  wait_for_pid_registered "$sibling_pid" || { fail "sibling pid never registered"; return; }
+  sleep 0.3
+
+  saved_root="$STALE_SCAN_ROOT"
+  saved_common_root="$STALE_SCAN_COMMON_REPO_ROOT"
+  STALE_SCAN_ROOT="$main_root"
+  STALE_SCAN_COMMON_REPO_ROOT="$(resolve_common_repo_root "$main_root")"
+  stale_scan_refresh_ps
+  gate_pids="$(stale_scan_repo_gate_pids "$$")"
+  STALE_SCAN_ROOT="$saved_root"
+  STALE_SCAN_COMMON_REPO_ROOT="$saved_common_root"
+  stale_scan_refresh_ps
+
+  assert_in_list "$sibling_pid" "common-root sibling gate pid" "$gate_pids" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 11: congested env - many simultaneous fakes all get reported.
 # ---------------------------------------------------------------------------
 scenario_congested_env() {
@@ -416,7 +489,7 @@ scenario_congested_env() {
 # ---------------------------------------------------------------------------
 scenario_end_to_end_detection() {
   start_test "check-no-stale-state.sh reports planted /tmp artifact"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-e2e.sock"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-e2e.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -442,7 +515,7 @@ scenario_end_to_end_detection() {
 # ---------------------------------------------------------------------------
 scenario_clean_tmp_removal_is_idempotent() {
   start_test "clean's remove_tmp_bridge_artifacts is idempotent"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-clean.sock"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-clean.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -877,6 +950,59 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 29b: xcodebuild lock cleanup must treat a recorded live mutator as
+# active work even if the wrapper owner pid itself is gone.
+# ---------------------------------------------------------------------------
+scenario_xcodebuild_lock_live_mutator_detected() {
+  start_test "xcodebuild lock runtime metadata keeps live mutator from being treated as stale"
+  local lock_path="$SANDBOX/live-mutator-lock/.xcodebuild.lock"
+  local owner_hostname mutator_command mutator_start
+  mkdir -p "$lock_path/owner"
+
+  /bin/sleep 300 &
+  local mutator_pid=$!
+  SPAWNED_PIDS+=("$mutator_pid")
+  owner_hostname="$(/bin/hostname)"
+  mutator_command="$(ps -p "$mutator_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
+  mutator_start="$(ps -p "$mutator_pid" -o lstart= 2>/dev/null | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
+
+  cat >"$lock_path/owner/lease.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=owner
+LOCK_OWNER_ID=dead-wrapper
+LOCK_AGENT_ID=test
+LOCK_PID=999999
+LOCK_HOSTNAME=$owner_hostname
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=stale
+LOCK_ACQUIRED_AT_EPOCH=1
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=3
+LOCK_WAITER_TIMEOUT_SEC=6
+LOCK_LEASE_TIMEOUT_SEC=3
+LOCK_LAST_HEARTBEAT_EPOCH=1
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=2
+LOCK_STATE=holding
+EOF
+  cat >"$lock_path/owner/runtime.env" <<EOF
+LOCK_RUNTIME_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_HOSTNAME=$owner_hostname
+LOCK_COMMON_REPO_ROOT=$ROOT
+LOCK_MUTATOR_PID=$mutator_pid
+LOCK_MUTATOR_COMMAND=$mutator_command
+LOCK_MUTATOR_PROCESS_START=$mutator_start
+EOF
+
+  if stale_scan_xcodebuild_lock_has_live_work "$lock_path"; then
+    pass
+  else
+    fail "lock helper treated a live mutator as stale"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
 # planted marker disappears. The "exit 0" happy-path end-state is only
 # reachable when no other pollution exists, which is not the case mid-suite;
@@ -885,7 +1011,8 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_autoclean_success() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and removes the marker"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-autoclean.sock"
+  kill_spawned_repo_gate_fixtures
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-autoclean.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -899,7 +1026,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if [[ -e "$marker" ]]; then
@@ -927,7 +1054,8 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_autoclean_unresolved_still_fails() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 still fails when clean is incomplete"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-unresolved.sock"
+  kill_spawned_repo_gate_fixtures
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-unresolved.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -940,7 +1068,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -963,7 +1091,8 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_autoclean_clean_script_fails() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces clean-script failure"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-cleanfail.sock"
+  kill_spawned_repo_gate_fixtures
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-cleanfail.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -976,7 +1105,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -996,7 +1125,7 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_end_to_end_without_autoclean() {
   start_test "baseline: without autoclean env the gate still fails on /tmp artifact"
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-baseline.sock"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-baseline.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -1022,9 +1151,10 @@ scenario_end_to_end_without_autoclean() {
 # ---------------------------------------------------------------------------
 scenario_autoclean_congestion_partial() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces remaining pollution under congestion"
-  local a="/tmp/h-bridge-TEST-$RUN_ID-partial-a.sock"
-  local b="/tmp/h-bridge-TEST-$RUN_ID-partial-b.pid"
-  local c="/tmp/h-bridge-TEST-$RUN_ID-partial-c.lock"
+  kill_spawned_repo_gate_fixtures
+  local a="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-partial-a.sock"
+  local b="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-partial-b.pid"
+  local c="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-partial-c.lock"
   : >"$a"
   : >"$b"
   : >"$c"
@@ -1039,7 +1169,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -1072,6 +1202,7 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_autoclean_blocks_on_live_repo_gate_helpers() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 defers while live repo gate helpers run"
+  kill_spawned_repo_gate_fixtures
 
   pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
@@ -1082,7 +1213,7 @@ scenario_autoclean_blocks_on_live_repo_gate_helpers() {
   wait_for_pid_registered "$sibling_pid" || { fail "sibling pid never registered"; return; }
   sleep 0.3
 
-  local marker="/tmp/h-bridge-TEST-$RUN_ID-live-helper.sock"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-live-helper.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
@@ -1207,6 +1338,7 @@ run_all() {
   scenario_lock_holder
   scenario_pid_describe_format
   scenario_ancestor_exclusion
+  scenario_common_root_gate_helper_detection
   scenario_congested_env
   scenario_end_to_end_detection
   scenario_clean_tmp_removal_is_idempotent
@@ -1227,6 +1359,7 @@ run_all() {
   scenario_codex_app_server_listener_detected
   scenario_orphan_monitor_wrapper_detected
   scenario_monitor_wrapper_with_owner_metadata_not_flagged
+  scenario_xcodebuild_lock_live_mutator_detected
   scenario_autoclean_success
   scenario_autoclean_unresolved_still_fails
   scenario_autoclean_clean_script_fails

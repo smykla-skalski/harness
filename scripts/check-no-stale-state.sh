@@ -13,16 +13,30 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+readonly COMMON_REPO_ROOT
 STALE_SCAN_ROOT="$ROOT"
-export STALE_SCAN_ROOT
+STALE_SCAN_COMMON_REPO_ROOT="$COMMON_REPO_ROOT"
+export STALE_SCAN_ROOT STALE_SCAN_COMMON_REPO_ROOT
 # shellcheck source=scripts/lib/stale-scan.sh
 source "$ROOT/scripts/lib/stale-scan.sh"
+# shellcheck source=scripts/lib/lease-lock.sh
+LEASE_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
+LEASE_LOCK_RESOURCE="stale-state-cleanup:${COMMON_REPO_ROOT}"
+LEASE_LOCK_WAITER_ID="check-stale-$$"
+source "$ROOT/scripts/lib/lease-lock.sh"
 
 readonly RESET_HINT="run 'mise run clean:stale' to reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
 # Allow tests to redirect autoclean to a sandbox-safe stub. Production runs
 # always resolve this to scripts/clean-stale-state.sh.
 readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
 stale_lines=()
+
+cleanup_stale_check_lease() {
+  lease_lock_cleanup
+}
 
 emit_pid_block() {
   local label="$1"
@@ -171,14 +185,22 @@ if (( ${#stale_lines[@]} == 0 )); then
 fi
 
 if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
-  repo_gate_pids="$(stale_scan_repo_gate_pids "$$")"
-  if [[ -n "$repo_gate_pids" ]]; then
-    echo "error: auto-clean blocked while repo-local gate helpers are still running" >&2
-    echo "shared cleanup must not overlap active repo-local build/check helpers" >&2
-    emit_pid_block "repo-local gate helpers still running:" "$repo_gate_pids"
-    report_stale
-    exit 1
+  # Tests and tightly-scoped diagnostics can opt out so they can exercise the
+  # autoclean branches deterministically even if unrelated repo-local helpers
+  # are alive on the host. Normal repo flows leave this unset.
+  if [[ "${HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS:-0}" != "1" ]]; then
+    repo_gate_pids="$(stale_scan_repo_gate_pids "$$")"
+    if [[ -n "$repo_gate_pids" ]]; then
+      echo "error: auto-clean blocked while repo-local gate helpers are still running" >&2
+      echo "shared cleanup must not overlap active repo-local build/check helpers" >&2
+      emit_pid_block "repo-local gate helpers still running:" "$repo_gate_pids"
+      report_stale
+      exit 1
+    fi
   fi
+
+  trap cleanup_stale_check_lease EXIT
+  lease_lock_acquire
 
   {
     echo "check:stale detected pollution; HARNESS_CHECK_AUTOCLEAN=1 is set, running clean:stale..."
@@ -188,7 +210,7 @@ if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
     done
     echo "---"
   } >&2
-  if ! "$CLEAN_SCRIPT" >&2; then
+  if ! env HARNESS_STALE_CLEANUP_LEASE_HELD=1 "$CLEAN_SCRIPT" >&2; then
     echo "error: auto-clean failed; dev state still stale" >&2
     report_stale
     exit 1

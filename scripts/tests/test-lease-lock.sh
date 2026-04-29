@@ -216,6 +216,8 @@ scenario_waiter_observes_live_heartbeat() {
 scenario_stale_owner_reclaimed() {
   start_test "stale owner lease is reclaimed after timeout"
   local lock_dir="$SANDBOX/stale-reclaim"
+  local owner_hostname
+  owner_hostname="$(/bin/hostname)"
   mkdir -p "$lock_dir/owner" "$lock_dir/waiters"
   cat >"$lock_dir/owner/lease.env" <<EOF
 LOCK_PROTOCOL_VERSION=1
@@ -224,7 +226,7 @@ LOCK_ROLE=owner
 LOCK_OWNER_ID=stale-owner
 LOCK_AGENT_ID=test
 LOCK_PID=999999
-LOCK_HOSTNAME=test-host
+LOCK_HOSTNAME=$owner_hostname
 LOCK_REPO_ROOT=$ROOT
 LOCK_COMMAND=stale
 LOCK_ACQUIRED_AT_EPOCH=1
@@ -251,6 +253,55 @@ EOF
     fail "reclaimer did not take over stale lease"
     return
   }
+
+  pass
+}
+
+scenario_waiter_reclaims_after_owner_becomes_stale_while_waiting() {
+  start_test "waiting waiter reclaims once owner ages past stale timeout"
+  local lock_dir="$SANDBOX/stale-while-waiting"
+  local now_epoch owner_hostname
+  owner_hostname="$(/bin/hostname)"
+  now_epoch="$(date +%s)"
+  mkdir -p "$lock_dir/owner" "$lock_dir/waiters"
+  cat >"$lock_dir/owner/lease.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=owner
+LOCK_OWNER_ID=stale-later-owner
+LOCK_AGENT_ID=test
+LOCK_PID=999999
+LOCK_HOSTNAME=$owner_hostname
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=stale
+LOCK_ACQUIRED_AT_EPOCH=$now_epoch
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=2
+LOCK_WAITER_TIMEOUT_SEC=5
+LOCK_LEASE_TIMEOUT_SEC=2
+LOCK_LAST_HEARTBEAT_EPOCH=$now_epoch
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=$((now_epoch + 1))
+LOCK_STATE=holding
+EOF
+  printf '%s\n' "$now_epoch" >"$lock_dir/owner/heartbeat"
+
+  if ! with_lock_env "$lock_dir" env \
+      LEASE_LOCK_OWNER_STALE_AFTER_SECONDS=2 \
+      LEASE_LOCK_WAITER_TIMEOUT_SECONDS=5 \
+      LEASE_LOCK_POLL_SECONDS=1 \
+      bash -c '
+        set -euo pipefail
+        export LEASE_LOCK_WAITER_ID=waiter-stale-later
+        source "$LOCK_HELPER_PATH"
+        lease_lock_acquire
+        if grep -q "^LOCK_OWNER_ID=stale-later-owner$" "$LEASE_LOCK_OWNER_FILE"; then
+          exit 1
+        fi
+        lease_lock_cleanup
+      '; then
+    fail "waiter did not reclaim once the owner became stale"
+    return
+  fi
 
   pass
 }
@@ -300,6 +351,69 @@ EOF
 
   if [[ ! -d "$lock_dir/owner" ]]; then
     fail "owner dir was removed while live owner pid still existed"
+    return
+  fi
+
+  pass
+}
+
+scenario_live_mutator_with_dead_owner_not_reclaimed() {
+  start_test "stale owner is not reclaimed while recorded mutator pid is still alive"
+  local lock_dir="$SANDBOX/live-mutator-stale-owner"
+  local mutator_command mutator_start owner_hostname
+  mkdir -p "$lock_dir/owner" "$lock_dir/waiters"
+
+  /bin/sleep 300 &
+  local mutator_pid=$!
+  SPAWNED_PIDS+=("$mutator_pid")
+  mutator_command="$(ps -p "$mutator_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
+  mutator_start="$(ps -p "$mutator_pid" -o lstart= 2>/dev/null | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
+  owner_hostname="$(/bin/hostname)"
+
+  cat >"$lock_dir/owner/lease.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=owner
+LOCK_OWNER_ID=dead-owner-live-mutator
+LOCK_AGENT_ID=test
+LOCK_PID=999999
+LOCK_HOSTNAME=$owner_hostname
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=stale
+LOCK_ACQUIRED_AT_EPOCH=1
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=3
+LOCK_WAITER_TIMEOUT_SEC=6
+LOCK_LEASE_TIMEOUT_SEC=3
+LOCK_LAST_HEARTBEAT_EPOCH=1
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=2
+LOCK_STATE=holding
+EOF
+  cat >"$lock_dir/owner/runtime.env" <<EOF
+LOCK_RUNTIME_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_HOSTNAME=$owner_hostname
+LOCK_COMMON_REPO_ROOT=$ROOT
+LOCK_MUTATOR_PID=$mutator_pid
+LOCK_MUTATOR_COMMAND=$mutator_command
+LOCK_MUTATOR_PROCESS_START=$mutator_start
+EOF
+  printf '1\n' >"$lock_dir/owner/heartbeat"
+
+  if ! with_lock_env "$lock_dir" bash -c '
+    set -euo pipefail
+    export LEASE_LOCK_WAITER_ID=waiter-live-mutator
+    source "$LOCK_HELPER_PATH"
+    if lease_lock_try_reclaim_stale_owner; then
+      exit 1
+    fi
+  '; then
+    fail "stale owner was reclaimed despite a live mutator pid"
+    return
+  fi
+
+  if [[ ! -d "$lock_dir/owner" ]]; then
+    fail "owner dir was removed while live mutator pid still existed"
     return
   fi
 
@@ -358,7 +472,9 @@ run_all() {
   scenario_waiter_cleanup_removes_heartbeat
   scenario_waiter_observes_live_heartbeat
   scenario_stale_owner_reclaimed
+  scenario_waiter_reclaims_after_owner_becomes_stale_while_waiting
   scenario_live_owner_with_stale_heartbeat_not_reclaimed
+  scenario_live_mutator_with_dead_owner_not_reclaimed
   scenario_active_owner_not_hijacked
 }
 

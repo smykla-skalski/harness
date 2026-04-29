@@ -42,7 +42,10 @@ FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/
 TRANSIENT_DB_STATUS=200
 LEASE_LOCK_HEARTBEAT_SECONDS="${XCODEBUILD_LOCK_HEARTBEAT_SECONDS:-30}"
 LEASE_LOCK_POLL_SECONDS="${XCODEBUILD_LOCK_POLL_SECONDS:-1}"
-LEASE_LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS:-90}"
+LEGACY_XCODEBUILD_LOCK_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS:-90}"
+LEASE_LOCK_OWNER_STALE_AFTER_SECONDS="${XCODEBUILD_LOCK_STALE_AFTER_SECONDS:-$LEGACY_XCODEBUILD_LOCK_TIMEOUT_SECONDS}"
+LEASE_LOCK_WAITER_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-$((LEASE_LOCK_OWNER_STALE_AFTER_SECONDS + LEASE_LOCK_POLL_SECONDS + 1))}"
+LEASE_LOCK_TIMEOUT_SECONDS="$LEASE_LOCK_OWNER_STALE_AFTER_SECONDS"
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
@@ -165,6 +168,7 @@ fi
 lock_path="$derive_data_path/.xcodebuild.lock"
 LEASE_LOCK_DIR="$lock_path"
 LEASE_LOCK_RESOURCE="xcodebuild:${derive_data_path}"
+LEASE_LOCK_COMMON_REPO_ROOT="$COMMON_REPO_ROOT"
 source "$SCRIPT_CHECKOUT_ROOT/scripts/lib/lease-lock.sh"
 
 current_lock_owner_pid() {
@@ -189,6 +193,13 @@ cleanup_descendants_and_lock() {
   terminate_descendant_processes "$$"
   cleanup_lock
   exit "$status"
+}
+
+harness_monitor_record_xcodebuild_capture_pid() {
+  local capture_pid="$1"
+  local mutator_pid
+  mutator_pid="$(xcodebuild_mutator_pid "$capture_pid")"
+  lease_lock_record_mutator_process "$mutator_pid"
 }
 
 is_db_transient_failure() {
