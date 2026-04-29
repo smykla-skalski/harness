@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
@@ -8,6 +7,9 @@ use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
+use crate::daemon::agent_acp::manager::test_support::{
+    write_exiting_acp_agent, write_sleeping_acp_agent,
+};
 
 fn manager() -> AcpAgentManagerHandle {
     let (sender, _) = broadcast::channel(16);
@@ -43,17 +45,7 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
     }
 }
 
-#[cfg(unix)]
-fn write_executable(path: &Path, body: &str) {
-    use std::os::unix::fs::PermissionsExt;
-
-    fs::write(path, body).expect("write script");
-    let mut permissions = fs::metadata(path).expect("metadata").permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("chmod script");
-}
-
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessions() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -78,7 +70,7 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn stopping_one_reused_process_session_keeps_sibling_active() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -117,7 +109,7 @@ fn shared_fake_runtime() -> (
 ) {
     let temp = TempDir::new().expect("temp");
     let script = temp.path().join("fake-agent.sh");
-    write_executable(&script, "#!/bin/sh\nsleep 60\n");
+    write_sleeping_acp_agent(&script);
     let descriptor = descriptor(&script);
     let request = AcpAgentStartRequest {
         agent: "fake".to_string(),
@@ -128,13 +120,13 @@ fn shared_fake_runtime() -> (
     (temp, manager(), descriptor, request)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_exit_disconnects_every_reused_logical_session() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("failing-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 0.2\nexit 7\n");
+        write_exiting_acp_agent(&script, 0.2, 7);
         let descriptor = descriptor(&script);
         let (manager, mut events) = manager_with_events();
         let request = AcpAgentStartRequest {
@@ -176,13 +168,13 @@ async fn process_exit_disconnects_every_reused_logical_session() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("failing-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 0.2\nexit 7\n");
+        write_exiting_acp_agent(&script, 0.2, 7);
         let descriptor = descriptor(&script);
         let (manager, mut events) = manager_with_events();
         let request = AcpAgentStartRequest {
