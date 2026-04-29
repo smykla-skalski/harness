@@ -23,6 +23,8 @@ const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
 
 mod process_fault;
 mod process_pool;
+#[cfg(test)]
+mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -278,7 +280,9 @@ impl AcpAgentManagerHandle {
             return Ok(before);
         }
         let process_key = session.process_key();
-        let pending_permissions = session.disconnect(DisconnectReason::SessionStopped, false);
+        let pending_permissions = session.disconnect_for_stop().map_err(|error| {
+            CliErrorKind::workflow_io(format!("detach ACP protocol session '{acp_id}': {error}"))
+        })?;
         if session.process().logical_session_count() == 0 {
             session.terminate_process(pending_permissions);
             self.remove_process_if_empty(&process_key);

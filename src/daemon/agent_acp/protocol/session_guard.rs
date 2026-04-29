@@ -36,6 +36,16 @@ impl SessionRouteGuard {
         state.routes.remove(&session_id.to_string());
     }
 
+    pub(super) fn stop_target(&self, target: &RouteTarget) -> Option<SessionId> {
+        let mut state = self.state.lock().expect("session route guard lock");
+        let session_id = state
+            .routes
+            .iter()
+            .find_map(|(session_id, route)| (route == target).then(|| session_id.clone()))?;
+        state.routes.remove(&session_id);
+        Some(SessionId::new(session_id))
+    }
+
     pub(super) fn ensure_known(&self, incoming: &SessionId) -> ClientResult<RouteTarget> {
         let state = self.state.lock().expect("session route guard lock");
         if let Some(target) = state.routes.get(&incoming.to_string()) {

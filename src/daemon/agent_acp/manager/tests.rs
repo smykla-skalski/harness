@@ -8,6 +8,7 @@ use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
+use crate::daemon::agent_acp::manager::test_support::{write_executable, write_sleeping_acp_agent};
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
 
 fn manager() -> AcpAgentManagerHandle {
@@ -44,16 +45,6 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
     }
 }
 
-#[cfg(unix)]
-fn write_executable(path: &Path, body: &str) {
-    use std::os::unix::fs::PermissionsExt;
-
-    fs::write(path, body).expect("write script");
-    let mut permissions = fs::metadata(path).expect("metadata").permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("chmod script");
-}
-
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
@@ -69,13 +60,13 @@ fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> Acp
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn start_list_stop_tracks_live_snapshot() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("fake-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
             prompt: None,
@@ -113,7 +104,7 @@ async fn start_list_stop_tracks_live_snapshot() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -166,7 +157,7 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn start_recording_mode_surfaces_log_path_in_inspect() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -174,7 +165,7 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
         let xdg = temp.path().join("xdg");
         temp_env::with_var("XDG_DATA_HOME", Some(&xdg), || {
             let script = temp.path().join("fake-agent.sh");
-            write_executable(&script, "#!/bin/sh\nsleep 60\n");
+            write_sleeping_acp_agent(&script);
             let request = AcpAgentStartRequest {
                 agent: "fake".to_string(),
                 prompt: None,
@@ -213,13 +204,13 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_key_changes_when_permission_mode_changes() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("fake-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
         let manager = manager();
         let base = AcpAgentStartRequest {
@@ -245,7 +236,7 @@ async fn process_key_changes_when_permission_mode_changes() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_key_changes_when_project_root_changes() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -255,7 +246,7 @@ async fn process_key_changes_when_project_root_changes() {
         fs::create_dir_all(&root_a).expect("mkdir a");
         fs::create_dir_all(&root_b).expect("mkdir b");
         let script = temp.path().join("fake-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
         let manager = manager();
         let first = AcpAgentStartRequest {
@@ -281,13 +272,13 @@ async fn process_key_changes_when_project_root_changes() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_key_stable_for_unlisted_env_drift() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("fake-agent.sh");
-        write_executable(&script, "#!/bin/sh\nsleep 60\n");
+        write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
         let manager = manager();
         let request = AcpAgentStartRequest {
@@ -361,7 +352,7 @@ fn process_fault_policy_env_toggle_parsing() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn repeated_process_faults_quarantine_process_key() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -424,7 +415,7 @@ async fn repeated_process_faults_quarantine_process_key() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn recent_process_fault_applies_backoff_before_next_start() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
@@ -461,7 +452,7 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
     });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement() {
     temp_env::with_vars(

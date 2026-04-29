@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::process::{Child, ExitStatus};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -10,7 +11,7 @@ use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
 use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
-use crate::daemon::agent_acp::protocol::AcpCancelHandle;
+use crate::daemon::agent_acp::protocol::AcpProtocolHandle;
 
 const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
 const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
@@ -18,7 +19,7 @@ const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
 pub(in crate::daemon::agent_acp) struct ActiveAcpProcess {
     child: Mutex<Option<Child>>,
     pub(super) supervisor: Arc<AcpSessionSupervisor>,
-    cancel: AcpCancelHandle,
+    protocol_handle: AcpProtocolHandle,
     pub(super) stderr_tail: SharedStderrTail,
     protocol_task: Mutex<Option<JoinHandle<()>>>,
     batcher_task: Mutex<Option<JoinHandle<()>>>,
@@ -41,14 +42,14 @@ impl ActiveAcpProcess {
     pub(in crate::daemon::agent_acp) fn new(
         child: Child,
         supervisor: Arc<AcpSessionSupervisor>,
-        cancel: AcpCancelHandle,
+        protocol_handle: AcpProtocolHandle,
         stderr_tail: SharedStderrTail,
         tasks: ActiveAcpTasks,
     ) -> Self {
         Self {
             child: Mutex::new(Some(child)),
             supervisor,
-            cancel,
+            protocol_handle,
             stderr_tail,
             protocol_task: Mutex::new(Some(tasks.protocol)),
             batcher_task: Mutex::new(Some(tasks.batcher)),
@@ -154,8 +155,27 @@ impl ActiveAcpProcess {
     }
 
     pub(super) fn request_cancel(&self) {
-        self.cancel.cancel();
+        self.protocol_handle.cancel();
         thread::sleep(PROTOCOL_CANCEL_FLUSH_GRACE);
+    }
+
+    pub(super) fn attach_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        project_dir: PathBuf,
+    ) -> Result<String, String> {
+        self.protocol_handle
+            .attach_session(acp_id, session_id, project_dir)
+            .map(|session_id| session_id.to_string())
+    }
+
+    pub(super) fn detach_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+    ) -> Result<(), String> {
+        self.protocol_handle.detach_session(acp_id, session_id)
     }
 }
 

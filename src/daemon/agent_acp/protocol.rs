@@ -1,4 +1,3 @@
-use std::future::pending;
 use std::io;
 use std::path::PathBuf;
 use std::process::Child;
@@ -30,31 +29,23 @@ use crate::agents::kind::DisconnectReason;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
+mod commands;
 mod context;
 mod session_guard;
+pub(super) use commands::AcpProtocolHandle;
+use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{
     ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result,
 };
 use session_guard::{RouteTarget, SessionRouteGuard};
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
-
-#[derive(Clone)]
-pub(super) struct AcpCancelHandle {
-    tx: mpsc::UnboundedSender<()>,
-}
-
-impl AcpCancelHandle {
-    pub(super) fn cancel(&self) {
-        let _ = self.tx.send(());
-    }
-}
 pub(super) struct SpawnedAcpProtocol {
     pub(super) events: mpsc::Receiver<EventBatch>,
     pub(super) disconnects: mpsc::Receiver<DisconnectReason>,
     pub(super) protocol: JoinHandle<()>,
     pub(super) batcher: JoinHandle<()>,
-    pub(super) cancel: AcpCancelHandle,
+    pub(super) handle: AcpProtocolHandle,
 }
 
 pub(super) struct SpawnProtocolInput<'a> {
@@ -104,6 +95,7 @@ pub(super) fn spawn_protocol_task(
         permission_mode,
     ));
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (disconnect_tx, disconnects) = mpsc::channel(1);
     let protocol_task = tokio::spawn(run_protocol(RunProtocolArgs {
         stdin,
@@ -116,6 +108,7 @@ pub(super) fn spawn_protocol_task(
         client,
         supervisor: Arc::clone(supervisor),
         cancel_rx,
+        command_rx,
         disconnect_tx,
     }));
     Ok(SpawnedAcpProtocol {
@@ -123,7 +116,7 @@ pub(super) fn spawn_protocol_task(
         disconnects,
         protocol: protocol_task,
         batcher: batcher.task,
-        cancel: AcpCancelHandle { tx: cancel_tx },
+        handle: AcpProtocolHandle::new(cancel_tx, command_tx),
     })
 }
 
@@ -138,6 +131,7 @@ struct RunProtocolArgs {
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
+    command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     disconnect_tx: mpsc::Sender<DisconnectReason>,
 }
 
@@ -157,6 +151,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         client,
         supervisor,
         cancel_rx,
+        command_rx,
         disconnect_tx,
     } = args;
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
@@ -265,6 +260,7 @@ async fn run_protocol(args: RunProtocolArgs) {
                 session_id,
                 supervisor,
                 cancel_rx,
+                command_rx,
                 session_guard,
             })
             .await
@@ -327,6 +323,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         session_id,
         supervisor,
         mut cancel_rx,
+        mut command_rx,
         session_guard,
     } = args;
     let initialize_timeout = supervisor.config().initialize_timeout;
@@ -349,7 +346,14 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
                 return Ok(());
             }
         }
-        wait_for_cancel(&connection, &mut cancel_rx, acp_session_id.clone()).await
+        run_protocol_command_loop(
+            &connection,
+            &mut cancel_rx,
+            &mut command_rx,
+            &session_guard,
+            acp_session_id.clone(),
+        )
+        .await
     }
     .await;
     // Keep route validation active for a short grace window after we have
@@ -368,6 +372,7 @@ struct RunConnectionArgs {
     session_id: String,
     supervisor: Arc<AcpSessionSupervisor>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
+    command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     session_guard: Arc<SessionRouteGuard>,
 }
 
@@ -417,19 +422,6 @@ async fn send_prompt_or_cancel(
             send_cancel_notification(connection, session_id)?;
             Ok(true)
         }
-    }
-}
-
-async fn wait_for_cancel(
-    connection: &ConnectionTo<Agent>,
-    cancel_rx: &mut mpsc::UnboundedReceiver<()>,
-    session_id: SessionId,
-) -> AcpResult<()> {
-    if cancel_rx.recv().await.is_some() {
-        send_cancel_notification(connection, session_id)?;
-        Ok(())
-    } else {
-        pending::<AcpResult<()>>().await
     }
 }
 

@@ -67,7 +67,7 @@ impl AcpAgentManagerHandle {
             .process_lifecycle
             .lock()
             .expect("ACP process lifecycle lock");
-        if let Some(snapshot) = self.try_start_reused_session(input) {
+        if let Some(snapshot) = self.try_start_reused_session(input)? {
             return Ok(snapshot);
         }
         self.start_new_process_session(input, &spawn)
@@ -76,16 +76,30 @@ impl AcpAgentManagerHandle {
     fn try_start_reused_session(
         &self,
         input: DescriptorStartInput<'_>,
-    ) -> Option<AcpAgentSnapshot> {
+    ) -> Result<Option<AcpAgentSnapshot>, CliError> {
         if !input
             .request
             .prompt
             .as_deref()
             .is_none_or(|prompt| prompt.trim().is_empty())
         {
-            return None;
+            return Ok(None);
         }
-        let existing = self.reusable_session_for_process_key(input.process_key)?;
+        let Some(existing) = self.reusable_session_for_process_key(input.process_key) else {
+            return Ok(None);
+        };
+        existing
+            .attach_protocol_session(
+                input.acp_id,
+                input.session_id,
+                input.project_dir.to_path_buf(),
+            )
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "attach reused ACP session '{}': {error}",
+                    input.descriptor.id
+                ))
+            })?;
         let snapshot = reused_snapshot(ReusedSnapshotInput {
             acp_id: input.acp_id,
             session_id: input.session_id,
@@ -114,7 +128,7 @@ impl AcpAgentManagerHandle {
             .expect("ACP sessions lock")
             .insert(input.acp_id.to_string(), active);
         self.broadcast("acp_agent_started", &snapshot);
-        Some(snapshot)
+        Ok(Some(snapshot))
     }
 
     fn start_new_process_session(
@@ -179,7 +193,7 @@ impl AcpAgentManagerHandle {
         let process = Arc::new(ActiveAcpProcess::new(
             child,
             Arc::clone(&supervisor),
-            protocol.cancel,
+            protocol.handle,
             stderr_tail,
             ActiveAcpTasks {
                 protocol: protocol.protocol,

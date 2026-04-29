@@ -1,6 +1,7 @@
 use std::io::Read;
+use std::path::PathBuf;
 use std::process::ChildStderr;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::thread;
 
 use serde::Serialize;
@@ -74,6 +75,16 @@ impl ActiveAcpSession {
 
     pub(super) fn process(&self) -> Arc<ActiveAcpProcess> {
         Arc::clone(&self.process)
+    }
+
+    pub(super) fn attach_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        project_dir: PathBuf,
+    ) -> Result<String, String> {
+        self.process
+            .attach_protocol_session(acp_id, session_id, project_dir)
     }
 
     pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
@@ -165,26 +176,84 @@ impl ActiveAcpSession {
         }
     }
 
+    pub(super) fn disconnect_for_stop(&self) -> Result<usize, String> {
+        self.disconnect_inner(DisconnectReason::SessionStopped, false, true)
+    }
+
     pub(super) fn disconnect(&self, reason: DisconnectReason, terminate_process: bool) -> usize {
+        self.disconnect_inner(reason, terminate_process, false)
+            .unwrap_or_else(|error| self.continue_after_detach_failure(&error))
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn continue_after_detach_failure(&self, error: &str) -> usize {
+        tracing::warn!(%error, "continuing ACP disconnect after detach failure");
+        self.permissions.shutdown_pending()
+    }
+
+    fn disconnect_inner(
+        &self,
+        reason: DisconnectReason,
+        terminate_process: bool,
+        fail_on_detach: bool,
+    ) -> Result<usize, String> {
+        let (acp_id, mut snapshot) =
+            self.detach_protocol_route_if_needed(&reason, terminate_process, fail_on_detach)?;
         if terminate_process {
             self.process.request_cancel();
             self.process.abort_non_protocol_tasks();
             self.process.supervisor.mark_done();
         }
         let pending_permissions = self.permissions.shutdown_pending();
-        let mut snapshot = self.snapshot.lock().expect("ACP snapshot lock");
         if snapshot.status.is_disconnected() {
-            return pending_permissions;
+            return Ok(pending_permissions);
         }
         snapshot.status = AgentStatus::Disconnected {
             reason,
             stderr_tail: self.process.stderr_tail.as_string(),
         };
         snapshot.updated_at = utc_now();
-        let acp_id = snapshot.acp_id.clone();
         drop(snapshot);
         self.process.remove_logical_session(&acp_id);
-        pending_permissions
+        Ok(pending_permissions)
+    }
+
+    fn detach_protocol_route_if_needed(
+        &self,
+        reason: &DisconnectReason,
+        terminate_process: bool,
+        fail_on_detach: bool,
+    ) -> Result<(String, MutexGuard<'_, AcpAgentSnapshot>), String> {
+        let mut snapshot = self.snapshot.lock().expect("ACP snapshot lock");
+        let (acp_id, session_id) = snapshot_route(&snapshot);
+        if should_detach_protocol_route(&snapshot, reason, terminate_process) {
+            drop(snapshot);
+            self.detach_protocol_route(&acp_id, &session_id, fail_on_detach)?;
+            snapshot = self.snapshot.lock().expect("ACP snapshot lock");
+        }
+        Ok((acp_id, snapshot))
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn detach_protocol_route(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        fail_on_detach: bool,
+    ) -> Result<(), String> {
+        if let Err(error) = self.process.detach_protocol_session(acp_id, session_id) {
+            if fail_on_detach {
+                return Err(error);
+            }
+            tracing::warn!(%error, acp_id, session_id, "failed to detach ACP protocol session");
+        }
+        Ok(())
     }
 
     pub(super) fn terminate_process(&self, pending_permissions: usize) {
@@ -193,6 +262,20 @@ impl ActiveAcpSession {
         self.process.supervisor.mark_done();
         self.process.kill_child(pending_permissions);
     }
+}
+
+fn snapshot_route(snapshot: &AcpAgentSnapshot) -> (String, String) {
+    (snapshot.acp_id.clone(), snapshot.session_id.clone())
+}
+
+fn should_detach_protocol_route(
+    snapshot: &AcpAgentSnapshot,
+    reason: &DisconnectReason,
+    terminate_process: bool,
+) -> bool {
+    matches!(reason, DisconnectReason::SessionStopped)
+        && !terminate_process
+        && !snapshot.status.is_disconnected()
 }
 
 impl Drop for ActiveAcpSession {
