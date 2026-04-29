@@ -268,7 +268,12 @@ impl ActiveAcpSession {
     }
 
     pub(super) fn terminate_process(&self, pending_permissions: usize) {
-        self.process.request_cancel();
+        // Session-local stop detaches the logical route first. Process teardown
+        // must only cancel remaining protocol routes when callers reach this
+        // path from a process-wide fault or shutdown while sessions still exist.
+        if self.process.logical_session_count() > 0 {
+            self.process.request_cancel();
+        }
         self.process.abort_non_protocol_tasks();
         self.process.supervisor.mark_done();
         self.process.kill_child(pending_permissions);

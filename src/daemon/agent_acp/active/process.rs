@@ -201,7 +201,9 @@ impl ActiveAcpProcess {
 
 impl Drop for ActiveAcpProcess {
     fn drop(&mut self) {
-        self.request_cancel();
+        if self.logical_session_count() > 0 {
+            self.request_cancel();
+        }
         self.abort_tasks();
         self.kill_child(0);
     }
