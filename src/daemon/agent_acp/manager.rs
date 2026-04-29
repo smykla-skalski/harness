@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -19,6 +20,7 @@ use crate::session::types::AgentStatus;
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
+const ACP_PROCESS_FAULT_POLICY_ENV: &str = "HARNESS_ACP_PROCESS_FAULT_POLICY";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -411,6 +413,9 @@ impl AcpAgentManagerHandle {
         snapshot: &AcpAgentSnapshot,
         mut event: StreamEvent,
     ) -> StreamEvent {
+        if !process_fault_policy_enabled() {
+            return event;
+        }
         let (backoff_applied, quarantine_applied) = self.record_process_fault(snapshot);
         if let serde_json::Value::Object(payload) = &mut event.payload {
             payload.insert("restart_applied".to_string(), serde_json::Value::Bool(false));
@@ -465,6 +470,15 @@ impl AcpAgentManagerHandle {
             .insert(snapshot.process_key.clone());
         (true, quarantined)
     }
+}
+
+pub(in crate::daemon::agent_acp) fn process_fault_policy_enabled() -> bool {
+    env::var(ACP_PROCESS_FAULT_POLICY_ENV).map_or(true, |value| {
+        !matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "disabled"
+        )
+    })
 }
 
 #[cfg(test)]
