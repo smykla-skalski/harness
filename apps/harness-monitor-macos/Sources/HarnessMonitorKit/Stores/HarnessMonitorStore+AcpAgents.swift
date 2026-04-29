@@ -117,10 +117,14 @@ extension HarnessMonitorStore {
     reconcilePresentedAcpPermissionBatch()
   }
 
-  func replaceAcpAgents(_ payload: AcpAgentsReconciledPayload) {
+  func replaceAcpAgents(
+    _ payload: AcpAgentsReconciledPayload,
+    allowAutoPresentation: Bool = true
+  ) {
     guard payload.sessionId == selectedSessionID else {
       return
     }
+    let hadPresentedBatch = presentingAcpPermissionBatch != nil
     selectedAcpAgents =
       sortedAcpAgents(
         payload.agents.map { snapshot in
@@ -137,7 +141,9 @@ extension HarnessMonitorStore {
         }
       )
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
-    reconcilePresentedAcpPermissionBatch()
+    reconcilePresentedAcpPermissionBatch(
+      allowAutoPresentation: allowAutoPresentation || hadPresentedBatch
+    )
   }
 
   /// Apply an already-decoded ACP event push to the in-memory timeline.
@@ -221,8 +227,10 @@ extension HarnessMonitorStore {
     else {
       return
     }
+    let resyncEntryID =
+      "acp-resync-\(payload.bridgeEpoch)-\(payload.continuity)-\(payload.nextSeq)-\(resolvedSessionID)"
     let entry = TimelineEntry(
-      entryId: "acp-resync-\(payload.bridgeEpoch)-\(payload.continuity)-\(payload.nextSeq)-\(resolvedSessionID)",
+      entryId: resyncEntryID,
       recordedAt: recordedAt,
       kind: "acp_bridge_resync_incident",
       sessionId: resolvedSessionID,
@@ -296,11 +304,55 @@ extension HarnessMonitorStore {
     resolvingAcpPermissionBatchID = nil
   }
 
+  func refreshAcpAgents(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async -> Bool {
+    do {
+      let measuredAgents = try await Self.measureOperation {
+        try await client.managedAgents(sessionID: sessionID)
+      }
+      recordRequestSuccess()
+      guard selectedSessionID == sessionID else {
+        return true
+      }
+      replaceAcpAgents(
+        AcpAgentsReconciledPayload(
+          sessionId: sessionID,
+          agents: measuredAgents.value.agents.compactMap(\.acp)
+        ),
+        allowAutoPresentation: shouldAutoPresentHydratedAcpPermissions()
+      )
+      return true
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return false
+      }
+      HarnessMonitorLogger.store.warning(
+        "managed ACP refresh failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return false
+    }
+  }
+
+  func recoverSelectedAcpAgentsAfterReconnect(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async {
+    _ = await refreshAcpAgents(using: client, sessionID: sessionID)
+  }
+
+  private func shouldAutoPresentHydratedAcpPermissions() -> Bool {
+    presentingAcpPermissionBatch != nil
+      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+        == "1"
+  }
+
   /// Preserve the currently presented batch whenever that batch is still pending and actively
   /// resolving; otherwise advance to the oldest remaining batch.
   ///
   /// UI-0 sticky-selection contract: new arrivals do not steal focus from the in-flight batch.
-  func reconcilePresentedAcpPermissionBatch() {
+  func reconcilePresentedAcpPermissionBatch(allowAutoPresentation: Bool = true) {
     let batches = pendingAcpPermissionBatches
     guard !batches.isEmpty else {
       presentingAcpPermissionBatch = nil
@@ -310,6 +362,9 @@ extension HarnessMonitorStore {
       resolvingAcpPermissionBatchID == current.batchId,
       batches.contains(where: { $0.batchId == current.batchId })
     {
+      return
+    }
+    guard allowAutoPresentation || presentingAcpPermissionBatch != nil else {
       return
     }
     presentingAcpPermissionBatch = batches[0]

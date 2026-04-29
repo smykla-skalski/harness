@@ -13,6 +13,10 @@ extension HarnessMonitorStore {
       using: client,
       sessionID: sessionID
     )
+    await recoverSelectedAcpAgentsAfterReconnect(
+      using: client,
+      sessionID: sessionID
+    )
   }
 
   func scheduleSessionPushFallback(

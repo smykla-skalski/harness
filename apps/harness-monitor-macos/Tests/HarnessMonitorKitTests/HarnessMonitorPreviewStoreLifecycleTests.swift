@@ -1,3 +1,5 @@
+import Darwin
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -204,6 +206,60 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     let agent = try #require(detail.agents.first { $0.agentId == "worker-codex" })
     #expect(agent.currentTaskId == "task-ui")
     #expect(detail.session.metrics.openTaskCount == 1)
+  }
+
+  @Test("Preview client seeds ACP managed agents when preview permissions start enabled")
+  func previewClientSeedsAcpManagedAgents() async throws {
+    let previousValue = Foundation.ProcessInfo.processInfo.environment[
+      "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
+    ]
+    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START", "1", 1)
+    defer {
+      if let previousValue {
+        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START", previousValue, 1)
+      } else {
+        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START")
+      }
+    }
+
+    let client = PreviewHarnessClient(
+      fixtures: .populated,
+      isLaunchAgentInstalled: true
+    )
+
+    let response = try await client.managedAgents(sessionID: PreviewFixtures.summary.sessionId)
+    let acpAgent = try #require(response.agents.compactMap(\.acp).first)
+
+    #expect(acpAgent.agentId == "worker-codex")
+    #expect(acpAgent.pendingPermissions == 2)
+    #expect(acpAgent.pendingPermissionBatches.map(\.batchId) == ["preview-acp-permission-1"])
+  }
+
+  @Test("Preview bootstrap refresh keeps ACP managed agents on selected session")
+  func previewBootstrapRefreshKeepsAcpManagedAgents() async {
+    let previousValue = Foundation.ProcessInfo.processInfo.environment[
+      "HARNESS_MONITOR_PREVIEW_ACP_PENDING"
+    ]
+    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", "1", 1)
+    defer {
+      if let previousValue {
+        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", previousValue, 1)
+      } else {
+        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING")
+      }
+    }
+
+    let store = HarnessMonitorStore(
+      daemonController: PreviewDaemonController(mode: .populated)
+    )
+
+    await store.bootstrapIfNeeded()
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectedAcpAgents.map(\.agentId) == ["worker-codex"])
+    #expect(store.acpDecisionAttention(for: "worker-codex")?.count == 2)
+    #expect(store.presentingAcpPermissionBatch == nil)
   }
 
   @Test("Preview store factory seeds empty state without stale selection")
