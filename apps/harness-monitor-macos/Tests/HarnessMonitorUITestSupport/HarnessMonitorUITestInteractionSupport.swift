@@ -208,13 +208,28 @@ extension HarnessMonitorUITestCase {
 
   @discardableResult
   func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
+    if element.isHittable {
+      element.tap()
+      return true
+    }
+
     if let coordinate = preferredTapCoordinate(in: app, for: element) {
       coordinate.tap()
       return true
     }
 
+    return false
+  }
+
+  @discardableResult
+  func rightClickElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
     if element.isHittable {
-      element.tap()
+      element.rightClick()
+      return true
+    }
+
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.rightClick()
       return true
     }
 
@@ -255,6 +270,10 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
+    if let coordinate = clampedWindowCoordinate(in: app, for: element) {
+      return coordinate
+    }
+
     if let coordinate = centerCoordinate(in: app, for: element) {
       return coordinate
     }
@@ -266,6 +285,40 @@ extension HarnessMonitorUITestCase {
 
     let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
     return centerCoordinate(in: app, for: frameMarker)
+  }
+
+  private func clampedWindowCoordinate(
+    in app: XCUIApplication,
+    for element: XCUIElement
+  ) -> XCUICoordinate? {
+    guard element.exists || element.waitForExistence(timeout: 0.2) else {
+      return nil
+    }
+
+    let containingWindow = window(in: app, containing: element)
+    guard containingWindow.exists else {
+      return nil
+    }
+
+    let visibleFrame = containingWindow.frame.intersection(element.frame)
+    guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
+      return nil
+    }
+
+    let clampedFrame = visibleFrame.insetBy(
+      dx: min(4, max(visibleFrame.width / 4, 0)),
+      dy: min(4, max(visibleFrame.height / 4, 0))
+    )
+    let targetFrame = clampedFrame.isEmpty ? visibleFrame : clampedFrame
+    let targetPoint = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+    let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
+
+    return origin.withOffset(
+      CGVector(
+        dx: targetPoint.x - containingWindow.frame.minX,
+        dy: targetPoint.y - containingWindow.frame.minY
+      )
+    )
   }
 
   func invokeMenuItem(

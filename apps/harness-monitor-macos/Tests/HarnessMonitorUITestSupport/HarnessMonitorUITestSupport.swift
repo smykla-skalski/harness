@@ -27,6 +27,44 @@ private struct HarnessMonitorUITestTeardownContext: Sendable {
   let uiTestHostBundleIdentifier: String
 }
 
+struct HarnessMonitorUITestLaunchEnvironmentEntry: Equatable {
+  let key: String
+  let value: String
+}
+
+struct HarnessMonitorUITestLaunchSignature: Equatable {
+  let mode: String
+  let environment: [HarnessMonitorUITestLaunchEnvironmentEntry]
+
+  init(mode: String, additionalEnvironment: [String: String]) {
+    self.mode = mode
+    environment = additionalEnvironment
+      .sorted { lhs, rhs in
+        if lhs.key == rhs.key {
+          return lhs.value < rhs.value
+        }
+        return lhs.key < rhs.key
+      }
+      .map { HarnessMonitorUITestLaunchEnvironmentEntry(key: $0.key, value: $0.value) }
+  }
+
+  var summary: String {
+    guard !environment.isEmpty else {
+      return mode
+    }
+    let environmentSummary = environment
+      .map { "\($0.key)=\($0.value)" }
+      .joined(separator: ",")
+    return "\(mode) [\(environmentSummary)]"
+  }
+}
+
+struct HarnessMonitorUITestCachedLaunch {
+  let app: XCUIApplication
+  let signature: HarnessMonitorUITestLaunchSignature
+  let dataHomeRoot: URL
+}
+
 @MainActor
 private func performHarnessMonitorUITestTeardown(
   _ context: HarnessMonitorUITestTeardownContext
@@ -97,7 +135,7 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated class var reuseLaunchedApp: Bool { false }
   nonisolated private static let failureTracker = HarnessMonitorUITestFailureTracker()
 
-  static var cachedLaunchedApp: XCUIApplication?
+  static var cachedLaunch: HarnessMonitorUITestCachedLaunch?
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -159,10 +197,7 @@ class HarnessMonitorUITestCase: XCTestCase {
 
   override class func tearDown() {
     MainActor.assumeIsolated {
-      if let cachedLaunchedApp {
-        terminateAndWait(cachedLaunchedApp)
-      }
-      cachedLaunchedApp = nil
+      discardCachedLaunch()
     }
     super.tearDown()
   }
@@ -195,6 +230,13 @@ class HarnessMonitorUITestCase: XCTestCase {
       let rhsDate = rhs.launchDate ?? .distantPast
       return lhsDate < rhsDate
     }
+  }
+
+  static func discardCachedLaunch() {
+    guard let cachedLaunch else { return }
+    terminateAndWait(cachedLaunch.app)
+    cleanupIsolatedDataHome(at: cachedLaunch.dataHomeRoot)
+    Self.cachedLaunch = nil
   }
 }
 
