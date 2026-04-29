@@ -1,5 +1,4 @@
 import Foundation
-
 import OSLog
 
 public protocol SupervisorLogSink: Sendable {

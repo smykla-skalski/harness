@@ -120,8 +120,7 @@ public struct DecisionDetailView: View {
     }
   }
 
-  @ViewBuilder
-  private var detailBody: some View {
+  @ViewBuilder private var detailBody: some View {
     if let viewModel {
       populatedBody(viewModel)
         .sheet(item: snoozeBinding(for: viewModel)) { _ in

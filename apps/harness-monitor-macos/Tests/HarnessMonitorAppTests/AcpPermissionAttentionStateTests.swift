@@ -7,6 +7,19 @@ import UserNotifications
 
 @MainActor
 struct AcpPermissionAttentionStateTests {
+  @Test("toast motion policy suppresses motion when reduced motion is enabled")
+  func toastMotionPolicyHonorsReducedMotion() {
+    #expect(
+      AcpPermissionAttentionMotionPolicy.markerText(reduceMotion: true)
+        == "transition=opacity animation=none"
+    )
+    #expect(
+      AcpPermissionAttentionMotionPolicy.markerText(reduceMotion: false)
+        == "transition=move-top-opacity animation=spring"
+    )
+    #expect(AcpPermissionAttentionMotionPolicy.animation(reduceMotion: true) == nil)
+  }
+
   @Test("reconcile schedules at most one ACP notification while delivery is in flight")
   func reconcileDoesNotDuplicateInFlightNotifications() async {
     let center = AppTestNotificationCenter()
@@ -122,7 +135,9 @@ private final class AppTestWindowApplication: KeyWindowObservableApplication {
   }
 }
 
-private final class AppTestNotificationCenter: HarnessMonitorUserNotificationCenter, @unchecked Sendable {
+private final class AppTestNotificationCenter: HarnessMonitorUserNotificationCenter,
+  @unchecked Sendable
+{
   var delegate: UNUserNotificationCenterDelegate?
 
   private var pendingRequests: [UNNotificationRequest] = []

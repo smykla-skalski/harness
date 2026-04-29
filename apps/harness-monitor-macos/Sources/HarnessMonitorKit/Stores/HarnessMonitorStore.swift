@@ -71,12 +71,20 @@ public final class HarnessMonitorStore {
       guard oldValue != selectedAcpAgents else { return }
     }
   }
+  public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] = [] {
+    didSet {
+      guard oldValue != selectedAcpInspectAgents else { return }
+    }
+  }
+  public var selectedAcpInspectObservedAt: Date?
+  @ObservationIgnored var acpAgentDescriptorsByID: [String: AcpAgentDescriptor] = [:]
   var standaloneAcpPermissionBatches: [AcpPermissionBatch] = []
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
   public var resolvingAcpPermissionBatchID: String?
   public var acpPermissionResolutionStateByDecisionID: [String: BatchResolutionState] = [:]
-  @ObservationIgnored var acpPermissionDecisionPayloadsByDecisionID: [String: AcpPermissionDecisionPayload] =
-    [:]
+  @ObservationIgnored var acpPermissionDecisionPayloadsByDecisionID:
+    [String: AcpPermissionDecisionPayload] =
+      [:]
   @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }

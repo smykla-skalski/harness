@@ -66,6 +66,21 @@ public struct PreferencesSupervisorNotificationsPane: View {
         Text(acpAuthorizationStatus.detailText)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Toggle(
+          "Verbose tool-call announcements",
+          isOn: Binding(
+            get: { viewModel.verboseToolCallAnnouncementsEnabled },
+            set: { viewModel.setVerboseToolCallAnnouncementsEnabled($0) }
+          )
+        )
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesAcpVerboseToolCallAnnouncements
+        )
+        Text(
+          "When off, VoiceOver announces only completed or failed tool calls. Turn this on to announce every tool-call state change."
+        )
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         if acpAuthorizationStatus.showsSystemSettingsLink,
           let settingsURL = AcpPermissionUserNotifications.systemSettingsURL
         {
@@ -84,7 +99,9 @@ public struct PreferencesSupervisorNotificationsPane: View {
     } header: {
       Text("ACP Attention")
     } footer: {
-      Text("Notification Center delivery is optional. Dock, badge, and Decisions routes stay available when system permission is denied.")
+      Text(
+        "Notification Center delivery is optional. Dock, badge, and Decisions routes stay available when system permission is denied, and the tool-call announcement toggle only changes VoiceOver verbosity."
+      )
     }
   }
 }

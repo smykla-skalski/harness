@@ -27,7 +27,8 @@ private final class HarnessMonitorUserNotificationCenterBox: @unchecked Sendable
   }
 }
 
-private final class PreviewHarnessMonitorUserNotificationCenter: HarnessMonitorUserNotificationCenter,
+private final class PreviewHarnessMonitorUserNotificationCenter:
+  HarnessMonitorUserNotificationCenter,
   @unchecked Sendable
 {
   var delegate: UNUserNotificationCenterDelegate?
@@ -115,7 +116,8 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
   @ObservationIgnored private let centerBox: HarnessMonitorUserNotificationCenterBox
   @ObservationIgnored private let assetWriter: HarnessMonitorNotificationAssetWriting
-  @ObservationIgnored private let previewSettingsSnapshot: HarnessMonitorNotificationSettingsSnapshot?
+  @ObservationIgnored private let previewSettingsSnapshot:
+    HarnessMonitorNotificationSettingsSnapshot?
   @ObservationIgnored private var isActivated = false
   @ObservationIgnored private var resolveHandler: DecisionResolveHandler?
 

@@ -38,7 +38,8 @@ struct AcpPermissionModal: View {
         payload: payload,
         resolutionState: resolutionState,
         isResolving: isResolving,
-        selectionSummaryAccessibilityID: HarnessMonitorAccessibility.acpPermissionModalSelectionSummary,
+        selectionSummaryAccessibilityID: HarnessMonitorAccessibility
+          .acpPermissionModalSelectionSummary,
         panelAccessibilityID: HarnessMonitorAccessibility.acpPermissionModal,
         requestAccessibilityID: HarnessMonitorAccessibility.acpPermissionModalItem
       ) { requestID, isSelected in
@@ -84,9 +85,10 @@ struct AcpPermissionModal: View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if payload.isRenderable {
         Button(payload.requestCount == 1 ? "Deny" : "Deny All") {
-          resolve(actionID: payload.requestCount == 1
-            ? AcpPermissionDecisionActionID.deny
-            : AcpPermissionDecisionActionID.denyAll)
+          resolve(
+            actionID: payload.requestCount == 1
+              ? AcpPermissionDecisionActionID.deny
+              : AcpPermissionDecisionActionID.denyAll)
         }
         .keyboardShortcut(.cancelAction)
         .disabled(isResolving)

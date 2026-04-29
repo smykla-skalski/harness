@@ -119,7 +119,8 @@ struct AcpDecisionAttentionTests {
       )
     )
 
-    #expect(store.acpDecisionAttention(for: "worker-codex")?.oldestDecisionID == "acp-permission:batch-1")
+    #expect(
+      store.acpDecisionAttention(for: "worker-codex")?.oldestDecisionID == "acp-permission:batch-1")
     #expect(store.acpPermissionAttentionEvents.first?.decisionID == "acp-permission:batch-1")
     #expect(store.selectOldestDecision(for: "worker-codex") == "acp-permission:batch-1")
   }

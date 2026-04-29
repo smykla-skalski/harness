@@ -84,6 +84,7 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   }
 
   public static let ruleID = "acp-permission"
+  static let maximumRequestCount = 8
 
   public let decisionID: String
   public let summary: String
@@ -184,14 +185,14 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   }
 
   public var decisionDraft: DecisionDraft {
-      DecisionDraft(
-        id: decisionID,
-        severity: .warn,
-        ruleID: Self.ruleID,
-        sessionID: rawBatch.sessionId,
-        agentID: agent.agentID,
-        taskID: nil,
-        summary: summary,
+    DecisionDraft(
+      id: decisionID,
+      severity: .warn,
+      ruleID: Self.ruleID,
+      sessionID: rawBatch.sessionId,
+      agentID: agent.agentID,
+      taskID: nil,
+      summary: summary,
       contextJSON: encodeJSONString(),
       suggestedActionsJSON: encodedSuggestedActionsJSON()
     )
@@ -238,7 +239,8 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     }
 
     return [
-      Self.suggestedAction(id: AcpPermissionDecisionActionID.approveSelected, title: "Approve Selected"),
+      Self.suggestedAction(
+        id: AcpPermissionDecisionActionID.approveSelected, title: "Approve Selected"),
       Self.suggestedAction(id: AcpPermissionDecisionActionID.approveAll, title: "Approve All"),
       Self.suggestedAction(id: AcpPermissionDecisionActionID.denyAll, title: "Deny All"),
     ]
@@ -301,6 +303,14 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     guard !batch.requests.isEmpty else {
       return (nil, invalidBatchError("The ACP batch does not contain any permission requests."))
     }
+    guard batch.requests.count <= maximumRequestCount else {
+      return (
+        nil,
+        invalidBatchError(
+          "The ACP batch exceeded the supported \(maximumRequestCount)-request limit."
+        )
+      )
+    }
 
     var requests: [RenderableBatch.Request] = []
     requests.reserveCapacity(batch.requests.count)
@@ -315,10 +325,22 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
           invalidBatchError("ACP permission items did not match the selected session.")
         )
       }
-      let title = toolCallLabel(request.toolCall, keys: ["kind", "name", "tool"]) ?? "Tool call"
-      let detail = toolCallLabel(request.toolCall, keys: ["path", "command"])
-        ?? compactJSON(request.toolCall)
-      let breadcrumb = toolCallLabel(request.toolCall, keys: ["kind", "tool", "name"])
+      guard case .object(let toolCallObject) = request.toolCall else {
+        return (
+          nil,
+          invalidBatchError("ACP permission items must include a tool-call object.")
+        )
+      }
+      if let toolCallContextError = validateToolCallContext(in: toolCallObject) {
+        return (nil, toolCallContextError)
+      }
+      let toolCall = JSONValue.object(toolCallObject)
+      let title = toolCallLabel(toolCall, keys: ["kind", "name", "tool"]) ?? "Tool call"
+      let detail =
+        toolCallLabel(toolCall, keys: ["path", "command"])
+        ?? compactJSON(toolCall)
+      let breadcrumb =
+        toolCallLabel(toolCall, keys: ["kind", "tool", "name"])
         ?? title
       requests.append(
         RenderableBatch.Request(
@@ -333,59 +355,43 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     return (RenderableBatch(batch: batch, requests: requests), nil)
   }
 
+  private static func validateToolCallContext(
+    in toolCallObject: [String: JSONValue]
+  ) -> RenderableError? {
+    guard
+      let toolCallContext = toolCallObject["tool_call_context"] ?? toolCallObject["toolCallContext"]
+    else {
+      return nil
+    }
+    guard case .object(let toolCallContextObject) = toolCallContext else {
+      return invalidBatchError("ACP tool_call_context must be an object when provided.")
+    }
+
+    let identifierKeys = [
+      "tool_call_id",
+      "toolCallId",
+      "invocation_id",
+      "invocationId",
+      "id",
+    ]
+    let hasIdentifier = identifierKeys.contains { key in
+      guard case .string(let value)? = toolCallContextObject[key] else {
+        return false
+      }
+      return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    guard hasIdentifier else {
+      return invalidBatchError("ACP tool_call_context is missing a tool-call identifier.")
+    }
+    return nil
+  }
+
   private static func invalidBatchError(_ message: String) -> RenderableError {
     RenderableError(
       title: "ACP payload could not be rendered",
       message: message,
       recoverySuggestion: "Refresh the session or wait for a fresh ACP permission request."
     )
-  }
-
-  private static func decodeFailure(
-    for decision: Decision,
-    message: String
-  ) -> Self {
-    let rawBatch = AcpPermissionBatch(
-      batchId: decision.id.replacingOccurrences(of: "\(ruleID):", with: ""),
-      acpId: decision.agentID ?? "unknown-managed-agent",
-      sessionId: decision.sessionID ?? "",
-      requests: [],
-      createdAt: ISO8601DateFormatter().string(from: decision.createdAt)
-    )
-    return Self(
-      decisionID: decision.id,
-      summary: decision.summary,
-      agent: AgentContext(
-        agentID: decision.agentID ?? "unknown-agent",
-        agentName: decision.agentID ?? "Unknown Agent",
-        managedAgentID: rawBatch.acpId
-      ),
-      rawBatch: rawBatch,
-      renderableBatch: nil,
-      renderError: RenderableError(
-        title: "ACP payload could not be rendered",
-        message: message,
-        recoverySuggestion: "Dismiss the decision and wait for the daemon to resend it."
-      )
-    )
-  }
-
-  private static func summary(agentName: String, requestCount: Int) -> String {
-    let suffix = requestCount == 1 ? "permission" : "permissions"
-    return "\(agentName) requested \(requestCount) \(suffix)"
-  }
-
-  private static func toolCallLabel(_ value: JSONValue, keys: [String]) -> String? {
-    guard case .object(let object) = value else {
-      return nil
-    }
-    for key in keys {
-      guard case .string(let string)? = object[key], !string.isEmpty else {
-        continue
-      }
-      return string
-    }
-    return nil
   }
 
   private static func compactJSON(_ value: JSONValue) -> String {

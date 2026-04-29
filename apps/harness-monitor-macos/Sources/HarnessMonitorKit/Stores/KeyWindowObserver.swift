@@ -168,7 +168,8 @@ public final class KeyWindowObserver {
       return true
     }
     let separators = CharacterSet.alphanumerics.inverted
-    return actual
+    return
+      actual
       .components(separatedBy: separators)
       .contains(expected)
   }

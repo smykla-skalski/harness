@@ -138,6 +138,51 @@ struct WebSocketProtocolAcpTests {
     )
   }
 
+  @Test("Daemon push event decodes ACP inspect snapshots")
+  func daemonPushEventDecodesAcpInspectSnapshots() throws {
+    let json = """
+      {
+        "event": "acp_inspect",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:00:45Z",
+        "payload": {
+          "inspect": {
+            "agents": [
+              {
+                "acp_id": "acp-1",
+                "session_id": "session-1",
+                "agent_id": "worker-codex",
+                "display_name": "worker-codex",
+                "pid": 41001,
+                "pgid": 41001,
+                "uptime_ms": 93000,
+                "last_update_at": "2026-04-28T00:00:40Z",
+                "last_client_call_at": "2026-04-28T00:00:35Z",
+                "watchdog_state": "active",
+                "permission_mode": "allow_edits",
+                "pending_permissions": 2,
+                "permission_queue_depth": 1,
+                "terminal_count": 1,
+                "prompt_deadline_remaining_ms": 45000
+              }
+            ]
+          }
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpInspect(let response) = event.kind else {
+      Issue.record("Expected ACP inspect, got \(event.kind)")
+      return
+    }
+    let snapshot = try #require(response.agents.first)
+    #expect(event.sessionId == "session-1")
+    #expect(snapshot.agentId == "worker-codex")
+    #expect(snapshot.pendingPermissions == 2)
+    #expect(snapshot.promptDeadlineRemainingMs == 45_000)
+  }
+
   @Test("Daemon push event decodes sessionless ACP bridge resync incident")
   func daemonPushEventDecodesSessionlessAcpBridgeResyncIncident() throws {
     let json = """

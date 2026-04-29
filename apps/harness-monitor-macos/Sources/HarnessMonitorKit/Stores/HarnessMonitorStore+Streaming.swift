@@ -153,7 +153,7 @@ extension HarnessMonitorStore {
     case .logLevelChanged(let response):
       daemonLogLevel = response.level
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
-      .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
+      .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
     case .unknown:
@@ -254,7 +254,7 @@ extension HarnessMonitorStore {
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
-      .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
+      .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
     }
@@ -271,6 +271,11 @@ extension HarnessMonitorStore {
       applyAgentTui(tui)
     case .acpAgentUpdated(let snapshot):
       applyAcpAgent(snapshot)
+    case .acpInspect(let response):
+      guard let sessionID = event.sessionId else {
+        return false
+      }
+      replaceAcpInspect(response, sessionID: sessionID)
     case .acpAgentsReconciled(let payload):
       replaceAcpAgents(payload)
     case .acpEvents(let payload):

@@ -27,7 +27,8 @@ private struct InteractiveAcpPermissionDecisionDetailView: View {
   @Bindable var store: HarnessMonitorStore
 
   var body: some View {
-    let resolutionState = store.acpPermissionResolutionState(for: payload.decisionID)
+    let resolutionState =
+      store.acpPermissionResolutionState(for: payload.decisionID)
       ?? payload.defaultResolutionState
     AcpPermissionDecisionDetailContent(
       payload: payload,

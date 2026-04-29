@@ -151,6 +151,34 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("Agents runtime identifiers match UI-test mirror")
+  func agentsRuntimeIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeStrip("worker-codex")
+        == "harness.agents.detail.runtime.strip.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeWatchdog("worker-codex")
+        == "harness.agents.detail.runtime.watchdog.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimePendingPermissions("worker-codex")
+        == "harness.agents.detail.runtime.pending-permissions.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeDeadline("worker-codex")
+        == "harness.agents.detail.runtime.deadline.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeDisclosure("worker-codex")
+        == "harness.agents.detail.runtime.disclosure.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeDisclosureContent("worker-codex")
+        == "harness.agents.detail.runtime.disclosure-content.worker-codex"
+    )
+  }
+
   @Test("Slug normalises delimiters and casing")
   func slugNormalisation() {
     #expect(

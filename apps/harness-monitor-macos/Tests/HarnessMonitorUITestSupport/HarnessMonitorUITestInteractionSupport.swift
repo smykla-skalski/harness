@@ -73,7 +73,7 @@ extension HarnessMonitorUITestCase {
           return
         }
         if let coordinate = centerCoordinate(in: app, for: frameMarker) {
-          coordinate.tap()
+          coordinate.click()
           return
         }
       }
@@ -84,7 +84,7 @@ extension HarnessMonitorUITestCase {
           return
         }
         if let coordinate = centerCoordinate(in: app, for: frameMarker) {
-          coordinate.tap()
+          coordinate.click()
           return
         }
       }
@@ -92,7 +92,7 @@ extension HarnessMonitorUITestCase {
       if waitForElement(frameMarker, timeout: Self.fastPollInterval),
         let coordinate = centerCoordinate(in: app, for: frameMarker)
       {
-        coordinate.tap()
+        coordinate.click()
         return
       }
 
@@ -217,12 +217,12 @@ extension HarnessMonitorUITestCase {
   @discardableResult
   private func tapButtonElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
     if element.isHittable {
-      element.tap()
+      element.click()
       return true
     }
 
     if let coordinate = preferredTapCoordinate(in: app, for: element) {
-      coordinate.tap()
+      coordinate.click()
       return true
     }
 

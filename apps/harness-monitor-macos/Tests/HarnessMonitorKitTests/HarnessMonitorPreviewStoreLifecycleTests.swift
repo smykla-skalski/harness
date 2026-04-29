@@ -229,10 +229,14 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
 
     let response = try await client.managedAgents(sessionID: PreviewFixtures.summary.sessionId)
     let acpAgent = try #require(response.agents.compactMap(\.acp).first)
+    let inspect = try await client.acpInspect(sessionID: PreviewFixtures.summary.sessionId)
+    let inspectedAgent = try #require(inspect.agents.first)
 
     #expect(acpAgent.agentId == "worker-codex")
     #expect(acpAgent.pendingPermissions == 2)
     #expect(acpAgent.pendingPermissionBatches.map(\.batchId) == ["preview-acp-permission-1"])
+    #expect(inspectedAgent.agentId == "worker-codex")
+    #expect(inspectedAgent.promptDeadlineRemainingMs == 95_000)
   }
 
   @Test("Preview bootstrap refresh keeps ACP managed agents on selected session")
@@ -258,6 +262,8 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
     #expect(store.selectedAcpAgents.map(\.agentId) == ["worker-codex"])
+    #expect(store.selectedAcpInspectAgents.map(\.agentId) == ["worker-codex"])
+    #expect(store.selectedAcpInspectObservedAt != nil)
     #expect(store.acpDecisionAttention(for: "worker-codex")?.count == 2)
     #expect(store.presentingAcpPermissionBatch == nil)
   }

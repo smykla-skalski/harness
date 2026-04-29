@@ -18,13 +18,27 @@ extension HarnessMonitorStore {
   }
 
   public func fetchAcpAgentDescriptors() async -> [AcpAgentDescriptor] {
-    guard let client else { return [] }
-    return (try? await client.acpAgentDescriptors()) ?? []
+    guard let client else {
+      return Array(acpAgentDescriptorsByID.values)
+    }
+    let descriptors = (try? await client.acpAgentDescriptors()) ?? Array(acpAgentDescriptorsByID.values)
+    acpAgentDescriptorsByID = Dictionary(
+      uniqueKeysWithValues: descriptors.map { ($0.id, $0) }
+    )
+    return descriptors
   }
 
   public func fetchRuntimeProbeResults() async -> AcpRuntimeProbeResponse? {
     guard let client else { return nil }
     return try? await client.runtimeProbeResults()
+  }
+
+  public func acpAgentSnapshot(for agentID: String) -> AcpAgentSnapshot? {
+    selectedAcpAgents.first { $0.agentId == agentID }
+  }
+
+  public func acpInspectSnapshot(for agentID: String) -> AcpAgentInspectSnapshot? {
+    selectedAcpInspectAgents.first { $0.agentId == agentID }
   }
 
   @discardableResult
@@ -140,7 +154,8 @@ extension HarnessMonitorStore {
     return makeAcpPermissionDecisionPayload(for: batch)
   }
 
-  public func acpPermissionDecisionPayload(for decisionID: String) -> AcpPermissionDecisionPayload? {
+  public func acpPermissionDecisionPayload(for decisionID: String) -> AcpPermissionDecisionPayload?
+  {
     acpPermissionDecisionPayloadsByDecisionID[decisionID]
   }
 
@@ -153,8 +168,9 @@ extension HarnessMonitorStore {
     requestID: String,
     isSelected: Bool
   ) {
-    guard var state = acpPermissionResolutionStateByDecisionID[decisionID]
-      ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
+    guard
+      var state = acpPermissionResolutionStateByDecisionID[decisionID]
+        ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
     else {
       return
     }
@@ -175,10 +191,12 @@ extension HarnessMonitorStore {
     let activeDecisionStore = decisionStore ?? supervisorDecisionStore
     let payload: AcpPermissionDecisionPayload
     do {
-      guard let resolvedPayload = try await resolveAcpPermissionPayload(
-        decisionID: decisionID,
-        decisionStore: activeDecisionStore
-      ) else {
+      guard
+        let resolvedPayload = try await resolveAcpPermissionPayload(
+          decisionID: decisionID,
+          decisionStore: activeDecisionStore
+        )
+      else {
         presentFailureFeedback("ACP permission decision is no longer available.")
         return false
       }
@@ -291,6 +309,19 @@ extension HarnessMonitorStore {
     reconcileAcpPermissionDecisions()
   }
 
+  func replaceAcpInspect(
+    _ response: AcpAgentInspectResponse,
+    sessionID: String
+  ) {
+    guard sessionID == selectedSessionID else {
+      return
+    }
+    selectedAcpInspectAgents = sortedAcpInspectSnapshots(
+      response.agents.filter { $0.sessionId == sessionID }
+    )
+    selectedAcpInspectObservedAt = Date()
+  }
+
   /// Apply an already-decoded ACP event push to the in-memory timeline.
   ///
   /// UI-0 contract: any future WS coalescer remains Swift-side only and sits before this method.
@@ -300,7 +331,10 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
-    let entries = payload.timelineEntries(fallbackRecordedAt: recordedAt)
+    let entries = payload.timelineEntries(
+      fallbackRecordedAt: recordedAt,
+      toolCallMetadata: acpToolCallTimelineMetadata(for: payload)
+    )
     guard !entries.isEmpty else {
       return
     }
@@ -322,6 +356,21 @@ extension HarnessMonitorStore {
         timelineWindow: TimelineWindowResponse.fallbackMetadata(for: mergedTimeline)
       )
     }
+  }
+
+  private func acpToolCallTimelineMetadata(
+    for payload: AcpEventBatchPayload
+  ) -> AcpToolCallTimelineMetadata {
+    let snapshot = selectedAcpAgents.first { $0.acpId == payload.acpId }
+    let descriptorID = snapshot?.agentId ?? payload.acpId
+    let descriptor = acpAgentDescriptorsByID[descriptorID]
+    return AcpToolCallTimelineMetadata(
+      acpAgentId: payload.acpId,
+      agentId: snapshot?.agentId ?? descriptor?.id ?? payload.acpId,
+      displayName: snapshot?.displayName ?? descriptor?.displayName ?? snapshot?.agentId
+        ?? payload.acpId,
+      capabilityTags: descriptor?.capabilities ?? []
+    )
   }
 
   func applyAcpProcessIncident(
@@ -447,6 +496,8 @@ extension HarnessMonitorStore {
 
   func resetSelectedAcpAgents() {
     selectedAcpAgents = []
+    selectedAcpInspectAgents = []
+    selectedAcpInspectObservedAt = nil
     standaloneAcpPermissionBatches = []
     presentingAcpPermissionBatch = nil
     resolvingAcpPermissionBatchID = nil
@@ -487,11 +538,38 @@ extension HarnessMonitorStore {
     }
   }
 
+  func refreshAcpInspect(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async -> Bool {
+    do {
+      let measuredInspect = try await Self.measureOperation {
+        try await client.acpInspect(sessionID: sessionID)
+      }
+      recordRequestSuccess()
+      guard selectedSessionID == sessionID else {
+        return true
+      }
+      replaceAcpInspect(measuredInspect.value, sessionID: sessionID)
+      return true
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return false
+      }
+      HarnessMonitorLogger.store.warning(
+        "managed ACP inspect refresh failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return false
+    }
+  }
+
   func recoverSelectedAcpAgentsAfterReconnect(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
   ) async {
-    _ = await refreshAcpAgents(using: client, sessionID: sessionID)
+    async let refreshedAgents = refreshAcpAgents(using: client, sessionID: sessionID)
+    async let refreshedInspect = refreshAcpInspect(using: client, sessionID: sessionID)
+    _ = await (refreshedAgents, refreshedInspect)
   }
 
   private func shouldAutoPresentHydratedAcpPermissions() -> Bool {
@@ -509,7 +587,8 @@ extension HarnessMonitorStore {
       let payload = makeAcpPermissionDecisionPayload(for: batch)
       nextPayloads[payload.decisionID] = payload
       let requestIDs = payload.renderableBatch?.requests.map(\.id) ?? []
-      let state = (acpPermissionResolutionStateByDecisionID[payload.decisionID]
+      let state =
+        (acpPermissionResolutionStateByDecisionID[payload.decisionID]
         ?? payload.defaultResolutionState)
         .rebased(to: requestIDs)
       nextResolutionState[payload.decisionID] = state
@@ -564,6 +643,17 @@ extension HarnessMonitorStore {
   }
 
   private func sortedAcpAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
+    snapshots.sorted {
+      if $0.displayName != $1.displayName {
+        return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+      }
+      return $0.acpId < $1.acpId
+    }
+  }
+
+  private func sortedAcpInspectSnapshots(
+    _ snapshots: [AcpAgentInspectSnapshot]
+  ) -> [AcpAgentInspectSnapshot] {
     snapshots.sorted {
       if $0.displayName != $1.displayName {
         return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
@@ -687,8 +777,9 @@ extension HarnessMonitorStore {
     decisionID: String,
     submittedAt: Date?
   ) {
-    guard var state = acpPermissionResolutionStateByDecisionID[decisionID]
-      ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
+    guard
+      var state = acpPermissionResolutionStateByDecisionID[decisionID]
+        ?? acpPermissionDecisionPayloadsByDecisionID[decisionID]?.defaultResolutionState
     else {
       return
     }
@@ -714,7 +805,8 @@ extension HarnessMonitorStore {
     }
     acpPermissionDecisionSyncTask = Task { @MainActor in
       var didPresentFailure = false
-      let reportFailure: @MainActor (String, String?, any Error) -> Void = { operation, decisionID, error in
+      let reportFailure: @MainActor (String, String?, any Error) -> Void = {
+        operation, decisionID, error in
         self.reportAcpPermissionDecisionStoreFailure(
           operation: operation,
           decisionID: decisionID,
@@ -753,8 +845,8 @@ extension HarnessMonitorStore {
           .filter { $0.ruleID == AcpPermissionDecisionPayload.ruleID }
           .map(\.id)
       )
-        .subtracting(activeDecisionIDs)
-        .union(staleDecisionIDs)
+      .subtracting(activeDecisionIDs)
+      .union(staleDecisionIDs)
       for decisionID in staleACPDecisionIDs.sorted() {
         guard !Task.isCancelled else {
           return

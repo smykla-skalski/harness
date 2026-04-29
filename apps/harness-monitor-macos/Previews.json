@@ -105,6 +105,12 @@
       "index": 0
     },
     {
+      "id": "AcpPermissionAttentionToast",
+      "description": "ACP permission attention toast overlay",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Attention/AcpPermissionAttentionToastView.swift",
+      "index": 0
+    },
+    {
       "id": "DecisionsWindowCrowded",
       "description": "Decisions window with sidebar, detail, and inspector populated",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsWindowCrowdedPreview.swift",

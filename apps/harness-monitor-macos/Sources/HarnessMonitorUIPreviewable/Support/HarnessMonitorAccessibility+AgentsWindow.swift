@@ -29,4 +29,28 @@ extension HarnessMonitorAccessibility {
   public static func agentDetailOpenDecisionsButton(_ agentID: String) -> String {
     "harness.agents.detail.awaiting-decision.open.\(slug(agentID))"
   }
+
+  public static func agentRuntimeStrip(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.strip.\(slug(agentID))"
+  }
+
+  public static func agentRuntimeWatchdog(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.watchdog.\(slug(agentID))"
+  }
+
+  public static func agentRuntimePendingPermissions(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.pending-permissions.\(slug(agentID))"
+  }
+
+  public static func agentRuntimeDeadline(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.deadline.\(slug(agentID))"
+  }
+
+  public static func agentRuntimeDisclosure(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.disclosure.\(slug(agentID))"
+  }
+
+  public static func agentRuntimeDisclosureContent(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.disclosure-content.\(slug(agentID))"
+  }
 }

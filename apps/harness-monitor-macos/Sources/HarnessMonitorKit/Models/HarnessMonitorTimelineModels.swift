@@ -226,23 +226,50 @@ public struct AcpConversationEvent: Codable, Equatable, Sendable {
   }
 }
 
+struct AcpToolCallTimelineMetadata: Equatable, Sendable {
+  let acpAgentId: String
+  let agentId: String
+  let displayName: String
+  let capabilityTags: [String]
+}
+
 extension AcpEventBatchPayload {
   /// Materialise timeline rows from the raw daemon payload without mutating ordering semantics.
   ///
   /// UI-0 contract: this transform is payload-only. Any future buffering, overflow, or
   /// `drop-oldest` policy belongs after decode and before store mutation so the wire contract
   /// stays stable across UI-only refactors.
-  public func timelineEntries(fallbackRecordedAt: String) -> [TimelineEntry] {
+  public func timelineEntries(
+    fallbackRecordedAt: String
+  ) -> [TimelineEntry] {
+    timelineEntries(
+      fallbackRecordedAt: fallbackRecordedAt,
+      toolCallMetadata: nil
+    )
+  }
+
+  func timelineEntries(
+    fallbackRecordedAt: String,
+    toolCallMetadata: AcpToolCallTimelineMetadata?
+  ) -> [TimelineEntry] {
     events
       .filter { $0.sessionId == sessionId }
       .compactMap { event in
-        event.timelineEntry(acpID: acpId, fallbackRecordedAt: fallbackRecordedAt)
+        event.timelineEntry(
+          acpID: acpId,
+          fallbackRecordedAt: fallbackRecordedAt,
+          toolCallMetadata: toolCallMetadata
+        )
       }
   }
 }
 
 extension AcpConversationEvent {
-  fileprivate func timelineEntry(acpID: String, fallbackRecordedAt: String) -> TimelineEntry? {
+  fileprivate func timelineEntry(
+    acpID: String,
+    fallbackRecordedAt: String,
+    toolCallMetadata: AcpToolCallTimelineMetadata?
+  ) -> TimelineEntry? {
     guard case .object(let event) = kind,
       let type = event.stringValue(for: "type")
     else {
@@ -260,30 +287,56 @@ extension AcpConversationEvent {
     }
 
     let toolName = event.stringValue(for: "tool_name") ?? "Tool"
-    let actor = agent.isEmpty ? acpID : agent
+    let acpAgentId = toolCallMetadata?.acpAgentId ?? acpID
+    let agentId = toolCallMetadata?.agentId ?? (agent.isEmpty ? acpID : agent)
+    let summaryActor = toolCallMetadata?.displayName ?? agentId
+    let status = Self.toolCallStatus(for: entryKind)
     let summary: String =
       switch entryKind {
       case "tool_invocation":
-        "\(actor) invoked \(toolName)"
+        "\(summaryActor) invoked \(toolName)"
       case "tool_result_error":
-        "\(actor) received an error from \(toolName)"
+        "\(summaryActor) received an error from \(toolName)"
       default:
-        "\(actor) received a result from \(toolName)"
+        "\(summaryActor) received a result from \(toolName)"
       }
 
     return TimelineEntry(
-      entryId: "acp-\(actor)-\(entryKind)-\(sequence)",
+      entryId: "acp-\(agentId)-\(entryKind)-\(sequence)",
       recordedAt: timestamp ?? fallbackRecordedAt,
       kind: entryKind,
       sessionId: sessionId,
-      agentId: actor,
+      agentId: agentId,
       taskId: nil,
       summary: summary,
       payload: .object([
         "runtime": .string("acp"),
         "event": kind,
+        "tool_call_timeline": .object([
+          "tool_call_id": event["invocation_id"] ?? .null,
+          "tool_name": .string(toolName),
+          "status": .string(status),
+          "acp_agent_id": .string(acpAgentId),
+          "agent_id": .string(agentId),
+          "agent_display_name": .string(summaryActor),
+          "capability_tags": .array(
+            (toolCallMetadata?.capabilityTags ?? []).map(JSONValue.string)
+          ),
+          "stop_reason": event["stop_reason"] ?? .null,
+        ]),
       ])
     )
+  }
+
+  private static func toolCallStatus(for entryKind: String) -> String {
+    switch entryKind {
+    case "tool_invocation":
+      "started"
+    case "tool_result_error":
+      "failed"
+    default:
+      "completed"
+    }
   }
 }
 
