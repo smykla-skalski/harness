@@ -15,6 +15,7 @@ pub fn sync_runtime_configs(
     project_dir: &Path,
     agents: &[HookAgent],
     skip_runtime_hooks: &[HookAgent],
+    install_pretool_hooks: bool,
     mode: SyncMode,
 ) -> Result<Vec<PathBuf>, String> {
     let mut processed = Vec::new();
@@ -32,7 +33,7 @@ pub fn sync_runtime_configs(
                 path.display()
             )
         })?;
-        let patched = patch_runtime_config(agent, &current)?;
+        let patched = patch_runtime_config(agent, &current, install_pretool_hooks)?;
 
         if patched != current {
             match mode {
@@ -65,22 +66,49 @@ pub fn sync_runtime_configs(
     Ok(processed)
 }
 
-fn patch_runtime_config(agent: HookAgent, current: &str) -> Result<String, String> {
+fn patch_runtime_config(
+    agent: HookAgent,
+    current: &str,
+    install_pretool_hooks: bool,
+) -> Result<String, String> {
     let mut root: Value = serde_json::from_str(current)
         .map_err(|error| format!("invalid runtime config JSON: {error}"))?;
 
     match agent {
         HookAgent::Claude => {
-            patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", None)
+            patch_nested_hook_config(
+                &mut root,
+                agent,
+                "PreToolUse",
+                "SessionStart",
+                None,
+                install_pretool_hooks,
+            )
         }
         HookAgent::Codex => {
-            patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", Some(10))
+            patch_nested_hook_config(
+                &mut root,
+                agent,
+                "PreToolUse",
+                "SessionStart",
+                Some(10),
+                install_pretool_hooks,
+            )
         }
         HookAgent::Gemini => {
-            patch_nested_hook_config(&mut root, agent, "BeforeTool", "SessionStart", Some(5000))
+            patch_nested_hook_config(
+                &mut root,
+                agent,
+                "BeforeTool",
+                "SessionStart",
+                Some(5000),
+                install_pretool_hooks,
+            )
         }
-        HookAgent::Copilot => patch_copilot_config(&mut root, agent),
-        HookAgent::Vibe | HookAgent::OpenCode => patch_registration_config(&mut root, agent),
+        HookAgent::Copilot => patch_copilot_config(&mut root, agent, install_pretool_hooks),
+        HookAgent::Vibe | HookAgent::OpenCode => {
+            patch_registration_config(&mut root, agent, install_pretool_hooks)
+        }
     }?;
 
     serde_json::to_string_pretty(&root)
@@ -93,6 +121,7 @@ fn patch_nested_hook_config(
     pre_tool_event: &'static str,
     session_start_event: &'static str,
     timeout: Option<u64>,
+    install_pretool_hooks: bool,
 ) -> Result<(), String> {
     let root_object = root
         .as_object_mut()
@@ -105,6 +134,7 @@ fn patch_nested_hook_config(
         agent.repo_policy_command().as_str(),
         Some(".*"),
         timeout,
+        install_pretool_hooks,
     )?;
     patch_nested_event(
         hooks,
@@ -112,26 +142,41 @@ fn patch_nested_hook_config(
         agent.session_start_command().as_str(),
         None,
         timeout,
+        true,
     )?;
     Ok(())
 }
 
-fn patch_copilot_config(root: &mut Value, agent: HookAgent) -> Result<(), String> {
+fn patch_copilot_config(
+    root: &mut Value,
+    agent: HookAgent,
+    install_pretool_hooks: bool,
+) -> Result<(), String> {
     let root_object = root
         .as_object_mut()
         .ok_or_else(|| "invalid runtime config: root must be a JSON object".to_string())?;
     let hooks = ensure_object(root_object, "hooks", "runtime config hooks")?;
 
-    patch_copilot_event(hooks, "preToolUse", agent.repo_policy_command().as_str())?;
+    patch_copilot_event(
+        hooks,
+        "preToolUse",
+        agent.repo_policy_command().as_str(),
+        install_pretool_hooks,
+    )?;
     patch_copilot_event(
         hooks,
         "sessionStart",
         agent.session_start_command().as_str(),
+        true,
     )?;
     Ok(())
 }
 
-fn patch_registration_config(root: &mut Value, agent: HookAgent) -> Result<(), String> {
+fn patch_registration_config(
+    root: &mut Value,
+    agent: HookAgent,
+    install_pretool_hooks: bool,
+) -> Result<(), String> {
     let root_object = root
         .as_object_mut()
         .ok_or_else(|| "invalid runtime config: root must be a JSON object".to_string())?;
@@ -143,12 +188,14 @@ fn patch_registration_config(root: &mut Value, agent: HookAgent) -> Result<(), S
             .and_then(Value::as_str)
             .is_none_or(|name| name != "aff-repo-policy" && name != "aff-session-start")
     });
-    registrations.push(json!({
-        "name": "aff-repo-policy",
-        "event": "tool.execute.before",
-        "command": agent.repo_policy_command(),
-        "matcher": ".*"
-    }));
+    if install_pretool_hooks {
+        registrations.push(json!({
+            "name": "aff-repo-policy",
+            "event": "tool.execute.before",
+            "command": agent.repo_policy_command(),
+            "matcher": ".*"
+        }));
+    }
     registrations.push(json!({
         "name": "aff-session-start",
         "event": "session.created",
@@ -163,9 +210,13 @@ fn patch_nested_event(
     command: &str,
     matcher: Option<&'static str>,
     timeout: Option<u64>,
+    should_install: bool,
 ) -> Result<(), String> {
     let event_hooks = ensure_array(hooks, event_name, event_name)?;
     event_hooks.retain(|entry| !nested_entry_matches_command(entry, command));
+    if !should_install {
+        return Ok(());
+    }
 
     let mut command_hook = Map::new();
     command_hook.insert("type".to_string(), Value::String("command".to_string()));
@@ -193,6 +244,7 @@ fn patch_copilot_event(
     hooks: &mut Map<String, Value>,
     event_name: &'static str,
     command: &str,
+    should_install: bool,
 ) -> Result<(), String> {
     let event_hooks = ensure_array(hooks, event_name, event_name)?;
     event_hooks.retain(|entry| {
@@ -201,6 +253,9 @@ fn patch_copilot_event(
             .and_then(Value::as_str)
             .is_none_or(|existing| existing != command)
     });
+    if !should_install {
+        return Ok(());
+    }
     event_hooks.push(json!({
         "type": "command",
         "bash": command,

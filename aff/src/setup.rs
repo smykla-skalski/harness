@@ -23,6 +23,9 @@ pub struct SetupBootstrapArgs {
     /// Skip runtime hook configs for the listed agents.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub skip_runtime_hooks: Vec<HookAgent>,
+    /// Install aff pre-tool hooks (opt-in).
+    #[arg(long)]
+    pub install_pretool_hooks: bool,
     /// Accepted for task-surface parity with harness; aff does not emit Gemini commands.
     #[arg(long)]
     pub include_gemini_commands: bool,
@@ -56,6 +59,9 @@ pub struct GenerateRuntimeHooksArgs {
     /// Skip runtime hook configs for the listed agents.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub skip_runtime_hooks: Vec<HookAgent>,
+    /// Install aff pre-tool hooks (opt-in).
+    #[arg(long)]
+    pub install_pretool_hooks: bool,
     /// Accepted for task-surface parity with harness; aff does not emit Gemini commands.
     #[arg(long)]
     pub include_gemini_commands: bool,
@@ -91,6 +97,7 @@ impl SetupBootstrapArgs {
             &project_dir,
             &agents,
             &self.skip_runtime_hooks,
+            self.install_pretool_hooks,
             SyncMode::Apply,
         )?;
         Ok(0)
@@ -113,6 +120,7 @@ impl GenerateRuntimeHooksArgs {
             &project_dir,
             &agents,
             &self.skip_runtime_hooks,
+            self.install_pretool_hooks,
             if self.check {
                 SyncMode::Check
             } else {

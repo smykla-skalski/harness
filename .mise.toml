@@ -71,6 +71,24 @@ run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
 description = "Verify aff-owned runtime hook patches are in sync with current runtime configs"
 run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate --check"
 
+[tasks."harness:check"]
+description = "Run harness-only quality gates (without aff package checks)"
+run = [
+  "./scripts/check-no-stale-state.sh",
+  "./scripts/version.sh check",
+  "./scripts/check-scripts.sh",
+  "./scripts/cargo-local.sh check -p harness",
+  "./scripts/cargo-local.sh clippy -p harness --lib",
+  "./scripts/cargo-local.sh run --quiet -- setup agents generate --check",
+]
+
+[tasks."aff:check"]
+description = "Run aff-only quality gates"
+run = [
+  "./scripts/cargo-local.sh check -p aff",
+  "./scripts/cargo-local.sh clippy -p aff --all-targets",
+]
+
 [tasks."aff:setup:agents:generate"]
 description = "Patch aff-owned runtime hooks into existing runtime configs (pass aff setup args after --)"
 run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate"
@@ -80,20 +98,22 @@ description = "Patch aff-owned runtime hooks into existing bootstrap configs (pa
 run = "./scripts/cargo-local.sh run --quiet -p aff -- setup bootstrap"
 
 [tasks.check]
-description = "Type-check without building"
-run = "./scripts/check.sh"
+description = "Run full repo quality gates (harness + aff)"
+depends = ["harness:check", "aff:check"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
 run = ["./scripts/cargo-local.sh fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
-description = "Build release binaries, sign them, install harness + aff to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binaries"
+description = "Build and install both harness and aff"
+depends = ["harness:install", "aff:install"]
+
+[tasks."harness:install"]
+description = "Build the harness binary, sign it, install it to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
 run = [
   "./scripts/cargo-local.sh build --release --features tokio-console",
   "./scripts/install-harness-release.sh",
-  "./scripts/cargo-local.sh build --release -p aff",
-  "./scripts/install-aff-release.sh",
 ]
 
 [tasks."aff:install"]
@@ -102,6 +122,10 @@ run = [
   "./scripts/cargo-local.sh build --release -p aff",
   "./scripts/install-aff-release.sh",
 ]
+
+[tasks."aff:test"]
+description = "Run aff package tests only"
+run = "./scripts/cargo-local.sh test --quiet -p aff"
 
 [tasks."cargo:local"]
 description = "Run cargo through the shared local wrapper (pass cargo args after --)"
