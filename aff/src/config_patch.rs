@@ -75,36 +75,30 @@ fn patch_runtime_config(
         .map_err(|error| format!("invalid runtime config JSON: {error}"))?;
 
     match agent {
-        HookAgent::Claude => {
-            patch_nested_hook_config(
-                &mut root,
-                agent,
-                "PreToolUse",
-                "SessionStart",
-                None,
-                install_pretool_hooks,
-            )
-        }
-        HookAgent::Codex => {
-            patch_nested_hook_config(
-                &mut root,
-                agent,
-                "PreToolUse",
-                "SessionStart",
-                Some(10),
-                install_pretool_hooks,
-            )
-        }
-        HookAgent::Gemini => {
-            patch_nested_hook_config(
-                &mut root,
-                agent,
-                "BeforeTool",
-                "SessionStart",
-                Some(5000),
-                install_pretool_hooks,
-            )
-        }
+        HookAgent::Claude => patch_nested_hook_config(
+            &mut root,
+            agent,
+            "PreToolUse",
+            "SessionStart",
+            None,
+            install_pretool_hooks,
+        ),
+        HookAgent::Codex => patch_nested_hook_config(
+            &mut root,
+            agent,
+            "PreToolUse",
+            "SessionStart",
+            Some(10),
+            install_pretool_hooks,
+        ),
+        HookAgent::Gemini => patch_nested_hook_config(
+            &mut root,
+            agent,
+            "BeforeTool",
+            "SessionStart",
+            Some(5000),
+            install_pretool_hooks,
+        ),
         HookAgent::Copilot => patch_copilot_config(&mut root, agent, install_pretool_hooks),
         HookAgent::Vibe | HookAgent::OpenCode => {
             patch_registration_config(&mut root, agent, install_pretool_hooks)
@@ -183,7 +177,10 @@ fn patch_registration_config(
     let registrations = ensure_array(root_object, "registrations", "runtime registrations")?;
 
     registrations.retain(|entry| {
-        let name = entry.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = entry
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let event = entry
             .get("event")
             .and_then(Value::as_str)
