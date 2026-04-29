@@ -222,23 +222,8 @@ impl AcpAgentManagerHandle {
                     self.set_sandbox_event_epoch(Some(response_epoch));
                     self.set_sandbox_event_continuity(Some(response_continuity));
                     self.set_sandbox_event_cursor(Some(response.next_seq));
-                    if replay_events.is_empty() {
-                        idle_polls = idle_polls.saturating_add(1);
-                        if idle_polls >= SANDBOX_ACP_IDLE_INSPECT_POLLS
-                            && bridge
-                                .acp_inspect(None)
-                                .is_ok_and(|inspect| inspect.agents.is_empty())
-                        {
-                            return;
-                        }
-                    } else {
-                        idle_polls = 0;
-                        for event in replay_events {
-                            if let Some(session_id) = event.session_id.as_ref() {
-                                self.remember_sandbox_session(session_id);
-                            }
-                            let _ = self.sender().send(event);
-                        }
+                    if self.handle_sandbox_replay_events(&bridge, replay_events, &mut idle_polls) {
+                        return;
                     }
                 }
                 Err(error) => {
@@ -321,6 +306,29 @@ impl AcpAgentManagerHandle {
         sessions.insert(session_id.to_string());
         self.set_sandbox_known_sessions(sessions);
     }
+
+    fn handle_sandbox_replay_events(
+        &self,
+        bridge: &BridgeClient,
+        replay_events: Vec<StreamEvent>,
+        idle_polls: &mut usize,
+    ) -> bool {
+        if replay_events.is_empty() {
+            *idle_polls = idle_polls.saturating_add(1);
+            return *idle_polls >= SANDBOX_ACP_IDLE_INSPECT_POLLS
+                && bridge
+                    .acp_inspect(None)
+                    .is_ok_and(|inspect| inspect.agents.is_empty());
+        }
+        *idle_polls = 0;
+        for event in replay_events {
+            if let Some(session_id) = event.session_id.as_ref() {
+                self.remember_sandbox_session(session_id);
+            }
+            let _ = self.sender().send(event);
+        }
+        false
+    }
 }
 
 #[expect(
@@ -352,7 +360,6 @@ fn reconciled_event(payload: &AcpAgentsReconciledPayload) -> Option<StreamEvent>
         payload: serde_json::to_value(payload).ok()?,
     })
 }
-
 
 fn reconcile_sessions(
     known_sessions: BTreeSet<String>,

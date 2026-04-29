@@ -1,47 +1,31 @@
 use std::io::Read;
-use std::process::{Child, ChildStderr, ExitStatus};
+use std::process::ChildStderr;
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
-use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
 use crate::agents::acp::connection::EventBatch;
-use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group, watchdog_loop};
+use crate::agents::acp::supervision::{AcpSessionSupervisor, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::protocol::StreamEvent;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
-use super::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
+use super::manager::{AcpAgentInspectSnapshot, AcpAgentManagerHandle, AcpAgentSnapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle};
-use super::protocol::AcpCancelHandle;
 
 const STDERR_TAIL_LIMIT: usize = 16 * 1024;
-const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
-const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
+
+mod process;
+pub(in crate::daemon::agent_acp) use process::{ActiveAcpProcess, ActiveAcpTasks};
 
 pub(super) struct ActiveAcpSession {
     snapshot: Mutex<AcpAgentSnapshot>,
-    child: Mutex<Option<Child>>,
-    supervisor: Arc<AcpSessionSupervisor>,
     permissions: PermissionBridgeHandle,
-    cancel: AcpCancelHandle,
-    stderr_tail: SharedStderrTail,
-    protocol_task: Mutex<Option<JoinHandle<()>>>,
-    batcher_task: Mutex<Option<JoinHandle<()>>>,
-    event_task: Mutex<Option<JoinHandle<()>>>,
-    protocol_disconnect_task: Mutex<Option<JoinHandle<()>>>,
-    watchdog_task: Mutex<Option<JoinHandle<()>>>,
-    started_at: Instant,
-}
-
-pub(super) struct ActiveAcpTasks {
-    pub protocol: JoinHandle<()>,
-    pub batcher: JoinHandle<()>,
-    pub event: JoinHandle<()>,
+    process: Arc<ActiveAcpProcess>,
 }
 
 #[derive(Clone, Default)]
@@ -69,38 +53,35 @@ impl ActiveAcpSession {
     #[must_use]
     pub(super) fn new(
         snapshot: AcpAgentSnapshot,
-        child: Child,
-        supervisor: Arc<AcpSessionSupervisor>,
         permissions: PermissionBridgeHandle,
-        cancel: AcpCancelHandle,
-        stderr_tail: SharedStderrTail,
-        tasks: ActiveAcpTasks,
+        process: Arc<ActiveAcpProcess>,
     ) -> Self {
+        process.add_logical_session(&snapshot.acp_id);
         Self {
             snapshot: Mutex::new(snapshot),
-            child: Mutex::new(Some(child)),
-            supervisor,
             permissions,
-            cancel,
-            stderr_tail,
-            protocol_task: Mutex::new(Some(tasks.protocol)),
-            batcher_task: Mutex::new(Some(tasks.batcher)),
-            event_task: Mutex::new(Some(tasks.event)),
-            protocol_disconnect_task: Mutex::new(None),
-            watchdog_task: Mutex::new(None),
-            started_at: Instant::now(),
+            process,
         }
     }
 
-    pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
-        *self
-            .protocol_disconnect_task
+    pub(super) fn process_key(&self) -> String {
+        self.snapshot
             .lock()
-            .expect("ACP protocol disconnect task lock") = Some(task);
+            .expect("ACP snapshot lock")
+            .process_key
+            .clone()
+    }
+
+    pub(super) fn process(&self) -> Arc<ActiveAcpProcess> {
+        Arc::clone(&self.process)
+    }
+
+    pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
+        self.process.set_protocol_disconnect_task(task);
     }
 
     pub(super) fn set_watchdog_task(&self, task: JoinHandle<()>) {
-        *self.watchdog_task.lock().expect("ACP watchdog task lock") = Some(task);
+        self.process.set_watchdog_task(task);
     }
 
     pub(super) fn session_id(&self) -> String {
@@ -137,8 +118,8 @@ impl ActiveAcpSession {
 
     pub(super) fn inspect_snapshot(&self) -> AcpAgentInspectSnapshot {
         let snapshot = self.snapshot_with_live_counts();
-        let prompt_timeout = self.supervisor.config().prompt_timeout;
-        let elapsed_since_last_event = self.supervisor.elapsed_since_last_event();
+        let prompt_timeout = self.process.supervisor.config().prompt_timeout;
+        let elapsed_since_last_event = self.process.supervisor.elapsed_since_last_event();
         let remaining = prompt_timeout
             .checked_sub(elapsed_since_last_event)
             .unwrap_or_default();
@@ -150,10 +131,16 @@ impl ActiveAcpSession {
             pid: snapshot.pid,
             pgid: snapshot.pgid,
             process_key: snapshot.process_key,
-            uptime_ms: u64::try_from(self.started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+            uptime_ms: u64::try_from(self.process.started_at.elapsed().as_millis())
+                .unwrap_or(u64::MAX),
             last_update_at: snapshot.updated_at,
-            last_client_call_at: self.supervisor.last_client_call_at(),
-            watchdog_state: self.supervisor.watchdog_state().as_str().to_string(),
+            last_client_call_at: self.process.supervisor.last_client_call_at(),
+            watchdog_state: self
+                .process
+                .supervisor
+                .watchdog_state()
+                .as_str()
+                .to_string(),
             permission_mode: snapshot.permission_mode,
             permission_log_path: snapshot.permission_log_path,
             pending_permissions: snapshot.pending_permissions,
@@ -173,106 +160,54 @@ impl ActiveAcpSession {
         {
             return;
         }
-
-        let mut child_guard = self.child.lock().expect("ACP child lock");
-        let Some(child) = child_guard.as_mut() else {
-            return;
-        };
-        let Ok(Some(status)) = child.try_wait() else {
-            return;
-        };
-
-        let reason = process_exit_reason(status);
-        drop(child_guard.take());
-        drop(child_guard);
-        let pending_permissions = self.disconnect(reason);
-        self.kill_child(pending_permissions);
+        if let Some(reason) = self.process.refresh_disconnect_reason() {
+            self.disconnect(reason, false);
+        }
     }
 
-    pub(super) fn disconnect(&self, reason: DisconnectReason) -> usize {
-        self.request_cancel();
+    pub(super) fn disconnect(&self, reason: DisconnectReason, terminate_process: bool) -> usize {
+        if terminate_process {
+            self.process.request_cancel();
+            self.process.abort_non_protocol_tasks();
+            self.process.supervisor.mark_done();
+        }
         let pending_permissions = self.permissions.shutdown_pending();
-        self.abort_non_protocol_tasks();
-        self.supervisor.mark_done();
         let mut snapshot = self.snapshot.lock().expect("ACP snapshot lock");
         if snapshot.status.is_disconnected() {
             return pending_permissions;
         }
         snapshot.status = AgentStatus::Disconnected {
             reason,
-            stderr_tail: self.stderr_tail.as_string(),
+            stderr_tail: self.process.stderr_tail.as_string(),
         };
         snapshot.updated_at = utc_now();
+        let acp_id = snapshot.acp_id.clone();
+        drop(snapshot);
+        self.process.remove_logical_session(&acp_id);
         pending_permissions
     }
 
-    pub(super) fn kill_child(&self, pending_permissions: usize) {
-        let mut child = self.child.lock().expect("ACP child lock");
-        if let Some(mut child) = child.take() {
-            let pgid = self.supervisor.pgid();
-            let _ = thread::spawn(move || {
-                if pending_permissions > 0 {
-                    thread::sleep(PERMISSION_SHUTDOWN_FLUSH_GRACE);
-                }
-                kill_process_group(pgid, &mut child);
-            });
-        }
-    }
-
-    fn abort_non_protocol_tasks(&self) {
-        if let Some(task) = self
-            .batcher_task
-            .lock()
-            .expect("ACP batcher task lock")
-            .take()
-        {
-            task.abort();
-        }
-        if let Some(task) = self.event_task.lock().expect("ACP event task lock").take() {
-            task.abort();
-        }
-        if let Some(task) = self
-            .protocol_disconnect_task
-            .lock()
-            .expect("ACP protocol disconnect task lock")
-            .take()
-        {
-            task.abort();
-        }
-        if let Some(task) = self
-            .watchdog_task
-            .lock()
-            .expect("ACP watchdog task lock")
-            .take()
-        {
-            task.abort();
-        }
-    }
-
-    fn abort_tasks(&self) {
-        if let Some(task) = self
-            .protocol_task
-            .lock()
-            .expect("ACP protocol task lock")
-            .take()
-        {
-            task.abort();
-        }
-        self.abort_non_protocol_tasks();
-    }
-
-    fn request_cancel(&self) {
-        self.cancel.cancel();
-        thread::sleep(PROTOCOL_CANCEL_FLUSH_GRACE);
+    pub(super) fn terminate_process(&self, pending_permissions: usize) {
+        self.process.request_cancel();
+        self.process.abort_non_protocol_tasks();
+        self.process.supervisor.mark_done();
+        self.process.kill_child(pending_permissions);
     }
 }
 
 impl Drop for ActiveAcpSession {
     fn drop(&mut self) {
+        let snapshot = self.snapshot.lock().expect("ACP snapshot lock");
+        let acp_id = snapshot.acp_id.clone();
+        let should_terminate = !snapshot.status.is_disconnected();
+        drop(snapshot);
         let pending_permissions = self.permissions.shutdown_pending();
-        self.request_cancel();
-        self.abort_tasks();
-        self.kill_child(pending_permissions);
+        self.process.remove_logical_session(&acp_id);
+        if should_terminate && self.process.logical_session_count() == 0 {
+            self.process.request_cancel();
+            self.process.abort_tasks();
+            self.process.kill_child(pending_permissions);
+        }
     }
 }
 
@@ -338,7 +273,7 @@ pub(super) fn spawn_event_forwarder(
 }
 
 pub(super) fn spawn_protocol_disconnect_forwarder(
-    sender: broadcast::Sender<StreamEvent>,
+    manager: AcpAgentManagerHandle,
     active: Weak<ActiveAcpSession>,
     mut disconnects: mpsc::Receiver<DisconnectReason>,
 ) -> JoinHandle<()> {
@@ -346,12 +281,12 @@ pub(super) fn spawn_protocol_disconnect_forwarder(
         let Some(reason) = disconnects.recv().await else {
             return;
         };
-        disconnect_active_session(&sender, &active, reason);
+        manager.disconnect_forwarded_session(&active, reason);
     })
 }
 
 pub(super) fn spawn_watchdog_forwarder(
-    sender: broadcast::Sender<StreamEvent>,
+    manager: AcpAgentManagerHandle,
     active: Weak<ActiveAcpSession>,
     supervisor: Arc<AcpSessionSupervisor>,
 ) -> JoinHandle<()> {
@@ -359,32 +294,8 @@ pub(super) fn spawn_watchdog_forwarder(
         let Some(reason) = watchdog_loop(supervisor).await else {
             return;
         };
-        disconnect_active_session(&sender, &active, reason);
+        manager.disconnect_forwarded_session(&active, reason);
     })
-}
-
-fn disconnect_active_session(
-    sender: &broadcast::Sender<StreamEvent>,
-    active: &Weak<ActiveAcpSession>,
-    reason: DisconnectReason,
-) {
-    let Some(session) = active.upgrade() else {
-        return;
-    };
-    session.refresh();
-    let pending_permissions = session.disconnect(reason);
-    session.kill_child(pending_permissions);
-    let snapshot = session.snapshot_with_live_counts();
-    if let Some(incident) = process_incident_event(&snapshot) {
-        let _ = sender.send(incident);
-    }
-    let payload = serde_json::to_value(&snapshot).unwrap_or_default();
-    let _ = sender.send(StreamEvent {
-        event: "acp_agent_disconnected".to_string(),
-        recorded_at: utc_now(),
-        session_id: Some(snapshot.session_id),
-        payload,
-    });
 }
 
 fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
@@ -460,24 +371,6 @@ fn reason_kind(reason: &DisconnectReason) -> String {
                 return value.clone();
             }
             "unknown".to_string()
-        }
-    }
-}
-
-fn process_exit_reason(status: ExitStatus) -> DisconnectReason {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        DisconnectReason::ProcessExited {
-            code: status.code(),
-            signal: status.signal(),
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        DisconnectReason::ProcessExited {
-            code: status.code(),
-            signal: None,
         }
     }
 }

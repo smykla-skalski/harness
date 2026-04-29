@@ -1,13 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
-use super::active::{ActiveAcpSession, process_incident_from_snapshot};
+use super::active::{ActiveAcpProcess, ActiveAcpSession, process_incident_from_snapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
@@ -17,10 +16,14 @@ use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::session::types::AgentStatus;
+use crate::workspace::utc_now;
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
-const ACP_PROCESS_FAULT_POLICY_ENV: &str = "HARNESS_ACP_PROCESS_FAULT_POLICY";
+
+mod process_fault;
+mod process_pool;
+pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -95,7 +98,9 @@ pub struct AcpAgentManagerHandle {
 pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) sender: broadcast::Sender<StreamEvent>,
     pub(in crate::daemon::agent_acp) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    pub(in crate::daemon::agent_acp) process_lifecycle: Mutex<()>,
     pub(in crate::daemon::agent_acp) sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
+    pub(in crate::daemon::agent_acp) processes: Mutex<BTreeMap<String, Arc<ActiveAcpProcess>>>,
     pub(in crate::daemon::agent_acp) sandbox_event_poller_running: AtomicBool,
     pub(in crate::daemon::agent_acp) sandbox_event_cursor: Mutex<Option<u64>>,
     pub(in crate::daemon::agent_acp) sandbox_event_epoch: Mutex<Option<String>>,
@@ -116,7 +121,9 @@ impl AcpAgentManagerHandle {
             state: Arc::new(AcpAgentManagerState {
                 sender,
                 db,
+                process_lifecycle: Mutex::new(()),
                 sessions: Mutex::new(BTreeMap::new()),
+                processes: Mutex::new(BTreeMap::new()),
                 sandbox_event_poller_running: AtomicBool::new(false),
                 sandbox_event_cursor: Mutex::new(None),
                 sandbox_event_epoch: Mutex::new(None),
@@ -253,13 +260,29 @@ impl AcpAgentManagerHandle {
     ///
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
+    ///
+    /// # Panics
+    /// Panics if the ACP process lifecycle mutex is poisoned.
     pub fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
         if service::sandboxed_from_env() {
             return self.stop_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
-        let pending_permissions = session.disconnect(DisconnectReason::SessionStopped);
-        session.kill_child(pending_permissions);
+        let _lifecycle = self
+            .state
+            .process_lifecycle
+            .lock()
+            .expect("ACP process lifecycle lock");
+        let before = session.snapshot_with_live_counts();
+        if before.status.is_disconnected() {
+            return Ok(before);
+        }
+        let process_key = session.process_key();
+        let pending_permissions = session.disconnect(DisconnectReason::SessionStopped, false);
+        if session.process().logical_session_count() == 0 {
+            session.terminate_process(pending_permissions);
+            self.remove_process_if_empty(&process_key);
+        }
         let snapshot = session.snapshot_with_live_counts();
         self.broadcast("acp_agent_stopped", &snapshot);
         Ok(snapshot)
@@ -283,9 +306,56 @@ impl AcpAgentManagerHandle {
             .cloned()
             .collect();
         for session in sessions {
-            let pending_permissions = session.disconnect(DisconnectReason::DaemonShutdown);
-            session.kill_child(pending_permissions);
+            let _lifecycle = self
+                .state
+                .process_lifecycle
+                .lock()
+                .expect("ACP process lifecycle lock");
+            let process_key = session.process_key();
+            let pending_permissions = session.disconnect(DisconnectReason::DaemonShutdown, false);
+            if session.process().logical_session_count() == 0 {
+                session.terminate_process(pending_permissions);
+                self.remove_process_if_empty(&process_key);
+            }
         }
+    }
+
+    pub(in crate::daemon::agent_acp) fn disconnect_forwarded_session(
+        &self,
+        active: &Weak<ActiveAcpSession>,
+        reason: DisconnectReason,
+    ) {
+        let Some(session) = active.upgrade() else {
+            return;
+        };
+        let (snapshot, incident) = {
+            let _lifecycle = self
+                .state
+                .process_lifecycle
+                .lock()
+                .expect("ACP process lifecycle lock");
+            session.refresh();
+            let pending_permissions = session.disconnect(reason, false);
+            let process_key = session.process_key();
+            let snapshot = session.snapshot_with_live_counts();
+            let incident = process_incident_from_snapshot(&snapshot)
+                .map(|event| self.process_fault_event_locked(&snapshot, event));
+            if session.process().logical_session_count() == 0 {
+                session.terminate_process(pending_permissions);
+                self.remove_process_if_empty(&process_key);
+            }
+            (snapshot, incident)
+        };
+        if let Some(incident) = incident {
+            let _ = self.state.sender.send(incident);
+        }
+        let payload = serde_json::to_value(&snapshot).unwrap_or_default();
+        let _ = self.state.sender.send(StreamEvent {
+            event: "acp_agent_disconnected".to_string(),
+            recorded_at: utc_now(),
+            session_id: Some(snapshot.session_id),
+            payload,
+        });
     }
 
     #[must_use]
@@ -346,7 +416,7 @@ impl AcpAgentManagerHandle {
             && after.status.is_disconnected()
             && let Some(event) = process_incident_from_snapshot(&after)
         {
-            let event = self.apply_process_fault_policy(&after, event);
+            let event = self.process_fault_event(&after, event);
             let _ = self.state.sender.send(event);
         }
         after
@@ -407,79 +477,9 @@ impl AcpAgentManagerHandle {
         }
         Ok(())
     }
-
-    fn apply_process_fault_policy(
-        &self,
-        snapshot: &AcpAgentSnapshot,
-        mut event: StreamEvent,
-    ) -> StreamEvent {
-        if !process_fault_policy_enabled() {
-            return event;
-        }
-        let (backoff_applied, quarantine_applied) = self.record_process_fault(snapshot);
-        if let serde_json::Value::Object(payload) = &mut event.payload {
-            payload.insert("restart_applied".to_string(), serde_json::Value::Bool(false));
-            payload.insert(
-                "backoff_applied".to_string(),
-                serde_json::Value::Bool(backoff_applied),
-            );
-            payload.insert(
-                "quarantine_applied".to_string(),
-                serde_json::Value::Bool(quarantine_applied),
-            );
-        }
-        event
-    }
-
-    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> (bool, bool) {
-        let AgentStatus::Disconnected { reason, .. } = &snapshot.status else {
-            return (false, false);
-        };
-        if !matches!(
-            reason,
-            DisconnectReason::ProcessExited { .. }
-                | DisconnectReason::TransportClosed
-                | DisconnectReason::StdioClosed
-                | DisconnectReason::InitializeTimeout
-                | DisconnectReason::PromptTimeout
-                | DisconnectReason::WatchdogFired
-        ) {
-            return (false, false);
-        }
-        self.state
-            .process_key_backoff_until
-            .lock()
-            .expect("ACP process key backoff lock")
-            .insert(snapshot.process_key.clone(), Instant::now() + PROCESS_KEY_BACKOFF);
-        let mut failures = self
-            .state
-            .process_key_failures
-            .lock()
-            .expect("ACP process key failures lock");
-        let failure_count = failures.entry(snapshot.process_key.clone()).or_insert(0);
-        *failure_count = failure_count.saturating_add(1);
-        if *failure_count < 3 {
-            return (true, false);
-        }
-        drop(failures);
-        let quarantined = self
-            .state
-            .quarantined_process_keys
-            .lock()
-            .expect("ACP quarantined process keys lock")
-            .insert(snapshot.process_key.clone());
-        (true, quarantined)
-    }
 }
 
-pub(in crate::daemon::agent_acp) fn process_fault_policy_enabled() -> bool {
-    env::var(ACP_PROCESS_FAULT_POLICY_ENV).map_or(true, |value| {
-        !matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "0" | "false" | "off" | "disabled"
-        )
-    })
-}
-
+#[cfg(test)]
+mod multiplexing_tests;
 #[cfg(test)]
 mod tests;
