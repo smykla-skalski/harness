@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 use crate::agents::acp::catalog::AcpAgentDescriptor;
@@ -42,8 +43,13 @@ impl AcpAgentManagerHandle {
             env_passthrough: descriptor.env_passthrough.clone(),
             working_dir: project_dir.clone(),
         };
-        let process_key =
-            AcpProcessPoolKey::from_spawn_inputs(descriptor, request, session_id, &spawn, &project_dir);
+        let process_key = AcpProcessPoolKey::from_spawn_inputs(
+            descriptor,
+            request,
+            session_id,
+            &spawn,
+            &project_dir,
+        );
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
@@ -82,30 +88,16 @@ impl AcpAgentManagerHandle {
             session_id.to_string(),
             protocol.events,
         );
-        let now = utc_now();
-        let snapshot = AcpAgentSnapshot {
-            acp_id: acp_id.clone(),
-            session_id: session_id.to_string(),
-            agent_id: descriptor.id.clone(),
-            display_name: descriptor.display_name.clone(),
-            status: AgentStatus::Active,
-            pid: supervisor.pid(),
-            pgid: supervisor.pgid(),
-            project_dir: project_dir.display().to_string(),
-            process_key: process_key.as_str().to_string(),
-            pending_permissions: 0,
-            permission_queue_depth: 0,
-            pending_permission_batches: Vec::new(),
-            permission_mode: if request.record_permissions {
-                "recording".to_string()
-            } else {
-                "daemon_bridge".to_string()
-            },
-            permission_log_path: permission_log_path.map(|path| path.display().to_string()),
-            terminal_count: 0,
-            created_at: now.clone(),
-            updated_at: now,
-        };
+        let snapshot = started_snapshot(
+            &acp_id,
+            session_id,
+            request,
+            descriptor,
+            &supervisor,
+            &project_dir,
+            process_key.as_str(),
+            permission_log_path,
+        );
         let active = Arc::new(ActiveAcpSession::new(
             snapshot.clone(),
             child,
@@ -138,16 +130,29 @@ impl AcpAgentManagerHandle {
         Ok(snapshot)
     }
 
-    pub(super) fn sender(&self) -> tokio::sync::broadcast::Sender<StreamEvent> {
+    pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {
         self.state.sender.clone()
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn broadcast_event(
+        stream_event: Option<StreamEvent>,
+        event: &str,
+        sender: &broadcast::Sender<StreamEvent>,
+    ) {
+        stream_event.map_or_else(
+            || tracing::warn!(event, "failed to serialize ACP manager event"),
+            |stream_event| {
+                let _ = sender.send(stream_event);
+            },
+        );
+    }
+
     pub(super) fn broadcast(&self, event: &str, payload: &impl Serialize) {
-        let Some(stream_event) = stream_event(event, payload) else {
-            tracing::warn!(event, "failed to serialize ACP manager event");
-            return;
-        };
-        let _ = self.state.sender.send(stream_event);
+        Self::broadcast_event(stream_event(event, payload), event, &self.state.sender);
     }
 
     pub(super) fn resolve_project_dir(
@@ -254,6 +259,42 @@ impl AcpAgentManagerHandle {
         self.state
             .sandbox_event_poller_running
             .store(false, Ordering::SeqCst);
+    }
+}
+
+fn started_snapshot(
+    acp_id: &str,
+    session_id: &str,
+    request: &AcpAgentStartRequest,
+    descriptor: &AcpAgentDescriptor,
+    supervisor: &AcpSessionSupervisor,
+    project_dir: &Path,
+    process_key: &str,
+    permission_log_path: Option<PathBuf>,
+) -> AcpAgentSnapshot {
+    let now = utc_now();
+    AcpAgentSnapshot {
+        acp_id: acp_id.to_string(),
+        session_id: session_id.to_string(),
+        agent_id: descriptor.id.clone(),
+        display_name: descriptor.display_name.clone(),
+        status: AgentStatus::Active,
+        pid: supervisor.pid(),
+        pgid: supervisor.pgid(),
+        project_dir: project_dir.display().to_string(),
+        process_key: process_key.to_string(),
+        pending_permissions: 0,
+        permission_queue_depth: 0,
+        pending_permission_batches: Vec::new(),
+        permission_mode: if request.record_permissions {
+            "recording".to_string()
+        } else {
+            "daemon_bridge".to_string()
+        },
+        permission_log_path: permission_log_path.map(|path| path.display().to_string()),
+        terminal_count: 0,
+        created_at: now.clone(),
+        updated_at: now,
     }
 }
 

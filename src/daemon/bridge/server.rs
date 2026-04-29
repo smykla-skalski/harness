@@ -24,15 +24,13 @@ use super::client::{
     BridgeAttachRequest, BridgeGetRequest, BridgeInputRequest, BridgeResizeRequest,
 };
 use super::core::{
-    BridgeAcpEventBuffer, BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope,
-    BridgeHandleResult, BridgeReconfigureSpec, BridgeRequest, BridgeResponse,
-    ResolvedBridgeConfig,
+    BridgeAcpEventBuffer, BridgeActiveTui, BridgeCodexProcess, BridgeEnvelope, BridgeHandleResult,
+    BridgeReconfigureSpec, BridgeRequest, BridgeResponse, ResolvedBridgeConfig,
 };
 use super::helpers::{parse_bridge_payload, resolve_bridge_config, uptime_from_started_at};
 use super::types::{
-    AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI,
-    BRIDGE_CAPABILITY_CODEX, BridgeCapability, BridgeState, BridgeStatusReport,
-    PersistedBridgeConfig,
+    AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
+    BridgeCapability, BridgeState, BridgeStatusReport, PersistedBridgeConfig,
 };
 
 pub(super) struct BridgeServer {
@@ -62,7 +60,7 @@ impl BridgeServer {
             .enable_all()
             .build()
             .expect("build ACP bridge runtime");
-        let (acp_sender, mut acp_receiver) = tokio::sync::broadcast::channel::<StreamEvent>(256);
+        let (acp_sender, mut acp_receiver) = broadcast::channel::<StreamEvent>(256);
         let acp_events = Arc::new(Mutex::new(BridgeAcpEventBuffer::new(format!(
             "bridge-{}",
             Uuid::new_v4()
