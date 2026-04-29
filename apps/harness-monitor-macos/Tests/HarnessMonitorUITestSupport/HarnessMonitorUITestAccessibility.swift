@@ -206,6 +206,8 @@ enum HarnessMonitorUITestAccessibility {
   static let acpPermissionToast = "harness.acp-permission.toast"
   static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"
   static let acpPermissionToastState = "harness.acp-permission.toast.state"
+  static let acpPermissionToastAccessibilityState =
+    "harness.acp-permission.toast.accessibility.state"
   static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
   static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
   static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
@@ -227,7 +229,14 @@ enum HarnessMonitorUITestAccessibility {
   static let newSessionContext = "harness.new-session.context"
   static let newSessionBaseRef = "harness.new-session.base-ref"
   static let newSessionProjectPicker = "harness.new-session.project-picker"
+  static let newSessionTabPicker = "harness.new-session.tab-picker"
+  static let newSessionCreateTab = "harness.new-session.tab.create.control"
+  static let newSessionRuntimeTab = "harness.new-session.tab.runtime.control"
+  static let newSessionCreatePanel = "harness.new-session.tab.create.panel"
+  static let newSessionRuntimePanel = "harness.new-session.tab.runtime.panel"
+  static let newSessionCapabilityPickerSection = "harness.new-session.capability-picker.section"
   static let newSessionCapabilityPicker = "harness.new-session.capability-picker"
+  static let newSessionCreateDisabledReason = "harness.new-session.create-disabled-reason"
   static let newSessionCreateButton = "harness.new-session.create-button"
   static let newSessionCancelButton = "harness.new-session.cancel-button"
   static let newSessionErrorBanner = "harness.new-session.error-banner"
@@ -424,6 +433,30 @@ enum HarnessMonitorUITestAccessibility {
 
   static func agentDetailOpenDecisionsButton(_ agentID: String) -> String {
     "harness.agents.detail.awaiting-decision.open.\(slug(agentID))"
+  }
+
+  static func agentRuntimeStrip(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.strip.\(slug(agentID))"
+  }
+
+  static func agentRuntimeWatchdog(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.watchdog.\(slug(agentID))"
+  }
+
+  static func agentRuntimePendingPermissions(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.pending-permissions.\(slug(agentID))"
+  }
+
+  static func agentRuntimeDeadline(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.deadline.\(slug(agentID))"
+  }
+
+  static func agentRuntimeDisclosure(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.disclosure.\(slug(agentID))"
+  }
+
+  static func agentRuntimeDisclosureContent(_ agentID: String) -> String {
+    "harness.agents.detail.runtime.disclosure-content.\(slug(agentID))"
   }
 
   static func agentTuiKeyButton(_ key: String) -> String {
