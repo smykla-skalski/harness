@@ -247,6 +247,31 @@ fn pool_key_mismatch_dedupe_emits_only_on_change() {
     assert!(rx.try_recv().is_err(), "second identical incident must be deduped");
 }
 
+#[test]
+fn pool_key_mismatch_state_is_cleared_for_non_mismatch_keys() {
+    let (sender, mut rx) = tokio::sync::broadcast::channel::<StreamEvent>(16);
+    let mut seen = BTreeMap::<String, Vec<String>>::new();
+    let session_id = "sess-1";
+
+    maybe_emit_pool_key_mismatch_incident(
+        &sender,
+        &mut seen,
+        session_id,
+        vec!["pk-a".to_string(), "pk-b".to_string()],
+    );
+    let _ = rx.try_recv().expect("mismatch incident");
+    assert!(seen.contains_key(session_id));
+
+    maybe_emit_pool_key_mismatch_incident(
+        &sender,
+        &mut seen,
+        session_id,
+        vec!["pk-a".to_string()],
+    );
+    assert!(!seen.contains_key(session_id));
+    assert!(rx.try_recv().is_err(), "no extra incident expected");
+}
+
 fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnapshot {
     AcpAgentInspectSnapshot {
         acp_id: format!("{session_id}-{process_key}"),
