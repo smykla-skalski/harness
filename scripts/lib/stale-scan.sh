@@ -48,9 +48,9 @@ stale_scan_matching_pids() {
       if (process_kind == "gate") {
         if ($0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) matched = 1
         if ($0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
-        if ($0 ~ /(^| )bash \.\/scripts\/check(\.sh|-scripts\.sh)( |$)/) matched = 1
+        if ($0 ~ /(^| )bash (([^ ]*\/)?scripts\/check(\.sh|-scripts\.sh))( |$)/) matched = 1
         if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|run --quiet -- setup agents generate --check)( |$)/) matched = 1
-        if ($0 ~ /(^| )(bash )?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref)\.sh( |$)/) matched = 1
+        if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
       }
       if (matched) print pid
     }
