@@ -6,7 +6,8 @@ extension HarnessMonitorStore {
     return sortedAcpPermissionBatches(
       mergedPermissionBatches(
         primary: selectedBatches,
-        secondary: standaloneAcpPermissionBatches
+        secondary: standaloneAcpPermissionBatches,
+        preferSecondary: false
       )
     )
   }
@@ -175,7 +176,11 @@ extension HarnessMonitorStore {
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
       guard snapshot.acpId == batch.acpId else { return snapshot }
       return snapshot.withPermissionBatches(
-        mergedPermissionBatches(primary: snapshot.pendingPermissionBatches, secondary: [batch])
+        mergedPermissionBatches(
+          primary: snapshot.pendingPermissionBatches,
+          secondary: [batch],
+          preferSecondary: false
+        )
       )
     }
     reconcilePresentedAcpPermissionBatch()
@@ -244,11 +249,31 @@ extension HarnessMonitorStore {
       byBatchID[batch.batchId] = batch
     }
     for batch in secondary {
-      if preferSecondary || byBatchID[batch.batchId] == nil {
+      if shouldReplacePermissionBatch(
+        existing: byBatchID[batch.batchId],
+        incoming: batch,
+        preferSecondary: preferSecondary
+      ) {
         byBatchID[batch.batchId] = batch
       }
     }
     return Array(byBatchID.values)
+  }
+
+  private func shouldReplacePermissionBatch(
+    existing: AcpPermissionBatch?,
+    incoming: AcpPermissionBatch,
+    preferSecondary: Bool
+  ) -> Bool {
+    guard let existing else {
+      return true
+    }
+    if preferSecondary {
+      return true
+    }
+    // Keep selected snapshot authoritative against stale replay, but allow
+    // equal/newer same-id refreshes to replace older payloads.
+    return incoming.createdAt >= existing.createdAt
   }
 
   private func upsertingAcpPermissionBatch(

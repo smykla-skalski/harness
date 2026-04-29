@@ -185,6 +185,78 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(requests == ["request-fresh"])
   }
 
+  @Test("pending permission list prefers selected snapshot over late standalone duplicate")
+  func pendingPermissionListPrefersSelectedSnapshotOverStandaloneDuplicate() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-precedence"
+
+    let stale = makeAcpPermissionBatch(
+      batchID: "batch-1",
+      acpID: "acp-1",
+      sessionID: "sess-acp-precedence",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    store.applyAcpPermissionBatch(stale)
+
+    let fresh = AcpPermissionBatch(
+      batchId: "batch-1",
+      acpId: "acp-1",
+      sessionId: "sess-acp-precedence",
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-selected",
+          sessionId: "sess-acp-precedence",
+          toolCall: .object(["kind": .string("write")]),
+          options: [.string("allow")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:02Z"
+    )
+    store.applyAcpAgent(
+      makeAcpSnapshot(acpID: "acp-1", sessionID: "sess-acp-precedence", pendingBatches: [fresh])
+    )
+
+    #expect(store.pendingAcpPermissionBatches.count == 1)
+    let requests = store.pendingAcpPermissionBatches.first?.requests.map(\.requestId)
+    #expect(requests == ["request-selected"])
+  }
+
+  @Test("selected snapshot keeps newer permission batch when stale duplicate arrives later")
+  func selectedSnapshotKeepsNewerBatchWhenStaleDuplicateArrivesLater() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-precedence"
+
+    let fresh = AcpPermissionBatch(
+      batchId: "batch-1",
+      acpId: "acp-1",
+      sessionId: "sess-acp-precedence",
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-selected",
+          sessionId: "sess-acp-precedence",
+          toolCall: .object(["kind": .string("write")]),
+          options: [.string("allow")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:02Z"
+    )
+    store.applyAcpAgent(
+      makeAcpSnapshot(acpID: "acp-1", sessionID: "sess-acp-precedence", pendingBatches: [fresh])
+    )
+
+    let stale = makeAcpPermissionBatch(
+      batchID: "batch-1",
+      acpID: "acp-1",
+      sessionID: "sess-acp-precedence",
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    store.applyAcpPermissionBatch(stale)
+
+    #expect(store.pendingAcpPermissionBatches.count == 1)
+    let requests = store.pendingAcpPermissionBatches.first?.requests.map(\.requestId)
+    #expect(requests == ["request-selected"])
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()
