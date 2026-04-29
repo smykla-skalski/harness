@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpPermissionDecision,
 };
@@ -15,7 +17,8 @@ impl BridgeServer {
         request: &AcpAgentStartRequest,
     ) -> Result<AcpAgentSnapshot, CliError> {
         self.ensure_acp_capability()?;
-        let snapshot = self.with_acp_runtime(|| self.acp_agent_manager.start(session_id, request))?;
+        let snapshot =
+            self.with_acp_runtime(|| self.acp_agent_manager.start(session_id, request))?;
         self.update_acp_metadata()?;
         Ok(snapshot)
     }
@@ -76,7 +79,7 @@ impl BridgeServer {
             healthy: true,
             transport: "unix".to_string(),
             endpoint: Some(self.socket_path.display().to_string()),
-            metadata: Default::default(),
+            metadata: BTreeMap::new(),
         };
         self.capabilities()?
             .insert(BRIDGE_CAPABILITY_ACP.to_string(), manifest);

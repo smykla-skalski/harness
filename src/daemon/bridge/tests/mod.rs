@@ -32,8 +32,8 @@ use super::{
     load_running_bridge_state, read_bridge_state, status_report, stop_bridge,
 };
 
-mod cleanup_and_config;
 mod acp;
+mod cleanup_and_config;
 mod legacy_server;
 mod liveness;
 mod locks;

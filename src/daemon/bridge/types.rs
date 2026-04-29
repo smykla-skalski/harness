@@ -81,8 +81,8 @@ pub fn compiled_capabilities() -> BTreeSet<BridgeCapability> {
         BridgeCapability::AgentTui,
         BridgeCapability::Acp,
     ]
-        .into_iter()
-        .collect()
+    .into_iter()
+    .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

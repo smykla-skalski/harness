@@ -13,8 +13,8 @@ use super::helpers::{launch_agent_plist_path, render_launch_agent_plist, stringi
 use super::runtime::{spawn_codex_monitor, spawn_codex_process};
 use super::server::BridgeServer;
 use super::types::{
-    BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
-    BridgeCapability, PersistedBridgeConfig,
+    BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
+    PersistedBridgeConfig,
 };
 
 impl BridgeServer {
@@ -116,8 +116,9 @@ impl BridgeServer {
     ) -> Result<(), CliError> {
         match capability {
             BridgeCapability::Codex => Ok(()),
-            BridgeCapability::AgentTui => self.ensure_agent_tui_can_disable(force),
-            BridgeCapability::Acp => self.ensure_acp_can_disable(force),
+            BridgeCapability::AgentTui | BridgeCapability::Acp => {
+                self.ensure_force_disable_allowed(capability, force)
+            }
         }
     }
 
@@ -134,12 +135,8 @@ impl BridgeServer {
     }
 
     pub(super) fn clear_codex(&self, persist_state: bool) -> Result<(), CliError> {
-        if let Ok(mut codex) = self.codex.lock()
-            && let Some(process) = codex.as_mut()
-        {
-            let _ = process.child.kill();
-            let _ = process.child.wait();
-            codex.take();
+        if let Ok(mut codex) = self.codex.lock() {
+            Self::stop_codex_process(&mut codex);
         }
         self.capabilities()?.remove(BRIDGE_CAPABILITY_CODEX);
         if persist_state {
@@ -208,8 +205,7 @@ impl BridgeServer {
         }
         match capability {
             BridgeCapability::Codex => self.codex_requires_restart(),
-            BridgeCapability::AgentTui => Ok(false),
-            BridgeCapability::Acp => Ok(false),
+            BridgeCapability::AgentTui | BridgeCapability::Acp => Ok(false),
         }
     }
 
@@ -250,12 +246,8 @@ impl BridgeServer {
             }
             active.clear();
         }
-        if let Ok(mut codex) = self.codex.lock()
-            && let Some(process) = codex.as_mut()
-        {
-            let _ = process.child.kill();
-            let _ = process.child.wait();
-            codex.take();
+        if let Ok(mut codex) = self.codex.lock() {
+            Self::stop_codex_process(&mut codex);
         }
         let _ = self.with_acp_runtime(|| {
             self.acp_agent_manager.shutdown_all();
@@ -290,5 +282,25 @@ impl BridgeServer {
             CliErrorKind::workflow_io(format!("bridge desired config lock poisoned: {error}"))
                 .into()
         })
+    }
+
+    fn ensure_force_disable_allowed(
+        &self,
+        capability: BridgeCapability,
+        force: bool,
+    ) -> Result<(), CliError> {
+        match capability {
+            BridgeCapability::Codex => Ok(()),
+            BridgeCapability::AgentTui => self.ensure_agent_tui_can_disable(force),
+            BridgeCapability::Acp => self.ensure_acp_can_disable(force),
+        }
+    }
+
+    fn stop_codex_process(codex: &mut Option<BridgeCodexProcess>) {
+        if let Some(process) = codex.as_mut() {
+            let _ = process.child.kill();
+            let _ = process.child.wait();
+            codex.take();
+        }
     }
 }

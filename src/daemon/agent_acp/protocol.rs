@@ -12,7 +12,7 @@ use agent_client_protocol::schema::{
     TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
-    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode,
+    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
 };
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::mpsc;
@@ -123,6 +123,10 @@ struct RunProtocolArgs {
     disconnect_tx: mpsc::Sender<DisconnectReason>,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "ACP protocol builder keeps all request routing in one registration table"
+)]
 async fn run_protocol(args: RunProtocolArgs) {
     let RunProtocolArgs {
         stdin,
@@ -240,7 +244,7 @@ async fn run_protocol(args: RunProtocolArgs) {
 }
 
 async fn report_protocol_result(
-    result: agent_client_protocol::Result<()>,
+    result: AcpResult<()>,
     disconnect_tx: mpsc::Sender<DisconnectReason>,
 ) {
     let Err(error) = result else {
@@ -291,7 +295,7 @@ async fn run_connection(
     supervisor: Arc<AcpSessionSupervisor>,
     mut cancel_rx: mpsc::UnboundedReceiver<()>,
     session_guard: Arc<SessionRouteGuard>,
-) -> agent_client_protocol::Result<()> {
+) -> AcpResult<()> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
@@ -326,7 +330,7 @@ async fn run_connection(
 async fn send_initialize(
     connection: &ConnectionTo<Agent>,
     initialize_timeout: Duration,
-) -> agent_client_protocol::Result<()> {
+) -> AcpResult<()> {
     timeout(
         initialize_timeout,
         connection
@@ -341,7 +345,7 @@ async fn send_initialize(
 async fn send_new_session(
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
-) -> agent_client_protocol::Result<SessionId> {
+) -> AcpResult<SessionId> {
     let response = connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
@@ -355,7 +359,7 @@ async fn send_prompt_or_cancel(
     session_id: SessionId,
     prompt_timeout: Duration,
     prompt: String,
-) -> agent_client_protocol::Result<bool> {
+) -> AcpResult<bool> {
     let request = PromptRequest::new(
         session_id.clone(),
         vec![ContentBlock::Text(TextContent::new(prompt))],
@@ -376,12 +380,12 @@ async fn wait_for_cancel(
     connection: &ConnectionTo<Agent>,
     cancel_rx: &mut mpsc::UnboundedReceiver<()>,
     session_id: SessionId,
-) -> agent_client_protocol::Result<()> {
+) -> AcpResult<()> {
     if cancel_rx.recv().await.is_some() {
         send_cancel_notification(connection, session_id)?;
         Ok(())
     } else {
-        pending::<agent_client_protocol::Result<()>>().await
+        pending::<AcpResult<()>>().await
     }
 }
 
@@ -398,7 +402,7 @@ fn deadline_error(operation: &str, timeout_duration: Duration) -> AcpError {
 fn send_cancel_notification(
     connection: &ConnectionTo<Agent>,
     session_id: SessionId,
-) -> agent_client_protocol::Result<()> {
+) -> AcpResult<()> {
     connection.send_notification(CancelNotification::new(session_id))
 }
 
