@@ -88,16 +88,16 @@ impl AcpAgentManagerHandle {
             session_id.to_string(),
             protocol.events,
         );
-        let snapshot = started_snapshot(
-            &acp_id,
+        let snapshot = started_snapshot(StartedSnapshotInput {
+            acp_id: &acp_id,
             session_id,
             request,
             descriptor,
-            &supervisor,
-            &project_dir,
-            process_key.as_str(),
+            supervisor: &supervisor,
+            project_dir: &project_dir,
+            process_key: process_key.as_str(),
             permission_log_path,
-        );
+        });
         let active = Arc::new(ActiveAcpSession::new(
             snapshot.clone(),
             child,
@@ -262,16 +262,28 @@ impl AcpAgentManagerHandle {
     }
 }
 
-fn started_snapshot(
-    acp_id: &str,
-    session_id: &str,
-    request: &AcpAgentStartRequest,
-    descriptor: &AcpAgentDescriptor,
-    supervisor: &AcpSessionSupervisor,
-    project_dir: &Path,
-    process_key: &str,
+struct StartedSnapshotInput<'a> {
+    acp_id: &'a str,
+    session_id: &'a str,
+    request: &'a AcpAgentStartRequest,
+    descriptor: &'a AcpAgentDescriptor,
+    supervisor: &'a AcpSessionSupervisor,
+    project_dir: &'a Path,
+    process_key: &'a str,
     permission_log_path: Option<PathBuf>,
-) -> AcpAgentSnapshot {
+}
+
+fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
+    let StartedSnapshotInput {
+        acp_id,
+        session_id,
+        request,
+        descriptor,
+        supervisor,
+        project_dir,
+        process_key,
+        permission_log_path,
+    } = input;
     let now = utc_now();
     AcpAgentSnapshot {
         acp_id: acp_id.to_string(),

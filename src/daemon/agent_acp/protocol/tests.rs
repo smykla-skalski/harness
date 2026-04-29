@@ -86,6 +86,73 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     let _ = agent_task.await;
 }
 
+#[tokio::test]
+#[cfg(unix)]
+async fn protocol_rejects_notification_with_unknown_session_id() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    let mut supervisor_child = Command::new("sleep")
+        .arg("60")
+        .spawn()
+        .expect("spawn supervisor child");
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig {
+            initialize_timeout: Duration::from_secs(1),
+            prompt_timeout: Duration::from_secs(1),
+            ..SupervisionConfig::default()
+        },
+    ));
+    let (client_transport, agent_transport) = Channel::duplex();
+    let agent_task = tokio::spawn(run_agent_with_stale_notification(agent_transport));
+    let (notification_tx, _notifications) = mpsc::channel(4);
+    let (_cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let project_dir = project.path().to_path_buf();
+    let protocol_supervisor = Arc::clone(&supervisor);
+
+    let protocol_task = tokio::spawn(async move {
+        Client
+            .builder()
+            .name("harness-test")
+            .on_receive_notification(
+                async move |notification: SessionNotification, _connection| {
+                    notification_tx
+                        .send(notification)
+                        .await
+                        .map_err(|error| AcpError::new(-32603, format!("queue event: {error}")))?;
+                    Ok(())
+                },
+                agent_client_protocol::on_receive_notification!(),
+            )
+            .connect_with(client_transport, async move |connection| {
+                run_connection(
+                    connection,
+                    project_dir,
+                    Some("trigger stale session".to_string()),
+                    protocol_supervisor,
+                    cancel_rx,
+                    Arc::new(SessionRouteGuard::default()),
+                )
+                .await
+            })
+            .await
+    });
+
+    let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)
+        .await
+        .expect("protocol should fail quickly on stale session id")
+        .expect("protocol task should not panic");
+    let error = protocol_result.expect_err("protocol should return stale-session error");
+    assert!(
+        error.to_string().contains("stale_session_id"),
+        "unexpected error: {error}"
+    );
+
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+    agent_task.abort();
+    let _ = agent_task.await;
+}
+
 async fn run_cookbook_style_agent(transport: Channel) -> agent_client_protocol::Result<()> {
     Agent
         .builder()
@@ -111,6 +178,45 @@ async fn run_cookbook_style_agent(transport: Channel) -> agent_client_protocol::
                     request.session_id,
                     SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
                         TextContent::new("second ACP descriptor smoke"),
+                    ))),
+                ))?;
+                responder.respond(PromptResponse::new(StopReason::EndTurn))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+async fn run_agent_with_stale_notification(transport: Channel) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("stale-notification-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: PromptRequest, responder, connection| {
+                connection.send_notification(SessionNotification::new(
+                    SessionId::new("acp-session-stale"),
+                    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                        TextContent::new("wrong session"),
                     ))),
                 ))?;
                 responder.respond(PromptResponse::new(StopReason::EndTurn))

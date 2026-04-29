@@ -209,8 +209,10 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
     assert!(client.acp_inspect(Some("sess-1")).is_err());
     assert!(client.acp_get("acp-1").is_err());
     assert!(client.acp_stop("acp-1").is_err());
-    assert!(client
-        .acp_resolve_permission("acp-1", "batch-1", &AcpPermissionDecision::DenyAll)
-        .is_err());
+    assert!(
+        client
+            .acp_resolve_permission("acp-1", "batch-1", &AcpPermissionDecision::DenyAll)
+            .is_err()
+    );
     server.join().expect("server thread");
 }
