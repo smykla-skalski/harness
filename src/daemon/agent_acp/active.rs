@@ -58,6 +58,9 @@ struct AcpProcessIncidentPayload {
     pgid: i32,
     exit_code: Option<i32>,
     exit_signal: Option<i32>,
+    restart_applied: bool,
+    backoff_applied: bool,
+    quarantine_applied: bool,
     stderr_tail: Option<String>,
     affected_logical_session_ids: Vec<String>,
 }
@@ -416,6 +419,9 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
         pgid: snapshot.pgid,
         exit_code,
         exit_signal,
+        restart_applied: false,
+        backoff_applied: false,
+        quarantine_applied: false,
         stderr_tail: stderr_tail.clone(),
         affected_logical_session_ids: sorted_singleton(snapshot.session_id.clone()),
     };
