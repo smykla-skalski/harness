@@ -432,10 +432,11 @@ lease_lock_try_reclaim_stale_owner() {
 }
 
 lease_lock_acquire() {
-  local started_at now_epoch last_reported_summary
+  local started_at now_epoch last_reported_summary last_status_epoch
   /bin/mkdir -p "$LEASE_LOCK_WAITERS_DIR"
   lease_lock_register_waiter
   started_at="$(lease_lock_now_epoch)"
+  last_status_epoch="$started_at"
   last_reported_summary=""
   while ! lease_lock_try_acquire_owner_dir; do
     if lease_lock_try_reclaim_stale_owner; then
@@ -445,17 +446,20 @@ lease_lock_acquire() {
     local owner_summary waiter_count
     owner_summary="$(lease_lock_owner_summary || true)"
     waiter_count="$(lease_lock_waiter_count)"
-    if [[ "$owner_summary" != "$last_reported_summary" ]]; then
+    now_epoch="$(lease_lock_now_epoch)"
+    if [[ "$owner_summary" != "$last_reported_summary" ]] \
+      || (( now_epoch - last_status_epoch >= 15 )); then
       printf 'Waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
       if [[ -n "$owner_summary" ]]; then
         printf 'lease owner: %s\n' "$owner_summary" >&2
       fi
       printf 'active waiters: %s\n' "$waiter_count" >&2
       last_reported_summary="$owner_summary"
+      last_status_epoch="$now_epoch"
     fi
 
-    now_epoch="$(lease_lock_now_epoch)"
-    if (( now_epoch - started_at >= LEASE_LOCK_WAITER_TIMEOUT_SECONDS )); then
+    if (( LEASE_LOCK_WAITER_TIMEOUT_SECONDS > 0 )) \
+      && (( now_epoch - started_at >= LEASE_LOCK_WAITER_TIMEOUT_SECONDS )); then
       printf 'Timed out waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
       return 1
     fi
