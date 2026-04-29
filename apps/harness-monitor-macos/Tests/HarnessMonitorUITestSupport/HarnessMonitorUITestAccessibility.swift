@@ -20,6 +20,8 @@ enum HarnessMonitorUITestAccessibility {
   static let supervisorBadgeState = "harness.supervisor.badge.state"
   static let supervisorForceTick = "harness.supervisor.force-tick"
   static let agentsWindow = "harness.agents.window"
+  static let agentsWindowDetailAwaitingDecisionState =
+    "harness.agents.detail.awaiting-decision.state"
   static let decisionsWindow = "harness.decisions.window"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"
@@ -385,6 +387,18 @@ enum HarnessMonitorUITestAccessibility {
 
   static func agentTuiExternalTab(_ agentID: String) -> String {
     "harness.sheet.agent-tui.external-tab.\(slug(agentID))"
+  }
+
+  static func agentPendingDecisionBadge(_ agentID: String) -> String {
+    "harness.sheet.agent-tui.pending-decision-badge.\(slug(agentID))"
+  }
+
+  static func agentDetailAwaitingDecisionStrip(_ agentID: String) -> String {
+    "harness.agents.detail.awaiting-decision.\(slug(agentID))"
+  }
+
+  static func agentDetailOpenDecisionsButton(_ agentID: String) -> String {
+    "harness.agents.detail.awaiting-decision.open.\(slug(agentID))"
   }
 
   static func agentTuiKeyButton(_ key: String) -> String {

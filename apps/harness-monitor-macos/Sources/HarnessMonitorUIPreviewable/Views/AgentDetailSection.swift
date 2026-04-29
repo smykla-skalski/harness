@@ -2,6 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct AgentDetailSection: View {
+  @Environment(\.openWindow)
+  private var openWindow
   let store: HarnessMonitorStore
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
@@ -62,8 +64,31 @@ struct AgentDetailSection: View {
     Array(store.timeline.filter { $0.agentId == agent.agentId }.prefix(8))
   }
 
+  private var pendingDecisionAttention: AcpDecisionAttention? {
+    store.acpDecisionAttention(for: agent.agentId)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      if let pendingDecisionAttention {
+        AgentDetailAwaitingDecisionStrip(
+          count: pendingDecisionAttention.count,
+          buttonAccessibilityIdentifier: HarnessMonitorAccessibility
+            .agentDetailOpenDecisionsButton(agent.agentId)
+        ) {
+          openPendingDecisions()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
+        )
+        .accessibilityTestProbe(
+          HarnessMonitorAccessibility.agentsWindowDetailAwaitingDecisionState,
+          label: agent.agentId,
+          value:
+            "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
+        )
+      }
       Text(agent.name)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text("\(agent.runtime) • \(agent.role.title)")
@@ -281,6 +306,11 @@ struct AgentDetailSection: View {
   private func changeRole() async {
     _ = await store.changeRole(agentID: agent.agentId, role: effectiveSelectedRole)
     selectedRole = agent.role
+  }
+
+  private func openPendingDecisions() {
+    store.selectOldestDecision(for: agent.agentId)
+    openWindow(id: HarnessMonitorWindowID.decisions)
   }
 
   static func submittedRoleSelection(
