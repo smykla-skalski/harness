@@ -32,6 +32,7 @@ extension AgentsWindowView {
         id: runtime.rawValue,
         title: runtime.title,
         transportChoices: transportChoices(runtime: runtime, descriptor: descriptor),
+        doctorProbe: descriptor?.doctorProbe,
         probe: descriptor.flatMap {
           probeResult(for: $0, runtimeProbeResults: runtimeProbeResults)
         },
@@ -56,6 +57,7 @@ extension AgentsWindowView {
               capabilities: descriptor.capabilities
             )
           ],
+          doctorProbe: descriptor.doctorProbe,
           probe: probeResult(for: descriptor, runtimeProbeResults: runtimeProbeResults),
           installHint: descriptor.installHint,
           sandboxed: sandboxed,
@@ -64,6 +66,28 @@ extension AgentsWindowView {
       )
     }
     return rows
+  }
+
+  static func normalizedLaunchSelection(
+    options: [AgentCapabilityOption],
+    selection: AgentLaunchSelection,
+    fallbackRuntime: AgentTuiRuntime
+  ) -> AgentLaunchSelection {
+    if let selectedOption = options.first(where: { option in
+      option.transportChoices.contains { $0.id == selection }
+    }) {
+      return selectedOption.normalizedSelection(for: selection)
+    }
+
+    if let runtimeOption = options.first(where: { $0.id == fallbackRuntime.rawValue }) {
+      return runtimeOption.normalizedSelection(for: .tui(fallbackRuntime))
+    }
+
+    if let firstEnabled = options.first(where: \.isEnabled) {
+      return firstEnabled.normalizedSelection(for: firstEnabled.transportChoices[0].id)
+    }
+
+    return selection
   }
 
   static func transportChoices(

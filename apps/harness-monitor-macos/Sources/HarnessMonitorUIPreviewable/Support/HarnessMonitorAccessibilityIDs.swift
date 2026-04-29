@@ -214,6 +214,18 @@ public enum HarnessMonitorAccessibility {
   public static func agentCapabilityRow(_ identifier: String) -> String {
     "harness.window.agents.capability.\(slug(identifier))"
   }
+  public static func agentCapabilityInstallButton(_ identifier: String) -> String {
+    "harness.window.agents.capability.\(slug(identifier)).install"
+  }
+  public static func agentCapabilityProbe(_ identifier: String) -> String {
+    "harness.window.agents.capability.\(slug(identifier)).probe"
+  }
+  public static func agentCapabilityTransportButton(
+    _ identifier: String,
+    transportID: String
+  ) -> String {
+    "harness.window.agents.capability.\(slug(identifier)).transport.\(slug(transportID))"
+  }
   public static let toolCallTimeline = "harness.window.agents.tool-call-timeline"
   public static func toolCallTimelineRow(_ identifier: String) -> String {
     "\(toolCallTimeline).row.\(slug(identifier))"

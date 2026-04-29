@@ -111,8 +111,8 @@ public struct AgentDisconnectReason: Codable, Equatable, Sendable {
 
   public var isRestartable: Bool {
     switch kind {
-    case "process_exited", "stdio_closed", "initialize_timeout", "prompt_timeout", "watchdog_fired",
-      "oom_killed":
+    case "process_exited", "stdio_closed", "transport_closed", "initialize_timeout",
+      "prompt_timeout", "watchdog_fired", "oom_killed":
       true
     case "user_cancelled", "daemon_shutdown", "unknown":
       false
