@@ -303,6 +303,49 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.timeline.last?.sessionId == "sess-acp-incident")
   }
 
+  @Test("ACP inspect push replaces selected runtime telemetry and clears with selection reset")
+  func acpInspectPushReplacesSelectedRuntimeTelemetry() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-inspect"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:45Z",
+        sessionId: "sess-acp-inspect",
+        kind: .acpInspect(
+          AcpAgentInspectResponse(
+            agents: [
+              makeAcpInspectSnapshot(
+                acpID: "zeta-agent",
+                sessionID: "sess-acp-inspect",
+                agentID: "zeta-agent",
+                displayName: "Zeta Agent"
+              ),
+              makeAcpInspectSnapshot(
+                acpID: "alpha-agent",
+                sessionID: "sess-acp-inspect",
+                agentID: "alpha-agent",
+                displayName: "Alpha Agent",
+                promptDeadlineRemainingMs: 42_000
+              ),
+            ]
+          )
+        )
+      )
+    )
+
+    #expect(store.selectedAcpInspectAgents.map(\.agentId) == ["alpha-agent", "zeta-agent"])
+    #expect(
+      store.acpInspectSnapshot(for: "alpha-agent")?.promptDeadlineRemainingMs == UInt64(42_000)
+    )
+    #expect(store.selectedAcpInspectObservedAt != nil)
+
+    store.resetSelectedAcpAgents()
+
+    #expect(store.selectedAcpInspectAgents.isEmpty)
+    #expect(store.selectedAcpInspectObservedAt == nil)
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()
@@ -426,5 +469,31 @@ func makeAcpSnapshot(
     terminalCount: 0,
     createdAt: "2026-04-28T00:00:00Z",
     updatedAt: "2026-04-28T00:00:00Z"
+  )
+}
+
+func makeAcpInspectSnapshot(
+  acpID: String,
+  sessionID: String,
+  agentID: String,
+  displayName: String,
+  promptDeadlineRemainingMs: UInt64 = 0
+) -> AcpAgentInspectSnapshot {
+  AcpAgentInspectSnapshot(
+    acpId: acpID,
+    sessionId: sessionID,
+    agentId: agentID,
+    displayName: displayName,
+    pid: UInt32(41_001),
+    pgid: Int32(41_001),
+    uptimeMs: 93_000,
+    lastUpdateAt: "2026-04-28T00:00:40Z",
+    lastClientCallAt: "2026-04-28T00:00:35Z",
+    watchdogState: "active",
+    permissionMode: "allow_edits",
+    pendingPermissions: 2,
+    permissionQueueDepth: 1,
+    terminalCount: 1,
+    promptDeadlineRemainingMs: promptDeadlineRemainingMs
   )
 }

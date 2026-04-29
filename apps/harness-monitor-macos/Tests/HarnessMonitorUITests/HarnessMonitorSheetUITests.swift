@@ -194,14 +194,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       "New Session should keep Base ref directly discoverable in the create tab"
     )
 
-    let tabPicker = element(in: app, identifier: Accessibility.newSessionTabPicker)
-    XCTAssertTrue(tabPicker.exists, "Tab picker should exist before selecting Runtime Setup")
-    let runtimeTab = app.segmentedControls.buttons["Runtime Setup"].firstMatch
-    XCTAssertTrue(
-      runtimeTab.waitForExistence(timeout: Self.fastActionTimeout),
-      "Runtime Setup segmented tab should exist"
-    )
-    runtimeTab.tap()
+    tapButton(in: app, identifier: Accessibility.newSessionRuntimeTab)
     XCTAssertTrue(
       app.staticTexts["Ready providers"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
@@ -248,12 +241,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
     )
     try writeCouncilPreviewSnapshot(in: app, named: "new-session-create-tab")
 
-    let runtimeTab = app.segmentedControls.buttons["Runtime Setup"].firstMatch
-    XCTAssertTrue(
-      runtimeTab.waitForExistence(timeout: Self.fastActionTimeout),
-      "Runtime Setup segmented tab should exist before capture"
-    )
-    runtimeTab.tap()
+    tapButton(in: app, identifier: Accessibility.newSessionRuntimeTab)
     XCTAssertTrue(
       app.staticTexts["Ready providers"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout

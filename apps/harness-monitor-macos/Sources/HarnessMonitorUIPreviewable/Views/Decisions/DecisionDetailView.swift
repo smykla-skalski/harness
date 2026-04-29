@@ -27,6 +27,7 @@ public struct DecisionDetailView: View {
 
   @Binding private var selectedTab: DecisionDetailTab
   @AccessibilityFocusState private var focusedPrimaryActionDecisionID: String?
+  @FocusState private var keyboardFocusedPrimaryActionDecisionID: String?
   @State private var handledPrimaryActionFocusTick = 0
 
   private let viewModel: DecisionDetailViewModel?
@@ -94,29 +95,29 @@ public struct DecisionDetailView: View {
     Group {
       detailBody
     }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .backgroundExtensionEffect()
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
-      .toolbar {
-        ToolbarItem(placement: .principal) {
-          detailTabPicker
-        }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .backgroundExtensionEffect()
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        detailTabPicker
       }
-      .overlay {
-        if let viewModel {
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.decisionPrimaryActionFocusState,
-            text: focusMarkerValue(for: viewModel)
-          )
-        }
+    }
+    .overlay {
+      if let viewModel {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.decisionPrimaryActionFocusState,
+          text: focusMarkerValue(for: viewModel)
+        )
       }
-      .onAppear {
-        applyPrimaryActionFocusIfNeeded()
-      }
-      .onChange(of: primaryActionFocusRequestTick) { _, _ in
-        applyPrimaryActionFocusIfNeeded()
-      }
+    }
+    .onAppear {
+      applyPrimaryActionFocusIfNeeded()
+    }
+    .onChange(of: primaryActionFocusRequestTick) { _, _ in
+      applyPrimaryActionFocusIfNeeded()
+    }
   }
 
   @ViewBuilder
@@ -153,14 +154,18 @@ public struct DecisionDetailView: View {
   }
 
   private func populatedBody(_ viewModel: DecisionDetailViewModel) -> some View {
-    ScrollView {
+    let contextAdapter = DecisionKindContextAdapter(
+      decision: viewModel.decision,
+      store: store
+    )
+    return ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         DecisionDetailHero(
           viewModel: viewModel,
           dateTimeConfiguration: dateTimeConfiguration
         )
-        suggestedActions(viewModel)
-        detailTabs(viewModel)
+        suggestedActions(viewModel, contextAdapter: contextAdapter)
+        detailTabs(viewModel, contextAdapter: contextAdapter)
       }
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,7 +173,7 @@ public struct DecisionDetailView: View {
   }
 
   @ViewBuilder private var emptyState: some View {
-    if let observer {
+    if let observer = observer {
       ScrollView {
         ObserverSummaryPanel(observer: observer)
           .padding(HarnessMonitorTheme.spacingLG)
@@ -190,7 +195,10 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private func suggestedActions(_ viewModel: DecisionDetailViewModel) -> some View {
+  private func suggestedActions(
+    _ viewModel: DecisionDetailViewModel,
+    contextAdapter: DecisionKindContextAdapter
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Suggested Actions")
         .scaledFont(.caption.bold())
@@ -203,7 +211,11 @@ public struct DecisionDetailView: View {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             ForEach(viewModel.suggestedActions) { action in
-              actionButton(for: action, viewModel: viewModel)
+              actionButton(
+                for: action,
+                viewModel: viewModel,
+                contextAdapter: contextAdapter
+              )
             }
           }
         }
@@ -214,7 +226,8 @@ public struct DecisionDetailView: View {
   @ViewBuilder
   private func actionButton(
     for action: SuggestedAction,
-    viewModel: DecisionDetailViewModel
+    viewModel: DecisionDetailViewModel,
+    contextAdapter: DecisionKindContextAdapter
   ) -> some View {
     let isPrimary = viewModel.isPrimary(action)
     let role: ButtonRole? = action.kind == .dismiss ? .destructive : nil
@@ -224,18 +237,18 @@ public struct DecisionDetailView: View {
       variant: isPrimary ? .prominent : .bordered,
       role: role,
       isLoading: false,
-      accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id)
+      accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id),
+      accessibilityFocusBinding: isPrimary ? $focusedPrimaryActionDecisionID : nil,
+      accessibilityFocusValue: isPrimary ? viewModel.decision.id : nil,
+      keyboardFocusBinding: isPrimary ? $keyboardFocusedPrimaryActionDecisionID : nil,
+      keyboardFocusValue: isPrimary ? viewModel.decision.id : nil
     ) {
       await viewModel.invoke(action: action)
     }
-    .disabled(isActionDisabled(action, viewModel: viewModel))
+    .disabled(contextAdapter.isActionDisabled(action.id))
     if isPrimary {
       button
         .keyboardShortcut(.defaultAction)
-        .accessibilityFocused(
-          $focusedPrimaryActionDecisionID,
-          equals: viewModel.decision.id
-        )
     } else if action.kind == .dismiss {
       button.keyboardShortcut(".", modifiers: [.command])
     } else {
@@ -244,14 +257,16 @@ public struct DecisionDetailView: View {
   }
 
   @ViewBuilder
-  private func detailTabs(_ viewModel: DecisionDetailViewModel) -> some View {
+  private func detailTabs(
+    _ viewModel: DecisionDetailViewModel,
+    contextAdapter: DecisionKindContextAdapter
+  ) -> some View {
     switch selectedTab {
     case .context:
-      if let payload = resolvedAcpPayload(for: viewModel) {
-        AcpPermissionDecisionDetailView(payload: payload, store: store)
-      } else {
-        DecisionContextPanel(sections: viewModel.contextSections)
-      }
+      DecisionKindContextView(
+        adapter: contextAdapter,
+        contextSections: viewModel.contextSections
+      )
     case .audit:
       DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
     }
@@ -284,33 +299,6 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private func resolvedAcpPayload(
-    for viewModel: DecisionDetailViewModel
-  ) -> AcpPermissionDecisionPayload? {
-    guard viewModel.decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
-      return nil
-    }
-    return store?.acpPermissionDecisionPayload(for: viewModel.decision.id)
-      ?? AcpPermissionDecisionPayload.decode(from: viewModel.decision)
-  }
-
-  private func isActionDisabled(
-    _ action: SuggestedAction,
-    viewModel: DecisionDetailViewModel
-  ) -> Bool {
-    guard let payload = resolvedAcpPayload(for: viewModel) else {
-      return false
-    }
-    let resolutionState = store?.acpPermissionResolutionState(for: payload.decisionID)
-      ?? payload.defaultResolutionState
-    if resolutionState.isSubmitting
-      || store?.resolvingAcpPermissionBatchID == payload.rawBatch.batchId
-    {
-      return true
-    }
-    return payload.isActionDisabled(action.id, resolutionState: resolutionState)
-  }
-
   private func applyPrimaryActionFocusIfNeeded() {
     guard let viewModel,
       primaryActionFocusDecisionID == viewModel.decision.id,
@@ -323,17 +311,31 @@ public struct DecisionDetailView: View {
     handledPrimaryActionFocusTick = primaryActionFocusRequestTick
     selectedTab = .context
     focusedPrimaryActionDecisionID = nil
+    keyboardFocusedPrimaryActionDecisionID = nil
+    let decisionID = viewModel.decision.id
     Task { @MainActor in
-      await Task.yield()
-      focusedPrimaryActionDecisionID = viewModel.decision.id
+      for _ in 0..<4 {
+        await Task.yield()
+        keyboardFocusedPrimaryActionDecisionID = decisionID
+        focusedPrimaryActionDecisionID = decisionID
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        if focusedPrimaryActionDecisionID == decisionID
+          || keyboardFocusedPrimaryActionDecisionID == decisionID
+        {
+          return
+        }
+      }
     }
   }
 
   private func focusMarkerValue(for viewModel: DecisionDetailViewModel) -> String {
-    let isFocused = focusedPrimaryActionDecisionID == viewModel.decision.id
+    let isAccessibilityFocused = focusedPrimaryActionDecisionID == viewModel.decision.id
+    let isKeyboardFocused = keyboardFocusedPrimaryActionDecisionID == viewModel.decision.id
     return [
       "decision=\(viewModel.decision.id)",
-      "focused=\(isFocused)",
+      "focused=\(isAccessibilityFocused || isKeyboardFocused)",
+      "accessibilityFocused=\(isAccessibilityFocused)",
+      "keyboardFocused=\(isKeyboardFocused)",
       "tick=\(handledPrimaryActionFocusTick)",
     ].joined(separator: " ")
   }
