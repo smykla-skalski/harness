@@ -41,7 +41,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     if !isTestHarnessRun {
       mcpStartupController.start()
     }
-    guard !hidesDockIconForPerfRuns else {
+    guard !hidesDockIconForPerfRuns, !isTestHarnessRun else {
       return
     }
     Task { @MainActor in
@@ -89,7 +89,14 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func configureWindowForUITesting(_ window: NSWindow?) {
-    window?.animationBehavior = .none
+    guard let window else {
+      return
+    }
+    guard isTestHarnessRun else {
+      window.animationBehavior = .none
+      return
+    }
+    window.animationBehavior = .none
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(

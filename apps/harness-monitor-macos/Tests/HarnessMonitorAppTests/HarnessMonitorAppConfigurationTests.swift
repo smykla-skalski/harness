@@ -67,6 +67,34 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     )
   }
 
+  func testDefersInitialMainWindowContentOnlyForUITestHostBundle() {
+    XCTAssertTrue(
+      HarnessMonitorAppConfiguration.shouldDeferInitialMainWindowContentUntilBootstrap(
+        isUITesting: true,
+        bundleIdentifier: "io.harnessmonitor.app.ui-testing"
+      )
+    )
+    XCTAssertFalse(
+      HarnessMonitorAppConfiguration.shouldDeferInitialMainWindowContentUntilBootstrap(
+        isUITesting: true,
+        bundleIdentifier: "io.harnessmonitor.app"
+      )
+    )
+    XCTAssertFalse(
+      HarnessMonitorAppConfiguration.shouldDeferInitialMainWindowContentUntilBootstrap(
+        isUITesting: false,
+        bundleIdentifier: "io.harnessmonitor.app.ui-testing"
+      )
+    )
+    XCTAssertFalse(
+      HarnessMonitorAppConfiguration.shouldDeferInitialMainWindowContentUntilBootstrap(
+        isUITesting: true,
+        hasPerfScenario: true,
+        bundleIdentifier: "io.harnessmonitor.app.ui-testing"
+      )
+    )
+  }
+
   func testAppDelegateDetectsLoadedXCTestBundles() {
     XCTAssertTrue(
       HarnessMonitorAppDelegate.isTestHarnessRun(
