@@ -1,6 +1,10 @@
 use std::collections::BTreeSet;
 
 use super::*;
+use super::incidents::{
+    AcpBridgeResyncIncidentPayload, bridge_resync_incident_events,
+    pool_key_mismatch_incident_events,
+};
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::agent_acp::AcpAgentInspectSnapshot;
 use crate::daemon::protocol::StreamEvent;
@@ -173,6 +177,59 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
     };
     let merged = reconcile_sessions(known, &inspect);
     assert_eq!(merged, vec!["sess-new".to_string(), "sess-old".to_string()]);
+}
+
+#[test]
+fn distinct_process_keys_for_session_dedupes_and_sorts_keys() {
+    let inspect = AcpAgentInspectResponse {
+        agents: vec![
+            inspect_snapshot("sess-1", "pk-b"),
+            inspect_snapshot("sess-1", "pk-a"),
+            inspect_snapshot("sess-1", "pk-a"),
+            inspect_snapshot("sess-2", "pk-z"),
+        ],
+    };
+    assert_eq!(
+        distinct_process_keys_for_session(&inspect, "sess-1"),
+        vec!["pk-a".to_string(), "pk-b".to_string()]
+    );
+}
+
+#[test]
+fn pool_key_mismatch_incident_events_fan_out_by_session() {
+    let payload = AcpPoolKeyMismatchIncidentPayload {
+        kind: "pool_key_mismatch".to_string(),
+        observed_process_keys: vec!["pk-a".to_string(), "pk-b".to_string()],
+        affected_logical_session_ids: vec!["sess-1".to_string(), "sess-2".to_string()],
+    };
+    let events = pool_key_mismatch_incident_events(&payload).expect("events");
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].event, "acp_process_incident");
+    assert_eq!(events[0].session_id.as_deref(), Some("sess-1"));
+    assert_eq!(events[1].session_id.as_deref(), Some("sess-2"));
+    assert_eq!(events[0].payload["kind"], "pool_key_mismatch");
+}
+
+fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnapshot {
+    AcpAgentInspectSnapshot {
+        acp_id: format!("{session_id}-{process_key}"),
+        session_id: session_id.to_string(),
+        agent_id: "fake".to_string(),
+        display_name: "Fake".to_string(),
+        pid: 1,
+        pgid: 1,
+        process_key: process_key.to_string(),
+        uptime_ms: 1,
+        last_update_at: "2026-01-01T00:00:00Z".to_string(),
+        last_client_call_at: None,
+        watchdog_state: "active".to_string(),
+        permission_mode: "daemon_bridge".to_string(),
+        permission_log_path: None,
+        pending_permissions: 0,
+        permission_queue_depth: 0,
+        terminal_count: 0,
+        prompt_deadline_remaining_ms: 0,
+    }
 }
 
 #[test]
