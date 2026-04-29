@@ -206,6 +206,7 @@ enum HarnessMonitorUITestAccessibility {
   static let acpPermissionToast = "harness.acp-permission.toast"
   static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"
   static let acpPermissionToastState = "harness.acp-permission.toast.state"
+  static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
   static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
   static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"

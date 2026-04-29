@@ -136,6 +136,25 @@ extension HarnessMonitorStore {
     return (client, sessionID)
   }
 
+  func prepareSessionAction(
+    named actionName: String,
+    sessionID: String
+  ) -> (client: any HarnessMonitorClientProtocol, sessionID: String)? {
+    if isSessionReadOnly {
+      reportUnavailableSelectedSessionAction(actionName, message: readOnlySessionAccessMessage)
+      return nil
+    }
+    guard !sessionID.isEmpty else {
+      reportUnavailableSelectedSessionAction(actionName, message: noSelectedSessionActionMessage)
+      return nil
+    }
+    guard let client else {
+      reportUnavailableSelectedSessionAction(actionName, message: actionChannelUnavailableMessage)
+      return nil
+    }
+    return (client, sessionID)
+  }
+
   public func reportDropRejection(_ reason: String) {
     presentFailureFeedback(reason)
   }

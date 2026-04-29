@@ -38,6 +38,47 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectSupervisorSection(in app: XCUIApplication) {
+    selectPreferencesSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorSection,
+      expectedTitle: "Supervisor"
+    )
+  }
+
+  func selectSupervisorNotificationsPane(in app: XCUIApplication) {
+    let notificationsPane = element(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorPane("notifications")
+    )
+    if notificationsPane.exists {
+      return
+    }
+
+    selectSupervisorSection(in: app)
+
+    let panePicker = segmentedControl(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorPane("pane-picker")
+    )
+    XCTAssertTrue(
+      panePicker.waitForExistence(timeout: Self.actionTimeout),
+      "Supervisor pane picker should appear in the toolbar"
+    )
+
+    tapButton(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.segmentedOption(
+        HarnessMonitorUITestAccessibility.preferencesSupervisorPane("pane-picker"),
+        option: "Notifications"
+      )
+    )
+    XCTAssertTrue(
+      waitForElement(notificationsPane, timeout: Self.actionTimeout),
+      "Supervisor Notifications pane should appear after selecting the toolbar segment"
+    )
+  }
+
   func selectGeneralSection(in app: XCUIApplication) {
     selectPreferencesSection(
       in: app,

@@ -29,22 +29,21 @@ public struct HarnessMonitorActionButton: View {
   }
 
   public var body: some View {
-    ZStack {
-      Button {
-        action()
-      } label: {
-        ProminentAwareLabel {
-          Text(title)
-            .lineLimit(1)
-            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-            .frame(maxWidth: fillsWidth ? .infinity : nil)
-        }
+    Button {
+      action()
+    } label: {
+      ProminentAwareLabel {
+        Text(title)
+          .lineLimit(1)
+          .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+          .frame(maxWidth: fillsWidth ? .infinity : nil)
       }
-      .frame(maxWidth: fillsWidth ? .infinity : nil)
-      .harnessActionButtonStyle(variant: variant, tint: tint)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .accessibilityIdentifier(accessibilityIdentifier)
+      .contentShape(Rectangle())
     }
+    .frame(maxWidth: fillsWidth ? .infinity : nil)
+    .harnessActionButtonStyle(variant: variant, tint: tint)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
 }
@@ -99,16 +98,14 @@ public struct HarnessMonitorAsyncActionButton: View {
   }
 
   public var body: some View {
-    ZStack {
-      Button(role: role) {
-        if isLoading {
-          cancelAction()
-        } else {
-          performAction()
-        }
-      } label: {
-        label
+    Button(role: role) {
+      if isLoading {
+        cancelAction()
+      } else {
+        performAction()
       }
+    } label: {
+      label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil)
     .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
@@ -135,6 +132,7 @@ public struct HarnessMonitorAsyncActionButton: View {
       .frame(maxWidth: fillsWidth ? .infinity : nil)
       .animation(reduceMotion ? nil : .spring(duration: 0.2), value: isLoading)
     }
+    .contentShape(Rectangle())
   }
 
   private func performAction() {
