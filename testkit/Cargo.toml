@@ -1,6 +1,6 @@
 [package]
 name = "harness-testkit"
-version = "30.22.1"
+version = "30.23.0"
 edition = "2024"
 rust-version = "1.94"
 
