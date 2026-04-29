@@ -2,87 +2,159 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension NewSessionSheetView {
-  @MainActor var capabilityPickerSection: some View {
-    fieldBlock(
-      "Preferred first leader",
-      help:
-        "Pick the capability you want preselected when you open Agents after creating this session."
-    ) {
-      NewSessionCapabilityPickerList(
-        options: agentCapabilityOptions,
-        selection: $selectedLaunchSelection
-      )
-    }
-  }
-}
-
-private struct NewSessionCapabilityPickerList: View {
-  let options: [AgentCapabilityOption]
-  @Binding var selection: AgentLaunchSelection
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      ForEach(options) { option in
-        NewSessionAgentCapabilityRow(
-          option: option,
-          selection: $selection
+  @MainActor var preferredLeaderSection: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      fieldBlock(
+        "Preferred first leader",
+        help: "Choose which ready leader is preselected after this session is created."
+      ) {
+        NewSessionPreferredLeaderPicker(
+          options: agentCapabilityOptions,
+          selection: $selectedLaunchSelection
         )
       }
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityPicker)
-    .onChange(of: options, initial: true) { _, updatedOptions in
-      let normalizedSelection = AgentsWindowView.normalizedLaunchSelection(
-        options: updatedOptions,
-        selection: selection,
-        fallbackRuntime: selection.preferredRuntime
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityPickerSection)
+  }
+}
+
+private struct NewSessionPreferredLeaderPicker: View {
+  private struct Choice: Identifiable {
+    let id: String
+    let title: String
+    let status: String
+    let selection: AgentLaunchSelection
+  }
+
+  let options: [AgentCapabilityOption]
+  @Binding var selection: AgentLaunchSelection
+
+  private var choices: [Choice] {
+    var seen: Set<String> = []
+    var result: [Choice] = []
+
+    for option in options {
+      guard option.isEnabled else { continue }
+      let defaultChoice = option.transportChoices[0].id
+      let normalized = option.normalizedSelection(for: defaultChoice)
+      let key = normalized.storageKey
+      guard seen.insert(key).inserted else { continue }
+      result.append(
+        Choice(
+          id: key,
+          title: option.title,
+          status: option.statusText,
+          selection: normalized
+        )
       )
-      if normalizedSelection != selection {
-        selection = normalizedSelection
+    }
+
+    return result
+  }
+
+  private var activeSelection: AgentLaunchSelection {
+    if choices.contains(where: { $0.selection == selection }) {
+      return selection
+    }
+    return choices.first?.selection ?? selection
+  }
+
+  var body: some View {
+    Picker(
+      "Preferred first leader",
+      selection: Binding(
+        get: { activeSelection },
+        set: { selection = $0 }
+      )
+    ) {
+      ForEach(choices) { choice in
+        Text("\(choice.title) (\(choice.status))")
+          .tag(choice.selection)
       }
+    }
+    .pickerStyle(.menu)
+    .harnessNativeFormControl()
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityPicker)
+  }
+}
+
+struct NewSessionRuntimeStatusSection: View {
+  let options: [AgentCapabilityOption]
+  @Binding var selection: AgentLaunchSelection
+
+  private var readyOptions: [AgentCapabilityOption] {
+    options.filter(\.isEnabled)
+  }
+
+  private var installRequiredOptions: [AgentCapabilityOption] {
+    options.filter(\.showsInstallCTA)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+      runtimeBlock(
+        title: "Ready providers",
+        help: "Available now for session startup."
+      ) {
+        ForEach(readyOptions) { option in
+          NewSessionRuntimeStatusRow(
+            option: option,
+            selection: $selection
+          )
+        }
+      }
+
+      runtimeBlock(
+        title: "Needs install",
+        help: "Install these providers to enable filesystem + terminal tools."
+      ) {
+        if installRequiredOptions.isEmpty {
+          Text("All detected providers are install-ready.")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        } else {
+          ForEach(installRequiredOptions) { option in
+            NewSessionRuntimeStatusRow(
+              option: option,
+              selection: $selection
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private func runtimeBlock<Content: View>(
+    title: String,
+    help: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(title)
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(help)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      content()
     }
   }
 }
 
-// Duplicate on purpose per UI-2 plan. Tripwire: extract only when a third caller appears
-// or this copy stays materially identical to AgentsWindow for 60 days.
-private struct NewSessionAgentCapabilityRow: View {
+private struct NewSessionRuntimeStatusRow: View {
   let option: AgentCapabilityOption
   @Binding var selection: AgentLaunchSelection
+  @State private var showDiagnostics = false
 
-  private var normalizedSelection: AgentLaunchSelection {
-    option.normalizedSelection(for: selection)
+  private var recommendedSelection: AgentLaunchSelection {
+    option.normalizedSelection(for: option.transportChoices[0].id)
   }
 
-  private var currentChoice: AgentCapabilityTransportChoice {
-    option.transportChoice(for: normalizedSelection)
-  }
-
-  private var capabilityTags: [String] {
-    currentChoice.capabilityLabels
-  }
-
-  private var accessibilityCapabilityTags: [String] {
-    option.acpChoice?.capabilityLabels ?? capabilityTags
-  }
-
-  private var accessibilityCapabilitySummary: String {
-    accessibilityCapabilityTags.joined(separator: ", ")
-  }
-
-  private var accessibilityRowLabel: String {
-    "\(option.accessibilityLabel), capabilities: \(accessibilityCapabilitySummary)"
-  }
-
-  private var currentChoiceIsEnabled: Bool {
-    option.isEnabled(currentChoice)
-  }
-
-  private var unavailableReason: String? {
-    if case .acp = currentChoice.id, option.sandboxed, !option.acpHostBridgeReady {
-      return
-        "Filesystem + terminal tools require the ACP host bridge while the daemon runs sandboxed."
-    }
-    return option.installHint
+  private var preferredTransportTitle: String {
+    option.transportChoice(for: recommendedSelection).title
   }
 
   private var statusTint: Color {
@@ -97,142 +169,69 @@ private struct NewSessionAgentCapabilityRow: View {
   }
 
   var body: some View {
-    // Keep this accessibility structure aligned with AgentCapabilityRow:
-    // the row exposes a summary label, while the visible title/probe/buttons
-    // remain individually discoverable for XCUI and VoiceOver navigation.
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      leadingColumn
-      transportColumn
-    }
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel(accessibilityRowLabel)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityRow(option.id))
-  }
-
-  private var leadingColumn: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      titleRow
-      capabilityTagRow()
-      probeRow()
-      unavailableReasonRow()
-      installActionRow()
-    }
-  }
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+            Text(option.title)
+              .scaledFont(.body.weight(.semibold))
+            Text(option.statusText)
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(statusTint)
+          }
+          Text(preferredTransportTitle)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Group {
+          if option.showsInstallCTA {
+            HarnessMonitorActionButton(
+              title: option.installActionTitle,
+              tint: HarnessMonitorTheme.caution,
+              variant: .prominent,
+              accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(
+                option.id
+              )
+            ) {
+              HarnessMonitorClipboard.copy(installHintText)
+            }
+          } else {
+            Button("Use") {
+              selection = recommendedSelection
+            }
+            .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+          }
+        }
+      }
 
-  private var titleRow: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(option.title)
-        .scaledFont(.body.weight(.semibold))
-      Text(option.statusText)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(statusTint)
-        .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-        .background(statusTint.opacity(0.14), in: Capsule())
-    }
-  }
+      if option.doctorProbeText != nil {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          Button(showDiagnostics ? "Hide diagnostics" : "Show diagnostics") {
+            withAnimation(.easeOut(duration: 0.2)) {
+              showDiagnostics.toggle()
+            }
+          }
+          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id)
+          )
+          Spacer(minLength: 0)
+        }
 
-  @ViewBuilder
-  private func capabilityTagRow() -> some View {
-    if !capabilityTags.isEmpty {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(capabilityTags.prefix(3), id: \.self) { capability in
-          NewSessionCapabilityChip(title: capability)
+        if showDiagnostics, let doctorProbeText = option.doctorProbeText {
+          Text(doctorProbeText)
+            .scaledFont(.caption.monospaced())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.newSessionCapabilityProbe(option.id)
+            )
         }
       }
     }
-  }
-
-  @ViewBuilder
-  private func probeRow() -> some View {
-    if let doctorProbeText = option.doctorProbeText {
-      Text(doctorProbeText)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityProbe(option.id))
-    }
-  }
-
-  @ViewBuilder
-  private func unavailableReasonRow() -> some View {
-    if !currentChoiceIsEnabled, let unavailableReason {
-      Text(unavailableReason)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.caution)
-        .lineLimit(2)
-    }
-  }
-
-  @ViewBuilder
-  private func installActionRow() -> some View {
-    if option.showsInstallCTA {
-      HarnessMonitorActionButton(
-        title: option.installActionTitle,
-        tint: HarnessMonitorTheme.caution,
-        variant: .prominent,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(
-          option.id
-        )
-      ) {
-        HarnessMonitorClipboard.copy(installHintText)
-      }
-      .help(installHintText)
-      .accessibilityHint(option.installAccessibilityHint ?? "")
-    }
-  }
-
-  private var transportColumn: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(option.transportChoices) { choice in
-        transportButton(choice)
-      }
-    }
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func transportButton(_ choice: AgentCapabilityTransportChoice) -> some View {
-    let isSelected = normalizedSelection == choice.id
-    let isChoiceEnabled = option.isEnabled(choice)
-    return Button {
-      selection = choice.id
-    } label: {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-        Text(choice.title)
-      }
-    }
-    .harnessActionButtonStyle(
-      variant: isSelected ? .prominent : .bordered,
-      tint: isSelected ? nil : .secondary
-    )
-    .disabled(!isChoiceEnabled)
-    .accessibilityLabel("\(option.title), \(choice.title)")
-    .accessibilityValue(isSelected ? "Selected" : "")
-    .accessibilityHint(
-      isChoiceEnabled ? "" : (unavailableReason ?? "Unavailable")
-    )
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.newSessionCapabilityTransportButton(
-        option.id,
-        transportID: choice.id.accessibilityIDComponent
-      )
-    )
-  }
-}
-
-private struct NewSessionCapabilityChip: View {
-  let title: String
-
-  var body: some View {
-    Text(title)
-      .scaledFont(.caption.weight(.semibold))
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-      .background(HarnessMonitorTheme.secondaryInk.opacity(0.08), in: Capsule())
-      .accessibilityHidden(true)
   }
 }

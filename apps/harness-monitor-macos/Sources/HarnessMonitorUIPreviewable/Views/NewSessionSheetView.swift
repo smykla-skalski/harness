@@ -4,6 +4,20 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct NewSessionSheetView: View {
+  private enum SheetTab: String, CaseIterable, Hashable {
+    case create
+    case runtime
+
+    var title: String {
+      switch self {
+      case .create:
+        "Create Session"
+      case .runtime:
+        "Runtime Setup"
+      }
+    }
+  }
+
   private enum Field: Hashable {
     case title
     case context
@@ -19,6 +33,7 @@ struct NewSessionSheetView: View {
   @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
   @State var selectedLaunchSelection =
     HarnessMonitorAgentLaunchDefaults.preferredSelection()
+  @State private var selectedTab = SheetTab.create
   @State private var showImporter = false
   @FocusState private var focusedField: Field?
 
@@ -30,18 +45,19 @@ struct NewSessionSheetView: View {
       Divider()
       footer
     }
-    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionSheet)
     .task {
       async let bookmarkRefresh: Void = refreshBookmarks()
       async let pickerCatalogRefresh: Void = loadAgentPickerCatalogs()
       _ = await bookmarkRefresh
       _ = await pickerCatalogRefresh
+      normalizePreferredSelection()
     }
-    .onChange(of: viewModel.selectedBookmarkId) { _, newValue in
-      guard newValue != nil, viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      else { return }
-      focusedField = .title
+    .onChange(of: availableAcpAgents) { _, _ in
+      normalizePreferredSelection()
+    }
+    .onChange(of: runtimeProbeResults) { _, _ in
+      normalizePreferredSelection()
     }
     .fileImporter(
       isPresented: $showImporter,
@@ -76,10 +92,14 @@ struct NewSessionSheetView: View {
   private var formContent: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        projectSection
-        capabilityPickerSection
-        detailsSection
-        advancedSection
+        tabSelector
+
+        switch selectedTab {
+        case .create:
+          createSessionTab
+        case .runtime:
+          runtimeSetupTab
+        }
 
         if let error = viewModel.lastError {
           errorBanner(for: error)
@@ -88,6 +108,33 @@ struct NewSessionSheetView: View {
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+  }
+
+  private var tabSelector: some View {
+    Picker("Session sheet section", selection: $selectedTab) {
+      Text(SheetTab.create.title).tag(SheetTab.create)
+      Text(SheetTab.runtime.title).tag(SheetTab.runtime)
+    }
+    .pickerStyle(.segmented)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTabPicker)
+  }
+
+  private var createSessionTab: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+      projectSection
+      detailsSection
+      preferredLeaderSection
+      advancedSection
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreatePanel)
+  }
+
+  private var runtimeSetupTab: some View {
+    NewSessionRuntimeStatusSection(
+      options: agentCapabilityOptions,
+      selection: $selectedLaunchSelection
+    )
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionRuntimePanel)
   }
 
   private var projectSection: some View {
@@ -154,15 +201,21 @@ struct NewSessionSheetView: View {
         "Context",
         help: "Optional goals, links, or handoff notes. Multiline input stays enabled."
       ) {
-        TextField(
-          "Optional goals, links, or handoff notes",
-          text: $viewModel.context,
-          axis: .vertical
-        )
-        .harnessNativeFormControl()
-        .focused($focusedField, equals: .context)
-        .lineLimit(4, reservesSpace: true)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
+        ZStack(alignment: .topLeading) {
+          if viewModel.context.isEmpty {
+            Text("Optional goals, links, or handoff notes")
+              .scaledFont(.body)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+              .padding(.vertical, HarnessMonitorTheme.spacingXS)
+              .allowsHitTesting(false)
+          }
+          TextEditor(text: $viewModel.context)
+            .harnessNativeFormControl()
+            .focused($focusedField, equals: .context)
+            .frame(minHeight: 84)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
+        }
       }
     }
   }
@@ -261,21 +314,32 @@ struct NewSessionSheetView: View {
   // MARK: - Footer
 
   private var footer: some View {
-    HStack {
-      Button("Cancel") {
-        dismiss()
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      if let disabledReason = createDisabledReason {
+        Text(disabledReason)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateDisabledReason)
       }
-      .keyboardShortcut(.cancelAction)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCancelButton)
-      Spacer()
-      Button("Create") {
-        Task { await submitAndDismiss() }
+
+      HStack {
+        Button("Cancel") {
+          dismiss()
+        }
+        .keyboardShortcut(.cancelAction)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCancelButton)
+        Spacer()
+        Button("Create") {
+          Task { await submitAndDismiss() }
+        }
+        .keyboardShortcut(.defaultAction)
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .disabled(!canCreate)
+        .accessibilityValue(createDisabledReason ?? "Ready")
+        .accessibilityHint(createDisabledReason ?? "Create a new session")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateButton)
       }
-      .keyboardShortcut(.defaultAction)
-      .harnessActionButtonStyle(variant: .prominent, tint: nil)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(!canCreate)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateButton)
     }
     .padding(HarnessMonitorTheme.spacingLG)
   }
@@ -284,6 +348,22 @@ struct NewSessionSheetView: View {
     !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && viewModel.selectedBookmarkId != nil
       && !viewModel.isSubmitting
+  }
+
+  private var createDisabledReason: String? {
+    if viewModel.isSubmitting {
+      return "Creating session…"
+    }
+
+    if viewModel.selectedBookmarkId == nil {
+      return "Select a project folder to enable Create."
+    }
+
+    if viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return "Session title is required."
+    }
+
+    return nil
   }
 
   private var selectedBookmark: BookmarkStore.Record? {
@@ -320,6 +400,14 @@ struct NewSessionSheetView: View {
     async let probes = store.fetchRuntimeProbeResults()
     availableAcpAgents = await descriptors
     runtimeProbeResults = await probes
+  }
+
+  private func normalizePreferredSelection() {
+    selectedLaunchSelection = AgentsWindowView.normalizedLaunchSelection(
+      options: agentCapabilityOptions,
+      selection: selectedLaunchSelection,
+      fallbackRuntime: selectedLaunchSelection.preferredRuntime
+    )
   }
 }
 
