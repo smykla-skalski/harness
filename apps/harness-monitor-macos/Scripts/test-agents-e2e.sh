@@ -12,6 +12,7 @@ DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived-e2e}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
+STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
@@ -114,6 +115,19 @@ cleanup() {
 
 trap 'status=$?; cleanup "$status"; exit "$status"' EXIT
 
+run_stale_preflight() {
+  if [[ "${HARNESS_SKIP_STALE_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  if [[ ! -x "$STALE_CHECK_SCRIPT" ]]; then
+    echo "stale-check script is not executable: $STALE_CHECK_SCRIPT" >&2
+    exit 1
+  fi
+
+  "$STALE_CHECK_SCRIPT"
+}
+
 resolve_supported_codex_launch() {
   if [[ -n "$CODEX_MODEL_OVERRIDE" ]]; then
     return 0
@@ -177,6 +191,7 @@ configure_xctestrun() {
 
 ensure_e2e_tool_binary
 resolve_supported_codex_launch
+run_stale_preflight
 
 "$ROOT/Scripts/generate.sh"
 "$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
@@ -188,6 +203,7 @@ TEST_ARGS=(
   -derivedDataPath "$DERIVED_DATA_PATH"
 )
 
+HARNESS_SKIP_STALE_CHECK=1 \
 HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER" \
   "${TEST_ARGS[@]}" \
   CODE_SIGNING_ALLOWED=YES \
@@ -235,7 +251,10 @@ if [[ -z "$CODEX_WORKSPACE" ]]; then
 fi
 APPROVAL_FILE="$CODEX_WORKSPACE/approved.txt"
 
-if HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 "$XCODEBUILD_RUNNER" \
+if HARNESS_SKIP_STALE_CHECK=1 \
+  HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 \
+  HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
+  "$XCODEBUILD_RUNNER" \
   -xctestrun "$CONFIGURED_XCTESTRUN" \
   -destination "$DESTINATION" \
   CODE_SIGNING_ALLOWED=YES \

@@ -67,27 +67,36 @@ kill_orphan_harness_processes() {
   signal_pids KILL "${pids[@]}"
 }
 
-kill_repo_gate_processes() {
+remove_orphan_monitor_wrapper_lock_dirs() {
+  local pids=("$@")
+  local pid desc derived_data_path
+  for pid in "${pids[@]}"; do
+    [[ -n "$pid" ]] || continue
+    desc="$(stale_scan_pid_describe "$pid")"
+    [[ -n "$desc" ]] || continue
+    derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$desc")"
+    [[ -n "$derived_data_path" ]] || continue
+    if [[ -d "$derived_data_path/.xcodebuild.lock" ]]; then
+      rm -rf "$derived_data_path/.xcodebuild.lock"
+    fi
+  done
+}
+
+kill_orphan_monitor_wrapper_processes() {
+  stale_scan_refresh_ps
   local pids=()
   local pid
   while IFS= read -r pid; do
     [[ -n "$pid" ]] && pids+=("$pid")
-  done < <(stale_scan_repo_gate_pids "$$")
+  done < <(stale_scan_orphan_monitor_wrapper_pids)
   (( ${#pids[@]} > 0 )) || return 0
 
-  echo "killing repo-local gate helper processes..."
+  echo "killing orphan xcodebuild wrapper shells..."
   signal_pids TERM "${pids[@]}"
   sleep 1
-
-  stale_scan_refresh_ps
-  pids=()
-  while IFS= read -r pid; do
-    [[ -n "$pid" ]] && pids+=("$pid")
-  done < <(stale_scan_repo_gate_pids "$$")
-  (( ${#pids[@]} > 0 )) || return 0
-
-  echo "force-stopping stubborn repo-local gate helper processes..."
   signal_pids KILL "${pids[@]}"
+  stale_scan_refresh_ps
+  remove_orphan_monitor_wrapper_lock_dirs "${pids[@]}"
 }
 
 kill_live_harness_processes() {
@@ -233,7 +242,7 @@ remove_stale_swarm_e2e_worktrees() {
 quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
-kill_repo_gate_processes
+kill_orphan_monitor_wrapper_processes
 kill_live_harness_processes "$STALE_SCAN_GROUP_CONTAINER_ROOT"
 kill_live_harness_processes "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
 kill_orphan_codex_app_servers

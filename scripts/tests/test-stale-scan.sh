@@ -48,6 +48,22 @@ log() {
   printf '%s\n' "$*" >&2
 }
 
+last_stale_block() {
+  awk '
+    /^error: dev state is stale$/ {
+      block = $0 ORS
+      capture = 1
+      next
+    }
+    capture {
+      block = block $0 ORS
+    }
+    END {
+      printf "%s", block
+    }
+  '
+}
+
 fail() {
   FAIL_COUNT=$((FAIL_COUNT + 1))
   FAIL_NAMES+=("$CURRENT_TEST")
@@ -494,7 +510,38 @@ scenario_refresh_updates_cache() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 16: SQLite sidecar orphan detection - .db-wal present, .db absent.
+# Scenario 16: refreshing the ps snapshot must also invalidate the cached
+# pid->ppid map. Otherwise repo-gate ancestor exclusion can reuse stale
+# lineage and flag the current lane's own parent helper as foreign.
+# ---------------------------------------------------------------------------
+scenario_refresh_invalidates_ppid_map() {
+  start_test "stale_scan_refresh_ps invalidates cached pid->ppid map"
+  stale_scan_refresh_ps
+  local _unused
+  _unused="$(stale_scan_parent_pid "$$")"
+
+  pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
+  # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
+  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  local sibling_pid=$!
+  popd >/dev/null || { fail "popd failed"; return; }
+  SPAWNED_PIDS+=("$sibling_pid")
+  wait_for_pid_registered "$sibling_pid" || { fail "sibling pid never registered"; return; }
+  sleep 0.3
+
+  stale_scan_refresh_ps
+  local sibling_parent
+  sibling_parent="$(stale_scan_parent_pid "$sibling_pid")"
+  if [[ -z "$sibling_parent" ]]; then
+    fail "refreshed ppid map did not include sibling pid $sibling_pid"
+    return
+  fi
+
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 17: SQLite sidecar orphan detection - .db-wal present, .db absent.
 # ---------------------------------------------------------------------------
 scenario_orphan_wal() {
   start_test "orphan harness.db-wal detected when harness.db is gone"
@@ -509,7 +556,7 @@ scenario_orphan_wal() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 17: SQLite sidecar orphan detection - .db-shm present, .db absent.
+# Scenario 18: SQLite sidecar orphan detection - .db-shm present, .db absent.
 # ---------------------------------------------------------------------------
 scenario_orphan_shm() {
   start_test "orphan harness.db-shm detected when harness.db is gone"
@@ -524,7 +571,7 @@ scenario_orphan_shm() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 18: sidecars alongside a live harness.db are NOT flagged. The DB
+# Scenario 19: sidecars alongside a live harness.db are NOT flagged. The DB
 # is the source of truth; sidecars are normal WAL-mode companions.
 # ---------------------------------------------------------------------------
 scenario_sidecars_with_db_noop() {
@@ -545,7 +592,7 @@ scenario_sidecars_with_db_noop() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 19: nonexistent daemon root is a clean no-op (never errors).
+# Scenario 20: nonexistent daemon root is a clean no-op (never errors).
 # ---------------------------------------------------------------------------
 scenario_orphan_sidecar_missing_root() {
   start_test "sidecar scan on missing root is a no-op"
@@ -792,7 +839,45 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 28: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
+# Scenario 28: parentless xcodebuild wrapper without surviving lease metadata
+# is detected as a stale orphan.
+# ---------------------------------------------------------------------------
+scenario_orphan_monitor_wrapper_detected() {
+  start_test "parentless xcodebuild wrapper without lease metadata is detected"
+  local derived_data_path="$SANDBOX/orphan-derived"
+  mkdir -p "$derived_data_path"
+
+  _stale_scan_ps_snapshot=$'12345 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ppid_map=""
+
+  local pids
+  pids="$(stale_scan_orphan_monitor_wrapper_pids)"
+  assert_in_list "12345" "orphan monitor wrapper pid" "$pids" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 29: parentless xcodebuild wrapper with live owner metadata is not
+# treated as stale just because its parent is gone.
+# ---------------------------------------------------------------------------
+scenario_monitor_wrapper_with_owner_metadata_not_flagged() {
+  start_test "parentless xcodebuild wrapper with owner lease metadata is not flagged"
+  local derived_data_path="$SANDBOX/live-owner-derived"
+  mkdir -p "$derived_data_path/.xcodebuild.lock/owner"
+  cat >"$derived_data_path/.xcodebuild.lock/owner/lease.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_PID=22334
+EOF
+
+  _stale_scan_ps_snapshot=$'22334 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ppid_map=""
+
+  local pids
+  pids="$(stale_scan_orphan_monitor_wrapper_pids)"
+  assert_not_in_list "22334" "live owner wrapper pid" "$pids" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
 # planted marker disappears. The "exit 0" happy-path end-state is only
 # reachable when no other pollution exists, which is not the case mid-suite;
 # we assert the invariants we control (marker gone, autoclean banner, fake
@@ -814,7 +899,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if [[ -e "$marker" ]]; then
@@ -837,7 +922,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 29: HARNESS_CHECK_AUTOCLEAN=1 - pollution the stub clean cannot
+# Scenario 31: HARNESS_CHECK_AUTOCLEAN=1 - pollution the stub clean cannot
 # resolve still fails the gate with exit 1.
 # ---------------------------------------------------------------------------
 scenario_autoclean_unresolved_still_fails() {
@@ -855,7 +940,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -874,7 +959,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 when clean script exits nonzero.
+# Scenario 32: HARNESS_CHECK_AUTOCLEAN=1 when clean script exits nonzero.
 # ---------------------------------------------------------------------------
 scenario_autoclean_clean_script_fails() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 surfaces clean-script failure"
@@ -891,7 +976,7 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -906,7 +991,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 31: baseline e2e without HARNESS_CHECK_AUTOCLEAN - planted artifact
+# Scenario 33: baseline e2e without HARNESS_CHECK_AUTOCLEAN - planted artifact
 # still fails the gate (regression check after autoclean plumbing).
 # ---------------------------------------------------------------------------
 scenario_end_to_end_without_autoclean() {
@@ -916,7 +1001,7 @@ scenario_end_to_end_without_autoclean() {
   TMP_MARKERS+=("$marker")
 
   local output status=0
-  output="$(env -u HARNESS_CHECK_AUTOCLEAN HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 \
+  output="$(env -u HARNESS_CHECK_AUTOCLEAN \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
@@ -931,7 +1016,7 @@ scenario_end_to_end_without_autoclean() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 32: congestion + autoclean - plant multiple /tmp artifacts; fake
+# Scenario 34: congestion + autoclean - plant multiple /tmp artifacts; fake
 # clean removes one; final report must list the remaining two and NOT the
 # cleaned one.
 # ---------------------------------------------------------------------------
@@ -954,37 +1039,39 @@ EOF
   chmod +x "$clean_script"
 
   local output status=0
-  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
+  output="$(HARNESS_CHECK_AUTOCLEAN=1 HARNESS_CHECK_CLEAN_SCRIPT="$clean_script" \
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
     fail "expected exit 1 after partial autoclean; got $status"
     return
   fi
-  # Final 'error: dev state is stale' block must list b and c and NOT a.
-  local tail_output
-  tail_output="$(awk '/^error: dev state is stale$/ { show = 1 } show { print }' <<<"$output" | tail -n 60)"
-  if grep -Fq -- "$a" <<<"$tail_output"; then
+  # Final 'error: dev state is stale' block must list b and c and NOT a. Parse
+  # only the last stale block so unrelated ambient pollution does not evict the
+  # markers we care about from a fixed-size tail window.
+  local final_block
+  final_block="$(last_stale_block <<<"$output")"
+  if grep -Fq -- "$a" <<<"$final_block"; then
     fail "$a was not cleaned: final block still lists it"
     return
   fi
   local ok=1
-  grep -Fq -- "$b" <<<"$tail_output" || ok=0
-  grep -Fq -- "$c" <<<"$tail_output" || ok=0
+  grep -Fq -- "$b" <<<"$final_block" || ok=0
+  grep -Fq -- "$c" <<<"$final_block" || ok=0
   if (( ok )); then
     pass
   else
-    fail "expected remaining markers in final block: $tail_output"
+    fail "expected remaining markers in final block: $final_block"
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 33: HARNESS_CHECK_AUTOCLEAN=1 must refuse to auto-clean when the
-# checkout is busy with live repo-local gate helpers. That state is contention,
-# not stale pollution, so the gate should fail without invoking clean:stale.
+# Scenario 35: live repo-local gate helpers are not stale pollution, but they
+# must still block auto-clean so shared repo state is not reset under active
+# build/check workers.
 # ---------------------------------------------------------------------------
-scenario_autoclean_refuses_live_repo_gate_helpers() {
-  start_test "HARNESS_CHECK_AUTOCLEAN=1 refuses to auto-clean live repo gate helpers"
+scenario_autoclean_blocks_on_live_repo_gate_helpers() {
+  start_test "HARNESS_CHECK_AUTOCLEAN=1 defers while live repo gate helpers run"
 
   pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
@@ -995,13 +1082,18 @@ scenario_autoclean_refuses_live_repo_gate_helpers() {
   wait_for_pid_registered "$sibling_pid" || { fail "sibling pid never registered"; return; }
   sleep 0.3
 
-  local clean_script="$SANDBOX/fake-clean-busy-$RUN_ID.sh"
-  local clean_marker="$SANDBOX/fake-clean-busy-$RUN_ID.was-run"
+  local marker="/tmp/h-bridge-TEST-$RUN_ID-live-helper.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local clean_script="$SANDBOX/fake-clean-live-helper-$RUN_ID.sh"
+  local clean_marker="$SANDBOX/fake-clean-live-helper-$RUN_ID.was-run"
   cat >"$clean_script" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 touch "$clean_marker"
-echo "fake clean should not run"
+rm -f "$marker"
+echo "fake clean ran with live helper present"
 EOF
   chmod +x "$clean_script"
 
@@ -1010,30 +1102,45 @@ EOF
     "$ROOT/scripts/check-no-stale-state.sh" 2>&1)" || status=$?
 
   if (( status != 1 )); then
-    fail "expected exit 1 for busy checkout; got $status (output: $output)"
+    fail "expected exit 1 when autoclean is blocked by a live helper; got $status (output: $output)"
     return
   fi
   if [[ -e "$clean_marker" ]]; then
-    fail "fake clean ran despite busy repo gate helper"
+    fail "fake clean ran despite live helper contention"
     return
   fi
-  if ! grep -Fq -- "auto-clean refused because live processes still own repo state" <<<"$output"; then
-    fail "expected busy-checkout refusal message; output: $output"
+  if [[ ! -e "$marker" ]]; then
+    fail "marker disappeared even though autoclean should have been blocked"
     return
   fi
-  if ! grep -Fq -- "repo-local gate helpers still running" <<<"$output"; then
-    fail "expected repo gate helper blocker listed; output: $output"
+  if ! grep -Fq -- "auto-clean blocked while repo-local gate helpers are still running" <<<"$output"; then
+    fail "expected auto-clean block message; output: $output"
     return
   fi
-  if grep -Fq -- "fake clean should not run" <<<"$output"; then
-    fail "unexpected fake clean output surfaced: $output"
+  if ! grep -Fq -- "repo-local gate helpers still running:" <<<"$output"; then
+    fail "expected live helper block; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "$sibling_pid" <<<"$output"; then
+    fail "expected live helper pid in output; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "$marker" <<<"$output"; then
+    fail "expected stale marker to remain listed after blocked autoclean; output: $output"
+    return
+  fi
+
+  local final_block
+  final_block="$(last_stale_block <<<"$output")"
+  if grep -Fq -- "repo-local gate helpers still running:" <<<"$final_block"; then
+    fail "repo-local gate helper leaked into stale pollution block: $final_block"
     return
   fi
   pass
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 34: swarm e2e worktree parser only reports branches created by the
+# Scenario 36: swarm e2e worktree parser only reports branches created by the
 # full-flow e2e harness. User/session worktrees under harness/* are preserved.
 # ---------------------------------------------------------------------------
 scenario_swarm_e2e_worktree_parser() {
@@ -1053,7 +1160,7 @@ scenario_swarm_e2e_worktree_parser() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 35: clean-stale swarm cleanup must noop cleanly when no e2e-owned
+# Scenario 37: clean-stale swarm cleanup must noop cleanly when no e2e-owned
 # worktrees or branches are present. The production script runs under `set -u`,
 # so empty arrays must be length-guarded before "${arr[@]}" iteration.
 # ---------------------------------------------------------------------------
@@ -1105,6 +1212,7 @@ run_all() {
   scenario_clean_tmp_removal_is_idempotent
   scenario_installed_not_in_build_bucket
   scenario_refresh_updates_cache
+  scenario_refresh_invalidates_ppid_map
   scenario_orphan_wal
   scenario_orphan_shm
   scenario_sidecars_with_db_noop
@@ -1117,12 +1225,14 @@ run_all() {
   scenario_harness_ws_listener_not_flagged
   scenario_codex_ws_port_env
   scenario_codex_app_server_listener_detected
+  scenario_orphan_monitor_wrapper_detected
+  scenario_monitor_wrapper_with_owner_metadata_not_flagged
   scenario_autoclean_success
   scenario_autoclean_unresolved_still_fails
   scenario_autoclean_clean_script_fails
   scenario_end_to_end_without_autoclean
   scenario_autoclean_congestion_partial
-  scenario_autoclean_refuses_live_repo_gate_helpers
+  scenario_autoclean_blocks_on_live_repo_gate_helpers
   scenario_swarm_e2e_worktree_parser
   scenario_swarm_e2e_cleanup_empty_lists
 }

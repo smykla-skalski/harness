@@ -296,9 +296,12 @@ cat
                 env=env,
             )
 
-            lock_file = derived_data_path / ".xcodebuild.lock"
-            self.wait_for_path(lock_file)
-            self.assertTrue(lock_file.is_file(), "test-swift must publish the shared lock as a PID file")
+            lock_owner_file = derived_data_path / ".xcodebuild.lock" / "owner" / "lease.env"
+            self.wait_for_path(lock_owner_file)
+            self.assertTrue(
+                lock_owner_file.is_file(),
+                "test-swift must publish shared lease owner metadata",
+            )
             self.wait_for_path(child_pid_path)
 
             child_pid = int(child_pid_path.read_text().strip())
@@ -306,7 +309,10 @@ cat
             stdout, stderr = process.communicate(timeout=10)
 
             self.assertEqual(process.returncode, 143, stdout + stderr)
-            self.assertFalse(lock_file.exists(), "test-swift must not leave the shared xcodebuild lock behind")
+            self.assertFalse(
+                lock_owner_file.exists(),
+                "test-swift must not leave shared lease owner metadata behind",
+            )
             with self.assertRaises(ProcessLookupError):
                 os.kill(child_pid, 0)
 

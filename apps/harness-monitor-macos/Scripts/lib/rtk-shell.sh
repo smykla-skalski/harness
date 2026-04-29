@@ -34,6 +34,46 @@ run_tuist_xcodebuild_command() {
   )
 }
 
+launch_xcodebuild_command_capture() {
+  local captured_log_path="$1"
+  shift
+  local use_tuist="$1"
+  shift
+  RUN_XCODEBUILD_CAPTURE_PID=""
+
+  if (( use_tuist == 1 )); then
+    local app_root="${HARNESS_MONITOR_APP_ROOT:-}"
+    local tuist_bin
+    if [[ -z "$app_root" || ! -d "$app_root" ]]; then
+      echo "launch_xcodebuild_command_capture: HARNESS_MONITOR_APP_ROOT is not set or missing" >&2
+      return 1
+    fi
+    tuist_bin="$(type -P tuist || true)"
+    if [[ -z "$tuist_bin" ]]; then
+      echo "launch_xcodebuild_command_capture: tuist is required for all Harness Monitor xcodebuild wrapper lanes; pin it in .mise.toml" >&2
+      return 127
+    fi
+
+    (
+      cd "$app_root" || exit 1
+      exec env \
+        -u SWIFT_DEBUG_INFORMATION_FORMAT \
+        -u SWIFT_DEBUG_INFORMATION_VERSION \
+        "$tuist_bin" xcodebuild "$@"
+    ) >"$captured_log_path" 2>&1 &
+    RUN_XCODEBUILD_CAPTURE_PID="$!"
+    return 0
+  fi
+
+  local xcodebuild_bin="${XCODEBUILD_BIN:-/usr/bin/xcodebuild}"
+  if [[ ! -x "$xcodebuild_bin" ]]; then
+    echo "xcodebuild binary is not executable: $xcodebuild_bin" >&2
+    return 127
+  fi
+  "$xcodebuild_bin" "$@" >"$captured_log_path" 2>&1 &
+  RUN_XCODEBUILD_CAPTURE_PID="$!"
+}
+
 xcbeautify_is_disabled() {
   case "${HARNESS_MONITOR_DISABLE_XCBEAUTIFY:-}" in
     1|true|TRUE|yes|YES|on|ON) return 0 ;;
@@ -55,6 +95,9 @@ run_xcodebuild_with_formatter() {
   local junit_path=""
   local use_tuist=0
   local raw_log_path="${XCODEBUILD_RAW_LOG_PATH:-}"
+  local captured_log_path=""
+  local cleanup_captured_log=0
+  local xcodebuild_pid xcodebuild_status formatter_status
   while (( $# > 0 )); do
     case "$1" in
       --junit-path)
@@ -73,10 +116,26 @@ run_xcodebuild_with_formatter() {
     esac
   done
 
-  local invoker=run_xcodebuild_command
-  if (( use_tuist == 1 )); then
-    invoker=run_tuist_xcodebuild_command
+  if [[ -n "$raw_log_path" ]]; then
+    captured_log_path="$raw_log_path"
+  else
+    captured_log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-xcodebuild.XXXXXX.log")"
+    cleanup_captured_log=1
   fi
+
+  if ! launch_xcodebuild_command_capture "$captured_log_path" "$use_tuist" "$@"; then
+    local launch_status="$?"
+    if (( cleanup_captured_log == 1 )); then
+      /bin/rm -f "$captured_log_path"
+    fi
+    return "$launch_status"
+  fi
+  xcodebuild_pid="$RUN_XCODEBUILD_CAPTURE_PID"
+
+  set +e
+  wait "$xcodebuild_pid"
+  xcodebuild_status="$?"
+  set -e
 
   if ! xcbeautify_is_disabled && command -v xcbeautify >/dev/null 2>&1; then
     local -a xcb_args=(--renderer terminal --is-ci --disable-logging)
@@ -84,24 +143,22 @@ run_xcodebuild_with_formatter() {
       /bin/mkdir -p "$(dirname "$junit_path")"
       xcb_args+=(--report junit --report-path "$junit_path")
     fi
-    set -o pipefail
-    if [[ -n "$raw_log_path" ]]; then
-      "$invoker" "$@" 2>&1 | tee "$raw_log_path" | xcbeautify "${xcb_args[@]}"
-    else
-      "$invoker" "$@" 2>&1 | xcbeautify "${xcb_args[@]}"
+    set +e
+    xcbeautify "${xcb_args[@]}" <"$captured_log_path"
+    formatter_status="$?"
+    set -e
+    if (( formatter_status != 0 )); then
+      cat "$captured_log_path"
     fi
-    local status="${PIPESTATUS[0]}"
-    set +o pipefail
-    return "$status"
+  else
+    cat "$captured_log_path"
   fi
-  if [[ -n "$raw_log_path" ]]; then
-    set -o pipefail
-    "$invoker" "$@" 2>&1 | tee "$raw_log_path"
-    local status="${PIPESTATUS[0]}"
-    set +o pipefail
-    return "$status"
+
+  if (( cleanup_captured_log == 1 )); then
+    /bin/rm -f "$captured_log_path"
   fi
-  "$invoker" "$@"
+
+  return "$xcodebuild_status"
 }
 
 # Returns 0 when the xcodebuild arg list contains a test action, 1 otherwise.
