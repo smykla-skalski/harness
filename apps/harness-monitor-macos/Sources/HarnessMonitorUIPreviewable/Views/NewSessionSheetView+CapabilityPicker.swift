@@ -107,7 +107,9 @@ struct NewSessionRuntimeStatusSection: View {
 
       runtimeBlock(
         title: "Needs install",
-        help: "Install these providers to enable filesystem + terminal tools."
+        help: installRequiredOptions.isEmpty
+          ? ""
+          : "Install these providers to enable filesystem + terminal tools."
       ) {
         if installRequiredOptions.isEmpty {
           Text("All detected providers are install-ready.")
@@ -135,9 +137,11 @@ struct NewSessionRuntimeStatusSection: View {
         Text(title)
           .scaledFont(.caption.bold())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(help)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        if !help.isEmpty {
+          Text(help)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
       }
       content()
     }
@@ -201,6 +205,8 @@ private struct NewSessionRuntimeStatusRow: View {
               selection = recommendedSelection
             }
             .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+            .accessibilityLabel("Use \(option.title) as preferred leader")
+            .accessibilityHint(option.statusText)
           }
         }
       }
@@ -213,6 +219,10 @@ private struct NewSessionRuntimeStatusRow: View {
             }
           }
           .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+          .accessibilityLabel(
+            "\(showDiagnostics ? "Hide" : "Show") diagnostics for \(option.title)"
+          )
+          .accessibilityHint(option.statusText)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id)
           )
