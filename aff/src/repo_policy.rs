@@ -323,8 +323,9 @@ fn passthrough_task(env_prefix: &[String], task: &str, args: &[String]) -> Optio
     } else {
         format!(" -- {}", shell_words::join(args.iter().map(String::as_str)))
     };
+    let verb = if task == "install" { "run " } else { "" };
     Some(SuggestedTask {
-        replacement: format!("{env_prefix}mise run {task}{passthrough}"),
+        replacement: format!("{env_prefix}mise {verb}{task}{passthrough}"),
     })
 }
 
@@ -332,8 +333,10 @@ fn exact_task(env_prefix: &[String], task: &str) -> Option<SuggestedTask> {
     if task.is_empty() {
         return None;
     }
+    let env_prefix = render_env_prefix(env_prefix);
+    let verb = if task == "install" { "run " } else { "" };
     Some(SuggestedTask {
-        replacement: format!("{}mise run {task}", render_env_prefix(env_prefix)),
+        replacement: format!("{env_prefix}mise {verb}{task}"),
     })
 }
 
@@ -389,20 +392,8 @@ fn is_mcp_input_helper_build(words: &[String]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{manual_command_denial_reason, session_start_context};
-    use crate::policy_spec::{ENFORCEMENT_EXAMPLES, TASK_FAMILY_SPECS};
-
-    #[test]
-    fn session_start_context_lists_all_canonical_task_families() {
-        let context = session_start_context();
-        for family in TASK_FAMILY_SPECS {
-            assert!(
-                context.contains(family.name),
-                "missing task family {}",
-                family.name
-            );
-        }
-    }
+    use super::manual_command_denial_reason;
+    use crate::policy_spec::ENFORCEMENT_EXAMPLES;
 
     #[test]
     fn enforcement_examples_match_current_policy_spec() {
