@@ -26,67 +26,108 @@ public struct DecisionDetailView: View {
   private var dateTimeConfiguration
 
   @Binding private var selectedTab: DecisionDetailTab
+  @AccessibilityFocusState private var focusedPrimaryActionDecisionID: String?
+  @State private var handledPrimaryActionFocusTick = 0
 
   private let viewModel: DecisionDetailViewModel?
+  private let store: HarnessMonitorStore?
   private let auditEvents: [SupervisorEvent]
   private let observer: ObserverSummary?
+  private let primaryActionFocusDecisionID: String?
+  private let primaryActionFocusRequestTick: Int
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
-    observer: ObserverSummary? = nil
+    observer: ObserverSummary? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
   ) {
     viewModel = nil
+    store = nil
     auditEvents = []
     self.observer = observer
+    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
+    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
     _selectedTab = selectedTab
   }
 
   public init(
     viewModel: DecisionDetailViewModel,
+    store: HarnessMonitorStore? = nil,
     auditEvents: [SupervisorEvent] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
-    observer: ObserverSummary? = nil
+    observer: ObserverSummary? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
   ) {
     self.viewModel = viewModel
+    self.store = store
     self.auditEvents = auditEvents
     self.observer = observer
+    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
+    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
     _selectedTab = selectedTab
   }
 
   public init(
     decision: Decision,
+    store: HarnessMonitorStore? = nil,
     handler: any DecisionActionHandler = NullDecisionActionHandler(),
     auditEvents: [SupervisorEvent] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
-    observer: ObserverSummary? = nil
+    observer: ObserverSummary? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
+      store: store,
       auditEvents: auditEvents,
       selectedTab: selectedTab,
-      observer: observer
+      observer: observer,
+      primaryActionFocusDecisionID: primaryActionFocusDecisionID,
+      primaryActionFocusRequestTick: primaryActionFocusRequestTick
     )
   }
 
   public var body: some View {
     Group {
-      if let viewModel {
-        populatedBody(viewModel)
-          .sheet(item: snoozeBinding(for: viewModel)) { _ in
-            DecisionSnoozeSheet(viewModel: viewModel)
-          }
-      } else {
-        emptyState
-      }
+      detailBody
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .backgroundExtensionEffect()
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        detailTabPicker
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .backgroundExtensionEffect()
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
+      .toolbar {
+        ToolbarItem(placement: .principal) {
+          detailTabPicker
+        }
       }
+      .overlay {
+        if let viewModel {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.decisionPrimaryActionFocusState,
+            text: focusMarkerValue(for: viewModel)
+          )
+        }
+      }
+      .onAppear {
+        applyPrimaryActionFocusIfNeeded()
+      }
+      .onChange(of: primaryActionFocusRequestTick) { _, _ in
+        applyPrimaryActionFocusIfNeeded()
+      }
+  }
+
+  @ViewBuilder
+  private var detailBody: some View {
+    if let viewModel {
+      populatedBody(viewModel)
+        .sheet(item: snoozeBinding(for: viewModel)) { _ in
+          DecisionSnoozeSheet(viewModel: viewModel)
+        }
+    } else {
+      emptyState
     }
   }
 
@@ -187,8 +228,14 @@ public struct DecisionDetailView: View {
     ) {
       await viewModel.invoke(action: action)
     }
+    .disabled(isActionDisabled(action, viewModel: viewModel))
     if isPrimary {
-      button.keyboardShortcut(.defaultAction)
+      button
+        .keyboardShortcut(.defaultAction)
+        .accessibilityFocused(
+          $focusedPrimaryActionDecisionID,
+          equals: viewModel.decision.id
+        )
     } else if action.kind == .dismiss {
       button.keyboardShortcut(".", modifiers: [.command])
     } else {
@@ -200,7 +247,11 @@ public struct DecisionDetailView: View {
   private func detailTabs(_ viewModel: DecisionDetailViewModel) -> some View {
     switch selectedTab {
     case .context:
-      DecisionContextPanel(sections: viewModel.contextSections)
+      if let payload = resolvedAcpPayload(for: viewModel) {
+        AcpPermissionDecisionDetailView(payload: payload, store: store)
+      } else {
+        DecisionContextPanel(sections: viewModel.contextSections)
+      }
     case .audit:
       DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
     }
@@ -231,6 +282,60 @@ public struct DecisionDetailView: View {
       }
       return nil
     }
+  }
+
+  private func resolvedAcpPayload(
+    for viewModel: DecisionDetailViewModel
+  ) -> AcpPermissionDecisionPayload? {
+    guard viewModel.decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
+      return nil
+    }
+    return store?.acpPermissionDecisionPayload(for: viewModel.decision.id)
+      ?? AcpPermissionDecisionPayload.decode(from: viewModel.decision)
+  }
+
+  private func isActionDisabled(
+    _ action: SuggestedAction,
+    viewModel: DecisionDetailViewModel
+  ) -> Bool {
+    guard let payload = resolvedAcpPayload(for: viewModel) else {
+      return false
+    }
+    let resolutionState = store?.acpPermissionResolutionState(for: payload.decisionID)
+      ?? payload.defaultResolutionState
+    if resolutionState.isSubmitting
+      || store?.resolvingAcpPermissionBatchID == payload.rawBatch.batchId
+    {
+      return true
+    }
+    return payload.isActionDisabled(action.id, resolutionState: resolutionState)
+  }
+
+  private func applyPrimaryActionFocusIfNeeded() {
+    guard let viewModel,
+      primaryActionFocusDecisionID == viewModel.decision.id,
+      primaryActionFocusRequestTick != 0,
+      primaryActionFocusRequestTick != handledPrimaryActionFocusTick,
+      viewModel.primaryActionID != nil
+    else {
+      return
+    }
+    handledPrimaryActionFocusTick = primaryActionFocusRequestTick
+    selectedTab = .context
+    focusedPrimaryActionDecisionID = nil
+    Task { @MainActor in
+      await Task.yield()
+      focusedPrimaryActionDecisionID = viewModel.decision.id
+    }
+  }
+
+  private func focusMarkerValue(for viewModel: DecisionDetailViewModel) -> String {
+    let isFocused = focusedPrimaryActionDecisionID == viewModel.decision.id
+    return [
+      "decision=\(viewModel.decision.id)",
+      "focused=\(isFocused)",
+      "tick=\(handledPrimaryActionFocusTick)",
+    ].joined(separator: " ")
   }
 }
 

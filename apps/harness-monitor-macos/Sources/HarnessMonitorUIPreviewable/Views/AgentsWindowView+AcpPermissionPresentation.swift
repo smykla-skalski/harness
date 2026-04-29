@@ -12,15 +12,9 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content.sheet(item: acpPermissionBatchBinding) { batch in
-      AcpPermissionModal(
-        batch: batch,
-        isResolving: store.resolvingAcpPermissionBatchID == batch.batchId
-      ) { decision in
-        Task {
-          await store.resolveAcpPermission(batch: batch, decision: decision)
-        }
-      }
-      .interactiveDismissDisabled(true)
+      let payload = store.acpPermissionDecisionPayload(for: batch)
+      AcpPermissionModal(store: store, batch: batch)
+        .interactiveDismissDisabled(payload.isRenderable)
     }
   }
 
@@ -28,9 +22,7 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
     Binding {
       store.presentingAcpPermissionBatch
     } set: { batch in
-      if let batch {
-        store.presentingAcpPermissionBatch = batch
-      }
+      store.presentingAcpPermissionBatch = batch
     }
   }
 }

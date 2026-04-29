@@ -330,6 +330,42 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func resolveManagedAcpPermission(
+    agentID: String,
+    batchID: String,
+    decision: AcpPermissionDecision
+  ) async throws -> ManagedAgentSnapshot {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(
+      .resolveAcpPermission(
+        agentID: agentID,
+        batchID: batchID,
+        decision: decision
+      )
+    )
+    if let snapshot = lock.withLock({ resolvedAcpSnapshotsByAgentID[agentID] }) {
+      return .acp(snapshot)
+    }
+    return .acp(
+      AcpAgentSnapshot(
+        acpId: agentID,
+        sessionId: detail.session.sessionId,
+        agentId: agentID,
+        displayName: agentID,
+        status: .active,
+        pid: 12_345,
+        pgid: 12_345,
+        projectDir: "/tmp/project",
+        pendingPermissions: 0,
+        permissionQueueDepth: 0,
+        pendingPermissionBatches: [],
+        terminalCount: 0,
+        createdAt: "2026-04-28T00:00:00Z",
+        updatedAt: "2026-04-28T00:00:00Z"
+      )
+    )
+  }
+
   func applyImproverPatch(
     sessionID: String,
     request: ImproverApplyRequest

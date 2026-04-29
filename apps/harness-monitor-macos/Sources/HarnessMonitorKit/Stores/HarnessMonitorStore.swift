@@ -74,6 +74,10 @@ public final class HarnessMonitorStore {
   var standaloneAcpPermissionBatches: [AcpPermissionBatch] = []
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
   public var resolvingAcpPermissionBatchID: String?
+  public var acpPermissionResolutionStateByDecisionID: [String: BatchResolutionState] = [:]
+  @ObservationIgnored var acpPermissionDecisionPayloadsByDecisionID: [String: AcpPermissionDecisionPayload] =
+    [:]
+  @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }

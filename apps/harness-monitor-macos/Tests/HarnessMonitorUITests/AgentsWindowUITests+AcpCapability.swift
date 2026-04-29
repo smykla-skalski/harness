@@ -106,6 +106,17 @@ extension AgentsWindowUITests {
         timeout: Self.actionTimeout
       )
     )
+
+    let approveSelected = button(in: app, title: "Approve Selected")
+    XCTAssertTrue(waitForElement(approveSelected, timeout: Self.actionTimeout))
+    approveSelected.tap()
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        !modal.exists
+      },
+      "Approving the coalesced ACP batch should dismiss the compatibility modal"
+    )
   }
 
   func testDecisionPanelAndModalShareSelectionState() throws {
@@ -132,23 +143,36 @@ extension AgentsWindowUITests {
     )
     XCTAssertTrue(waitForElement(terminalToggle, timeout: Self.actionTimeout))
     tapElement(in: app, identifier: Accessibility.decisionAcpRequest("preview-request-terminal"))
-
-    let selectionSummary = element(in: app, identifier: Accessibility.decisionAcpSelectionSummary)
+    let decisionSelectionSummary = element(
+      in: app,
+      identifier: Accessibility.decisionAcpSelectionSummary
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        selectionSummary.exists && selectionSummary.label.contains("1 of 2 selected")
-      }
+        decisionSelectionSummary.exists && decisionSelectionSummary.label.contains("1 of 2 selected")
+      },
+      """
+      The Decisions panel should reflect the updated ACP selection \
+      (summaryLabel=\(decisionSelectionSummary.label), toggleValue=\(String(describing: terminalToggle.value)))
+      """
     )
 
     openAgentsWindow(in: app)
 
     let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
     XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
+    let modalSelectionSummary = element(
+      in: app,
+      identifier: Accessibility.acpPermissionModalSelectionSummary
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        selectionSummary.exists && selectionSummary.label.contains("1 of 2 selected")
+        modalSelectionSummary.exists && modalSelectionSummary.label.contains("1 of 2 selected")
       },
-      "The legacy ACP modal should mirror the shared selection state from the Decisions window"
+      """
+      The legacy ACP modal should mirror the shared selection state from the Decisions window \
+      (summaryLabel=\(modalSelectionSummary.label))
+      """
     )
   }
 }
