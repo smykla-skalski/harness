@@ -45,7 +45,7 @@ impl HookAgent {
                 .join(".github")
                 .join("hooks")
                 .join("harness.json"),
-            Self::Codex => project_dir.join(".codex").join("config.toml"),
+            Self::Codex => project_dir.join(".codex").join("hooks.json"),
             Self::Gemini => project_dir.join(".gemini").join("settings.json"),
             Self::Vibe => project_dir.join(".vibe").join("hooks.json"),
             Self::OpenCode => project_dir.join(".opencode").join("hooks.json"),

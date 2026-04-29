@@ -28,7 +28,7 @@ pub fn sync_runtime_configs(
         let path = agent.config_path(project_dir);
         let current = fs::read_to_string(&path).map_err(|error| {
             format!(
-                "expected harness-generated runtime config at {} before aff patching: {error}",
+                "expected existing runtime config at {} before aff patching: {error}",
                 path.display()
             )
         })?;
@@ -58,7 +58,7 @@ pub fn sync_runtime_configs(
             .collect::<Vec<_>>()
             .join("\n");
         return Err(format!(
-            "aff runtime config drift detected:\n{paths}\nRerun `aff setup agents generate` after the harness setup step."
+            "aff runtime config drift detected:\n{paths}\nRerun `aff setup agents generate` to reapply the aff-owned hook patch."
         ));
     }
 
@@ -66,10 +66,6 @@ pub fn sync_runtime_configs(
 }
 
 fn patch_runtime_config(agent: HookAgent, current: &str) -> Result<String, String> {
-    if agent == HookAgent::Codex {
-        return Ok(current.to_string());
-    }
-
     let mut root: Value = serde_json::from_str(current)
         .map_err(|error| format!("invalid runtime config JSON: {error}"))?;
 
@@ -77,7 +73,9 @@ fn patch_runtime_config(agent: HookAgent, current: &str) -> Result<String, Strin
         HookAgent::Claude => {
             patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", None)
         }
-        HookAgent::Codex => unreachable!("handled before JSON parsing"),
+        HookAgent::Codex => {
+            patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", Some(10))
+        }
         HookAgent::Gemini => {
             patch_nested_hook_config(&mut root, agent, "BeforeTool", "SessionStart", Some(5000))
         }
