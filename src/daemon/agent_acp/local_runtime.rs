@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use serde::Serialize;
 use uuid::Uuid;
@@ -20,7 +20,9 @@ use super::active::{
     ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
     spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
 };
-use super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, PERMISSION_RESPONSE_DEADLINE};
+use super::manager::{
+    AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, PERMISSION_RESPONSE_DEADLINE,
+};
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
 use super::protocol::spawn_protocol_task;
@@ -41,7 +43,7 @@ impl AcpAgentManagerHandle {
             working_dir: project_dir.clone(),
         };
         let process_key =
-            AcpProcessPoolKey::from_spawn_inputs(descriptor, request, &spawn, &project_dir);
+            AcpProcessPoolKey::from_spawn_inputs(descriptor, request, session_id, &spawn, &project_dir);
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
@@ -62,7 +64,7 @@ impl AcpAgentManagerHandle {
         let protocol = spawn_protocol_task(
             &mut child,
             request,
-            session_id.to_string(),
+            session_id,
             descriptor.display_name.clone(),
             project_dir.clone(),
             &supervisor,
