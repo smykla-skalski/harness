@@ -70,10 +70,6 @@ impl AcpAgentManagerHandle {
         bridge.acp_list(session_id)
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "bridge availability and fallback-empty inspect are handled inline for clarity"
-    )]
     pub(super) fn inspect_via_bridge(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
         let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
             Ok(bridge) => bridge,
