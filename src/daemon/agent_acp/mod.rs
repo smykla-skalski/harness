@@ -23,6 +23,7 @@ mod local_runtime;
 mod manager;
 mod permission_bridge;
 mod pool_key;
+mod prompt_gate;
 mod protocol;
 mod sandbox_proxy;
 

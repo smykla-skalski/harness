@@ -87,6 +87,17 @@ impl ActiveAcpSession {
             .attach_protocol_session(acp_id, session_id, project_dir)
     }
 
+    pub(super) fn prompt_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        project_dir: PathBuf,
+        prompt: String,
+    ) -> Result<String, String> {
+        self.process
+            .prompt_protocol_session(acp_id, session_id, project_dir, prompt)
+    }
+
     pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
         self.process.set_protocol_disconnect_task(task);
     }
