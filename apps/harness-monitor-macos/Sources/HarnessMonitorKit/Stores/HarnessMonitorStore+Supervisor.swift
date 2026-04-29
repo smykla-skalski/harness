@@ -31,6 +31,7 @@ private final class SupervisorStack {
 
 final class SupervisorBindings {
   weak var notificationController: HarnessMonitorUserNotificationController?
+  var pendingDecisionsBadgeSync: (@MainActor (Int) -> Void)?
 }
 
 private enum SupervisorStackKey {
@@ -116,6 +117,12 @@ extension HarnessMonitorStore {
         self.enqueueNotificationResolution(decisionID: decisionID, outcome: outcome)
       }
     }
+  }
+
+  public func bindPendingDecisionsBadgeSync(
+    _ sync: @escaping @MainActor (Int) -> Void
+  ) {
+    supervisorBindings.pendingDecisionsBadgeSync = sync
   }
 
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {
@@ -260,6 +267,7 @@ extension HarnessMonitorStore {
     supervisorToolbarSlice.stop()
     supervisorOpenDecisions = []
     supervisorSelectedDecisionID = nil
+    supervisorBindings.pendingDecisionsBadgeSync?(0)
     if let controller = supervisorBindings.notificationController {
       await controller.resetBadge()
     }
@@ -372,6 +380,7 @@ extension HarnessMonitorStore {
     }
     supervisorOpenDecisions = openDecisions
     supervisorToolbarSlice.refresh(counts: counts)
+    supervisorBindings.pendingDecisionsBadgeSync?(openDecisions.count)
     if let controller = supervisorBindings.notificationController {
       await controller.syncAppBadgeCount(openDecisions.count)
     }
