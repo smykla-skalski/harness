@@ -181,6 +181,16 @@ fn session_start_cli_emits_hook_output_json() {
 }
 
 #[test]
+fn cli_supports_top_level_version_flag() {
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(contains("aff "));
+}
+
+#[test]
 fn repo_policy_cli_blocks_manual_commands() {
     Command::cargo_bin("aff")
         .expect("aff binary")

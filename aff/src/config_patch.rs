@@ -183,10 +183,18 @@ fn patch_registration_config(
     let registrations = ensure_array(root_object, "registrations", "runtime registrations")?;
 
     registrations.retain(|entry| {
-        entry
-            .get("name")
+        let name = entry.get("name").and_then(Value::as_str).unwrap_or_default();
+        let event = entry
+            .get("event")
             .and_then(Value::as_str)
-            .is_none_or(|name| name != "aff-repo-policy" && name != "aff-session-start")
+            .unwrap_or_default();
+        let command = entry
+            .get("command")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let is_aff_owned = name == "aff-repo-policy" || name == "aff-session-start";
+        let is_legacy_pretool = event == "tool.execute.before" && command.contains("tool-guard");
+        !is_aff_owned && !is_legacy_pretool
     });
     if install_pretool_hooks {
         registrations.push(json!({
@@ -213,7 +221,9 @@ fn patch_nested_event(
     should_install: bool,
 ) -> Result<(), String> {
     let event_hooks = ensure_array(hooks, event_name, event_name)?;
-    event_hooks.retain(|entry| !nested_entry_matches_command(entry, command));
+    event_hooks.retain(|entry| {
+        !nested_entry_matches_command(entry, command) && !nested_entry_contains_tool_guard(entry)
+    });
     if !should_install {
         return Ok(());
     }
@@ -248,10 +258,15 @@ fn patch_copilot_event(
 ) -> Result<(), String> {
     let event_hooks = ensure_array(hooks, event_name, event_name)?;
     event_hooks.retain(|entry| {
-        entry
+        let same_command = entry
             .get("bash")
             .and_then(Value::as_str)
-            .is_none_or(|existing| existing != command)
+            .is_some_and(|existing| existing == command);
+        let legacy_tool_guard = entry
+            .get("bash")
+            .and_then(Value::as_str)
+            .is_some_and(|existing| existing.contains("tool-guard"));
+        !same_command && !legacy_tool_guard
     });
     if !should_install {
         return Ok(());
@@ -274,6 +289,19 @@ fn nested_entry_matches_command(entry: &Value, command: &str) -> bool {
                 hook.get("command")
                     .and_then(Value::as_str)
                     .is_some_and(|existing| existing == command)
+            })
+        })
+}
+
+fn nested_entry_contains_tool_guard(entry: &Value) -> bool {
+    entry
+        .get("hooks")
+        .and_then(Value::as_array)
+        .is_some_and(|hooks| {
+            hooks.iter().any(|hook| {
+                hook.get("command")
+                    .and_then(Value::as_str)
+                    .is_some_and(|existing| existing.contains("tool-guard"))
             })
         })
 }
