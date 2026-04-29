@@ -7,7 +7,9 @@ extension AgentsWindowView {
   }
 
   func openPendingDecisions(for agentID: String) {
-    store.selectOldestDecision(for: agentID)
+    if let decisionID = store.selectOldestDecision(for: agentID) {
+      store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+    }
     openWindow(id: HarnessMonitorWindowID.decisions)
   }
 }

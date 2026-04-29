@@ -93,6 +93,9 @@ public enum HarnessMonitorAccessibility {
     "harness.preferences.voice.pending-transcript-limit"
   public static let preferencesVoiceStatus = "harness.preferences.voice.status"
   public static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
+  public static let preferencesAcpNotificationStatus = "harness.preferences.acp.status"
+  public static let preferencesAcpNotificationStatusState = "harness.preferences.acp.status.state"
+  public static let preferencesAcpOpenSystemSettings = "harness.preferences.acp.open-system-settings"
   public static let preferencesNotificationsPresetPicker =
     "harness.preferences.notifications.preset"
   public static let preferencesNotificationsCategoryPicker =
@@ -122,6 +125,12 @@ public enum HarnessMonitorAccessibility {
   public static let actionToast = "harness.action-toast"
   public static let actionToastFrame = "harness.action-toast.frame"
   public static let actionToastCloseButton = "harness.action-toast.close"
+  public static let acpPermissionToast = "harness.acp-permission.toast"
+  public static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"
+  public static let acpPermissionToastState = "harness.acp-permission.toast.state"
+  public static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
+  public static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
+  public static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
   public static let sessionTimelinePagination = "harness.session.timeline.pagination"
   public static let sessionTimelinePageSizePicker =
     "harness.session.timeline.pagination.page-size"

@@ -123,10 +123,13 @@ public struct DecisionsWindowView: View {
     if let selectedDecision {
       DecisionDetailView(
         decision: selectedDecision,
+        store: store,
         handler: actionHandler,
         auditEvents: runtime.auditEvents,
         selectedTab: $detailTab,
-        observer: sessionObserver
+        observer: sessionObserver,
+        primaryActionFocusDecisionID: store?.supervisorPrimaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: store?.supervisorPrimaryActionFocusRequestTick ?? 0
       )
     } else {
       DecisionDetailView(selectedTab: $detailTab, observer: sessionObserver)
@@ -171,6 +174,13 @@ public struct DecisionsWindowView: View {
     .onChange(of: store?.supervisorObserverFocusTick ?? 0) { _, _ in
       selection = nil
       store?.supervisorSelectedDecisionID = nil
+    }
+    .onChange(of: store?.supervisorPrimaryActionFocusRequestTick ?? 0) { _, _ in
+      guard let requestedID = store?.supervisorPrimaryActionFocusDecisionID else {
+        return
+      }
+      selection = requestedID
+      detailTab = .context
     }
   }
 

@@ -66,21 +66,29 @@ extension HarnessMonitorUITestCase {
         app.activate()
       }
 
+      let frameMarker = element(in: app, identifier: "\(identifier).frame")
       let button = button(in: app, identifier: identifier)
       if waitForElement(button, timeout: Self.fastPollInterval) {
-        if tapElementReliably(in: app, element: button) {
+        if tapButtonElementReliably(in: app, element: button) {
+          return
+        }
+        if let coordinate = centerCoordinate(in: app, for: frameMarker) {
+          coordinate.tap()
           return
         }
       }
 
       let genericTarget = element(in: app, identifier: identifier)
       if waitForElement(genericTarget, timeout: Self.fastPollInterval) {
-        if tapElementReliably(in: app, element: genericTarget) {
+        if tapButtonElementReliably(in: app, element: genericTarget) {
+          return
+        }
+        if let coordinate = centerCoordinate(in: app, for: frameMarker) {
+          coordinate.tap()
           return
         }
       }
 
-      let frameMarker = element(in: app, identifier: "\(identifier).frame")
       if waitForElement(frameMarker, timeout: Self.fastPollInterval),
         let coordinate = centerCoordinate(in: app, for: frameMarker)
       {
@@ -104,7 +112,7 @@ extension HarnessMonitorUITestCase {
 
       let buttonTarget = button(in: app, title: title)
       if waitForElement(buttonTarget, timeout: Self.fastPollInterval) {
-        if tapElementReliably(in: app, element: buttonTarget) {
+        if tapButtonElementReliably(in: app, element: buttonTarget) {
           return
         }
 
@@ -112,7 +120,7 @@ extension HarnessMonitorUITestCase {
 
       let presentedTarget = element(in: app, title: title)
       if waitForElement(presentedTarget, timeout: Self.fastPollInterval) {
-        if tapElementReliably(in: app, element: presentedTarget) {
+        if tapButtonElementReliably(in: app, element: presentedTarget) {
           return
         }
       }
@@ -207,7 +215,7 @@ extension HarnessMonitorUITestCase {
   }
 
   @discardableResult
-  func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
+  private func tapButtonElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
     if element.isHittable {
       element.tap()
       return true
@@ -215,6 +223,21 @@ extension HarnessMonitorUITestCase {
 
     if let coordinate = preferredTapCoordinate(in: app, for: element) {
       coordinate.tap()
+      return true
+    }
+
+    return false
+  }
+
+  @discardableResult
+  func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
+    if element.isHittable {
+      element.click()
+      return true
+    }
+
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.click()
       return true
     }
 
