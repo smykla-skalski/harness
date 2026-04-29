@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -35,6 +35,8 @@ struct IdentityPayload {
     resolved_command: String,
     args: Vec<String>,
     canonical_root: String,
+    protocol_version: String,
+    log_mode: String,
     permission_mode: String,
     env_fingerprint: String,
 }
@@ -55,6 +57,7 @@ impl AcpProcessPoolKey {
     pub(super) fn from_spawn_inputs(
         descriptor: &AcpAgentDescriptor,
         request: &AcpAgentStartRequest,
+        _session_id: &str,
         spawn: &SpawnConfig,
         project_dir: &Path,
     ) -> Self {
@@ -77,6 +80,9 @@ impl AcpProcessPoolKey {
             resolved_command: spawn.resolved_command_for_identity(),
             args: spawn.args.clone(),
             canonical_root,
+            protocol_version: "v1".to_string(),
+            // Stage-1 ACP runtime emits text/event stream mode only.
+            log_mode: "text".to_string(),
             permission_mode: mode.to_string(),
             env_fingerprint,
         };
@@ -102,7 +108,7 @@ fn hash_identity_environment(
     allowed.sort();
     allowed.dedup();
 
-    let allowed = allowed.into_iter().collect::<std::collections::BTreeSet<_>>();
+    let allowed = allowed.into_iter().collect::<BTreeSet<_>>();
     let mut hashed = BTreeMap::new();
     for (key, value) in values {
         if allowed.contains(&key) {
@@ -128,27 +134,19 @@ mod tests {
 
     #[test]
     fn fingerprint_changes_when_tracked_value_changes() {
-        let first =
-            temp_env::with_var("OPENAI_API_KEY", Some("a"), || hash_identity_environment(vec![
-                ("OPENAI_API_KEY".to_string(), "a".to_string()),
-            ], &[]));
-        let second =
-            temp_env::with_var("OPENAI_API_KEY", Some("b"), || hash_identity_environment(vec![
-                ("OPENAI_API_KEY".to_string(), "b".to_string()),
-            ], &[]));
+        let first = temp_env::with_var("OPENAI_API_KEY", Some("a"), || {
+            hash_identity_environment(vec![("OPENAI_API_KEY".to_string(), "a".to_string())], &[])
+        });
+        let second = temp_env::with_var("OPENAI_API_KEY", Some("b"), || {
+            hash_identity_environment(vec![("OPENAI_API_KEY".to_string(), "b".to_string())], &[])
+        });
         assert_ne!(first, second);
     }
 
     #[test]
     fn fingerprint_ignores_unlisted_env_values() {
-        let first = hash_identity_environment(
-            vec![("NOISE".to_string(), "a".to_string())],
-            &[],
-        );
-        let second = hash_identity_environment(
-            vec![("NOISE".to_string(), "b".to_string())],
-            &[],
-        );
+        let first = hash_identity_environment(vec![("NOISE".to_string(), "a".to_string())], &[]);
+        let second = hash_identity_environment(vec![("NOISE".to_string(), "b".to_string())], &[]);
         assert_eq!(first, second);
     }
 }

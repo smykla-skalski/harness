@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use serde::Serialize;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
@@ -46,6 +47,19 @@ pub(super) struct ActiveAcpTasks {
 #[derive(Clone, Default)]
 pub(super) struct SharedStderrTail {
     bytes: Arc<Mutex<Vec<u8>>>,
+}
+
+#[derive(Serialize)]
+struct AcpProcessIncidentPayload {
+    kind: String,
+    reason_kind: String,
+    process_key: String,
+    pid: u32,
+    pgid: i32,
+    exit_code: Option<i32>,
+    exit_signal: Option<i32>,
+    stderr_tail: Option<String>,
+    affected_logical_session_ids: Vec<String>,
 }
 
 impl ActiveAcpSession {
@@ -358,6 +372,9 @@ fn disconnect_active_session(
     let pending_permissions = session.disconnect(reason);
     session.kill_child(pending_permissions);
     let snapshot = session.snapshot_with_live_counts();
+    if let Some(incident) = process_incident_event(&snapshot) {
+        let _ = sender.send(incident);
+    }
     let payload = serde_json::to_value(&snapshot).unwrap_or_default();
     let _ = sender.send(StreamEvent {
         event: "acp_agent_disconnected".to_string(),
@@ -365,6 +382,76 @@ fn disconnect_active_session(
         session_id: Some(snapshot.session_id),
         payload,
     });
+}
+
+fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
+    let AgentStatus::Disconnected {
+        reason,
+        stderr_tail,
+    } = &snapshot.status
+    else {
+        return None;
+    };
+    let kind = match reason {
+        DisconnectReason::ProcessExited { .. } => "process_exit",
+        DisconnectReason::TransportClosed => "transport_closed",
+        DisconnectReason::StdioClosed => "stdio_closed",
+        DisconnectReason::InitializeTimeout | DisconnectReason::PromptTimeout => "protocol_desync",
+        DisconnectReason::WatchdogFired => "watchdog_fired",
+        DisconnectReason::SessionStopped
+        | DisconnectReason::UserCancelled
+        | DisconnectReason::DaemonShutdown
+        | DisconnectReason::OomKilled
+        | DisconnectReason::Unknown { .. } => return None,
+    };
+    let (exit_code, exit_signal) = match reason {
+        DisconnectReason::ProcessExited { code, signal } => (*code, *signal),
+        _ => (None, None),
+    };
+    let payload = AcpProcessIncidentPayload {
+        kind: kind.to_string(),
+        reason_kind: reason_kind(reason),
+        process_key: snapshot.process_key.clone(),
+        pid: snapshot.pid,
+        pgid: snapshot.pgid,
+        exit_code,
+        exit_signal,
+        stderr_tail: stderr_tail.clone(),
+        affected_logical_session_ids: sorted_singleton(snapshot.session_id.clone()),
+    };
+    Some(StreamEvent {
+        event: "acp_process_incident".to_string(),
+        recorded_at: utc_now(),
+        session_id: Some(snapshot.session_id.clone()),
+        payload: serde_json::to_value(payload).ok()?,
+    })
+}
+
+fn sorted_singleton(session_id: String) -> Vec<String> {
+    let mut ids = vec![session_id];
+    ids.sort();
+    ids
+}
+
+fn reason_kind(reason: &DisconnectReason) -> String {
+    match reason {
+        DisconnectReason::ProcessExited { .. } => "process_exited".to_string(),
+        DisconnectReason::StdioClosed => "stdio_closed".to_string(),
+        DisconnectReason::TransportClosed => "transport_closed".to_string(),
+        DisconnectReason::InitializeTimeout => "initialize_timeout".to_string(),
+        DisconnectReason::PromptTimeout => "prompt_timeout".to_string(),
+        DisconnectReason::WatchdogFired => "watchdog_fired".to_string(),
+        DisconnectReason::UserCancelled => "user_cancelled".to_string(),
+        DisconnectReason::SessionStopped => "session_stopped".to_string(),
+        DisconnectReason::DaemonShutdown => "daemon_shutdown".to_string(),
+        DisconnectReason::OomKilled => "oom_killed".to_string(),
+        DisconnectReason::Unknown { raw_kind } => {
+            if let Some(value) = raw_kind {
+                return value.clone();
+            }
+            "unknown".to_string()
+        }
+    }
 }
 
 fn process_exit_reason(status: ExitStatus) -> DisconnectReason {
@@ -384,3 +471,6 @@ fn process_exit_reason(status: ExitStatus) -> DisconnectReason {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

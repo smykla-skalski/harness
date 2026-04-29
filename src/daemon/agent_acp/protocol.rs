@@ -31,7 +31,9 @@ use crate::hooks::runner_policy::managed_cluster_binaries;
 use super::manager::AcpAgentStartRequest;
 mod context;
 mod session_guard;
-use context::{ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result};
+use context::{
+    ProtocolContext, client_error_to_acp, handle_permission_request, respond_client_result,
+};
 use session_guard::SessionRouteGuard;
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 
@@ -55,7 +57,7 @@ pub(super) struct SpawnedAcpProtocol {
 pub(super) fn spawn_protocol_task(
     child: &mut Child,
     request: &AcpAgentStartRequest,
-    session_id: String,
+    session_id: &str,
     agent_name: String,
     project_dir: PathBuf,
     supervisor: &Arc<AcpSessionSupervisor>,
@@ -74,7 +76,7 @@ pub(super) fn spawn_protocol_task(
 
     let batcher = spawn_notification_batcher(
         agent_name,
-        session_id.clone(),
+        session_id.to_string(),
         Arc::clone(supervisor),
         ConnectionConfig::default(),
     );
@@ -258,9 +260,19 @@ fn disconnect_reason_from_error(error: &AcpError) -> DisconnectReason {
         && error.message.contains("session/prompt")
     {
         DisconnectReason::PromptTimeout
+    } else if is_transport_closed_error(error) {
+        DisconnectReason::TransportClosed
     } else {
         DisconnectReason::StdioClosed
     }
+}
+
+fn is_transport_closed_error(error: &AcpError) -> bool {
+    let message = error.message.to_ascii_lowercase();
+    message.contains("transport closed")
+        || message.contains("connection closed")
+        || message.contains("broken pipe")
+        || message.contains("unexpected eof")
 }
 
 async fn run_connection(
@@ -276,22 +288,26 @@ async fn run_connection(
 
     send_initialize(&connection, initialize_timeout).await?;
     let session_id = send_new_session(&connection, project_dir).await?;
-    session_guard.set_expected(session_id.clone());
-
-    if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty())
-        && send_prompt_or_cancel(
-            &connection,
-            &mut cancel_rx,
-            session_id.clone(),
-            prompt_timeout,
-            prompt,
-        )
-        .await?
-    {
-        return Ok(());
+    session_guard.start_session(session_id.clone());
+    let run_result = async {
+        if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
+            let cancelled = send_prompt_or_cancel(
+                &connection,
+                &mut cancel_rx,
+                session_id.clone(),
+                prompt_timeout,
+                prompt,
+            )
+            .await?;
+            if cancelled {
+                return Ok(());
+            }
+        }
+        wait_for_cancel(&connection, &mut cancel_rx, session_id.clone()).await
     }
-
-    wait_for_cancel(&connection, &mut cancel_rx, session_id).await
+    .await;
+    session_guard.stop_session(&session_id);
+    run_result
 }
 
 async fn send_initialize(

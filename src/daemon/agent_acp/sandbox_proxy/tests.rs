@@ -1,0 +1,157 @@
+use std::collections::BTreeSet;
+
+use super::*;
+use crate::daemon::agent_acp::AcpAgentInspectResponse;
+use crate::daemon::agent_acp::AcpAgentInspectSnapshot;
+use crate::daemon::protocol::StreamEvent;
+
+#[test]
+fn replay_safe_resync_events_keeps_safe_events_only() {
+    let events = vec![
+        stream_event("acp_agent_started"),
+        stream_event("acp_events"),
+        stream_event("acp_permission_requested"),
+        stream_event("acp_events"),
+    ];
+
+    let filtered = replay_safe_resync_events(events);
+
+    assert_eq!(
+        filtered
+            .iter()
+            .map(|event| event.event.as_str())
+            .collect::<Vec<_>>(),
+        vec!["acp_events", "acp_events"]
+    );
+}
+
+#[test]
+fn replay_safe_resync_events_keeps_resync_incidents() {
+    let events = vec![
+        stream_event("acp_bridge_resync_incident"),
+        stream_event("acp_agent_started"),
+    ];
+    let filtered = replay_safe_resync_events(events);
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].event, "acp_bridge_resync_incident");
+}
+
+#[test]
+fn replay_safe_resync_events_keeps_process_incidents() {
+    let events = vec![
+        stream_event("acp_process_incident"),
+        stream_event("acp_agent_started"),
+    ];
+    let filtered = replay_safe_resync_events(events);
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].event, "acp_process_incident");
+}
+
+fn stream_event(event: &str) -> StreamEvent {
+    StreamEvent {
+        event: event.to_string(),
+        recorded_at: "2026-04-29T00:00:00Z".to_string(),
+        session_id: Some("sess-1".to_string()),
+        payload: serde_json::json!({}),
+    }
+}
+
+#[test]
+fn bridge_resync_incident_event_uses_expected_kind_and_scope() {
+    let event = bridge_resync_incident_event(&AcpBridgeResyncIncidentPayload {
+        kind: "protocol_desync".to_string(),
+        bridge_epoch: "epoch-1".to_string(),
+        continuity: 7,
+        next_seq: 11,
+        truncated: true,
+        affected_logical_session_ids: vec!["sess-1".to_string()],
+    })
+    .expect("incident event");
+
+    assert_eq!(event.event, "acp_bridge_resync_incident");
+    assert_eq!(event.session_id, None);
+    assert_eq!(event.payload["kind"], "protocol_desync");
+    assert_eq!(
+        event.payload["affected_logical_session_ids"],
+        serde_json::json!(["sess-1"])
+    );
+}
+
+#[test]
+fn bridge_resync_incident_events_fan_out_by_session() {
+    let payload = AcpBridgeResyncIncidentPayload {
+        kind: "protocol_desync".to_string(),
+        bridge_epoch: "epoch-1".to_string(),
+        continuity: 7,
+        next_seq: 11,
+        truncated: false,
+        affected_logical_session_ids: vec!["sess-a".to_string(), "sess-b".to_string()],
+    };
+    let events = bridge_resync_incident_events(&payload).expect("events");
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].session_id.as_deref(), Some("sess-a"));
+    assert_eq!(events[1].session_id.as_deref(), Some("sess-b"));
+}
+
+#[test]
+fn incident_key_tracks_epoch_continuity_and_cursor_shape() {
+    let payload = AcpBridgeResyncIncidentPayload {
+        kind: "protocol_desync".to_string(),
+        bridge_epoch: "epoch-5".to_string(),
+        continuity: 42,
+        next_seq: 77,
+        truncated: false,
+        affected_logical_session_ids: vec![],
+    };
+    assert_eq!(
+        incident_key(&payload),
+        ("epoch-5".to_string(), 42, 77, false, Vec::<String>::new())
+    );
+}
+
+#[test]
+fn reconcile_sessions_uses_known_and_inspect_sets() {
+    let mut known = BTreeSet::new();
+    known.insert("sess-old".to_string());
+    let inspect = AcpAgentInspectResponse {
+        agents: vec![AcpAgentInspectSnapshot {
+            acp_id: "a1".to_string(),
+            session_id: "sess-new".to_string(),
+            agent_id: "fake".to_string(),
+            display_name: "Fake".to_string(),
+            pid: 1,
+            pgid: 1,
+            process_key: "pk".to_string(),
+            uptime_ms: 1,
+            last_update_at: "2026-01-01T00:00:00Z".to_string(),
+            last_client_call_at: None,
+            watchdog_state: "active".to_string(),
+            permission_mode: "daemon_bridge".to_string(),
+            permission_log_path: None,
+            pending_permissions: 0,
+            permission_queue_depth: 0,
+            terminal_count: 0,
+            prompt_deadline_remaining_ms: 0,
+        }],
+    };
+    let merged = reconcile_sessions(known, &inspect);
+    assert_eq!(merged, vec!["sess-new".to_string(), "sess-old".to_string()]);
+}
+
+#[test]
+fn bridge_resync_incident_payload_uses_protocol_desync_kind() {
+    let payload =
+        bridge_resync_incident_payload("epoch-1".to_string(), 9, 12, true, vec!["sess-1".to_string()]);
+    assert_eq!(payload.kind, "protocol_desync");
+    assert_eq!(payload.bridge_epoch, "epoch-1");
+    assert_eq!(payload.continuity, 9);
+}
+
+fn bridge_resync_incident_event(payload: &AcpBridgeResyncIncidentPayload) -> Option<StreamEvent> {
+    Some(StreamEvent {
+        event: "acp_bridge_resync_incident".to_string(),
+        recorded_at: utc_now(),
+        session_id: None,
+        payload: serde_json::to_value(payload).ok()?,
+    })
+}

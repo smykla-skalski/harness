@@ -10,7 +10,9 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
 
-use super::manager::{AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest};
+use super::manager::{
+    AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest,
+};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 
 const SANDBOX_ACP_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -21,6 +23,16 @@ const SANDBOX_ACP_IDLE_INSPECT_POLLS: usize = 20;
 struct AcpAgentsReconciledPayload {
     session_id: String,
     agents: Vec<AcpAgentSnapshot>,
+}
+
+#[derive(Serialize)]
+struct AcpBridgeResyncIncidentPayload {
+    kind: String,
+    bridge_epoch: String,
+    continuity: u64,
+    next_seq: u64,
+    truncated: bool,
+    affected_logical_session_ids: Vec<String>,
 }
 
 impl AcpAgentManagerHandle {
@@ -99,7 +111,9 @@ impl AcpAgentManagerHandle {
     }
 
     pub(super) fn pending_permission_count_via_bridge(&self, acp_id: &str) -> Option<usize> {
-        self.get_via_bridge(acp_id).ok().map(|snapshot| snapshot.pending_permissions)
+        self.get_via_bridge(acp_id)
+            .ok()
+            .map(|snapshot| snapshot.pending_permissions)
     }
 
     pub(super) fn pending_permission_batches_via_bridge(
@@ -129,13 +143,19 @@ impl AcpAgentManagerHandle {
         }
         let manager = self.clone();
         thread::spawn(move || {
-            manager.run_sandbox_event_poller();
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                manager.run_sandbox_event_poller();
+            }));
             manager.clear_sandbox_event_poller_running();
+            if result.is_err() {
+                tracing::warn!("ACP sandbox event poller panicked; it can be restarted");
+            }
         });
     }
 
     fn run_sandbox_event_poller(&self) {
         let mut idle_polls = 0usize;
+        let mut last_protocol_desync: Option<(String, u64, u64, bool, Vec<String>)> = None;
         loop {
             let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
                 Ok(bridge) => bridge,
@@ -162,7 +182,24 @@ impl AcpAgentManagerHandle {
                             truncated = response.truncated,
                             "ACP bridge event continuity changed; forcing authoritative resync"
                         );
-                        match self.reconcile_sandbox_state(&bridge) {
+                        let inspect = bridge.acp_inspect(None);
+                        let affected_logical_session_ids = inspect.as_ref().map_or_else(
+                            |_| self.sandbox_known_sessions().into_iter().collect::<Vec<_>>(),
+                            |value| reconcile_sessions(self.sandbox_known_sessions(), value),
+                        );
+                        let payload = bridge_resync_incident_payload(
+                            response_epoch.clone(),
+                            response_continuity,
+                            response.next_seq,
+                            response.truncated,
+                            affected_logical_session_ids,
+                        );
+                        let current_desync = incident_key(&payload);
+                        if last_protocol_desync.as_ref() != Some(&current_desync) {
+                            emit_bridge_resync_incident(&self.sender(), &payload);
+                            last_protocol_desync = Some(current_desync);
+                        }
+                        match self.reconcile_sandbox_state(&bridge, inspect.ok()) {
                             Ok(true) => idle_polls = 0,
                             Ok(false) => {
                                 tracing::warn!(
@@ -180,6 +217,8 @@ impl AcpAgentManagerHandle {
                         // After authoritative reconcile, replay only timeline batches.
                         // State-mutating ACP events can be stale relative to reconcile.
                         replay_events = replay_safe_resync_events(replay_events);
+                    } else {
+                        last_protocol_desync = None;
                     }
                     self.set_sandbox_event_epoch(Some(response_epoch));
                     self.set_sandbox_event_continuity(Some(response_continuity));
@@ -213,8 +252,12 @@ impl AcpAgentManagerHandle {
         }
     }
 
-    fn reconcile_sandbox_state(&self, bridge: &BridgeClient) -> Result<bool, CliError> {
-        let inspect = bridge.acp_inspect(None)?;
+    fn reconcile_sandbox_state(
+        &self,
+        bridge: &BridgeClient,
+        inspect: Option<AcpAgentInspectResponse>,
+    ) -> Result<bool, CliError> {
+        let inspect = inspect.unwrap_or(bridge.acp_inspect(None)?);
         let mut agents_by_session = BTreeMap::<String, Vec<AcpAgentSnapshot>>::new();
         let mut current_sessions = BTreeSet::new();
         let mut had_fetch_failures = false;
@@ -278,38 +321,89 @@ fn reconciled_event(payload: &AcpAgentsReconciledPayload) -> Option<StreamEvent>
 fn replay_safe_resync_events(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
     events
         .into_iter()
-        .filter(|event| event.event == "acp_events")
+        .filter(|event| {
+            event.event == "acp_events"
+                || event.event == "acp_bridge_resync_incident"
+                || event.event == "acp_process_incident"
+        })
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::replay_safe_resync_events;
-    use crate::daemon::protocol::StreamEvent;
-
-    #[test]
-    fn replay_safe_resync_events_keeps_timeline_batches_only() {
-        let events = vec![
-            stream_event("acp_agent_started"),
-            stream_event("acp_events"),
-            stream_event("acp_permission_requested"),
-            stream_event("acp_events"),
-        ];
-
-        let filtered = replay_safe_resync_events(events);
-
-        assert_eq!(
-            filtered.iter().map(|event| event.event.as_str()).collect::<Vec<_>>(),
-            vec!["acp_events", "acp_events"]
-        );
+fn bridge_resync_incident_events(
+    payload: &AcpBridgeResyncIncidentPayload,
+) -> Option<Vec<StreamEvent>> {
+    let serialized_payload = serde_json::to_value(payload).ok()?;
+    if payload.affected_logical_session_ids.is_empty() {
+        return Some(vec![StreamEvent {
+            event: "acp_bridge_resync_incident".to_string(),
+            recorded_at: utc_now(),
+            session_id: None,
+            payload: serialized_payload,
+        }]);
     }
+    let mut events = Vec::with_capacity(payload.affected_logical_session_ids.len());
+    for session_id in &payload.affected_logical_session_ids {
+        events.push(StreamEvent {
+            event: "acp_bridge_resync_incident".to_string(),
+            recorded_at: utc_now(),
+            session_id: Some(session_id.clone()),
+            payload: serialized_payload.clone(),
+        });
+    }
+    Some(events)
+}
 
-    fn stream_event(event: &str) -> StreamEvent {
-        StreamEvent {
-            event: event.to_string(),
-            recorded_at: "2026-04-29T00:00:00Z".to_string(),
-            session_id: Some("sess-1".to_string()),
-            payload: serde_json::json!({}),
+fn incident_key(
+    payload: &AcpBridgeResyncIncidentPayload,
+) -> (String, u64, u64, bool, Vec<String>) {
+    (
+        payload.bridge_epoch.clone(),
+        payload.continuity,
+        payload.next_seq,
+        payload.truncated,
+        payload.affected_logical_session_ids.clone(),
+    )
+}
+
+fn bridge_resync_incident_payload(
+    bridge_epoch: String,
+    continuity: u64,
+    next_seq: u64,
+    truncated: bool,
+    affected_logical_session_ids: Vec<String>,
+) -> AcpBridgeResyncIncidentPayload {
+    AcpBridgeResyncIncidentPayload {
+        kind: "protocol_desync".to_string(),
+        bridge_epoch,
+        continuity,
+        next_seq,
+        truncated,
+        affected_logical_session_ids,
+    }
+}
+
+fn reconcile_sessions(
+    known_sessions: BTreeSet<String>,
+    inspect: &AcpAgentInspectResponse,
+) -> Vec<String> {
+    known_sessions
+        .into_iter()
+        .chain(inspect.agents.iter().map(|agent| agent.session_id.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>()
+}
+
+fn emit_bridge_resync_incident(
+    sender: &tokio::sync::broadcast::Sender<StreamEvent>,
+    payload: &AcpBridgeResyncIncidentPayload,
+) {
+    if let Some(events) = bridge_resync_incident_events(payload) {
+        for event in events {
+            let _ = sender.send(event);
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
