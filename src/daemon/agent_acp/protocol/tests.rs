@@ -47,14 +47,16 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                 agent_client_protocol::on_receive_notification!(),
             )
             .connect_with(client_transport, async move |connection| {
-                run_connection(
+                run_connection(RunConnectionArgs {
                     connection,
                     project_dir,
-                    Some("smoke the second descriptor".to_string()),
-                    protocol_supervisor,
+                    prompt: Some("smoke the second descriptor".to_string()),
+                    acp_id: "agent-acp-1".to_string(),
+                    session_id: "harness-sess-1".to_string(),
+                    supervisor: protocol_supervisor,
                     cancel_rx,
-                    Arc::new(SessionRouteGuard::default()),
-                )
+                    session_guard: Arc::new(SessionRouteGuard::default()),
+                })
                 .await
             })
             .await
@@ -124,14 +126,16 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                 agent_client_protocol::on_receive_notification!(),
             )
             .connect_with(client_transport, async move |connection| {
-                run_connection(
+                run_connection(RunConnectionArgs {
                     connection,
                     project_dir,
-                    Some("trigger stale session".to_string()),
-                    protocol_supervisor,
+                    prompt: Some("trigger stale session".to_string()),
+                    acp_id: "agent-acp-1".to_string(),
+                    session_id: "harness-sess-1".to_string(),
+                    supervisor: protocol_supervisor,
                     cancel_rx,
-                    Arc::new(SessionRouteGuard::default()),
-                )
+                    session_guard: Arc::new(SessionRouteGuard::default()),
+                })
                 .await
             })
             .await
@@ -190,7 +194,9 @@ async fn run_cookbook_style_agent(transport: Channel) -> agent_client_protocol::
         .await
 }
 
-async fn run_agent_with_stale_notification(transport: Channel) -> agent_client_protocol::Result<()> {
+async fn run_agent_with_stale_notification(
+    transport: Channel,
+) -> agent_client_protocol::Result<()> {
     Agent
         .builder()
         .name("stale-notification-agent")
@@ -286,7 +292,7 @@ fn session_route_guard_rejects_before_initialization() {
 #[test]
 fn session_route_guard_rejects_stale_session_id() {
     let guard = SessionRouteGuard::default();
-    guard.start_session(SessionId::new("acp-session-1"));
+    guard.start_session(&SessionId::new("acp-session-1"), route_target("sess-1"));
     let error = guard
         .ensure_known(&SessionId::new("acp-session-2"))
         .expect_err("guard should reject unknown session id");
@@ -302,21 +308,72 @@ fn session_route_guard_rejects_stale_session_id() {
 fn session_route_guard_accepts_expected_session_id() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
-    guard.start_session(session_id.clone());
-    guard
+    guard.start_session(&session_id, route_target("sess-1"));
+    let target = guard
         .ensure_known(&session_id)
         .expect("guard should accept expected session id");
+    assert_eq!(target.acp_id, "agent-sess-1");
+    assert_eq!(target.session_id, "sess-1");
 }
 
 #[test]
 fn session_route_guard_rejects_after_session_end() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
-    guard.start_session(session_id.clone());
+    guard.start_session(&session_id, route_target("sess-1"));
     guard.stop_session(&session_id);
     let error = guard
         .ensure_known(&session_id)
         .expect_err("guard should reject removed session id");
     assert_eq!(error.code, session_guard::ACP_STALE_SESSION_ID);
     assert!(error.message.contains("already ended"));
+}
+
+#[test]
+fn session_route_guard_accepts_multiple_session_ids() {
+    let guard = SessionRouteGuard::default();
+    guard.start_session(&SessionId::new("acp-session-1"), route_target("sess-1"));
+    guard.start_session(&SessionId::new("acp-session-2"), route_target("sess-2"));
+
+    assert_eq!(
+        guard
+            .ensure_known(&SessionId::new("acp-session-1"))
+            .expect("first session"),
+        route_target("sess-1")
+    );
+    assert_eq!(
+        guard
+            .ensure_known(&SessionId::new("acp-session-2"))
+            .expect("second session"),
+        route_target("sess-2")
+    );
+}
+
+#[test]
+fn session_route_guard_removes_one_route_without_poisoning_siblings() {
+    let guard = SessionRouteGuard::default();
+    let first = SessionId::new("acp-session-1");
+    let second = SessionId::new("acp-session-2");
+    guard.start_session(&first, route_target("sess-1"));
+    guard.start_session(&second, route_target("sess-2"));
+
+    guard.stop_session(&first);
+
+    assert!(
+        guard.ensure_known(&first).is_err(),
+        "removed route should be stale"
+    );
+    assert_eq!(
+        guard
+            .ensure_known(&second)
+            .expect("sibling route remains active"),
+        route_target("sess-2")
+    );
+}
+
+fn route_target(session_id: &str) -> RouteTarget {
+    RouteTarget {
+        acp_id: format!("agent-{session_id}"),
+        session_id: session_id.to_string(),
+    }
 }

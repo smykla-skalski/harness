@@ -38,7 +38,7 @@ impl ProtocolContext {
         request: &ReadTextFileRequest,
     ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_read_text_file(request)
         })
@@ -49,7 +49,7 @@ impl ProtocolContext {
         request: &WriteTextFileRequest,
     ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_write_text_file(request)
         })
@@ -60,7 +60,7 @@ impl ProtocolContext {
         request: &CreateTerminalRequest,
     ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_create_terminal(request)
         })
@@ -71,7 +71,7 @@ impl ProtocolContext {
         request: &TerminalOutputRequest,
     ) -> ClientResult<<TerminalOutputRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_terminal_output(request)
         })
@@ -82,7 +82,7 @@ impl ProtocolContext {
         request: &ReleaseTerminalRequest,
     ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_release_terminal(request)
         })
@@ -93,7 +93,7 @@ impl ProtocolContext {
         request: &WaitForTerminalExitRequest,
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_wait_for_terminal_exit(request)
         })
@@ -104,7 +104,7 @@ impl ProtocolContext {
         request: &KillTerminalRequest,
     ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         with_client_call(&self.supervisor, || {
             self.client.handle_kill_terminal(request)
         })
@@ -115,7 +115,7 @@ impl ProtocolContext {
         request: RequestPermissionRequest,
     ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        self.session_guard.ensure_known(&request.session_id)?;
+        let _target = self.session_guard.ensure_known(&request.session_id)?;
         spawn_blocking(move || {
             with_client_call(&self.supervisor, || {
                 self.client.handle_request_permission(&request)

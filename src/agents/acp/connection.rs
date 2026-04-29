@@ -28,6 +28,10 @@ use super::supervision::AcpSessionSupervisor;
 /// Batch of materialised events ready for downstream consumption.
 #[derive(Debug)]
 pub struct EventBatch {
+    /// Harness ACP logical session id.
+    pub acp_id: String,
+    /// Harness session id that owns this batch.
+    pub session_id: String,
     /// The conversation events in this batch.
     pub events: Vec<ConversationEvent>,
     /// Number of raw updates that produced these events.
@@ -278,7 +282,12 @@ fn next_event_batch(
     let (events, next_seq) = materialise_batch(ring.updates(), agent_name, session_id, *sequence);
     *sequence = next_seq;
     ring.clear();
-    Some(EventBatch { events, raw_count })
+    Some(EventBatch {
+        acp_id: session_id.to_string(),
+        session_id: session_id.to_string(),
+        events,
+        raw_count,
+    })
 }
 
 /// Parse a single NDJSON line into a `SessionNotification`.
@@ -429,9 +438,13 @@ mod tests {
     #[tokio::test]
     async fn event_batch_structure() {
         let batch = EventBatch {
+            acp_id: "acp-1".to_string(),
+            session_id: "sess-1".to_string(),
             events: vec![],
             raw_count: 5,
         };
+        assert_eq!(batch.acp_id, "acp-1");
+        assert_eq!(batch.session_id, "sess-1");
         assert_eq!(batch.raw_count, 5);
         assert!(batch.events.is_empty());
     }
