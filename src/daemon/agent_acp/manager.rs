@@ -98,6 +98,8 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) sandbox_event_epoch: Mutex<Option<String>>,
     pub(in crate::daemon::agent_acp) sandbox_event_continuity: Mutex<Option<u64>>,
     pub(in crate::daemon::agent_acp) sandbox_known_sessions: Mutex<BTreeSet<String>>,
+    pub(in crate::daemon::agent_acp) process_key_failures: Mutex<BTreeMap<String, u32>>,
+    pub(in crate::daemon::agent_acp) quarantined_process_keys: Mutex<BTreeSet<String>>,
 }
 
 impl AcpAgentManagerHandle {
@@ -116,6 +118,8 @@ impl AcpAgentManagerHandle {
                 sandbox_event_epoch: Mutex::new(None),
                 sandbox_event_continuity: Mutex::new(None),
                 sandbox_known_sessions: Mutex::new(BTreeSet::new()),
+                process_key_failures: Mutex::new(BTreeMap::new()),
+                quarantined_process_keys: Mutex::new(BTreeSet::new()),
             }),
         }
     }
@@ -337,6 +341,7 @@ impl AcpAgentManagerHandle {
             && after.status.is_disconnected()
             && let Some(event) = process_incident_from_snapshot(&after)
         {
+            let event = self.apply_process_fault_policy(&after, event);
             let _ = self.state.sender.send(event);
         }
         after
@@ -363,6 +368,75 @@ impl AcpAgentManagerHandle {
             .filter(|session| session.session_id() == session_id)
             .cloned()
             .collect()
+    }
+
+    pub(in crate::daemon::agent_acp) fn ensure_process_key_start_allowed(
+        &self,
+        process_key: &str,
+    ) -> Result<(), CliError> {
+        if self
+            .state
+            .quarantined_process_keys
+            .lock()
+            .expect("ACP quarantined process keys lock")
+            .contains(process_key)
+        {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "ACP process key is quarantined after repeated faults: {process_key}"
+            ))
+            .into());
+        }
+        Ok(())
+    }
+
+    fn apply_process_fault_policy(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+        mut event: StreamEvent,
+    ) -> StreamEvent {
+        let quarantine_applied = self.record_process_fault(snapshot);
+        if let serde_json::Value::Object(payload) = &mut event.payload {
+            payload.insert("restart_applied".to_string(), serde_json::Value::Bool(false));
+            payload.insert("backoff_applied".to_string(), serde_json::Value::Bool(false));
+            payload.insert(
+                "quarantine_applied".to_string(),
+                serde_json::Value::Bool(quarantine_applied),
+            );
+        }
+        event
+    }
+
+    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> bool {
+        let AgentStatus::Disconnected { reason, .. } = &snapshot.status else {
+            return false;
+        };
+        if !matches!(
+            reason,
+            DisconnectReason::ProcessExited { .. }
+                | DisconnectReason::TransportClosed
+                | DisconnectReason::StdioClosed
+                | DisconnectReason::InitializeTimeout
+                | DisconnectReason::PromptTimeout
+                | DisconnectReason::WatchdogFired
+        ) {
+            return false;
+        }
+        let mut failures = self
+            .state
+            .process_key_failures
+            .lock()
+            .expect("ACP process key failures lock");
+        let failure_count = failures.entry(snapshot.process_key.clone()).or_insert(0);
+        *failure_count = failure_count.saturating_add(1);
+        if *failure_count < 3 {
+            return false;
+        }
+        drop(failures);
+        self.state
+            .quarantined_process_keys
+            .lock()
+            .expect("ACP quarantined process keys lock")
+            .insert(snapshot.process_key.clone())
     }
 }
 

@@ -50,6 +50,7 @@ impl AcpAgentManagerHandle {
             &spawn,
             &project_dir,
         );
+        self.ensure_process_key_start_allowed(process_key.as_str())?;
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
         })?;
