@@ -94,7 +94,6 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
         ))
         .into());
     }
-
     let (target_dir, _already_on_path) = choose_install_dir_with_home(path_env, home)?;
     install_wrapper(&target_dir)?;
 
@@ -135,7 +134,23 @@ pub fn write_agent_bootstrap(
 pub fn harness_on_path(path_env: &str) -> bool {
     path_candidates(path_env)
         .iter()
-        .any(|dir| dir.join("harness").is_file())
+        .any(|dir| is_executable_file(&dir.join("harness")))
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs_err::metadata(path) {
+            let mode = metadata.permissions().mode();
+            return metadata.is_file() && (mode & 0o111) != 0;
+        }
+        false
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
 }
 
 fn write_process_agent_bootstrap(
@@ -203,20 +218,24 @@ pub(crate) fn planned_agent_bootstrap_files(
     let mut planned = Vec::new();
     if !skip_runtime_hooks.contains(&agent) {
         let path = match agent {
-            HookAgent::Claude => project_dir.join(".claude").join("settings.json"),
-            HookAgent::Copilot => project_dir
-                .join(".github")
-                .join("hooks")
-                .join("harness.json"),
-            HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
-            HookAgent::Gemini => project_dir.join(".gemini").join("settings.json"),
-            HookAgent::Vibe => project_dir.join(".vibe").join("hooks.json"),
-            HookAgent::OpenCode => project_dir.join(".opencode").join("hooks.json"),
+            HookAgent::Claude => Some(project_dir.join(".claude").join("settings.json")),
+            HookAgent::Copilot => Some(
+                project_dir
+                    .join(".github")
+                    .join("hooks")
+                    .join("harness.json"),
+            ),
+            HookAgent::Codex => None,
+            HookAgent::Gemini => Some(project_dir.join(".gemini").join("settings.json")),
+            HookAgent::Vibe => Some(project_dir.join(".vibe").join("hooks.json")),
+            HookAgent::OpenCode => Some(project_dir.join(".opencode").join("hooks.json")),
         };
-        let registrations = process_agent_registrations(agent, flags);
-        let config = adapter_for(agent).generate_config(&registrations);
-        log_omitted_hook_families(&path, flags);
-        planned.push((path, config));
+        if let Some(path) = path {
+            let registrations = process_agent_registrations(agent, flags);
+            let config = adapter_for(agent).generate_config(&registrations);
+            log_omitted_hook_families(&path, flags);
+            planned.push((path, config));
+        }
     }
     if agent == HookAgent::Codex {
         planned.push((

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
 use tokio::sync::broadcast;
@@ -80,7 +80,7 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert!(matches!(
             stopped.status,
             AgentStatus::Disconnected {
-                reason: DisconnectReason::UserCancelled,
+                reason: DisconnectReason::SessionStopped,
                 ..
             }
         ));
@@ -106,8 +106,18 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             .start_descriptor("sess-1", &request, &descriptor)
             .expect("start");
 
-        std::thread::sleep(Duration::from_millis(100));
-        let refreshed = manager.get(&snapshot.acp_id).expect("refresh");
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let refreshed = loop {
+            let refreshed = manager.get(&snapshot.acp_id).expect("refresh");
+            if matches!(&refreshed.status, AgentStatus::Disconnected { .. }) {
+                break refreshed;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for ACP process to disconnect"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        };
         assert!(matches!(
             refreshed.status,
             AgentStatus::Disconnected {
@@ -292,7 +302,9 @@ fn start_rejects_sandboxed_daemon_mode() {
                 record_permissions: false,
             };
 
-            let error = manager().start("sess-1", &request).expect_err("sandbox must refuse ACP");
+            let error = manager()
+                .start("sess-1", &request)
+                .expect_err("sandbox must refuse ACP");
             let rendered = format!("{error}");
             assert!(
                 rendered.contains("sandbox feature disabled: acp.host-bridge"),

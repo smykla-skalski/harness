@@ -66,6 +66,10 @@ pub fn sync_runtime_configs(
 }
 
 fn patch_runtime_config(agent: HookAgent, current: &str) -> Result<String, String> {
+    if agent == HookAgent::Codex {
+        return Ok(current.to_string());
+    }
+
     let mut root: Value = serde_json::from_str(current)
         .map_err(|error| format!("invalid runtime config JSON: {error}"))?;
 
@@ -73,9 +77,7 @@ fn patch_runtime_config(agent: HookAgent, current: &str) -> Result<String, Strin
         HookAgent::Claude => {
             patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", None)
         }
-        HookAgent::Codex => {
-            patch_nested_hook_config(&mut root, agent, "PreToolUse", "SessionStart", Some(10))
-        }
+        HookAgent::Codex => unreachable!("handled before JSON parsing"),
         HookAgent::Gemini => {
             patch_nested_hook_config(&mut root, agent, "BeforeTool", "SessionStart", Some(5000))
         }
