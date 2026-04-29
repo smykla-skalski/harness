@@ -151,6 +151,13 @@ async fn run_protocol(args: RunProtocolArgs) {
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
                 if let Err(error) = notification_guard.ensure_known(&notification.session_id) {
+                    if error.message.contains("already ended") {
+                        tracing::debug!(
+                            session_id = %notification.session_id,
+                            "dropping late ACP notification after session shutdown"
+                        );
+                        return Ok(());
+                    }
                     return Err(client_error_to_acp(error));
                 }
                 notifications

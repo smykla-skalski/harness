@@ -94,17 +94,23 @@ extension AgentsWindowView {
         ForEach(agentCapabilityOptions) { option in
           AgentCapabilityRow(
             option: option,
-            selection: Binding(
-              get: { formModel.selectedLaunchSelection },
-              set: { newValue in
-                formModel.selectedLaunchSelection = newValue
-                if case .tui(let runtime) = newValue {
-                  formModel.runtime = runtime
-                }
-              }
-            )
+            selection: $formModel.selectedLaunchSelection
           )
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityRow(option.id))
+        }
+      }
+      .onChange(of: formModel.selectedLaunchSelection, initial: true) { _, newValue in
+        if case .tui(let runtime) = newValue {
+          formModel.runtime = runtime
+        }
+      }
+      .onChange(of: agentCapabilityOptions, initial: true) { _, options in
+        let normalizedSelection = Self.normalizedLaunchSelection(
+          options: options,
+          selection: formModel.selectedLaunchSelection,
+          fallbackRuntime: formModel.runtime
+        )
+        if normalizedSelection != formModel.selectedLaunchSelection {
+          formModel.selectedLaunchSelection = normalizedSelection
         }
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRuntimePicker)

@@ -137,4 +137,64 @@ struct WebSocketProtocolAcpTests {
         ])
     )
   }
+
+  @Test("Daemon push event decodes sessionless ACP bridge resync incident")
+  func daemonPushEventDecodesSessionlessAcpBridgeResyncIncident() throws {
+    let json = """
+      {
+        "event": "acp_bridge_resync_incident",
+        "recorded_at": "2026-04-28T00:10:00Z",
+        "payload": {
+          "kind": "protocol_desync",
+          "bridge_epoch": "epoch-1",
+          "continuity": 8,
+          "next_seq": 19,
+          "truncated": false,
+          "affected_logical_session_ids": []
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpBridgeResyncIncident(let payload) = event.kind else {
+      Issue.record("Expected ACP bridge resync incident, got \(event.kind)")
+      return
+    }
+    #expect(event.sessionId == nil)
+    #expect(payload.kind == "protocol_desync")
+    #expect(payload.bridgeEpoch == "epoch-1")
+    #expect(payload.continuity == 8)
+  }
+
+  @Test("Daemon push event decodes ACP process incident")
+  func daemonPushEventDecodesAcpProcessIncident() throws {
+    let json = """
+      {
+        "event": "acp_process_incident",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:10:00Z",
+        "payload": {
+          "kind": "transport_closed",
+          "reason_kind": "transport_closed",
+          "process_key": "acp-process-1",
+          "pid": 42,
+          "pgid": 42,
+          "exit_code": null,
+          "exit_signal": null,
+          "stderr_tail": "lost transport",
+          "affected_logical_session_ids": ["session-1"]
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpProcessIncident(let payload) = event.kind else {
+      Issue.record("Expected ACP process incident, got \(event.kind)")
+      return
+    }
+    #expect(event.sessionId == "session-1")
+    #expect(payload.kind == "transport_closed")
+    #expect(payload.reasonKind == "transport_closed")
+    #expect(payload.affectedLogicalSessionIds == ["session-1"])
+  }
 }

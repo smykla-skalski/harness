@@ -216,7 +216,8 @@ impl AcpAgentManagerHandle {
                         }
                         // After authoritative reconcile, replay only timeline batches.
                         // State-mutating ACP events can be stale relative to reconcile.
-                        replay_events = replay_safe_resync_events(replay_events);
+                        replay_events =
+                            dedupe_incident_replays(replay_safe_resync_events(replay_events));
                     } else {
                         last_protocol_desync = None;
                     }
@@ -327,6 +328,27 @@ fn replay_safe_resync_events(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
                 || event.event == "acp_process_incident"
         })
         .collect()
+}
+
+fn dedupe_incident_replays(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
+    let mut seen = BTreeSet::<String>::new();
+    let mut deduped = Vec::with_capacity(events.len());
+    for event in events {
+        if event.event != "acp_process_incident" {
+            deduped.push(event);
+            continue;
+        }
+        let key = format!(
+            "{}|{}|{}",
+            event.event,
+            event.session_id.as_deref().unwrap_or(""),
+            event.payload
+        );
+        if seen.insert(key) {
+            deduped.push(event);
+        }
+    }
+    deduped
 }
 
 fn bridge_resync_incident_events(

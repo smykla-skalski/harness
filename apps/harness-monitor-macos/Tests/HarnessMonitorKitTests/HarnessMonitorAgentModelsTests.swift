@@ -85,6 +85,12 @@ struct HarnessMonitorAgentModelsTests {
     #expect(snapshot.acp?.stderrTail == "boom")
   }
 
+  @Test("Transport-closed disconnect is restartable")
+  func transportClosedDisconnectIsRestartable() {
+    let reason = AgentDisconnectReason(kind: "transport_closed", code: nil, signal: nil)
+    #expect(reason.isRestartable == true)
+  }
+
   @Test("ACP permission decision wire format matches daemon")
   func acpPermissionDecisionWireFormat() throws {
     let approveAll = try encodedJSONObject(AcpPermissionDecision.approveAll)

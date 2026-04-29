@@ -5,6 +5,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let id: String
   let title: String
   let transportChoices: [AgentCapabilityTransportChoice]
+  let doctorProbe: AcpDoctorProbe?
   let probe: AcpRuntimeProbe?
   let installHint: String?
   let sandboxed: Bool
@@ -14,9 +15,16 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     transportChoices.contains(where: isEnabled)
   }
 
+  var hasPendingAcpProbe: Bool {
+    acpChoice != nil && !sandboxed && probe == nil
+  }
+
   var statusText: String {
     if showsInstallCTA {
       return "Install required"
+    }
+    if hasPendingAcpProbe {
+      return "Checking"
     }
     if transportChoices.contains(where: { $0.id.isAcp }) {
       return isEnabled ? "Ready" : "Unavailable"
@@ -61,8 +69,8 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   }
 
   var probeCommand: String? {
-    guard let probe else { return nil }
-    return ([probe.command] + probe.args).joined(separator: " ")
+    guard let doctorProbe else { return nil }
+    return ([doctorProbe.command] + doctorProbe.args).joined(separator: " ")
   }
 
   var acpChoice: AgentCapabilityTransportChoice? {
@@ -89,7 +97,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
       if sandboxed {
         return acpHostBridgeReady
       }
-      return probe?.binaryPresent ?? true
+      return probe?.binaryPresent == true
     }
   }
 }
@@ -146,8 +154,12 @@ struct AgentCapabilityRow: View {
     currentChoice.capabilityLabels
   }
 
+  private var accessibilityCapabilityTags: [String] {
+    option.acpChoice?.capabilityLabels ?? capabilityTags
+  }
+
   private var accessibilityCapabilitySummary: String {
-    capabilityTags.joined(separator: ", ")
+    accessibilityCapabilityTags.joined(separator: ", ")
   }
 
   private var accessibilityRowLabel: String {
@@ -179,54 +191,9 @@ struct AgentCapabilityRow: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-          Text(option.title)
-            .scaledFont(.body.weight(.semibold))
-          Text(option.statusText)
-            .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(statusTint)
-            .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-            .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-            .background(statusTint.opacity(0.14), in: Capsule())
-        }
-        capabilityTagRow
-        if let doctorProbeText = option.doctorProbeText {
-          Text(doctorProbeText)
-            .scaledFont(.caption.monospaced())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(2)
-            .accessibilityIdentifier(
-              HarnessMonitorAccessibility.agentCapabilityProbe(option.id)
-            )
-        }
-        if !currentChoiceIsEnabled, let unavailableReason {
-          Text(unavailableReason)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.caution)
-            .lineLimit(2)
-        }
-        if option.showsInstallCTA {
-          HarnessMonitorActionButton(
-            title: option.installActionTitle,
-            tint: HarnessMonitorTheme.caution,
-            variant: .prominent,
-            accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(
-              option.id
-            )
-          ) {
-            HarnessMonitorClipboard.copy(installHintText)
-          }
-          .help(installHintText)
-          .accessibilityHint(option.installAccessibilityHint ?? "")
-        }
-      }
+      leadingColumn
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(option.transportChoices) { choice in
-          transportButton(choice)
-        }
-      }
+      transportColumn
     }
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .accessibilityElement(children: .contain)
@@ -234,17 +201,83 @@ struct AgentCapabilityRow: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityRow(option.id))
   }
 
-  @ViewBuilder private var capabilityTagRow: some View {
+  private var leadingColumn: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      titleRow
+      capabilityTagRow()
+      probeRow()
+      unavailableReasonRow()
+      installActionRow()
+    }
+  }
+
+  private var titleRow: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(option.title)
+        .scaledFont(.body.weight(.semibold))
+      Text(option.statusText)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(statusTint)
+        .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+        .background(statusTint.opacity(0.14), in: Capsule())
+    }
+  }
+
+  @ViewBuilder
+  private func capabilityTagRow() -> some View {
     if !capabilityTags.isEmpty {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(capabilityTags.prefix(3), id: \.self) { capability in
-          Text(capability)
-            .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-            .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-            .background(HarnessMonitorTheme.secondaryInk.opacity(0.08), in: Capsule())
+          CapabilityChip(title: capability)
         }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func probeRow() -> some View {
+    if let doctorProbeText = option.doctorProbeText {
+      Text(doctorProbeText)
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(2)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
+    }
+  }
+
+  @ViewBuilder
+  private func unavailableReasonRow() -> some View {
+    if !currentChoiceIsEnabled, let unavailableReason {
+      Text(unavailableReason)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .lineLimit(2)
+    }
+  }
+
+  @ViewBuilder
+  private func installActionRow() -> some View {
+    if option.showsInstallCTA {
+      HarnessMonitorActionButton(
+        title: option.installActionTitle,
+        tint: HarnessMonitorTheme.caution,
+        variant: .prominent,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(
+          option.id
+        )
+      ) {
+        HarnessMonitorClipboard.copy(installHintText)
+      }
+      .help(installHintText)
+      .accessibilityHint(option.installAccessibilityHint ?? "")
+    }
+  }
+
+  private var transportColumn: some View {
+    VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+      ForEach(option.transportChoices) { choice in
+        transportButton(choice)
       }
     }
   }
@@ -270,5 +303,24 @@ struct AgentCapabilityRow: View {
     .accessibilityHint(
       isChoiceEnabled ? "" : (unavailableReason ?? "Unavailable")
     )
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentCapabilityTransportButton(
+        option.id,
+        transportID: choice.id.accessibilityIDComponent
+      )
+    )
+  }
+}
+
+private struct CapabilityChip: View {
+  let title: String
+
+  var body: some View {
+    Text(title)
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+      .background(HarnessMonitorTheme.secondaryInk.opacity(0.08), in: Capsule())
   }
 }
