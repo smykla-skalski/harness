@@ -61,6 +61,7 @@ public final class NewSessionViewModel {
   private let isSandboxedCheck: @Sendable () -> Bool
   private let bookmarkResolver: BookmarkResolver
   private let logSink: any NewSessionLogSink
+  private let launchPreferenceRecorder: @Sendable (String) -> Void
 
   public init(
     store: HarnessMonitorStore,
@@ -68,7 +69,8 @@ public final class NewSessionViewModel {
     client: any HarnessMonitorClientProtocol,
     isSandboxed: @Sendable @escaping () -> Bool = NewSessionViewModel.liveIsSandboxed,
     bookmarkResolver: BookmarkResolver? = nil,
-    logSink: any NewSessionLogSink = LiveNewSessionLogSink()
+    logSink: any NewSessionLogSink = LiveNewSessionLogSink(),
+    launchPreferenceRecorder: @Sendable @escaping (String) -> Void = { _ in }
   ) {
     self.store = store
     self.bookmarkStore = bookmarkStore
@@ -78,9 +80,12 @@ public final class NewSessionViewModel {
       bookmarkResolver
       ?? Self.makeDefaultResolver(bookmarkStore: bookmarkStore)
     self.logSink = logSink
+    self.launchPreferenceRecorder = launchPreferenceRecorder
   }
 
-  public func submit() async -> Result<SessionStartResult, SubmitError> {
+  public func submit(
+    preferredLaunchSelectionStorageKey: String? = nil
+  ) async -> Result<SessionStartResult, SubmitError> {
     let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedTitle.isEmpty else {
       let error = SubmitError.validation(.titleRequired)
@@ -145,6 +150,11 @@ public final class NewSessionViewModel {
     }
 
     logSink.info("new-session submit succeeded id=\(startedSession.sessionId)")
+    if let preferredLaunchSelectionStorageKey,
+      !preferredLaunchSelectionStorageKey.isEmpty
+    {
+      launchPreferenceRecorder(preferredLaunchSelectionStorageKey)
+    }
     await store.selectSession(startedSession.sessionId)
     lastError = nil
     return .success(startedSession)

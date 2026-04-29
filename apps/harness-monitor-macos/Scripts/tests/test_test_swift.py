@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import signal
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -18,6 +20,14 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class TestSwiftScriptTests(unittest.TestCase):
+    def wait_for_path(self, path: Path, *, timeout: float = 5.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if path.exists():
+                return
+            time.sleep(0.05)
+        self.fail(f"timed out waiting for {path}")
+
     def run_script(
         self,
         *,
@@ -212,6 +222,93 @@ exit 1
                 calls = [line.split() for line in runner_calls.read_text().splitlines() if line]
             rtk_log = rtk_calls.read_text() if rtk_calls.exists() else ""
             return completed, calls, rtk_log
+
+    def test_termination_kills_wrapper_tree_including_xcodebuild_child(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "HarnessMonitor"
+            scripts_root = app_root / "Scripts"
+            scripts_root.mkdir(parents=True)
+            derived_data_path = temp_root / "derived"
+            build_for_testing_script = scripts_root / "build-for-testing.sh"
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            child_pid_path = temp_root / "child.pid"
+
+            write_executable(
+                build_for_testing_script,
+                """#!/bin/bash
+set -euo pipefail
+""",
+            )
+            fake_runner = fake_bin / "xcodebuild"
+            write_executable(
+                fake_runner,
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "$$" > "{child_pid_path}"
+trap 'exit 0' TERM INT HUP
+while true; do
+  sleep 1
+done
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_runner}" "$@"
+""",
+            )
+            write_executable(
+                fake_bin / "xcbeautify",
+                """#!/bin/bash
+set -euo pipefail
+cat
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
+                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
+                    "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
+                    "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
+                    "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "XCODEBUILD_BIN": str(fake_runner),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            process = subprocess.Popen(
+                ["bash", str(SCRIPT_PATH)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+
+            lock_file = derived_data_path / ".xcodebuild.lock"
+            self.wait_for_path(lock_file)
+            self.assertTrue(lock_file.is_file(), "test-swift must publish the shared lock as a PID file")
+            self.wait_for_path(child_pid_path)
+
+            child_pid = int(child_pid_path.read_text().strip())
+            process.send_signal(signal.SIGTERM)
+            stdout, stderr = process.communicate(timeout=10)
+
+            self.assertEqual(process.returncode, 143, stdout + stderr)
+            self.assertFalse(lock_file.exists(), "test-swift must not leave the shared xcodebuild lock behind")
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
 
     def test_passes_only_testing_selector_to_test_without_building_invocation(self) -> None:
         completed, calls, rtk_log = self.run_script(

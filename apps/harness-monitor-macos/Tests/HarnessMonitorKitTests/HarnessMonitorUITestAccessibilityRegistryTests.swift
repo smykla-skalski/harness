@@ -132,6 +132,25 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("New session capability identifiers match UI-test mirror")
+  func newSessionCapabilityIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.newSessionCapabilityRow("Copilot CLI")
+        == "harness.new-session.capability.copilot-cli"
+    )
+    #expect(
+      HarnessMonitorAccessibility.newSessionCapabilityProbe("Copilot CLI")
+        == "harness.new-session.capability.copilot-cli.probe"
+    )
+    #expect(
+      HarnessMonitorAccessibility.newSessionCapabilityTransportButton(
+        "Copilot CLI",
+        transportID: "managed:copilot"
+      )
+        == "harness.new-session.capability.copilot-cli.transport.managed-copilot"
+    )
+  }
+
   @Test("Slug normalises delimiters and casing")
   func slugNormalisation() {
     #expect(

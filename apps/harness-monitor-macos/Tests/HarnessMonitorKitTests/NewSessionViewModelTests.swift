@@ -209,6 +209,48 @@ struct NewSessionViewModelTests {
     #expect(store.selectedSession?.session.status == .awaitingLeader)
   }
 
+  @Test("submit records preferred launch selection after success")
+  func submitRecordsPreferredLaunchSelection() async {
+    let recordingClient = RecordingHarnessClient()
+    final class SelectionBox: @unchecked Sendable {
+      private let lock = NSLock()
+      private var storage: String?
+
+      func set(_ value: String) {
+        lock.lock()
+        storage = value
+        lock.unlock()
+      }
+
+      var value: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+      }
+    }
+
+    let recordedSelection = SelectionBox()
+    let vm = makeNewSessionViewModel(
+      client: recordingClient,
+      isSandboxed: { true },
+      bookmarkResolver: stubBookmarkResolver(
+        id: "B-selection",
+        path: "/tmp/selection"
+      ),
+      launchPreferenceRecorder: { recordedSelection.set($0) }
+    )
+    vm.title = "Selection Session"
+    vm.selectedBookmarkId = "B-selection"
+
+    let result = await vm.submit(preferredLaunchSelectionStorageKey: "managed:copilot")
+
+    guard case .success = result else {
+      Issue.record("Expected success, got \(result)")
+      return
+    }
+    #expect(recordedSelection.value == "managed:copilot")
+  }
+
   // MARK: - URLError mapping
 
   @Test("URLError.cannotConnectToHost maps to daemonUnreachable")

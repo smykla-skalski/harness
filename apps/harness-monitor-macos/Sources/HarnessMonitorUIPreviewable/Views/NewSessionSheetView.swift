@@ -15,6 +15,10 @@ struct NewSessionSheetView: View {
   @Environment(\.dismiss)
   private var dismiss
   @State private var bookmarks: [BookmarkStore.Record] = []
+  @State private var availableAcpAgents: [AcpAgentDescriptor] = []
+  @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
+  @State var selectedLaunchSelection =
+    HarnessMonitorAgentLaunchDefaults.preferredSelection()
   @State private var showImporter = false
   @FocusState private var focusedField: Field?
 
@@ -28,7 +32,12 @@ struct NewSessionSheetView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionSheet)
-    .task { await refreshBookmarks() }
+    .task {
+      async let bookmarkRefresh: Void = refreshBookmarks()
+      async let pickerCatalogRefresh: Void = loadAgentPickerCatalogs()
+      _ = await bookmarkRefresh
+      _ = await pickerCatalogRefresh
+    }
     .onChange(of: viewModel.selectedBookmarkId) { _, newValue in
       guard newValue != nil, viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else { return }
@@ -68,6 +77,7 @@ struct NewSessionSheetView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         projectSection
+        capabilityPickerSection
         detailsSection
         advancedSection
 
@@ -169,7 +179,16 @@ struct NewSessionSheetView: View {
     }
   }
 
-  private func fieldBlock<Content: View>(
+  var agentCapabilityOptions: [AgentCapabilityOption] {
+    AgentsWindowView.agentCapabilityOptions(
+      acpAgents: availableAcpAgents,
+      runtimeProbeResults: runtimeProbeResults,
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+    )
+  }
+
+  func fieldBlock<Content: View>(
     _ title: String,
     help: String? = nil,
     @ViewBuilder content: () -> Content
@@ -272,8 +291,11 @@ struct NewSessionSheetView: View {
   }
 
   private func submitAndDismiss() async {
-    let result = await viewModel.submit()
+    let result = await viewModel.submit(
+      preferredLaunchSelectionStorageKey: selectedLaunchSelection.storageKey
+    )
     if case .success = result {
+      HarnessMonitorAgentLaunchDefaults.persist(selectedLaunchSelection)
       dismiss()
     }
   }
@@ -291,6 +313,13 @@ struct NewSessionSheetView: View {
     if viewModel.selectedBookmarkId == nil, availableBookmarks.count == 1 {
       viewModel.selectedBookmarkId = availableBookmarks[0].id
     }
+  }
+
+  private func loadAgentPickerCatalogs() async {
+    async let descriptors = store.fetchAcpAgentDescriptors()
+    async let probes = store.fetchRuntimeProbeResults()
+    availableAcpAgents = await descriptors
+    runtimeProbeResults = await probes
   }
 }
 
