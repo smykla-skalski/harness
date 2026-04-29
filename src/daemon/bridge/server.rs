@@ -308,7 +308,11 @@ impl BridgeServer {
         match action {
             "start" => {
                 let request: BridgeAcpStartRequest = parse_bridge_payload(payload)?;
-                let snapshot = self.start_acp(&request.session_id, &request.request)?;
+                let snapshot = self.start_acp(
+                    &request.session_id,
+                    &request.request,
+                    request.disable_pooling,
+                )?;
                 Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
             "list" => {

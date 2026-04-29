@@ -15,10 +15,13 @@ impl BridgeServer {
         &self,
         session_id: &str,
         request: &AcpAgentStartRequest,
+        disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
         self.ensure_acp_capability()?;
-        let snapshot =
-            self.with_acp_runtime(|| self.acp_agent_manager.start(session_id, request))?;
+        let snapshot = self.with_acp_runtime(|| {
+            self.acp_agent_manager
+                .start_with_pooling_disabled(session_id, request, disable_pooling)
+        })?;
         self.update_acp_metadata()?;
         Ok(snapshot)
     }

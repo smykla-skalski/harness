@@ -73,6 +73,69 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
+async fn pooling_disable_env_starts_separate_children_for_identical_contracts() {
+    temp_env::with_vars(
+        [
+            (feature_flags::ACP_ENV, Some("1")),
+            ("HARNESS_ACP_DISABLE_POOLING", Some("1")),
+        ],
+        || {
+            let (_temp, manager, descriptor, request) = shared_fake_runtime();
+
+            let first = manager
+                .start_descriptor("sess-1", &request, &descriptor)
+                .expect("start first");
+            let second = manager
+                .start_descriptor("sess-2", &request, &descriptor)
+                .expect("start second");
+
+            assert_ne!(first.process_key, second.process_key);
+            assert_ne!(first.pid, second.pid);
+            assert_eq!(process_count(&manager), 2);
+
+            manager.stop(&first.acp_id).expect("stop first");
+            manager.stop(&second.acp_id).expect("stop second");
+        },
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
+    temp_env::with_vars(
+        [
+            (feature_flags::ACP_ENV, Some("1")),
+            ("HARNESS_ACP_DISABLE_POOLING", Some("1")),
+        ],
+        || {
+            let temp = TempDir::new().expect("temp");
+            let script = temp.path().join("failing-agent.sh");
+            write_exiting_acp_agent(&script, 0.0, 7);
+            let descriptor = descriptor(&script);
+            let request = AcpAgentStartRequest {
+                agent: "fake".to_string(),
+                prompt: None,
+                project_dir: Some(temp.path().display().to_string()),
+                record_permissions: false,
+            };
+            let manager = manager();
+            let first = manager
+                .start_descriptor("sess-1", &request, &descriptor)
+                .expect("start first isolated failing session");
+            let _ = wait_until_disconnected(&manager, &first.acp_id);
+            let error = manager
+                .start_descriptor("sess-2", &request, &descriptor)
+                .expect_err("canonical process key should be backoff-blocked");
+            assert!(
+                format!("{error}").contains("backoff"),
+                "unexpected error: {error}"
+            );
+        },
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
 async fn stopping_one_reused_process_session_keeps_sibling_active() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
