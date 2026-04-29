@@ -14,10 +14,23 @@ fn permission_request(
     PermissionBridgeRequest,
     std::sync::mpsc::Receiver<PermissionBridgeResult>,
 ) {
+    permission_request_for_session(id, "acp-session")
+}
+
+fn permission_request_for_session(
+    id: &str,
+    acp_session_id: &str,
+) -> (
+    PermissionBridgeRequest,
+    std::sync::mpsc::Receiver<PermissionBridgeResult>,
+) {
     let (tx, rx) = sync_channel(1);
     let tool_call = ToolCallUpdate::new(id.to_string(), ToolCallUpdateFields::new());
-    let request =
-        RequestPermissionRequest::new("acp-session", tool_call, standard_permission_options());
+    let request = RequestPermissionRequest::new(
+        acp_session_id.to_string(),
+        tool_call,
+        standard_permission_options(),
+    );
     (
         PermissionBridgeRequest {
             request,
@@ -43,6 +56,64 @@ async fn coalesces_concurrent_requests_into_one_batch() {
     assert_eq!(batches.len(), 1);
     assert_eq!(batches[0].requests.len(), 2);
     let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
+    assert!(rx_a.recv().expect("response a").is_ok());
+    assert!(rx_b.recv().expect("response b").is_ok());
+}
+
+#[tokio::test]
+async fn separate_logical_sessions_never_coalesce_permission_batches() {
+    let (sender, mut events) = broadcast::channel(8);
+    let bridge_a = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender.clone());
+    let bridge_b = PermissionBridgeHandle::spawn("acp-2".into(), "sess-2".into(), sender);
+    let (req_a, rx_a) = permission_request_for_session("tool-a", "acp-session-a");
+    let (req_b, rx_b) = permission_request_for_session("tool-b", "acp-session-b");
+
+    bridge_a.tx.send(req_a).await.expect("send a");
+    bridge_b.tx.send(req_b).await.expect("send b");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let batches_a = bridge_a.pending_batches();
+    let batches_b = bridge_b.pending_batches();
+    assert_eq!(batches_a.len(), 1);
+    assert_eq!(batches_b.len(), 1);
+    assert_eq!(batches_a[0].acp_id, "acp-1");
+    assert_eq!(batches_a[0].session_id, "sess-1");
+    assert_eq!(batches_b[0].acp_id, "acp-2");
+    assert_eq!(batches_b[0].session_id, "sess-2");
+    assert_ne!(batches_a[0].batch_id, batches_b[0].batch_id);
+    assert_eq!(batches_a[0].requests[0].session_id, "acp-session-a");
+    assert_eq!(batches_b[0].requests[0].session_id, "acp-session-b");
+    assert!(
+        batches_a[0].requests[0]
+            .request_id
+            .starts_with(&batches_a[0].batch_id)
+    );
+    assert!(
+        batches_b[0].requests[0]
+            .request_id
+            .starts_with(&batches_b[0].batch_id)
+    );
+    assert_ne!(
+        batches_a[0].requests[0].request_id,
+        batches_b[0].requests[0].request_id
+    );
+    assert!(
+        batches_a[0].requests[0]
+            .tool_call
+            .to_string()
+            .contains("tool-a")
+    );
+    assert!(
+        batches_b[0].requests[0]
+            .tool_call
+            .to_string()
+            .contains("tool-b")
+    );
+
+    let seen_sessions = permission_requested_sessions(&mut events);
+    assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
+    let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
+    let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
     assert!(rx_a.recv().expect("response a").is_ok());
     assert!(rx_b.recv().expect("response b").is_ok());
 }
@@ -158,4 +229,20 @@ async fn timeout_removes_pending_batch_and_broadcasts_removal() {
             .is_ok_and(|event| event.event == "acp_permission_timeout")
     });
     assert!(saw_timeout, "timeout should broadcast removal event");
+}
+
+fn permission_requested_sessions(receiver: &mut broadcast::Receiver<StreamEvent>) -> Vec<String> {
+    let mut sessions = Vec::new();
+    for _ in 0..8 {
+        let Ok(event) = receiver.try_recv() else {
+            continue;
+        };
+        if event.event == "acp_permission_requested"
+            && let Some(session_id) = event.session_id
+        {
+            sessions.push(session_id);
+        }
+    }
+    sessions.sort();
+    sessions
 }
