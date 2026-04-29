@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
+use tokio::sync::broadcast;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::protocol::StreamEvent;
@@ -40,7 +42,7 @@ impl AcpAgentManagerHandle {
         &self,
         session_id: &str,
         request: &AcpAgentStartRequest,
-    ) -> Result<AcpAgentSnapshot, crate::errors::CliError> {
+    ) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
         let snapshot = bridge.acp_start(session_id, request)?;
         self.ensure_sandbox_event_poller();
@@ -52,7 +54,7 @@ impl AcpAgentManagerHandle {
         acp_id: &str,
         batch_id: &str,
         decision: &AcpPermissionDecision,
-    ) -> Result<AcpAgentSnapshot, crate::errors::CliError> {
+    ) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
         let snapshot = bridge.acp_resolve_permission(acp_id, batch_id, decision)?;
         self.ensure_sandbox_event_poller();
@@ -62,50 +64,37 @@ impl AcpAgentManagerHandle {
     pub(super) fn list_via_bridge(
         &self,
         session_id: &str,
-    ) -> Result<Vec<AcpAgentSnapshot>, crate::errors::CliError> {
+    ) -> Result<Vec<AcpAgentSnapshot>, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
         self.ensure_sandbox_event_poller();
         bridge.acp_list(session_id)
     }
 
     pub(super) fn inspect_via_bridge(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
-        let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
-            Ok(bridge) => bridge,
-            Err(error) => {
-                tracing::warn!(%error, "failed to connect to ACP host bridge");
-                return AcpAgentInspectResponse { agents: Vec::new() };
-            }
+        let Ok(bridge) = BridgeClient::for_capability(BridgeCapability::Acp) else {
+            return log_empty_inspect("failed to connect to ACP host bridge");
         };
         self.ensure_sandbox_event_poller();
         match bridge.acp_inspect(session_id) {
             Ok(response) => response,
-            Err(error) => {
-                tracing::warn!(%error, "failed to inspect ACP host bridge sessions");
-                AcpAgentInspectResponse { agents: Vec::new() }
-            }
+            Err(error) => log_empty_inspect_with_error(error, "failed to inspect ACP host bridge sessions"),
         }
     }
 
-    pub(super) fn get_via_bridge(
-        &self,
-        acp_id: &str,
-    ) -> Result<AcpAgentSnapshot, crate::errors::CliError> {
+    pub(super) fn get_via_bridge(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
         self.ensure_sandbox_event_poller();
         bridge.acp_get(acp_id)
     }
 
-    pub(super) fn stop_via_bridge(
-        &self,
-        acp_id: &str,
-    ) -> Result<AcpAgentSnapshot, crate::errors::CliError> {
+    pub(super) fn stop_via_bridge(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
         let snapshot = bridge.acp_stop(acp_id)?;
         self.ensure_sandbox_event_poller();
         Ok(snapshot)
     }
 
-    pub(super) fn shutdown_all_via_bridge(&self) {
+    pub(super) fn shutdown_all_via_bridge() {
         // Once ACP is host-bridged, the bridge owns host lifecycle. A
         // sandboxed daemon shutdown must not tear down those sessions.
     }
@@ -125,7 +114,7 @@ impl AcpAgentManagerHandle {
             .map(|snapshot| snapshot.pending_permission_batches)
     }
 
-    pub(super) fn live_session_count_via_bridge(&self) -> Result<usize, CliError> {
+    pub(super) fn live_session_count_via_bridge() -> Result<usize, CliError> {
         BridgeClient::for_capability(BridgeCapability::Acp)
             .and_then(|bridge| bridge.acp_inspect(None))
             .map(|response| {
@@ -143,9 +132,7 @@ impl AcpAgentManagerHandle {
         }
         let manager = self.clone();
         thread::spawn(move || {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                manager.run_sandbox_event_poller();
-            }));
+            let result = catch_unwind(AssertUnwindSafe(|| manager.run_sandbox_event_poller()));
             manager.clear_sandbox_event_poller_running();
             if result.is_err() {
                 tracing::warn!("ACP sandbox event poller panicked; it can be restarted");
@@ -153,6 +140,10 @@ impl AcpAgentManagerHandle {
         });
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "bridge resync and replay branches dominate the measured complexity"
+    )]
     fn run_sandbox_event_poller(&self) {
         let mut idle_polls = 0usize;
         let mut last_protocol_desync: Option<(String, u64, u64, bool, Vec<String>)> = None;
@@ -184,7 +175,11 @@ impl AcpAgentManagerHandle {
                         );
                         let inspect = bridge.acp_inspect(None);
                         let affected_logical_session_ids = inspect.as_ref().map_or_else(
-                            |_| self.sandbox_known_sessions().into_iter().collect::<Vec<_>>(),
+                            |_| {
+                                self.sandbox_known_sessions()
+                                    .into_iter()
+                                    .collect::<Vec<_>>()
+                            },
                             |value| reconcile_sessions(self.sandbox_known_sessions(), value),
                         );
                         let payload = bridge_resync_incident_payload(
@@ -253,6 +248,10 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "sandbox ACP reconcile must merge snapshot fetch failures with session fanout"
+    )]
     fn reconcile_sandbox_state(
         &self,
         bridge: &BridgeClient,
@@ -310,6 +309,16 @@ impl AcpAgentManagerHandle {
     }
 }
 
+fn log_empty_inspect(message: &str) -> AcpAgentInspectResponse {
+    tracing::warn!(message);
+    AcpAgentInspectResponse { agents: Vec::new() }
+}
+
+fn log_empty_inspect_with_error(error: CliError, message: &str) -> AcpAgentInspectResponse {
+    tracing::warn!(%error, "{message}");
+    AcpAgentInspectResponse { agents: Vec::new() }
+}
+
 fn reconciled_event(payload: &AcpAgentsReconciledPayload) -> Option<StreamEvent> {
     Some(StreamEvent {
         event: "acp_agents_reconciled".to_string(),
@@ -334,7 +343,9 @@ fn dedupe_incident_replays(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
     let mut seen = BTreeSet::<String>::new();
     let mut deduped = Vec::with_capacity(events.len());
     for event in events {
-        if event.event != "acp_process_incident" {
+        if event.event != "acp_process_incident"
+            && event.event != "acp_bridge_resync_incident"
+        {
             deduped.push(event);
             continue;
         }
@@ -375,9 +386,7 @@ fn bridge_resync_incident_events(
     Some(events)
 }
 
-fn incident_key(
-    payload: &AcpBridgeResyncIncidentPayload,
-) -> (String, u64, u64, bool, Vec<String>) {
+fn incident_key(payload: &AcpBridgeResyncIncidentPayload) -> (String, u64, u64, bool, Vec<String>) {
     (
         payload.bridge_epoch.clone(),
         payload.continuity,
@@ -417,7 +426,7 @@ fn reconcile_sessions(
 }
 
 fn emit_bridge_resync_incident(
-    sender: &tokio::sync::broadcast::Sender<StreamEvent>,
+    sender: &broadcast::Sender<StreamEvent>,
     payload: &AcpBridgeResyncIncidentPayload,
 ) {
     if let Some(events) = bridge_resync_incident_events(payload) {
