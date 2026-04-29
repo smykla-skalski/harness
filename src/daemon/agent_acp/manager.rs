@@ -26,6 +26,7 @@ mod process_pool;
 #[cfg(test)]
 mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
+pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -148,6 +149,15 @@ impl AcpAgentManagerHandle {
         session_id: &str,
         request: &AcpAgentStartRequest,
     ) -> Result<AcpAgentSnapshot, CliError> {
+        self.start_with_pooling_disabled(session_id, request, false)
+    }
+
+    pub(crate) fn start_with_pooling_disabled(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+        disable_pooling: bool,
+    ) -> Result<AcpAgentSnapshot, CliError> {
         if !feature_flags::acp_enabled_from_env() {
             return Err(CliErrorKind::workflow_parse(format!(
                 "ACP managed agents are disabled; set {}=1 to enable",
@@ -162,9 +172,18 @@ impl AcpAgentManagerHandle {
             )))
         })?;
         if service::sandboxed_from_env() {
-            return self.start_via_bridge(session_id, request);
+            return self.start_via_bridge_with_pooling_disabled(
+                session_id,
+                request,
+                disable_pooling,
+            );
         }
-        self.start_descriptor(session_id, request, descriptor)
+        self.start_descriptor_with_pooling_disabled(
+            session_id,
+            request,
+            descriptor,
+            disable_pooling,
+        )
     }
 
     /// Resolve a pending ACP permission batch and return the updated snapshot.

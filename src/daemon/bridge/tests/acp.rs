@@ -6,6 +6,7 @@ use tempfile::tempdir;
 
 use super::{BridgeClient, BridgeResponse};
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
+use crate::daemon::bridge::acp_rpc::BridgeAcpStartRequest;
 use crate::daemon::bridge::core::BridgeAcpEventBuffer;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
@@ -147,13 +148,47 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
 }
 
 #[test]
+fn acp_start_request_defaults_pooling_enabled_for_legacy_payloads() {
+    let legacy: BridgeAcpStartRequest = serde_json::from_value(serde_json::json!({
+        "session_id": "sess-1",
+        "request": {
+            "agent": "claude",
+            "prompt": "hello",
+            "project_dir": "/tmp/project",
+            "record_permissions": false
+        }
+    }))
+    .expect("legacy payload");
+    assert!(!legacy.disable_pooling);
+
+    let isolated: BridgeAcpStartRequest = serde_json::from_value(serde_json::json!({
+        "session_id": "sess-1",
+        "request": {
+            "agent": "claude",
+            "prompt": "hello",
+            "project_dir": "/tmp/project",
+            "record_permissions": false
+        },
+        "disable_pooling": true
+    }))
+    .expect("isolated payload");
+    assert!(isolated.disable_pooling);
+}
+
+#[test]
 fn bridge_client_acp_methods_use_expected_capability_actions() {
     let dir = tempdir().expect("tempdir");
     let socket_path = dir.path().join("bridge.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind socket");
     let server = thread::spawn(move || {
         let expected = [
-            ("start", serde_json::json!({ "session_id": "sess-1" })),
+            (
+                "start",
+                serde_json::json!({
+                    "session_id": "sess-1",
+                    "disable_pooling": true
+                }),
+            ),
             ("list", serde_json::json!({ "session_id": "sess-1" })),
             ("inspect", serde_json::json!({ "session_id": "sess-1" })),
             ("get", serde_json::json!({ "acp_id": "acp-1" })),
@@ -204,7 +239,7 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
         project_dir: Some("/tmp/project".to_string()),
         record_permissions: false,
     };
-    assert!(client.acp_start("sess-1", &start_request).is_err());
+    assert!(client.acp_start("sess-1", &start_request, true).is_err());
     assert!(client.acp_list("sess-1").is_err());
     assert!(client.acp_inspect(Some("sess-1")).is_err());
     assert!(client.acp_get("acp-1").is_err());

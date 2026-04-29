@@ -20,6 +20,7 @@ impl BridgeClient {
         &self,
         session_id: &str,
         request: &AcpAgentStartRequest,
+        disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
         self.typed_capability_request(
             BridgeCapability::Acp,
@@ -27,6 +28,7 @@ impl BridgeClient {
             &BridgeAcpStartRequest {
                 session_id: session_id.to_string(),
                 request: request.clone(),
+                disable_pooling,
             },
         )
     }
