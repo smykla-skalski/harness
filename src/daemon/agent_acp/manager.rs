@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -18,6 +18,7 @@ use crate::feature_flags;
 use crate::session::types::AgentStatus;
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
+const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -99,6 +100,7 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) sandbox_event_continuity: Mutex<Option<u64>>,
     pub(in crate::daemon::agent_acp) sandbox_known_sessions: Mutex<BTreeSet<String>>,
     pub(in crate::daemon::agent_acp) process_key_failures: Mutex<BTreeMap<String, u32>>,
+    pub(in crate::daemon::agent_acp) process_key_backoff_until: Mutex<BTreeMap<String, Instant>>,
     pub(in crate::daemon::agent_acp) quarantined_process_keys: Mutex<BTreeSet<String>>,
 }
 
@@ -119,6 +121,7 @@ impl AcpAgentManagerHandle {
                 sandbox_event_continuity: Mutex::new(None),
                 sandbox_known_sessions: Mutex::new(BTreeSet::new()),
                 process_key_failures: Mutex::new(BTreeMap::new()),
+                process_key_backoff_until: Mutex::new(BTreeMap::new()),
                 quarantined_process_keys: Mutex::new(BTreeSet::new()),
             }),
         }
@@ -374,6 +377,20 @@ impl AcpAgentManagerHandle {
         &self,
         process_key: &str,
     ) -> Result<(), CliError> {
+        if let Some(until) = self
+            .state
+            .process_key_backoff_until
+            .lock()
+            .expect("ACP process key backoff lock")
+            .get(process_key)
+            .copied()
+            && until > Instant::now()
+        {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "ACP process key is in backoff after recent faults: {process_key}"
+            ))
+            .into());
+        }
         if self
             .state
             .quarantined_process_keys
@@ -394,10 +411,13 @@ impl AcpAgentManagerHandle {
         snapshot: &AcpAgentSnapshot,
         mut event: StreamEvent,
     ) -> StreamEvent {
-        let quarantine_applied = self.record_process_fault(snapshot);
+        let (backoff_applied, quarantine_applied) = self.record_process_fault(snapshot);
         if let serde_json::Value::Object(payload) = &mut event.payload {
             payload.insert("restart_applied".to_string(), serde_json::Value::Bool(false));
-            payload.insert("backoff_applied".to_string(), serde_json::Value::Bool(false));
+            payload.insert(
+                "backoff_applied".to_string(),
+                serde_json::Value::Bool(backoff_applied),
+            );
             payload.insert(
                 "quarantine_applied".to_string(),
                 serde_json::Value::Bool(quarantine_applied),
@@ -406,9 +426,9 @@ impl AcpAgentManagerHandle {
         event
     }
 
-    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> bool {
+    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> (bool, bool) {
         let AgentStatus::Disconnected { reason, .. } = &snapshot.status else {
-            return false;
+            return (false, false);
         };
         if !matches!(
             reason,
@@ -419,8 +439,13 @@ impl AcpAgentManagerHandle {
                 | DisconnectReason::PromptTimeout
                 | DisconnectReason::WatchdogFired
         ) {
-            return false;
+            return (false, false);
         }
+        self.state
+            .process_key_backoff_until
+            .lock()
+            .expect("ACP process key backoff lock")
+            .insert(snapshot.process_key.clone(), Instant::now() + PROCESS_KEY_BACKOFF);
         let mut failures = self
             .state
             .process_key_failures
@@ -429,14 +454,16 @@ impl AcpAgentManagerHandle {
         let failure_count = failures.entry(snapshot.process_key.clone()).or_insert(0);
         *failure_count = failure_count.saturating_add(1);
         if *failure_count < 3 {
-            return false;
+            return (true, false);
         }
         drop(failures);
-        self.state
+        let quarantined = self
+            .state
             .quarantined_process_keys
             .lock()
             .expect("ACP quarantined process keys lock")
-            .insert(snapshot.process_key.clone())
+            .insert(snapshot.process_key.clone());
+        (true, quarantined)
     }
 }
 
