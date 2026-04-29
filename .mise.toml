@@ -88,10 +88,12 @@ description = "Format and apply clippy fixes"
 run = ["./scripts/cargo-local.sh fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
-description = "Build release binary, sign it, install to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
+description = "Build release binaries, sign them, install harness + aff to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binaries"
 run = [
   "./scripts/cargo-local.sh build --release --features tokio-console",
   "./scripts/install-harness-release.sh",
+  "./scripts/cargo-local.sh build --release -p aff",
+  "./scripts/install-aff-release.sh",
 ]
 
 [tasks."aff:install"]

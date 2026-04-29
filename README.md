@@ -10,7 +10,7 @@ For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 mise run install
 ```
 
-Builds a release binary and installs `harness` to `~/.local/bin`. Requires Rust 1.94+.
+Builds release binaries and installs both `harness` and `aff` to `~/.local/bin`. Requires Rust 1.94+.
 The install step also reconciles stale same-tool `harness` binaries found earlier on `PATH`, including stale `~/.cargo/bin/harness` shadows; if a conflicting shadow path cannot be rewritten safely, install fails and prints the path that needs manual cleanup.
 
 ## Fast Local Rust Workflow
@@ -263,7 +263,8 @@ mise run setup:bootstrap -- --skip-runtime-hooks gemini,copilot
 mise run setup:bootstrap -- --enable-suite-hooks
 HARNESS_FEATURE_SUITE_HOOKS=1 mise run setup:bootstrap
 
-# aff-owned runtime hook wiring is manual and separate
+# aff-owned runtime hook wiring is manual and separate, but standard `mise run install`
+# now installs the global `aff` binary those hook commands expect on PATH.
 mise run aff:setup:bootstrap -- --agents codex
 mise run aff:setup:agents:generate -- --target codex
 mise run aff:check:agent-assets -- --target codex
