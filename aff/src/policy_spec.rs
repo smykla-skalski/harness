@@ -287,6 +287,25 @@ pub(crate) const HARNESS_ROUTES: &[WordRoute] = &[
 ];
 
 pub(crate) static SESSION_START_CONTEXT: LazyLock<String> = LazyLock::new(|| {
-    "Repo policy: Use `mise tasks ls` to discover workflows and `mise <task>` for all logic. Run `mise` directly without wrappers. Avoid raw `cargo` or `xcodebuild`. Constraints: Triage before acting as every action carries weight. Maintain read-only posture outside the working tree unless explicitly approved by user. Git history is append-only; no rebase, amend, or force-push. Use `git commit -sS` and verify sign-off is `Bart Smykla <bartek@smykla.com>`. Run build gates (Rust: `mise harness:check` for harness, `mise aff:check` for aff, Swift: `monitor:macos:lint` + lane) before committing unless the change is docs, version-sync, or tiny noise. Investigate call sites and state flow before fixing. Break work into small chunks. For each chunk: test first, implement, verify, run gate if significant, commit `-sS`, and verify. After the last chunk, ensure all touched gates pass unless final changes were trivial noise. Do not stop until the task is fully done. Rust files must be under 520 lines with functions under 100 lines and logic at the top. Module paths must have max 2 segments (e.g., `path::Path` OK, `std::path::Path` NO); use `use`. Use descriptive names and idiomatic code without suppressions. Check for performance regressions on hot paths. If blocked by another agent for 5 minutes, ask the user. Hard stop if 1Password is unavailable"
-        .to_string()
+    concat!(
+        "Repo policy: Use `mise tasks ls` to discover workflows and `mise <task>` for all logic. ",
+        "Run `mise` directly without wrappers. Avoid raw `cargo` or `xcodebuild`. Constraints: ",
+        "Triage before acting as every action carries weight. Maintain read-only posture outside ",
+        "the working tree unless explicitly approved by user. Git history is append-only; no ",
+        "rebase, amend, or force-push. Use `git commit -sS` and verify sign-off is `Bart Smykla ",
+        "<bartek@smykla.com>`. Run build gates (Rust: `mise harness:check` for harness, `mise ",
+        "aff:check` for aff, Swift: `monitor:macos:lint` + lane) before committing unless the ",
+        "change is docs, version-sync, or tiny noise. Investigate call sites and state flow ",
+        "before fixing. Break work into small chunks. For each chunk: test first, implement, ",
+        "verify, run gate if significant, commit `-sS`, and verify. After the last chunk, ensure ",
+        "all touched gates pass unless final changes were trivial noise. Do not stop until the ",
+        "task is fully done. Rust files must stay under 520 lines with functions under 100 lines ",
+        "and logic at the top. Once a change pushes a file past 400 lines, split it properly into ",
+        "smaller files immediately. If it reaches 520, do not shave blank lines or other cosmetic ",
+        "noise to slip back under the cap. Module paths must have max 2 segments (e.g., ",
+        "`path::Path` OK, `std::path::Path` NO); use `use`. Use descriptive names and idiomatic ",
+        "code without suppressions. Check for performance regressions on hot paths. If blocked by ",
+        "another agent for 5 minutes, ask the user. Hard stop if 1Password is unavailable",
+    )
+    .to_string()
 });
