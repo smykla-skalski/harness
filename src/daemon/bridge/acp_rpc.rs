@@ -7,6 +7,8 @@ use crate::daemon::protocol::StreamEvent;
 pub(super) struct BridgeAcpStartRequest {
     pub(super) session_id: String,
     pub(super) request: AcpAgentStartRequest,
+    #[serde(default)]
+    pub(super) disable_pooling: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

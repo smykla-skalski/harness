@@ -12,9 +12,7 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
 
-use super::manager::{
-    AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest,
-};
+use super::manager::{AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 mod incidents;
 use incidents::{
@@ -34,13 +32,14 @@ struct AcpAgentsReconciledPayload {
 }
 
 impl AcpAgentManagerHandle {
-    pub(super) fn start_via_bridge(
+    pub(super) fn start_via_bridge_with_pooling_disabled(
         &self,
         session_id: &str,
-        request: &AcpAgentStartRequest,
+        request: &super::manager::AcpAgentStartRequest,
+        disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
-        let snapshot = bridge.acp_start(session_id, request)?;
+        let snapshot = bridge.acp_start(session_id, request, disable_pooling)?;
         self.ensure_sandbox_event_poller();
         Ok(snapshot)
     }

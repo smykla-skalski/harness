@@ -104,20 +104,18 @@ impl AcpAgentManagerHandle {
         ) {
             return (false, false);
         }
+        let process_key = fault_policy_process_key(&snapshot.process_key);
         self.state
             .process_key_backoff_until
             .lock()
             .expect("ACP process key backoff lock")
-            .insert(
-                snapshot.process_key.clone(),
-                Instant::now() + PROCESS_KEY_BACKOFF,
-            );
+            .insert(process_key.clone(), Instant::now() + PROCESS_KEY_BACKOFF);
         let mut failures = self
             .state
             .process_key_failures
             .lock()
             .expect("ACP process key failures lock");
-        let failure_count = failures.entry(snapshot.process_key.clone()).or_insert(0);
+        let failure_count = failures.entry(process_key.clone()).or_insert(0);
         *failure_count = failure_count.saturating_add(1);
         if *failure_count < 3 {
             return (true, false);
@@ -128,7 +126,7 @@ impl AcpAgentManagerHandle {
             .quarantined_process_keys
             .lock()
             .expect("ACP quarantined process keys lock")
-            .insert(snapshot.process_key.clone());
+            .insert(process_key);
         (true, quarantined)
     }
 }
@@ -140,6 +138,15 @@ pub(in crate::daemon::agent_acp) fn process_fault_policy_enabled() -> bool {
             "0" | "false" | "off" | "disabled"
         )
     })
+}
+
+fn fault_policy_process_key(process_key: &str) -> String {
+    if let Some((canonical, acp_id)) = process_key.rsplit_once(":isolated:")
+        && acp_id.starts_with("agent-acp-")
+    {
+        return canonical.to_string();
+    }
+    process_key.to_string()
 }
 
 fn process_fault_fanout_events(

@@ -23,7 +23,7 @@ use super::active::{
 };
 use super::manager::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, PERMISSION_RESPONSE_DEADLINE,
-    process_fault_policy_enabled,
+    process_fault_policy_enabled, process_pooling_disabled,
 };
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
@@ -31,11 +31,22 @@ use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{SpawnProtocolInput, spawn_protocol_task};
 
 impl AcpAgentManagerHandle {
+    #[cfg(test)]
     pub(super) fn start_descriptor(
         &self,
         session_id: &str,
         request: &AcpAgentStartRequest,
         descriptor: &AcpAgentDescriptor,
+    ) -> Result<AcpAgentSnapshot, CliError> {
+        self.start_descriptor_with_pooling_disabled(session_id, request, descriptor, false)
+    }
+
+    pub(in crate::daemon::agent_acp) fn start_descriptor_with_pooling_disabled(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+        descriptor: &AcpAgentDescriptor,
+        disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
@@ -55,13 +66,18 @@ impl AcpAgentManagerHandle {
         if process_fault_policy_enabled() {
             self.ensure_process_key_start_allowed(process_key.as_str())?;
         }
+        let process_key = if disable_pooling || process_pooling_disabled() {
+            format!("{}:isolated:{acp_id}", process_key.as_str())
+        } else {
+            process_key.as_str().to_string()
+        };
         let input = DescriptorStartInput {
             acp_id: &acp_id,
             session_id,
             request,
             descriptor,
             project_dir: &project_dir,
-            process_key: process_key.as_str(),
+            process_key: &process_key,
         };
         let _lifecycle = self
             .state

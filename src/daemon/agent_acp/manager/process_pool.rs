@@ -1,12 +1,18 @@
+use std::env;
 use std::sync::Arc;
 
 use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession};
+
+const ACP_DISABLE_POOLING_ENV: &str = "HARNESS_ACP_DISABLE_POOLING";
 
 impl AcpAgentManagerHandle {
     pub(in crate::daemon::agent_acp) fn reusable_session_for_process_key(
         &self,
         process_key: &str,
     ) -> Option<Arc<ActiveAcpSession>> {
+        if process_pooling_disabled() {
+            return None;
+        }
         self.state
             .sessions
             .lock()
@@ -40,4 +46,13 @@ impl AcpAgentManagerHandle {
             processes.remove(process_key);
         }
     }
+}
+
+pub(in crate::daemon::agent_acp) fn process_pooling_disabled() -> bool {
+    env::var(ACP_DISABLE_POOLING_ENV).is_ok_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "on" | "yes"
+        )
+    })
 }
