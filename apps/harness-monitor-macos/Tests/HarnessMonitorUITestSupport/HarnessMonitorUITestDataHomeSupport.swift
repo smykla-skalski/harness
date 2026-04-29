@@ -5,9 +5,10 @@ extension HarnessMonitorUITestCase {
   func configureIsolatedDataHome(
     for app: XCUIApplication,
     purpose: String,
+    registerPerTestCleanup: Bool = true,
     file: StaticString = #filePath,
     line: UInt = #line
-  ) -> Bool {
+  ) -> URL? {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent("HarnessMonitorUITests", isDirectory: true)
       .appendingPathComponent(
@@ -46,14 +47,16 @@ extension HarnessMonitorUITestCase {
         file: file,
         line: line
       )
-      return false
+      return nil
     }
 
     app.launchEnvironment[Self.daemonDataHomeKey] = root.path
-    addTeardownBlock { @MainActor in
-      try? FileManager.default.removeItem(at: root)
+    if registerPerTestCleanup {
+      addTeardownBlock { @MainActor in
+        Self.cleanupIsolatedDataHome(at: root)
+      }
     }
-    return true
+    return root
   }
 
   func openSettings(in app: XCUIApplication) {
@@ -120,5 +123,9 @@ extension HarnessMonitorUITestCase {
       "  \"headers\": {}",
       "}",
     ].joined(separator: "\n")
+  }
+
+  static func cleanupIsolatedDataHome(at root: URL) {
+    try? FileManager.default.removeItem(at: root)
   }
 }

@@ -2,14 +2,19 @@ import XCTest
 
 extension HarnessMonitorUITestCase {
   func launch(mode: String, additionalEnvironment: [String: String] = [:]) -> XCUIApplication {
+    let signature = HarnessMonitorUITestLaunchSignature(
+      mode: mode,
+      additionalEnvironment: additionalEnvironment
+    )
     recordDiagnosticsTrace(
       event: "launch.start",
       details: [
         "mode": mode,
+        "signature": signature.summary,
         "reuse_cached_app": String(Self.reuseLaunchedApp),
       ]
     )
-    if let cached = reusableCachedApp(mode: mode) {
+    if let cached = reusableCachedApp(matching: signature) {
       return cached
     }
 
@@ -18,8 +23,24 @@ extension HarnessMonitorUITestCase {
     app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
-    guard configureIsolatedDataHome(for: app, purpose: mode) else {
+    guard
+      let dataHomeRoot = configureIsolatedDataHome(
+        for: app,
+        purpose: mode,
+        registerPerTestCleanup: !Self.reuseLaunchedApp
+      )
+    else {
       return app
+    }
+    var shouldTerminateOnReturn = false
+    var shouldCleanupDataHomeOnReturn = Self.reuseLaunchedApp
+    defer {
+      if shouldTerminateOnReturn {
+        Self.terminateAndWait(app)
+      }
+      if shouldCleanupDataHomeOnReturn {
+        Self.cleanupIsolatedDataHome(at: dataHomeRoot)
+      }
     }
     app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
     guard armRecordingStartIfConfigured() else {
@@ -27,6 +48,7 @@ extension HarnessMonitorUITestCase {
     }
 
     app.launch()
+    shouldTerminateOnReturn = Self.reuseLaunchedApp
     recordDiagnosticsTrace(event: "launch.app-launched", app: app, details: ["mode": mode])
     XCTAssertTrue(
       waitForLaunchForeground(app, mode: mode),
@@ -63,7 +85,13 @@ extension HarnessMonitorUITestCase {
       """
     )
     if Self.reuseLaunchedApp {
-      Self.cachedLaunchedApp = app
+      Self.cachedLaunch = HarnessMonitorUITestCachedLaunch(
+        app: app,
+        signature: signature,
+        dataHomeRoot: dataHomeRoot
+      )
+      shouldTerminateOnReturn = false
+      shouldCleanupDataHomeOnReturn = false
     }
     if windowReady {
       recordDiagnosticsTrace(event: "launch.window-ready", app: app, details: ["mode": mode])
@@ -74,25 +102,49 @@ extension HarnessMonitorUITestCase {
     return app
   }
 
-  private func reusableCachedApp(mode: String) -> XCUIApplication? {
-    guard
-      Self.reuseLaunchedApp,
-      let cached = Self.cachedLaunchedApp,
-      cached.state == .runningForeground || cached.state == .runningBackground
-    else {
+  private func reusableCachedApp(
+    matching signature: HarnessMonitorUITestLaunchSignature
+  ) -> XCUIApplication? {
+    guard Self.reuseLaunchedApp else {
+      return nil
+    }
+
+    guard let cachedLaunch = Self.cachedLaunch else {
+      return nil
+    }
+
+    guard cachedLaunch.signature == signature else {
+      recordDiagnosticsTrace(
+        event: "launch.reuse.signature-mismatch",
+        details: [
+          "cached_signature": cachedLaunch.signature.summary,
+          "requested_signature": signature.summary,
+        ]
+      )
+      Self.discardCachedLaunch()
+      return nil
+    }
+
+    let cached = cachedLaunch.app
+    guard cached.state == .runningForeground || cached.state == .runningBackground else {
+      recordDiagnosticsTrace(
+        event: "launch.reuse.process-missing",
+        details: ["signature": signature.summary]
+      )
+      Self.discardCachedLaunch()
       return nil
     }
 
     recordDiagnosticsTrace(
       event: "launch.reuse.cached",
       app: cached,
-      details: ["mode": mode]
+      details: ["signature": signature.summary]
     )
     cached.activate()
     recordDiagnosticsTrace(
       event: "launch.reuse.activate",
       app: cached,
-      details: ["mode": mode]
+      details: ["signature": signature.summary]
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
