@@ -332,7 +332,7 @@ impl AcpAgentManagerHandle {
         let Some(session) = active.upgrade() else {
             return;
         };
-        let (snapshot, incident) = {
+        let (snapshot, incidents) = {
             let _lifecycle = self
                 .state
                 .process_lifecycle
@@ -342,15 +342,17 @@ impl AcpAgentManagerHandle {
             let pending_permissions = session.disconnect(reason, false);
             let process_key = session.process_key();
             let snapshot = session.snapshot_with_live_counts();
-            let incident = process_incident_from_snapshot(&snapshot)
-                .map(|event| self.process_fault_event_locked(&snapshot, event));
+            let incidents = process_incident_from_snapshot(&snapshot)
+                .map_or_else(Vec::new, |event| {
+                    self.process_fault_events_locked(&snapshot, event)
+                });
             if session.process().logical_session_count() == 0 {
                 session.terminate_process(pending_permissions);
                 self.remove_process_if_empty(&process_key);
             }
-            (snapshot, incident)
+            (snapshot, incidents)
         };
-        if let Some(incident) = incident {
+        for incident in incidents {
             let _ = self.state.sender.send(incident);
         }
         let payload = serde_json::to_value(&snapshot).unwrap_or_default();
@@ -420,8 +422,9 @@ impl AcpAgentManagerHandle {
             && after.status.is_disconnected()
             && let Some(event) = process_incident_from_snapshot(&after)
         {
-            let event = self.process_fault_event(&after, event);
-            let _ = self.state.sender.send(event);
+            for event in self.process_fault_events(&after, event) {
+                let _ = self.state.sender.send(event);
+            }
         }
         after
     }

@@ -405,8 +405,7 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
     };
     let kind = match reason {
         DisconnectReason::ProcessExited { .. } => "process_exit",
-        DisconnectReason::TransportClosed => "transport_closed",
-        DisconnectReason::StdioClosed => "stdio_closed",
+        DisconnectReason::TransportClosed | DisconnectReason::StdioClosed => "transport_closed",
         DisconnectReason::InitializeTimeout | DisconnectReason::PromptTimeout => "protocol_desync",
         DisconnectReason::WatchdogFired => "watchdog_fired",
         DisconnectReason::SessionStopped

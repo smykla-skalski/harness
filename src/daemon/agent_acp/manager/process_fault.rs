@@ -11,28 +11,28 @@ use crate::session::types::AgentStatus;
 const ACP_PROCESS_FAULT_POLICY_ENV: &str = "HARNESS_ACP_PROCESS_FAULT_POLICY";
 
 impl AcpAgentManagerHandle {
-    pub(super) fn process_fault_event(
+    pub(super) fn process_fault_events(
         &self,
         snapshot: &AcpAgentSnapshot,
         event: StreamEvent,
-    ) -> StreamEvent {
+    ) -> Vec<StreamEvent> {
         let _lifecycle = self
             .state
             .process_lifecycle
             .lock()
             .expect("ACP process lifecycle lock");
-        self.process_fault_event_locked(snapshot, event)
+        self.process_fault_events_locked(snapshot, event)
     }
 
-    pub(super) fn process_fault_event_locked(
+    pub(super) fn process_fault_events_locked(
         &self,
         snapshot: &AcpAgentSnapshot,
         event: StreamEvent,
-    ) -> StreamEvent {
+    ) -> Vec<StreamEvent> {
         let affected_session_ids = self.disconnect_process_siblings(snapshot);
         self.remove_process_if_empty(&snapshot.process_key);
         let event = self.apply_process_fault_policy(snapshot, event);
-        with_affected_logical_session_ids(event, affected_session_ids)
+        process_fault_fanout_events(event, affected_session_ids)
     }
 
     fn sessions_for_process_key(&self, process_key: &str) -> Vec<Arc<ActiveAcpSession>> {
@@ -142,10 +142,10 @@ pub(in crate::daemon::agent_acp) fn process_fault_policy_enabled() -> bool {
     })
 }
 
-fn with_affected_logical_session_ids(
+fn process_fault_fanout_events(
     mut event: StreamEvent,
     affected_session_ids: Vec<String>,
-) -> StreamEvent {
+) -> Vec<StreamEvent> {
     if let serde_json::Value::Object(payload) = &mut event.payload {
         payload.insert(
             "affected_logical_session_ids".to_string(),
@@ -157,5 +157,27 @@ fn with_affected_logical_session_ids(
             ),
         );
     }
+    let session_ids = affected_logical_session_ids(&event);
+    if session_ids.is_empty() {
+        return vec![event];
+    }
+    session_ids
+        .into_iter()
+        .map(|session_id| {
+            let mut event = event.clone();
+            event.session_id = Some(session_id);
+            event
+        })
+        .collect()
+}
+
+fn affected_logical_session_ids(event: &StreamEvent) -> Vec<String> {
     event
+        .payload
+        .get("affected_logical_session_ids")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+        .collect()
 }

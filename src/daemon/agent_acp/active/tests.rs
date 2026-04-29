@@ -38,6 +38,14 @@ fn process_incident_event_maps_transport_closed() {
 }
 
 #[test]
+fn process_incident_event_maps_stdio_closed_to_transport_kind() {
+    let snapshot = disconnected_snapshot(DisconnectReason::StdioClosed);
+    let event = process_incident_event(&snapshot).expect("incident event");
+    assert_eq!(event.payload["kind"], "transport_closed");
+    assert_eq!(event.payload["reason_kind"], "stdio_closed");
+}
+
+#[test]
 fn process_incident_event_maps_prompt_timeout_to_protocol_desync() {
     let snapshot = disconnected_snapshot(DisconnectReason::PromptTimeout);
     let event = process_incident_event(&snapshot).expect("incident event");
