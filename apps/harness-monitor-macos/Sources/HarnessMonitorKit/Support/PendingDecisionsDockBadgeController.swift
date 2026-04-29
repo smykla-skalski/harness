@@ -14,7 +14,7 @@ public final class PendingDecisionsDockBadgeController {
   private var dockTile: (any DockTileBadgeWriting)?
 
   public init() {
-    dockTileProvider = { NSApp?.dockTile }
+    dockTileProvider = Self.defaultDockTile
   }
 
   init(dockTile: any DockTileBadgeWriting) {
@@ -52,5 +52,9 @@ public final class PendingDecisionsDockBadgeController {
     let resolvedDockTile = dockTileProvider()
     dockTile = resolvedDockTile
     return resolvedDockTile
+  }
+
+  private static func defaultDockTile() -> (any DockTileBadgeWriting)? {
+    NSApp?.dockTile
   }
 }
