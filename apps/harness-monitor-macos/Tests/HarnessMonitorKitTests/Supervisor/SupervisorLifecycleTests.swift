@@ -320,6 +320,27 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_pendingDecisionsBadgeSyncReflectsInsertedAndDismissedDecision() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let recorder = PendingDecisionsBadgeSyncRecorder()
+    store.bindPendingDecisionsBadgeSync { count in
+      recorder.record(count)
+    }
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    let decisionID = "d-pending-badge-sync"
+    try await store.insertDecisionForTesting(DecisionDraft.fixture(id: decisionID))
+    try await waitForPendingDecisionBadgeCounts([0, 1], recorder: recorder)
+    XCTAssertEqual(recorder.counts, [0, 1])
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    try await decisionStore.dismiss(id: decisionID)
+    try await waitForPendingDecisionBadgeCounts([0, 1, 0], recorder: recorder)
+    XCTAssertEqual(recorder.counts, [0, 1, 0])
+  }
+
+  @MainActor
   func test_stopSupervisorClearsBadge() async throws {
     let store = HarnessMonitorStore.fixture()
     let center = RecordingNotificationCenter()
@@ -334,6 +355,24 @@ final class SupervisorLifecycleTests: XCTestCase {
     await store.stopSupervisor()
 
     XCTAssertEqual(center.badgeCounts, [1, 0])
+  }
+
+  @MainActor
+  func test_stopSupervisorClearsPendingDecisionsBadgeSync() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let recorder = PendingDecisionsBadgeSyncRecorder()
+    store.bindPendingDecisionsBadgeSync { count in
+      recorder.record(count)
+    }
+    await store.startSupervisor()
+
+    try await store.insertDecisionForTesting(DecisionDraft.fixture(id: "d-pending-badge-stop"))
+    try await waitForPendingDecisionBadgeCounts([0, 1], recorder: recorder)
+    XCTAssertEqual(recorder.counts, [0, 1])
+
+    await store.stopSupervisor()
+
+    XCTAssertEqual(recorder.counts, [0, 1, 0])
   }
 
   @MainActor
