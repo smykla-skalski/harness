@@ -80,6 +80,10 @@ struct AgentsSidebar: View {
                 )
               }
               .frame(maxWidth: .infinity, alignment: .leading)
+              .contentShape(Rectangle())
+              .onTapGesture {
+                selection = .agent(agent.agentId)
+              }
               .overlay(alignment: .topTrailing) {
                 if agent.isAutoSpawned {
                   AutoSpawnedBadgeView(agentID: agent.agentId)
@@ -90,6 +94,9 @@ struct AgentsSidebar: View {
               .tag(AgentTuiSheetSelection.agent(agent.agentId))
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
+              )
+              .accessibilityFrameMarker(
+                "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
               )
               .accessibilityTestProbe(
                 pendingDecisionBadgeID,
@@ -110,6 +117,10 @@ struct AgentsSidebar: View {
                 Spacer(minLength: HarnessMonitorTheme.spacingSM)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
+              .contentShape(Rectangle())
+              .onTapGesture {
+                selection = .agent(agent.agentId)
+              }
               .overlay(alignment: .topTrailing) {
                 if agent.isAutoSpawned {
                   AutoSpawnedBadgeView(agentID: agent.agentId)
@@ -120,6 +131,9 @@ struct AgentsSidebar: View {
               .tag(AgentTuiSheetSelection.agent(agent.agentId))
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
+              )
+              .accessibilityFrameMarker(
+                "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
               )
             }
           }

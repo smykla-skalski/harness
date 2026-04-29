@@ -30,26 +30,33 @@ final class AttentionInfrastructureUITests_SidebarBadge:
       "Sidebar badge should appear for agent with pending ACP permission requests"
     )
 
-    tapButton(in: app, identifier: Accessibility.agentTuiExternalTab(Self.agentID))
-
-    let strip = element(
-      in: app,
-      identifier: Accessibility.agentDetailAwaitingDecisionStrip(Self.agentID)
-    )
-    XCTAssertTrue(
-      waitForElement(strip, timeout: Self.uiTimeout),
-      "Agent detail should surface the awaiting-decision strip"
-    )
+    let agentRow = element(in: app, identifier: Accessibility.agentTuiExternalTab(Self.agentID))
+    XCTAssertTrue(waitForElement(agentRow, timeout: Self.uiTimeout))
+    tapViaCoordinate(in: app, element: agentRow)
 
     let stripState = element(
       in: app,
       identifier: Accessibility.agentsWindowDetailAwaitingDecisionState
     )
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        self.markerText(for: stripState).contains("count=2")
-      },
-      "Strip state marker should publish the pending request count"
+      waitForElement(stripState, timeout: Self.uiTimeout),
+      "Agent detail should surface the awaiting-decision strip markers"
+    )
+    let stripCountMatched = waitUntil(timeout: Self.actionTimeout) {
+      self.markerText(for: stripState).contains("count=2")
+    }
+    XCTAssertTrue(
+      stripCountMatched,
+      "Strip state marker should publish the pending request count; actual=\(markerText(for: stripState))"
+    )
+
+    let openDecisionsButton = button(
+      in: app,
+      identifier: Accessibility.agentDetailOpenDecisionsButton(Self.agentID)
+    )
+    XCTAssertTrue(
+      waitForElement(openDecisionsButton, timeout: Self.uiTimeout),
+      "Agent detail should surface the strip action button"
     )
 
     tapButton(in: app, identifier: Accessibility.agentDetailOpenDecisionsButton(Self.agentID))
@@ -69,11 +76,17 @@ final class AttentionInfrastructureUITests_SidebarBadge:
   }
 
   private func markerText(for element: XCUIElement) -> String {
-    if !element.label.isEmpty {
-      return element.label
+    if let value = element.value {
+      let rendered = String(describing: value)
+      if rendered != "nil", !rendered.isEmpty {
+        return rendered
+      }
     }
     if let value = element.value as? String, !value.isEmpty {
       return value
+    }
+    if !element.label.isEmpty {
+      return element.label
     }
     return element.debugDescription
   }

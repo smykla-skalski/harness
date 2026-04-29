@@ -83,10 +83,16 @@ struct AgentDetailSection: View {
           HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
         )
         .accessibilityTestProbe(
-          HarnessMonitorAccessibility.agentsWindowDetailAwaitingDecisionState,
-          label: agent.agentId,
+          HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId),
+          label: "Awaiting decision",
           value:
             "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
+        )
+        .accessibilityTestProbe(
+          HarnessMonitorAccessibility.agentsWindowDetailAwaitingDecisionState,
+          label:
+            "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
+          value: agent.agentId
         )
       }
       Text(agent.name)
@@ -309,7 +315,9 @@ struct AgentDetailSection: View {
   }
 
   private func openPendingDecisions() {
-    store.selectOldestDecision(for: agent.agentId)
+    if let decisionID = store.selectOldestDecision(for: agent.agentId) {
+      store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+    }
     openWindow(id: HarnessMonitorWindowID.decisions)
   }
 

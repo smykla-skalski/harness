@@ -27,6 +27,63 @@ private final class HarnessMonitorUserNotificationCenterBox: @unchecked Sendable
   }
 }
 
+private final class PreviewHarnessMonitorUserNotificationCenter: HarnessMonitorUserNotificationCenter,
+  @unchecked Sendable
+{
+  var delegate: UNUserNotificationCenterDelegate?
+
+  private var pendingRequests: [UNNotificationRequest]
+  private var categories: Set<UNNotificationCategory>
+  private var badgeCount = 0
+
+  init(
+    pendingRequests: [UNNotificationRequest] = [],
+    categories: Set<UNNotificationCategory> = []
+  ) {
+    self.pendingRequests = pendingRequests
+    self.categories = categories
+  }
+
+  func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
+    _ = options
+    return true
+  }
+
+  func notificationSettings() async -> UNNotificationSettings {
+    fatalError("Preview center does not vend system notification settings directly.")
+  }
+
+  func pendingNotificationRequests() async -> [UNNotificationRequest] {
+    pendingRequests
+  }
+
+  func deliveredNotifications() async -> [UNNotification] {
+    []
+  }
+
+  func notificationCategories() async -> Set<UNNotificationCategory> {
+    categories
+  }
+
+  func add(_ request: UNNotificationRequest) async throws {
+    pendingRequests.append(request)
+  }
+
+  func removeAllPendingNotificationRequests() {
+    pendingRequests.removeAll()
+  }
+
+  func removeAllDeliveredNotifications() {}
+
+  func setBadgeCount(_ newBadgeCount: Int) async throws {
+    badgeCount = newBadgeCount
+  }
+
+  func setNotificationCategories(_ categories: Set<UNNotificationCategory>) {
+    self.categories = categories
+  }
+}
+
 @MainActor
 @Observable
 public final class HarnessMonitorUserNotificationController: NSObject,
@@ -58,26 +115,46 @@ public final class HarnessMonitorUserNotificationController: NSObject,
 
   @ObservationIgnored private let centerBox: HarnessMonitorUserNotificationCenterBox
   @ObservationIgnored private let assetWriter: HarnessMonitorNotificationAssetWriting
+  @ObservationIgnored private let previewSettingsSnapshot: HarnessMonitorNotificationSettingsSnapshot?
   @ObservationIgnored private var isActivated = false
   @ObservationIgnored private var resolveHandler: DecisionResolveHandler?
 
   public init(
     center: any HarnessMonitorUserNotificationCenter = UNUserNotificationCenter.current(),
-    assetWriter: HarnessMonitorNotificationAssetWriting = HarnessMonitorNotificationAssetWriter()
+    assetWriter: HarnessMonitorNotificationAssetWriting = HarnessMonitorNotificationAssetWriter(),
+    previewSettingsSnapshot: HarnessMonitorNotificationSettingsSnapshot? = nil
   ) {
     centerBox = HarnessMonitorUserNotificationCenterBox(center)
     self.assetWriter = assetWriter
+    self.previewSettingsSnapshot = previewSettingsSnapshot
     super.init()
   }
 
-  public static func preview() -> HarnessMonitorUserNotificationController {
-    let controller = HarnessMonitorUserNotificationController()
-    controller.settingsSnapshot = .preview
-    controller.pendingRequestCount = 2
-    controller.deliveredNotificationCount = 4
+  public static func preview(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> HarnessMonitorUserNotificationController {
+    let settingsSnapshot = AcpPermissionUserNotifications.previewSettingsSnapshot(
+      environment: environment
+    )
+    let center = PreviewHarnessMonitorUserNotificationCenter(
+      categories: HarnessMonitorNotificationRequestFactory.categories()
+    )
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: settingsSnapshot
+    )
+    controller.settingsSnapshot = settingsSnapshot
+    controller.pendingRequestCount = 0
+    controller.deliveredNotificationCount = 0
     controller.registeredCategoryCount = HarnessMonitorNotificationRequestFactory.categories().count
     controller.lastResult = "Preview notification controls are ready."
     return controller
+  }
+
+  public static func preview(
+    environment: HarnessMonitorEnvironment
+  ) -> HarnessMonitorUserNotificationController {
+    preview(environment: environment.values)
   }
 
   public func activate() {
@@ -167,11 +244,51 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   public func refreshStatus() async {
+    if let previewSettingsSnapshot {
+      settingsSnapshot = previewSettingsSnapshot
+      pendingRequestCount = await centerBox.base.pendingNotificationRequests().count
+      deliveredNotificationCount = await centerBox.base.deliveredNotifications().count
+      registeredCategoryCount = await centerBox.base.notificationCategories().count
+      return
+    }
     let settings = await centerBox.base.notificationSettings()
     settingsSnapshot = HarnessMonitorNotificationSettingsSnapshot(settings: settings)
     pendingRequestCount = await centerBox.base.pendingNotificationRequests().count
     deliveredNotificationCount = await centerBox.base.deliveredNotifications().count
     registeredCategoryCount = await centerBox.base.notificationCategories().count
+  }
+
+  @discardableResult
+  public func deliverAcpPermissionRequest(_ attention: AcpPermissionAttentionEvent) async -> Bool {
+    if AcpPermissionUserNotifications.authorizationStatus(from: settingsSnapshot) == .unknown {
+      await refreshStatus()
+    }
+    let authorizationStatus = AcpPermissionUserNotifications.authorizationStatus(
+      from: settingsSnapshot
+    )
+    guard authorizationStatus.allowsUserNotificationDelivery else {
+      lastResult =
+        "ACP permission notification skipped: \(authorizationStatus.rawValue)."
+      return false
+    }
+
+    var didSchedule = false
+    await performNotificationOperation {
+      do {
+        registerCategories()
+        let request = HarnessMonitorNotificationRequestFactory.makeAcpPermissionRequest(
+          agentName: attention.agentName,
+          decisionID: attention.decisionID
+        )
+        try await centerBox.base.add(request)
+        didSchedule = true
+        lastResult = "Scheduled ACP permission \(attention.batchID)."
+        await refreshStatus()
+      } catch {
+        lastResult = "Scheduling ACP permission failed: \(error.localizedDescription)"
+      }
+    }
+    return didSchedule
   }
 
   public func deliverDraft() async {
