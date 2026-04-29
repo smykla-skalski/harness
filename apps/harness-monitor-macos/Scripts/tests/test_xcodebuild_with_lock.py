@@ -69,6 +69,15 @@ printf 'RTK=%s\\n' "$*" >> "{tool_log}"
                 f"""#!/bin/bash
 set -euo pipefail
 printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+if [[ "${{FAKE_XCODEBUILD_FAIL_WITH_DIAGNOSTICS:-}}" == "1" ]]; then
+  count="${{FAKE_XCODEBUILD_DIAGNOSTIC_COUNT:-1}}"
+  for ((i = 1; i <= count; i += 1)); do
+    printf '/tmp/FakeSource.swift:%s:3: error: synthetic failure %s\\n' "$i" "$i"
+    printf 'let failure_%s = boom\\n' "$i"
+    printf '  ^~~~\\n'
+  done
+  exit 65
+fi
 if [[ "${{FAKE_XCODEBUILD_EMIT_NOISE:-}}" == "1" ]]; then
   printf '%s\\n' \\
     "Loading and constructing the graph" \\
@@ -88,7 +97,12 @@ fi
                     f"""#!/bin/bash
 set -euo pipefail
 printf 'XCBEAUTIFY=%s\\n' "$*" >> "{tool_log}"
-cat
+if [[ "${{FAKE_XCBEAUTIFY_HIDE_DIAGNOSTICS:-}}" == "1" ]]; then
+  cat >/dev/null
+  printf '%s\\n' "** BUILD FAILED **"
+else
+  cat
+fi
 """,
                 )
             if include_tuist:
@@ -156,6 +170,72 @@ shift
         self.assertIn("lock owner command:", completed.stderr)
         self.assertIn("Timed out waiting for xcodebuild lock at", completed.stderr)
         self.assertEqual(log, "")
+
+    def test_surfaces_raw_compiler_diagnostics_when_xcbeautify_hides_them(self) -> None:
+        completed, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={
+                "FAKE_XCODEBUILD_FAIL_WITH_DIAGNOSTICS": "1",
+                "FAKE_XCBEAUTIFY_HIDE_DIAGNOSTICS": "1",
+            },
+            include_xcbeautify=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        combined_output = completed.stdout + completed.stderr
+        self.assertIn(
+            "swift-raw-diagnostics: extracted compiler diagnostics from raw xcodebuild output",
+            combined_output,
+        )
+        self.assertIn(
+            "/tmp/FakeSource.swift:1:3: error: synthetic failure 1",
+            combined_output,
+        )
+        self.assertNotIn("swift-compile-context:", combined_output)
+
+    def test_caps_raw_compiler_diagnostics_to_avoid_huge_failure_dumps(self) -> None:
+        completed, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={
+                "FAKE_XCODEBUILD_FAIL_WITH_DIAGNOSTICS": "1",
+                "FAKE_XCODEBUILD_DIAGNOSTIC_COUNT": "20",
+                "FAKE_XCBEAUTIFY_HIDE_DIAGNOSTICS": "1",
+            },
+            include_xcbeautify=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        combined_output = completed.stdout + completed.stderr
+        self.assertIn(
+            "/tmp/FakeSource.swift:12:3: error: synthetic failure 12",
+            combined_output,
+        )
+        self.assertNotIn(
+            "/tmp/FakeSource.swift:13:3: error: synthetic failure 13",
+            combined_output,
+        )
+
+    def test_raw_log_capture_also_works_when_xcbeautify_is_disabled(self) -> None:
+        completed, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={
+                "FAKE_XCODEBUILD_FAIL_WITH_DIAGNOSTICS": "1",
+                "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
+            },
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        combined_output = completed.stdout + completed.stderr
+        self.assertIn(
+            "/tmp/FakeSource.swift:1:3: error: synthetic failure 1",
+            combined_output,
+        )
 
     def test_uses_tuist_xcodebuild_for_normal_build_invocations(self) -> None:
         completed, log = self.run_script("-scheme", "HarnessMonitor", "build")

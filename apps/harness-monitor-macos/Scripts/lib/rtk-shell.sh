@@ -54,6 +54,7 @@ xcbeautify_is_disabled() {
 run_xcodebuild_with_formatter() {
   local junit_path=""
   local use_tuist=0
+  local raw_log_path="${XCODEBUILD_RAW_LOG_PATH:-}"
   while (( $# > 0 )); do
     case "$1" in
       --junit-path)
@@ -84,7 +85,18 @@ run_xcodebuild_with_formatter() {
       xcb_args+=(--report junit --report-path "$junit_path")
     fi
     set -o pipefail
-    "$invoker" "$@" 2>&1 | xcbeautify "${xcb_args[@]}"
+    if [[ -n "$raw_log_path" ]]; then
+      "$invoker" "$@" 2>&1 | tee "$raw_log_path" | xcbeautify "${xcb_args[@]}"
+    else
+      "$invoker" "$@" 2>&1 | xcbeautify "${xcb_args[@]}"
+    fi
+    local status="${PIPESTATUS[0]}"
+    set +o pipefail
+    return "$status"
+  fi
+  if [[ -n "$raw_log_path" ]]; then
+    set -o pipefail
+    "$invoker" "$@" 2>&1 | tee "$raw_log_path"
     local status="${PIPESTATUS[0]}"
     set +o pipefail
     return "$status"
