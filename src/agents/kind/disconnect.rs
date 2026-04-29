@@ -26,6 +26,8 @@ pub enum DisconnectReason {
     },
     /// Stdio (or PTY) closed unexpectedly with the process still live.
     StdioClosed,
+    /// ACP transport closed unexpectedly.
+    TransportClosed,
     /// `initialize` did not complete inside its deadline.
     InitializeTimeout,
     /// `session/prompt` did not complete inside its deadline.
@@ -34,6 +36,8 @@ pub enum DisconnectReason {
     WatchdogFired,
     /// User cancelled the session.
     UserCancelled,
+    /// Logical ACP session was stopped explicitly.
+    SessionStopped,
     /// Daemon shut down.
     DaemonShutdown,
     /// Process was OOM-killed.
@@ -65,11 +69,15 @@ impl DisconnectReason {
         match self {
             Self::ProcessExited { .. }
             | Self::StdioClosed
+            | Self::TransportClosed
             | Self::WatchdogFired
             | Self::PromptTimeout
             | Self::InitializeTimeout
             | Self::OomKilled => true,
-            Self::UserCancelled | Self::DaemonShutdown | Self::Unknown { .. } => false,
+            Self::UserCancelled
+            | Self::SessionStopped
+            | Self::DaemonShutdown
+            | Self::Unknown { .. } => false,
         }
     }
 
@@ -77,10 +85,12 @@ impl DisconnectReason {
         match self {
             Self::ProcessExited { .. } => KIND_PROCESS_EXITED,
             Self::StdioClosed => KIND_STDIO_CLOSED,
+            Self::TransportClosed => KIND_TRANSPORT_CLOSED,
             Self::InitializeTimeout => KIND_INITIALIZE_TIMEOUT,
             Self::PromptTimeout => KIND_PROMPT_TIMEOUT,
             Self::WatchdogFired => KIND_WATCHDOG_FIRED,
             Self::UserCancelled => KIND_USER_CANCELLED,
+            Self::SessionStopped => KIND_SESSION_STOPPED,
             Self::DaemonShutdown => KIND_DAEMON_SHUTDOWN,
             Self::OomKilled => KIND_OOM_KILLED,
             Self::Unknown { .. } => KIND_UNKNOWN,
@@ -94,10 +104,12 @@ impl DisconnectReason {
 
 const KIND_PROCESS_EXITED: &str = "process_exited";
 const KIND_STDIO_CLOSED: &str = "stdio_closed";
+const KIND_TRANSPORT_CLOSED: &str = "transport_closed";
 const KIND_INITIALIZE_TIMEOUT: &str = "initialize_timeout";
 const KIND_PROMPT_TIMEOUT: &str = "prompt_timeout";
 const KIND_WATCHDOG_FIRED: &str = "watchdog_fired";
 const KIND_USER_CANCELLED: &str = "user_cancelled";
+const KIND_SESSION_STOPPED: &str = "session_stopped";
 const KIND_DAEMON_SHUTDOWN: &str = "daemon_shutdown";
 const KIND_OOM_KILLED: &str = "oom_killed";
 const KIND_UNKNOWN: &str = "unknown";
@@ -155,10 +167,12 @@ impl<'de> Deserialize<'de> for DisconnectReason {
                 signal: raw.signal,
             },
             KIND_STDIO_CLOSED => Self::StdioClosed,
+            KIND_TRANSPORT_CLOSED => Self::TransportClosed,
             KIND_INITIALIZE_TIMEOUT => Self::InitializeTimeout,
             KIND_PROMPT_TIMEOUT => Self::PromptTimeout,
             KIND_WATCHDOG_FIRED => Self::WatchdogFired,
             KIND_USER_CANCELLED => Self::UserCancelled,
+            KIND_SESSION_STOPPED => Self::SessionStopped,
             KIND_DAEMON_SHUTDOWN => Self::DaemonShutdown,
             KIND_OOM_KILLED => Self::OomKilled,
             KIND_UNKNOWN => Self::Unknown { raw_kind: None },
@@ -181,10 +195,12 @@ mod tests {
                 signal: None,
             },
             DisconnectReason::StdioClosed,
+            DisconnectReason::TransportClosed,
             DisconnectReason::InitializeTimeout,
             DisconnectReason::PromptTimeout,
             DisconnectReason::WatchdogFired,
             DisconnectReason::UserCancelled,
+            DisconnectReason::SessionStopped,
             DisconnectReason::DaemonShutdown,
             DisconnectReason::OomKilled,
             DisconnectReason::Unknown { raw_kind: None },
@@ -231,8 +247,10 @@ mod tests {
             .is_restartable()
         );
         assert!(!DisconnectReason::UserCancelled.is_restartable());
+        assert!(!DisconnectReason::SessionStopped.is_restartable());
         assert!(!DisconnectReason::DaemonShutdown.is_restartable());
         assert!(DisconnectReason::OomKilled.is_restartable());
         assert!(DisconnectReason::StdioClosed.is_restartable());
+        assert!(DisconnectReason::TransportClosed.is_restartable());
     }
 }

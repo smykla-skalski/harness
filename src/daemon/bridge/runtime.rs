@@ -20,15 +20,14 @@ use super::bridge_state::{
     resolve_running_bridge, write_bridge_config,
 };
 use super::core::{
-    BridgeAgentTuiMetadata, BridgeCodexMetadata, BridgeCodexProcess,
-    CodexEndpointScheme, ResolvedBridgeConfig,
+    BridgeAgentTuiMetadata, BridgeCodexMetadata, BridgeCodexProcess, CodexEndpointScheme,
+    ResolvedBridgeConfig,
 };
 use super::helpers::{detect_codex_version, remove_if_exists, stringify_metadata_map};
 use super::server::BridgeServer;
 use super::stream_handler::handle_stream;
 use super::types::{
-    BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
-    BridgeCapability,
+    BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
     CODEX_READY_POLL_INTERVAL, CODEX_READY_PROBE_TIMEOUT, CODEX_READY_TIMEOUT,
     CODEX_READY_WARN_AFTER,
 };

@@ -70,14 +70,26 @@ impl AcpAgentManagerHandle {
         bridge.acp_list(session_id)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "bridge availability and fallback-empty inspect are handled inline for clarity"
+    )]
     pub(super) fn inspect_via_bridge(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
-        let Ok(bridge) = BridgeClient::for_capability(BridgeCapability::Acp) else {
-            return log_empty_inspect("failed to connect to ACP host bridge");
+        let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
+            Ok(bridge) => bridge,
+            Err(error) => {
+                return log_empty_inspect_with_error(
+                    &error,
+                    "failed to connect to ACP host bridge",
+                );
+            }
         };
         self.ensure_sandbox_event_poller();
         match bridge.acp_inspect(session_id) {
             Ok(response) => response,
-            Err(error) => log_empty_inspect_with_error(error, "failed to inspect ACP host bridge sessions"),
+            Err(error) => {
+                log_empty_inspect_with_error(&error, "failed to inspect ACP host bridge sessions")
+            }
         }
     }
 
@@ -131,13 +143,7 @@ impl AcpAgentManagerHandle {
             return;
         }
         let manager = self.clone();
-        thread::spawn(move || {
-            let result = catch_unwind(AssertUnwindSafe(|| manager.run_sandbox_event_poller()));
-            manager.clear_sandbox_event_poller_running();
-            if result.is_err() {
-                tracing::warn!("ACP sandbox event poller panicked; it can be restarted");
-            }
-        });
+        thread::spawn(move || run_sandbox_event_poller_thread(&manager));
     }
 
     #[expect(
@@ -309,14 +315,25 @@ impl AcpAgentManagerHandle {
     }
 }
 
-fn log_empty_inspect(message: &str) -> AcpAgentInspectResponse {
-    tracing::warn!(message);
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_empty_inspect_with_error(error: &CliError, message: &str) -> AcpAgentInspectResponse {
+    tracing::warn!(%error, "{message}");
     AcpAgentInspectResponse { agents: Vec::new() }
 }
 
-fn log_empty_inspect_with_error(error: CliError, message: &str) -> AcpAgentInspectResponse {
-    tracing::warn!(%error, "{message}");
-    AcpAgentInspectResponse { agents: Vec::new() }
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn run_sandbox_event_poller_thread(manager: &AcpAgentManagerHandle) {
+    let result = catch_unwind(AssertUnwindSafe(|| manager.run_sandbox_event_poller()));
+    manager.clear_sandbox_event_poller_running();
+    if result.is_err() {
+        tracing::warn!("ACP sandbox event poller panicked; it can be restarted");
+    }
 }
 
 fn reconciled_event(payload: &AcpAgentsReconciledPayload) -> Option<StreamEvent> {
@@ -343,9 +360,7 @@ fn dedupe_incident_replays(events: Vec<StreamEvent>) -> Vec<StreamEvent> {
     let mut seen = BTreeSet::<String>::new();
     let mut deduped = Vec::with_capacity(events.len());
     for event in events {
-        if event.event != "acp_process_incident"
-            && event.event != "acp_bridge_resync_incident"
-        {
+        if event.event != "acp_process_incident" && event.event != "acp_bridge_resync_incident" {
             deduped.push(event);
             continue;
         }

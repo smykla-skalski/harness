@@ -262,7 +262,7 @@ impl AcpAgentManagerHandle {
     /// Panics if the ACP sessions mutex is poisoned.
     pub fn shutdown_all(&self) {
         if service::sandboxed_from_env() {
-            self.shutdown_all_via_bridge();
+            Self::shutdown_all_via_bridge();
             return;
         }
         let sessions: Vec<_> = self
@@ -280,6 +280,7 @@ impl AcpAgentManagerHandle {
     }
 
     #[must_use]
+    /// Return the number of pending ACP permission prompts for one ACP session.
     pub fn pending_permission_count(&self, acp_id: &str) -> Option<usize> {
         if service::sandboxed_from_env() {
             return self.pending_permission_count_via_bridge(acp_id);
@@ -291,6 +292,7 @@ impl AcpAgentManagerHandle {
     }
 
     #[must_use]
+    /// Return the queued ACP permission batches for one ACP session.
     pub fn pending_permission_batches(&self, acp_id: &str) -> Option<Vec<AcpPermissionBatch>> {
         if service::sandboxed_from_env() {
             return self.pending_permission_batches_via_bridge(acp_id);
@@ -301,10 +303,16 @@ impl AcpAgentManagerHandle {
             .map(|session| session.pending_permission_batches())
     }
 
-    #[must_use]
+    /// Count ACP sessions that are still live after a refresh pass.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the sandbox bridge inspect call fails.
+    ///
+    /// # Panics
+    /// Panics if the ACP sessions mutex is poisoned.
     pub fn count_live_sessions(&self) -> Result<usize, CliError> {
         if service::sandboxed_from_env() {
-            return self.live_session_count_via_bridge();
+            return Self::live_session_count_via_bridge();
         }
         Ok(self
             .state
@@ -325,7 +333,8 @@ impl AcpAgentManagerHandle {
         let before = session.snapshot_with_live_counts();
         session.refresh();
         let after = session.snapshot_with_live_counts();
-        if !before.status.is_disconnected() && after.status.is_disconnected()
+        if !before.status.is_disconnected()
+            && after.status.is_disconnected()
             && let Some(event) = process_incident_from_snapshot(&after)
         {
             let _ = self.state.sender.send(event);
