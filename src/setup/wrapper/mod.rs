@@ -26,7 +26,7 @@ pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
 use plugin_cache::sync_plugin_cache;
-use registrations::{build_codex_config, process_agent_registrations};
+use registrations::process_agent_registrations;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -236,12 +236,6 @@ pub(crate) fn planned_agent_bootstrap_files(
             log_omitted_hook_families(&path, flags);
             planned.push((path, config));
         }
-    }
-    if agent == HookAgent::Codex {
-        planned.push((
-            project_dir.join(".codex").join("config.toml"),
-            build_codex_config(),
-        ));
     }
     planned
 }

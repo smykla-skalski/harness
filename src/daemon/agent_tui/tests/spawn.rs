@@ -42,10 +42,7 @@ fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
                 ),
                 (
                     "codex",
-                    vec![
-                        ".codex/config.toml",
-                        "plugins/harness/skills/harness/SKILL.md",
-                    ],
+                    vec!["plugins/harness/skills/harness/SKILL.md"],
                 ),
                 ("gemini", vec![".gemini/settings.json"]),
                 (

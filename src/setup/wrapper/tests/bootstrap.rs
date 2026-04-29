@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use super::super::registrations::{build_codex_config, lifecycle_command};
-use super::super::write_agent_bootstrap;
+use super::super::registrations::lifecycle_command;
+use super::super::{planned_agent_bootstrap_files, write_agent_bootstrap};
 use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 
@@ -62,38 +62,11 @@ fn claude_lifecycle_commands_match_hook_template() {
     }
 }
 
-#[test]
-fn build_codex_config_includes_notify() {
-    let config = build_codex_config();
-    assert_contains_all(
-        &config,
-        &["\"audit-turn\"", "[features]", "codex_hooks = true"],
-    );
-    assert_contains_none(
-        &config,
-        &[
-            "[hooks]",
-            "session_start = [",
-            "pre_compact = [",
-            "session_end = [",
-        ],
-    );
-}
-
 fn assert_contains_all(haystack: &str, needles: &[&str]) {
     for needle in needles {
         assert!(
             haystack.contains(needle),
             "missing expected fragment {needle}"
-        );
-    }
-}
-
-fn assert_contains_none(haystack: &str, needles: &[&str]) {
-    for needle in needles {
-        assert!(
-            !haystack.contains(needle),
-            "unexpected fragment present {needle}"
         );
     }
 }
@@ -109,7 +82,16 @@ fn assert_written_paths(written: &[PathBuf], expected: &[&Path]) {
 }
 
 #[test]
-fn write_agent_bootstrap_writes_codex_notify_config() {
+fn planned_agent_bootstrap_files_omit_codex_project_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let planned =
+        planned_agent_bootstrap_files(dir.path(), HookAgent::Codex, &[], RuntimeHookFlags::default());
+
+    assert!(planned.is_empty());
+}
+
+#[test]
+fn write_agent_bootstrap_writes_codex_plugin_assets_only() {
     let dir = tempfile::tempdir().unwrap();
     let written =
         write_agent_bootstrap(dir.path(), HookAgent::Codex, false, &[], legacy_flags()).unwrap();
@@ -121,17 +103,10 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
         .join("skills")
         .join("harness")
         .join("SKILL.md");
-    let config_path = dir.path().join(".codex").join("config.toml");
-
-    assert_written_paths(&written, &[&plugin_skill, &config_path]);
+    assert_written_paths(&written, &[&plugin_skill]);
 
     let skill = fs::read_to_string(plugin_skill).unwrap();
     assert_contains_all(&skill, &["name: harness"]);
-    let config = fs::read_to_string(config_path).unwrap();
-    assert_contains_all(
-        &config,
-        &["\"audit-turn\"", "[features]", "codex_hooks = true"],
-    );
 }
 
 #[test]
