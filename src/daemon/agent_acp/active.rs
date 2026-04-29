@@ -250,22 +250,20 @@ impl SharedStderrTail {
 
 pub(super) fn spawn_event_forwarder(
     sender: broadcast::Sender<StreamEvent>,
-    acp_id: String,
-    session_id: String,
     mut events: mpsc::Receiver<EventBatch>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(batch) = events.recv().await {
             let payload = serde_json::json!({
-                "acp_id": acp_id,
-                "session_id": session_id,
+                "acp_id": batch.acp_id,
+                "session_id": batch.session_id,
                 "raw_count": batch.raw_count,
                 "events": batch.events,
             });
             let _ = sender.send(StreamEvent {
                 event: "acp_events".to_string(),
                 recorded_at: utc_now(),
-                session_id: Some(session_id.clone()),
+                session_id: Some(batch.session_id),
                 payload,
             });
         }

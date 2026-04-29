@@ -27,7 +27,7 @@ use super::manager::{
 };
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
-use super::protocol::spawn_protocol_task;
+use super::protocol::{SpawnProtocolInput, spawn_protocol_task};
 
 impl AcpAgentManagerHandle {
     pub(super) fn start_descriptor(
@@ -149,12 +149,15 @@ impl AcpAgentManagerHandle {
         );
         let protocol = spawn_protocol_task(
             &mut child,
-            input.request,
-            input.session_id,
-            input.descriptor.display_name.clone(),
-            input.project_dir.to_path_buf(),
-            &supervisor,
-            permission_mode,
+            SpawnProtocolInput {
+                request: input.request,
+                acp_id: input.acp_id,
+                session_id: input.session_id,
+                agent_name: input.descriptor.display_name.clone(),
+                project_dir: input.project_dir.to_path_buf(),
+                supervisor: &supervisor,
+                permission_mode,
+            },
         )
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(
@@ -162,12 +165,7 @@ impl AcpAgentManagerHandle {
                 input.descriptor.id
             ))
         })?;
-        let event_task = spawn_event_forwarder(
-            self.sender(),
-            input.acp_id.to_string(),
-            input.session_id.to_string(),
-            protocol.events,
-        );
+        let event_task = spawn_event_forwarder(self.sender(), protocol.events);
         let snapshot = started_snapshot(StartedSnapshotInput {
             acp_id: input.acp_id,
             session_id: input.session_id,
