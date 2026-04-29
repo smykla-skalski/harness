@@ -54,6 +54,21 @@ fn write_executable(path: &Path, body: &str) {
     fs::set_permissions(path, permissions).expect("chmod script");
 }
 
+fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let snapshot = manager.get(acp_id).expect("refresh");
+        if matches!(snapshot.status, AgentStatus::Disconnected { .. }) {
+            return snapshot;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for ACP process to disconnect"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn start_list_stop_tracks_live_snapshot() {
@@ -328,4 +343,56 @@ fn start_rejects_sandboxed_daemon_mode() {
             );
         },
     );
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn repeated_process_faults_quarantine_process_key() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let script = temp.path().join("failing-agent.sh");
+        write_executable(&script, "#!/bin/sh\nexit 7\n");
+        let descriptor = descriptor(&script);
+        let (manager, mut events) = manager_with_events();
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: None,
+            project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
+        };
+
+        let mut saw_quarantine_applied = false;
+        for idx in 1..=3 {
+            let snapshot = manager
+                .start_descriptor(&format!("sess-{idx}"), &request, &descriptor)
+                .expect("start failing session");
+            let disconnected = wait_until_disconnected(&manager, &snapshot.acp_id);
+            assert!(matches!(
+                disconnected.status,
+                AgentStatus::Disconnected {
+                    reason: DisconnectReason::ProcessExited { .. },
+                    ..
+                }
+            ));
+            for _ in 0..32 {
+                let Ok(event) = events.try_recv() else {
+                    continue;
+                };
+                if event.event == "acp_process_incident"
+                    && event.payload["quarantine_applied"] == serde_json::Value::Bool(true)
+                {
+                    saw_quarantine_applied = true;
+                }
+            }
+        }
+        assert!(saw_quarantine_applied, "expected quarantine-applied incident");
+
+        let error = manager
+            .start_descriptor("sess-4", &request, &descriptor)
+            .expect_err("quarantined process key should be blocked");
+        assert!(
+            format!("{error}").contains("quarantined"),
+            "unexpected error: {error}"
+        );
+    });
 }
