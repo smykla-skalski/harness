@@ -31,7 +31,7 @@ struct AcpPermissionModal: View {
       Text(selectionSummary)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityIdentifier("harness.acp-permission.selection-summary")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalSelectionSummary)
 
       ScrollView {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -54,7 +54,9 @@ struct AcpPermissionModal: View {
             }
             .toggleStyle(.checkbox)
             .disabled(isResolving)
-            .accessibilityIdentifier("harness.acp-permission.item.\(request.requestId)")
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.acpPermissionModalItem(request.requestId)
+            )
           }
         }
       }
@@ -90,7 +92,7 @@ struct AcpPermissionModal: View {
       AccessibilityNotification.Announcement(accessibilityAnnouncement).post()
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.acp-permission.modal")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModal)
   }
 
   private var title: String {

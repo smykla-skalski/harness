@@ -3,10 +3,12 @@ import Foundation
 public struct AcpDecisionAttention: Equatable, Sendable {
   public let count: Int
   public let oldestBatchID: String
+  public let oldestDecisionID: String
 
-  public init(count: Int, oldestBatchID: String) {
+  public init(count: Int, oldestBatchID: String, oldestDecisionID: String) {
     self.count = count
     self.oldestBatchID = oldestBatchID
+    self.oldestDecisionID = oldestDecisionID
   }
 }
 
@@ -35,24 +37,29 @@ extension HarnessMonitorStore {
     byAgentID.reserveCapacity(selectedAcpAgents.count)
 
     for snapshot in selectedAcpAgents {
-      let sortedBatches = snapshot.pendingPermissionBatches.sorted {
-        if $0.createdAt != $1.createdAt {
-          return $0.createdAt < $1.createdAt
+      let sortedBatches = snapshot.pendingPermissionBatches
+        .sorted {
+          if $0.createdAt != $1.createdAt {
+            return $0.createdAt < $1.createdAt
+          }
+          return $0.batchId < $1.batchId
         }
-        return $0.batchId < $1.batchId
-      }
       guard let oldestBatch = sortedBatches.first else {
         continue
       }
       let count = sortedBatches.reduce(into: 0) { partialResult, batch in
         partialResult += batch.requests.count
       }
-      guard count > 0 else {
+      guard
+        count > 0,
+        let oldestDecisionID = oldestOpenDecisionID(for: snapshot.agentId)
+      else {
         continue
       }
       byAgentID[snapshot.agentId] = AcpDecisionAttention(
         count: count,
-        oldestBatchID: oldestBatch.batchId
+        oldestBatchID: oldestBatch.batchId,
+        oldestDecisionID: oldestDecisionID
       )
     }
 
@@ -63,10 +70,56 @@ extension HarnessMonitorStore {
     acpDecisionAttentionSnapshot.byAgentID[agentID]
   }
 
+  public var acpPermissionAttentionEvents: [AcpPermissionAttentionEvent] {
+    let attentionByAgentID = acpDecisionAttentionSnapshot.byAgentID
+    return
+      selectedAcpAgents
+      .flatMap { snapshot -> [AcpPermissionAttentionEvent] in
+        guard let attention = attentionByAgentID[snapshot.agentId] else {
+          return []
+        }
+        return snapshot.pendingPermissionBatches
+          .sorted {
+            if $0.createdAt != $1.createdAt {
+              return $0.createdAt < $1.createdAt
+            }
+            return $0.batchId < $1.batchId
+          }
+          .compactMap { batch in
+            guard batch.batchId == attention.oldestBatchID else {
+              return nil
+            }
+            return AcpPermissionAttentionEvent(
+              batchID: batch.batchId,
+              decisionID: attention.oldestDecisionID,
+              agentID: snapshot.agentId,
+              agentName: snapshot.displayName,
+              requestCount: attention.count,
+              createdAt: batch.createdAt
+            )
+          }
+      }
+      .sorted { lhs, rhs in
+        if lhs.createdAt != rhs.createdAt {
+          return lhs.createdAt < rhs.createdAt
+        }
+        return lhs.batchID < rhs.batchID
+      }
+  }
+
+  public func oldestDecisionID(for agentID: String) -> String? {
+    oldestOpenDecisionID(for: agentID)
+  }
+
   @discardableResult
   public func selectOldestDecision(for agentID: String) -> String? {
-    let selectedID =
-      supervisorOpenDecisions
+    let selectedID = oldestDecisionID(for: agentID)
+    supervisorSelectedDecisionID = selectedID
+    return selectedID
+  }
+
+  private func oldestOpenDecisionID(for agentID: String) -> String? {
+    supervisorOpenDecisions
       .filter { $0.agentID == agentID }
       .min { lhs, rhs in
         if lhs.createdAt != rhs.createdAt {
@@ -75,7 +128,5 @@ extension HarnessMonitorStore {
         return lhs.id < rhs.id
       }?
       .id
-    supervisorSelectedDecisionID = selectedID
-    return selectedID
   }
 }
