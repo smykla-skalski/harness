@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
-use super::*;
 use super::incidents::{
     AcpBridgeResyncIncidentPayload, bridge_resync_incident_events,
     pool_key_mismatch_incident_events,
 };
+use super::*;
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::agent_acp::AcpAgentInspectSnapshot;
 use crate::daemon::protocol::StreamEvent;
@@ -244,7 +244,10 @@ fn pool_key_mismatch_dedupe_emits_only_on_change() {
 
     let first = rx.try_recv().expect("first incident");
     assert_eq!(first.event, "acp_process_incident");
-    assert!(rx.try_recv().is_err(), "second identical incident must be deduped");
+    assert!(
+        rx.try_recv().is_err(),
+        "second identical incident must be deduped"
+    );
 }
 
 #[test]
@@ -262,12 +265,7 @@ fn pool_key_mismatch_state_is_cleared_for_non_mismatch_keys() {
     let _ = rx.try_recv().expect("mismatch incident");
     assert!(seen.contains_key(session_id));
 
-    maybe_emit_pool_key_mismatch_incident(
-        &sender,
-        &mut seen,
-        session_id,
-        vec!["pk-a".to_string()],
-    );
+    maybe_emit_pool_key_mismatch_incident(&sender, &mut seen, session_id, vec!["pk-a".to_string()]);
     assert!(!seen.contains_key(session_id));
     assert!(rx.try_recv().is_err(), "no extra incident expected");
 }
