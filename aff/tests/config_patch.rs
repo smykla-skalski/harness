@@ -183,7 +183,7 @@ fn bootstrap_can_opt_in_to_pretool_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(updated.contains("harness hook --agent codex suite:run tool-guard"));
+    assert!(updated.contains("aff repo-policy --agent codex"));
     assert_aff_commands(&updated, "codex", true);
 }
 
