@@ -13,7 +13,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
       app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
       app.launchEnvironment["HARNESS_MONITOR_KEEP_ANIMATIONS"] = "1"
-      guard configureIsolatedDataHome(for: app, purpose: "launch-performance") else {
+      guard configureIsolatedDataHome(for: app, purpose: "launch-performance") != nil else {
         return
       }
       app.launch()
@@ -60,7 +60,9 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
         Self.launchModeKey: "preview",
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
       ]
-      guard configureIsolatedDataHome(for: app, purpose: "preferences-database-scroll") else {
+      guard
+        configureIsolatedDataHome(for: app, purpose: "preferences-database-scroll") != nil
+      else {
         return
       }
 
@@ -139,7 +141,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
   func testLaunchForPerfSeedsObservabilityConfigIntoIsolatedDataHome() throws {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
 
-    XCTAssertTrue(
+    XCTAssertNotNil(
       configureIsolatedDataHome(for: app, purpose: "perf-observability-config")
     )
 
@@ -236,7 +238,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "HARNESS_MONITOR_PERF_SHORT_DELAY_MS": "60",
       "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS": "180",
     ]
-    guard configureIsolatedDataHome(for: app, purpose: scenario) else {
+    guard configureIsolatedDataHome(for: app, purpose: scenario) != nil else {
       return app
     }
     app.launch()

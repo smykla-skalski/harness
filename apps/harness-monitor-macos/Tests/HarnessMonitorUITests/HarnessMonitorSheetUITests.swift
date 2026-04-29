@@ -5,93 +5,152 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
-  func testSendSignalSheetPresentsAndDismissesWithEscape() throws {
+  // swiftlint:disable:next static_over_final_class
+  override nonisolated class var reuseLaunchedApp: Bool { true }
+
+  func testSendSignalSheetSupportsDismissalAndPreviewVoiceCapture() throws {
     let app = launchInCockpitPreview()
 
-    openSendSignalSheet(in: app)
+    XCTContext.runActivity(named: "Validate the form and dismiss via Cancel") { _ in
+      openSendSignalSheet(in: app)
 
-    // Verify sheet appeared.
-    let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
-    XCTAssertTrue(
-      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
-      "Send Signal sheet should appear after context menu tap"
-    )
+      let sheetRoot = assertSendSignalSheetVisible(in: app)
+      tapElement(in: app, identifier: Accessibility.sendSignalSheetMessageField)
+      let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
+      messageField.typeText("Review the latest changes")
 
-    // Verify form fields exist.
-    let commandField = editableField(in: app, identifier: Accessibility.sendSignalSheetCommandField)
-    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
-    let cancelButton = button(in: app, identifier: Accessibility.sendSignalSheetCancelButton)
-    let submitButton = button(in: app, identifier: Accessibility.sendSignalSheetSubmitButton)
+      assertSendSignalFormChrome(in: app)
+      let actionHintField = editableField(
+        in: app,
+        identifier: Accessibility.sendSignalSheetActionHintField
+      )
+      XCTAssertTrue(actionHintField.exists, "Action hint field should exist")
 
-    XCTAssertTrue(commandField.exists, "Command field should exist")
-    XCTAssertTrue(messageField.exists, "Message field should exist")
-    XCTAssertTrue(cancelButton.exists, "Cancel button should exist")
-    XCTAssertTrue(submitButton.exists, "Submit button should exist")
+      dismissSendSignalSheetWithCancel(in: app, sheetRoot: sheetRoot)
+    }
 
-    // Dismiss with Escape.
-    app.typeKey(.escape, modifierFlags: [])
-    RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
+    XCTContext.runActivity(named: "Reopen the sheet and insert preview voice input") { _ in
+      openSendSignalSheet(in: app)
 
-    XCTAssertTrue(
-      waitUntil(timeout: 2) { !sheetRoot.exists },
-      "Sheet should dismiss on Escape"
-    )
+      let sheetRoot = assertSendSignalSheetVisible(in: app)
+      let popover = openVoicePopover(in: app)
+      let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+      XCTAssertTrue(recordButton.label.contains("Record"))
+      tapButton(in: app, identifier: Accessibility.voiceInputStopButton)
+
+      let transcript = element(in: app, identifier: Accessibility.voiceInputTranscript)
+      let transcriptText = app.staticTexts["Preview voice input for Harness Monitor"].firstMatch
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          (transcript.exists
+            && transcript.label.contains("Preview voice input for Harness Monitor"))
+            || transcriptText.exists
+        },
+        "Preview voice capture should produce a transcript without microphone access"
+      )
+
+      let insertButton = button(in: app, identifier: Accessibility.voiceInputInsertButton)
+      XCTAssertTrue(insertButton.waitForExistence(timeout: Self.actionTimeout))
+      tapButton(in: app, identifier: Accessibility.voiceInputInsertButton)
+
+      let messageField = editableField(
+        in: app,
+        identifier: Accessibility.sendSignalSheetMessageField
+      )
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          let value = messageField.value as? String
+          return value?.contains("Preview voice input for Harness Monitor") == true
+        },
+        "Inserted voice transcript should update the message field"
+      )
+      XCTAssertTrue(
+        waitUntil(timeout: Self.fastActionTimeout) { !popover.exists },
+        "Manual insert should close the voice popover"
+      )
+
+      dismissSendSignalSheetWithEscape(in: app, sheetRoot: sheetRoot)
+    }
   }
 
-  func testSendSignalSheetDismissesWithCancelButton() throws {
-    let app = launchInCockpitPreview()
+  func testSendSignalVoicePopoverHandlesFailureAndAutoInsertModes() throws {
+    XCTContext.runActivity(named: "Show speech asset recovery guidance") { _ in
+      let app = launchInCockpitPreview(
+        additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_VOICE_FAILURE": "speech-assets"]
+      )
 
-    openSendSignalSheet(in: app)
+      openSendSignalSheet(in: app)
+      _ = assertSendSignalSheetVisible(in: app)
+      _ = openVoicePopover(in: app)
 
-    let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
-    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.actionTimeout))
+      let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+      XCTAssertTrue(recordButton.waitForExistence(timeout: Self.fastActionTimeout))
+      tapButton(in: app, identifier: Accessibility.voiceInputStopButton)
 
-    // Dismiss via Cancel button.
-    let cancelButton = button(in: app, identifier: Accessibility.sendSignalSheetCancelButton)
-    XCTAssertTrue(cancelButton.waitForExistence(timeout: 2))
-    tapViaCoordinate(in: app, element: cancelButton)
+      let overlay = element(in: app, identifier: Accessibility.voiceInputFailureOverlay)
+      XCTAssertTrue(
+        overlay.waitForExistence(timeout: Self.actionTimeout),
+        "Speech asset failures should cover the voice popover with a recovery panel"
+      )
 
-    XCTAssertTrue(
-      waitUntil(timeout: 2) { !sheetRoot.exists },
-      "Sheet should dismiss on Cancel"
-    )
+      let message = element(in: app, identifier: Accessibility.voiceInputFailureMessage)
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          message.exists && message.label.contains("Speech assets for en_PL are unavailable")
+        },
+        "Recovery panel should show the full Speech asset error"
+      )
+
+      let instructions = element(in: app, identifier: Accessibility.voiceInputFailureInstructions)
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          instructions.exists
+            && instructions.label.contains("System Settings")
+            && instructions.label.contains("English (US)")
+        },
+        "Recovery panel should explain how to install or select usable speech assets"
+      )
+    }
+
+    XCTContext.runActivity(named: "Auto-insert closes the voice popover") { _ in
+      let app = launchInCockpitPreview(
+        additionalEnvironment: [
+          HarnessMonitorSettingsUITestKeys.voiceInsertionModeOverride: "autoInsert"
+        ]
+      )
+
+      openSendSignalSheet(in: app)
+      let sheetRoot = assertSendSignalSheetVisible(in: app)
+      let popover = openVoicePopover(in: app)
+
+      let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
+      XCTAssertTrue(recordButton.waitForExistence(timeout: Self.fastActionTimeout))
+      tapButton(in: app, identifier: Accessibility.voiceInputStopButton)
+
+      let messageField = editableField(
+        in: app,
+        identifier: Accessibility.sendSignalSheetMessageField
+      )
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) {
+          let value = messageField.value as? String
+          return value?.contains("Preview voice input for Harness Monitor") == true
+        },
+        "Auto-insert should write the captured transcript into the message field"
+      )
+      XCTAssertTrue(
+        waitUntil(timeout: Self.actionTimeout) { !popover.exists },
+        "Auto-insert should close the voice popover after inserting the transcript"
+      )
+
+      dismissSendSignalSheetWithEscape(in: app, sheetRoot: sheetRoot)
+    }
   }
 
-  func testSendSignalSheetFormInteraction() throws {
-    let app = launchInCockpitPreview()
-
-    openSendSignalSheet(in: app)
-
-    let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
-    XCTAssertTrue(sheetRoot.waitForExistence(timeout: Self.actionTimeout))
-
-    // Command field should have default value "inject_context".
-    let commandField = editableField(in: app, identifier: Accessibility.sendSignalSheetCommandField)
-    XCTAssertTrue(commandField.waitForExistence(timeout: 2))
-
-    // Type into message field.
-    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
-    XCTAssertTrue(messageField.waitForExistence(timeout: 2))
-    tapViaCoordinate(in: app, element: messageField)
-    messageField.typeText("Review the latest changes")
-
-    // Verify submit button exists and is accessible.
-    let submitButton = button(in: app, identifier: Accessibility.sendSignalSheetSubmitButton)
-    XCTAssertTrue(submitButton.exists, "Submit button should exist")
-
-    // Verify action hint field exists.
-    let actionHintField = editableField(
-      in: app,
-      identifier: Accessibility.sendSignalSheetActionHintField
-    )
-    XCTAssertTrue(actionHintField.exists, "Action hint field should exist")
-
-    // Clean up.
-    app.typeKey(.escape, modifierFlags: [])
-  }
-
-  func testNewSessionSheetUsesStackedEditableFields() throws {
+  func testNewSessionSheetFieldsCapabilityPickerAndLayoutStability() throws {
     let app = launch(mode: "preview")
+    let processID = try launchedMonitorPID()
+    let logStart = Date()
 
     tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
 
@@ -106,7 +165,13 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
       "Base ref should become interactable as soon as the sheet opens"
     )
-    tapViaCoordinate(in: app, element: baseRefField)
+    tapElement(in: app, identifier: Accessibility.newSessionBaseRef)
+
+    let managedTransportIdentifier = Accessibility.newSessionCapabilityTransportButton(
+      "copilot",
+      transportID: "managed:copilot"
+    )
+    tapButton(in: app, identifier: managedTransportIdentifier)
 
     XCTAssertTrue(
       app.staticTexts["Project folder"].firstMatch
@@ -125,6 +190,7 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       app.staticTexts["Base ref"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
       "New Session should keep the Base ref field directly discoverable"
     )
+
     let capabilityPicker = element(in: app, identifier: Accessibility.newSessionCapabilityPicker)
     XCTAssertTrue(
       capabilityPicker.waitForExistence(timeout: Self.fastActionTimeout),
@@ -134,172 +200,25 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       app.staticTexts["Copilot"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
       "New Session should show the duplicated capability title"
     )
-    let managedTransportButton = button(
-      in: app,
-      identifier: Accessibility.newSessionCapabilityTransportButton(
-        "copilot",
-        transportID: "managed:copilot"
-      )
-    )
+
+    let managedTransportButton = button(in: app, identifier: managedTransportIdentifier)
     XCTAssertTrue(
       managedTransportButton.waitForExistence(timeout: Self.fastActionTimeout),
       "New Session should expose the duplicated capability transport controls"
     )
-    tapViaCoordinate(in: app, element: managedTransportButton)
     XCTAssertEqual(
       managedTransportButton.value as? String,
       "Selected",
       "New Session capability controls should remain interactive inside the sheet"
     )
+    XCTAssertTrue(baseRefField.exists, "Base ref should remain directly editable in the sheet")
 
-    XCTAssertTrue(
-      baseRefField.exists,
-      "Base ref should remain directly editable in the sheet"
-    )
-  }
-
-  func testNewSessionSheetDoesNotEmitLayoutRecursionWarning() throws {
-    let app = launch(mode: "preview")
-    let processID = try launchedMonitorPID()
-    let logStart = Date()
-
-    tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
-
-    let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
-    XCTAssertTrue(
-      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
-      "New Session sheet should appear before checking AppKit warnings"
-    )
-    XCTAssertTrue(
-      app.staticTexts["Session title"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
-      "New Session should finish presenting before log inspection"
-    )
-
-    RunLoop.current.run(until: Date.now.addingTimeInterval(1.0))
+    RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastActionTimeout))
 
     let warnings = appKitLayoutRecursionWarnings(since: logStart, processID: processID)
     XCTAssertTrue(
       warnings.isEmpty,
       "Opening New Session should not emit the AppKit layout recursion warning.\n\(warnings)"
-    )
-  }
-
-  func testSendSignalVoicePopoverRecordsPreviewTranscript() throws {
-    let app = launchInCockpitPreview()
-
-    openSendSignalSheet(in: app)
-
-    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
-    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: voiceButton)
-
-    let popover = element(in: app, identifier: Accessibility.voiceInputPopover)
-    XCTAssertTrue(
-      popover.waitForExistence(timeout: Self.actionTimeout),
-      "Voice input popover should open from the message field"
-    )
-
-    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
-    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(recordButton.label.contains("Record"))
-    tapViaCoordinate(in: app, element: recordButton)
-
-    let transcript = element(in: app, identifier: Accessibility.voiceInputTranscript)
-    let transcriptText = app.staticTexts["Preview voice input for Harness Monitor"].firstMatch
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        (transcript.exists
-          && transcript.label.contains("Preview voice input for Harness Monitor"))
-          || transcriptText.exists
-      },
-      "Preview voice capture should produce a transcript without microphone access"
-    )
-
-    let insertButton = button(in: app, identifier: Accessibility.voiceInputInsertButton)
-    XCTAssertTrue(insertButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: insertButton)
-
-    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        let value = messageField.value as? String
-        return value?.contains("Preview voice input for Harness Monitor") == true
-      },
-      "Inserted voice transcript should update the message field"
-    )
-  }
-
-  func testSendSignalVoicePopoverSurfacesSpeechAssetRecovery() throws {
-    let app = launchInCockpitPreview(
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_VOICE_FAILURE": "speech-assets"]
-    )
-
-    openSendSignalSheet(in: app)
-
-    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
-    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: voiceButton)
-
-    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
-    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: recordButton)
-
-    let overlay = element(in: app, identifier: Accessibility.voiceInputFailureOverlay)
-    XCTAssertTrue(
-      overlay.waitForExistence(timeout: Self.actionTimeout),
-      "Speech asset failures should cover the voice popover with a recovery panel"
-    )
-
-    let message = element(in: app, identifier: Accessibility.voiceInputFailureMessage)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        message.exists && message.label.contains("Speech assets for en_PL are unavailable")
-      },
-      "Recovery panel should show the full Speech asset error"
-    )
-
-    let instructions = element(in: app, identifier: Accessibility.voiceInputFailureInstructions)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        instructions.exists
-          && instructions.label.contains("System Settings")
-          && instructions.label.contains("English (US)")
-      },
-      "Recovery panel should explain how to install or select usable speech assets"
-    )
-  }
-
-  func testSendSignalVoicePopoverAutoInsertsWhenConfigured() throws {
-    let app = launchInCockpitPreview(
-      additionalEnvironment: [
-        HarnessMonitorSettingsUITestKeys.voiceInsertionModeOverride: "autoInsert"
-      ]
-    )
-
-    openSendSignalSheet(in: app)
-
-    let voiceButton = button(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
-    XCTAssertTrue(voiceButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: voiceButton)
-
-    let popover = element(in: app, identifier: Accessibility.voiceInputPopover)
-    XCTAssertTrue(popover.waitForExistence(timeout: Self.actionTimeout))
-
-    let recordButton = button(in: app, identifier: Accessibility.voiceInputStopButton)
-    XCTAssertTrue(recordButton.waitForExistence(timeout: Self.actionTimeout))
-    tapViaCoordinate(in: app, element: recordButton)
-
-    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        let value = messageField.value as? String
-        return value?.contains("Preview voice input for Harness Monitor") == true
-      },
-      "Auto-insert should write the captured transcript into the message field"
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { !popover.exists },
-      "Auto-insert should close the voice popover after inserting the transcript"
     )
   }
 }
@@ -398,6 +317,27 @@ extension HarnessMonitorSheetUITests {
     )
   }
 
+  fileprivate func assertSendSignalSheetVisible(in app: XCUIApplication) -> XCUIElement {
+    let sheetRoot = element(in: app, identifier: Accessibility.sendSignalSheet)
+    XCTAssertTrue(
+      sheetRoot.waitForExistence(timeout: Self.actionTimeout),
+      "Send Signal sheet should appear after context menu tap"
+    )
+    return sheetRoot
+  }
+
+  fileprivate func assertSendSignalFormChrome(in app: XCUIApplication) {
+    let commandField = editableField(in: app, identifier: Accessibility.sendSignalSheetCommandField)
+    let messageField = editableField(in: app, identifier: Accessibility.sendSignalSheetMessageField)
+    let cancelButton = button(in: app, identifier: Accessibility.sendSignalSheetCancelButton)
+    let submitButton = button(in: app, identifier: Accessibility.sendSignalSheetSubmitButton)
+
+    XCTAssertTrue(commandField.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(messageField.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(submitButton.waitForExistence(timeout: Self.fastActionTimeout))
+  }
+
   /// Right-click the already-loaded leader agent card to open the "Send Signal"
   /// context menu item.
   fileprivate func openSendSignalSheet(in app: XCUIApplication) {
@@ -410,7 +350,10 @@ extension HarnessMonitorSheetUITests {
       "Leader agent card should be visible in cockpit preview"
     )
 
-    agentCard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+    guard rightClickElementReliably(in: app, element: agentCard) else {
+      XCTFail("Failed to open the Send Signal context menu from the leader card")
+      return
+    }
 
     let signalMenuItem = app.menuItems["Send Signal"].firstMatch
     XCTAssertTrue(
@@ -420,10 +363,36 @@ extension HarnessMonitorSheetUITests {
     signalMenuItem.tap()
   }
 
-  fileprivate func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
-    guard tapElementReliably(in: app, element: element) else {
-      XCTFail("Cannot resolve coordinate for \(element)")
-      return
-    }
+  fileprivate func openVoicePopover(in app: XCUIApplication) -> XCUIElement {
+    tapButton(in: app, identifier: Accessibility.sendSignalSheetMessageVoiceButton)
+
+    let popover = element(in: app, identifier: Accessibility.voiceInputPopover)
+    XCTAssertTrue(
+      popover.waitForExistence(timeout: Self.actionTimeout),
+      "Voice input popover should open from the message field"
+    )
+    return popover
+  }
+
+  fileprivate func dismissSendSignalSheetWithCancel(
+    in app: XCUIApplication,
+    sheetRoot: XCUIElement
+  ) {
+    tapButton(in: app, identifier: Accessibility.sendSignalSheetCancelButton)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !sheetRoot.exists },
+      "Sheet should dismiss on Cancel"
+    )
+  }
+
+  fileprivate func dismissSendSignalSheetWithEscape(
+    in app: XCUIApplication,
+    sheetRoot: XCUIElement
+  ) {
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !sheetRoot.exists },
+      "Sheet should dismiss on Escape"
+    )
   }
 }

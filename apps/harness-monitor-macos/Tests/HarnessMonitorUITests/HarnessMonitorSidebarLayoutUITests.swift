@@ -196,7 +196,10 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
 
     tapPreviewSession(in: app)
-    sessionRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+    XCTAssertTrue(
+      rightClickElementReliably(in: app, element: sessionRow),
+      "Selected sidebar row should expose its native context menu via a reliable right click"
+    )
 
     let bookmarkItem = app.menuItems["Bookmark"].firstMatch
     let copySessionIDItem = app.menuItems["Copy Session ID"].firstMatch

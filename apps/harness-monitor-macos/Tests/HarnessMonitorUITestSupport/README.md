@@ -19,3 +19,13 @@ Preferred debugging order for similar failures:
 2. Check whether the production accessibility helper and the UI-test mirror still match exactly.
 3. Re-run the smallest focused UI test after the contract is aligned.
 4. Only then consider changing the test query itself.
+
+Launch reuse contract:
+- Only enable `reuseLaunchedApp` for a class when every reused launch stays within the same `mode` plus `additionalEnvironment` signature.
+- If a test class needs multiple environment variants, keep them in the smallest number of scenario tests and let the harness relaunch only when that signature actually changes.
+- Reused launches own their isolated data home until the cached app is torn down; do not add per-test cleanup that can delete live UI-test storage underneath a running host.
+
+Interaction contract:
+- Prefer normal XCTest interaction first (`tap()`, `click()`, keyboard input).
+- Fall back to synthetic coordinates only when the element is not hittable, and clamp fallback taps to the containing window's visible frame.
+- If a scenario repeatedly opens the same sheet or popover, combine the assertions into one scenario test before adding more one-launch-per-test methods.
