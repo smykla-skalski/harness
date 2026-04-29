@@ -213,16 +213,6 @@ fn copilot_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistrat
     hooks
 }
 
-pub(super) fn build_codex_config() -> String {
-    concat!(
-        "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
-        "\n",
-        "[features]\n",
-        "codex_hooks = true\n",
-    )
-    .to_string()
-}
-
 pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
     let (project_dir, agent_name) = match agent {
         HookAgent::Claude => ("\"$CLAUDE_PROJECT_DIR\"", "claude"),

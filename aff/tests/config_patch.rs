@@ -16,15 +16,6 @@ fn read_file(path: &Path) -> String {
     fs::read_to_string(path).expect("read patched config")
 }
 
-fn codex_config() -> &'static str {
-    concat!(
-        "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
-        "\n",
-        "[features]\n",
-        "codex_hooks = true\n",
-    )
-}
-
 fn codex_hooks() -> &'static str {
     r#"{
   "hooks": {
@@ -139,9 +130,7 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
 #[test]
 fn bootstrap_patches_codex_hooks_with_aff_hooks() {
     let dir = tempdir().expect("tempdir");
-    let config_path = dir.path().join(".codex").join("config.toml");
     let hooks_path = dir.path().join(".codex").join("hooks.json");
-    write_file(&config_path, codex_config());
     write_file(&hooks_path, codex_hooks());
 
     Command::cargo_bin("aff")
@@ -157,7 +146,6 @@ fn bootstrap_patches_codex_hooks_with_aff_hooks() {
         .assert()
         .success();
 
-    assert_eq!(read_file(&config_path), codex_config());
     let updated = read_file(&hooks_path);
     assert!(!updated.contains("harness hook --agent codex suite:run tool-guard"));
     assert_aff_commands(&updated, "codex", false);
@@ -166,9 +154,7 @@ fn bootstrap_patches_codex_hooks_with_aff_hooks() {
 #[test]
 fn bootstrap_can_opt_in_to_pretool_hooks() {
     let dir = tempdir().expect("tempdir");
-    let config_path = dir.path().join(".codex").join("config.toml");
     let hooks_path = dir.path().join(".codex").join("hooks.json");
-    write_file(&config_path, codex_config());
     write_file(&hooks_path, codex_hooks());
 
     Command::cargo_bin("aff")
