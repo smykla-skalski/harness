@@ -8,12 +8,53 @@ source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
+source "$ROOT/Scripts/lib/rtk-shell.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
+
+cleanup_script_descendants() {
+  local status="${1:-$?}"
+  trap - EXIT INT TERM HUP
+  terminate_descendant_processes "$$"
+  exit "$status"
+}
+
+run_background_and_wait() {
+  local child_pid status
+  set +e
+  "$@" &
+  child_pid=$!
+  wait "$child_pid"
+  status=$?
+  set -e
+  return "$status"
+}
+
+run_test_action() {
+  if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+    exec env HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+  else
+    exec "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+  fi
+}
+
+run_only_testing_enumeration() {
+  local selector="$1"
+  local enumeration_path="$2"
+  HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
+    "$XCODEBUILD_RUNNER" \
+    "${BASE_TEST_ARGS[@]}" \
+    "-only-testing:${selector}" \
+    -enumerate-tests \
+    -test-enumeration-style flat \
+    -test-enumeration-format json \
+    -test-enumeration-output-path "$enumeration_path"
+}
 
 # Targets that launch a hosted app under xctest. macOS attributes their
 # startup-time app-data access to the Xcode-bundled xctest agent, which
@@ -97,14 +138,10 @@ enumerate_only_testing_selector() {
   enumeration_dir="$(mktemp -d "${TMPDIR:-/tmp}/harness-monitor-tests.XXXXXX")"
   enumeration_path="$enumeration_dir/tests.json"
   enumeration_log_path="$enumeration_dir/xcodebuild.log"
-  if ! HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
-      "$XCODEBUILD_RUNNER" \
-    "${BASE_TEST_ARGS[@]}" \
-    "-only-testing:${selector}" \
-    -enumerate-tests \
-    -test-enumeration-style flat \
-    -test-enumeration-format json \
-    -test-enumeration-output-path "$enumeration_path" >"$enumeration_log_path" 2>&1; then
+  if ! run_background_and_wait \
+    run_only_testing_enumeration \
+    "$selector" \
+    "$enumeration_path" >"$enumeration_log_path" 2>&1; then
     /usr/bin/tail -n 80 "$enumeration_log_path" >&2 || true
     /bin/rm -rf "$enumeration_dir"
     echo "failed to enumerate tests for XCODE_ONLY_TESTING selector: ${selector}" >&2
@@ -223,7 +260,12 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
-run_build_for_testing
+trap 'cleanup_script_descendants $?' EXIT
+trap 'cleanup_script_descendants 130' INT
+trap 'cleanup_script_descendants 143' TERM
+trap 'cleanup_script_descendants 129' HUP
+
+run_background_and_wait run_build_for_testing
 
 clear_gatekeeper_metadata
 
@@ -245,8 +287,4 @@ if [[ -n "$XCODE_ONLY_TESTING" ]] && [[ "${#TEST_ARGS[@]}" == "${#BASE_TEST_ARGS
   exit 1
 fi
 
-if [[ -n "$XCODE_ONLY_TESTING" ]]; then
-  HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
-else
-  "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
-fi
+run_test_action

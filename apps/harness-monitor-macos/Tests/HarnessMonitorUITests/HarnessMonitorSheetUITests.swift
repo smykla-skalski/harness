@@ -101,6 +101,13 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       "New Session sheet should appear from the toolbar action"
     )
 
+    let baseRefField = editableField(in: app, identifier: Accessibility.newSessionBaseRef)
+    XCTAssertTrue(
+      baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
+      "Base ref should become interactable as soon as the sheet opens"
+    )
+    tapViaCoordinate(in: app, element: baseRefField)
+
     XCTAssertTrue(
       app.staticTexts["Project folder"].firstMatch
         .waitForExistence(timeout: Self.fastActionTimeout),
@@ -118,10 +125,35 @@ final class HarnessMonitorSheetUITests: HarnessMonitorUITestCase {
       app.staticTexts["Base ref"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
       "New Session should keep the Base ref field directly discoverable"
     )
-
-    let baseRefField = editableField(in: app, identifier: Accessibility.newSessionBaseRef)
+    let capabilityPicker = element(in: app, identifier: Accessibility.newSessionCapabilityPicker)
     XCTAssertTrue(
-      baseRefField.waitForExistence(timeout: Self.fastActionTimeout),
+      capabilityPicker.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should surface the preferred leader capability picker"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Copilot"].firstMatch.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should show the duplicated capability title"
+    )
+    let managedTransportButton = button(
+      in: app,
+      identifier: Accessibility.newSessionCapabilityTransportButton(
+        "copilot",
+        transportID: "managed:copilot"
+      )
+    )
+    XCTAssertTrue(
+      managedTransportButton.waitForExistence(timeout: Self.fastActionTimeout),
+      "New Session should expose the duplicated capability transport controls"
+    )
+    tapViaCoordinate(in: app, element: managedTransportButton)
+    XCTAssertEqual(
+      managedTransportButton.value as? String,
+      "Selected",
+      "New Session capability controls should remain interactive inside the sheet"
+    )
+
+    XCTAssertTrue(
+      baseRefField.exists,
       "Base ref should remain directly editable in the sheet"
     )
   }

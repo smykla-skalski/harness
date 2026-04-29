@@ -3,9 +3,11 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import signal
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -35,11 +37,20 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class XcodebuildWithLockTests(unittest.TestCase):
+    def wait_for_path(self, path: Path, *, timeout: float = 5.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if path.exists():
+                return
+            time.sleep(0.05)
+        self.fail(f"timed out waiting for {path}")
+
     def run_script(
         self,
         *args: str,
         extra_env: dict[str, str] | None = None,
         preexisting_lock_pid: int | None = None,
+        preexisting_empty_lock: bool = False,
         cwd: Path | None = None,
         inject_derived_data_path: bool = True,
         include_tuist: bool = True,
@@ -53,9 +64,10 @@ class XcodebuildWithLockTests(unittest.TestCase):
             tool_log = temp_root / "tool.log"
 
             if preexisting_lock_pid is not None:
-                lock_dir = derived_data_path / ".xcodebuild.lock"
-                lock_dir.mkdir(parents=True)
-                (lock_dir / "pid").write_text(f"{preexisting_lock_pid}\n")
+                derived_data_path.mkdir(parents=True, exist_ok=True)
+                (derived_data_path / ".xcodebuild.lock").write_text(f"{preexisting_lock_pid}\n")
+            elif preexisting_empty_lock:
+                (derived_data_path / ".xcodebuild.lock").mkdir(parents=True)
 
             write_executable(
                 fake_bin / "rtk",
@@ -147,6 +159,89 @@ shift
             log = tool_log.read_text() if tool_log.exists() else ""
             return completed, log
 
+    def test_termination_cleans_up_lock_and_child_xcodebuild(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            tool_log = temp_root / "tool.log"
+            child_pid_path = temp_root / "child.pid"
+
+            write_executable(
+                fake_bin / "rtk",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'RTK=%s\\n' "$*" >> "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf '%s\\n' "$$" > "{child_pid_path}"
+trap 'exit 0' TERM INT HUP
+while true; do
+  sleep 1
+done
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" != "xcodebuild" ]]; then
+  echo "unexpected tuist subcommand: $*" >&2
+  exit 1
+fi
+shift
+"{fake_bin / "xcodebuild"}" "$@"
+""",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "RTK_BIN": str(fake_bin / "rtk"),
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
+                }
+            )
+
+            command = [
+                "bash",
+                str(SCRIPT_PATH),
+                "-derivedDataPath",
+                str(derived_data_path),
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+            ]
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+
+            lock_file = derived_data_path / ".xcodebuild.lock"
+            self.wait_for_path(lock_file)
+            self.assertTrue(lock_file.is_file(), "wrapper must publish the shared lock as a PID file")
+            self.wait_for_path(child_pid_path)
+
+            child_pid = int(child_pid_path.read_text().strip())
+            process.send_signal(signal.SIGTERM)
+            stdout, stderr = process.communicate(timeout=10)
+
+            self.assertEqual(process.returncode, 143, stdout + stderr)
+            self.assertFalse(lock_file.exists(), "wrapper must release the shared lock on termination")
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
+
     def test_reports_lock_owner_while_waiting_for_shared_derived_data(self) -> None:
         sleeper = subprocess.Popen(["/bin/sleep", "10"])
         try:
@@ -170,6 +265,21 @@ shift
         self.assertIn("lock owner command:", completed.stderr)
         self.assertIn("Timed out waiting for xcodebuild lock at", completed.stderr)
         self.assertEqual(log, "")
+
+    def test_recovers_empty_lock_directory_without_waiting_for_timeout(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={
+                "XCODEBUILD_LOCK_TIMEOUT_SECONDS": "1",
+                "XCODEBUILD_LOCK_POLL_SECONDS": "1",
+            },
+            preexisting_empty_lock=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("XCODEBUILD=-derivedDataPath", log)
 
     def test_surfaces_raw_compiler_diagnostics_when_xcbeautify_hides_them(self) -> None:
         completed, _ = self.run_script(
@@ -415,6 +525,21 @@ shift
         self.assertIn("-retry-tests-on-failure -test-iterations 2", log)
         self.assertNotIn("mapfile", completed.stderr)
 
+    def test_ui_test_actions_do_not_inject_retry_flags(self) -> None:
+        completed, log = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "test-without-building",
+            "-only-testing:HarnessMonitorUITests/HarnessMonitorSheetUITests/testNewSessionSheetUsesStackedEditableFields",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("TUIST=xcodebuild", log)
+        self.assertIn("XCODEBUILD=-derivedDataPath", log)
+        self.assertIn("HarnessMonitorUITests/HarnessMonitorSheetUITests", log)
+        self.assertNotIn("-retry-tests-on-failure", log)
+        self.assertNotIn("-test-iterations", log)
+
     def test_test_actions_resolve_repo_relative_paths_before_tuist_xcodebuild(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -615,6 +740,43 @@ PY
             completed.stderr,
         )
         self.assertNotIn("CUSTOM_SIGNING_TOKEN=top-secret", completed.stderr)
+
+    def test_failure_footer_persists_full_report_and_prints_searchable_path_last(self) -> None:
+        with tempfile.TemporaryDirectory() as report_dir:
+            completed, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={
+                    "FAKE_XCODEBUILD_FAIL_WITH_DIAGNOSTICS": "1",
+                    "FAKE_XCBEAUTIFY_HIDE_DIAGNOSTICS": "1",
+                    "HARNESS_MONITOR_FAILURE_REPORT_DIR": report_dir,
+                },
+                include_xcbeautify=True,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            stderr_lines = [line for line in completed.stderr.splitlines() if line.strip()]
+            footer = stderr_lines[-1]
+            self.assertIn("failure", footer)
+            self.assertIn("fail", footer)
+            self.assertIn("error", footer)
+            self.assertIn("full-report", footer)
+            self.assertIn("path=", footer)
+
+            report_path = Path(footer.split("path=", 1)[1].split(" ", 1)[0])
+            console_log = Path(footer.split("console_log=", 1)[1].split(" ", 1)[0])
+            raw_log = Path(footer.split("raw_log=", 1)[1].split(" ", 1)[0])
+
+            self.assertTrue(report_path.exists(), report_path)
+            self.assertTrue(console_log.exists(), console_log)
+            self.assertTrue(raw_log.exists(), raw_log)
+
+            report_body = report_path.read_text(encoding="utf-8")
+            self.assertIn("Harness Monitor xcodebuild failure report", report_body)
+            self.assertIn("===== filtered-console-output =====", report_body)
+            self.assertIn("===== raw-xcodebuild-output =====", report_body)
+            self.assertIn("/tmp/FakeSource.swift:1:3: error: synthetic failure 1", report_body)
 
     def test_succeeds_when_literal_mktemp_template_path_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -140,3 +140,61 @@ print_log_tail_compact() {
 
   /usr/bin/tail -n "$lines" "$path"
 }
+
+descendant_process_pids() {
+  local root_pid="$1"
+  /bin/ps -Ao pid=,ppid= \
+    | /usr/bin/awk -v root_pid="$root_pid" '
+        {
+          pid = $1
+          ppid = $2
+          children[ppid] = children[ppid] " " pid
+        }
+
+        function walk(parent_pid, child_list, child_count, child_index, child_pid) {
+          child_count = split(children[parent_pid], child_list, " ")
+          for (child_index = 1; child_index <= child_count; child_index += 1) {
+            child_pid = child_list[child_index]
+            if (child_pid == "") {
+              continue
+            }
+            print child_pid
+            walk(child_pid)
+          }
+        }
+
+        END {
+          walk(root_pid)
+        }
+      '
+}
+
+terminate_descendant_processes() {
+  local root_pid="$1"
+  local signal="${2:-TERM}"
+  local -a descendant_pids=()
+  local descendant_pid
+  local index
+
+  while IFS= read -r descendant_pid; do
+    if [[ -n "$descendant_pid" ]]; then
+      descendant_pids+=("$descendant_pid")
+    fi
+  done < <(descendant_process_pids "$root_pid")
+  if (( ${#descendant_pids[@]} == 0 )); then
+    return 0
+  fi
+
+  for ((index = ${#descendant_pids[@]} - 1; index >= 0; index -= 1)); do
+    kill "-${signal}" "${descendant_pids[index]}" 2>/dev/null || true
+  done
+
+  if [[ "$signal" != "KILL" ]]; then
+    sleep 0.2
+    for ((index = ${#descendant_pids[@]} - 1; index >= 0; index -= 1)); do
+      if kill -0 "${descendant_pids[index]}" 2>/dev/null; then
+        kill -KILL "${descendant_pids[index]}" 2>/dev/null || true
+      fi
+    done
+  fi
+}

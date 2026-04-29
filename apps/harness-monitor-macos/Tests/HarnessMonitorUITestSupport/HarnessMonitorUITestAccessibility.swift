@@ -203,9 +203,19 @@ enum HarnessMonitorUITestAccessibility {
   static let newSessionContext = "harness.new-session.context"
   static let newSessionBaseRef = "harness.new-session.base-ref"
   static let newSessionProjectPicker = "harness.new-session.project-picker"
+  static let newSessionCapabilityPicker = "harness.new-session.capability-picker"
   static let newSessionCreateButton = "harness.new-session.create-button"
   static let newSessionCancelButton = "harness.new-session.cancel-button"
   static let newSessionErrorBanner = "harness.new-session.error-banner"
+  static func newSessionCapabilityRow(_ identifier: String) -> String {
+    "harness.new-session.capability.\(slug(identifier))"
+  }
+  static func newSessionCapabilityProbe(_ identifier: String) -> String {
+    "harness.new-session.capability.\(slug(identifier)).probe"
+  }
+  static func newSessionCapabilityTransportButton(_ identifier: String, transportID: String) -> String {
+    "harness.new-session.capability.\(slug(identifier)).transport.\(slug(transportID))"
+  }
   static let voiceInputPopover = "harness.voice-input.popover"
   static let voiceInputTranscript = "harness.voice-input.transcript"
   static let voiceInputInsertButton = "harness.voice-input.insert"

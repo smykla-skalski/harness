@@ -34,6 +34,7 @@ MAX_DB_RETRIES="${XCODEBUILD_DB_RETRIES:-3}"
 REGENERATE_AFTER_SUCCESS="${HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD:-0}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-2}"
 JUNIT_REPORT_DIR="${HARNESS_MONITOR_JUNIT_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
+FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
 TRANSIENT_DB_STATUS=200
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
@@ -154,17 +155,67 @@ if (( has_derived_data_path == 0 )); then
   args=("-derivedDataPath" "$derive_data_path" "${args[@]}")
 fi
 
-lock_dir="$derive_data_path/.xcodebuild.lock"
-lock_pid_file="$lock_dir/pid"
+lock_path="$derive_data_path/.xcodebuild.lock"
+legacy_lock_pid_file="$lock_path/pid"
+lock_path_owned_by_self=0
+
+current_lock_owner_pid() {
+  if [[ -f "$lock_path" ]]; then
+    /bin/cat "$lock_path" 2>/dev/null || true
+    return 0
+  fi
+
+  if [[ -f "$legacy_lock_pid_file" ]]; then
+    /bin/cat "$legacy_lock_pid_file" 2>/dev/null || true
+    return 0
+  fi
+
+  return 1
+}
+
+remove_lock_path() {
+  if [[ -d "$lock_path" ]]; then
+    /bin/rm -rf "$lock_path"
+    return 0
+  fi
+
+  /bin/rm -f "$lock_path"
+}
 
 cleanup_lock() {
-  if [[ -d "$lock_dir" ]] && [[ -f "$lock_pid_file" ]]; then
-    local owner_pid
-    owner_pid="$(cat "$lock_pid_file" 2>/dev/null || true)"
-    if [[ "$owner_pid" == "$$" ]]; then
-      /bin/rm -rf "$lock_dir"
-    fi
+  if [[ ! -e "$lock_path" ]]; then
+    return 0
   fi
+
+  if (( lock_path_owned_by_self == 1 )); then
+    remove_lock_path
+    return 0
+  fi
+
+  local owner_pid
+  owner_pid="$(current_lock_owner_pid || true)"
+  if [[ "$owner_pid" == "$$" ]]; then
+    remove_lock_path
+  fi
+}
+
+cleanup_descendants_and_lock() {
+  local status="${1:-$?}"
+  trap - EXIT INT TERM HUP
+  terminate_descendant_processes "$$"
+  cleanup_lock
+  exit "$status"
+}
+
+run_background_and_wait() {
+  local child_pid status
+  set +e
+  "$@" &
+  child_pid=$!
+  wait "$child_pid"
+  status=$?
+  set -e
+  return "$status"
 }
 
 is_db_transient_failure() {
@@ -211,6 +262,60 @@ create_temp_log_path() {
   log_path="${log_stem}.log"
   /bin/mv "$log_stem" "$log_path"
   printf '%s\n' "$log_path"
+}
+
+create_failure_report_base() {
+  local timestamp
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  /bin/mkdir -p "$FAILURE_REPORT_DIR"
+  printf '%s/xcodebuild-failure-%s-%s\n' "$FAILURE_REPORT_DIR" "$timestamp" "$$"
+}
+
+persist_failure_report() {
+  local status="$1"
+  local log_path="$2"
+  local raw_log_path="$3"
+  local report_base report_path console_copy raw_copy
+
+  report_base="$(create_failure_report_base)"
+  report_path="${report_base}.report.txt"
+  console_copy="${report_base}.console.log"
+  raw_copy="${report_base}.raw.log"
+
+  /bin/cp "$log_path" "$console_copy"
+  /bin/cp "$raw_log_path" "$raw_copy"
+
+  {
+    printf 'Harness Monitor xcodebuild failure report\n'
+    printf 'status: %s\n' "$status"
+    printf 'app_root: %s\n' "$ROOT"
+    printf 'caller_pwd: %s\n' "$CALLER_PWD"
+    printf 'derived_data_path: %s\n' "$derive_data_path"
+    printf 'console_log: %s\n' "$console_copy"
+    printf 'raw_log: %s\n' "$raw_copy"
+    printf '\n'
+    printf 'normalized_args:'
+    local arg
+    for arg in "${args[@]}"; do
+      printf ' %q' "$arg"
+    done
+    printf '\n\n'
+    printf '===== filtered-console-output =====\n'
+    /bin/cat "$console_copy"
+    printf '\n===== raw-xcodebuild-output =====\n'
+    /bin/cat "$raw_copy"
+  } > "$report_path"
+
+  printf '%s\n' "$report_path"
+}
+
+emit_failure_report_footer() {
+  local report_path="$1"
+  local console_copy="$2"
+  local raw_copy="$3"
+  printf '%s\n' \
+    "xcodebuild-wrapper failure error fail full-report path=${report_path} console_log=${console_copy} raw_log=${raw_copy}" \
+    >&2
 }
 
 latest_nonempty_activity_log() {
@@ -427,23 +532,55 @@ lock_owner_command() {
   /bin/ps -p "$owner_pid" -o command= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//'
 }
 
+recover_legacy_lock_dir_if_stale() {
+  if [[ ! -d "$lock_path" ]]; then
+    return 1
+  fi
+
+  if [[ ! -f "$legacy_lock_pid_file" ]]; then
+    remove_lock_path
+    return 0
+  fi
+
+  local owner_pid
+  owner_pid="$(/bin/cat "$legacy_lock_pid_file" 2>/dev/null || true)"
+  if [[ -z "$owner_pid" ]]; then
+    remove_lock_path
+    return 0
+  fi
+  if [[ -n "$owner_pid" ]] && kill -0 "$owner_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  remove_lock_path
+  return 0
+}
+
 acquire_lock() {
   local started_at now owner_pid owner_command last_reported_owner
   /bin/mkdir -p "$derive_data_path"
   started_at="$(date +%s)"
   last_reported_owner=""
-  while ! /bin/mkdir "$lock_dir" 2>/dev/null; do
+  while ! /usr/bin/shlock -f "$lock_path" -p "$$"; do
     owner_pid=""
-    if [[ -f "$lock_pid_file" ]]; then
-      owner_pid="$(cat "$lock_pid_file" 2>/dev/null || true)"
+    if recover_legacy_lock_dir_if_stale; then
+      continue
+    fi
+
+    if [[ -f "$lock_path" ]]; then
+      owner_pid="$(/bin/cat "$lock_path" 2>/dev/null || true)"
+      if [[ -z "$owner_pid" ]]; then
+        remove_lock_path
+        continue
+      fi
       if [[ -n "$owner_pid" ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
-        /bin/rm -rf "$lock_dir"
+        remove_lock_path
         continue
       fi
     fi
 
     if [[ "$owner_pid" != "$last_reported_owner" ]]; then
-      printf 'Waiting for xcodebuild lock at %s\n' "$lock_dir" >&2
+      printf 'Waiting for xcodebuild lock at %s\n' "$lock_path" >&2
       if [[ -n "$owner_pid" ]]; then
         printf 'lock owner pid: %s\n' "$owner_pid" >&2
         owner_command="$(lock_owner_command "$owner_pid" || true)"
@@ -456,22 +593,35 @@ acquire_lock() {
 
     now="$(date +%s)"
     if (( now - started_at >= LOCK_TIMEOUT_SECONDS )); then
-      printf 'Timed out waiting for xcodebuild lock at %s\n' "$lock_dir" >&2
+      printf 'Timed out waiting for xcodebuild lock at %s\n' "$lock_path" >&2
       exit 1
     fi
     sleep "$LOCK_POLL_SECONDS"
   done
-  printf '%s\n' "$$" > "$lock_pid_file"
+  lock_path_owned_by_self=1
 }
 
 build_test_action_args() {
   local -a out=("${args[@]}")
   if (( TEST_RETRY_ITERATIONS > 0 )) \
+      && ! xcodebuild_args_target_ui_tests "${args[@]}" \
       && ! xcodebuild_args_have_flag "-retry-tests-on-failure" "${args[@]}" \
       && ! xcodebuild_args_have_flag "-test-iterations" "${args[@]}"; then
     out+=("-retry-tests-on-failure" "-test-iterations" "$TEST_RETRY_ITERATIONS")
   fi
   printf '%s\n' "${out[@]}"
+}
+
+xcodebuild_args_target_ui_tests() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      *HarnessMonitorUITests*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
 }
 
 junit_report_path_for_run() {
@@ -580,10 +730,10 @@ run_inner() {
 }
 
 run_once() {
-  local log_path raw_log_path status
+  local log_path raw_log_path status report_path report_base console_copy raw_copy
   log_path="$(create_temp_log_path)"
   raw_log_path="$(create_temp_log_path)"
-  run_inner "$log_path" "$raw_log_path"
+  run_background_and_wait run_inner "$log_path" "$raw_log_path"
   status=$?
 
   if (( status == 0 )); then
@@ -611,13 +761,22 @@ run_once() {
     fi
   fi
 
+  report_path="$(persist_failure_report "$status" "$log_path" "$raw_log_path")"
+  report_base="${report_path%.report.txt}"
+  console_copy="${report_base}.console.log"
+  raw_copy="${report_base}.raw.log"
+  emit_failure_report_footer "$report_path" "$console_copy" "$raw_copy"
+
   /bin/rm -f "$log_path"
   /bin/rm -f "$raw_log_path"
   return "$status"
 }
 
+trap 'cleanup_descendants_and_lock $?' EXIT
+trap 'cleanup_descendants_and_lock 130' INT
+trap 'cleanup_descendants_and_lock 143' TERM
+trap 'cleanup_descendants_and_lock 129' HUP
 acquire_lock
-trap cleanup_lock EXIT
 
 attempt=1
 while true; do
