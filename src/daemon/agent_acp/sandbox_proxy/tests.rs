@@ -65,6 +65,25 @@ fn dedupe_incident_replays_drops_identical_process_incidents() {
     assert_eq!(filtered[1].event, "acp_events");
 }
 
+#[test]
+fn dedupe_incident_replays_drops_identical_resync_incidents() {
+    let repeated = StreamEvent {
+        event: "acp_bridge_resync_incident".to_string(),
+        recorded_at: "2026-04-29T00:00:00Z".to_string(),
+        session_id: Some("sess-1".to_string()),
+        payload: serde_json::json!({
+            "kind": "protocol_desync",
+            "bridge_epoch": "epoch-1",
+            "continuity": 3,
+        }),
+    };
+    let filtered =
+        dedupe_incident_replays(vec![repeated.clone(), repeated, stream_event("acp_events")]);
+    assert_eq!(filtered.len(), 2);
+    assert_eq!(filtered[0].event, "acp_bridge_resync_incident");
+    assert_eq!(filtered[1].event, "acp_events");
+}
+
 fn stream_event(event: &str) -> StreamEvent {
     StreamEvent {
         event: event.to_string(),
@@ -158,8 +177,13 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
 
 #[test]
 fn bridge_resync_incident_payload_uses_protocol_desync_kind() {
-    let payload =
-        bridge_resync_incident_payload("epoch-1".to_string(), 9, 12, true, vec!["sess-1".to_string()]);
+    let payload = bridge_resync_incident_payload(
+        "epoch-1".to_string(),
+        9,
+        12,
+        true,
+        vec!["sess-1".to_string()],
+    );
     assert_eq!(payload.kind, "protocol_desync");
     assert_eq!(payload.bridge_epoch, "epoch-1");
     assert_eq!(payload.continuity, 9);
