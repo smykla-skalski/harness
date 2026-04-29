@@ -278,6 +278,31 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(requests == ["request-selected"])
   }
 
+  @Test("ACP process incident appends timeline entry for selected session")
+  func acpProcessIncidentAppendsTimelineEntryForSelectedSession() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-incident"
+
+    store.applyAcpProcessIncident(
+      AcpProcessIncidentPayload(
+        kind: "transport_closed",
+        reasonKind: "transport_closed",
+        processKey: "acp-process-1",
+        pid: UInt32(42),
+        pgid: Int32(42),
+        exitCode: nil,
+        exitSignal: nil,
+        stderrTail: "lost transport",
+        affectedLogicalSessionIds: ["sess-acp-incident"]
+      ),
+      recordedAt: "2026-04-29T00:00:00Z",
+      sessionID: "sess-acp-incident"
+    )
+
+    #expect(store.timeline.last?.kind == "acp_process_incident")
+    #expect(store.timeline.last?.sessionId == "sess-acp-incident")
+  }
+
   @Test("ACP event push appends selected session timeline")
   func acpEventPushAppendsSelectedSessionTimeline() async throws {
     let client = RecordingHarnessClient()

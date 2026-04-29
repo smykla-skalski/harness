@@ -275,8 +275,14 @@ extension HarnessMonitorStore {
       replaceAcpAgents(payload)
     case .acpEvents(let payload):
       applyAcpEvents(payload, recordedAt: event.recordedAt)
-    case .acpProcessIncident, .acpBridgeResyncIncident:
-      break
+    case .acpProcessIncident(let payload):
+      applyAcpProcessIncident(payload, recordedAt: event.recordedAt, sessionID: event.sessionId)
+    case .acpBridgeResyncIncident(let payload):
+      applyAcpBridgeResyncIncident(
+        payload,
+        recordedAt: event.recordedAt,
+        sessionID: event.sessionId
+      )
     case .acpPermissionBatch(let batch):
       applyAcpPermissionBatch(batch)
     case .acpPermissionBatchRemoved(let batch):
