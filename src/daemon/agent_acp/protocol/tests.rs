@@ -29,6 +29,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     let agent_task = tokio::spawn(run_cookbook_style_agent(agent_transport));
     let (notification_tx, mut notifications) = mpsc::channel(4);
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
 
@@ -55,6 +56,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     session_id: "harness-sess-1".to_string(),
                     supervisor: protocol_supervisor,
                     cancel_rx,
+                    command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
                 })
                 .await
@@ -108,6 +110,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     let agent_task = tokio::spawn(run_agent_with_stale_notification(agent_transport));
     let (notification_tx, _notifications) = mpsc::channel(4);
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
 
@@ -134,6 +137,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     session_id: "harness-sess-1".to_string(),
                     supervisor: protocol_supervisor,
                     cancel_rx,
+                    command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
                 })
                 .await
@@ -368,6 +372,27 @@ fn session_route_guard_removes_one_route_without_poisoning_siblings() {
             .ensure_known(&second)
             .expect("sibling route remains active"),
         route_target("sess-2")
+    );
+}
+
+#[test]
+fn session_route_guard_removes_route_by_logical_target() {
+    let guard = SessionRouteGuard::default();
+    let first = SessionId::new("acp-session-1");
+    let second = SessionId::new("acp-session-2");
+    let first_target = route_target("sess-1");
+    let second_target = route_target("sess-2");
+    guard.start_session(&first, first_target.clone());
+    guard.start_session(&second, second_target.clone());
+
+    assert_eq!(
+        guard.stop_target(&first_target).expect("removed ACP id"),
+        first
+    );
+    assert!(guard.ensure_known(&first).is_err());
+    assert_eq!(
+        guard.ensure_known(&second).expect("sibling remains"),
+        second_target
     );
 }
 
