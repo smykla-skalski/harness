@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
@@ -5,6 +6,7 @@ struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var preferencesSelectedSection: PreferencesSection
@@ -23,7 +25,6 @@ struct HarnessMonitorWindowRootView: View {
   #endif
   @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
-  @State private var handledDecisionRequestTick = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
   private var backdropMode: HarnessMonitorBackdropMode {
     HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
@@ -65,6 +66,12 @@ struct HarnessMonitorWindowRootView: View {
       )
     )
     .modifier(HarnessMonitorUITestAnimationModifier())
+    .acpPermissionAttentionScene(
+      store: store,
+      notifications: notifications,
+      attentionState: acpAttentionState,
+      windowID: HarnessMonitorWindowID.main
+    )
     .modifier(SupervisorUITestForceTickModifier(store: store))
     .task(id: shouldShowBootstrapPlaceholder) {
       await bootstrapDeferredContentIfNeeded()
@@ -76,12 +83,6 @@ struct HarnessMonitorWindowRootView: View {
       handledSettingsOpenRequestID = requestID
       preferencesSelectedSection = .notifications
       openWindow(id: HarnessMonitorWindowID.preferences)
-    }
-    .task(id: notifications.decisionRequestTick) {
-      routeDecisionWindowRequest(for: notifications.decisionRequestTick)
-    }
-    .onChange(of: notifications.decisionRequestTick) { _, tick in
-      routeDecisionWindowRequest(for: tick)
     }
   }
 
@@ -122,17 +123,6 @@ struct HarnessMonitorWindowRootView: View {
     delegate.bind(store: store)
     await store.bootstrapIfNeeded()
     completedInitialBootstrap = true
-  }
-
-  private func routeDecisionWindowRequest(for tick: Int) {
-    guard tick != handledDecisionRequestTick,
-      let decisionID = notifications.decisionRequestedID
-    else {
-      return
-    }
-    handledDecisionRequestTick = tick
-    store.supervisorSelectedDecisionID = decisionID
-    openWindow(id: HarnessMonitorWindowID.decisions)
   }
 }
 
@@ -225,6 +215,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
 struct HarnessMonitorSettingsRootView: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: PreferencesSection
@@ -237,12 +228,14 @@ struct HarnessMonitorSettingsRootView: View {
   init(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
+    acpAttentionState: AcpPermissionAttentionState,
     windowCommandRouting: WindowCommandRoutingState,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<PreferencesSection>
   ) {
     self.store = store
     self.notifications = notifications
+    self.acpAttentionState = acpAttentionState
     self.windowCommandRouting = windowCommandRouting
     _themeMode = themeMode
     _selectedSection = selectedSection
@@ -291,6 +284,8 @@ struct HarnessMonitorSettingsRootView: View {
 
 struct AgentsWindowRootView: View {
   let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
+  let acpAttentionState: AcpPermissionAttentionState
   let navigationBridge: AgentsWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
@@ -359,6 +354,268 @@ struct AgentsWindowRootView: View {
           )
         }
       }
+  }
+}
+
+@MainActor
+@Observable
+final class AcpPermissionAttentionState {
+  private enum PreviewContextOverride: String {
+    case foreground
+    case hidden
+  }
+
+  private static let previewContextEnvironmentKey = "HARNESS_MONITOR_PREVIEW_ACP_ATTENTION_CONTEXT"
+
+  var activeToast: AcpPermissionAttentionEvent?
+
+  private let keyWindowObserver: KeyWindowObserver
+  @ObservationIgnored private let notifications: HarnessMonitorUserNotificationController
+  @ObservationIgnored private let previewContextOverride: PreviewContextOverride?
+  @ObservationIgnored private var handledBatchIDs: Set<String> = []
+  @ObservationIgnored private var handledDecisionRequestTick = 0
+
+  init(
+    keyWindowObserver: KeyWindowObserver,
+    notifications: HarnessMonitorUserNotificationController
+  ) {
+    self.keyWindowObserver = keyWindowObserver
+    self.notifications = notifications
+    self.previewContextOverride = Self.resolvePreviewContextOverride()
+  }
+
+  var routingToken: String {
+    [
+      keyWindowObserver.snapshot.routingToken,
+      "override=\(previewContextOverride?.rawValue ?? "live")",
+    ].joined(separator: ",")
+  }
+
+  func reconcile(store: HarnessMonitorStore) {
+    let currentBatchIDs = Set(store.acpPermissionAttentionEvents.map(\.batchID))
+    handledBatchIDs.formIntersection(currentBatchIDs)
+    if let activeToast, !currentBatchIDs.contains(activeToast.batchID) {
+      self.activeToast = nil
+    }
+
+    guard let nextAttention = store.acpPermissionAttentionEvents.first(where: {
+      !handledBatchIDs.contains($0.batchID)
+    }) else {
+      return
+    }
+
+    if shouldSuppressForegroundAttention(for: nextAttention, store: store) {
+      handledBatchIDs.insert(nextAttention.batchID)
+      if activeToast?.batchID == nextAttention.batchID {
+        activeToast = nil
+      }
+      return
+    }
+
+    if prefersUserNotificationDelivery {
+      activeToast = nil
+      Task { @MainActor in
+        if await notifications.deliverAcpPermissionRequest(nextAttention) {
+          handledBatchIDs.insert(nextAttention.batchID)
+        }
+      }
+      return
+    }
+
+    handledBatchIDs.insert(nextAttention.batchID)
+    activeToast = nextAttention
+  }
+
+  func dismissToast() {
+    activeToast = nil
+  }
+
+  func showsToast(in windowID: String) -> Bool {
+    guard activeToast != nil else {
+      return false
+    }
+    return !prefersUserNotificationDelivery && keyWindowObserver.isKey(windowID: windowID)
+  }
+
+  func routeActiveToast(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) {
+    guard let attention = activeToast else {
+      return
+    }
+    activeToast = nil
+    routeToDecision(
+      decisionID: attention.decisionID,
+      store: store,
+      openWindow: openWindow
+    )
+  }
+
+  func routeNotificationRequestIfNeeded(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) {
+    guard notifications.decisionRequestTick != handledDecisionRequestTick,
+      let decisionID = notifications.decisionRequestedID
+    else {
+      return
+    }
+    handledDecisionRequestTick = notifications.decisionRequestTick
+    routeToDecision(
+      decisionID: decisionID,
+      store: store,
+      openWindow: openWindow
+    )
+  }
+
+  private var prefersUserNotificationDelivery: Bool {
+    switch previewContextOverride {
+    case .foreground:
+      return false
+    case .hidden:
+      return true
+    case nil:
+      return keyWindowObserver.snapshot.prefersUserNotificationDelivery
+    }
+  }
+
+  private func shouldSuppressForegroundAttention(
+    for attention: AcpPermissionAttentionEvent,
+    store: HarnessMonitorStore
+  ) -> Bool {
+    guard keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.decisions),
+      let selectedDecisionID = store.supervisorSelectedDecisionID
+    else {
+      return false
+    }
+    return selectedDecisionID != attention.decisionID
+  }
+
+  private func routeToDecision(
+    decisionID: String,
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) {
+    store.supervisorSelectedDecisionID = decisionID
+    store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+    Self.activateHarnessMonitorApp()
+    openWindow(id: HarnessMonitorWindowID.decisions)
+    Task { @MainActor in
+      await Task.yield()
+      Self.decisionsWindow()?.makeKeyAndOrderFront(nil)
+    }
+  }
+
+  private static func activateHarnessMonitorApp() {
+    if #available(macOS 14.0, *) {
+      NSApplication.shared.activate()
+    } else {
+      NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+  }
+
+  private static func decisionsWindow() -> NSWindow? {
+    NSApplication.shared.windows.first { window in
+      let identifier = window.identifier?.rawValue ?? ""
+      return identifier.contains(HarnessMonitorWindowID.decisions)
+    }
+  }
+
+  private static func resolvePreviewContextOverride() -> PreviewContextOverride? {
+    let environment = ProcessInfo.processInfo.environment
+    guard
+      let rawValue = environment[previewContextEnvironmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased(),
+      !rawValue.isEmpty
+    else {
+      return nil
+    }
+    switch rawValue {
+    case "foreground", "active", "live":
+      return .foreground
+    case "hidden", "background", "minimized":
+      return .hidden
+    default:
+      return nil
+    }
+  }
+}
+
+private struct AcpPermissionAttentionSceneModifier: ViewModifier {
+  let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
+  let attentionState: AcpPermissionAttentionState
+  let windowID: String
+
+  @Environment(\.openWindow)
+  private var openWindow
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+
+  private var observationKey: String {
+    [
+      store.pendingAcpPermissionBatches.map(\.batchId).joined(separator: "|"),
+      "\(store.supervisorDecisionRefreshTick)",
+      store.supervisorSelectedDecisionID ?? "nil",
+      attentionState.routingToken,
+    ].joined(separator: "||")
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .overlay(alignment: .topTrailing) {
+        if attentionState.showsToast(in: windowID),
+          let attention = attentionState.activeToast
+        {
+          AcpPermissionAttentionToastView(
+            attention: attention,
+            openDecisions: {
+              attentionState.routeActiveToast(store: store, openWindow: openWindow)
+            },
+            dismiss: attentionState.dismissToast
+          )
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+          .padding(.trailing, HarnessMonitorTheme.spacingLG)
+          .transition(
+            reduceMotion
+              ? .opacity
+              : .move(edge: .top).combined(with: .opacity)
+          )
+        }
+      }
+      .animation(
+        reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.18),
+        value: attentionState.activeToast?.batchID
+      )
+      .task(id: observationKey) {
+        attentionState.reconcile(store: store)
+      }
+      .task(id: notifications.decisionRequestTick) {
+        attentionState.routeNotificationRequestIfNeeded(
+          store: store,
+          openWindow: openWindow
+        )
+      }
+  }
+}
+
+extension View {
+  func acpPermissionAttentionScene(
+    store: HarnessMonitorStore,
+    notifications: HarnessMonitorUserNotificationController,
+    attentionState: AcpPermissionAttentionState,
+    windowID: String
+  ) -> some View {
+    modifier(
+      AcpPermissionAttentionSceneModifier(
+        store: store,
+        notifications: notifications,
+        attentionState: attentionState,
+        windowID: windowID
+      )
+    )
   }
 }
 
