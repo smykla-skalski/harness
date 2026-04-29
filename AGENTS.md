@@ -13,9 +13,13 @@ Discover supported workflows with `rtk mise tasks ls` and run repo logic only th
 ## Build and test commands
 
 ```bash
-mise run check                 # type-check without building
-mise run test                  # unit + integration (fast, single-threaded)
+mise run check                 # default aggregate quality gate: harness + aff
+mise run harness:check         # harness-only quality gate (opt-in; not default)
+mise run aff:check             # aff-only quality gate (opt-in; not default)
+mise run test                  # default aggregate fast tests: harness + aff
 mise run test:unit             # unit tests only
+mise run test:integration      # integration tests only
+mise run aff:test              # aff package tests only (opt-in; not default)
 mise run test:slow             # slow tests (#[ignore])
 mise run lint:fix              # format + clippy fixes
 mise run install               # build release binary, install to ~/.local/bin

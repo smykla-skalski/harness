@@ -370,9 +370,14 @@ If `harness run repair` still leaves blocking findings, start a fresh tracked ru
 
 ```bash
 mise run version:check
-mise run check    # type-check + clippy
-mise run test     # unit + integration
-mise run monitor:macos:test  # generate + lint + test the macOS Harness Monitor app
+mise run check                       # default aggregate: harness + aff quality gates
+mise run harness:check               # harness-only quality gates (opt-in; not run by default)
+mise run aff:check                   # aff-only quality gates (opt-in; not run by default)
+mise run test                        # default aggregate: harness + aff fast tests
+mise run test:unit                   # harness unit tests (opt-in; not run by default)
+mise run test:integration            # harness integration tests (opt-in; not run by default)
+mise run aff:test                    # aff-only tests (opt-in; not run by default)
+mise run monitor:macos:test          # generate + lint + test the macOS Harness Monitor app
 mise run monitor:macos:quality-gate  # slower build-based sandbox + daemon validation for the macOS app
 XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:macos:test  # focused macOS XCTest via the shared wrapper
 ```
