@@ -10,6 +10,7 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
+STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
@@ -24,22 +25,27 @@ cleanup_script_descendants() {
   exit "$status"
 }
 
-run_background_and_wait() {
-  local child_pid status
-  set +e
-  "$@" &
-  child_pid=$!
-  wait "$child_pid"
-  status=$?
-  set -e
-  return "$status"
+run_stale_preflight() {
+  if [[ "${HARNESS_SKIP_STALE_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  if [[ ! -x "$STALE_CHECK_SCRIPT" ]]; then
+    echo "stale-check script is not executable: $STALE_CHECK_SCRIPT" >&2
+    exit 1
+  fi
+
+  "$STALE_CHECK_SCRIPT"
 }
 
 run_test_action() {
   if [[ -n "$XCODE_ONLY_TESTING" ]]; then
-    exec env HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+    exec env \
+      HARNESS_SKIP_STALE_CHECK=1 \
+      HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 \
+      "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
   else
-    exec "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+    exec env HARNESS_SKIP_STALE_CHECK=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
   fi
 }
 
@@ -47,6 +53,7 @@ run_only_testing_enumeration() {
   local selector="$1"
   local enumeration_path="$2"
   HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
+    HARNESS_SKIP_STALE_CHECK=1 \
     "$XCODEBUILD_RUNNER" \
     "${BASE_TEST_ARGS[@]}" \
     "-only-testing:${selector}" \
@@ -92,10 +99,14 @@ filter_monitor_test_console_output() {
 }
 
 run_build_for_testing() {
+  local build_log_path
+  build_log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-build-for-testing.XXXXXX.log")"
   set +e
-  "$BUILD_FOR_TESTING_SCRIPT" 2>&1 | filter_monitor_test_console_output
-  local status="${PIPESTATUS[0]}"
+  HARNESS_SKIP_STALE_CHECK=1 "$BUILD_FOR_TESTING_SCRIPT" >"$build_log_path" 2>&1
+  local status="$?"
   set -e
+  filter_monitor_test_console_output <"$build_log_path"
+  /bin/rm -f "$build_log_path"
   return "$status"
 }
 
@@ -138,8 +149,7 @@ enumerate_only_testing_selector() {
   enumeration_dir="$(mktemp -d "${TMPDIR:-/tmp}/harness-monitor-tests.XXXXXX")"
   enumeration_path="$enumeration_dir/tests.json"
   enumeration_log_path="$enumeration_dir/xcodebuild.log"
-  if ! run_background_and_wait \
-    run_only_testing_enumeration \
+  if ! run_only_testing_enumeration \
     "$selector" \
     "$enumeration_path" >"$enumeration_log_path" 2>&1; then
     /usr/bin/tail -n 80 "$enumeration_log_path" >&2 || true
@@ -260,12 +270,14 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
+run_stale_preflight
+
 trap 'cleanup_script_descendants $?' EXIT
 trap 'cleanup_script_descendants 130' INT
 trap 'cleanup_script_descendants 143' TERM
 trap 'cleanup_script_descendants 129' HUP
 
-run_background_and_wait run_build_for_testing
+run_build_for_testing
 
 clear_gatekeeper_metadata
 

@@ -24,6 +24,7 @@ _stale_scan_ps_snapshot=""
 
 stale_scan_refresh_ps() {
   _stale_scan_ps_snapshot="$(ps -Ao pid=,ppid=,etime=,command=)"
+  _stale_scan_ppid_map=""
 }
 
 stale_scan_ensure_ps() {
@@ -69,6 +70,50 @@ stale_scan_pid_describe() {
       exit
     }
   ' <<<"$_stale_scan_ps_snapshot"
+}
+
+stale_scan_monitor_wrapper_derived_data_path() {
+  local command_line="$1"
+  awk '
+    {
+      for (i = 1; i <= NF; i += 1) {
+        if ($i == "-derivedDataPath" && i < NF) {
+          print $(i + 1)
+          exit
+        }
+        if ($i ~ /^-derivedDataPath=/) {
+          sub(/^-derivedDataPath=/, "", $i)
+          print $i
+          exit
+        }
+      }
+    }
+  ' <<<"$command_line"
+}
+
+stale_scan_orphan_monitor_wrapper_pids() {
+  stale_scan_ensure_ps
+  local line pid ppid command_line derived_data_path
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    pid="$(awk '{print $1}' <<<"$line")"
+    ppid="$(awk '{print $2}' <<<"$line")"
+    command_line="$(awk '{ $1=""; $2=""; $3=""; sub(/^ +/, "", $0); print }' <<<"$line")"
+
+    [[ "$ppid" == "1" ]] || continue
+    [[ "$command_line" == *"xcodebuild-with-lock.sh"* ]] || continue
+
+    derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$command_line")"
+    if [[ -z "$derived_data_path" ]]; then
+      echo "$pid"
+      continue
+    fi
+
+    if [[ ! -e "$derived_data_path/.xcodebuild.lock/owner/lease.env" \
+      && ! -e "$derived_data_path/.xcodebuild.lock/waiters/${pid}.env" ]]; then
+      echo "$pid"
+    fi
+  done <<<"$_stale_scan_ps_snapshot"
 }
 
 stale_scan_root_lock_holder_pids() {
