@@ -93,3 +93,53 @@ fn agent_tui_attach_clears_rpc_timeouts_before_returning() {
     assert_eq!(stream.write_timeout().expect("write timeout"), None);
     server.join().expect("server thread");
 }
+
+#[test]
+fn bridge_client_acp_events_since_uses_expected_capability_payload() {
+    let dir = tempdir().expect("tempdir");
+    let socket_path = dir.path().join("bridge.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind socket");
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut line = String::new();
+        BufReader::new(stream.try_clone().expect("clone server stream"))
+            .read_line(&mut line)
+            .expect("read request");
+        let request: serde_json::Value = serde_json::from_str(&line).expect("decode envelope");
+        assert_eq!(request["request"]["operation"], "capability");
+        assert_eq!(request["request"]["capability"], "acp");
+        assert_eq!(request["request"]["action"], "events_since");
+        assert_eq!(request["request"]["payload"]["after_seq"], 7);
+        assert_eq!(request["request"]["payload"]["known_epoch"], "epoch-a");
+        assert_eq!(request["request"]["payload"]["known_continuity"], 3);
+
+        let payload = serde_json::json!({
+            "bridge_epoch": "epoch-a",
+            "continuity": 3,
+            "next_seq": 8,
+            "truncated": false,
+            "requires_resync": false,
+            "events": [],
+        });
+        let response = BridgeResponse::ok_payload(&payload).expect("response payload");
+        let serialized = serde_json::to_string(&response).expect("serialize");
+        stream
+            .write_all(serialized.as_bytes())
+            .and_then(|()| stream.write_all(b"\n"))
+            .and_then(|()| stream.flush())
+            .expect("write response");
+    });
+
+    let client = BridgeClient {
+        socket_path,
+        token: "test-token".to_string(),
+    };
+    let response = client
+        .acp_events_since(Some(7), Some("epoch-a"), Some(3))
+        .expect("events_since");
+    assert_eq!(response.bridge_epoch, "epoch-a");
+    assert_eq!(response.continuity, 3);
+    assert_eq!(response.next_seq, 8);
+    assert!(!response.requires_resync);
+    server.join().expect("server thread");
+}
