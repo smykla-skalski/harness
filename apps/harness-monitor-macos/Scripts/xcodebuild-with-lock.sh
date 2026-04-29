@@ -21,6 +21,9 @@ LEGACY_TUIST_OPT_OUT="${HARNESS_MONITOR_USE_TUIST_TEST:-}"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
 
+STALE_CHECK_SCRIPT="$SCRIPT_CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
+RUN_STARTED_AT_EPOCH="$(date +%s)"
+
 if [[ -n "$LEGACY_TUIST_OPT_OUT" ]]; then
   printf '%s\n' \
     'HARNESS_MONITOR_USE_TUIST_TEST is no longer supported; all Harness Monitor xcodebuild lanes already use Tuist' \
@@ -419,6 +422,7 @@ emit_swift_compile_context() {
 }
 
 emit_swift_dia_diagnostics() {
+  local min_epoch="${1:-0}"
   local diagnostics_root diagnostics_file emitted files_file line output shown
   diagnostics_root="$derive_data_path/Build/Intermediates.noindex"
   if [[ ! -d "$diagnostics_root" ]]; then
@@ -428,6 +432,7 @@ emit_swift_dia_diagnostics() {
   files_file="$(mktemp "${TMPDIR:-/tmp}/harness-xcodebuild-dia.XXXXXX")"
   /usr/bin/find "$diagnostics_root" -type f -name '*.dia' -size +0c \
     -exec /usr/bin/stat -f '%m %N' {} + 2>/dev/null \
+    | /usr/bin/awk -v min_epoch="$min_epoch" '$1 >= min_epoch { print }' \
     | /usr/bin/sort -n \
     | /usr/bin/tail -80 \
     | /usr/bin/sed 's/^[0-9][0-9]* //' > "$files_file"
@@ -757,7 +762,7 @@ run_once() {
       emit_raw_compiler_diagnostics "$raw_log_path"
     else
       emit_swift_compile_context
-      emit_swift_dia_diagnostics
+      emit_swift_dia_diagnostics "$RUN_STARTED_AT_EPOCH"
     fi
   fi
 
@@ -772,10 +777,24 @@ run_once() {
   return "$status"
 }
 
+run_stale_preflight() {
+  if [[ "${HARNESS_SKIP_STALE_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  if [[ ! -x "$STALE_CHECK_SCRIPT" ]]; then
+    printf 'stale-check script is not executable: %s\n' "$STALE_CHECK_SCRIPT" >&2
+    exit 1
+  fi
+
+  "$STALE_CHECK_SCRIPT"
+}
+
 trap 'cleanup_descendants_and_lock $?' EXIT
 trap 'cleanup_descendants_and_lock 130' INT
 trap 'cleanup_descendants_and_lock 143' TERM
 trap 'cleanup_descendants_and_lock 129' HUP
+run_stale_preflight
 acquire_lock
 
 attempt=1
