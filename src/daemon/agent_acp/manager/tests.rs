@@ -409,7 +409,10 @@ async fn repeated_process_faults_quarantine_process_key() {
             std::thread::sleep(Duration::from_millis(1100));
         }
         assert!(saw_backoff_applied, "expected backoff-applied incident");
-        assert!(saw_quarantine_applied, "expected quarantine-applied incident");
+        assert!(
+            saw_quarantine_applied,
+            "expected quarantine-applied incident"
+        );
 
         let error = manager
             .start_descriptor("sess-4", &request, &descriptor)

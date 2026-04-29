@@ -18,7 +18,7 @@ use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
 use super::active::{
-    ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
+    ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
     spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
 };
 use super::manager::{
@@ -54,59 +54,133 @@ impl AcpAgentManagerHandle {
         if process_fault_policy_enabled() {
             self.ensure_process_key_start_allowed(process_key.as_str())?;
         }
+        let input = DescriptorStartInput {
+            acp_id: &acp_id,
+            session_id,
+            request,
+            descriptor,
+            project_dir: &project_dir,
+            process_key: process_key.as_str(),
+        };
+        let _lifecycle = self
+            .state
+            .process_lifecycle
+            .lock()
+            .expect("ACP process lifecycle lock");
+        if let Some(snapshot) = self.try_start_reused_session(input) {
+            return Ok(snapshot);
+        }
+        self.start_new_process_session(input, &spawn)
+    }
+
+    fn try_start_reused_session(
+        &self,
+        input: DescriptorStartInput<'_>,
+    ) -> Option<AcpAgentSnapshot> {
+        if !input
+            .request
+            .prompt
+            .as_deref()
+            .is_none_or(|prompt| prompt.trim().is_empty())
+        {
+            return None;
+        }
+        let existing = self.reusable_session_for_process_key(input.process_key)?;
+        let snapshot = reused_snapshot(ReusedSnapshotInput {
+            acp_id: input.acp_id,
+            session_id: input.session_id,
+            request: input.request,
+            descriptor: input.descriptor,
+            source: &existing.snapshot_with_live_counts(),
+            project_dir: input.project_dir,
+            permission_log_path: input
+                .request
+                .record_permissions
+                .then(|| recording_log_path_for_session(input.session_id)),
+        });
+        let permissions = PermissionBridgeHandle::spawn(
+            input.acp_id.to_string(),
+            input.session_id.to_string(),
+            self.sender(),
+        );
+        let active = Arc::new(ActiveAcpSession::new(
+            snapshot.clone(),
+            permissions,
+            existing.process(),
+        ));
+        self.state
+            .sessions
+            .lock()
+            .expect("ACP sessions lock")
+            .insert(input.acp_id.to_string(), active);
+        self.broadcast("acp_agent_started", &snapshot);
+        Some(snapshot)
+    }
+
+    fn start_new_process_session(
+        &self,
+        input: DescriptorStartInput<'_>,
+        spawn: &SpawnConfig,
+    ) -> Result<AcpAgentSnapshot, CliError> {
         let mut child = spawn.spawn().map_err(|error| {
-            CliErrorKind::workflow_io(format!("spawn ACP agent '{}': {error}", descriptor.id))
+            CliErrorKind::workflow_io(format!(
+                "spawn ACP agent '{}': {error}",
+                input.descriptor.id
+            ))
         })?;
         let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
         let supervisor = Arc::new(AcpSessionSupervisor::new(
             &child,
-            SupervisionConfig::default().with_prompt_timeout(descriptor.prompt_timeout_seconds),
+            SupervisionConfig::default()
+                .with_prompt_timeout(input.descriptor.prompt_timeout_seconds),
         ));
-        let permissions =
-            PermissionBridgeHandle::spawn(acp_id.clone(), session_id.to_string(), self.sender());
-        let permission_log_path = request
+        let permissions = PermissionBridgeHandle::spawn(
+            input.acp_id.to_string(),
+            input.session_id.to_string(),
+            self.sender(),
+        );
+        let permission_log_path = input
+            .request
             .record_permissions
-            .then(|| recording_log_path_for_session(session_id));
+            .then(|| recording_log_path_for_session(input.session_id));
         let permission_mode = permission_log_path.clone().map_or_else(
             || permissions.mode(PERMISSION_RESPONSE_DEADLINE),
             |log_path| PermissionMode::Recording { log_path },
         );
         let protocol = spawn_protocol_task(
             &mut child,
-            request,
-            session_id,
-            descriptor.display_name.clone(),
-            project_dir.clone(),
+            input.request,
+            input.session_id,
+            input.descriptor.display_name.clone(),
+            input.project_dir.to_path_buf(),
             &supervisor,
             permission_mode,
         )
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(
                 "attach ACP protocol for '{}': {error}",
-                descriptor.id
+                input.descriptor.id
             ))
         })?;
         let event_task = spawn_event_forwarder(
             self.sender(),
-            acp_id.clone(),
-            session_id.to_string(),
+            input.acp_id.to_string(),
+            input.session_id.to_string(),
             protocol.events,
         );
         let snapshot = started_snapshot(StartedSnapshotInput {
-            acp_id: &acp_id,
-            session_id,
-            request,
-            descriptor,
+            acp_id: input.acp_id,
+            session_id: input.session_id,
+            request: input.request,
+            descriptor: input.descriptor,
             supervisor: &supervisor,
-            project_dir: &project_dir,
-            process_key: process_key.as_str(),
+            project_dir: input.project_dir,
+            process_key: input.process_key,
             permission_log_path,
         });
-        let active = Arc::new(ActiveAcpSession::new(
-            snapshot.clone(),
+        let process = Arc::new(ActiveAcpProcess::new(
             child,
             Arc::clone(&supervisor),
-            permissions,
             protocol.cancel,
             stderr_tail,
             ActiveAcpTasks {
@@ -115,13 +189,18 @@ impl AcpAgentManagerHandle {
                 event: event_task,
             },
         ));
+        let active = Arc::new(ActiveAcpSession::new(
+            snapshot.clone(),
+            permissions,
+            Arc::clone(&process),
+        ));
         active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
-            self.sender(),
+            self.clone(),
             Arc::downgrade(&active),
             protocol.disconnects,
         ));
         active.set_watchdog_task(spawn_watchdog_forwarder(
-            self.sender(),
+            self.clone(),
             Arc::downgrade(&active),
             supervisor,
         ));
@@ -129,7 +208,8 @@ impl AcpAgentManagerHandle {
             .sessions
             .lock()
             .expect("ACP sessions lock")
-            .insert(acp_id, active);
+            .insert(input.acp_id.to_string(), active);
+        self.insert_process(input.process_key.to_string(), process);
         self.broadcast("acp_agent_started", &snapshot);
         Ok(snapshot)
     }
@@ -277,6 +357,26 @@ struct StartedSnapshotInput<'a> {
     permission_log_path: Option<PathBuf>,
 }
 
+#[derive(Clone, Copy)]
+struct DescriptorStartInput<'a> {
+    acp_id: &'a str,
+    session_id: &'a str,
+    request: &'a AcpAgentStartRequest,
+    descriptor: &'a AcpAgentDescriptor,
+    project_dir: &'a Path,
+    process_key: &'a str,
+}
+
+struct ReusedSnapshotInput<'a> {
+    acp_id: &'a str,
+    session_id: &'a str,
+    request: &'a AcpAgentStartRequest,
+    descriptor: &'a AcpAgentDescriptor,
+    source: &'a AcpAgentSnapshot,
+    project_dir: &'a Path,
+    permission_log_path: Option<PathBuf>,
+}
+
 fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
     let StartedSnapshotInput {
         acp_id,
@@ -299,6 +399,42 @@ fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
         pgid: supervisor.pgid(),
         project_dir: project_dir.display().to_string(),
         process_key: process_key.to_string(),
+        pending_permissions: 0,
+        permission_queue_depth: 0,
+        pending_permission_batches: Vec::new(),
+        permission_mode: if request.record_permissions {
+            "recording".to_string()
+        } else {
+            "daemon_bridge".to_string()
+        },
+        permission_log_path: permission_log_path.map(|path| path.display().to_string()),
+        terminal_count: 0,
+        created_at: now.clone(),
+        updated_at: now,
+    }
+}
+
+fn reused_snapshot(input: ReusedSnapshotInput<'_>) -> AcpAgentSnapshot {
+    let ReusedSnapshotInput {
+        acp_id,
+        session_id,
+        request,
+        descriptor,
+        source,
+        project_dir,
+        permission_log_path,
+    } = input;
+    let now = utc_now();
+    AcpAgentSnapshot {
+        acp_id: acp_id.to_string(),
+        session_id: session_id.to_string(),
+        agent_id: descriptor.id.clone(),
+        display_name: descriptor.display_name.clone(),
+        status: AgentStatus::Active,
+        pid: source.pid,
+        pgid: source.pgid,
+        project_dir: project_dir.display().to_string(),
+        process_key: source.process_key.clone(),
         pending_permissions: 0,
         permission_queue_depth: 0,
         pending_permission_batches: Vec::new(),
