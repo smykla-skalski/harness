@@ -177,7 +177,6 @@ pub(super) fn check_compact_handoff(project_dir: &Path, compact_path: &Path) -> 
 fn runtime_bootstrap_code(agent: HookAgent, path: &Path) -> &'static str {
     match (agent, path.file_name().and_then(|name| name.to_str())) {
         (HookAgent::Claude, Some("settings.json")) => "observe_runtime_claude_settings",
-        (HookAgent::Codex, Some("config.toml")) => "observe_runtime_codex_config",
         (HookAgent::Codex, Some("hooks.json")) => "observe_runtime_codex_hooks",
         (HookAgent::Gemini, Some("settings.json")) => "observe_runtime_gemini_settings",
         (HookAgent::Copilot, Some("harness.json")) => "observe_runtime_copilot_hooks",

@@ -44,7 +44,7 @@ For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that direc
 Every directory under `.claude/`, `.agents/`, `.gemini/`, `.vibe/`, `.opencode/`, `.github/hooks/`, and `plugins/` that holds agent assets is a managed output root. The renderer owns these directories. Each contains an `AGENTS.md` marker it emits. Do not hand-edit files inside managed roots.
 
 - `harness setup agents generate` - renders skill/plugin assets from canonical sources into all managed roots
-- `harness setup bootstrap` - writes runtime config files (`.claude/settings.json`, `.codex/config.toml`, `.gemini/settings.json`, `.github/hooks/harness.json`, `.vibe/hooks.json`, `.opencode/hooks.json`) and syncs the Claude plugin cache
+- `harness setup bootstrap` - writes runtime config files (`.claude/settings.json`, `.gemini/settings.json`, `.github/hooks/harness.json`, `.vibe/hooks.json`, `.opencode/hooks.json`) and syncs the Claude plugin cache
 
 ## Architecture
 
