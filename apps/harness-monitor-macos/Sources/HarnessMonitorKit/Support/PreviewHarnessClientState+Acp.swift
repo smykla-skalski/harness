@@ -71,7 +71,7 @@ extension PreviewHarnessClientState {
       ProcessInfo.processInfo.environment[
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
       ] == "1"
-        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
     if seedsPermission,
       let detail = fallbackDetail,
       !detail.session.sessionId.isEmpty
@@ -105,6 +105,51 @@ extension PreviewHarnessClientState {
     let codex = (codexRunsBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.codex)
     let acp = (acpAgentsBySessionID[sessionID] ?? []).map(ManagedAgentSnapshot.acp)
     return terminals + codex + acp
+  }
+
+  func acpInspect(sessionID: String?) -> AcpAgentInspectResponse {
+    let sessions =
+      if let sessionID {
+        [sessionID]
+      } else {
+        Array(acpAgentsBySessionID.keys)
+      }
+
+    let sortedAgents = sessions
+      .flatMap { acpAgentsBySessionID[$0] ?? [] }
+      .map(Self.inspectSnapshot(from:))
+      .sorted {
+        if $0.displayName != $1.displayName {
+          return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+        return $0.acpId < $1.acpId
+      }
+    return AcpAgentInspectResponse(agents: sortedAgents)
+  }
+
+  static func inspectSnapshot(from snapshot: AcpAgentSnapshot) -> AcpAgentInspectSnapshot {
+    let seedsPendingDeadline =
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+      || ProcessInfo.processInfo.environment[
+        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
+      ] == "1"
+    return AcpAgentInspectSnapshot(
+      acpId: snapshot.acpId,
+      sessionId: snapshot.sessionId,
+      agentId: snapshot.agentId,
+      displayName: snapshot.displayName,
+      pid: snapshot.pid,
+      pgid: snapshot.pgid,
+      uptimeMs: 93_000,
+      lastUpdateAt: snapshot.updatedAt,
+      lastClientCallAt: snapshot.updatedAt,
+      watchdogState: "active",
+      permissionMode: "allow_edits",
+      pendingPermissions: snapshot.pendingPermissions,
+      permissionQueueDepth: snapshot.permissionQueueDepth,
+      terminalCount: snapshot.terminalCount,
+      promptDeadlineRemainingMs: seedsPendingDeadline ? 95_000 : 0
+    )
   }
 
   private func previewPermissionBatches(

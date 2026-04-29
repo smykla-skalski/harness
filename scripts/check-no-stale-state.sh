@@ -34,6 +34,10 @@ readonly RESET_HINT="run 'mise run clean:stale' to reset (or re-run with HARNESS
 readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
 stale_lines=()
 
+should_skip_live_daemon_lock_holder_check() {
+  [[ "${HARNESS_CHECK_ALLOW_DAEMON_LOCK_HOLDERS:-0}" == "1" ]]
+}
+
 cleanup_stale_check_lease() {
   lease_lock_cleanup
 }
@@ -95,11 +99,13 @@ collect_stale_lines() {
 
   # 2. Live installed harness daemon/bridge processes only count as stale
   #    when they still hold the well-known locks under the real Harness roots.
-  local group_lock_holders app_support_lock_holders
-  group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
-  append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
-  app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
-  append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
+  if ! should_skip_live_daemon_lock_holder_check; then
+    local group_lock_holders app_support_lock_holders
+    group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
+    append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
+    app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
+    append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
+  fi
 
   # 3. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
   #    anything in /tmp is from before the sandbox fix or from an unsandboxed

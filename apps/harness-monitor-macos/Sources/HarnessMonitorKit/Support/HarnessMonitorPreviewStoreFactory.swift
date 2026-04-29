@@ -124,9 +124,15 @@ public enum HarnessMonitorPreviewStoreFactory {
           == "1"
       if seedsPendingAcp {
         let pendingBatch = previewAcpPermissionBatch(sessionID: selectedSessionID)
-        store.selectedAcpAgents = [
-          previewAcpAgentSnapshot(sessionID: selectedSessionID, pendingBatch: pendingBatch)
+        let previewAcpAgent = previewAcpAgentSnapshot(
+          sessionID: selectedSessionID,
+          pendingBatch: pendingBatch
+        )
+        store.selectedAcpAgents = [previewAcpAgent]
+        store.selectedAcpInspectAgents = [
+          PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
         ]
+        store.selectedAcpInspectObservedAt = Date()
         if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
           == "1"
         {

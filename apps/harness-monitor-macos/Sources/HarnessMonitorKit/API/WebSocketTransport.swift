@@ -4,6 +4,80 @@ private final class SemanticBatchDeliveryTracker: @unchecked Sendable {
   var delivered = false
 }
 
+struct PendingAcpEventPushKey: Hashable, Sendable {
+  let sessionId: String
+  let acpId: String
+}
+
+struct BufferedAcpEvent: Sendable {
+  let event: AcpConversationEvent
+  let rawWeight: Int
+}
+
+struct PendingAcpEventPushBatch: Sendable {
+  let sessionId: String
+  let acpId: String
+  var recordedAt: String
+  var rawCount: Int
+  var droppedRawCount: Int
+  private var bufferedEvents: [BufferedAcpEvent]
+
+  init(recordedAt: String, payload: AcpEventBatchPayload, maxRetainedEvents: Int) {
+    sessionId = payload.sessionId
+    acpId = payload.acpId
+    self.recordedAt = recordedAt
+    rawCount = payload.rawCount
+    droppedRawCount = 0
+    bufferedEvents = Self.weightedEvents(from: payload)
+    trim(to: maxRetainedEvents)
+  }
+
+  var payload: AcpEventBatchPayload {
+    AcpEventBatchPayload(
+      acpId: acpId,
+      sessionId: sessionId,
+      rawCount: rawCount,
+      events: bufferedEvents.map(\.event)
+    )
+  }
+
+  mutating func merge(
+    recordedAt: String,
+    payload: AcpEventBatchPayload,
+    maxRetainedEvents: Int
+  ) {
+    self.recordedAt = recordedAt
+    rawCount += payload.rawCount
+    bufferedEvents.append(contentsOf: Self.weightedEvents(from: payload))
+    trim(to: maxRetainedEvents)
+  }
+
+  private mutating func trim(to maxRetainedEvents: Int) {
+    let overflowCount = bufferedEvents.count - maxRetainedEvents
+    guard overflowCount > 0 else {
+      return
+    }
+    droppedRawCount += bufferedEvents.prefix(overflowCount).reduce(0) { partialResult, event in
+      partialResult + event.rawWeight
+    }
+    bufferedEvents.removeFirst(overflowCount)
+  }
+
+  private static func weightedEvents(from payload: AcpEventBatchPayload) -> [BufferedAcpEvent] {
+    guard !payload.events.isEmpty else {
+      return []
+    }
+    let baseWeight = payload.rawCount / payload.events.count
+    let remainder = payload.rawCount % payload.events.count
+    return payload.events.enumerated().map { index, event in
+      BufferedAcpEvent(
+        event: event,
+        rawWeight: payload.rawCount > 0 ? baseWeight + (index < remainder ? 1 : 0) : 0
+      )
+    }
+  }
+}
+
 public actor WebSocketTransport: HarnessMonitorClientProtocol {
   typealias RPCSender =
     @Sendable (
@@ -27,12 +101,18 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var responseBatchHandlers: [String: ResponseBatchHandler] = [:]
   var pendingRPCMethods: [String: WebSocketRPCMethod] = [:]
   var partialFrames: [String: PendingFrameChunks] = [:]
+  var pendingAcpEventPushes: [PendingAcpEventPushKey: PendingAcpEventPushBatch] = [:]
+  var pendingAcpEventPushOrder: [PendingAcpEventPushKey] = []
+  var pendingAcpEventFlushTask: Task<Void, Never>?
+  var acpOverflowLogBurstCount = 0
+  var acpEventAutoFlushEnabled = true
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
   var isShutDown = false
   var cachedConfiguration: MonitorConfiguration?
   var configurationWaiters: [CheckedContinuation<MonitorConfiguration, Error>] = []
 
+  static let maxCoalescedAcpEvents = 256
   static let reconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
@@ -248,29 +328,25 @@ extension WebSocketTransport {
     recordedAt: String,
     sessionId: String?,
     payload: JSONValue
-  ) {
+  ) async {
     if event == "config" {
       handleConfigurationPush(payload: payload)
       return
     }
-    let streamEvent = StreamEvent(
+    if event == "acp_events" {
+      await enqueueAcpEventPush(
+        recordedAt: recordedAt,
+        sessionId: sessionId,
+        payload: payload
+      )
+      return
+    }
+    deliverPushFrame(
       event: event,
       recordedAt: recordedAt,
       sessionId: sessionId,
       payload: payload
     )
-    do {
-      let pushEvent = try DaemonPushEvent(streamEvent: streamEvent)
-      globalStreamContinuation?.yield(pushEvent)
-      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
-        continuation.yield(pushEvent)
-      }
-    } catch {
-      let err = error.localizedDescription
-      HarnessMonitorLogger.websocket.warning(
-        "Dropping malformed push frame \(event, privacy: .public): \(err, privacy: .public)"
-      )
-    }
   }
 
   private func timelineWindowParams(

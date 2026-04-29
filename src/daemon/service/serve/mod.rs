@@ -106,6 +106,11 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         agent_tui_manager,
         acp_agent_manager,
     };
+    let _acp_inspect_push = spawn_acp_inspect_publisher(
+        app_state.sender.clone(),
+        shutdown_rx.clone(),
+        app_state.acp_agent_manager.clone(),
+    );
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     let cleanup_result = state::clear_manifest_for_pid(process_id());
@@ -120,6 +125,95 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn spawn_acp_inspect_publisher(
+    sender: broadcast::Sender<super::protocol::StreamEvent>,
+    shutdown_rx: tokio_watch::Receiver<bool>,
+    acp_agent_manager: AcpAgentManagerHandle,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(run_acp_inspect_publisher(
+        sender,
+        shutdown_rx,
+        acp_agent_manager,
+    ))
+}
+
+async fn run_acp_inspect_publisher(
+    sender: broadcast::Sender<super::protocol::StreamEvent>,
+    mut shutdown_rx: tokio_watch::Receiver<bool>,
+    acp_agent_manager: AcpAgentManagerHandle,
+) {
+    let mut event_rx = sender.subscribe();
+    loop {
+        tokio::select! {
+            changed = shutdown_rx.changed() => {
+                if changed.is_err() || *shutdown_rx.borrow() {
+                    break;
+                }
+            }
+            received = event_rx.recv() => {
+                match received {
+                    Ok(event) => {
+                        if let Some(session_id) = acp_inspect_trigger_session_id(&event) {
+                            publish_acp_inspect_event(&sender, &acp_agent_manager, session_id);
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    }
+}
+
+fn acp_inspect_trigger_session_id(
+    event: &super::protocol::StreamEvent,
+) -> Option<&str> {
+    match event.event.as_str() {
+        "acp_agent_started"
+        | "acp_agent_updated"
+        | "acp_agent_stopped"
+        | "acp_agent_failed"
+        | "acp_agent_disconnected"
+        | "acp_agents_reconciled"
+        | "acp_events"
+        | "acp_process_incident"
+        | "acp_bridge_resync_incident"
+        | "acp_permission_requested"
+        | "acp_permission_resolved"
+        | "acp_permission_shutdown"
+        | "acp_permission_timeout"
+        | "acp_permission_batch_resolved" => event.session_id.as_deref(),
+        "acp_inspect" => None,
+        _ => None,
+    }
+}
+
+fn publish_acp_inspect_event(
+    sender: &broadcast::Sender<super::protocol::StreamEvent>,
+    acp_agent_manager: &AcpAgentManagerHandle,
+    session_id: &str,
+) {
+    let payload = match serde_json::to_value(super::protocol::WsAcpInspect {
+        inspect: acp_agent_manager.inspect(Some(session_id)),
+    }) {
+        Ok(payload) => payload,
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                session_id,
+                "failed to serialize ACP inspect push payload"
+            );
+            return;
+        }
+    };
+    let _ = sender.send(super::protocol::StreamEvent {
+        event: "acp_inspect".to_string(),
+        recorded_at: utc_now(),
+        session_id: Some(session_id.to_string()),
+        payload,
+    });
 }
 
 pub(crate) fn validate_serve_config(config: &DaemonServeConfig) -> Result<(), CliError> {
@@ -223,6 +317,44 @@ fn startup_span() -> tracing::Span {
         error_message = Empty,
         trace_id = Empty
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::acp_inspect_trigger_session_id;
+    use crate::daemon::protocol::StreamEvent;
+    use serde_json::json;
+
+    fn stream_event(event: &str, session_id: Option<&str>) -> StreamEvent {
+        StreamEvent {
+            event: event.to_string(),
+            recorded_at: "2026-04-29T00:00:00Z".to_string(),
+            session_id: session_id.map(str::to_string),
+            payload: json!({}),
+        }
+    }
+
+    #[test]
+    fn acp_inspect_trigger_uses_session_scoped_acp_events() {
+        let event = stream_event("acp_events", Some("sess-1"));
+        assert_eq!(acp_inspect_trigger_session_id(&event), Some("sess-1"));
+    }
+
+    #[test]
+    fn acp_inspect_trigger_ignores_non_acp_or_self_push_events() {
+        assert_eq!(
+            acp_inspect_trigger_session_id(&stream_event("session_updated", Some("sess-1"))),
+            None
+        );
+        assert_eq!(
+            acp_inspect_trigger_session_id(&stream_event("acp_inspect", Some("sess-1"))),
+            None
+        );
+        assert_eq!(
+            acp_inspect_trigger_session_id(&stream_event("acp_events", None)),
+            None
+        );
+    }
 }
 
 #[expect(

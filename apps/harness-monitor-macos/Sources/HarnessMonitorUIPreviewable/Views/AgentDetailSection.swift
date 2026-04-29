@@ -7,10 +7,23 @@ struct AgentDetailSection: View {
   let store: HarnessMonitorStore
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
+  let runtimePresentation: AcpRuntimePresentation
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
   @State private var selectedRole: SessionRole = .worker
+
+  init(
+    store: HarnessMonitorStore,
+    agent: AgentRegistration,
+    activity: AgentToolActivitySummary?,
+    runtimePresentation: AcpRuntimePresentation = .full
+  ) {
+    self.store = store
+    self.agent = agent
+    self.activity = activity
+    self.runtimePresentation = runtimePresentation
+  }
 
   private var sessionID: String { store.selectedSessionID ?? "" }
   private var leaderID: String? { store.selectedSession?.session.leaderId }
@@ -68,12 +81,21 @@ struct AgentDetailSection: View {
     store.acpDecisionAttention(for: agent.agentId)
   }
 
+  private var acpRuntimeSnapshot: AcpAgentSnapshot? {
+    store.acpAgentSnapshot(for: agent.agentId)
+  }
+
+  private var acpRuntimeInspect: AcpAgentInspectSnapshot? {
+    store.acpInspectSnapshot(for: agent.agentId)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if let pendingDecisionAttention {
         AgentDetailAwaitingDecisionStrip(
           count: pendingDecisionAttention.count,
-          buttonAccessibilityIdentifier: HarnessMonitorAccessibility
+          buttonAccessibilityIdentifier:
+            HarnessMonitorAccessibility
             .agentDetailOpenDecisionsButton(agent.agentId)
         ) {
           openPendingDecisions()
@@ -94,6 +116,9 @@ struct AgentDetailSection: View {
             "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
           value: agent.agentId
         )
+      }
+      if let acpRuntimeSnapshot {
+        runtimeView(snapshot: acpRuntimeSnapshot)
       }
       Text(agent.name)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
@@ -307,6 +332,18 @@ struct AgentDetailSection: View {
       value: agent.agentId
     )
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsWindowDetailCard).frame")
+  }
+
+  @ViewBuilder
+  private func runtimeView(snapshot: AcpAgentSnapshot) -> some View {
+    AcpRuntimeView(
+      agentID: agent.agentId,
+      agentName: agent.name,
+      snapshot: snapshot,
+      inspect: acpRuntimeInspect,
+      observedAt: store.selectedAcpInspectObservedAt,
+      presentation: runtimePresentation
+    )
   }
 
   private func changeRole() async {

@@ -282,7 +282,7 @@ extension WebSocketTransport {
         batchCount: batchCount
       )
     case .push(let event, let recordedAt, let sessionId, let payload, _):
-      handlePushFrame(
+      await handlePushFrame(
         event: event,
         recordedAt: recordedAt,
         sessionId: sessionId,

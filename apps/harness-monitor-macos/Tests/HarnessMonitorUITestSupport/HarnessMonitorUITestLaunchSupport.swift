@@ -165,9 +165,12 @@ extension HarnessMonitorUITestCase {
         details: ["mode": mode]
       )
       app.activate()
-      if waitUntil(timeout: Self.fastActionTimeout, condition: {
-        app.state == .runningForeground || self.mainWindow(in: app).exists
-      }) {
+      if waitUntil(
+        timeout: Self.fastActionTimeout,
+        condition: {
+          app.state == .runningForeground || self.mainWindow(in: app).exists
+        })
+      {
         return true
       }
       recordDiagnosticsTrace(
@@ -194,13 +197,16 @@ extension HarnessMonitorUITestCase {
         details: ["mode": mode]
       )
       app.activate()
-      if waitUntil(timeout: Self.fastActionTimeout, condition: {
-        let window = self.mainWindow(in: app)
-        return
-          window.exists
-          && window.frame.width > 0
-          && window.frame.height > 0
-      }) {
+      if waitUntil(
+        timeout: Self.fastActionTimeout,
+        condition: {
+          let window = self.mainWindow(in: app)
+          return
+            window.exists
+            && window.frame.width > 0
+            && window.frame.height > 0
+        })
+      {
         return true
       }
       recordDiagnosticsTrace(

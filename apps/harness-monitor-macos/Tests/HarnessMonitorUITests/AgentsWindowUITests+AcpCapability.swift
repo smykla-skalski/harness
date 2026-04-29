@@ -149,7 +149,8 @@ extension AgentsWindowUITests {
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        decisionSelectionSummary.exists && decisionSelectionSummary.label.contains("1 of 2 selected")
+        decisionSelectionSummary.exists
+          && decisionSelectionSummary.label.contains("1 of 2 selected")
       },
       """
       The Decisions panel should reflect the updated ACP selection \

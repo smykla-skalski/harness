@@ -38,7 +38,8 @@ struct HarnessMonitorUITestLaunchSignature: Equatable {
 
   init(mode: String, additionalEnvironment: [String: String]) {
     self.mode = mode
-    environment = additionalEnvironment
+    environment =
+      additionalEnvironment
       .sorted { lhs, rhs in
         if lhs.key == rhs.key {
           return lhs.value < rhs.value
@@ -52,7 +53,8 @@ struct HarnessMonitorUITestLaunchSignature: Equatable {
     guard !environment.isEmpty else {
       return mode
     }
-    let environmentSummary = environment
+    let environmentSummary =
+      environment
       .map { "\($0.key)=\($0.value)" }
       .joined(separator: ",")
     return "\(mode) [\(environmentSummary)]"

@@ -22,6 +22,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case codexApprovalRequested(CodexApprovalRequestedPayload)
     case agentTuiUpdated(AgentTuiSnapshot)
     case acpAgentUpdated(AcpAgentSnapshot)
+    case acpInspect(AcpAgentInspectResponse)
     case acpAgentsReconciled(AcpAgentsReconciledPayload)
     case acpEvents(AcpEventBatchPayload)
     case acpProcessIncident(AcpProcessIncidentPayload)
@@ -143,6 +144,14 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   ) throws -> Self? {
     let at = streamEvent.recordedAt
     switch streamEvent.event {
+    case "acp_inspect":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpInspect(
+          try streamEvent.decodePayload(as: AcpInspectPushPayload.self).inspect
+        )
+      )
     case "acp_agents_reconciled":
       return Self(
         recordedAt: at,
@@ -246,6 +255,10 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
 public struct AcpAgentsReconciledPayload: Codable, Equatable, Sendable {
   public let sessionId: String
   public let agents: [AcpAgentSnapshot]
+}
+
+private struct AcpInspectPushPayload: Codable, Equatable, Sendable {
+  let inspect: AcpAgentInspectResponse
 }
 
 public struct AcpProcessIncidentPayload: Codable, Equatable, Sendable {

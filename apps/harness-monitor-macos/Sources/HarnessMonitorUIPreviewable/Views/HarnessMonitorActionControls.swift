@@ -64,6 +64,10 @@ public struct HarnessMonitorAsyncActionButton: View {
   public let isLoading: Bool
   public let accessibilityIdentifier: String
   public let fillsWidth: Bool
+  private let accessibilityFocusBinding: AccessibilityFocusState<String?>.Binding?
+  private let accessibilityFocusValue: String?
+  private let keyboardFocusBinding: FocusState<String?>.Binding?
+  private let keyboardFocusValue: String?
   public let action: Action
   @State private var runningTask: Task<Void, Never>?
   @Environment(\.accessibilityReduceMotion)
@@ -77,6 +81,10 @@ public struct HarnessMonitorAsyncActionButton: View {
     isLoading: Bool,
     accessibilityIdentifier: String,
     fillsWidth: Bool = false,
+    accessibilityFocusBinding: AccessibilityFocusState<String?>.Binding? = nil,
+    accessibilityFocusValue: String? = nil,
+    keyboardFocusBinding: FocusState<String?>.Binding? = nil,
+    keyboardFocusValue: String? = nil,
     action: @escaping Action
   ) {
     self.title = title
@@ -86,6 +94,10 @@ public struct HarnessMonitorAsyncActionButton: View {
     self.isLoading = isLoading
     self.accessibilityIdentifier = accessibilityIdentifier
     self.fillsWidth = fillsWidth
+    self.accessibilityFocusBinding = accessibilityFocusBinding
+    self.accessibilityFocusValue = accessibilityFocusValue
+    self.keyboardFocusBinding = keyboardFocusBinding
+    self.keyboardFocusValue = keyboardFocusValue
     self.action = action
   }
 
@@ -97,8 +109,8 @@ public struct HarnessMonitorAsyncActionButton: View {
     isLoading ? .secondary : tint
   }
 
-  public var body: some View {
-    Button(role: role) {
+  @ViewBuilder public var body: some View {
+    let control = Button(role: role) {
       if isLoading {
         cancelAction()
       } else {
@@ -115,6 +127,25 @@ public struct HarnessMonitorAsyncActionButton: View {
     .onDisappear {
       runningTask?.cancel()
       runningTask = nil
+    }
+
+    if let keyboardFocusBinding, let keyboardFocusValue {
+      let keyboardFocusedControl = control.focused(
+        keyboardFocusBinding,
+        equals: keyboardFocusValue
+      )
+      if let accessibilityFocusBinding, let accessibilityFocusValue {
+        keyboardFocusedControl.accessibilityFocused(
+          accessibilityFocusBinding,
+          equals: accessibilityFocusValue
+        )
+      } else {
+        keyboardFocusedControl
+      }
+    } else if let accessibilityFocusBinding, let accessibilityFocusValue {
+      control.accessibilityFocused(accessibilityFocusBinding, equals: accessibilityFocusValue)
+    } else {
+      control
     }
   }
 

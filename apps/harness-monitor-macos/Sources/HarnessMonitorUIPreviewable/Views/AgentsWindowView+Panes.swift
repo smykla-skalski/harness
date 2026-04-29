@@ -114,7 +114,8 @@ extension AgentsWindowView {
       AgentDetailSection(
         store: store,
         agent: agent,
-        activity: session.agentActivity.first(where: { $0.agentId == agentID })
+        activity: session.agentActivity.first(where: { $0.agentId == agentID }),
+        runtimePresentation: .compact
       )
       .id("agents.agent.inline.\(agentID)")
     }

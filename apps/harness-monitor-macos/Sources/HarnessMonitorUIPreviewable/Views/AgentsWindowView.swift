@@ -14,7 +14,7 @@ struct ClickableSwitchStyle: ToggleStyle {
   }
 }
 
-  public struct AgentsWindowView: View {
+public struct AgentsWindowView: View {
   let store: HarnessMonitorStore
   let navigationBridge: AgentsWindowNavigationBridge
   @Environment(\.openWindow)

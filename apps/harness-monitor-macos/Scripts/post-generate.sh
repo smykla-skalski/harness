@@ -75,6 +75,48 @@ write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$REPO_ROOT/xcode-derived"
 
+generated_project_link="$(readlink "$ROOT/HarnessMonitor.xcodeproj" || true)"
+GENERATED_APP_ROOT="$ROOT"
+if [ -n "$generated_project_link" ]; then
+  GENERATED_APP_ROOT="$(cd "$ROOT" && cd "$(dirname "$generated_project_link")" && pwd)"
+fi
+
+stage_generated_project_link() {
+  local name="$1"
+  local source_path="$ROOT/$name"
+  local target_path="$GENERATED_APP_ROOT/$name"
+
+  if [ "$GENERATED_APP_ROOT" = "$ROOT" ] || [ ! -e "$source_path" ]; then
+    return 0
+  fi
+
+  if [ -e "$target_path" ] && [ ! -L "$target_path" ]; then
+    return 0
+  fi
+
+  ln -sfn "$source_path" "$target_path"
+}
+
+for staged_path in \
+  Sources \
+  Tests \
+  Resources \
+  Scripts \
+  features \
+  docs \
+  HarnessMonitor.entitlements \
+  HarnessMonitorDaemon.entitlements \
+  HarnessMonitorPreviewHost.entitlements \
+  HarnessMonitorUITestHost.entitlements \
+  Previews.json \
+  Project.swift \
+  Tuist.swift \
+  .swift-format \
+  .swiftlint.yml
+do
+  stage_generated_project_link "$staged_path"
+done
+
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
 LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$LAST_UPGRADE_CHECK}"

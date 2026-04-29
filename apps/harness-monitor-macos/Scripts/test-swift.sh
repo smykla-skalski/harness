@@ -35,7 +35,18 @@ run_stale_preflight() {
     exit 1
   fi
 
-  "$STALE_CHECK_SCRIPT"
+  local -a stale_env=()
+  if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+    # Focused excerpts should not be blocked by unrelated long-lived daemon locks.
+    # Keep all other stale-state checks active.
+    stale_env+=(HARNESS_CHECK_ALLOW_DAEMON_LOCK_HOLDERS=1)
+  fi
+
+  if (( ${#stale_env[@]} > 0 )); then
+    env "${stale_env[@]}" "$STALE_CHECK_SCRIPT"
+  else
+    "$STALE_CHECK_SCRIPT"
+  fi
 }
 
 run_test_action() {
@@ -130,6 +141,13 @@ expand_only_testing_selector() {
   local selector="$1"
 
   if [[ "$selector" != */* ]]; then
+    printf '%s\n' "$selector"
+    return 0
+  fi
+
+  # Fully-qualified selectors already point to one test method.
+  # Avoid enumerate-tests here because xcodebuild enumeration can stall.
+  if [[ "$selector" == */*/* ]]; then
     printf '%s\n' "$selector"
     return 0
   fi
