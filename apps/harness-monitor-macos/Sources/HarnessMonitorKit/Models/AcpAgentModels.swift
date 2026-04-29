@@ -1,5 +1,10 @@
 import Foundation
 
+/// One daemon-issued permission item inside an ACP batch.
+///
+/// UI-0 contract: approval granularity is request-level, but queue ownership is batch-level.
+/// A future "approve some" audit row must preserve the chosen `requestId` subset exactly as
+/// emitted here so resolution remains replayable without re-reading the original tool payload.
 public struct AcpPermissionItem: Codable, Equatable, Sendable {
   public let requestId: String
   public let sessionId: String
@@ -7,6 +12,16 @@ public struct AcpPermissionItem: Codable, Equatable, Sendable {
   public let options: [JSONValue]
 }
 
+/// First-class ACP permission queue element.
+///
+/// UI-0 contract:
+/// - One batch carries `1...N` `requests`; "approve some" is therefore a partial resolution of a
+///   single queue item, not multiple queue items.
+/// - `batchId` is the idempotency key for every UI/store mutation. Replays with the same
+///   `batchId` refresh the payload in place instead of creating a second pending row.
+/// - `createdAt` is daemon-authored ordering data. When the UI later renders decisions instead of
+///   the modal, sticky selection must keep the currently focused batch while preserving this
+///   oldest-first queue order for newly materialised rows.
 public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public let batchId: String
   public let acpId: String
@@ -17,6 +32,15 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public var id: String { batchId }
 }
 
+/// Canonical outcome semantics for ACP permission resolution.
+///
+/// UI-0 contract:
+/// - Exactly one terminal decision is emitted per `batchId`.
+/// - `.approveAll` and `.denyAll` are whole-batch terminals.
+/// - `.approveSome` embeds the exact approved `requestId` array and implies deny for every
+///   request in the batch not listed there.
+/// - Timeout and daemon-shutdown removals are not enum cases here. They arrive through the daemon
+///   removal event stream and belong in queue/audit handling rather than the decision payload.
 public enum AcpPermissionDecision: Codable, Equatable, Sendable {
   case approveAll
   case approveSome([String])

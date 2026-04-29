@@ -1,6 +1,11 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  /// Pending ACP queue for the selected session.
+  ///
+  /// UI-0 contract: this array stays oldest-first by daemon `createdAt`, but selection/presentation
+  /// is sticky to the batch the operator is already handling. Future Decisions-window rows may
+  /// render the same queue differently, but they must preserve these ordering semantics.
   public var pendingAcpPermissionBatches: [AcpPermissionBatch] {
     let selectedBatches = selectedAcpAgents.flatMap(\.pendingPermissionBatches)
     return sortedAcpPermissionBatches(
@@ -116,22 +121,30 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
-    selectedAcpAgents = sortedAcpAgents(payload.agents.map { snapshot in
-      let pendingStandaloneBatches = standaloneAcpPermissionBatches.filter {
-        $0.acpId == snapshot.acpId
-      }
-      return snapshot.withPermissionBatches(
-        mergedPermissionBatches(
-          primary: snapshot.pendingPermissionBatches,
-          secondary: pendingStandaloneBatches,
-          preferSecondary: false
-        )
+    selectedAcpAgents =
+      sortedAcpAgents(
+        payload.agents.map { snapshot in
+          let pendingStandaloneBatches = standaloneAcpPermissionBatches.filter {
+            $0.acpId == snapshot.acpId
+          }
+          return snapshot.withPermissionBatches(
+            mergedPermissionBatches(
+              primary: snapshot.pendingPermissionBatches,
+              secondary: pendingStandaloneBatches,
+              preferSecondary: false
+            )
+          )
+        }
       )
-    })
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
     reconcilePresentedAcpPermissionBatch()
   }
 
+  /// Apply an already-decoded ACP event push to the in-memory timeline.
+  ///
+  /// UI-0 contract: any future WS coalescer remains Swift-side only and sits before this method.
+  /// This apply step therefore assumes stable wire payloads and mutates the store exactly once per
+  /// accepted batch.
   func applyAcpEvents(_ payload: AcpEventBatchPayload, recordedAt: String) {
     guard payload.sessionId == selectedSessionID else {
       return
@@ -160,6 +173,10 @@ extension HarnessMonitorStore {
     }
   }
 
+  /// Upsert one ACP permission batch using `batchId` as the idempotency key.
+  ///
+  /// UI-0 contract: same-id replays refresh the existing queue entry in place rather than creating
+  /// a second pending batch. Fresh batches append according to daemon `createdAt`.
   func applyAcpPermissionBatch(_ batch: AcpPermissionBatch) {
     guard batch.sessionId == selectedSessionID else {
       return
@@ -206,6 +223,10 @@ extension HarnessMonitorStore {
     resolvingAcpPermissionBatchID = nil
   }
 
+  /// Preserve the currently presented batch whenever that batch is still pending and actively
+  /// resolving; otherwise advance to the oldest remaining batch.
+  ///
+  /// UI-0 sticky-selection contract: new arrivals do not steal focus from the in-flight batch.
   func reconcilePresentedAcpPermissionBatch() {
     let batches = pendingAcpPermissionBatches
     guard !batches.isEmpty else {
@@ -248,14 +269,13 @@ extension HarnessMonitorStore {
     for batch in primary {
       byBatchID[batch.batchId] = batch
     }
-    for batch in secondary {
-      if shouldReplacePermissionBatch(
-        existing: byBatchID[batch.batchId],
-        incoming: batch,
-        preferSecondary: preferSecondary
-      ) {
-        byBatchID[batch.batchId] = batch
-      }
+    for batch in secondary
+    where shouldReplacePermissionBatch(
+      existing: byBatchID[batch.batchId],
+      incoming: batch,
+      preferSecondary: preferSecondary
+    ) {
+      byBatchID[batch.batchId] = batch
     }
     return Array(byBatchID.values)
   }
@@ -283,6 +303,9 @@ extension HarnessMonitorStore {
     sortedAcpPermissionBatches(batches.filter { $0.batchId != batch.batchId } + [batch])
   }
 
+  /// Canonical queue ordering for ACP batches.
+  ///
+  /// UI-0 contract: oldest daemon-created batch wins; `batchId` is only the stable tiebreaker.
   private func sortedAcpPermissionBatches(
     _ batches: [AcpPermissionBatch]
   ) -> [AcpPermissionBatch] {
