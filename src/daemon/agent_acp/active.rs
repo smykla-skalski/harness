@@ -427,6 +427,10 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
     })
 }
 
+pub(super) fn process_incident_from_snapshot(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
+    process_incident_event(snapshot)
+}
+
 fn sorted_singleton(session_id: String) -> Vec<String> {
     let mut ids = vec![session_id];
     ids.sort();

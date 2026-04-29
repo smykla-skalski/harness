@@ -6,16 +6,16 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+use super::active::{ActiveAcpSession, process_incident_from_snapshot};
+use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::db::DaemonDb;
-use crate::daemon::service;
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::session::types::AgentStatus;
-use super::active::ActiveAcpSession;
-use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 
@@ -185,8 +185,7 @@ impl AcpAgentManagerHandle {
         let sessions = self.sessions_for(session_id);
         let mut snapshots = Vec::with_capacity(sessions.len());
         for session in sessions {
-            session.refresh();
-            snapshots.push(session.snapshot_with_live_counts());
+            snapshots.push(self.refresh_session_snapshot(&session));
         }
         snapshots.sort_by(|a, b| {
             b.updated_at
@@ -217,7 +216,7 @@ impl AcpAgentManagerHandle {
         let mut agents = sessions
             .into_iter()
             .map(|session| {
-                session.refresh();
+                self.refresh_session_snapshot(&session);
                 session.inspect_snapshot()
             })
             .collect::<Vec<_>>();
@@ -238,8 +237,7 @@ impl AcpAgentManagerHandle {
             return self.get_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
-        session.refresh();
-        Ok(session.snapshot_with_live_counts())
+        Ok(self.refresh_session_snapshot(&session))
     }
 
     /// Stop an ACP session and fail every pending permission with daemon shutdown.
@@ -251,7 +249,7 @@ impl AcpAgentManagerHandle {
             return self.stop_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
-        let pending_permissions = session.disconnect(DisconnectReason::UserCancelled);
+        let pending_permissions = session.disconnect(DisconnectReason::SessionStopped);
         session.kill_child(pending_permissions);
         let snapshot = session.snapshot_with_live_counts();
         self.broadcast("acp_agent_stopped", &snapshot);
@@ -315,10 +313,24 @@ impl AcpAgentManagerHandle {
             .expect("ACP sessions lock")
             .values()
             .filter(|session| {
-                session.refresh();
-                !session.snapshot_with_live_counts().status.is_disconnected()
+                !self
+                    .refresh_session_snapshot(session)
+                    .status
+                    .is_disconnected()
             })
             .count())
+    }
+
+    fn refresh_session_snapshot(&self, session: &Arc<ActiveAcpSession>) -> AcpAgentSnapshot {
+        let before = session.snapshot_with_live_counts();
+        session.refresh();
+        let after = session.snapshot_with_live_counts();
+        if !before.status.is_disconnected() && after.status.is_disconnected()
+            && let Some(event) = process_incident_from_snapshot(&after)
+        {
+            let _ = self.state.sender.send(event);
+        }
+        after
     }
 
     fn session(&self, acp_id: &str) -> Result<Arc<ActiveAcpSession>, CliError> {
@@ -343,7 +355,6 @@ impl AcpAgentManagerHandle {
             .cloned()
             .collect()
     }
-
 }
 
 #[cfg(test)]
