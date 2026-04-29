@@ -17,6 +17,7 @@ use agent_client_protocol::{
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
@@ -36,6 +37,7 @@ use context::{
 };
 use session_guard::SessionRouteGuard;
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
+const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
 
 #[derive(Clone)]
 pub(super) struct AcpCancelHandle {
@@ -313,6 +315,10 @@ async fn run_connection(
         wait_for_cancel(&connection, &mut cancel_rx, session_id.clone()).await
     }
     .await;
+    // Keep route validation active for a short grace window after we have
+    // requested cancel so in-flight notifications are not immediately marked
+    // stale while transport shutdown is still propagating.
+    sleep(SESSION_ROUTE_DRAIN_GRACE).await;
     session_guard.stop_session(&session_id);
     run_result
 }
