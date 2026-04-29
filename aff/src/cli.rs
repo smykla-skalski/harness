@@ -6,7 +6,7 @@ use crate::hook_agent::HookAgent;
 use crate::{hook_render, repo_policy, setup};
 
 #[derive(Debug, Parser)]
-#[command(name = "aff")]
+#[command(name = "aff", version)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
