@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
+use tokio::sync::broadcast;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::protocol::StreamEvent;
@@ -289,23 +290,14 @@ impl AcpAgentManagerHandle {
         }
         for session_id in &current_sessions {
             let process_keys = distinct_process_keys_for_session(&inspect, session_id);
-            if process_keys.len() > 1 {
-                let changed = last_pool_key_mismatch.get(session_id) != Some(&process_keys);
-                last_pool_key_mismatch.insert(session_id.clone(), process_keys.clone());
-                if changed {
-                    emit_pool_key_mismatch_incidents(
-                        &self.sender(),
-                        &AcpPoolKeyMismatchIncidentPayload {
-                            kind: "pool_key_mismatch".to_string(),
-                            observed_process_keys: process_keys,
-                            affected_logical_session_ids: vec![session_id.clone()],
-                        },
-                    );
-                }
-            } else {
-                last_pool_key_mismatch.remove(session_id);
-            }
+            maybe_emit_pool_key_mismatch_incident(
+                &self.sender(),
+                last_pool_key_mismatch,
+                session_id,
+                process_keys,
+            );
         }
+        last_pool_key_mismatch.retain(|session_id, _| current_sessions.contains(session_id));
         let reconciled_sessions = self
             .sandbox_known_sessions()
             .into_iter()
@@ -386,6 +378,30 @@ fn distinct_process_keys_for_session(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
+}
+
+fn maybe_emit_pool_key_mismatch_incident(
+    sender: &broadcast::Sender<StreamEvent>,
+    last_pool_key_mismatch: &mut BTreeMap<String, Vec<String>>,
+    session_id: &str,
+    process_keys: Vec<String>,
+) {
+    if process_keys.len() > 1 {
+        let changed = last_pool_key_mismatch.get(session_id) != Some(&process_keys);
+        last_pool_key_mismatch.insert(session_id.to_string(), process_keys.clone());
+        if changed {
+            emit_pool_key_mismatch_incidents(
+                sender,
+                &AcpPoolKeyMismatchIncidentPayload {
+                    kind: "pool_key_mismatch".to_string(),
+                    observed_process_keys: process_keys,
+                    affected_logical_session_ids: vec![session_id.to_string()],
+                },
+            );
+        }
+    } else {
+        last_pool_key_mismatch.remove(session_id);
+    }
 }
 
 #[cfg(test)]
