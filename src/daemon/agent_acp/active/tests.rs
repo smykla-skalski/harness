@@ -27,6 +27,28 @@ fn process_incident_event_skips_session_stopped() {
 }
 
 #[test]
+fn process_incident_event_maps_transport_closed() {
+    let snapshot = disconnected_snapshot(DisconnectReason::TransportClosed);
+    let event = process_incident_event(&snapshot).expect("incident event");
+    assert_eq!(event.payload["kind"], "transport_closed");
+    assert_eq!(event.payload["reason_kind"], "transport_closed");
+    assert_eq!(event.payload["restart_applied"], false);
+    assert_eq!(event.payload["backoff_applied"], false);
+    assert_eq!(event.payload["quarantine_applied"], false);
+}
+
+#[test]
+fn process_incident_event_maps_prompt_timeout_to_protocol_desync() {
+    let snapshot = disconnected_snapshot(DisconnectReason::PromptTimeout);
+    let event = process_incident_event(&snapshot).expect("incident event");
+    assert_eq!(event.payload["kind"], "protocol_desync");
+    assert_eq!(event.payload["reason_kind"], "prompt_timeout");
+    assert_eq!(event.payload["restart_applied"], false);
+    assert_eq!(event.payload["backoff_applied"], false);
+    assert_eq!(event.payload["quarantine_applied"], false);
+}
+
+#[test]
 fn sorted_singleton_returns_one_stable_session_id() {
     assert_eq!(sorted_singleton("sess-2".to_string()), vec!["sess-2"]);
 }
