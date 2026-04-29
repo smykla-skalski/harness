@@ -3,6 +3,24 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
+run_quiet_step() {
+  local label="$1"
+  shift
+
+  local log_path
+  log_path="$(mktemp "${TMPDIR:-/tmp}/check-scripts.XXXXXX")"
+  if "$@" >"$log_path" 2>&1; then
+    printf 'ok: %s\n' "$label"
+    rm -f "$log_path"
+    return 0
+  fi
+
+  printf 'error: %s failed\n' "$label" >&2
+  cat "$log_path" >&2
+  rm -f "$log_path"
+  return 1
+}
+
 if ! command -v shellcheck >/dev/null 2>&1; then
   printf "error: shellcheck is required. Install tools with \`mise install\`.\n" >&2
   exit 1
@@ -51,13 +69,17 @@ if (( ${#python_scripts[@]} > 0 )); then
 fi
 if (( ${#monitor_python_tests[@]} > 0 )); then
   python3 -m py_compile "${monitor_python_tests[@]}"
-  python3 -m unittest discover -s "$ROOT/apps/harness-monitor-macos/Scripts/tests" -p 'test_*.py'
+  run_quiet_step \
+    "monitor python script tests" \
+    python3 -m unittest discover -s "$ROOT/apps/harness-monitor-macos/Scripts/tests" -p 'test_*.py'
 fi
 
-"$ROOT/scripts/tests/test-run-step.sh"
-"$ROOT/scripts/tests/test-mcp-scripts.sh"
-"$ROOT/scripts/tests/test-stale-scan.sh"
-"$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
-"$ROOT/scripts/e2e/recording-triage/tests/run-all.sh"
-"$ROOT/scripts/swarm-iterate/tests/run-all.sh"
-"$ROOT/scripts/swarm-iterate/check-active-ledger.sh"
+run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
+run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
+run_quiet_step "stale-scan shell tests" "$ROOT/scripts/tests/test-stale-scan.sh"
+run_quiet_step "swarm e2e contract shell tests" "$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
+run_quiet_step \
+  "recording triage shell tests" \
+  "$ROOT/scripts/e2e/recording-triage/tests/run-all.sh"
+run_quiet_step "swarm iterate shell tests" "$ROOT/scripts/swarm-iterate/tests/run-all.sh"
+run_quiet_step "active ledger shell check" "$ROOT/scripts/swarm-iterate/check-active-ledger.sh"
