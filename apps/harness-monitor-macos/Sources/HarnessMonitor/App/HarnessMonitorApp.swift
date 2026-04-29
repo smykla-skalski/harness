@@ -16,6 +16,7 @@ struct HarnessMonitorApp: App {
   private let defersInitialMainWindowContentUntilBootstrap: Bool
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
+  private let acpAttentionState: AcpPermissionAttentionState
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
@@ -66,13 +67,19 @@ struct HarnessMonitorApp: App {
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
     let notificationController =
       isTestRun
-      ? HarnessMonitorUserNotificationController.preview()
+      ? HarnessMonitorUserNotificationController.preview(
+        environment: configuration.environment
+      )
       : {
         let controller = HarnessMonitorUserNotificationController()
         controller.activate()
         return controller
       }()
     self.notificationController = notificationController
+    acpAttentionState = AcpPermissionAttentionState(
+      keyWindowObserver: KeyWindowObserver(),
+      notifications: notificationController
+    )
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
@@ -140,6 +147,7 @@ struct HarnessMonitorApp: App {
       HarnessMonitorSettingsRootView(
         store: store,
         notifications: notificationController,
+        acpAttentionState: acpAttentionState,
         windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode,
         selectedSection: $preferencesSelectedSection
@@ -156,6 +164,8 @@ struct HarnessMonitorApp: App {
     Window("Agents", id: HarnessMonitorWindowID.agents) {
       AgentsWindowRootView(
         store: store,
+        notifications: notificationController,
+        acpAttentionState: acpAttentionState,
         navigationBridge: agentsNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode
@@ -186,6 +196,7 @@ struct HarnessMonitorApp: App {
           delegate: delegate,
           store: store,
           notifications: notificationController,
+          acpAttentionState: acpAttentionState,
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
@@ -198,6 +209,7 @@ struct HarnessMonitorApp: App {
           delegate: delegate,
           store: store,
           notifications: notificationController,
+          acpAttentionState: acpAttentionState,
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
