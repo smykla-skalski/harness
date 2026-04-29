@@ -334,9 +334,20 @@ emit_swift_dia_diagnostics() {
     fi
     output="$(
       strings "$diagnostics_file" \
-        | /usr/bin/grep -E \
-          '(^/.*\.swift$|error:|warning:|note:|cannot |does not|no-usage|result of call|is unused|main actor|actor-isolated|overriding |overridden |requires an)' \
-        | /usr/bin/sed '/^DIAG$/d;/^C8< $/d' \
+        | /usr/bin/awk '
+          /^DIAG$/ || /^C8< $/ { next }
+
+          /^\/.*\.swift$/ {
+            print
+            detail_count = 0
+            next
+          }
+
+          detail_count < 3 && NF > 0 {
+            print
+            detail_count += 1
+          }
+        ' \
         | /usr/bin/head -40 || true
     )"
     if [[ -z "$output" ]]; then
@@ -362,6 +373,53 @@ emit_swift_dia_diagnostics() {
     fi
   done < "$files_file"
   /bin/rm -f "$files_file"
+}
+
+raw_log_has_compiler_diagnostics() {
+  local raw_log_path="$1"
+  [[ -f "$raw_log_path" ]] || return 1
+  /usr/bin/grep -Eq '^/.*:[0-9]+:[0-9]+:\s+(error|warning|note):' "$raw_log_path"
+}
+
+emit_raw_compiler_diagnostics() {
+  local raw_log_path="$1"
+  [[ -f "$raw_log_path" ]] || return 1
+
+  /usr/bin/awk '
+    BEGIN {
+      emitted = 0
+      capture = 0
+      max_blocks = 12
+    }
+
+    function flush_line(prefix, value) {
+      if (value != "") {
+        printf "%s%s\n", prefix, value > "/dev/stderr"
+      }
+    }
+
+    match($0, /^\/.*:[0-9]+:[0-9]+: (error|warning|note):/) {
+      if (seen[$0]++) {
+        capture = 0
+        next
+      }
+      if (emitted == 0) {
+        flush_line("swift-raw-diagnostics: ", "extracted compiler diagnostics from raw xcodebuild output")
+      }
+      emitted += 1
+      flush_line("swift-raw-diagnostics: ", $0)
+      capture = 2
+      if (emitted >= max_blocks) {
+        exit
+      }
+      next
+    }
+
+    capture > 0 {
+      flush_line("swift-raw-diagnostics:   ", $0)
+      capture -= 1
+    }
+  ' "$raw_log_path"
 }
 
 lock_owner_command() {
@@ -500,6 +558,7 @@ emit_wrapper_failure_context() {
 
 run_inner() {
   local log_path="$1"
+  local raw_log_path="$2"
   local -a inner_args=("${args[@]}")
   local -a fmt_prefix=(--use-tuist)
   local line
@@ -511,7 +570,8 @@ run_inner() {
     fmt_prefix+=(--junit-path "$(junit_report_path_for_run)")
   fi
   set +e
-  run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 \
+  XCODEBUILD_RAW_LOG_PATH="$raw_log_path" \
+    run_xcodebuild_with_formatter ${fmt_prefix[@]+"${fmt_prefix[@]}"} "${inner_args[@]}" 2>&1 \
     | tee "$log_path" \
     | filter_xcodebuild_console_output
   local status="${PIPESTATUS[0]}"
@@ -520,31 +580,39 @@ run_inner() {
 }
 
 run_once() {
-  local log_path status
+  local log_path raw_log_path status
   log_path="$(create_temp_log_path)"
-  run_inner "$log_path"
+  raw_log_path="$(create_temp_log_path)"
+  run_inner "$log_path" "$raw_log_path"
   status=$?
 
   if (( status == 0 )); then
     normalize_shared_schemes_after_xcodebuild
     /bin/rm -f "$log_path"
+    /bin/rm -f "$raw_log_path"
     return 0
   fi
 
   if is_db_transient_failure "$log_path" || latest_activity_log_has_transient_db_failure; then
     printf 'Detected transient xcodebuild database failure in build logs\n' >&2
     /bin/rm -f "$log_path"
+    /bin/rm -f "$raw_log_path"
     return "$TRANSIENT_DB_STATUS"
   fi
 
   emit_wrapper_failure_context
 
   if (( status != 127 )) && log_needs_swift_compile_context "$log_path"; then
-    emit_swift_compile_context
-    emit_swift_dia_diagnostics
+    if raw_log_has_compiler_diagnostics "$raw_log_path"; then
+      emit_raw_compiler_diagnostics "$raw_log_path"
+    else
+      emit_swift_compile_context
+      emit_swift_dia_diagnostics
+    fi
   fi
 
   /bin/rm -f "$log_path"
+  /bin/rm -f "$raw_log_path"
   return "$status"
 }
 
