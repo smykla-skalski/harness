@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use assert_cmd::Command;
+use predicates::str::contains;
 use tempfile::tempdir;
 
 fn write_file(path: &Path, contents: &str) {
@@ -22,6 +23,36 @@ fn codex_config() -> &'static str {
         "[features]\n",
         "codex_hooks = true\n",
     )
+}
+
+fn codex_hooks() -> &'static str {
+    r#"{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "harness hook --agent codex suite:run tool-guard",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "harness agents session-start --agent codex --project-dir \"$PWD\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}"#
 }
 
 fn assert_single_aff_commands(config: &str, agent: &str) {
@@ -97,10 +128,12 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
 }
 
 #[test]
-fn bootstrap_preserves_codex_config() {
+fn bootstrap_patches_codex_hooks_with_aff_hooks() {
     let dir = tempdir().expect("tempdir");
     let config_path = dir.path().join(".codex").join("config.toml");
+    let hooks_path = dir.path().join(".codex").join("hooks.json");
     write_file(&config_path, codex_config());
+    write_file(&hooks_path, codex_hooks());
 
     Command::cargo_bin("aff")
         .expect("aff binary")
@@ -115,8 +148,10 @@ fn bootstrap_preserves_codex_config() {
         .assert()
         .success();
 
-    let updated = read_file(&config_path);
-    assert_eq!(updated, codex_config());
+    assert_eq!(read_file(&config_path), codex_config());
+    let updated = read_file(&hooks_path);
+    assert!(updated.contains("harness hook --agent codex suite:run tool-guard"));
+    assert_single_aff_commands(&updated, "codex");
 }
 
 #[test]
@@ -306,10 +341,40 @@ fn bootstrap_patches_opencode_hooks_with_aff_hooks() {
 }
 
 #[test]
-fn generate_check_accepts_codex_config_without_aff_patch() {
+fn generate_check_patches_codex_hooks_with_aff_hooks() {
     let dir = tempdir().expect("tempdir");
-    let config_path = dir.path().join(".codex").join("config.toml");
-    write_file(&config_path, codex_config());
+    let hooks_path = dir.path().join(".codex").join("hooks.json");
+    write_file(&hooks_path, codex_hooks());
+
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .args([
+            "setup",
+            "agents",
+            "generate",
+            "--check",
+            "--project-dir",
+            dir.path().to_str().expect("path"),
+            "--target",
+            "codex",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("aff runtime config drift detected"));
+
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .args([
+            "setup",
+            "agents",
+            "generate",
+            "--project-dir",
+            dir.path().to_str().expect("path"),
+            "--target",
+            "codex",
+        ])
+        .assert()
+        .success();
 
     Command::cargo_bin("aff")
         .expect("aff binary")
@@ -326,34 +391,6 @@ fn generate_check_accepts_codex_config_without_aff_patch() {
         .assert()
         .success();
 
-    Command::cargo_bin("aff")
-        .expect("aff binary")
-        .args([
-            "setup",
-            "agents",
-            "generate",
-            "--project-dir",
-            dir.path().to_str().expect("path"),
-            "--target",
-            "codex",
-        ])
-        .assert()
-        .success();
-
-    Command::cargo_bin("aff")
-        .expect("aff binary")
-        .args([
-            "setup",
-            "agents",
-            "generate",
-            "--check",
-            "--project-dir",
-            dir.path().to_str().expect("path"),
-            "--target",
-            "codex",
-        ])
-        .assert()
-        .success();
-
-    assert_eq!(read_file(&config_path), codex_config());
+    let updated = read_file(&hooks_path);
+    assert_single_aff_commands(&updated, "codex");
 }
