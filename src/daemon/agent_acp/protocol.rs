@@ -26,6 +26,7 @@ use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
 use crate::agents::acp::permission::PermissionMode;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::agents::kind::DisconnectReason;
+use crate::daemon::agent_acp::prompt_gate::PromptLease;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::AcpAgentStartRequest;
@@ -56,6 +57,7 @@ pub(super) struct SpawnProtocolInput<'a> {
     pub project_dir: PathBuf,
     pub supervisor: &'a Arc<AcpSessionSupervisor>,
     pub permission_mode: PermissionMode,
+    pub initial_prompt_lease: Option<PromptLease>,
 }
 
 pub(super) fn spawn_protocol_task(
@@ -70,6 +72,7 @@ pub(super) fn spawn_protocol_task(
         project_dir,
         supervisor,
         permission_mode,
+        initial_prompt_lease,
     } = input;
     let stdin = child
         .stdin
@@ -107,6 +110,7 @@ pub(super) fn spawn_protocol_task(
         notifications: batcher.notifications,
         client,
         supervisor: Arc::clone(supervisor),
+        initial_prompt_lease,
         cancel_rx,
         command_rx,
         disconnect_tx,
@@ -130,6 +134,7 @@ struct RunProtocolArgs {
     notifications: mpsc::Sender<RoutedSessionNotification>,
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
+    initial_prompt_lease: Option<PromptLease>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
     command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     disconnect_tx: mpsc::Sender<DisconnectReason>,
@@ -150,6 +155,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         notifications,
         client,
         supervisor,
+        initial_prompt_lease,
         cancel_rx,
         command_rx,
         disconnect_tx,
@@ -259,6 +265,7 @@ async fn run_protocol(args: RunProtocolArgs) {
                 acp_id,
                 session_id,
                 supervisor,
+                initial_prompt_lease,
                 cancel_rx,
                 command_rx,
                 session_guard,
@@ -322,6 +329,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         acp_id,
         session_id,
         supervisor,
+        mut initial_prompt_lease,
         mut cancel_rx,
         mut command_rx,
         session_guard,
@@ -331,7 +339,8 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
 
     send_initialize(&connection, initialize_timeout).await?;
     let acp_session_id = send_new_session(&connection, project_dir).await?;
-    session_guard.start_session(&acp_session_id, RouteTarget { acp_id, session_id });
+    let target = RouteTarget { acp_id, session_id };
+    session_guard.start_session(&acp_session_id, target.clone());
     let run_result = async {
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
             let cancelled = send_prompt_or_cancel(
@@ -342,6 +351,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
                 prompt,
             )
             .await?;
+            drop(initial_prompt_lease.take());
             if cancelled {
                 return Ok(());
             }
@@ -352,6 +362,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
             &mut command_rx,
             &session_guard,
             acp_session_id.clone(),
+            prompt_timeout,
         )
         .await
     }
@@ -361,6 +372,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
     // stale while transport shutdown is still propagating.
     sleep(SESSION_ROUTE_DRAIN_GRACE).await;
     session_guard.stop_session(&acp_session_id);
+    drop(initial_prompt_lease);
     run_result
 }
 
@@ -371,6 +383,7 @@ struct RunConnectionArgs {
     acp_id: String,
     session_id: String,
     supervisor: Arc<AcpSessionSupervisor>,
+    initial_prompt_lease: Option<PromptLease>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
     command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     session_guard: Arc<SessionRouteGuard>,
@@ -413,13 +426,17 @@ async fn send_prompt_or_cancel(
         session_id.clone(),
         vec![ContentBlock::Text(TextContent::new(prompt))],
     );
+    let mut prompt = Box::pin(connection.send_request(request).block_task());
     tokio::select! {
-        result = timeout(prompt_timeout, connection.send_request(request).block_task()) => {
+        result = timeout(prompt_timeout, &mut prompt) => {
             result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
             Ok(false)
         }
         Some(()) = cancel_rx.recv() => {
             send_cancel_notification(connection, session_id)?;
+            timeout(prompt_timeout, prompt)
+                .await
+                .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
             Ok(true)
         }
     }
