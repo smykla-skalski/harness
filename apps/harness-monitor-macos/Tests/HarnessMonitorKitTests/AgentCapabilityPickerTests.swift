@@ -45,7 +45,12 @@ struct AgentCapabilityPickerTests {
         ),
       ],
       doctorProbe: AcpDoctorProbe(command: "gemini", args: ["--version"]),
-      probe: nil,
+      probe: AcpRuntimeProbe(
+        agentId: "gemini",
+        displayName: "Gemini",
+        binaryPresent: true,
+        authState: .ready
+      ),
       installHint: nil,
       sandboxed: false,
       acpHostBridgeReady: true

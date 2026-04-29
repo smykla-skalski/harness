@@ -8,11 +8,31 @@ source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcodebuild-destination.sh
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
+source "$ROOT/Scripts/lib/rtk-shell.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
+
+cleanup_script_descendants() {
+  local status="${1:-$?}"
+  trap - EXIT INT TERM HUP
+  terminate_descendant_processes "$$"
+  exit "$status"
+}
+
+run_background_and_wait() {
+  local child_pid status
+  set +e
+  "$@" &
+  child_pid=$!
+  wait "$child_pid"
+  status=$?
+  set -e
+  return "$status"
+}
 
 # Unit and app-test builds exercise Swift code and do not need the embedded
 # Rust daemon helper. Keep the default macOS test lane out of Cargo and the
@@ -39,9 +59,14 @@ if [ ! -x "${GENERATE_PROJECT_SCRIPT}" ]; then
   exit 1
 fi
 
-"$GENERATE_PROJECT_SCRIPT"
+trap 'cleanup_script_descendants $?' EXIT
+trap 'cleanup_script_descendants 130' INT
+trap 'cleanup_script_descendants 143' TERM
+trap 'cleanup_script_descendants 129' HUP
 
-"$XCODEBUILD_RUNNER" \
+run_background_and_wait "$GENERATE_PROJECT_SCRIPT"
+
+exec "$XCODEBUILD_RUNNER" \
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \

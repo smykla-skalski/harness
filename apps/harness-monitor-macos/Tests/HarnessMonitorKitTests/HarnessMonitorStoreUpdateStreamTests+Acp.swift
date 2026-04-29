@@ -379,7 +379,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 }
 
-private func makeAcpPermissionBatch(
+func makeAcpPermissionBatch(
   batchID: String,
   acpID: String,
   sessionID: String,
@@ -404,7 +404,7 @@ private func makeAcpPermissionBatch(
   )
 }
 
-private func makeAcpSnapshot(
+func makeAcpSnapshot(
   acpID: String,
   sessionID: String,
   displayName: String = "Copilot",

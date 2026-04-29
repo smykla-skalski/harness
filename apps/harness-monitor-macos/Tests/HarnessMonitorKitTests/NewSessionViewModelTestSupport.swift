@@ -52,7 +52,8 @@ func makeNewSessionViewModel(
   client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
   isSandboxed: @Sendable @escaping () -> Bool = { true },
   bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
-  logSink: (any NewSessionLogSink)? = nil
+  logSink: (any NewSessionLogSink)? = nil,
+  launchPreferenceRecorder: @Sendable @escaping (String) -> Void = { _ in }
 ) -> NewSessionViewModel {
   NewSessionViewModel(
     store: store ?? makeNewSessionStore(),
@@ -60,7 +61,8 @@ func makeNewSessionViewModel(
     client: client,
     isSandboxed: isSandboxed,
     bookmarkResolver: bookmarkResolver,
-    logSink: logSink ?? LiveNewSessionLogSink()
+    logSink: logSink ?? LiveNewSessionLogSink(),
+    launchPreferenceRecorder: launchPreferenceRecorder
   )
 }
 

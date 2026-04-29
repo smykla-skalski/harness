@@ -292,8 +292,8 @@ extension AgentsWindowView {
   @MainActor
   @Observable
   final class ViewModel {
-    var runtime: AgentTuiRuntime = .copilot
-    var selectedLaunchSelection: AgentLaunchSelection = .tui(.copilot)
+    var runtime: AgentTuiRuntime
+    var selectedLaunchSelection: AgentLaunchSelection
     var selectedRole: SessionRole = .worker
     var name = ""
     var prompt = ""
@@ -346,6 +346,9 @@ extension AgentsWindowView {
       selection: AgentTuiSheetSelection = .create,
       displayState: AgentTuiDisplayState = AgentTuiDisplayState()
     ) {
+      let preferredLaunchSelection = HarnessMonitorAgentLaunchDefaults.preferredSelection()
+      runtime = preferredLaunchSelection.preferredRuntime
+      selectedLaunchSelection = preferredLaunchSelection
       self.selection = selection
       self.displayState = displayState
     }
