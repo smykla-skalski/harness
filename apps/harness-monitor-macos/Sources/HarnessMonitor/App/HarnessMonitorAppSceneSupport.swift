@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
@@ -10,6 +9,7 @@ struct HarnessMonitorWindowRootView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var preferencesSelectedSection: PreferencesSection
   let perfScenario: HarnessMonitorPerfScenario?
+  let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
   private var openWindow
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
@@ -21,6 +21,7 @@ struct HarnessMonitorWindowRootView: View {
     @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
     private var cornerAnimationEnabled = false
   #endif
+  @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
   @State private var handledDecisionRequestTick = 0
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
@@ -30,27 +31,14 @@ struct HarnessMonitorWindowRootView: View {
   private var backgroundImage: HarnessMonitorBackgroundSelection {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
+
+  private var shouldShowBootstrapPlaceholder: Bool {
+    defersInitialContentUntilBootstrap && !completedInitialBootstrap
+  }
+
   var body: some View {
-    Group {
-      #if HARNESS_FEATURE_LOTTIE
-        ContentView(
-          store: store,
-          showsCornerAnimation: cornerAnimationEnabled
-        ) {
-          HarnessMonitorAppLlamaAnimation()
-        }
-      #else
-        ContentView(store: store)
-      #endif
-    }
+    rootContent
     .writingToolsBehavior(.disabled)
-    .modifier(
-      HarnessMonitorPerfScenarioModifier(
-        delegate: delegate,
-        store: store,
-        perfScenario: perfScenario
-      )
-    )
     .frame(minWidth: 900, minHeight: 600)
     .modifier(
       OptionalInstantFocusRingModifier(
@@ -78,6 +66,9 @@ struct HarnessMonitorWindowRootView: View {
     )
     .modifier(HarnessMonitorUITestAnimationModifier())
     .modifier(SupervisorUITestForceTickModifier(store: store))
+    .task(id: shouldShowBootstrapPlaceholder) {
+      await bootstrapDeferredContentIfNeeded()
+    }
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
         return
@@ -93,6 +84,46 @@ struct HarnessMonitorWindowRootView: View {
       routeDecisionWindowRequest(for: tick)
     }
   }
+
+  @ViewBuilder private var rootContent: some View {
+    if shouldShowBootstrapPlaceholder {
+      HarnessMonitorBootstrapPlaceholderView()
+    } else {
+      liveContent
+    }
+  }
+
+  @ViewBuilder private var liveContent: some View {
+    Group {
+      #if HARNESS_FEATURE_LOTTIE
+        ContentView(
+          store: store,
+          showsCornerAnimation: cornerAnimationEnabled
+        ) {
+          HarnessMonitorAppLlamaAnimation()
+        }
+      #else
+        ContentView(store: store)
+      #endif
+    }
+    .modifier(
+      HarnessMonitorPerfScenarioModifier(
+        delegate: delegate,
+        store: store,
+        perfScenario: perfScenario
+      )
+    )
+  }
+
+  private func bootstrapDeferredContentIfNeeded() async {
+    guard shouldShowBootstrapPlaceholder else {
+      return
+    }
+    delegate.bind(store: store)
+    await store.bootstrapIfNeeded()
+    completedInitialBootstrap = true
+  }
+
   private func routeDecisionWindowRequest(for tick: Int) {
     guard tick != handledDecisionRequestTick,
       let decisionID = notifications.decisionRequestedID
@@ -102,6 +133,14 @@ struct HarnessMonitorWindowRootView: View {
     handledDecisionRequestTick = tick
     store.supervisorSelectedDecisionID = decisionID
     openWindow(id: HarnessMonitorWindowID.decisions)
+  }
+}
+
+private struct HarnessMonitorBootstrapPlaceholderView: View {
+  var body: some View {
+    Color.clear
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .accessibilityHidden(true)
   }
 }
 private enum HarnessMonitorPerfScenarioStatus: String {
