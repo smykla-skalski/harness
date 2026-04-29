@@ -27,6 +27,7 @@ use super::manager::{
 };
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
+use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{SpawnProtocolInput, spawn_protocol_task};
 
 impl AcpAgentManagerHandle {
@@ -77,29 +78,29 @@ impl AcpAgentManagerHandle {
         &self,
         input: DescriptorStartInput<'_>,
     ) -> Result<Option<AcpAgentSnapshot>, CliError> {
-        if !input
-            .request
-            .prompt
-            .as_deref()
-            .is_none_or(|prompt| prompt.trim().is_empty())
-        {
-            return Ok(None);
-        }
         let Some(existing) = self.reusable_session_for_process_key(input.process_key) else {
             return Ok(None);
         };
-        existing
-            .attach_protocol_session(
+        if let Some(prompt) = prompt_text(input.request.prompt.as_deref()) {
+            existing.prompt_protocol_session(
+                input.acp_id,
+                input.session_id,
+                input.project_dir.to_path_buf(),
+                prompt,
+            )
+        } else {
+            existing.attach_protocol_session(
                 input.acp_id,
                 input.session_id,
                 input.project_dir.to_path_buf(),
             )
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!(
-                    "attach reused ACP session '{}': {error}",
-                    input.descriptor.id
-                ))
-            })?;
+        }
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "attach reused ACP session '{}': {error}",
+                input.descriptor.id
+            ))
+        })?;
         let snapshot = reused_snapshot(ReusedSnapshotInput {
             acp_id: input.acp_id,
             session_id: input.session_id,
@@ -148,6 +149,14 @@ impl AcpAgentManagerHandle {
             SupervisionConfig::default()
                 .with_prompt_timeout(input.descriptor.prompt_timeout_seconds),
         ));
+        let prompt_gate = PromptGate::default();
+        let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
+            .map(|_| {
+                prompt_gate
+                    .acquire(PromptOwner::new(input.acp_id, input.session_id))
+                    .map_err(|error| CliErrorKind::workflow_io(error.message()))
+            })
+            .transpose()?;
         let permissions = PermissionBridgeHandle::spawn(
             input.acp_id.to_string(),
             input.session_id.to_string(),
@@ -171,6 +180,7 @@ impl AcpAgentManagerHandle {
                 project_dir: input.project_dir.to_path_buf(),
                 supervisor: &supervisor,
                 permission_mode,
+                initial_prompt_lease,
             },
         )
         .map_err(|error| {
@@ -194,6 +204,7 @@ impl AcpAgentManagerHandle {
             child,
             Arc::clone(&supervisor),
             protocol.handle,
+            prompt_gate,
             stderr_tail,
             ActiveAcpTasks {
                 protocol: protocol.protocol,

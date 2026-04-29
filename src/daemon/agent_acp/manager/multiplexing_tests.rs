@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    write_exiting_acp_agent, write_sleeping_acp_agent,
+    write_exiting_acp_agent, write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
 };
 
 fn manager() -> AcpAgentManagerHandle {
@@ -97,6 +97,62 @@ async fn stopping_one_reused_process_session_keeps_sibling_active() {
 
         manager.stop(&second.acp_id).expect("stop second");
         assert_eq!(process_count(&manager), 0);
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn prompted_reuse_rejects_busy_prompt_without_saturation_spawn() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let temp = TempDir::new().expect("temp");
+        let script = temp.path().join("prompt-agent.sh");
+        write_prompt_delaying_acp_agent(&script, 1.0);
+        let descriptor = descriptor(&script);
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            prompt: Some("first".to_string()),
+            project_dir: Some(temp.path().display().to_string()),
+            record_permissions: false,
+        };
+        let manager = manager();
+
+        let first = manager
+            .start_descriptor("sess-1", &request, &descriptor)
+            .expect("start first");
+        let second = manager.start_descriptor("sess-2", &request, &descriptor);
+
+        assert!(
+            second
+                .expect_err("busy prompt should reject second start")
+                .to_string()
+                .contains("prompt_busy")
+        );
+        assert_eq!(process_count(&manager), 1);
+
+        manager.stop(&first.acp_id).expect("stop first");
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn prompted_reuse_attaches_to_idle_shared_process() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let (_temp, manager, descriptor, mut request) = shared_fake_runtime();
+
+        let first = manager
+            .start_descriptor("sess-1", &request, &descriptor)
+            .expect("start first");
+        request.prompt = Some("next".to_string());
+        let second = manager
+            .start_descriptor("sess-2", &request, &descriptor)
+            .expect("start prompted second");
+
+        assert_eq!(first.process_key, second.process_key);
+        assert_eq!(first.pid, second.pid);
+        assert_eq!(process_count(&manager), 1);
+
+        manager.stop(&first.acp_id).expect("stop first");
+        manager.stop(&second.acp_id).expect("stop second");
     });
 }
 

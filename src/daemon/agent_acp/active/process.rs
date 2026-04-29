@@ -11,6 +11,7 @@ use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
 use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
+use crate::daemon::agent_acp::prompt_gate::{PromptGate, PromptOwner};
 use crate::daemon::agent_acp::protocol::AcpProtocolHandle;
 
 const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
@@ -26,6 +27,7 @@ pub(in crate::daemon::agent_acp) struct ActiveAcpProcess {
     event_task: Mutex<Option<JoinHandle<()>>>,
     protocol_disconnect_task: Mutex<Option<JoinHandle<()>>>,
     watchdog_task: Mutex<Option<JoinHandle<()>>>,
+    prompt_gate: PromptGate,
     pub(super) started_at: Instant,
     disconnect_reason: Mutex<Option<DisconnectReason>>,
     logical_acp_ids: Mutex<BTreeSet<String>>,
@@ -43,6 +45,7 @@ impl ActiveAcpProcess {
         child: Child,
         supervisor: Arc<AcpSessionSupervisor>,
         protocol_handle: AcpProtocolHandle,
+        prompt_gate: PromptGate,
         stderr_tail: SharedStderrTail,
         tasks: ActiveAcpTasks,
     ) -> Self {
@@ -56,6 +59,7 @@ impl ActiveAcpProcess {
             event_task: Mutex::new(Some(tasks.event)),
             protocol_disconnect_task: Mutex::new(None),
             watchdog_task: Mutex::new(None),
+            prompt_gate,
             started_at: Instant::now(),
             disconnect_reason: Mutex::new(None),
             logical_acp_ids: Mutex::new(BTreeSet::new()),
@@ -167,6 +171,22 @@ impl ActiveAcpProcess {
     ) -> Result<String, String> {
         self.protocol_handle
             .attach_session(acp_id, session_id, project_dir)
+            .map(|session_id| session_id.to_string())
+    }
+
+    pub(super) fn prompt_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        project_dir: PathBuf,
+        prompt: String,
+    ) -> Result<String, String> {
+        let lease = self
+            .prompt_gate
+            .acquire(PromptOwner::new(acp_id, session_id))
+            .map_err(|error| error.message())?;
+        self.protocol_handle
+            .prompt_session(acp_id, session_id, project_dir, prompt, lease)
             .map(|session_id| session_id.to_string())
     }
 
