@@ -95,7 +95,8 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
   public static let preferencesAcpNotificationStatus = "harness.preferences.acp.status"
   public static let preferencesAcpNotificationStatusState = "harness.preferences.acp.status.state"
-  public static let preferencesAcpOpenSystemSettings = "harness.preferences.acp.open-system-settings"
+  public static let preferencesAcpOpenSystemSettings =
+    "harness.preferences.acp.open-system-settings"
   public static let preferencesNotificationsPresetPicker =
     "harness.preferences.notifications.preset"
   public static let preferencesNotificationsCategoryPicker =
@@ -128,6 +129,8 @@ public enum HarnessMonitorAccessibility {
   public static let acpPermissionToast = "harness.acp-permission.toast"
   public static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"
   public static let acpPermissionToastState = "harness.acp-permission.toast.state"
+  public static let acpPermissionToastAccessibilityState =
+    "harness.acp-permission.toast.accessibility.state"
   public static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
   public static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
   public static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
@@ -249,6 +252,12 @@ public enum HarnessMonitorAccessibility {
   public static let newSessionContext = "harness.new-session.context"
   public static let newSessionBaseRef = "harness.new-session.base-ref"
   public static let newSessionProjectPicker = "harness.new-session.project-picker"
+  public static let newSessionTabPicker = "harness.new-session.tab-picker"
+  public static let newSessionCreateTab = "harness.new-session.tab.create.control"
+  public static let newSessionRuntimeTab = "harness.new-session.tab.runtime.control"
+  public static let newSessionCreatePanel = "harness.new-session.tab.create.panel"
+  public static let newSessionRuntimePanel = "harness.new-session.tab.runtime.panel"
+  public static let newSessionCreateDisabledReason = "harness.new-session.create-disabled-reason"
   public static let newSessionCreateButton = "harness.new-session.create-button"
   public static let newSessionCancelButton = "harness.new-session.cancel-button"
   public static let newSessionErrorBanner = "harness.new-session.error-banner"
