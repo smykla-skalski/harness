@@ -7,29 +7,6 @@ enum SessionTimelineWindowAction: Equatable, Sendable {
   case newer
 }
 
-enum SessionTimelineScrollTarget {
-  case top
-  case bottom
-
-  var id: String {
-    switch self {
-    case .top:
-      "session-timeline-top"
-    case .bottom:
-      "session-timeline-bottom"
-    }
-  }
-
-  var anchor: UnitPoint {
-    switch self {
-    case .top:
-      .top
-    case .bottom:
-      .bottom
-    }
-  }
-}
-
 struct SessionTimelineWindowNavigation: Equatable, Sendable {
   static let defaultLimit = 10
 
@@ -74,13 +51,18 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
     if totalCount == 0 {
       return isLoading ? "Loading latest activity" : "No timeline events"
     }
-    if hasNewer {
-      return "Loaded \(loadedCount) of \(totalCount)"
+    if windowStart == 0 && !hasNewer {
+      return "Latest \(visibleWindowEnd) of \(totalCount)"
     }
-    if windowStart == 0 {
-      return "Latest \(loadedCount) of \(totalCount)"
-    }
-    return "Loaded \(loadedCount) of \(totalCount)"
+    return "Showing \(visibleWindowStart + 1)-\(visibleWindowEnd) of \(totalCount)"
+  }
+
+  private var visibleWindowStart: Int {
+    max(0, min(windowStart, totalCount))
+  }
+
+  private var visibleWindowEnd: Int {
+    max(visibleWindowStart, min(windowEnd, totalCount))
   }
 
   var showsNavigation: Bool {
@@ -107,6 +89,8 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
 
 struct SessionTimelineNavigationControls: View {
   let navigation: SessionTimelineWindowNavigation
+  let canScrollOlder: Bool
+  let canScrollNewer: Bool
   let performAction: (SessionTimelineWindowAction) -> Void
 
   var body: some View {
@@ -147,7 +131,7 @@ struct SessionTimelineNavigationControls: View {
         title: "Older",
         systemImage: "chevron.down",
         action: .older,
-        isEnabled: navigation.loadedCount > 0,
+        isEnabled: canScrollOlder,
         identifier: HarnessMonitorAccessibility.sessionTimelineOlderButton
       )
       navigationButton(
@@ -161,7 +145,7 @@ struct SessionTimelineNavigationControls: View {
         title: "Newer",
         systemImage: "chevron.up",
         action: .newer,
-        isEnabled: navigation.hasNewer,
+        isEnabled: canScrollNewer,
         identifier: HarnessMonitorAccessibility.sessionTimelineNewerButton
       )
     }

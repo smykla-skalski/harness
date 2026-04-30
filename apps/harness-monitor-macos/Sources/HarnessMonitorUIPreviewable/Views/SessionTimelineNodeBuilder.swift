@@ -127,19 +127,35 @@ private struct SessionTimelineDecisionIndex {
   }
 }
 
-private enum SessionTimelineTimestampParser {
-  static func parse(_ value: String) -> Date? {
-    let internetDateFormatter = ISO8601DateFormatter()
-    internetDateFormatter.formatOptions = [.withInternetDateTime]
-    if let date = internetDateFormatter.date(from: value) {
-      return date
-    }
+enum SessionTimelineTimestampParser {
+  nonisolated(unsafe) private static let fractionalFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
 
-    let fractionalFormatter = ISO8601DateFormatter()
-    fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  nonisolated(unsafe) private static let internetDateFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
+  private static let spaceSeparatedFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return formatter
+  }()
+
+  static func parse(_ value: String) -> Date? {
     if let date = fractionalFormatter.date(from: value) {
       return date
     }
-    return nil
+
+    if let date = internetDateFormatter.date(from: value) {
+      return date
+    }
+    return spaceSeparatedFormatter.date(from: value)
   }
 }

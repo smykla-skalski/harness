@@ -239,7 +239,7 @@ extension HarnessMonitorStore {
     return selectedSession?.session.sessionId == sessionID
   }
 
-  private func cancelPendingListSelection() {
+  func cancelPendingListSelection() {
     pendingListSelectionTask?.cancel()
     pendingListSelectionTask = nil
     pendingListSelectionTaskToken &+= 1
