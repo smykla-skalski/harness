@@ -163,7 +163,7 @@ extension RetiredInspectorEntryPointsUITests {
       waitUntil(timeout: Self.actionTimeout) {
         trigger.exists && !trigger.frame.isEmpty
       },
-      "Cockpit Agents action button should be visible"
+      "Agents toolbar button should be visible"
     )
     tapElement(in: app, identifier: Accessibility.agentsButton)
     XCTAssertTrue(
@@ -172,7 +172,7 @@ extension RetiredInspectorEntryPointsUITests {
           || self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
           || self.button(in: app, identifier: Accessibility.agentsTaskTab("task-ui")).exists
       },
-      "Agents window should open after tapping the cockpit Agents action"
+      "Agents window should open after tapping the toolbar Agents action"
     )
   }
 

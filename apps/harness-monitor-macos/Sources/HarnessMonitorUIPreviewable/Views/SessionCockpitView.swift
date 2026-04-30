@@ -41,11 +41,6 @@ struct SessionCockpitView: View {
             requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
             inspectObserver: focusObserver
           )
-          SessionActionDock(
-            detail: detail,
-            inspectObserver: focusObserver,
-            openAgents: { openWindow(id: HarnessMonitorWindowID.agents) }
-          )
           if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
             SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
           }
