@@ -123,19 +123,17 @@ struct WebSocketProtocolAcpTests {
     #expect(payload.rawCount == 2)
     #expect(entries.map(\.kind) == ["tool_invocation", "tool_result"])
     #expect(entries[0].entryId == "acp-copilot-tool_invocation-7")
-    #expect(
-      entries[1].payload
-        == .object([
-          "runtime": .string("acp"),
-          "event": .object([
-            "type": .string("tool_result"),
-            "tool_name": .string("Write"),
-            "invocation_id": .string("call-1"),
-            "output": .string("ok"),
-            "is_error": .bool(false),
-          ]),
-        ])
-    )
+    guard case .object(let payloadObject) = entries[1].payload else {
+      Issue.record("Expected ACP timeline payload object")
+      return
+    }
+    #expect(payloadObject["runtime"] == .string("acp"))
+    guard case .object(let timelineObject)? = payloadObject["tool_call_timeline"] else {
+      Issue.record("Expected tool_call_timeline metadata")
+      return
+    }
+    #expect(timelineObject["tool_call_id"] == .string("call-1"))
+    #expect(timelineObject["status"] == .string("completed"))
   }
 
   @Test("Daemon push event decodes ACP inspect snapshots")

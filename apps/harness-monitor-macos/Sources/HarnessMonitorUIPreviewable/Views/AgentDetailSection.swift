@@ -81,12 +81,8 @@ struct AgentDetailSection: View {
     store.acpDecisionAttention(for: agent.agentId)
   }
 
-  private var acpRuntimeSnapshot: AcpAgentSnapshot? {
-    store.acpAgentSnapshot(for: agent.agentId)
-  }
-
-  private var acpRuntimeInspect: AcpAgentInspectSnapshot? {
-    store.acpInspectSnapshot(for: agent.agentId)
+  private var acpRuntimeState: AcpAgentRuntimeState? {
+    store.acpRuntimeState(for: agent.agentId)
   }
 
   var body: some View {
@@ -117,8 +113,8 @@ struct AgentDetailSection: View {
           value: agent.agentId
         )
       }
-      if let acpRuntimeSnapshot {
-        runtimeView(snapshot: acpRuntimeSnapshot)
+      if let acpRuntimeState {
+        runtimeView(runtimeState: acpRuntimeState)
       }
       Text(agent.name)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
@@ -335,13 +331,9 @@ struct AgentDetailSection: View {
   }
 
   @ViewBuilder
-  private func runtimeView(snapshot: AcpAgentSnapshot) -> some View {
+  private func runtimeView(runtimeState: AcpAgentRuntimeState) -> some View {
     AcpRuntimeView(
-      agentID: agent.agentId,
-      agentName: agent.name,
-      snapshot: snapshot,
-      inspect: acpRuntimeInspect,
-      observedAt: store.selectedAcpInspectObservedAt,
+      runtimeState: runtimeState,
       presentation: runtimePresentation
     )
   }

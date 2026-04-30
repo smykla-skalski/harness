@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -155,6 +156,56 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.pendingAcpPermissionBatches.isEmpty)
   }
 
+  @Test("ACP reconcile drops inspect snapshots whose runtime identity no longer matches")
+  func acpReconcileDropsInspectSnapshotsWithSwappedRuntimeIdentity() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-reconcile"
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-acp-reconcile",
+      sampledAt: Date(timeIntervalSince1970: 1),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-copilot",
+          sessionID: "sess-acp-reconcile",
+          agentID: "copilot",
+          displayName: "Copilot"
+        ),
+        makeAcpInspectSnapshot(
+          acpID: "acp-worker",
+          sessionID: "sess-acp-reconcile",
+          agentID: "worker",
+          displayName: "Worker"
+        ),
+      ]
+    )
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-reconcile",
+        agents: [
+          makeAcpSnapshot(
+            acpID: "acp-copilot",
+            sessionID: "sess-acp-reconcile",
+            agentID: "worker",
+            displayName: "Worker",
+            pendingBatches: []
+          ),
+          makeAcpSnapshot(
+            acpID: "acp-worker",
+            sessionID: "sess-acp-reconcile",
+            agentID: "copilot",
+            displayName: "Copilot",
+            pendingBatches: []
+          ),
+        ]
+      )
+    )
+
+    #expect(store.selectedAcpInspectAgents.isEmpty)
+    #expect(store.acpRuntimeState(for: "worker")?.inspect == nil)
+    #expect(store.acpRuntimeState(for: "copilot")?.inspect == nil)
+  }
+
   @Test("ACP reconcile keeps snapshot batch authoritative over stale standalone cache")
   func acpReconcilePrefersSnapshotBatchOverStandaloneCache() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -200,6 +251,46 @@ extension HarnessMonitorStoreUpdateStreamTests {
     let requests =
       store.selectedAcpAgents.first?.pendingPermissionBatches.first?.requests.map(\.requestId)
     #expect(requests == ["request-fresh"])
+  }
+
+  @Test("ACP runtime lookup refuses ambiguous selected snapshots")
+  func acpRuntimeLookupRejectsDuplicateAgentIDs() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-ambiguous"
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-acp-ambiguous",
+      sampledAt: Date(timeIntervalSince1970: 5),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-1",
+          sessionID: "sess-acp-ambiguous",
+          agentID: "worker",
+          displayName: "Worker Inspect"
+        )
+      ]
+    )
+    #expect(store.acpRuntimeState(for: "worker")?.inspect?.displayName == "Worker Inspect")
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-ambiguous",
+        agentID: "worker",
+        displayName: "Worker One",
+        pendingBatches: []
+      )
+    )
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-2",
+        sessionID: "sess-acp-ambiguous",
+        agentID: "worker",
+        displayName: "Worker Two",
+        pendingBatches: []
+      )
+    )
+
+    #expect(store.acpAgentSnapshot(for: "worker") == nil)
+    #expect(store.acpRuntimeState(for: "worker") == nil)
   }
 
   @Test("pending permission list prefers selected snapshot over late standalone duplicate")
@@ -338,7 +429,9 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(
       store.acpInspectSnapshot(for: "alpha-agent")?.promptDeadlineRemainingMs == UInt64(42_000)
     )
-    #expect(store.selectedAcpInspectObservedAt != nil)
+    let sampledAt = HarnessMonitorStore.acpInspectSampledAt(from: "2026-04-28T00:00:45Z")
+    #expect(store.selectedAcpInspectObservedAt == sampledAt)
+    #expect(store.acpRuntimeState(for: "alpha-agent")?.promptDeadlineAnchorAt == sampledAt)
 
     store.resetSelectedAcpAgents()
 
@@ -412,13 +505,191 @@ extension HarnessMonitorStoreUpdateStreamTests {
     )
 
     let acpEntry = try #require(
-      store.timeline.first { $0.entryId == "acp-copilot-tool_invocation-9" }
+      store.timeline.first(where: { entry in
+        guard entry.kind == "tool_invocation",
+          let payloadObject = jsonObject(from: entry.payload),
+          let timelineObject = jsonObject(from: payloadObject["tool_call_timeline"])
+        else {
+          return false
+        }
+        return jsonString(from: timelineObject["tool_call_id"]) == "call-read"
+      })
     )
     #expect(acpEntry.kind == "tool_invocation")
     #expect(acpEntry.summary == "copilot invoked Read")
     #expect(store.timelineWindow?.totalCount == 2)
 
     store.stopAllStreams()
+  }
+
+  @Test("ACP event push precomputes timeline attribution metadata")
+  func acpEventPushPrecomputesTimelineAttributionMetadata() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-events",
+        pendingBatches: []
+      )
+    )
+    store.acpAgentDescriptorsByID["copilot"] = AcpAgentDescriptor(
+      id: "copilot",
+      displayName: "Copilot",
+      capabilities: ["filesystem", "terminal"],
+      launchCommand: "copilot",
+      launchArgs: [],
+      envPassthrough: [],
+      modelCatalog: nil,
+      installHint: nil,
+      doctorProbe: AcpDoctorProbe(command: "copilot", args: ["doctor"])
+    )
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let entry = try #require(store.timeline.first)
+    let payloadObject = try #require(jsonObject(from: entry.payload))
+    let toolCallTimeline = try #require(jsonObject(from: payloadObject["tool_call_timeline"]))
+    let capabilityTags: [String] =
+      if case .array(let values)? = toolCallTimeline["capability_tags"] {
+        values.compactMap { value in
+          if case .string(let string) = value {
+            string
+          } else {
+            nil
+          }
+        }
+      } else {
+        [String]()
+      }
+
+    #expect(jsonString(from: toolCallTimeline["tool_call_id"]) == "call-read")
+    #expect(jsonString(from: toolCallTimeline["acp_agent_id"]) == "acp-1")
+    #expect(jsonString(from: toolCallTimeline["agent_id"]) == "copilot")
+    #expect(jsonString(from: toolCallTimeline["agent_display_name"]) == "Copilot")
+    #expect(jsonNumber(from: toolCallTimeline["sequence"]) == 9)
+    #expect(capabilityTags == ["filesystem", "terminal"])
+  }
+
+  @Test("ACP event push preserves event agent when no descriptor is cached")
+  func acpEventPushPreservesEventAgentWhenNoDescriptorIsCached() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let entry = try #require(store.timeline.first)
+    let payloadObject = try #require(jsonObject(from: entry.payload))
+    let toolCallTimeline = try #require(jsonObject(from: payloadObject["tool_call_timeline"]))
+
+    #expect(jsonString(from: toolCallTimeline["agent_id"]) == "copilot")
+    #expect(jsonString(from: toolCallTimeline["agent_display_name"]) == "copilot")
+  }
+
+  @Test("ACP event push coalesces same-phase duplicate tool calls before rendering")
+  func acpEventPushCoalescesSamePhaseDuplicateToolCallsBeforeRendering() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 2,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              ),
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              ),
+            ]
+          )
+        )
+      )
+    )
+
+    let timelineEntries = store.timeline.filter { entry in
+      guard let payloadObject = jsonObject(from: entry.payload),
+        let toolCallTimeline = jsonObject(from: payloadObject["tool_call_timeline"])
+      else {
+        return false
+      }
+      return jsonString(from: toolCallTimeline["tool_call_id"]) == "call-read"
+    }
+
+    #expect(timelineEntries.count == 1)
+    #expect(timelineEntries.first?.recordedAt == "2026-04-28T00:00:21Z")
   }
 }
 
@@ -496,4 +767,25 @@ func makeAcpInspectSnapshot(
     terminalCount: 1,
     promptDeadlineRemainingMs: promptDeadlineRemainingMs
   )
+}
+
+private func jsonObject(from value: JSONValue?) -> [String: JSONValue]? {
+  guard case .object(let object)? = value else {
+    return nil
+  }
+  return object
+}
+
+private func jsonString(from value: JSONValue?) -> String? {
+  guard case .string(let string)? = value else {
+    return nil
+  }
+  return string
+}
+
+private func jsonNumber(from value: JSONValue?) -> UInt64? {
+  guard case .number(let number)? = value, number >= 0 else {
+    return nil
+  }
+  return UInt64(number)
 }

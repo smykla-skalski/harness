@@ -129,10 +129,15 @@ public enum HarnessMonitorPreviewStoreFactory {
           pendingBatch: pendingBatch
         )
         store.selectedAcpAgents = [previewAcpAgent]
-        store.selectedAcpInspectAgents = [
-          PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
-        ]
-        store.selectedAcpInspectObservedAt = Date()
+        store.selectedAcpInspectState = AcpInspectSample(
+          sessionID: selectedSessionID,
+          sampledAt: HarnessMonitorStore.acpInspectSampledAt(
+            from: PreviewHarnessClientState.mutationTimestamp
+          ),
+          agents: [
+            PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
+          ]
+        )
         if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
           == "1"
         {
