@@ -2,6 +2,8 @@ import Foundation
 
 actor PreviewHarnessClientState {
   static let mutationTimestamp = "2026-03-28T14:20:30Z"
+  static let agentTuiRefreshStatusEnvironmentKey =
+    "HARNESS_MONITOR_PREVIEW_AGENT_TUI_REFRESH_STATUS"
 
   private var sessionSummaries: [SessionSummary]
   private var detailsBySessionID: [String: SessionDetail]
@@ -21,7 +23,7 @@ actor PreviewHarnessClientState {
     self.detailsBySessionID = fixtures.detailsBySessionID
     self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
     self.timelinesBySessionID = fixtures.timelinesBySessionID
-    self.agentTuisBySessionID = fixtures.agentTuisBySessionID
+    self.agentTuisBySessionID = Self.seededAgentTuisBySessionID(fixtures: fixtures)
     self.acpAgentsBySessionID = Self.seededAcpAgentsBySessionID(fixtures: fixtures)
     self.codexRunsBySessionID = fixtures.codexRunsBySessionID
     self.nextAgentTuiSequence = max(
@@ -35,81 +37,6 @@ actor PreviewHarnessClientState {
     self.nextAcpAgentSequence = 0
     self.fallbackDetail = fixtures.detail
     self.fallbackTimeline = fixtures.timeline
-  }
-
-  private static func seededAcpAgentsBySessionID(
-    fixtures: PreviewHarnessClient.Fixtures
-  ) -> [String: [AcpAgentSnapshot]] {
-    guard
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-          == "1"
-    else {
-      return [:]
-    }
-    guard
-      let detail = fixtures.detail ?? fixtures.detailsBySessionID.values.first,
-      !detail.session.sessionId.isEmpty
-    else {
-      return [:]
-    }
-    return [
-      detail.session.sessionId: [
-        seededAcpAgentSnapshot(
-          sessionID: detail.session.sessionId,
-          projectDir: detail.session.projectDir ?? "/Users/example/Projects/harness"
-        )
-      ]
-    ]
-  }
-
-  static func seededAcpAgentSnapshot(
-    sessionID: String,
-    projectDir: String
-  ) -> AcpAgentSnapshot {
-    AcpAgentSnapshot(
-      acpId: "preview-managed-agent-1",
-      sessionId: sessionID,
-      agentId: "worker-codex",
-      displayName: "worker-codex",
-      status: .active,
-      pid: 41_001,
-      pgid: 41_001,
-      projectDir: projectDir,
-      pendingPermissions: 2,
-      permissionQueueDepth: 0,
-      pendingPermissionBatches: [
-        AcpPermissionBatch(
-          batchId: "preview-acp-permission-1",
-          acpId: "preview-managed-agent-1",
-          sessionId: sessionID,
-          requests: [
-            AcpPermissionItem(
-              requestId: "preview-request-write",
-              sessionId: sessionID,
-              toolCall: .object([
-                "kind": .string("fs.write_text_file"),
-                "path": .string("Sources/App.swift"),
-              ]),
-              options: []
-            ),
-            AcpPermissionItem(
-              requestId: "preview-request-terminal",
-              sessionId: sessionID,
-              toolCall: .object([
-                "kind": .string("terminal.create"),
-                "command": .string("swift test"),
-              ]),
-              options: []
-            ),
-          ],
-          createdAt: Self.mutationTimestamp
-        )
-      ],
-      terminalCount: 0,
-      createdAt: Self.mutationTimestamp,
-      updatedAt: Self.mutationTimestamp
-    )
   }
 
   func sessions() -> [SessionSummary] {

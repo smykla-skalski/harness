@@ -21,11 +21,35 @@ private enum WorkspaceChromeMetrics {
 }
 
 public struct AgentsWindowView: View {
+  struct DismissBatchSnapshot: Equatable {
+    let ids: [String]
+    let count: Int
+    let filterSignature: String
+    let capturedAt: Date
+  }
+
+  struct ReopenBatchState: Equatable {
+    let ids: [String]
+    let expiresAt: Date
+  }
+
   let store: HarnessMonitorStore
   let navigationBridge: AgentsWindowNavigationBridge
   @Environment(\.openWindow)
   var openWindow
   @State private var stateViewModel: ViewModel
+  @State private var decisionsRuntime = DecisionsWindowRuntime()
+  @State private var decisionFilters = DecisionsSidebarViewModel.FilterState(
+    query: "",
+    severities: [],
+    scope: .summary
+  )
+  @State private var decisionDetailTab: DecisionDetailTab = .context
+  @State private var dismissAllVisibleDraft = ""
+  @State private var pendingDismissBatch: DismissBatchSnapshot?
+  @State private var showDismissAllVisibleConfirmation = false
+  @State private var reopenBatch: ReopenBatchState?
+  @State private var decisionInspectorVisible = false
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
   @Environment(\.fontScale)
@@ -39,7 +63,7 @@ public struct AgentsWindowView: View {
   ) {
     self.store = store
     self.navigationBridge = navigationBridge
-    let initialDisplayState = AgentTuiDisplayState(store: store)
+    let initialDisplayState = AgentTuiDisplayState(initialWindowStore: store)
     let initialSelection = Self.initialSelection(
       displayState: initialDisplayState,
       selectedTerminalID: store.selectedAgentTui?.tuiId,
@@ -72,107 +96,163 @@ public struct AgentsWindowView: View {
 
   var focusedFieldBinding: FocusState<Field?>.Binding { $stateFocusedField }
 
-  var selectedSessionTui: AgentTuiSnapshot? {
-    guard let selectedTuiID = viewModel.selection.terminalID else {
-      return nil
-    }
-    return displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
+  var decisionInspectorBinding: Binding<Bool> {
+    Binding(
+      get: { viewModel.selection.isDecisionRoute && decisionInspectorVisible },
+      set: { decisionInspectorVisible = $0 }
+    )
   }
 
-  var selectedCodexRun: CodexRunSnapshot? {
-    guard let selectedRunID = viewModel.selection.codexRunID else {
-      return nil
-    }
-    return displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
+  var decisionItems: [Decision] {
+    decisionsRuntime.decisions
   }
 
-  var selectedCodexApprovalItems: [CodexApprovalItem] {
-    guard let selectedCodexRun else {
-      return []
-    }
-    return Self.codexApprovalItems(for: selectedCodexRun, decisions: store.supervisorOpenDecisions)
+  var currentDecisionsRuntime: DecisionsWindowRuntime {
+    decisionsRuntime
   }
 
-  var trimmedInput: String {
-    viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+  var currentDecisionFilters: DecisionsSidebarViewModel.FilterState {
+    decisionFilters
   }
 
-  var trimmedCodexPrompt: String {
-    viewModel.codexPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  var decisionAuditEvents: [SupervisorEvent] {
+    decisionsRuntime.auditEvents
   }
 
-  var trimmedCodexContext: String {
-    viewModel.codexContext.trimmingCharacters(in: .whitespacesAndNewlines)
+  var decisionLiveTick: DecisionLiveTickSnapshot {
+    decisionsRuntime.liveTick
   }
 
-  var trimmedProjectDir: String? {
-    let normalized = viewModel.projectDir.trimmingCharacters(in: .whitespacesAndNewlines)
-    return normalized.isEmpty ? nil : normalized
+  var decisionDetailTabBinding: Binding<DecisionDetailTab> {
+    $decisionDetailTab
   }
 
-  var parsedArgvOverride: [String] {
-    viewModel.argvOverride
-      .split(whereSeparator: \.isNewline)
-      .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
+  var currentDecisionDetailTab: DecisionDetailTab {
+    get { decisionDetailTab }
+    nonmutating set { decisionDetailTab = newValue }
   }
 
-  var canStartCodex: Bool {
-    !viewModel.isSubmitting && !trimmedCodexPrompt.isEmpty
+  var dismissAllVisibleDraftText: String {
+    get { dismissAllVisibleDraft }
+    nonmutating set { dismissAllVisibleDraft = newValue }
   }
 
-  var canSend: Bool {
-    guard let selectedSessionTui else {
-      return false
-    }
-    return selectedSessionTui.status.isActive && !trimmedInput.isEmpty && !viewModel.isSubmitting
+  var currentPendingDismissBatch: DismissBatchSnapshot? {
+    get { pendingDismissBatch }
+    nonmutating set { pendingDismissBatch = newValue }
   }
 
-  var canResize: Bool {
-    guard let selectedSessionTui else {
-      return false
-    }
-    return selectedSessionTui.status.isActive && viewModel.rows > 0 && viewModel.cols > 0
-      && !viewModel.isSubmitting
+  var showsDismissAllVisibleConfirmation: Bool {
+    get { showDismissAllVisibleConfirmation }
+    nonmutating set { showDismissAllVisibleConfirmation = newValue }
   }
 
-  var canStop: Bool {
-    selectedSessionTui?.status.isActive == true && !viewModel.isSubmitting
+  var currentReopenBatch: ReopenBatchState? {
+    get { reopenBatch }
+    nonmutating set { reopenBatch = newValue }
   }
 
-  var canSteerCodex: Bool {
-    guard let selectedCodexRun else {
-      return false
-    }
-    return
-      selectedCodexRun.status.isActive
-      && !trimmedCodexContext.isEmpty
-      && !viewModel.isSubmitting
-  }
-
-  var usesLiveViewportSplitLayout: Bool {
-    selectedSessionTui?.status.isActive == true
-  }
-
-  var liveViewportIsReconciling: Bool {
-    guard let selectedSessionTui, selectedSessionTui.status.isActive else {
-      return false
-    }
-    if viewModel.pendingViewportResizeTarget != nil {
-      return true
-    }
-    guard let expectedSize = viewModel.expectedSize else {
-      return false
-    }
-    return selectedSessionTui.size != expectedSize
+  var isDecisionInspectorVisible: Bool {
+    get { decisionInspectorVisible }
+    nonmutating set { decisionInspectorVisible = newValue }
   }
 
   public var body: some View {
     @Bindable var viewModel = viewModel
     let displayState = displayState
-    return NavigationSplitView {
+    let splitView = workspaceSplitView(
+      displayState: displayState,
+      selection: $viewModel.selection
+    )
+
+    return
+      splitView
+      .navigationSplitViewStyle(.balanced)
+      .toolbar {
+        agentTuiNavigationToolbarItems
+        sessionToolbarItems
+        decisionToolbarItems
+      }
+      .toolbarBaselineOverlay()
+      .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+      .containerBackground(.windowBackground, for: .window)
+      .task {
+        await prepareWorkspace(viewModel: viewModel)
+      }
+      .onChange(of: store.pendingWorkspaceSelection) { _, _ in
+        consumePendingWorkspaceSelection()
+      }
+      .onChange(of: store.selectedAgentTuis) { _, _ in
+        refreshWorkspaceAfterDataChange()
+      }
+      .onChange(of: store.selectedCodexRuns) { _, _ in
+        refreshWorkspaceAfterDataChange()
+      }
+      .onChange(of: store.agentTuiUnavailable) { _, _ in
+        refreshWorkspaceAfterDataChange()
+      }
+      .onChange(of: store.codexUnavailable) { _, _ in
+        refreshWorkspaceAfterDataChange()
+      }
+      .onChange(of: store.selectedSession) { _, _ in
+        refreshWorkspaceAfterDataChange()
+      }
+      .onChange(of: store.supervisorDecisionRefreshTick) { _, _ in
+        handleSupervisorDecisionRefresh()
+      }
+      .onChange(of: store.supervisorSelectedDecisionID) { _, _ in
+        syncSupervisorDecisionRoute(recordHistory: true)
+      }
+      .onChange(of: store.supervisorObserverFocusTick) { _, _ in
+        focusDecisionDesk()
+      }
+      .onChange(of: store.supervisorPrimaryActionFocusRequestTick) { _, _ in
+        focusPrimaryDecisionAction()
+      }
+      .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
+        handleSelectedTuiChange(selectedTuiID, viewModel: viewModel)
+      }
+      .onChange(of: viewModel.selection) { oldValue, newValue in
+        handleViewSelectionChange(from: oldValue, to: newValue, viewModel: viewModel)
+      }
+      .onDisappear {
+        handleWindowDisappear()
+      }
+      .acpPermissionPresentation(store: store)
+      .confirmationDialog(
+        "Dismiss all visible decisions",
+        isPresented: $showDismissAllVisibleConfirmation,
+        titleVisibility: .visible
+      ) {
+        TextField(
+          "Type \(pendingDismissBatch?.count ?? 0) to confirm",
+          text: $dismissAllVisibleDraft
+        )
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleInput)
+        Button("Dismiss selected visible") {
+          Task { await confirmDismissAllVisible() }
+        }
+        .disabled(dismissAllVisibleDraft != "\(pendingDismissBatch?.count ?? -1)")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleConfirm)
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text(dismissConfirmationMessage)
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+  }
+
+  private func workspaceSplitView(
+    displayState: AgentTuiDisplayState,
+    selection: Binding<WorkspaceSelection>
+  ) -> some View {
+    NavigationSplitView {
       AgentsSidebar(
-        selection: $viewModel.selection,
+        store: store,
+        selection: selection,
+        decisionFilters: $decisionFilters,
+        decisions: decisionItems,
+        currentSessionID: store.selectedSessionID,
         agentTuis: displayState.sortedAgentTuis,
         sessionTitlesByID: displayState.sessionTitlesByID,
         codexRuns: displayState.sortedCodexRuns,
@@ -191,108 +271,63 @@ public struct AgentsWindowView: View {
       .toolbarBaselineFrame(.sidebar)
     } detail: {
       detailColumnContent
-    }
-    .navigationSplitViewStyle(.balanced)
-    .toolbar {
-      agentTuiNavigationToolbarItems
-      sessionToolbarItems
-    }
-    .toolbarBaselineOverlay()
-    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-    .containerBackground(.windowBackground, for: .window)
-    .task {
-      viewModel.windowNavigation.setHandlers(
-        back: { navigateHistoryBack() },
-        forward: { navigateHistoryForward() }
-      )
-      navigationBridge.update(viewModel.windowNavigation)
-      await Task.yield()
-      await loadAgentPickerCatalogs()
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: true)
-      consumePendingAgentsWindowSelection()
-    }
-    .onChange(of: store.pendingAgentsWindowSelection) { _, _ in
-      consumePendingAgentsWindowSelection()
-    }
-    .onChange(of: store.selectedAgentTuis) { _, _ in
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: false)
-    }
-    .onChange(of: store.selectedCodexRuns) { _, _ in
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: false)
-    }
-    .onChange(of: store.agentTuiUnavailable) { _, _ in
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: false)
-    }
-    .onChange(of: store.codexUnavailable) { _, _ in
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: false)
-    }
-    .onChange(of: store.selectedSession) { _, _ in
-      refreshDisplayState()
-      reconcileSheetState(afterRefresh: false)
-    }
-    .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
-      guard let selectedTuiID else {
-        return
-      }
-      if viewModel.selection.terminalID == selectedTuiID,
-        let currentSize = selectedSessionTui?.size
-      {
-        syncTerminalResizeControls(to: currentSize)
-        if viewModel.expectedSize == nil {
-          viewModel.expectedSize = currentSize
+        .inspector(isPresented: decisionInspectorBinding) {
+          if viewModel.selection.isDecisionRoute {
+            DecisionInspector(
+              decision: selectedDecision,
+              liveTick: decisionLiveTick
+            )
+            .inspectorColumnWidth(min: 200, ideal: 220, max: 280)
+          }
         }
-        enforceExpectedSize()
-      }
     }
-    .onChange(of: viewModel.selection) { oldValue, newValue in
-      if oldValue != newValue {
-        cancelPendingViewportResize()
-        Task {
-          await flushPendingKeySequenceIfNeeded()
-        }
-      }
-      if viewModel.suppressHistoryRecording {
-        viewModel.suppressHistoryRecording = false
-      } else if oldValue != newValue {
-        viewModel.navigationBackStack.append(oldValue)
-        viewModel.navigationForwardStack.removeAll()
-        updateNavigationState()
-      }
-      switch newValue {
-      case .create:
-        break
-      case .terminal(let sessionID):
-        guard oldValue.terminalID != sessionID else { return }
-        store.selectAgentTui(tuiID: sessionID)
-        if let currentSize = selectedSessionTui?.size {
-          syncTerminalResizeControls(to: currentSize)
-          viewModel.expectedSize = currentSize
-        }
-        enforceExpectedSize()
-      case .codex(let runID):
-        guard oldValue.codexRunID != runID else { return }
-        store.selectCodexRun(runID: runID)
-      case .agent:
-        break
-      case .task:
-        break
-      }
+  }
+
+  private func prepareWorkspace(viewModel: ViewModel) async {
+    viewModel.windowNavigation.setHandlers(
+      back: { navigateHistoryBack() },
+      forward: { navigateHistoryForward() }
+    )
+    navigationBridge.update(viewModel.windowNavigation)
+    await Task.yield()
+    async let catalogsLoaded = loadAgentPickerCatalogs()
+    let refreshOutcome = await refreshManagedSelections()
+    applyManagedSelectionFreshness(refreshOutcome)
+    refreshWorkspaceAfterDataChange(afterRefresh: refreshOutcome.didRefreshManagedSelections)
+    await reloadDecisions()
+    syncSupervisorDecisionRoute(recordHistory: false)
+    consumePendingWorkspaceSelection()
+    _ = await catalogsLoaded
+  }
+
+  private func refreshWorkspaceAfterDataChange(afterRefresh: Bool = false) {
+    refreshDisplayState()
+    reconcileSheetState(afterRefresh: afterRefresh)
+  }
+
+  private func handleSupervisorDecisionRefresh() {
+    Task {
+      await reloadDecisions()
+      syncSupervisorDecisionRoute(recordHistory: false)
     }
-    .onDisappear {
-      cancelPendingViewportResize()
-      Task {
-        await flushPendingKeySequenceIfNeeded()
-      }
-      navigationBridge.update(WindowNavigationState())
+  }
+
+  private func handleSelectedTuiChange(
+    _ selectedTuiID: String?,
+    viewModel: ViewModel
+  ) {
+    guard let selectedTuiID else {
+      return
     }
-    .acpPermissionPresentation(store: store)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+    if viewModel.selection.terminalID == selectedTuiID,
+      let currentSize = selectedSessionTui?.size
+    {
+      syncTerminalResizeControls(to: currentSize)
+      if viewModel.expectedSize == nil {
+        viewModel.expectedSize = currentSize
+      }
+      enforceExpectedSize()
+    }
   }
 
 }

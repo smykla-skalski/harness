@@ -2,14 +2,17 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
-  func applyProgrammaticSelection(_ nextSelection: AgentTuiSheetSelection) {
+  func applyProgrammaticSelection(
+    _ nextSelection: WorkspaceSelection,
+    recordHistory: Bool = false
+  ) {
     guard viewModel.selection != nextSelection else {
       if nextSelection.terminalID != nil {
         enforceExpectedSize()
       }
       return
     }
-    viewModel.suppressHistoryRecording = true
+    viewModel.suppressHistoryRecording = !recordHistory
     viewModel.selection = nextSelection
     if nextSelection.terminalID != nil {
       enforceExpectedSize()
