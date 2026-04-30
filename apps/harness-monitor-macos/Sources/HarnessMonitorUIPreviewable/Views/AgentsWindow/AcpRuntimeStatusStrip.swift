@@ -8,62 +8,56 @@ enum AcpRuntimePresentation: Equatable {
 }
 
 struct AcpRuntimeView: View {
-  let agentID: String
-  let agentName: String
-  let snapshot: AcpAgentSnapshot
-  let inspect: AcpAgentInspectSnapshot?
-  let observedAt: Date?
+  let runtimeState: AcpAgentRuntimeState
   let presentation: AcpRuntimePresentation
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       AcpRuntimeStatusStrip(
-        agentID: agentID,
-        agentName: agentName,
-        snapshot: snapshot,
-        inspect: inspect,
-        observedAt: observedAt,
+        runtimeState: runtimeState,
         presentation: presentation
       )
       if presentation == .full {
-        AcpRuntimeDisclosure(agentID: agentID, inspect: inspect)
+        AcpRuntimeDisclosure(runtimeState: runtimeState)
       }
     }
   }
 }
 
 struct AcpRuntimeStatusStrip: View {
-  let agentID: String
-  let agentName: String
-  let snapshot: AcpAgentSnapshot
-  let inspect: AcpAgentInspectSnapshot?
-  let observedAt: Date?
+  let runtimeState: AcpAgentRuntimeState
   let presentation: AcpRuntimePresentation
 
   @State private var lastWatchdogAnnouncement: AcpRuntimeWatchdogAnnouncement?
 
-  private var pendingPermissions: Int {
-    inspect?.pendingPermissions ?? snapshot.pendingPermissions
-  }
-
   private var promptDeadlineDate: Date? {
-    guard let inspect, let observedAt, inspect.promptDeadlineRemainingMs > 0 else {
+    guard
+      let observedAt = runtimeState.promptDeadlineAnchorAt,
+      let remaining = runtimeState.promptDeadlineRemainingMs
+    else {
       return nil
     }
-    return observedAt.addingTimeInterval(TimeInterval(inspect.promptDeadlineRemainingMs) / 1000)
-  }
-
-  private var watchdogState: String {
-    inspect?.watchdogState ?? "unknown"
+    return observedAt.addingTimeInterval(TimeInterval(remaining) / 1000)
   }
 
   private var subtitle: String {
     switch presentation {
     case .full:
-      snapshot.projectDir.isEmpty ? "ACP runtime active" : snapshot.projectDir
+      if let projectDir = runtimeState.projectDir, projectDir.isEmpty == false {
+        projectDir
+      } else {
+        "ACP runtime active"
+      }
     case .compact:
       "Runtime telemetry"
     }
+  }
+
+  private var watchdogSignal: AcpRuntimeWatchdogSignal? {
+    guard let state = runtimeState.inspect?.watchdogState else {
+      return nil
+    }
+    return AcpRuntimeWatchdogSignal(runtimeID: runtimeState.id, state: state)
   }
 
   var body: some View {
@@ -97,21 +91,20 @@ struct AcpRuntimeStatusStrip: View {
         .stroke(HarnessMonitorTheme.accent.opacity(0.25), lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimeStrip(agentID))
-    .onAppear {
-      guard let inspect else {
-        return
-      }
-      lastWatchdogAnnouncement = AcpRuntimeWatchdogAnnouncement(
-        state: inspect.watchdogState,
-        announcedAt: .now
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentRuntimeStrip(runtimeState.agentId)
+    )
+    .accessibilityLabel("ACP runtime status")
+    .onChange(of: watchdogSignal, initial: true) { oldValue, newValue in
+      applyWatchdogAnnouncementEffect(
+        AcpRuntimeWatchdogAnnouncementCoordinator.effect(
+          from: oldValue,
+          to: newValue,
+          lastAnnouncement: lastWatchdogAnnouncement,
+          agentName: runtimeState.agentName,
+          now: .now
+        )
       )
-    }
-    .onChange(of: inspect?.watchdogState) { oldValue, newValue in
-      guard oldValue != newValue, let newValue else {
-        return
-      }
-      announceWatchdogStateIfNeeded(newValue)
     }
   }
 
@@ -119,42 +112,53 @@ struct AcpRuntimeStatusStrip: View {
   private var statusChips: some View {
     AcpRuntimeChip(
       title: "Watchdog",
-      value: AcpRuntimeWatchdogAnnouncementPolicy.label(for: watchdogState),
+      value: AcpRuntimeWatchdogAnnouncementPolicy.label(for: runtimeState.watchdogDisplayState),
       systemImage: "shield.lefthalf.filled",
-      tint: AcpRuntimeWatchdogAnnouncementPolicy.tint(for: watchdogState)
+      tint: AcpRuntimeWatchdogAnnouncementPolicy.tint(for: runtimeState.watchdogDisplayState),
+      accessibilityLabel: "Watchdog",
+      accessibilityValue: AcpRuntimeWatchdogAnnouncementPolicy.label(
+        for: runtimeState.watchdogDisplayState
+      )
     )
-    .accessibilityLiveRegion(AcpRuntimeWatchdogAnnouncementPolicy.liveRegion(for: watchdogState))
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimeWatchdog(agentID))
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentRuntimeWatchdog(runtimeState.agentId)
+    )
 
     AcpRuntimeChip(
       title: "Pending permissions",
-      value: pendingPermissions.formatted(),
+      value: runtimeState.pendingPermissions.formatted(),
       systemImage: "person.badge.key",
-      tint: pendingPermissions > 0 ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk
+      tint: runtimeState.pendingPermissions > 0
+        ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk,
+      accessibilityLabel: "Pending permissions",
+      accessibilityValue: runtimeState.pendingPermissions.formatted()
     )
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimePendingPermissions(agentID))
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentRuntimePendingPermissions(runtimeState.agentId)
+    )
 
     if let promptDeadlineDate {
       AcpRuntimeDeadlineChip(deadline: promptDeadlineDate)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimeDeadline(agentID))
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.agentRuntimeDeadline(runtimeState.agentId)
+        )
     }
   }
 
-  private func announceWatchdogStateIfNeeded(_ state: String) {
-    let now = Date()
-    guard
-      AcpRuntimeWatchdogAnnouncementPolicy.shouldAnnounce(
-        state: state,
-        lastAnnouncement: lastWatchdogAnnouncement,
-        now: now
-      )
-    else {
-      return
+  private func applyWatchdogAnnouncementEffect(
+    _ effect: AcpRuntimeWatchdogAnnouncementEffect
+  ) {
+    switch effect {
+    case .none:
+      break
+    case .clear:
+      lastWatchdogAnnouncement = nil
+    case .seed(let announcement):
+      lastWatchdogAnnouncement = announcement
+    case .announce(let message, let announcement):
+      AccessibilityNotification.Announcement(message).post()
+      lastWatchdogAnnouncement = announcement
     }
-    AccessibilityNotification.Announcement(
-      AcpRuntimeWatchdogAnnouncementPolicy.message(agentName: agentName, state: state)
-    ).post()
-    lastWatchdogAnnouncement = AcpRuntimeWatchdogAnnouncement(state: state, announcedAt: now)
   }
 }
 
@@ -163,11 +167,64 @@ struct AcpRuntimeWatchdogAnnouncement: Equatable {
   let announcedAt: Date
 }
 
-enum AcpRuntimeWatchdogAnnouncementPolicy {
-  static func liveRegion(for state: String) -> HarnessMonitorAccessibilityLiveRegion {
-    isAssertive(state) ? .assertive : .polite
-  }
+struct AcpRuntimeWatchdogSignal: Equatable {
+  let runtimeID: String
+  let state: String
 
+  func announcement(at now: Date) -> AcpRuntimeWatchdogAnnouncement {
+    AcpRuntimeWatchdogAnnouncement(state: state, announcedAt: now)
+  }
+}
+
+enum AcpRuntimeWatchdogAnnouncementEffect: Equatable {
+  case none
+  case clear
+  case seed(AcpRuntimeWatchdogAnnouncement)
+  case announce(message: String, announcement: AcpRuntimeWatchdogAnnouncement)
+}
+
+enum AcpRuntimeWatchdogAnnouncementCoordinator {
+  static func effect(
+    from previousSignal: AcpRuntimeWatchdogSignal?,
+    to newSignal: AcpRuntimeWatchdogSignal?,
+    lastAnnouncement: AcpRuntimeWatchdogAnnouncement?,
+    agentName: String,
+    now: Date
+  ) -> AcpRuntimeWatchdogAnnouncementEffect {
+    guard let newSignal else {
+      return .clear
+    }
+
+    let announcement = newSignal.announcement(at: now)
+    guard let previousSignal else {
+      return .seed(announcement)
+    }
+    guard previousSignal.runtimeID == newSignal.runtimeID else {
+      return .seed(announcement)
+    }
+    guard previousSignal.state != newSignal.state else {
+      return .none
+    }
+    guard
+      AcpRuntimeWatchdogAnnouncementPolicy.shouldAnnounce(
+        state: newSignal.state,
+        lastAnnouncement: lastAnnouncement,
+        now: now
+      )
+    else {
+      return .none
+    }
+    return .announce(
+      message: AcpRuntimeWatchdogAnnouncementPolicy.message(
+        agentName: agentName,
+        state: newSignal.state
+      ),
+      announcement: announcement
+    )
+  }
+}
+
+enum AcpRuntimeWatchdogAnnouncementPolicy {
   static func label(for state: String) -> String {
     normalizedState(state)
       .split(separator: "_")
@@ -221,6 +278,8 @@ private struct AcpRuntimeChip: View {
   let value: String
   let systemImage: String
   let tint: Color
+  let accessibilityLabel: String
+  let accessibilityValue: String
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -241,6 +300,8 @@ private struct AcpRuntimeChip: View {
         .stroke(tint.opacity(0.25), lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
+    .accessibilityLabel(accessibilityLabel)
+    .accessibilityValue(accessibilityValue)
   }
 }
 
@@ -249,13 +310,17 @@ private struct AcpRuntimeDeadlineChip: View {
 
   var body: some View {
     TimelineView(.periodic(from: .now, by: 1)) { context in
-      AcpRuntimeChip(
-        title: "Prompt deadline",
-        value: countdownLabel(now: context.date),
-        systemImage: "timer",
-        tint: remainingSeconds(now: context.date) <= 10
-          ? HarnessMonitorTheme.caution : HarnessMonitorTheme.accent
-      )
+      if remainingSeconds(now: context.date) > 0 {
+        AcpRuntimeChip(
+          title: "Prompt deadline",
+          value: countdownLabel(now: context.date),
+          systemImage: "timer",
+          tint: remainingSeconds(now: context.date) <= 10
+            ? HarnessMonitorTheme.caution : HarnessMonitorTheme.accent,
+          accessibilityLabel: "Prompt deadline",
+          accessibilityValue: accessibilityCountdownLabel(now: context.date)
+        )
+      }
     }
   }
 
@@ -268,5 +333,13 @@ private struct AcpRuntimeDeadlineChip: View {
 
   private func remainingSeconds(now: Date) -> Int {
     max(0, Int(deadline.timeIntervalSince(now).rounded(.down)))
+  }
+
+  private func accessibilityCountdownLabel(now: Date) -> String {
+    let remaining = remainingSeconds(now: now)
+    if remaining == 1 {
+      return "1 second remaining"
+    }
+    return "\(remaining) seconds remaining"
   }
 }

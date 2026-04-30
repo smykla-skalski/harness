@@ -71,12 +71,17 @@ public final class HarnessMonitorStore {
       guard oldValue != selectedAcpAgents else { return }
     }
   }
-  public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] = [] {
+  var selectedAcpInspectState: AcpInspectSample? {
     didSet {
-      guard oldValue != selectedAcpInspectAgents else { return }
+      guard oldValue != selectedAcpInspectState else { return }
     }
   }
-  public var selectedAcpInspectObservedAt: Date?
+  public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] {
+    selectedAcpInspectState?.agents ?? []
+  }
+  public var selectedAcpInspectObservedAt: Date? {
+    selectedAcpInspectState?.sampledAt
+  }
   @ObservationIgnored var acpAgentDescriptorsByID: [String: AcpAgentDescriptor] = [:]
   var standaloneAcpPermissionBatches: [AcpPermissionBatch] = []
   public var presentingAcpPermissionBatch: AcpPermissionBatch?

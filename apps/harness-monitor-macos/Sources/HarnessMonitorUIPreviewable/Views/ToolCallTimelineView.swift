@@ -37,16 +37,10 @@ struct ToolCallTimelineView: View {
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolCallTimeline)
-    .onAppear {
-      logDuplicateToolCallIDs(presentation.duplicateToolCallIDs)
-    }
-    .onChange(of: presentation.duplicateToolCallIDs) { _, duplicateIDs in
-      logDuplicateToolCallIDs(duplicateIDs)
-    }
     .onChange(of: presentation.announcementStates) { oldValue, _ in
       announceToolCallStateChanges(
         from: oldValue,
-        rowsByID: presentation.rowsByID
+        rows: presentation.rows
       )
     }
   }
@@ -63,18 +57,13 @@ struct ToolCallTimelineView: View {
       .compactMap(ToolCallTimelineRow.init(entry:))
       .sorted(by: rowSortOrder)
     var rowsByID: [String: ToolCallTimelineRow] = [:]
-    var duplicateToolCallIDs: [String] = []
 
     for row in sortedRows {
       guard let existingRow = rowsByID[row.id] else {
         rowsByID[row.id] = row
         continue
       }
-      let mergeResult = existingRow.merging(row)
-      rowsByID[row.id] = mergeResult.row
-      if mergeResult.didDropDuplicate {
-        duplicateToolCallIDs.append(row.id)
-      }
+      rowsByID[row.id] = existingRow.merging(row)
     }
 
     let rows = rowsByID.values.sorted(by: reverseRowSortOrder)
@@ -90,8 +79,7 @@ struct ToolCallTimelineView: View {
     }
 
     return ToolCallTimelinePresentation(
-      sections: sections,
-      duplicateToolCallIDs: Array(Set(duplicateToolCallIDs)).sorted()
+      sections: sections
     )
   }
 
@@ -116,6 +104,12 @@ struct ToolCallTimelineView: View {
     if lhs.recordedAt != rhs.recordedAt {
       return lhs.recordedAt < rhs.recordedAt
     }
+    if let lhsSequence = lhs.sequence,
+      let rhsSequence = rhs.sequence,
+      lhsSequence != rhsSequence
+    {
+      return lhsSequence < rhsSequence
+    }
     return lhs.entryId < rhs.entryId
   }
 
@@ -126,40 +120,52 @@ struct ToolCallTimelineView: View {
     if lhs.recordedAt != rhs.recordedAt {
       return lhs.recordedAt > rhs.recordedAt
     }
+    if let lhsSequence = lhs.sequence,
+      let rhsSequence = rhs.sequence,
+      lhsSequence != rhsSequence
+    {
+      return lhsSequence > rhsSequence
+    }
     return lhs.entryId < rhs.entryId
+  }
+
+  static func orderedAnnouncementRows(
+    previousStates: [String: ToolCallTimelineRow.Status],
+    rows: [ToolCallTimelineRow],
+    verboseAnnouncements: Bool
+  ) -> [ToolCallTimelineRow] {
+    guard !previousStates.isEmpty else {
+      return []
+    }
+    let currentIDs = Set(rows.map(\.id))
+    guard !currentIDs.isDisjoint(with: Set(previousStates.keys)) else {
+      return []
+    }
+    return rows.filter { row in
+      shouldAnnounceToolCallStatusChange(
+        previousStatus: previousStates[row.id],
+        row: row,
+        verboseAnnouncements: verboseAnnouncements
+      )
+    }
   }
 
   private func announceToolCallStateChanges(
     from oldValue: [String: ToolCallTimelineRow.Status],
-    rowsByID: [String: ToolCallTimelineRow]
+    rows: [ToolCallTimelineRow]
   ) {
-    for rowID in rowsByID.keys.sorted() {
-      guard
-        let row = rowsByID[rowID],
-        Self.shouldAnnounceToolCallStatusChange(
-          previousStatus: oldValue[rowID],
-          row: row,
-          verboseAnnouncements: verboseToolCallAnnouncements
-        )
-      else {
-        continue
-      }
+    for row in Self.orderedAnnouncementRows(
+      previousStates: oldValue,
+      rows: rows,
+      verboseAnnouncements: verboseToolCallAnnouncements
+    ) {
       AccessibilityNotification.Announcement(row.announcementText).post()
-    }
-  }
-
-  private func logDuplicateToolCallIDs(_ duplicateIDs: [String]) {
-    for duplicateID in duplicateIDs {
-      HarnessMonitorLogger.store.warning(
-        "Dropping duplicate tool call id \(duplicateID, privacy: .public) from timeline presentation"
-      )
     }
   }
 }
 
 struct ToolCallTimelinePresentation: Equatable {
   let sections: [ToolCallTimelineSection]
-  let duplicateToolCallIDs: [String]
 
   var rows: [ToolCallTimelineRow] {
     sections.flatMap(\.rows)
@@ -249,7 +255,7 @@ struct ToolCallTimelineRowView: View {
   let row: ToolCallTimelineRow
 
   var body: some View {
-    let content = HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: row.symbolName)
         .foregroundStyle(row.tint)
         .accessibilityHidden(true)
@@ -268,12 +274,6 @@ struct ToolCallTimelineRowView: View {
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityValue(row.accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolCallTimelineRow(row.id))
-
-    if let liveRegion = row.liveRegion {
-      content.accessibilityLiveRegion(liveRegion)
-    } else {
-      content
-    }
   }
 }
 
@@ -281,6 +281,7 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
   let id: String
   let entryId: String
   let recordedAt: String
+  let sequence: UInt64?
   let title: String
   let detail: String
   let status: Status
@@ -315,6 +316,7 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
     self.id = id
     entryId = entry.entryId
     recordedAt = entry.recordedAt
+    sequence = payloadMetadata?.sequence
     self.title = title
     detail = entry.summary
     self.status = status
@@ -322,10 +324,6 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
     agentDisplayName = payloadMetadata?.agentDisplayName
     capabilityTags = payloadMetadata?.capabilityTags ?? []
     stopReason = payloadMetadata?.stopReason
-  }
-
-  var liveRegion: HarnessMonitorAccessibilityLiveRegion? {
-    stopReason == nil ? nil : .polite
   }
 
   var symbolName: String {
@@ -380,17 +378,11 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
     }
   }
 
-  func merging(_ newer: Self) -> ToolCallTimelineMergeResult {
+  func merging(_ newer: Self) -> Self {
     guard status == newer.status else {
-      return ToolCallTimelineMergeResult(
-        row: newer.status.isTerminal ? newer : self,
-        didDropDuplicate: false
-      )
+      return newer.status.isTerminal ? newer : self
     }
-    return ToolCallTimelineMergeResult(
-      row: newer.preferredDuplicate(over: self),
-      didDropDuplicate: true
-    )
+    return newer.preferredDuplicate(over: self)
   }
 
   private func preferredDuplicate(over older: Self) -> Self {
@@ -411,6 +403,7 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
       acpAgentID: metadata.stringValue(for: "acp_agent_id"),
       agentDisplayName: metadata.stringValue(for: "agent_display_name"),
       capabilityTags: metadata.arrayStringValues(for: "capability_tags"),
+      sequence: metadata.uint64Value(for: "sequence"),
       stopReason: metadata.stringValue(for: "stop_reason")
     )
   }
@@ -488,13 +481,9 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
     let acpAgentID: String?
     let agentDisplayName: String?
     let capabilityTags: [String]
+    let sequence: UInt64?
     let stopReason: String?
   }
-}
-
-struct ToolCallTimelineMergeResult: Equatable {
-  let row: ToolCallTimelineRow
-  let didDropDuplicate: Bool
 }
 
 extension [String: JSONValue] {
@@ -522,5 +511,12 @@ extension [String: JSONValue] {
       }
       return value
     }
+  }
+
+  fileprivate func uint64Value(for key: String) -> UInt64? {
+    guard case .number(let value)? = self[key], value >= 0 else {
+      return nil
+    }
+    return UInt64(value)
   }
 }

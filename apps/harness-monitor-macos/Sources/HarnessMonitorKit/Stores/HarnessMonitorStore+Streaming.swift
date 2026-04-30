@@ -275,7 +275,11 @@ extension HarnessMonitorStore {
       guard let sessionID = event.sessionId else {
         return false
       }
-      replaceAcpInspect(response, sessionID: sessionID)
+      replaceAcpInspect(
+        response,
+        sessionID: sessionID,
+        sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
+      )
     case .acpAgentsReconciled(let payload):
       replaceAcpAgents(payload)
     case .acpEvents(let payload):
