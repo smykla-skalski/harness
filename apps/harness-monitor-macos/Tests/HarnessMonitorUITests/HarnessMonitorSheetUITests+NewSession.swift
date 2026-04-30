@@ -48,10 +48,10 @@ extension HarnessMonitorSheetUITests {
       "New Session should render the shared capability row experience"
     )
     XCTAssertTrue(
-      app.staticTexts["Selected leader"].firstMatch.waitForExistence(
+      app.staticTexts["Start with"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
       ),
-      "New Session should keep the selected leader summary inline"
+      "New Session should keep leader selection in the primary inline form flow"
     )
     let providerDetailsLabel = app.staticTexts["Provider details"].firstMatch
     if providerDetailsLabel.waitForExistence(timeout: Self.fastActionTimeout) {
@@ -111,10 +111,10 @@ extension HarnessMonitorSheetUITests {
     )
 
     XCTAssertTrue(
-      app.staticTexts["Selected leader"].firstMatch.waitForExistence(
+      app.staticTexts["Start with"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
       ),
-      "The redesigned sheet should show the inline leader summary before capturing council preview"
+      "The redesigned sheet should show the inline leader selection section before capturing council preview"
     )
     recordDiagnosticsSnapshot(in: app, named: "new-session-sheet")
   }
