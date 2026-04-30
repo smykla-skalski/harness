@@ -27,15 +27,38 @@ struct SessionTaskListSection: View {
     return "taskCount=\(tasks.count), taskIDs=\(taskIDs)"
   }
 
+  private var areSessionActionsAvailable: Bool {
+    store.areSelectedSessionActionsAvailable
+  }
+
+  private var unavailableActionHelp: String {
+    store.selectedSessionActionUnavailableMessage ?? ""
+  }
+
+  private var newTaskHelp: String {
+    if unavailableActionHelp.isEmpty {
+      "Create a new task in this session (⌘T)"
+    } else {
+      unavailableActionHelp
+    }
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.sessionTaskListState,
         text: taskStateMarkerText
       )
-      Text("Tasks")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
+        Text("Tasks")
+          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+        newTaskButton
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskListHeader)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionTaskListHeaderFrame)
       if tasks.isEmpty {
         SessionCockpitEmptyStateRow(section: .tasks)
       } else {
@@ -53,6 +76,18 @@ struct SessionTaskListSection: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+
+  private var newTaskButton: some View {
+    HarnessMonitorActionButton(
+      title: "New Task",
+      variant: .bordered,
+      accessibilityIdentifier: HarnessMonitorAccessibility.sessionTaskCreateOpenButton
+    ) {
+      store.requestCreateTaskSheet()
+    }
+    .help(newTaskHelp)
+    .disabled(!areSessionActionsAvailable)
   }
 }
 

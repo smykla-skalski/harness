@@ -4,11 +4,9 @@ import SwiftUI
 struct SessionCockpitHeaderCard: View {
   let store: HarnessMonitorStore
   let detail: SessionDetail
-  let isSessionReadOnly: Bool
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
   let inspectObserver: () -> Void
-  let createTask: () -> Void
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -30,14 +28,6 @@ struct SessionCockpitHeaderCard: View {
 
   private var unavailableActionHelp: String {
     store.selectedSessionActionUnavailableMessage ?? ""
-  }
-
-  private var newTaskHelp: String {
-    if unavailableActionHelp.isEmpty {
-      "Create a new task in this session (⌘T)"
-    } else {
-      unavailableActionHelp
-    }
   }
 
   private var awaitingLeaderMessage: String? {
@@ -88,7 +78,6 @@ struct SessionCockpitHeaderCard: View {
         Spacer()
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            newTaskButton
             observeButton
             if detail.agents.count > 1 {
               transferLeadershipButton
@@ -117,16 +106,6 @@ struct SessionCockpitHeaderCard: View {
     .animation(.spring(duration: 0.3), value: supplementalSummaryVisibility)
     .accessibilityTestProbe(HarnessMonitorAccessibility.sessionHeaderCard)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionHeaderCardFrame)
-  }
-
-  private var newTaskButton: some View {
-    Button("New Task") {
-      createTask()
-    }
-    .harnessActionButtonStyle(variant: .bordered)
-    .help(newTaskHelp)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.createTaskOpenButton)
-    .disabled(!areSessionActionsAvailable || isSessionReadOnly)
   }
 
   private var observeButton: some View {
@@ -298,11 +277,9 @@ private func sessionLeaderAndActivityLine(
   SessionCockpitHeaderCard(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     detail: PreviewFixtures.detail,
-    isSessionReadOnly: false,
     observeSelectedSession: {},
     requestEndSessionConfirmation: {},
-    inspectObserver: {},
-    createTask: {}
+    inspectObserver: {}
   )
   .padding()
   .frame(width: 960)

@@ -61,14 +61,14 @@ extension RetiredInspectorEntryPointsUITests {
   }
 
   fileprivate func verifyCreateTaskSheet(in app: XCUIApplication) {
-    let newTaskButton = button(in: app, identifier: Accessibility.createTaskOpenButton)
+    let newTaskButton = button(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         newTaskButton.exists && !newTaskButton.frame.isEmpty
       },
-      "Session header should expose a New Task button"
+      "Tasks section should expose a New Task button"
     )
-    tapButton(in: app, identifier: Accessibility.createTaskOpenButton)
+    tapButton(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
 
     let sheet = element(in: app, identifier: Accessibility.createTaskSheet)
     XCTAssertTrue(
