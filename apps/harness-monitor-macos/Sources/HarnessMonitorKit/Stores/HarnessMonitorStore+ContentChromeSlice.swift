@@ -7,6 +7,7 @@ extension HarnessMonitorStore {
     public var persistenceError: String?
     public var sessionDataAvailability: SessionDataAvailability = .live
     public var sessionStatus: SessionStatus?
+    public var acpBridgeBanner: AcpBridgeBannerState?
 
     public init() {}
 
@@ -19,6 +20,9 @@ extension HarnessMonitorStore {
       }
       if sessionStatus != state.sessionStatus {
         sessionStatus = state.sessionStatus
+      }
+      if acpBridgeBanner != state.acpBridgeBanner {
+        acpBridgeBanner = state.acpBridgeBanner
       }
     }
   }

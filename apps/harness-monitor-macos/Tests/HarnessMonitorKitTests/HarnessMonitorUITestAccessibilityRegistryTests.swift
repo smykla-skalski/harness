@@ -132,6 +132,27 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("ACP bridge banner identifiers match UI-test mirror")
+  func acpBridgeBannerIdentifiersMirror() throws {
+    #expect(
+      HarnessMonitorAccessibility.contentAcpBridgeBanner
+        == "harness.content.acp-bridge.banner"
+    )
+    #expect(
+      HarnessMonitorAccessibility.contentAcpBridgeOpenLogButton
+        == "harness.content.acp-bridge.open-log"
+    )
+    #expect(
+      HarnessMonitorAccessibility.contentAcpBridgeRunDoctorButton
+        == "harness.content.acp-bridge.run-doctor"
+    )
+
+    let contentBridges = try sourceFile(named: "ContentView+Bridges.swift")
+    #expect(contentBridges.contains("contentAcpBridgeBanner"))
+    #expect(contentBridges.contains("contentAcpBridgeOpenLogButton"))
+    #expect(contentBridges.contains("contentAcpBridgeRunDoctorButton"))
+  }
+
   @Test("New session capability identifiers match UI-test mirror")
   func newSessionCapabilityIdentifiersMirror() {
     #expect(

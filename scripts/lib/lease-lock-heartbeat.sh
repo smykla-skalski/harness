@@ -32,10 +32,23 @@ sleep_pid=""
 
 atomic_write_file() {
   local target_path="$1"
+  local target_dir
   local temp_path
+  target_dir="$(dirname "$target_path")"
+  [[ -d "$target_dir" && -e "$metadata_file" ]] || return 1
   temp_path="${target_path}.tmp.$$"
-  cat >"$temp_path"
-  mv -f "$temp_path" "$target_path"
+  if ! cat >"$temp_path" 2>/dev/null; then
+    rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
+  if [[ ! -d "$target_dir" || ! -e "$metadata_file" ]]; then
+    rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
+  if ! mv -f "$temp_path" "$target_path" 2>/dev/null; then
+    rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
 }
 
 cleanup() {
@@ -57,10 +70,13 @@ while kill -0 "$target_pid" 2>/dev/null; do
 
   now_epoch="$(date +%s)"
   next_due_epoch="$((now_epoch + heartbeat_seconds))"
-  atomic_write_file "$heartbeat_file" <<EOF
+  if ! atomic_write_file "$heartbeat_file" <<EOF
 $now_epoch
 EOF
-  atomic_write_file "$metadata_file" <<EOF
+  then
+    exit 0
+  fi
+  if ! atomic_write_file "$metadata_file" <<EOF
 LOCK_PROTOCOL_VERSION=1
 LOCK_RESOURCE=${resource}
 LOCK_ROLE=${role}
@@ -80,4 +96,7 @@ LOCK_LAST_HEARTBEAT_EPOCH=${now_epoch}
 LOCK_NEXT_HEARTBEAT_DUE_EPOCH=${next_due_epoch}
 LOCK_STATE=${state}
 EOF
+  then
+    exit 0
+  fi
 done

@@ -8,7 +8,25 @@ struct DecisionRow: View {
   let decision: Decision
   let isSelected: Bool
   let fontScale: CGFloat
+  let acpPayload: AcpPermissionDecisionPayload?
+  let lastMessageAt: Date?
   let select: () -> Void
+
+  init(
+    decision: Decision,
+    isSelected: Bool,
+    fontScale: CGFloat,
+    acpPayload: AcpPermissionDecisionPayload? = nil,
+    lastMessageAt: Date? = nil,
+    select: @escaping () -> Void
+  ) {
+    self.decision = decision
+    self.isSelected = isSelected
+    self.fontScale = fontScale
+    self.acpPayload = acpPayload
+    self.lastMessageAt = lastMessageAt
+    self.select = select
+  }
 
   @MainActor private static let ageFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
@@ -43,8 +61,26 @@ struct DecisionRow: View {
     return parts.joined(separator: " · ")
   }
 
+  @ViewBuilder
   var body: some View {
-    Button(action: select) {
+    if acpPayload?.expiresAtDate != nil {
+      TimelineView(.periodic(from: .now, by: 1)) { context in
+        rowButton(referenceDate: context.date)
+      }
+    } else {
+      rowButton(referenceDate: .now)
+    }
+  }
+
+  private func rowButton(
+    referenceDate: Date
+  ) -> some View {
+    let deadlineStatus = acpPayload?.deadlineStatus(
+      now: referenceDate,
+      lastMessageAt: lastMessageAt
+    )
+
+    return Button(action: select) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
         Circle()
           .fill(severity.chipColor)
@@ -65,6 +101,15 @@ struct DecisionRow: View {
             .scaledFont(.caption.monospaced())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
+          if let acpPayload {
+            AcpPermissionDeadlineStatusView(
+              payload: acpPayload,
+              lastMessageAt: lastMessageAt,
+              style: .row,
+              accessibilityIdentifier: HarnessMonitorAccessibility.decisionDeadline(decision.id),
+              referenceDate: referenceDate
+            )
+          }
         }
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
@@ -79,11 +124,29 @@ struct DecisionRow: View {
     }
     .harnessDismissButtonStyle()
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(
-      "\(severity.chipLabel). \(decision.summary). \(metaLine)"
-    )
+    .accessibilityLabel(accessibilityLabelText(deadlineStatus: deadlineStatus))
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
-    .accessibilityValue(isSelected ? "selected" : "not selected")
+    .accessibilityValue(accessibilityValueText(deadlineStatus: deadlineStatus))
+  }
+
+  private func accessibilityLabelText(
+    deadlineStatus: AcpPermissionDeadlineStatus?
+  ) -> String {
+    var parts = ["\(severity.chipLabel). \(decision.summary). \(metaLine)"]
+    if let deadlineStatus {
+      parts.append(deadlineStatus.label)
+    }
+    return parts.joined(separator: ". ")
+  }
+
+  private func accessibilityValueText(
+    deadlineStatus: AcpPermissionDeadlineStatus?
+  ) -> String {
+    var parts = [isSelected ? "selected" : "not selected"]
+    if let deadlineStatus {
+      parts.append(deadlineStatus.accessibilityValue)
+    }
+    return parts.joined(separator: ", ")
   }
 
   private var freshPill: some View {

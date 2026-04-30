@@ -194,6 +194,18 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(store.codexUnavailable == true)
+    #expect(store.acpBridgeHTTPIncident?.retryCount == 1)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 1)
+    #expect(
+      store.contentUI.chrome.acpBridgeBanner?.factText.contains(
+        "Daemon process not responding to ACP HTTP since "
+      ) == true
+    )
+    #expect(store.contentUI.chrome.acpBridgeBanner?.factText.contains("1 retries") == true)
+    #expect(
+      AcpBridgeBannerState.blastRadiusText
+        == "ACP sessions cannot make tool calls; existing TUI agents unaffected"
+    )
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 
@@ -248,6 +260,8 @@ struct HarnessMonitorStoreCodexTests {
         ]
     )
     #expect(store.codexUnavailable == false)
+    #expect(store.acpBridgeHTTPIncident == nil)
+    #expect(store.contentUI.chrome.acpBridgeBanner == nil)
     #expect(store.daemonStatus?.manifest?.hostBridge.running == true)
     #expect(store.daemonStatus?.manifest?.hostBridge.capabilities["codex"]?.healthy == true)
     #expect(store.currentSuccessFeedbackMessage == "Codex run started")
@@ -304,6 +318,8 @@ struct HarnessMonitorStoreCodexTests {
         ]
     )
     #expect(store.codexUnavailable == true)
+    #expect(store.acpBridgeHTTPIncident?.retryCount == 0)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .unavailable)
     #expect(
       store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
@@ -322,6 +338,8 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(store.codexUnavailable == false)
+    #expect(store.acpBridgeHTTPIncident == nil)
+    #expect(store.contentUI.chrome.acpBridgeBanner == nil)
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 

@@ -284,6 +284,52 @@ extension HarnessMonitorStore {
     )
   }
 
+  func endSession(
+    sessionID: String,
+    actorID: String
+  ) async -> Bool {
+    let actionName = "End session"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    return await mutateSelectedSession(
+      actionName: actionName,
+      actionID: ActionID.endSession(sessionID: sessionID).key,
+      using: action.client,
+      sessionID: sessionID,
+      mutation: {
+        try await action.client.endSession(
+          sessionID: sessionID,
+          request: SessionEndRequest(actor: actorID)
+        )
+      }
+    )
+  }
+
+  func removeAgent(
+    sessionID: String,
+    agentID: String,
+    actorID: String
+  ) async -> Bool {
+    let actionName = "Remove agent"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    return await mutateSelectedSession(
+      actionName: actionName,
+      actionID: ActionID.removeAgent(sessionID: sessionID, agentID: agentID).key,
+      using: action.client,
+      sessionID: sessionID,
+      mutation: {
+        try await action.client.removeAgent(
+          sessionID: sessionID,
+          agentID: agentID,
+          request: AgentRemoveRequest(actor: actorID)
+        )
+      }
+    )
+  }
+
   public func requestRemoveAgentConfirmation(agentID: String) {
     let actionName = "Remove agent"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return }
@@ -397,6 +443,7 @@ extension HarnessMonitorStore {
           detail: detail,
           timeline: timeline,
           timelineWindow: timelineWindow,
+          clearBurstState: false,
           showingCachedData: isShowingCachedData,
           cancelPendingTimelineRefresh: false
         )

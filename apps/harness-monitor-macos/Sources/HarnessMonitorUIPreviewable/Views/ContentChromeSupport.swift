@@ -25,13 +25,9 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
         titleVisibility: .visible
       ) {
         switch shellUI.pendingConfirmation {
-        case .endSession(_, let actorID):
-          Button("End Session Now", role: .destructive) {
-            Task { await store.endSelectedSession(actor: actorID) }
-          }
-        case .removeAgent(_, let agentID, let actorID):
-          Button("Remove Agent Now", role: .destructive) {
-            Task { await store.removeAgent(agentID: agentID, actor: actorID) }
+        case .endSession, .removeAgent, .interruptCodexRun:
+          Button(confirmButtonTitle, role: .destructive) {
+            Task { await store.confirmPendingAction() }
           }
         case nil:
           EmptyView()
@@ -50,16 +46,32 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
     switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
     case .removeAgent: "Remove Agent?"
+    case .interruptCodexRun: "Interrupt Whole Run?"
     case nil: ""
+    }
+  }
+
+  private var confirmButtonTitle: String {
+    switch shellUI.pendingConfirmation {
+    case .endSession:
+      "End Session Now"
+    case .removeAgent:
+      "Remove Agent Now"
+    case .interruptCodexRun:
+      "Interrupt Whole Run Now"
+    case nil:
+      ""
     }
   }
 
   private var message: String {
     switch shellUI.pendingConfirmation {
-    case .endSession(let sessionID, let actorID):
-      "This ends \(sessionID) using \(actorID). Active task work must already be closed."
-    case .removeAgent(_, let agentID, let actorID):
-      "This removes \(agentID) using \(actorID) and returns any active work to the queue."
+    case .endSession(let sessionID, _):
+      "This ends \(store.confirmationSessionSubject(sessionID: sessionID)). Active task work must already be closed."
+    case .removeAgent(let sessionID, let agentID, _):
+      "This removes \(store.confirmationAgentSubject(sessionID: sessionID, agentID: agentID)) and returns any active work to the queue."
+    case .interruptCodexRun(_, _, let runTitle):
+      "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately."
     case nil:
       ""
     }

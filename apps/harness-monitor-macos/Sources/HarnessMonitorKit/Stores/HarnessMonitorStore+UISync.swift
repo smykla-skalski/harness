@@ -199,7 +199,8 @@ extension HarnessMonitorStore {
       ContentChromeState(
         persistenceError: persistenceError,
         sessionDataAvailability: sessionDataAvailability,
-        sessionStatus: selectedDetail?.session.status
+        sessionStatus: selectedDetail?.session.status,
+        acpBridgeBanner: acpBridgeBannerState
       )
     )
   }

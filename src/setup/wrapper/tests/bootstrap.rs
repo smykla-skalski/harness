@@ -84,8 +84,12 @@ fn assert_written_paths(written: &[PathBuf], expected: &[&Path]) {
 #[test]
 fn planned_agent_bootstrap_files_omit_codex_project_config() {
     let dir = tempfile::tempdir().unwrap();
-    let planned =
-        planned_agent_bootstrap_files(dir.path(), HookAgent::Codex, &[], RuntimeHookFlags::default());
+    let planned = planned_agent_bootstrap_files(
+        dir.path(),
+        HookAgent::Codex,
+        &[],
+        RuntimeHookFlags::default(),
+    );
 
     assert!(planned.is_empty());
 }

@@ -23,6 +23,7 @@ struct WebSocketProtocolAcpTests {
           "acp_id": "acp-1",
           "session_id": "session-1",
           "created_at": "2026-04-28T00:00:00Z",
+          "expires_at": "2026-04-28T00:05:00Z",
           "requests": [
             {
               "request_id": "request-1",
@@ -41,6 +42,7 @@ struct WebSocketProtocolAcpTests {
       return
     }
     #expect(batch.batchId == "batch-1")
+    #expect(batch.expiresAt == "2026-04-28T00:05:00Z")
     #expect(batch.requests.first?.requestId == "request-1")
   }
 
@@ -56,17 +58,20 @@ struct WebSocketProtocolAcpTests {
           "acp_id": "acp-1",
           "session_id": "session-1",
           "created_at": "2026-04-28T00:00:00Z",
+          "expires_at": "2026-04-28T00:05:00Z",
           "requests": []
         }
       }
       """
     let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
     let event = try DaemonPushEvent(streamEvent: streamEvent)
-    guard case .acpPermissionBatchRemoved(let batch) = event.kind else {
+    guard case .acpPermissionBatchRemoved(let removal) = event.kind else {
       Issue.record("Expected ACP permission removal, got \(event.kind)")
       return
     }
-    #expect(batch.batchId == "batch-1")
+    #expect(removal.batch.batchId == "batch-1")
+    #expect(removal.batch.expiresAt == "2026-04-28T00:05:00Z")
+    #expect(removal.reason == .timeout)
   }
 
   @Test("Daemon push event decodes ACP events into timeline entries")

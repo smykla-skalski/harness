@@ -42,8 +42,7 @@ extension HarnessMonitorStore {
       // flip the cockpit back to the dashboard mid-switch whenever a global
       // sessionsUpdated event lands for the newly selected session.
       selectedSession = nil
-      timeline = []
-      timelineWindow = nil
+      clearSelectedTimelineSnapshot()
       isSelectionLoading = true
       applySessionSummaryUpdate(summary)
       synchronizeActionActor()

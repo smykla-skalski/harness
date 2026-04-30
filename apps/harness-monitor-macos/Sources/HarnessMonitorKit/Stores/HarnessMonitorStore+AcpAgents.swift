@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 private enum AcpAgentSnapshotLookupResult {
   case none
@@ -383,21 +384,24 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
+    let entries = payload.timelineEntries(
+      fallbackRecordedAt: recordedAt,
+      toolCallMetadata: acpToolCallTimelineMetadata(for: payload)
+    )
+    let visibleToolCallCount = Set(
+      entries.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
+    ).count
     toolCallTimelineOverflowNotice =
       if payload.rawCount > payload.events.count {
         ToolCallTimelineOverflowNotice(
           sessionID: payload.sessionId,
           rawUpdateCount: payload.rawCount,
-          displayedEventCount: payload.events.count,
+          displayedEventCount: visibleToolCallCount,
           recordedAt: recordedAt
         )
       } else {
         nil
       }
-    let entries = payload.timelineEntries(
-      fallbackRecordedAt: recordedAt,
-      toolCallMetadata: acpToolCallTimelineMetadata(for: payload)
-    )
     liveToolCallAnnouncementRowIDs = Set(
       entries.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
     )
@@ -530,7 +534,17 @@ extension HarnessMonitorStore {
     reconcileAcpPermissionDecisions()
   }
 
-  func removeAcpPermissionBatch(_ batch: AcpPermissionBatch) {
+  func removeAcpPermissionBatch(
+    _ batch: AcpPermissionBatch,
+    reason: AcpPermissionBatchRemovalReason = .resolved
+  ) {
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+    if reason == .timeout {
+      acpPermissionPendingDeadlineResolutionDecisionIDs.insert(decisionID)
+      scheduleAcpPermissionDeadlineResolution(for: batch, decisionID: decisionID)
+    } else {
+      acpPermissionPendingDeadlineResolutionDecisionIDs.remove(decisionID)
+    }
     standaloneAcpPermissionBatches.removeAll { $0.batchId == batch.batchId }
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
       guard snapshot.acpId == batch.acpId else { return snapshot }
@@ -542,6 +556,11 @@ extension HarnessMonitorStore {
     }
     reconcilePresentedAcpPermissionBatch()
     reconcileAcpPermissionDecisions()
+    let protectedDecisionIDs: Set<String> = reason == .timeout ? [decisionID] : []
+    scheduleAcpPermissionDecisionSync(
+      staleDecisionIDs: [decisionID],
+      protectedDecisionIDs: protectedDecisionIDs
+    )
   }
 
   func resetSelectedAcpAgents() {
@@ -554,6 +573,7 @@ extension HarnessMonitorStore {
     resolvingAcpPermissionBatchID = nil
     acpPermissionDecisionPayloadsByDecisionID = [:]
     acpPermissionResolutionStateByDecisionID = [:]
+    acpPermissionPendingDeadlineResolutionDecisionIDs = []
     acpPermissionDecisionSyncTask?.cancel()
     acpPermissionDecisionSyncTask = nil
   }
@@ -921,7 +941,10 @@ extension HarnessMonitorStore {
     acpPermissionResolutionStateByDecisionID.removeValue(forKey: decisionID)
   }
 
-  private func scheduleAcpPermissionDecisionSync(staleDecisionIDs: Set<String>) {
+  private func scheduleAcpPermissionDecisionSync(
+    staleDecisionIDs: Set<String>,
+    protectedDecisionIDs: Set<String> = []
+  ) {
     acpPermissionDecisionSyncTask?.cancel()
     guard let decisionStore = supervisorDecisionStore else {
       return
@@ -976,6 +999,8 @@ extension HarnessMonitorStore {
       )
       .subtracting(activeDecisionIDs)
       .union(staleDecisionIDs)
+      .subtracting(protectedDecisionIDs)
+      .subtracting(self.acpPermissionPendingDeadlineResolutionDecisionIDs)
       for decisionID in staleACPDecisionIDs.sorted() {
         guard !Task.isCancelled else {
           return
@@ -987,6 +1012,109 @@ extension HarnessMonitorStore {
         }
       }
     }
+  }
+
+  private func scheduleAcpPermissionDeadlineResolution(
+    for batch: AcpPermissionBatch,
+    decisionID: String
+  ) {
+    Task { @MainActor in
+      guard let decisionStore = self.supervisorDecisionStore else {
+        self.acpPermissionPendingDeadlineResolutionDecisionIDs.remove(decisionID)
+        return
+      }
+
+      do {
+        guard let decision = try await decisionStore.decision(id: decisionID) else {
+          self.acpPermissionPendingDeadlineResolutionDecisionIDs.remove(decisionID)
+          return
+        }
+        try await decisionStore.resolve(
+          id: decisionID,
+          outcome: DecisionOutcome(
+            chosenActionID: nil,
+            note: "client_deadline_exceeded"
+          )
+        )
+        appendAcpPermissionDeadlineAudit(
+          for: batch,
+          decisionID: decisionID,
+          agentID: decision.agentID
+        )
+        supervisorDecisionRefreshTick &+= 1
+      } catch {
+        reportAcpPermissionDecisionStoreFailure(
+          operation: "timeout-resolve",
+          decisionID: decisionID,
+          error: error
+        )
+        acpPermissionPendingDeadlineResolutionDecisionIDs.remove(decisionID)
+        scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+        return
+      }
+
+      acpPermissionPendingDeadlineResolutionDecisionIDs.remove(decisionID)
+    }
+  }
+
+  private func appendAcpPermissionDeadlineAudit(
+    for batch: AcpPermissionBatch,
+    decisionID: String,
+    agentID: String?
+  ) {
+    guard let container = modelContext?.container else {
+      return
+    }
+
+    let context = ModelContext(container)
+    context.autosaveEnabled = false
+    context.insert(
+      SupervisorEvent(
+        id: UUID().uuidString,
+        tickID: "acp-timeout-\(batch.batchId)",
+        kind: "acp_permission_deadline_expired",
+        ruleID: AcpPermissionDecisionPayload.ruleID,
+        severity: .warn,
+        payloadJSON: encodeAcpPermissionDeadlineAuditPayload(
+          decisionID: decisionID,
+          batchID: batch.batchId,
+          sessionID: batch.sessionId,
+          agentID: agentID,
+          managedAgentID: batch.acpId
+        )
+      )
+    )
+    do {
+      try context.save()
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.audit_append_failed error=\(String(describing: error))"
+      )
+    }
+  }
+
+  private func encodeAcpPermissionDeadlineAuditPayload(
+    decisionID: String,
+    batchID: String,
+    sessionID: String,
+    agentID: String?,
+    managedAgentID: String
+  ) -> String {
+    let payload = AcpPermissionDeadlineAuditPayload(
+      decisionID: decisionID,
+      batchID: batchID,
+      sessionID: sessionID,
+      agentID: agentID,
+      managedAgentID: managedAgentID,
+      reason: "client_deadline_exceeded"
+    )
+    guard
+      let data = try? JSONEncoder().encode(payload),
+      let json = String(data: data, encoding: .utf8)
+    else {
+      return #"{"reason":"client_deadline_exceeded"}"#
+    }
+    return json
   }
 
   private func reportAcpPermissionDecisionStoreFailure(
@@ -1070,6 +1198,15 @@ extension HarnessMonitorStore {
       )
     }
   }
+}
+
+private struct AcpPermissionDeadlineAuditPayload: Encodable {
+  let decisionID: String
+  let batchID: String
+  let sessionID: String
+  let agentID: String?
+  let managedAgentID: String
+  let reason: String
 }
 
 private struct AcpToolCallPhaseKey: Hashable {

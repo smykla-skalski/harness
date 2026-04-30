@@ -45,6 +45,12 @@ public final class HarnessMonitorStore {
   }
   public var pendingAgentsWindowSelection: AgentTuiSheetSelection?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
+  public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
+    didSet {
+      guard oldValue != acpBridgeHTTPIncident else { return }
+      scheduleUISync([.contentChrome])
+    }
+  }
   @ObservationIgnored var forcedHostBridgeCapabilities: Set<String> = []
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {
@@ -82,6 +88,8 @@ public final class HarnessMonitorStore {
   public var selectedAcpInspectObservedAt: Date? {
     selectedAcpInspectState?.sampledAt
   }
+  public var liveToolCallAnnouncementRowIDs: Set<String> = []
+  public var toolCallTimelineOverflowNotice: ToolCallTimelineOverflowNotice?
   @ObservationIgnored var acpAgentDescriptorsByID: [String: AcpAgentDescriptor] = [:]
   var standaloneAcpPermissionBatches: [AcpPermissionBatch] = []
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
@@ -90,6 +98,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpPermissionDecisionPayloadsByDecisionID:
     [String: AcpPermissionDecisionPayload] =
       [:]
+  @ObservationIgnored var acpPermissionPendingDeadlineResolutionDecisionIDs: Set<String> = []
   @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }

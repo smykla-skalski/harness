@@ -6,7 +6,6 @@ struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
   let liveAnnouncementRowIDs: Set<String>
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
-  let stopSession: () -> Void
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsKey
@@ -17,13 +16,11 @@ struct ToolCallTimelineView: View {
   init(
     entries: [TimelineEntry],
     liveAnnouncementRowIDs: Set<String> = [],
-    overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice? = nil,
-    stopSession: @escaping () -> Void
+    overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice? = nil
   ) {
     self.entries = entries
     self.liveAnnouncementRowIDs = liveAnnouncementRowIDs
     self.overflowNotice = overflowNotice
-    self.stopSession = stopSession
   }
 
   private var presentation: ToolCallTimelinePresentation {
@@ -37,6 +34,23 @@ struct ToolCallTimelineView: View {
     )
   }
 
+  private var visibleOverflowToolCallCount: Int {
+    presentation.rows.filter { liveAnnouncementRowIDs.contains($0.id) }.count
+  }
+
+  private var overflowAnnouncement: ToolCallTimelineOverflowAnnouncement? {
+    guard let overflowNotice else {
+      return nil
+    }
+    return ToolCallTimelineOverflowAnnouncement(
+      id: overflowNotice.recordedAt,
+      text: Self.overflowNoticeText(
+        rawUpdateCount: overflowNotice.rawUpdateCount,
+        visibleToolCallCount: max(overflowNotice.displayedEventCount, visibleOverflowToolCallCount)
+      )
+    )
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack {
@@ -44,13 +58,12 @@ struct ToolCallTimelineView: View {
           .scaledFont(.headline)
           .accessibilityAddTraits(.isHeader)
         Spacer()
-        Button(role: .destructive, action: stopSession) {
-          Label("Interrupt run", systemImage: "stop.fill")
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
       }
       if let overflowNotice {
-        ToolCallTimelineOverflowNoticeView(notice: overflowNotice)
+        ToolCallTimelineOverflowNoticeView(
+          rawUpdateCount: overflowNotice.rawUpdateCount,
+          visibleToolCallCount: max(overflowNotice.displayedEventCount, visibleOverflowToolCallCount)
+        )
       }
       if presentation.rows.isEmpty {
         Text("No tool calls yet.")
@@ -72,6 +85,12 @@ struct ToolCallTimelineView: View {
         from: oldValue,
         to: newValue
       )
+    }
+    .onChange(of: overflowAnnouncement) { oldValue, newValue in
+      guard let newValue, newValue != oldValue else {
+        return
+      }
+      AccessibilityNotification.Announcement(newValue.text).post()
     }
   }
 
@@ -180,6 +199,20 @@ struct ToolCallTimelineView: View {
     }
   }
 
+  static func overflowNoticeText(
+    rawUpdateCount: Int,
+    visibleToolCallCount: Int
+  ) -> String {
+    "The latest ACP burst condensed \(rawUpdateCount) raw updates into \(visibleToolCallCount) visible tool calls. Older activity is omitted here."
+  }
+
+  static func sectionAccessibilityLabel(title: String, capabilityTags: [String]) -> String {
+    guard !capabilityTags.isEmpty else {
+      return title
+    }
+    return "\(title). Capabilities: \(capabilityTags.joined(separator: ", "))."
+  }
+
   private func announceToolCallStateChanges(
     from oldValue: ToolCallTimelineAnnouncementSnapshot,
     to newValue: ToolCallTimelineAnnouncementSnapshot
@@ -189,10 +222,15 @@ struct ToolCallTimelineView: View {
       rows: newValue.rows,
       liveAnnouncementRowIDs: newValue.liveRowIDs,
       verboseAnnouncements: verboseToolCallAnnouncements
-    ) {
+    ).reversed() {
       AccessibilityNotification.Announcement(row.announcementText).post()
     }
   }
+}
+
+private struct ToolCallTimelineOverflowAnnouncement: Equatable {
+  let id: String
+  let text: String
 }
 
 struct ToolCallTimelinePresentation: Equatable {
@@ -281,12 +319,14 @@ struct ToolCallTimelineSectionHeader: View {
     }
     .padding(.top, HarnessMonitorTheme.spacingXS)
     .accessibilityElement(children: .combine)
+    .accessibilityLabel(ToolCallTimelineView.sectionAccessibilityLabel(title: title, capabilityTags: capabilityTags))
     .accessibilityAddTraits(.isHeader)
   }
 }
 
 struct ToolCallTimelineOverflowNoticeView: View {
-  let notice: HarnessMonitorStore.ToolCallTimelineOverflowNotice
+  let rawUpdateCount: Int
+  let visibleToolCallCount: Int
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
@@ -294,7 +334,10 @@ struct ToolCallTimelineOverflowNoticeView: View {
         .foregroundStyle(HarnessMonitorTheme.caution)
         .accessibilityHidden(true)
       Text(
-        "The latest ACP burst condensed \(notice.rawUpdateCount) raw updates into \(notice.displayedEventCount) displayed tool calls. Older activity is omitted here."
+        ToolCallTimelineView.overflowNoticeText(
+          rawUpdateCount: rawUpdateCount,
+          visibleToolCallCount: visibleToolCallCount
+        )
       )
       .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -425,13 +468,19 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
 
   var announcementText: String {
     let actor = agentDisplayName ?? "Agent"
+    let suffix =
+      if let formattedStopReason {
+        ". \(formattedStopReason)."
+      } else {
+        ""
+      }
     switch status {
     case .started:
-      return "\(actor) started \(title)"
+      return "\(actor) started \(title)\(suffix)"
     case .completed:
-      return "\(actor) completed \(title)"
+      return "\(actor) completed \(title)\(suffix)"
     case .failed:
-      return "\(actor) failed \(title)"
+      return "\(actor) failed \(title)\(suffix)"
     }
   }
 

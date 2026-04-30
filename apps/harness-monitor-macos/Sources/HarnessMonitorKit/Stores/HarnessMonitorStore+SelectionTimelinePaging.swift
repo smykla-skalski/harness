@@ -116,8 +116,11 @@ extension HarnessMonitorStore {
     )
 
     withUISyncBatch {
-      timeline = resolvedTimeline
-      timelineWindow = resolvedTimelineWindow
+      replaceSelectedTimelineSnapshot(
+        resolvedTimeline,
+        timelineWindow: resolvedTimelineWindow,
+        clearBurstState: true
+      )
       isShowingCachedData = false
     }
     scheduleCacheWrite { service in

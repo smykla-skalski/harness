@@ -54,6 +54,7 @@ extension HarnessMonitorStore {
         detail: detail,
         timeline: preservedTimeline,
         timelineWindow: preservedTimelineWindow,
+        clearBurstState: !preserveVisibleTimeline,
         showingCachedData: false
       )
       beginTimelineLoadingGate(hasVisibleTimeline: preserveVisibleTimeline)
@@ -244,10 +245,10 @@ extension HarnessMonitorStore {
         prefix.append(contentsOf: batch)
         updatedTimeline = prefix
       }
-      timeline = updatedTimeline
-      self.timelineWindow = normalizedTimelineWindow(
-        timelineWindow,
-        loadedTimeline: updatedTimeline
+      replaceSelectedTimelineSnapshot(
+        updatedTimeline,
+        timelineWindow: timelineWindow,
+        clearBurstState: true
       )
       isShowingCachedData = false
     }
@@ -357,6 +358,7 @@ extension HarnessMonitorStore {
     detail: SessionDetail,
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse? = nil,
+    clearBurstState: Bool = true,
     showingCachedData: Bool,
     cancelPendingTimelineRefresh: Bool = true
   ) {
@@ -369,10 +371,10 @@ extension HarnessMonitorStore {
         detail,
         change: selectedSessionChange(for: selectedSession, next: detail)
       )
-      self.timeline = timeline
-      self.timelineWindow = normalizedTimelineWindow(
-        timelineWindow,
-        loadedTimeline: timeline
+      replaceSelectedTimelineSnapshot(
+        timeline,
+        timelineWindow: timelineWindow,
+        clearBurstState: clearBurstState
       )
       applySessionSummaryUpdate(detail.session)
       isShowingCachedData = showingCachedData

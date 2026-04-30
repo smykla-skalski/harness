@@ -13,6 +13,7 @@ extension HarnessMonitorStore {
       return
     }
     self.daemonStatus = daemonStatus.updating(hostBridge: status.hostBridgeManifest)
+    reconcileAcpBridgeIncidentVisibility()
   }
 
   /// Apply a lightweight in-place manifest update triggered by the
@@ -194,6 +195,7 @@ extension HarnessMonitorStore {
     clearTransientHostBridgeIssues()
     if let daemonStatus {
       self.daemonStatus = daemonStatus.updating(hostBridge: HostBridgeManifest())
+      reconcileAcpBridgeIncidentVisibility()
     }
   }
 

@@ -4,6 +4,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session cockpit timeline section")
+@MainActor
 struct SessionCockpitTimelineSectionTests {
   @Test("Cockpit attribution headers group consecutive ACP agent rows")
   func cockpitAttributionHeadersGroupConsecutiveAcpAgentRows() {
@@ -73,10 +74,11 @@ struct SessionCockpitTimelineSectionTests {
     ]
 
     let presentation = SessionCockpitTimelineSection.materialisePresentation(from: entries)
-    let section = try? #require(presentation.sections.first)
+    #expect(presentation.sections.count == 1)
+    let section = presentation.sections[0]
 
-    #expect(section?.acpAgentID == "acp-a")
-    #expect(section?.showsHeader == false)
+    #expect(section.acpAgentID == "acp-a")
+    #expect(section.showsHeader == false)
   }
 
   private func makeTimelineEntry(
