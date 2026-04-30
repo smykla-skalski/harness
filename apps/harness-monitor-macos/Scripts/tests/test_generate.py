@@ -11,6 +11,7 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[2]
 GENERATE_SOURCE = APP_ROOT / "Scripts" / "generate.sh"
+POST_GENERATE_SOURCE = APP_ROOT / "Scripts" / "post-generate.sh"
 SWIFT_TOOL_ENV_SOURCE = APP_ROOT / "Scripts" / "lib" / "swift-tool-env.sh"
 
 
@@ -20,6 +21,11 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class GenerateScriptTests(unittest.TestCase):
+    def test_post_generate_keeps_mcp_servers_workspace_path_repo_relative(self) -> None:
+        source = POST_GENERATE_SOURCE.read_text()
+
+        self.assertNotIn("../../../mcp-servers", source)
+
     def test_unsets_xcode_only_swift_debug_environment_before_tuist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -145,6 +151,57 @@ class GenerateScriptTests(unittest.TestCase):
                 "xcode-derived",
             ):
                 (app_root / name).symlink_to(hidden_app_root / name)
+            for source_path, target_path in (
+                (
+                    app_root / "Tools" / "HarnessMonitorE2E" / ".build",
+                    hidden_app_root / "Tools" / "HarnessMonitorE2E" / ".build",
+                ),
+                (
+                    app_root / "Tools" / "HarnessMonitorPerf" / ".build",
+                    hidden_app_root / "Tools" / "HarnessMonitorPerf" / ".build",
+                ),
+                (repo_root / ".cache", repo_root / ".spotlight-build-artifacts.noindex" / ".cache"),
+                (
+                    repo_root / ".claude" / "worktrees" / "tmp" / "xcode-derived",
+                    repo_root
+                    / ".spotlight-build-artifacts.noindex"
+                    / ".claude"
+                    / "worktrees"
+                    / "tmp"
+                    / "xcode-derived",
+                ),
+                (
+                    repo_root / ".claude" / "worktrees" / "xcode-derived",
+                    repo_root
+                    / ".spotlight-build-artifacts.noindex"
+                    / ".claude"
+                    / "worktrees"
+                    / "xcode-derived",
+                ),
+                (
+                    repo_root / ".opencode" / "node_modules",
+                    repo_root / ".spotlight-build-artifacts.noindex" / ".opencode" / "node_modules",
+                ),
+                (
+                    repo_root / ".playwright-cli",
+                    repo_root / ".spotlight-build-artifacts.noindex" / ".playwright-cli",
+                ),
+                (
+                    repo_root / "_artifacts",
+                    repo_root / ".spotlight-build-artifacts.noindex" / "_artifacts",
+                ),
+                (
+                    repo_root / "mcp-servers" / "harness-monitor-registry" / ".build",
+                    repo_root
+                    / ".spotlight-build-artifacts.noindex"
+                    / "mcp-servers"
+                    / "harness-monitor-registry"
+                    / ".build",
+                ),
+                (repo_root / "output", repo_root / ".spotlight-build-artifacts.noindex" / "output"),
+            ):
+                source_path.parent.mkdir(parents=True, exist_ok=True)
+                source_path.symlink_to(target_path)
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
@@ -188,6 +245,19 @@ class GenerateScriptTests(unittest.TestCase):
                 "xcode-derived",
             ):
                 self.assertFalse((app_root / name).exists(), name)
+            for path in (
+                app_root / "Tools" / "HarnessMonitorE2E" / ".build",
+                app_root / "Tools" / "HarnessMonitorPerf" / ".build",
+                repo_root / ".cache",
+                repo_root / ".claude" / "worktrees" / "tmp" / "xcode-derived",
+                repo_root / ".claude" / "worktrees" / "xcode-derived",
+                repo_root / ".opencode" / "node_modules",
+                repo_root / ".playwright-cli",
+                repo_root / "_artifacts",
+                repo_root / "mcp-servers" / "harness-monitor-registry" / ".build",
+                repo_root / "output",
+            ):
+                self.assertFalse(path.exists(), str(path))
             self.assertEqual(
                 captured_args_path.read_text().splitlines(),
                 [

@@ -66,6 +66,16 @@ remove_legacy_spotlight_link "$ROOT/build"
 remove_legacy_spotlight_link "$ROOT/tmp"
 remove_legacy_spotlight_link "$ROOT/xcode-derived"
 remove_legacy_spotlight_link "$ROOT/Tuist/.build"
+remove_legacy_spotlight_link "$ROOT/Tools/HarnessMonitorE2E/.build"
+remove_legacy_spotlight_link "$ROOT/Tools/HarnessMonitorPerf/.build"
+remove_legacy_spotlight_link "$REPO_ROOT/.cache"
+remove_legacy_spotlight_link "$REPO_ROOT/.claude/worktrees/tmp/xcode-derived"
+remove_legacy_spotlight_link "$REPO_ROOT/.claude/worktrees/xcode-derived"
+remove_legacy_spotlight_link "$REPO_ROOT/.opencode/node_modules"
+remove_legacy_spotlight_link "$REPO_ROOT/.playwright-cli"
+remove_legacy_spotlight_link "$REPO_ROOT/_artifacts"
+remove_legacy_spotlight_link "$REPO_ROOT/mcp-servers/harness-monitor-registry/.build"
+remove_legacy_spotlight_link "$REPO_ROOT/output"
 
 latest_mtime() {
   local latest=0 path mtime

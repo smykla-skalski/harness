@@ -356,6 +356,7 @@ wait "$child_pid"
                 "build",
                 extra_env={
                     "XCODEBUILD_LOCK_LEASE_TIMEOUT_SECONDS": "1",
+                    "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
                     "XCODEBUILD_LOCK_POLL_SECONDS": "1",
                 },
                 preexisting_lock_pid=sleeper.pid,
