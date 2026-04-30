@@ -14,6 +14,12 @@ struct ClickableSwitchStyle: ToggleStyle {
   }
 }
 
+private enum WorkspaceChromeMetrics {
+  static let sidebarMinWidth: CGFloat = 220
+  static let sidebarIdealWidth: CGFloat = 260
+  static let sidebarMaxWidth: CGFloat = 380
+}
+
 public struct AgentsWindowView: View {
   let store: HarnessMonitorStore
   let navigationBridge: AgentsWindowNavigationBridge
@@ -178,9 +184,9 @@ public struct AgentsWindowView: View {
         refresh: refresh
       )
       .navigationSplitViewColumnWidth(
-        min: PreferencesChromeMetrics.sidebarMinWidth,
-        ideal: PreferencesChromeMetrics.sidebarIdealWidth,
-        max: PreferencesChromeMetrics.sidebarMaxWidth
+        min: WorkspaceChromeMetrics.sidebarMinWidth,
+        ideal: WorkspaceChromeMetrics.sidebarIdealWidth,
+        max: WorkspaceChromeMetrics.sidebarMaxWidth
       )
       .toolbarBaselineFrame(.sidebar)
     } detail: {
