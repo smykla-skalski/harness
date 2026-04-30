@@ -297,6 +297,98 @@ fn migrates_v8_schema_repairs_active_sessions_without_leader() {
     assert_eq!(repaired_state.schema_version, CURRENT_VERSION);
 }
 
+#[test]
+fn sync_session_backfills_managed_agent_identity_after_v10_schema_migration() {
+    use crate::session::types::ManagedAgentRef;
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+
+    let session_id = {
+        let db = DaemonDb::open(&path).expect("open fresh db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state_with_managed_agents();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+        simulate_pre_v11_agents_table(&db.conn);
+        state.session_id
+    };
+
+    let db = DaemonDb::open(&path).expect("open migrated db");
+    assert_eq!(db.schema_version().expect("version"), "11");
+    assert_eq!(
+        session_agent_identity_rows(&db.conn, &session_id),
+        vec![
+            ("acp-worker".into(), None, None),
+            ("claude-leader".into(), None, None),
+            ("codex-worker".into(), None, None),
+            ("unmanaged-reviewer".into(), None, None),
+        ]
+    );
+
+    let loaded = db
+        .load_session_state(&session_id)
+        .expect("load session")
+        .expect("session present");
+    assert_eq!(
+        loaded
+            .agents
+            .get("claude-leader")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::tui("agent-tui-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("acp-worker")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::acp("acp-agent-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("codex-worker")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::codex("codex-run-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("unmanaged-reviewer")
+            .and_then(|agent| agent.managed_agent.clone()),
+        None
+    );
+
+    let project_id = db
+        .project_id_for_session(&session_id)
+        .expect("project id query")
+        .expect("project id present");
+    db.sync_session(&project_id, &loaded)
+        .expect("resync session");
+    assert_eq!(
+        session_agent_identity_rows(&db.conn, &session_id),
+        vec![
+            (
+                "acp-worker".into(),
+                Some("acp".into()),
+                Some("acp-agent-1".into()),
+            ),
+            (
+                "claude-leader".into(),
+                Some("tui".into()),
+                Some("agent-tui-1".into()),
+            ),
+            (
+                "codex-worker".into(),
+                Some("codex".into()),
+                Some("codex-run-1".into()),
+            ),
+            ("unmanaged-reviewer".into(), None, None),
+        ]
+    );
+}
+
 fn simulate_pre_v7_timeline_state(conn: &Connection) {
     wipe_timeline_ledger(conn);
     conn.execute(

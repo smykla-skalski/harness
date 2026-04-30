@@ -59,6 +59,8 @@ CREATE TABLE agents (
     capabilities_json         TEXT NOT NULL DEFAULT '[]',
     status                    TEXT NOT NULL,
     agent_session_id          TEXT,
+    managed_agent_kind        TEXT,
+    managed_agent_id          TEXT,
     joined_at                 TEXT NOT NULL,
     updated_at                TEXT NOT NULL,
     last_activity_at          TEXT,

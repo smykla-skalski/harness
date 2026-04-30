@@ -198,6 +198,7 @@ fn sample_state_for_runtime(
             updated_at: "2026-03-28T14:05:00Z".into(),
             status: AgentStatus::Active,
             agent_session_id: Some(runtime_session_id.into()),
+            managed_agent: None,
             last_activity_at: Some("2026-03-28T14:05:00Z".into()),
             current_task_id: Some("task-1".into()),
             runtime_capabilities: RuntimeCapabilities::default(),

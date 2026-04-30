@@ -65,6 +65,7 @@ mod tests {
             updated_at: "now".to_string(),
             status: AgentStatus::Active,
             agent_session_id: None,
+            managed_agent: None,
             last_activity_at: None,
             current_task_id: None,
             runtime_capabilities: Default::default(),

@@ -1,4 +1,5 @@
 use crate::agents::kind::RuntimeKind;
+use crate::session::types::ManagedAgentRef;
 
 use super::{
     AgentRegistration, AgentStatus, CliError, CliErrorKind, END_SESSION_SIGNAL_ACTION_HINT,
@@ -58,36 +59,33 @@ pub(crate) fn build_new_session_with_policy(
     build_initial_state(context, title, session_id, now, policy_preset)
 }
 
-/// Find an existing agent whose capabilities include the same
-/// `agent-tui:agent-tui-{uuid}` marker. Returns the agent ID if found.
-pub(crate) fn find_agent_by_tui_marker(
+pub(crate) fn find_agent_by_managed_agent(
     state: &SessionState,
-    capabilities: &[String],
+    managed_agent: &ManagedAgentRef,
 ) -> Option<String> {
-    let marker = capabilities
-        .iter()
-        .find(|capability| capability.starts_with("agent-tui:agent-tui-"))?;
-    find_agent_by_capability(state, marker)
-}
-
-fn find_agent_by_capability(state: &SessionState, capability: &str) -> Option<String> {
     state
         .agents
         .values()
-        .find(|agent| {
-            agent
-                .capabilities
-                .iter()
-                .any(|agent_capability| agent_capability == capability)
-        })
+        .find(|agent| agent.managed_agent.as_ref() == Some(managed_agent))
         .map(|agent| agent.agent_id.clone())
+}
+
+fn managed_agent_from_capabilities(capabilities: &[String]) -> Option<ManagedAgentRef> {
+    let tui_id = capabilities
+        .iter()
+        .find_map(|capability| capability.strip_prefix("agent-tui:"))?
+        .trim();
+    if tui_id.is_empty() {
+        return None;
+    }
+    Some(ManagedAgentRef::tui(tui_id))
 }
 
 /// Register a new agent into an existing session state. Returns the assigned
 /// agent ID.
 ///
-/// If an agent with the same `agent-tui:{uuid}` marker capability already
-/// exists, return its ID instead of creating a duplicate registration.
+/// If an agent with the same managed-agent identity already exists, return its
+/// ID instead of creating a duplicate registration.
 #[expect(
     clippy::too_many_arguments,
     reason = "session join requires all registration fields; a builder would add indirection without reducing complexity"
@@ -101,6 +99,7 @@ pub(crate) fn apply_join_session(
     agent_session_id: Option<&str>,
     now: &str,
     persona: Option<&str>,
+    managed_agent: Option<ManagedAgentRef>,
 ) -> Result<String, CliError> {
     if !matches!(
         state.status,
@@ -113,7 +112,11 @@ pub(crate) fn apply_join_session(
         .into());
     }
 
-    if let Some(existing_id) = find_agent_by_tui_marker(state, capabilities) {
+    let managed_agent = managed_agent.or_else(|| managed_agent_from_capabilities(capabilities));
+    if let Some(existing_id) = managed_agent
+        .as_ref()
+        .and_then(|managed_agent| find_agent_by_managed_agent(state, managed_agent))
+    {
         return Ok(existing_id);
     }
 
@@ -130,6 +133,7 @@ pub(crate) fn apply_join_session(
             updated_at: now.to_string(),
             status: AgentStatus::Active,
             agent_session_id: agent_session_id.map(ToString::to_string),
+            managed_agent,
             last_activity_at: Some(now.to_string()),
             current_task_id: None,
             runtime_capabilities: runtime_capabilities(runtime_name),
@@ -147,19 +151,18 @@ pub(crate) fn apply_join_session(
 pub(crate) fn apply_register_agent_runtime_session(
     state: &mut SessionState,
     runtime_name: &str,
-    tui_id: &str,
+    managed_agent: &ManagedAgentRef,
     agent_session_id: &str,
     now: &str,
 ) -> Result<bool, CliError> {
-    let marker = format!("agent-tui:{tui_id}");
-    let Some(agent_id) = find_agent_by_capability(state, &marker) else {
+    let Some(agent_id) = find_agent_by_managed_agent(state, managed_agent) else {
         return Ok(false);
     };
     let current_agent_session_id = {
         let agent = state
             .agents
             .get(&agent_id)
-            .expect("marker lookup resolved agent");
+            .expect("managed-agent lookup resolved agent");
         if agent.runtime != runtime_name {
             return Err(CliErrorKind::session_agent_conflict(format!(
                 "agent '{agent_id}' uses runtime '{}' but runtime session registration requested '{}'",
@@ -176,7 +179,7 @@ pub(crate) fn apply_register_agent_runtime_session(
     let agent = state
         .agents
         .get_mut(&agent_id)
-        .expect("marker lookup resolved mutable agent");
+        .expect("managed-agent lookup resolved mutable agent");
     agent.agent_session_id = Some(agent_session_id.to_string());
     Ok(true)
 }

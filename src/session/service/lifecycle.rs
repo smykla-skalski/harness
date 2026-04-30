@@ -152,6 +152,7 @@ pub fn join_session_with_fallback(
             agent_session_id.as_deref(),
             &now,
             persona,
+            None,
         )?;
         joined_agent_id = Some(agent_id);
         Ok(())

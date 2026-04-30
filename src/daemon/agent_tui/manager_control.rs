@@ -22,11 +22,30 @@ impl AgentTuiManagerHandle {
     /// Returns [`CliError`] when DB access fails.
     pub fn list(&self, session_id: &str) -> Result<AgentTuiListResponse, CliError> {
         let session_id_owned = session_id.to_string();
-        if let Some(result) = self.run_with_async_db(|async_db| async move {
-            let mut tuis = async_db.list_agent_tuis(&session_id_owned).await?;
-            let roles_by_agent = async_db
-                .resolve_session(&session_id_owned)
-                .await?
+        let (mut tuis, roles_by_agent) = if let Some(result) =
+            self.run_with_async_db(|async_db| async move {
+                let tuis = async_db.list_agent_tuis(&session_id_owned).await?;
+                let roles_by_agent = async_db
+                    .resolve_session(&session_id_owned)
+                    .await?
+                    .map(|resolved| {
+                        resolved
+                            .state
+                            .agents
+                            .into_iter()
+                            .map(|(agent_id, agent)| (agent_id, agent.role))
+                            .collect::<BTreeMap<_, _>>()
+                    })
+                    .unwrap_or_default();
+                Ok((tuis, roles_by_agent))
+            }) {
+            result?
+        } else {
+            let db = self.db()?;
+            let db_guard = lock_db(&db)?;
+            let tuis = db_guard.list_agent_tuis(session_id)?;
+            let roles_by_agent = db_guard
+                .resolve_session(session_id)?
                 .map(|resolved| {
                     resolved
                         .state
@@ -36,27 +55,35 @@ impl AgentTuiManagerHandle {
                         .collect::<BTreeMap<_, _>>()
                 })
                 .unwrap_or_default();
-            sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
-            Ok(AgentTuiListResponse { tuis })
-        }) {
-            return result;
-        }
-        let db = self.db()?;
-        let db_guard = lock_db(&db)?;
-        let mut tuis = db_guard.list_agent_tuis(session_id)?;
-        let roles_by_agent = db_guard
-            .resolve_session(session_id)?
-            .map(|resolved| {
-                resolved
-                    .state
-                    .agents
-                    .into_iter()
-                    .map(|(agent_id, agent)| (agent_id, agent.role))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default();
+            (tuis, roles_by_agent)
+        };
+        tuis = tuis
+            .into_iter()
+            .map(|snapshot| self.refresh_listed_snapshot(snapshot))
+            .collect::<Result<Vec<_>, _>>()?;
         sort_agent_tui_snapshots(&mut tuis, &roles_by_agent);
         Ok(AgentTuiListResponse { tuis })
+    }
+
+    fn refresh_listed_snapshot(
+        &self,
+        snapshot: AgentTuiSnapshot,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        if !matches!(
+            snapshot.status,
+            AgentTuiStatus::Starting | AgentTuiStatus::Running
+        ) {
+            return Ok(snapshot);
+        }
+
+        let previous = snapshot.clone();
+        let refreshed = if self.is_tui_active(&snapshot.tui_id)? {
+            self.refresh_live_snapshot(snapshot)?
+        } else {
+            self.orphaned_inactive_snapshot(snapshot)
+        };
+        self.persist_refreshed_snapshot(&previous, &refreshed)?;
+        Ok(refreshed)
     }
 
     /// Load a managed TUI snapshot by ID, refreshing live screen/process state when active.

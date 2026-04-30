@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
@@ -8,23 +7,20 @@ use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
-use crate::daemon::agent_acp::manager::test_support::{write_executable, write_sleeping_acp_agent};
+use crate::daemon::agent_acp::manager::test_support::{
+    seeded_manager, seeded_manager_with_events, write_executable, write_sleeping_acp_agent,
+};
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
 
 fn manager() -> AcpAgentManagerHandle {
-    let (sender, _) = broadcast::channel(16);
-    AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()))
+    seeded_manager()
 }
 
 fn manager_with_events() -> (
     AcpAgentManagerHandle,
     broadcast::Receiver<crate::daemon::protocol::StreamEvent>,
 ) {
-    let (sender, receiver) = broadcast::channel(64);
-    (
-        AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new())),
-        receiver,
-    )
+    seeded_manager_with_events()
 }
 
 fn descriptor(command: &Path) -> AcpAgentDescriptor {
@@ -69,9 +65,8 @@ async fn start_list_stop_tracks_live_snapshot() {
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let manager = manager();
         let descriptor = descriptor(&script);
@@ -86,7 +81,7 @@ async fn start_list_stop_tracks_live_snapshot() {
         let inspected = manager.inspect(Some("sess-1"));
         assert_eq!(inspected.agents.len(), 1);
         assert_eq!(inspected.agents[0].acp_id, snapshot.acp_id);
-        assert_eq!(inspected.agents[0].agent_id, "fake");
+        assert!(inspected.agents[0].agent_id.starts_with("fake-"));
         assert_eq!(inspected.agents[0].watchdog_state, "active");
         assert_eq!(inspected.agents[0].permission_mode, "daemon_bridge");
         assert_eq!(inspected.agents[0].permission_queue_depth, 0);
@@ -113,9 +108,8 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
         write_executable(&script, "#!/bin/sh\necho boom >&2\nexit 7\n");
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
@@ -168,9 +162,9 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
             write_sleeping_acp_agent(&script);
             let request = AcpAgentStartRequest {
                 agent: "fake".to_string(),
-                prompt: None,
                 project_dir: Some(temp.path().display().to_string()),
                 record_permissions: true,
+                ..AcpAgentStartRequest::default()
             };
             let manager = manager();
             let descriptor = descriptor(&script);
@@ -215,9 +209,8 @@ async fn process_key_changes_when_permission_mode_changes() {
         let manager = manager();
         let base = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let recording = AcpAgentStartRequest {
             record_permissions: true,
@@ -251,9 +244,8 @@ async fn process_key_changes_when_project_root_changes() {
         let manager = manager();
         let first = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(root_a.display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let second = AcpAgentStartRequest {
             project_dir: Some(root_b.display().to_string()),
@@ -283,9 +275,8 @@ async fn process_key_stable_for_unlisted_env_drift() {
         let manager = manager();
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
 
         let first = temp_env::with_var("HARNESS_TEST_NOISE", Some("a"), || {
@@ -319,9 +310,7 @@ fn start_rejects_sandboxed_daemon_mode() {
         || {
             let request = AcpAgentStartRequest {
                 agent: "copilot".to_string(),
-                prompt: None,
-                project_dir: None,
-                record_permissions: false,
+                ..AcpAgentStartRequest::default()
             };
 
             let error = manager()
@@ -363,9 +352,8 @@ async fn repeated_process_faults_quarantine_process_key() {
         let (manager, mut events) = manager_with_events();
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
 
         let mut saw_quarantine_applied = false;
@@ -426,9 +414,8 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
         let manager = manager();
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
 
         let first = manager
@@ -468,9 +455,8 @@ async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement(
             let manager = manager();
             let request = AcpAgentStartRequest {
                 agent: "fake".to_string(),
-                prompt: None,
                 project_dir: Some(temp.path().display().to_string()),
-                record_permissions: false,
+                ..AcpAgentStartRequest::default()
             };
 
             let first = manager

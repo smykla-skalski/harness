@@ -11,7 +11,7 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
-use super::support::{WAIT_TIMEOUT, wait_until, with_agent_tui_home};
+use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
 
 #[test]
 fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
@@ -110,6 +110,112 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
         assert_eq!(after_modified, baseline_modified);
 
         manager.stop(&second_refresh.tui_id).expect("stop");
+    });
+}
+
+#[test]
+fn refresh_local_snapshot_marks_missing_running_process_exited() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    with_agent_tui_home(tmp.path(), || {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+        let snapshot = sample_snapshot(
+            "agent-tui-orphaned-refresh",
+            "sess-tui-orphaned-refresh",
+            "",
+            "codex",
+            "2026-04-30T12:00:00Z",
+            "2026-04-30T12:01:00Z",
+        );
+
+        let refreshed = manager
+            .refresh_local_snapshot(snapshot)
+            .expect("refresh snapshot");
+
+        assert_eq!(refreshed.status, AgentTuiStatus::Exited);
+        assert_eq!(
+            refreshed.error.as_deref(),
+            Some("managed terminal agent process missing from daemon runtime")
+        );
+        assert!(
+            refreshed.updated_at.as_str() >= "2026-04-30T12:01:00Z",
+            "orphaned refresh should advance updated_at"
+        );
+    });
+}
+
+#[test]
+fn list_marks_orphaned_running_snapshot_inactive_and_persists_it() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    with_agent_tui_home(tmp.path(), || {
+        let project_dir = tmp.path().join("project");
+        let context_root = tmp.path().join("context-root");
+        fs_err::create_dir_all(&project_dir).expect("project dir");
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = crate::daemon::index::DiscoveredProject {
+            project_id: "project-tui-orphaned-list".into(),
+            name: "project".into(),
+            project_dir: Some(project_dir.clone()),
+            repository_root: Some(project_dir.clone()),
+            checkout_id: "checkout-tui-orphaned-list".into(),
+            checkout_name: "Directory".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project).expect("sync project");
+        let state = session_service::build_new_session(
+            "orphaned list test",
+            "managed tui",
+            "sess-tui-orphaned-list",
+            "claude",
+            None,
+            &utc_now(),
+        );
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+        let snapshot = sample_snapshot(
+            "agent-tui-orphaned-list",
+            "sess-tui-orphaned-list",
+            "",
+            "codex",
+            "2026-04-30T13:00:00Z",
+            "2026-04-30T13:01:00Z",
+        );
+        db.save_agent_tui(&snapshot).expect("seed tui snapshot");
+
+        let db_slot = Arc::new(OnceLock::new());
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("install test db");
+        let (sender, _receiver) = broadcast::channel(8);
+        let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
+
+        let listed = manager
+            .list("sess-tui-orphaned-list")
+            .expect("list managed tuis");
+
+        assert_eq!(listed.tuis.len(), 1);
+        assert_eq!(listed.tuis[0].status, AgentTuiStatus::Exited);
+        assert_eq!(
+            listed.tuis[0].error.as_deref(),
+            Some("managed terminal agent process missing from daemon runtime")
+        );
+
+        let persisted = db_slot
+            .get()
+            .expect("db slot")
+            .lock()
+            .expect("db lock")
+            .agent_tui("agent-tui-orphaned-list")
+            .expect("load persisted snapshot")
+            .expect("persisted snapshot present");
+        assert_eq!(persisted.status, AgentTuiStatus::Exited);
     });
 }
 

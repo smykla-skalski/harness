@@ -1,13 +1,58 @@
 use super::*;
 use std::process::Command;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use agent_client_protocol::Channel;
 use agent_client_protocol::schema::{
     AgentCapabilities, ContentChunk, InitializeResponse, NewSessionResponse, PromptResponse,
     SessionUpdate, StopReason,
 };
+use tokio::sync::broadcast;
 
 use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
+use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::db::DaemonDb;
+use crate::daemon::index::DiscoveredProject;
+use crate::session::service as session_service;
+use crate::session::types::{ManagedAgentRef, SessionRole};
+
+fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAgentManagerHandle {
+    let (sender, _) = broadcast::channel(8);
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = DiscoveredProject {
+        project_id: "project-protocol".into(),
+        name: "harness".into(),
+        project_dir: Some("/tmp/harness".into()),
+        repository_root: Some("/tmp/harness".into()),
+        checkout_id: "checkout-protocol".into(),
+        checkout_name: "Repository".into(),
+        context_root: "/tmp/data/projects/project-protocol".into(),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+    let now = "2026-04-30T12:00:00Z";
+    let mut state =
+        session_service::build_new_session("protocol", "protocol", session_id, "claude", None, now);
+    let _ = session_service::apply_join_session(
+        &mut state,
+        "Protocol ACP",
+        runtime_name,
+        SessionRole::Worker,
+        &[],
+        None,
+        now,
+        None,
+        Some(ManagedAgentRef::acp(acp_id)),
+    )
+    .expect("register ACP agent");
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+    let db = Arc::new(Mutex::new(db));
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot.set(Arc::clone(&db)).expect("seed protocol test db");
+    AcpAgentManagerHandle::new(sender, db_slot)
+}
 
 #[tokio::test]
 #[cfg(unix)]
@@ -32,6 +77,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
+    let manager = protocol_manager("fake", "agent-acp-1", "harness-sess-1");
 
     let protocol_task = tokio::spawn(async move {
         Client
@@ -54,11 +100,13 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     prompt: Some("smoke the second descriptor".to_string()),
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "harness-sess-1".to_string(),
+                    runtime_name: "fake".to_string(),
                     supervisor: protocol_supervisor,
                     initial_prompt_lease: None,
                     cancel_rx,
                     command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
+                    manager,
                 })
                 .await
             })
@@ -114,6 +162,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
+    let manager = protocol_manager("fake", "agent-acp-1", "harness-sess-1");
 
     let protocol_task = tokio::spawn(async move {
         Client
@@ -136,11 +185,13 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     prompt: Some("trigger stale session".to_string()),
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "harness-sess-1".to_string(),
+                    runtime_name: "fake".to_string(),
                     supervisor: protocol_supervisor,
                     initial_prompt_lease: None,
                     cancel_rx,
                     command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
+                    manager,
                 })
                 .await
             })

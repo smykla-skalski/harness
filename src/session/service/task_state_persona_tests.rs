@@ -28,6 +28,7 @@ fn agent(id: &str, persona_identifier: Option<&str>) -> AgentRegistration {
         updated_at: "t0".to_string(),
         status: crate::session::types::AgentStatus::Idle,
         agent_session_id: None,
+        managed_agent: None,
         last_activity_at: Some("t0".to_string()),
         current_task_id: None,
         runtime_capabilities: Default::default(),

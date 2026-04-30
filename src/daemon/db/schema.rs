@@ -97,9 +97,15 @@ impl DaemonDb {
         }
         if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9") {
             self.migrate_v9_to_v10()?;
-        } else if version != "10" {
+        }
+        if matches!(
+            version,
+            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10"
+        ) {
+            self.migrate_v10_to_v11()?;
+        } else if version != "11" {
             return Err(db_error(format!(
-                "daemon database schema version '{version}' is newer than expected '10'; downgrade is not supported"
+                "daemon database schema version '{version}' is newer than expected '11'; downgrade is not supported"
             )));
         }
         Ok(())
@@ -133,6 +139,10 @@ impl DaemonDb {
 
     fn migrate_v9_to_v10(&self) -> Result<(), CliError> {
         super::schema_v10::run(&self.conn)
+    }
+
+    fn migrate_v10_to_v11(&self) -> Result<(), CliError> {
+        super::schema_v11::run(&self.conn)
     }
 }
 

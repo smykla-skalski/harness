@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::daemon::client::DaemonClient;
 use crate::daemon::protocol;
 use crate::errors::CliError;
+use crate::session::types::ManagedAgentRef;
 
 use super::{apply_register_agent_runtime_session, ensure_known_runtime, storage, utc_now};
 
@@ -37,12 +38,13 @@ pub fn register_agent_runtime_session(
         return Ok(false);
     }
     let now = utc_now();
+    let managed_agent = ManagedAgentRef::tui(tui_id);
     let mut registered = false;
     let _ = storage::update_state_if_changed(&layout, |state| {
         registered = apply_register_agent_runtime_session(
             state,
             runtime_name,
-            tui_id,
+            &managed_agent,
             agent_session_id,
             &now,
         )?;
