@@ -95,10 +95,23 @@ lease_lock_is_expired_epoch() {
 
 lease_lock_atomic_write_file() {
   local target_path="$1"
+  local target_dir
   local temp_path
+  target_dir="$(/usr/bin/dirname "$target_path")"
+  [[ -d "$target_dir" ]] || return 1
   temp_path="${target_path}.tmp.$$"
-  /bin/cat >"$temp_path"
-  /bin/mv -f "$temp_path" "$target_path"
+  if ! /bin/cat >"$temp_path" 2>/dev/null; then
+    /bin/rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
+  if [[ ! -d "$target_dir" ]]; then
+    /bin/rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
+  if ! /bin/mv -f "$temp_path" "$target_path" 2>/dev/null; then
+    /bin/rm -f "$temp_path" 2>/dev/null || true
+    return 1
+  fi
 }
 
 lease_lock_write_metadata_file() {
@@ -280,12 +293,13 @@ lease_lock_owner_process_alive() {
 }
 
 lease_lock_owner_summary() {
-  local owner_summary mutator_pid mutator_command
+  local owner_summary mutator_pid mutator_command now_epoch
 
   if [[ ! -f "$LEASE_LOCK_OWNER_FILE" ]]; then
     return 1
   fi
-  owner_summary="$(awk -F= '
+  now_epoch="$(lease_lock_now_epoch)"
+  owner_summary="$(awk -F= -v now_epoch="$now_epoch" '
     /^LOCK_OWNER_ID=/ { owner_id = $2 }
     /^LOCK_AGENT_ID=/ { agent_id = $2 }
     /^LOCK_PID=/ { pid = $2 }
@@ -294,8 +308,10 @@ lease_lock_owner_summary() {
     /^LOCK_NEXT_HEARTBEAT_DUE_EPOCH=/ { next_due = $2 }
     END {
       if (owner_id != "") {
-        printf "owner_id=%s agent=%s pid=%s last_heartbeat=%s next_due=%s command=%s\n",
-          owner_id, agent_id, pid, last, next_due, command
+        age_sec = (last == "" ? "?" : now_epoch - last)
+        due_in_sec = (next_due == "" ? "?" : next_due - now_epoch)
+        printf "owner_id=%s agent=%s pid=%s age_sec=%s due_in_sec=%s last_heartbeat=%s next_due=%s command=%s\n",
+          owner_id, agent_id, pid, age_sec, due_in_sec, last, next_due, command
       }
     }
   ' "$LEASE_LOCK_OWNER_FILE")"
@@ -311,6 +327,48 @@ lease_lock_owner_summary() {
   fi
 
   printf '%s\n' "$owner_summary"
+}
+
+lease_lock_waiter_file_is_stale() {
+  local waiter_file="$1"
+  local last_heartbeat_epoch now_epoch
+
+  last_heartbeat_epoch="$(lease_lock_metadata_value_from_file "$waiter_file" LOCK_LAST_HEARTBEAT_EPOCH || true)"
+  [[ "$last_heartbeat_epoch" =~ ^[0-9]+$ ]] || return 0
+  now_epoch="$(lease_lock_now_epoch)"
+  (( now_epoch - last_heartbeat_epoch > LEASE_LOCK_WAITER_TIMEOUT_SECONDS ))
+}
+
+lease_lock_waiter_process_alive() {
+  local waiter_file="$1"
+  lease_lock_process_alive_from_file \
+    "$waiter_file" \
+    LOCK_PID \
+    LOCK_PROCESS_START \
+    LOCK_COMMAND
+}
+
+lease_lock_cleanup_stale_waiters() {
+  local waiter_file waiter_heartbeat_file cleaned_count
+  cleaned_count=0
+  [[ -d "$LEASE_LOCK_WAITERS_DIR" ]] || return 0
+  while IFS= read -r waiter_file; do
+    [[ -n "$waiter_file" ]] || continue
+    if lease_lock_waiter_process_alive "$waiter_file"; then
+      continue
+    fi
+    if ! lease_lock_waiter_file_is_stale "$waiter_file"; then
+      continue
+    fi
+    waiter_heartbeat_file="${waiter_file}.heartbeat"
+    /bin/rm -f "$waiter_file" "$waiter_heartbeat_file"
+    cleaned_count=$((cleaned_count + 1))
+  done < <(find "$LEASE_LOCK_WAITERS_DIR" -type f -name '*.env' 2>/dev/null)
+
+  if (( cleaned_count > 0 )); then
+    printf 'Cleaned stale waiter metadata for %s lease at %s: removed=%s\n' \
+      "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" "$cleaned_count" >&2
+  fi
 }
 
 lease_lock_waiter_count() {
@@ -434,11 +492,13 @@ lease_lock_try_reclaim_stale_owner() {
 lease_lock_acquire() {
   local started_at now_epoch last_reported_summary last_status_epoch
   /bin/mkdir -p "$LEASE_LOCK_WAITERS_DIR"
+  lease_lock_cleanup_stale_waiters
   lease_lock_register_waiter
   started_at="$(lease_lock_now_epoch)"
   last_status_epoch="$started_at"
   last_reported_summary=""
   while ! lease_lock_try_acquire_owner_dir; do
+    lease_lock_cleanup_stale_waiters
     if lease_lock_try_reclaim_stale_owner; then
       continue
     fi
@@ -461,6 +521,10 @@ lease_lock_acquire() {
     if (( LEASE_LOCK_WAITER_TIMEOUT_SECONDS > 0 )) \
       && (( now_epoch - started_at >= LEASE_LOCK_WAITER_TIMEOUT_SECONDS )); then
       printf 'Timed out waiting for %s lease at %s\n' "$LEASE_LOCK_RESOURCE" "$LEASE_LOCK_DIR" >&2
+      if [[ -n "$owner_summary" ]]; then
+        printf 'timeout owner summary: %s\n' "$owner_summary" >&2
+      fi
+      printf 'timeout waiters observed: %s\n' "$waiter_count" >&2
       return 1
     fi
     sleep "$LEASE_LOCK_POLL_SECONDS"
