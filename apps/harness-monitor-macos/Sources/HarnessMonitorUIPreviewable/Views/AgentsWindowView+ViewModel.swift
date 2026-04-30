@@ -191,6 +191,7 @@ extension AgentsWindowView {
     let codexTitlesByID: [String: String]
     let externalAgents: [AgentRegistration]
     let agentTuiUnavailable: Bool
+    let acpUnavailable: Bool
     let codexUnavailable: Bool
     var hasAgentTuis: Bool {
       !sortedAgentTuis.isEmpty
@@ -208,6 +209,7 @@ extension AgentsWindowView {
       codexTitlesByID = [:]
       externalAgents = []
       agentTuiUnavailable = false
+      acpUnavailable = false
       codexUnavailable = false
     }
 
@@ -269,6 +271,7 @@ extension AgentsWindowView {
       self.codexTitlesByID = codexTitlesByID
       self.externalAgents = externalAgents
       self.agentTuiUnavailable = store.agentTuiUnavailable
+      self.acpUnavailable = store.acpUnavailable
       self.codexUnavailable = store.codexUnavailable
     }
 
@@ -315,6 +318,7 @@ extension AgentsWindowView {
     var runtime: AgentTuiRuntime
     var selectedLaunchSelection: AgentLaunchSelection
     var selectedRole: SessionRole = .worker
+    var selectedAcpFallbackRole: SessionRole = .worker
     var name = ""
     var prompt = ""
     var projectDir = ""

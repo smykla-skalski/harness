@@ -15,12 +15,21 @@ struct ClickableSwitchStyle: ToggleStyle {
 }
 
 private enum WorkspaceChromeMetrics {
-  static let sidebarMinWidth: CGFloat = 220
-  static let sidebarIdealWidth: CGFloat = 260
-  static let sidebarMaxWidth: CGFloat = 380
+  static let sidebarMinWidth: CGFloat = 240
+  static let sidebarIdealWidth: CGFloat = 280
+  static let sidebarMaxWidth: CGFloat = 400
 }
 
 public struct AgentsWindowView: View {
+  struct WorkspaceRefreshState: Equatable {
+    let selectedAgentTuis: [AgentTuiSnapshot]
+    let selectedCodexRuns: [CodexRunSnapshot]
+    let selectedSession: SessionDetail?
+    let agentTuiUnavailable: Bool
+    let acpUnavailable: Bool
+    let codexUnavailable: Bool
+  }
+
   struct DismissBatchSnapshot: Equatable {
     let ids: [String]
     let count: Int
@@ -159,6 +168,17 @@ public struct AgentsWindowView: View {
     nonmutating set { decisionInspectorVisible = newValue }
   }
 
+  var workspaceRefreshState: WorkspaceRefreshState {
+    WorkspaceRefreshState(
+      selectedAgentTuis: store.selectedAgentTuis,
+      selectedCodexRuns: store.selectedCodexRuns,
+      selectedSession: store.selectedSession,
+      agentTuiUnavailable: store.agentTuiUnavailable,
+      acpUnavailable: store.acpUnavailable,
+      codexUnavailable: store.codexUnavailable
+    )
+  }
+
   public var body: some View {
     @Bindable var viewModel = viewModel
     let displayState = displayState
@@ -186,19 +206,7 @@ public struct AgentsWindowView: View {
       .onChange(of: store.pendingWorkspaceSelection) { _, _ in
         consumePendingWorkspaceSelection()
       }
-      .onChange(of: store.selectedAgentTuis) { _, _ in
-        refreshWorkspaceAfterDataChange()
-      }
-      .onChange(of: store.selectedCodexRuns) { _, _ in
-        refreshWorkspaceAfterDataChange()
-      }
-      .onChange(of: store.agentTuiUnavailable) { _, _ in
-        refreshWorkspaceAfterDataChange()
-      }
-      .onChange(of: store.codexUnavailable) { _, _ in
-        refreshWorkspaceAfterDataChange()
-      }
-      .onChange(of: store.selectedSession) { _, _ in
+      .onChange(of: workspaceRefreshState) { _, _ in
         refreshWorkspaceAfterDataChange()
       }
       .onChange(of: store.supervisorDecisionRefreshTick) { _, _ in
@@ -255,6 +263,7 @@ public struct AgentsWindowView: View {
       AgentsSidebar(
         store: store,
         selection: selection,
+        createMode: viewModel.createMode,
         decisionFilters: $decisionFilters,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,

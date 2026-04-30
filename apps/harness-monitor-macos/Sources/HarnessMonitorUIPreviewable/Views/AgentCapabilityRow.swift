@@ -26,6 +26,40 @@ enum AgentCapabilityAvailabilityState {
     }
   }
 
+  var compactTitle: String {
+    switch self {
+    case .projectAccessAvailable:
+      "Ready"
+    case .checkingAccess:
+      "Checking"
+    case .setupRequired:
+      "Setup needed"
+    case .bridgeAccessRequired:
+      "Bridge required"
+    case .terminalOnly:
+      "Terminal only"
+    case .unavailable:
+      "Unavailable"
+    }
+  }
+
+  var symbolName: String {
+    switch self {
+    case .projectAccessAvailable:
+      "checkmark.circle.fill"
+    case .checkingAccess:
+      "clock.fill"
+    case .setupRequired:
+      "wrench.and.screwdriver.fill"
+    case .bridgeAccessRequired:
+      "link.badge.plus"
+    case .terminalOnly:
+      "terminal"
+    case .unavailable:
+      "xmark.circle.fill"
+    }
+  }
+
   var tint: Color {
     switch self {
     case .projectAccessAvailable:

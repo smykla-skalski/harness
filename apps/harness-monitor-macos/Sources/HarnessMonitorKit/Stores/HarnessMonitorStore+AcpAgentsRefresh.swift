@@ -10,6 +10,7 @@ extension HarnessMonitorStore {
         try await client.managedAgents(sessionID: sessionID)
       }
       recordRequestSuccess()
+      clearHostBridgeIssue(for: "acp")
       guard selectedSessionID == sessionID else {
         return true
       }
@@ -23,6 +24,16 @@ extension HarnessMonitorStore {
       return true
     } catch {
       guard selectedSessionID == sessionID else {
+        return false
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        case .server(let code, _) = apiError,
+        code == 501 || code == 503
+      {
+        self.markHostBridgeIssue(for: "acp", statusCode: code)
+        HarnessMonitorLogger.store.info(
+          "managed ACP refresh unavailable: \(self.acpHostBridgeFailureMessage(), privacy: .public)"
+        )
         return false
       }
       HarnessMonitorLogger.store.warning(
@@ -41,6 +52,7 @@ extension HarnessMonitorStore {
         try await client.acpInspect(sessionID: sessionID)
       }
       recordRequestSuccess()
+      clearHostBridgeIssue(for: "acp")
       guard selectedSessionID == sessionID else {
         return true
       }
@@ -52,6 +64,16 @@ extension HarnessMonitorStore {
       return true
     } catch {
       guard selectedSessionID == sessionID else {
+        return false
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        case .server(let code, _) = apiError,
+        code == 501 || code == 503
+      {
+        self.markHostBridgeIssue(for: "acp", statusCode: code)
+        HarnessMonitorLogger.store.info(
+          "managed ACP inspect unavailable: \(self.acpHostBridgeFailureMessage(), privacy: .public)"
+        )
         return false
       }
       HarnessMonitorLogger.store.warning(

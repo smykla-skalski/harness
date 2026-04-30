@@ -177,6 +177,27 @@ extension HarnessMonitorStore {
     hostBridgeCapabilityState(for: "agent-tui") != .ready
   }
 
+  public var acpUnavailable: Bool {
+    hostBridgeCapabilityState(for: "acp") != .ready
+  }
+
+  func acpHostBridgeFailureMessage() -> String {
+    let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    switch hostBridgeCapabilityState(for: "acp") {
+    case .ready:
+      return
+        "ACP project access should be available, but the last request still failed. Retry or restart the shared host bridge."
+    case .excluded:
+      return "ACP project access is excluded from the shared host bridge. Enable ACP and try again."
+    case .unavailable:
+      if hostBridge.running {
+        return
+          "ACP project access is unavailable on the shared host bridge. Re-enable ACP and try again."
+      }
+      return "ACP project access requires the shared host bridge. Start it and try again."
+    }
+  }
+
   private var shouldPresentAcpBridgeBanner: Bool {
     guard let manifest = daemonStatus?.manifest, manifest.sandboxed else {
       return false

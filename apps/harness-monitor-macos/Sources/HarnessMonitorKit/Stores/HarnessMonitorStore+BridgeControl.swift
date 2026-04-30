@@ -111,7 +111,8 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     capability: String,
     enabled: Bool,
-    force: Bool
+    force: Bool,
+    announceFeedback: Bool = true
   ) async -> HostBridgeCapabilityMutationResult {
     do {
       let measuredStatus = try await measureHostBridgeCapabilityMutation(
@@ -123,7 +124,8 @@ extension HarnessMonitorStore {
       applyHostBridgeCapabilityMutationSuccess(
         capability: capability,
         enabled: enabled,
-        status: measuredStatus.value
+        status: measuredStatus.value,
+        announceFeedback: announceFeedback
       )
       return .success
     } catch let apiError as HarnessMonitorAPIError {
@@ -178,7 +180,8 @@ extension HarnessMonitorStore {
   private func applyHostBridgeCapabilityMutationSuccess(
     capability: String,
     enabled: Bool,
-    status: BridgeStatusReport
+    status: BridgeStatusReport,
+    announceFeedback: Bool
   ) {
     recordRequestSuccess()
     clearHostBridgeIssue(for: capability)
@@ -188,7 +191,9 @@ extension HarnessMonitorStore {
       selectedAgentTuis = []
       selectedAgentTui = nil
     }
-    presentSuccessFeedback(hostBridgeActionLabel(for: capability, enabled: enabled))
+    if announceFeedback {
+      presentSuccessFeedback(hostBridgeActionLabel(for: capability, enabled: enabled))
+    }
   }
 
   private func applyStoppedHostBridgeState() {
@@ -228,7 +233,8 @@ extension HarnessMonitorStore {
         applyHostBridgeCapabilityMutationSuccess(
           capability: capability,
           enabled: enabled,
-          status: measuredStatus.value
+          status: measuredStatus.value,
+          announceFeedback: true
         )
         return .success
       } catch {
@@ -280,6 +286,8 @@ extension HarnessMonitorStore {
         "Agents"
       case "codex":
         "Codex"
+      case "acp":
+        "ACP"
       default:
         capability.replacingOccurrences(of: "-", with: " ").capitalized
       }

@@ -4,6 +4,7 @@ import SwiftUI
 struct AgentsSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
+  let createMode: AgentTuiCreateMode
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
@@ -57,10 +58,18 @@ struct AgentsSidebar: View {
 
   var body: some View {
     List(selection: selectionBinding) {
-      Label("New Session", systemImage: "plus.rectangle")
-        .scaledFont(.body)
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Image(systemName: "plus.rectangle")
+          .accessibilityHidden(true)
+        Text(createMode.sidebarTitle)
+          .scaledFont(.body)
+          .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, rowPadding)
         .tag(WorkspaceSelection.create)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
       AgentsSidebarDecisionSection(
@@ -158,7 +167,7 @@ struct AgentsSidebar: View {
               VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                   .scaledFont(.body)
-                  .lineLimit(1)
+                  .lineLimit(2)
                 Text("\(task.severity.title) • \(task.status.title)")
                   .scaledFont(.caption)
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)

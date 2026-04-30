@@ -24,9 +24,7 @@ extension AgentsWindowView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         AgentsCreateSectionHeading(
           title: "Provider",
-          description:
-            "Pick the runtime you want to launch first. "
-            + "Transport details stay focused on the selected provider."
+          description: "Choose the provider that should open when this agent starts."
         )
 
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -59,9 +57,9 @@ extension AgentsWindowView {
     if let option = selectedCapabilityOption {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         terminalConfigurationCard(option: option)
+        terminalLaunchCard
         terminalDetailsCard
         terminalSizeCard
-        terminalLaunchCard
       }
     } else {
       AgentsCreateSectionCard {
@@ -82,9 +80,8 @@ extension AgentsWindowView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         AgentsCreateSectionHeading(
           title: "Configuration",
-          description: "Tune how \(option.title) launches from the current session."
+          description: "Choose how \(option.title) joins this session and which defaults it uses."
         )
-        terminalConfigurationHeader(option: option, choice: context.choice)
         terminalTransportChoicesSection(option: option, context: context)
         terminalTransportNotice(option: option, choice: context.choice)
         terminalModelField(context: context)
@@ -97,8 +94,8 @@ extension AgentsWindowView {
   var roleMenu: some View {
     @Bindable var formModel = viewModel
     return AgentsCreateFieldBlock(
-      title: "Role",
-      help: "Choose how the new agent should participate in the session."
+      title: "Role in session",
+      help: "Choose how this agent joins the current session."
     ) {
       Picker("Role", selection: $formModel.selectedRole) {
         ForEach(SessionRole.allCases, id: \.self) { role in
@@ -121,8 +118,8 @@ extension AgentsWindowView {
 
   var personaMenu: some View {
     AgentsCreateFieldBlock(
-      title: "Persona",
-      help: "Apply a persona only when you want a consistent behavior template."
+      title: "Persona (optional)",
+      help: "Apply one only when you want a consistent behavior template."
     ) {
       Picker(
         "Persona",
@@ -150,6 +147,36 @@ extension AgentsWindowView {
       .pickerStyle(.menu)
       .harnessNativeFormControl()
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiPersonaPicker)
+
+      Text(selectedPersonaStateText)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  var acpFallbackRoleMenu: some View {
+    @Bindable var formModel = viewModel
+    return AgentsCreateFieldBlock(
+      title: "If leader already exists",
+      help: "Choose how project access joins when another leader is active."
+    ) {
+      Picker("Fallback role", selection: $formModel.selectedAcpFallbackRole) {
+        ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+          Text(role.title)
+            .tag(role)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.agentsFallbackRolePicker,
+                option: role.title
+              )
+            )
+        }
+      }
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsFallbackRolePicker)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -160,12 +187,12 @@ extension AgentsWindowView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         AgentsCreateSectionHeading(
           title: "Details",
-          description: "Optional metadata and startup input for the first launch."
+          description: "Name this launch or seed the first message before the agent opens."
         )
 
         AgentsCreateFieldBlock(
           title: "Display name",
-          help: "Optional. Leave blank to keep the default provider title."
+          help: nil
         ) {
           TextField("Optional display name", text: $formModel.name)
             .harnessNativeFormControl()
@@ -175,7 +202,7 @@ extension AgentsWindowView {
 
         AgentsCreateFieldBlock(
           title: "Initial prompt",
-          help: "Optional. Send the first prompt automatically after the terminal opens."
+          help: nil
         ) {
           multilineEditor(
             placeholder: "Optional first prompt to submit inside the terminal agent",
@@ -186,27 +213,36 @@ extension AgentsWindowView {
           )
         }
 
-        AgentsCreateFieldBlock(
-          title: "Project directory",
-          help: "Optional. Override the project folder for this launch only."
-        ) {
-          TextField("Optional project directory override", text: $formModel.projectDir)
-            .harnessNativeFormControl()
-            .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
-        }
+        DisclosureGroup {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+            AgentsCreateFieldBlock(
+              title: "Project directory override",
+              help: nil
+            ) {
+              TextField("Optional project directory override", text: $formModel.projectDir)
+                .harnessNativeFormControl()
+                .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiProjectDirField)
+            }
 
-        AgentsCreateFieldBlock(
-          title: "Command override",
-          help: "Optional. One argument per line. The first line is the executable."
-        ) {
-          multilineEditor(
-            placeholder:
-              "Optional argv override (one argument per line; first line is the executable)",
-            text: $formModel.argvOverride,
-            field: .argv,
-            minHeight: 100,
-            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
-          )
+            AgentsCreateFieldBlock(
+              title: "Command override",
+              help: "One argument per line. The first line is the executable."
+            ) {
+              multilineEditor(
+                placeholder:
+                  "Optional argv override (one argument per line; first line is the executable)",
+                text: $formModel.argvOverride,
+                field: .argv,
+                minHeight: 100,
+                accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
+              )
+            }
+          }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+        } label: {
+          Text("Advanced overrides")
+            .scaledFont(.caption.bold())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
       }
     }
@@ -262,7 +298,7 @@ extension AgentsWindowView {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           Text("Ready to launch")
             .scaledFont(.headline)
-          Text("Start \(selectedAgentLaunchTitle) with the selected provider and configuration.")
+          Text(terminalLaunchCalloutText)
             .scaledFont(.subheadline)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .fixedSize(horizontal: false, vertical: true)
@@ -280,6 +316,16 @@ extension AgentsWindowView {
         .disabled(!canStartTerminal)
       }
     }
+  }
+
+  private var terminalLaunchCalloutText: String {
+    var message = "Launches as \(viewModel.selectedRole.title)."
+
+    if showsAcpFallbackRoleMenu {
+      message += " If a leader is already active, it joins as \(viewModel.selectedAcpFallbackRole.title)."
+    }
+
+    return message
   }
 
 }

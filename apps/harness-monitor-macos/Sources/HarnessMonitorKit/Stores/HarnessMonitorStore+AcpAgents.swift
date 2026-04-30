@@ -2,6 +2,12 @@ import Foundation
 import SwiftData
 
 extension HarnessMonitorStore {
+  enum AcpStartRecoveryOutcome {
+    case notAttempted
+    case succeeded(AcpAgentSnapshot)
+    case failed
+  }
+
   /// Pending ACP queue for the selected session.
   ///
   /// UI-0 contract: this array stays oldest-first by daemon `createdAt`, but selection/presentation
@@ -38,8 +44,14 @@ extension HarnessMonitorStore {
   @discardableResult
   public func startAcpAgent(
     agentID: String,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String?,
     prompt: String?,
     projectDir: String? = nil,
+    persona: String? = nil,
+    recordPermissions: Bool = false,
     sessionID: String? = nil
   ) async -> AcpAgentSnapshot? {
     let actionName = "Agent started"
@@ -51,31 +63,197 @@ extension HarnessMonitorStore {
         prepareSelectedSessionAction(named: actionName)
       }
     guard let action else { return nil }
+    let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedProjectDir = projectDir?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedPersona = persona?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedCapabilities =
+      capabilities
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    let request = AcpAgentStartRequest(
+      agent: agentID,
+      role: role,
+      fallbackRole: fallbackRole,
+      capabilities: normalizedCapabilities,
+      name: trimmedName?.isEmpty == false ? trimmedName : nil,
+      prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
+      projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
+      persona: trimmedPersona?.isEmpty == false ? trimmedPersona : nil,
+      recordPermissions: recordPermissions
+    )
 
     do {
-      let measuredSnapshot = try await Self.measureOperation {
-        try await action.client.startManagedAcpAgent(
-          sessionID: action.sessionID,
-          request: AcpAgentStartRequest(
-            agent: agentID,
-            prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
-            projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil
-          )
-        )
-      }
-      recordRequestSuccess()
-      guard case .acp(let snapshot) = measuredSnapshot.value else {
+      let measuredSnapshot = try await measureAcpAgentStart(
+        using: action.client,
+        sessionID: action.sessionID,
+        request: request
+      )
+      guard let snapshot = acpAgentSnapshot(from: measuredSnapshot.value) else {
         presentFailureFeedback("Agent controller returned an unexpected response.")
         return nil
       }
-      applyAcpAgent(snapshot)
-      presentSuccessFeedback(actionName)
+      applyAcpAgentStartSuccess(snapshot, actionName: actionName)
       return snapshot
+    } catch let apiError as HarnessMonitorAPIError {
+      let firstFailureRecordedAt = Date.now
+      switch await recoverAcpStartAfterBridgeFailure(
+        using: action.client,
+        sessionID: action.sessionID,
+        request: request,
+        error: apiError,
+        firstFailureRecordedAt: firstFailureRecordedAt
+      ) {
+      case .succeeded(let snapshot):
+        applyAcpAgentStartSuccess(snapshot, actionName: actionName)
+        return snapshot
+      case .failed:
+        return nil
+      case .notAttempted:
+        break
+      }
+      if case .server(let code, _) = apiError, code == 501 || code == 503 {
+        markHostBridgeIssue(
+          for: "acp",
+          statusCode: code,
+          recordedAt: firstFailureRecordedAt
+        )
+        presentFailureFeedback(acpHostBridgeFailureMessage())
+        return nil
+      }
+      presentFailureFeedback(apiError.localizedDescription)
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
+    }
+  }
+
+  private func applyAcpAgentStartSuccess(
+    _ snapshot: AcpAgentSnapshot,
+    actionName: String
+  ) {
+    recordRequestSuccess()
+    clearHostBridgeIssue(for: "acp")
+    applyAcpAgent(snapshot)
+    presentSuccessFeedback(actionName)
+  }
+
+  private func measureAcpAgentStart(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    request: AcpAgentStartRequest
+  ) async throws -> MeasuredOperation<ManagedAgentSnapshot> {
+    try await Self.measureOperation {
+      try await client.startManagedAcpAgent(sessionID: sessionID, request: request)
+    }
+  }
+
+  private func acpAgentSnapshot(from snapshot: ManagedAgentSnapshot) -> AcpAgentSnapshot? {
+    guard case .acp(let acpSnapshot) = snapshot else {
+      return nil
+    }
+    return acpSnapshot
+  }
+
+  private func recoverAcpStartAfterBridgeFailure(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    request: AcpAgentStartRequest,
+    error: HarnessMonitorAPIError,
+    firstFailureRecordedAt: Date
+  ) async -> AcpStartRecoveryOutcome {
+    guard case .server(let code, _) = error, code == 501 || code == 503 else {
+      return .notAttempted
+    }
+    guard daemonStatus?.manifest?.sandboxed == true else {
+      return .notAttempted
+    }
+
+    let currentHostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    if let recovery = await retryAcpStartIfRunningHostBridge(
+      using: client,
+      sessionID: sessionID,
+      request: request,
+      firstFailureRecordedAt: firstFailureRecordedAt,
+      hostBridge: currentHostBridge
+    ) {
+      return recovery
+    }
+
+    await refreshDaemonStatus()
+    reconcileHostBridgeIssueFromManifest(for: "acp")
+
+    let refreshedHostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    guard daemonStatus?.manifest?.sandboxed == true else {
+      return .notAttempted
+    }
+    guard let recovery = await retryAcpStartIfRunningHostBridge(
+      using: client,
+      sessionID: sessionID,
+      request: request,
+      firstFailureRecordedAt: firstFailureRecordedAt,
+      hostBridge: refreshedHostBridge
+    ) else {
+      return .notAttempted
+    }
+    return recovery
+  }
+
+  private func retryAcpStartIfRunningHostBridge(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    request: AcpAgentStartRequest,
+    firstFailureRecordedAt: Date,
+    hostBridge: HostBridgeManifest
+  ) async -> AcpStartRecoveryOutcome? {
+    guard hostBridge.running else {
+      return nil
+    }
+    if hostBridge.capabilities["acp"]?.healthy != true {
+      switch await mutateHostBridgeCapability(
+        using: client,
+        capability: "acp",
+        enabled: true,
+        force: false,
+        announceFeedback: false
+      ) {
+      case .success:
+        break
+      case .requiresForce(let message):
+        presentFailureFeedback(message)
+        return .failed
+      case .failed:
+        return .failed
+      }
+    }
+
+    do {
+      let measuredSnapshot = try await measureAcpAgentStart(
+        using: client,
+        sessionID: sessionID,
+        request: request
+      )
+      guard let snapshot = acpAgentSnapshot(from: measuredSnapshot.value) else {
+        presentFailureFeedback("Agent controller returned an unexpected response.")
+        return .failed
+      }
+      return .succeeded(snapshot)
+    } catch let retryError as HarnessMonitorAPIError {
+      if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
+        markHostBridgeIssue(
+          for: "acp",
+          statusCode: retryCode,
+          recordedAt: firstFailureRecordedAt
+        )
+        presentFailureFeedback(acpHostBridgeFailureMessage())
+        return .failed
+      }
+      presentFailureFeedback(retryError.localizedDescription)
+      return .failed
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return .failed
     }
   }
 

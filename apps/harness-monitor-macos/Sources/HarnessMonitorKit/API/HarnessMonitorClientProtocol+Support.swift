@@ -66,8 +66,8 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     switch feature {
     case "acp.host-bridge":
       """
-      ACP sessions can't make tool calls because the shared host bridge isn't \
-      running. Start the host bridge and try again.
+      ACP project access isn't available on the shared host bridge. Start the \
+      host bridge or enable ACP and try again.
       """
     case "agent-tui.host-bridge":
       """

@@ -17,14 +17,14 @@ struct AgentsCreateSectionCard<Content: View>: View {
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           style: .continuous
         )
-        .fill(HarnessMonitorTheme.ink.opacity(0.035))
+        .fill(HarnessMonitorTheme.ink.opacity(0.055))
       )
       .overlay {
         RoundedRectangle(
           cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
           style: .continuous
         )
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.6), lineWidth: 1)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.8), lineWidth: 1)
       }
   }
 }
@@ -37,9 +37,49 @@ struct AgentsCreateSectionHeading: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(title)
         .scaledFont(.headline)
+        .accessibilityAddTraits(.isHeader)
       Text(description)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+}
+
+struct AgentsCreateSummaryFact: Identifiable, Equatable {
+  let title: String
+  let value: String
+
+  var id: String { title }
+}
+
+struct AgentsCreateSummaryFactsView: View {
+  let facts: [AgentsCreateSummaryFact]
+
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingLG) {
+        ForEach(facts) { fact in
+          summaryFact(fact)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        ForEach(facts) { fact in
+          summaryFact(fact)
+        }
+      }
+    }
+  }
+
+  private func summaryFact(_ fact: AgentsCreateSummaryFact) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(fact.title)
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(fact.value)
+        .scaledFont(.body.weight(.semibold))
         .fixedSize(horizontal: false, vertical: true)
     }
   }
@@ -106,25 +146,37 @@ struct AgentsCreateProviderRow: View {
 
   private var subtitle: String {
     if currentChoice.id.isAcp {
-      return "Starts with project access ready."
+      return "Starts with project access."
     }
-    if let acpChoice = option.acpChoice, option.isEnabled(acpChoice) {
-      return "Starts in a terminal screen. Project access is also available."
+    if let projectAccessStatusText {
+      return "Starts in Terminal. \(projectAccessStatusText)"
     }
-    if option.showsInstallCTA {
-      return "Starts in a terminal screen. Install project access for richer project context."
+    return "Starts in Terminal."
+  }
+
+  private var projectAccessStatusText: String? {
+    guard option.acpChoice != nil else {
+      return nil
     }
-    return "Starts in a terminal screen."
+
+    switch option.availabilityState {
+    case .projectAccessAvailable:
+      return "Project access is also available."
+    case .checkingAccess:
+      return "Project access is still being checked."
+    case .setupRequired:
+      return "Project access needs CLI setup."
+    case .bridgeAccessRequired:
+      return "Project access needs bridge setup."
+    case .terminalOnly:
+      return "Project access isn't available for this provider yet."
+    case .unavailable:
+      return option.projectAccessGuidanceText ?? "Project access isn't available for this provider yet."
+    }
   }
 
   private var statusTint: Color {
-    if option.showsInstallCTA {
-      return HarnessMonitorTheme.caution
-    }
-    if option.transportChoices.contains(where: { $0.id.isAcp }) {
-      return option.isEnabled ? HarnessMonitorTheme.success : HarnessMonitorTheme.secondaryInk
-    }
-    return HarnessMonitorTheme.accent
+    option.availabilityState.tint
   }
 
   var body: some View {
@@ -135,8 +187,16 @@ struct AgentsCreateProviderRow: View {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
           HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
             VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-              Text(option.title)
-                .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+              HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+                Text(option.title)
+                  .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+
+                if isSelected {
+                  Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(HarnessMonitorTheme.accent)
+                    .accessibilityHidden(true)
+                }
+              }
               Text(subtitle)
                 .scaledFont(.caption)
                 .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -145,11 +205,15 @@ struct AgentsCreateProviderRow: View {
 
             Spacer(minLength: HarnessMonitorTheme.spacingSM)
 
-            AgentsCreateProviderStatusBadge(title: option.statusText, tint: statusTint)
+            AgentsCreateProviderStatusBadge(
+              title: option.availabilityState.compactTitle,
+              tint: statusTint,
+              systemImage: option.availabilityState.symbolName
+            )
           }
 
-          Text(capabilitySummary)
-            .scaledFont(.caption)
+          Text("Capabilities: \(capabilitySummary)")
+            .scaledFont(.caption2)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(2)
         }
@@ -157,13 +221,13 @@ struct AgentsCreateProviderRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-            .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.1) : .clear)
+            .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.14) : .clear)
         }
         .overlay {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
             .stroke(
-              HarnessMonitorTheme.accent.opacity(0.45),
-              lineWidth: 1.5
+              HarnessMonitorTheme.accent.opacity(0.7),
+              lineWidth: 1.75
             )
             .opacity(isSelected ? 1 : 0)
         }
@@ -174,7 +238,7 @@ struct AgentsCreateProviderRow: View {
         extraHoverHint: isSelected
       )
       .accessibilityLabel(option.title)
-      .accessibilityHint("Select provider")
+      .accessibilityHint(isSelected ? "Selected provider" : "Select provider")
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.segmentedOption(
           HarnessMonitorAccessibility.agentTuiRuntimePicker,
@@ -192,9 +256,10 @@ struct AgentsCreateProviderRow: View {
 struct AgentsCreateProviderStatusBadge: View {
   let title: String
   let tint: Color
+  let systemImage: String
 
   var body: some View {
-    Text(title)
+    Label(title, systemImage: systemImage)
       .scaledFont(.caption.weight(.semibold))
       .harnessPillPadding()
       .harnessContentPill(tint: tint)
@@ -215,29 +280,39 @@ struct AgentsCreateTransportChoiceButton: View {
   }
 
   var body: some View {
-    Button {
-      selection.wrappedValue = choice.id
-    } label: {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-        Text(shortTitle)
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Button {
+        selection.wrappedValue = choice.id
+      } label: {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          Text(shortTitle)
+        }
+        .frame(maxWidth: .infinity)
       }
-      .frame(maxWidth: .infinity)
-    }
-    .harnessActionButtonStyle(
-      variant: isSelected ? .prominent : .bordered,
-      tint: isSelected ? nil : .secondary
-    )
-    .disabled(!isEnabled)
-    .accessibilityLabel("\(providerTitle), \(choice.title)")
-    .accessibilityValue(isSelected ? "Selected" : "")
-    .accessibilityHint(isEnabled ? "" : (unavailableReason ?? "Unavailable"))
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.agentCapabilityTransportButton(
-        optionID,
-        transportID: choice.id.accessibilityIDComponent
+      .harnessActionButtonStyle(
+        variant: isSelected ? .prominent : .bordered,
+        tint: isSelected ? nil : .secondary
       )
-    )
+      .disabled(!isEnabled)
+      .accessibilityLabel("\(providerTitle), \(choice.title)")
+      .accessibilityValue(isSelected ? "Selected" : "")
+      .accessibilityHint(isEnabled ? "" : (unavailableReason ?? "Unavailable"))
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.agentCapabilityTransportButton(
+          optionID,
+          transportID: choice.id.accessibilityIDComponent
+        )
+      )
+
+      if !isEnabled, let unavailableReason {
+        Text(unavailableReason)
+          .scaledFont(.caption2)
+          .foregroundStyle(HarnessMonitorTheme.caution)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -247,13 +322,13 @@ struct AgentsCreateDiagnosticsDisclosure: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Button(isExpanded ? "Hide diagnostics" : "Show diagnostics") {
+      Button(isExpanded ? "Hide setup details" : "Show setup details") {
         isExpanded.toggle()
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .accessibilityLabel(
-        "\(isExpanded ? "Hide" : "Show") diagnostics for \(option.title)"
+        "\(isExpanded ? "Hide" : "Show") setup details for \(option.title)"
       )
       .accessibilityHint(option.statusText)
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id))

@@ -2,6 +2,10 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  var showsAcpFallbackRoleMenu: Bool {
+    viewModel.selectedLaunchSelection.isAcp && viewModel.selectedRole == .leader
+  }
+
   var selectedCapabilityOption: AgentCapabilityOption? {
     agentCapabilityOptions.first { option in
       option.transportChoices.contains { $0.id == viewModel.selectedLaunchSelection }
@@ -19,21 +23,24 @@ extension AgentsWindowView {
     for option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> String? {
-    if case .acp = choice.id {
-      return option.projectAccessGuidanceText
+    guard case .acp = choice.id else {
+      return nil
     }
-    return nil
-  }
 
-  func providerStatusTint(for option: AgentCapabilityOption) -> Color {
-    option.availabilityState.tint
-  }
-
-  func transportChoiceSummary(for choice: AgentCapabilityTransportChoice) -> String {
-    if choice.id.isAcp {
-      return "Starts with project access available."
+    switch option.availabilityState {
+    case .projectAccessAvailable:
+      return nil
+    case .checkingAccess:
+      return "Project access is still being checked."
+    case .setupRequired:
+      return "Project access requires CLI setup. Copy install instructions below."
+    case .bridgeAccessRequired:
+      return "Project access requires bridge setup. Open setup details below."
+    case .terminalOnly:
+      return "Project access isn't available for this provider yet."
+    case .unavailable:
+      return option.projectAccessGuidanceText ?? "Project access isn't available for this provider yet."
     }
-    return "Opens in Terminal."
   }
 
   func transportSummary(
@@ -64,33 +71,18 @@ extension AgentsWindowView {
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         roleMenu
+        if showsAcpFallbackRoleMenu {
+          acpFallbackRoleMenu
+        }
         personaMenu
       }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         roleMenu
+        if showsAcpFallbackRoleMenu {
+          acpFallbackRoleMenu
+        }
         personaMenu
       }
-    }
-  }
-
-  func terminalConfigurationHeader(
-    option: AgentCapabilityOption,
-    choice: AgentCapabilityTransportChoice
-  ) -> some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text(option.title)
-          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-        Text(transportSummary(for: option, choice: choice))
-          .scaledFont(.subheadline)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      AgentsCreateProviderStatusBadge(
-        title: option.statusText,
-        tint: providerStatusTint(for: option)
-      )
     }
   }
 
@@ -101,30 +93,21 @@ extension AgentsWindowView {
   ) -> some View {
     if option.transportChoices.count > 1 {
       AgentsCreateFieldBlock(
-        title: "Launch with",
-        help:
-          "Choose whether this provider opens in a terminal first "
-          + "or starts with project access when available."
+        title: "Start with",
+        help: "Choose whether this provider opens in Terminal or joins with project access."
       ) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          HStack(spacing: HarnessMonitorTheme.spacingSM) {
-            ForEach(option.transportChoices) { transportChoice in
-              AgentsCreateTransportChoiceButton(
-                providerTitle: option.title,
-                optionID: option.id,
-                choice: transportChoice,
-                selection: context.selection,
-                isSelected: context.normalizedSelection == transportChoice.id,
-                isEnabled: option.isEnabled(transportChoice),
-                unavailableReason: unavailableReason(for: option, choice: transportChoice)
-              )
-            }
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          ForEach(option.transportChoices) { transportChoice in
+            AgentsCreateTransportChoiceButton(
+              providerTitle: option.title,
+              optionID: option.id,
+              choice: transportChoice,
+              selection: context.selection,
+              isSelected: context.normalizedSelection == transportChoice.id,
+              isEnabled: option.isEnabled(transportChoice),
+              unavailableReason: unavailableReason(for: option, choice: transportChoice)
+            )
           }
-
-          Text(transportChoiceSummary(for: context.choice))
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }
@@ -153,7 +136,7 @@ extension AgentsWindowView {
       HarnessMonitorActionButton(
         title: option.installActionTitle,
         tint: .orange,
-        variant: .bordered,
+        variant: .prominent,
         accessibilityIdentifier: installButtonID,
         fillsWidth: false
       ) {
@@ -163,7 +146,11 @@ extension AgentsWindowView {
       .accessibilityHint(option.installAccessibilityHint ?? "")
     }
 
-    if option.doctorProbeText != nil {
+    if option.availabilityState == .checkingAccess
+      || option.availabilityState == .setupRequired
+      || option.availabilityState == .bridgeAccessRequired
+      || option.availabilityState == .unavailable
+    {
       AgentsCreateDiagnosticsDisclosure(option: option)
         .id(option.id)
     }
@@ -174,7 +161,7 @@ extension AgentsWindowView {
       title: "Model",
       help: "Choose the default model for the selected provider."
     ) {
-      Picker("Model", selection: context.modelBinding) {
+      Picker(selectedTerminalModelMenuTitle(context: context), selection: context.modelBinding) {
         ForEach(context.catalogModels) { model in
           Text(model.displayName)
             .tag(model.id)
@@ -197,7 +184,13 @@ extension AgentsWindowView {
       .pickerStyle(.menu)
       .harnessNativeFormControl()
       .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsModelPicker).frame")
+      .accessibilityLabel("Model")
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsModelPicker)
+
+      Text(selectedTerminalModelStateText(context: context))
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
 
       if context.modelBinding.wrappedValue == RuntimeCustomModel.tag {
         TextField("Provider-specific model id", text: context.customModelBinding)
@@ -205,6 +198,46 @@ extension AgentsWindowView {
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCustomModelField)
       }
     }
+  }
+
+  func selectedTerminalModelStateText(context: TerminalConfigurationContext) -> String {
+    let selectedModelID = context.modelBinding.wrappedValue
+    if selectedModelID == RuntimeCustomModel.tag {
+      let customModelID = context.customModelBinding.wrappedValue.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      )
+      if customModelID.isEmpty {
+        return "Custom model selected. Enter the provider-specific id below."
+      }
+      return "Using custom model \(customModelID)."
+    }
+
+    let displayName =
+      context.catalogModels.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
+    return "Using \(displayName)."
+  }
+
+  func selectedTerminalModelMenuTitle(context: TerminalConfigurationContext) -> String {
+    let selectedModelID = context.modelBinding.wrappedValue
+    if selectedModelID == RuntimeCustomModel.tag {
+      let customModelID = context.customModelBinding.wrappedValue.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      )
+      return customModelID.isEmpty ? "Custom model" : customModelID
+    }
+
+    return context.catalogModels.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
+  }
+
+  var selectedPersonaStateText: String {
+    guard let selectedPersona = viewModel.selectedPersona,
+      let personaName = viewModel.availablePersonas.first(where: { $0.identifier == selectedPersona })?
+        .name
+    else {
+      return "No persona selected."
+    }
+
+    return "Using \(personaName)."
   }
 
   @ViewBuilder

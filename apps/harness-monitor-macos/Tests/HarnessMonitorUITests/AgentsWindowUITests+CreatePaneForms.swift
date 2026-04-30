@@ -88,7 +88,7 @@ extension AgentsWindowUITests {
       in: app,
       identifier: Accessibility.segmentedOption(
         Accessibility.agentTuiCreateModePicker,
-        option: "Codex"
+        option: "Codex Run"
       )
     )
 

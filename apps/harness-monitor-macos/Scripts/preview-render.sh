@@ -9,7 +9,8 @@
 #   preview-render.sh --file <path> --index <N>
 #
 # Environment:
-#   PREVIEW_TIMEOUT_SECONDS  render timeout (default 120)
+#   PREVIEW_TIMEOUT_SECONDS  render timeout (default 240)
+#   PREVIEW_CALL_TIMEOUT_MS  xcode-cli call timeout in ms (default: render timeout + 30s)
 
 set -euo pipefail
 
@@ -18,7 +19,8 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
 MANIFEST="$PROJECT_DIR/Previews.json"
 OUT_DIR="$PROJECT_DIR/tmp/previews"
-TIMEOUT="${PREVIEW_TIMEOUT_SECONDS:-120}"
+TIMEOUT="${PREVIEW_TIMEOUT_SECONDS:-240}"
+CALL_TIMEOUT_MS="${PREVIEW_CALL_TIMEOUT_MS:-$(((TIMEOUT * 1000) + 30000))}"
 XCODE_PROJECT_PATH_PREFIX="apps/HarnessMonitor/Project/"
 
 require() {
@@ -133,7 +135,7 @@ run_once() {
   local xcode_entry_file
   xcode_entry_file="$(xcode_project_file "$entry_file")"
   started=$(date +%s)
-  if (cd "$PROJECT_DIR" && XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews xcode-cli preview "$xcode_entry_file" \
+  if (cd "$PROJECT_DIR" && XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews xcode-cli --timeout "$CALL_TIMEOUT_MS" preview "$xcode_entry_file" \
       --index "$entry_index" \
       --render-timeout "$TIMEOUT" \
       --out "$png_path") \

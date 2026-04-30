@@ -60,6 +60,61 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }
 
+  @Test("ACP host bridge enable updates manifest and clears excluded issue")
+  func setAcpHostBridgeCapabilityEnableUpdatesManifest() async {
+    let client = RecordingHarnessClient()
+    client.configureHostBridgeStatusReport(
+      BridgeStatusReport(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        pid: 4321,
+        startedAt: "2026-04-11T10:00:00Z",
+        uptimeSeconds: 15,
+        capabilities: [
+          "acp": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          ),
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          ),
+        ]
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [
+          "agent-tui": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          )
+        ]
+      )
+    )
+    store.hostBridgeCapabilityIssues["acp"] = .excluded
+
+    let result = await store.setHostBridgeCapability("acp", enabled: true)
+
+    #expect(result == .success)
+    #expect(
+      client.recordedCalls()
+        == [.reconfigureHostBridge(enable: ["acp"], disable: [], force: false)]
+    )
+    #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
+    #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
+    #expect(
+      store.daemonStatus?.manifest?.hostBridge.capabilities["acp"]?.endpoint
+        == "/tmp/bridge.sock")
+    #expect(store.currentSuccessFeedbackMessage == "Enabled ACP host bridge")
+  }
+
   @Test("Managed host bridge reconfigure recovers from legacy daemon 404 by restarting once")
   func setHostBridgeCapabilityManaged404RecoveryRestartsDaemon() async {
     let staleClient = RecordingHarnessClient()

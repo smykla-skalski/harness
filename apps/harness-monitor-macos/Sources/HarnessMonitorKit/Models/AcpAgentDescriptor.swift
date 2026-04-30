@@ -92,19 +92,34 @@ public enum AcpAuthState: String, Codable, Equatable, Sendable {
 
 public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
   public let agent: String
+  public let role: SessionRole
+  public let fallbackRole: SessionRole?
+  public let capabilities: [String]
+  public let name: String?
   public let prompt: String?
   public let projectDir: String?
+  public let persona: String?
   public let recordPermissions: Bool
 
   public init(
     agent: String,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String? = nil,
     prompt: String? = nil,
     projectDir: String? = nil,
+    persona: String? = nil,
     recordPermissions: Bool = false
   ) {
     self.agent = agent
+    self.role = role
+    self.fallbackRole = fallbackRole
+    self.capabilities = capabilities
+    self.name = name
     self.prompt = prompt
     self.projectDir = projectDir
+    self.persona = persona
     self.recordPermissions = recordPermissions
   }
 }

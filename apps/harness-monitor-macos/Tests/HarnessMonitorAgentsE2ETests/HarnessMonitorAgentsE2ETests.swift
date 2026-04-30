@@ -23,7 +23,7 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
     selectSegment(
       in: app,
       controlIdentifier: Accessibility.agentTuiCreateModePicker,
-      title: "Terminal"
+      title: "Agent"
     )
     selectSegment(
       in: app,
