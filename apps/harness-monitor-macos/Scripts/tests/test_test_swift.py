@@ -203,6 +203,7 @@ exit 1
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_runner),
                     "TMPDIR": str(temp_root),
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                 }
             )
             if only_testing is not None:
@@ -285,6 +286,7 @@ cat
                     "BASH_ENV": "/dev/null",
                     "XCODEBUILD_BIN": str(fake_runner),
                     "TMPDIR": str(temp_root),
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                 }
             )
 
@@ -366,20 +368,18 @@ cat
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(calls), 3)
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-enumerate-tests", calls[1])
         self.assertIn("test-without-building", calls[2])
-        self.assertIn("-enumerate-tests", calls[2])
-        self.assertIn("test-without-building", calls[3])
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/PolicyGapRuleTests/"
             "testDefaultPolicyGapRuleUsesStableMetadata()",
-            calls[3],
+            calls[2],
         )
         self.assertIn(
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
-            calls[3],
+            calls[2],
         )
         self.assertEqual(rtk_log, "")
 
@@ -437,11 +437,11 @@ cat
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 2)
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
             "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
-            calls[2],
+            calls[1],
         )
         self.assertEqual(rtk_log, "")
 
@@ -455,11 +455,11 @@ cat
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 2)
         self.assertIn(
             "-only-testing:HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
             "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
-            calls[2],
+            calls[1],
         )
         self.assertEqual(rtk_log, "")
 

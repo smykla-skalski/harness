@@ -61,6 +61,24 @@ class ResolveCargoTargetDirTests(unittest.TestCase):
 
         self.assertEqual(resolved, f"{repo_root}/.cache/harness-monitor-xcode-daemon")
 
+    def test_replaces_legacy_spotlight_cache_symlink_with_real_cache_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir) / "repo"
+            repo_root.mkdir()
+            (repo_root / ".cache").symlink_to(".spotlight-build-artifacts.noindex/.cache")
+
+            resolved = run_helper(
+                f'repo_root="{repo_root}"; '
+                'export TARGET_TEMP_DIR="/tmp/DerivedData/HarnessMonitorUITestHost.build"; '
+                "unset CARGO_TARGET_DIR; "
+                "resolve_cargo_target_dir"
+            )
+
+            self.assertEqual(resolved, f"{repo_root}/.cache/harness-monitor-xcode-daemon")
+            self.assertFalse((repo_root / ".cache").is_symlink())
+            self.assertTrue((repo_root / ".cache").is_dir())
+            self.assertFalse((repo_root / ".spotlight-build-artifacts.noindex").exists())
+
     def test_worktree_defaults_to_common_repo_target_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir) / "repo"
