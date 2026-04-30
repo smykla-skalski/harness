@@ -28,53 +28,46 @@ struct SessionCockpitView: View {
 
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitView") {
-      ScrollViewReader { scrollProxy in
-        HarnessMonitorColumnScrollView(
-          horizontalPadding: 24,
-          verticalPadding: HarnessMonitorTheme.spacingXL,
-          constrainContentWidth: true,
-          readableWidth: false,
-          topScrollEdgeEffect: .soft
-        ) {
-          VStack(alignment: .leading, spacing: 16) {
-            SessionCockpitHeaderCard(
-              store: store,
-              detail: detail,
-              observeSelectedSession: { Task { await store.observeSelectedSession() } },
-              requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-              inspectObserver: focusObserver
-            )
-            if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
-              SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
-            }
-            HarnessMonitorAdaptiveGridLayout(
-              minimumColumnWidth: 340,
-              maximumColumns: 3,
-              spacing: 16
-            ) {
-              taskSection
-              agentSection
-              signalSection
-            }
-            SessionCockpitTimelineSection(
-              sessionID: detail.session.sessionId,
-              timeline: timeline,
-              timelineWindow: timelineWindow,
-              decisions: store.supervisorOpenDecisions,
-              isTimelineLoading: isTimelineLoading,
-              actionHandler: store.supervisorDecisionActionHandler(),
-              loadWindow: { request in
-                await store.loadSelectedTimelineWindow(request: request)
-              },
-              scrollToTimelineTarget: { target in
-                withAnimation(.snappy(duration: 0.22, extraBounce: 0)) {
-                  scrollProxy.scrollTo(target.id, anchor: target.anchor)
-                }
-              }
-            )
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: 24,
+        verticalPadding: HarnessMonitorTheme.spacingXL,
+        constrainContentWidth: true,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft
+      ) {
+        VStack(alignment: .leading, spacing: 16) {
+          SessionCockpitHeaderCard(
+            store: store,
+            detail: detail,
+            observeSelectedSession: { Task { await store.observeSelectedSession() } },
+            requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+            inspectObserver: focusObserver
+          )
+          if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
+            SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
+          HarnessMonitorAdaptiveGridLayout(
+            minimumColumnWidth: 340,
+            maximumColumns: 3,
+            spacing: 16
+          ) {
+            taskSection
+            agentSection
+            signalSection
+          }
+          SessionCockpitTimelineSection(
+            sessionID: detail.session.sessionId,
+            timeline: timeline,
+            timelineWindow: timelineWindow,
+            decisions: store.supervisorOpenDecisions,
+            isTimelineLoading: isTimelineLoading,
+            actionHandler: store.supervisorDecisionActionHandler(),
+            loadWindow: { request in
+              await store.loadSelectedTimelineWindow(request: request)
+            }
+          )
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
