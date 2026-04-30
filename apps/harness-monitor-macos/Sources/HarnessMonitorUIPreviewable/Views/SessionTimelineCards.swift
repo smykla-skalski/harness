@@ -62,7 +62,7 @@ private struct SessionTimelineNodeRow: View {
   }
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .sessionTimelineMarkerCenter, spacing: HarnessMonitorTheme.itemSpacing) {
       Text(row.timestampLabel)
         .scaledFont(.caption.monospaced())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -80,6 +80,9 @@ private struct SessionTimelineNodeRow: View {
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .background(SessionTimelineCardBackground(tint: cardTint))
+      .alignmentGuide(.sessionTimelineMarkerCenter) { _ in
+        SessionTimelineLayout.singleLineMarkerCenterY
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .contextMenu {
@@ -210,8 +213,23 @@ private struct SessionTimelineNodeRow: View {
 enum SessionTimelineLayout {
   static let timeColumnWidth: CGFloat = 92
   static let railWidth: CGFloat = 14
+  static let markerDiameter: CGFloat = 19
+  static let markerCoreDiameter: CGFloat = 11
+  static let singleLineMarkerCenterY = HarnessMonitorTheme.spacingSM + (markerDiameter / 2)
   static let railLineOffset =
     timeColumnWidth + HarnessMonitorTheme.itemSpacing + (railWidth / 2)
+}
+
+extension VerticalAlignment {
+  fileprivate enum SessionTimelineMarkerCenter: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat {
+      context[VerticalAlignment.center]
+    }
+  }
+
+  fileprivate static let sessionTimelineMarkerCenter = VerticalAlignment(
+    SessionTimelineMarkerCenter.self
+  )
 }
 
 private struct SessionTimelineRailBackground: View {
@@ -237,13 +255,18 @@ private struct SessionTimelineDot: View {
     ZStack {
       Circle()
         .fill(.background)
-        .frame(width: 19, height: 19)
+        .frame(
+          width: SessionTimelineLayout.markerDiameter,
+          height: SessionTimelineLayout.markerDiameter
+        )
       Circle()
         .fill(tint)
-        .frame(width: 11, height: 11)
+        .frame(
+          width: SessionTimelineLayout.markerCoreDiameter,
+          height: SessionTimelineLayout.markerCoreDiameter
+        )
     }
     .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
-    .padding(.top, 6)
     .shadow(color: tint.opacity(0.4), radius: 8)
     .accessibilityHidden(true)
   }
