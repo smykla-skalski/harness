@@ -24,7 +24,7 @@ final class AttentionInfrastructureUITestsUserNotification:
   private static let decisionID = "acp-permission:\(previewBatchID)"
   private static let primaryActionID = "approve-selected"
 
-  func testAcpPermissionToastCouncilPreviewSnapshot() throws {
+  func testAcpPermissionToastPreviewSnapshot() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
         Self.uiTestsKey: "1",

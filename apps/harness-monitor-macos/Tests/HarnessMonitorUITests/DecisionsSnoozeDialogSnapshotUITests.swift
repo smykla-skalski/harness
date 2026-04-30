@@ -4,13 +4,13 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class CouncilSnapshotSnoozeDialogUITests: HarnessMonitorUITestCase {
+final class DecisionsSnoozeDialogSnapshotUITests: HarnessMonitorUITestCase {
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
-  private static let decisionID = "council-snooze-seed"
-  private static let snoozeActionID = "snooze-council-seed"
+  private static let decisionID = "snooze-snapshot-seed"
+  private static let snoozeActionID = "snooze-snapshot-action"
 
-  func testCaptureDecisionsWindowWithSnoozeConfirmationDialog() throws {
+  func testCaptureDecisionsWindowWithSnoozeDialogSnapshot() throws {
     let app = launch(
       mode: "empty",
       additionalEnvironment: [
@@ -44,19 +44,19 @@ final class CouncilSnapshotSnoozeDialogUITests: HarnessMonitorUITestCase {
 
     saveWindowSnapshot(
       decisionsWindow,
-      named: "council-snooze-confirmation-dialog"
+      named: "decisions-snooze-dialog"
     )
   }
 
   private func saveWindowSnapshot(_ window: XCUIElement, named name: String) {
     guard window.exists else {
-      XCTFail("Cannot capture council snapshot for \(name): target window does not exist.")
+      XCTFail("Cannot capture preview snapshot for \(name): target window does not exist.")
       return
     }
     let screenshot = window.screenshot()
     let artifactsDirectory =
       diagnosticsArtifactsDirectory(for: Self.artifactsDirectoryKey)
-      ?? URL(fileURLWithPath: "/tmp/harness-monitor-council-snapshots", isDirectory: true)
+      ?? URL(fileURLWithPath: "/tmp/harness-monitor-design-snapshots", isDirectory: true)
     let outputURL = artifactsDirectory.appendingPathComponent("\(name).png")
     do {
       try FileManager.default.createDirectory(
@@ -74,8 +74,8 @@ final class CouncilSnapshotSnoozeDialogUITests: HarnessMonitorUITestCase {
       "id": Self.decisionID,
       "severity": "warn",
       "ruleID": "stuck-agent",
-      "summary": "Council snooze snapshot seed",
-      "contextJSON": "{\"agentID\":\"agent-council\"}",
+      "summary": "Snooze snapshot seed",
+      "contextJSON": "{\"agentID\":\"agent-snapshot\"}",
       "suggestedActionsJSON": serializeJSONObject([
         [
           "id": Self.snoozeActionID,
