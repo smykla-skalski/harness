@@ -4,6 +4,8 @@ import SwiftUI
 
 struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
+  let liveAnnouncementRowIDs: Set<String>
+  let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
   let stopSession: () -> Void
 
   @AppStorage(
@@ -12,8 +14,27 @@ struct ToolCallTimelineView: View {
   private var verboseToolCallAnnouncements =
     HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsDefault
 
+  init(
+    entries: [TimelineEntry],
+    liveAnnouncementRowIDs: Set<String> = [],
+    overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice? = nil,
+    stopSession: @escaping () -> Void
+  ) {
+    self.entries = entries
+    self.liveAnnouncementRowIDs = liveAnnouncementRowIDs
+    self.overflowNotice = overflowNotice
+    self.stopSession = stopSession
+  }
+
   private var presentation: ToolCallTimelinePresentation {
     Self.materialisePresentation(from: entries)
+  }
+
+  private var announcementSnapshot: ToolCallTimelineAnnouncementSnapshot {
+    ToolCallTimelineAnnouncementSnapshot(
+      rows: presentation.rows,
+      liveRowIDs: liveAnnouncementRowIDs
+    )
   }
 
   var body: some View {
@@ -24,23 +45,32 @@ struct ToolCallTimelineView: View {
           .accessibilityAddTraits(.isHeader)
         Spacer()
         Button(role: .destructive, action: stopSession) {
-          Label("Stop session", systemImage: "stop.fill")
+          Label("Interrupt run", systemImage: "stop.fill")
         }
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
       }
-      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        ForEach(presentation.sections) { section in
-          ToolCallTimelineSectionView(section: section)
+      if let overflowNotice {
+        ToolCallTimelineOverflowNoticeView(notice: overflowNotice)
+      }
+      if presentation.rows.isEmpty {
+        Text("No tool calls yet.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      } else {
+        LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          ForEach(presentation.sections) { section in
+            ToolCallTimelineSectionView(section: section)
+          }
         }
       }
     }
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolCallTimeline)
-    .onChange(of: presentation.announcementStates) { oldValue, _ in
+    .onChange(of: announcementSnapshot) { oldValue, newValue in
       announceToolCallStateChanges(
         from: oldValue,
-        rows: presentation.rows
+        to: newValue
       )
     }
   }
@@ -132,17 +162,17 @@ struct ToolCallTimelineView: View {
   static func orderedAnnouncementRows(
     previousStates: [String: ToolCallTimelineRow.Status],
     rows: [ToolCallTimelineRow],
+    liveAnnouncementRowIDs: Set<String>,
     verboseAnnouncements: Bool
   ) -> [ToolCallTimelineRow] {
-    guard !previousStates.isEmpty else {
-      return []
-    }
-    let currentIDs = Set(rows.map(\.id))
-    guard !currentIDs.isDisjoint(with: Set(previousStates.keys)) else {
+    guard !liveAnnouncementRowIDs.isEmpty else {
       return []
     }
     return rows.filter { row in
-      shouldAnnounceToolCallStatusChange(
+      guard liveAnnouncementRowIDs.contains(row.id) else {
+        return false
+      }
+      return shouldAnnounceToolCallStatusChange(
         previousStatus: previousStates[row.id],
         row: row,
         verboseAnnouncements: verboseAnnouncements
@@ -151,12 +181,13 @@ struct ToolCallTimelineView: View {
   }
 
   private func announceToolCallStateChanges(
-    from oldValue: [String: ToolCallTimelineRow.Status],
-    rows: [ToolCallTimelineRow]
+    from oldValue: ToolCallTimelineAnnouncementSnapshot,
+    to newValue: ToolCallTimelineAnnouncementSnapshot
   ) {
     for row in Self.orderedAnnouncementRows(
-      previousStates: oldValue,
-      rows: rows,
+      previousStates: oldValue.statusesByRowID,
+      rows: newValue.rows,
+      liveAnnouncementRowIDs: newValue.liveRowIDs,
       verboseAnnouncements: verboseToolCallAnnouncements
     ) {
       AccessibilityNotification.Announcement(row.announcementText).post()
@@ -170,12 +201,13 @@ struct ToolCallTimelinePresentation: Equatable {
   var rows: [ToolCallTimelineRow] {
     sections.flatMap(\.rows)
   }
+}
 
-  var rowsByID: [String: ToolCallTimelineRow] {
-    Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-  }
+struct ToolCallTimelineAnnouncementSnapshot: Equatable {
+  let rows: [ToolCallTimelineRow]
+  let liveRowIDs: Set<String>
 
-  var announcementStates: [String: ToolCallTimelineRow.Status] {
+  var statusesByRowID: [String: ToolCallTimelineRow.Status] {
     Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.status) })
   }
 }
@@ -248,6 +280,31 @@ struct ToolCallTimelineSectionHeader: View {
       }
     }
     .padding(.top, HarnessMonitorTheme.spacingXS)
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
+  }
+}
+
+struct ToolCallTimelineOverflowNoticeView: View {
+  let notice: HarnessMonitorStore.ToolCallTimelineOverflowNotice
+
+  var body: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .accessibilityHidden(true)
+      Text(
+        "The latest ACP burst condensed \(notice.rawUpdateCount) raw updates into \(notice.displayedEventCount) displayed tool calls. Older activity is omitted here."
+      )
+      .scaledFont(.caption)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .padding(HarnessMonitorTheme.spacingSM)
+    .background(
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
+        .fill(HarnessMonitorTheme.caution.opacity(0.12))
+    )
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -268,7 +325,18 @@ struct ToolCallTimelineRowView: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
       }
-      Spacer(minLength: 0)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      VStack(alignment: .trailing, spacing: 2) {
+        Text(row.statusDisplayText)
+          .scaledFont(.caption2.weight(.semibold))
+          .foregroundStyle(row.tint)
+        if let stopReasonText = row.formattedStopReason {
+          Text(stopReasonText)
+            .scaledFont(.caption2)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .multilineTextAlignment(.trailing)
+        }
+      }
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(row.accessibilityLabel)
@@ -279,6 +347,7 @@ struct ToolCallTimelineRowView: View {
 
 struct ToolCallTimelineRow: Identifiable, Equatable {
   let id: String
+  let toolCallID: String
   let entryId: String
   let recordedAt: String
   let sequence: UInt64?
@@ -301,29 +370,24 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
   }
 
   init?(entry: TimelineEntry) {
-    guard let event = Self.toolEventPayload(from: entry) else {
+    guard let metadata = entry.toolCallTimelineEntryMetadata(),
+      let status = Status(rawValue: metadata.status)
+    else {
       return nil
     }
 
-    let title = Self.toolName(from: entry, event: event)
-    let id = Self.toolCallID(from: entry, event: event)
-    let status = Self.status(for: entry, event: event)
-    guard let status else {
-      return nil
-    }
-
-    let payloadMetadata = Self.payloadMetadata(from: entry)
-    self.id = id
+    id = metadata.rowID
+    toolCallID = metadata.toolCallID
     entryId = entry.entryId
     recordedAt = entry.recordedAt
-    sequence = payloadMetadata?.sequence
-    self.title = title
+    sequence = metadata.sequence
+    title = metadata.toolName
     detail = entry.summary
     self.status = status
-    acpAgentID = payloadMetadata?.acpAgentID
-    agentDisplayName = payloadMetadata?.agentDisplayName
-    capabilityTags = payloadMetadata?.capabilityTags ?? []
-    stopReason = payloadMetadata?.stopReason
+    acpAgentID = metadata.acpAgentID
+    agentDisplayName = metadata.agentDisplayName
+    capabilityTags = metadata.capabilityTags
+    stopReason = metadata.stopReason
   }
 
   var symbolName: String {
@@ -349,21 +413,14 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
   }
 
   var accessibilityLabel: String {
-    if let agentDisplayName {
-      return "\(agentDisplayName), \(title)"
-    }
-    return title
+    detail
   }
 
   var accessibilityValue: String {
-    switch status {
-    case .started:
-      "In progress"
-    case .completed:
-      "Completed"
-    case .failed:
-      "Failed"
+    if let formattedStopReason {
+      return "\(statusDisplayText). \(formattedStopReason)"
     }
+    return statusDisplayText
   }
 
   var announcementText: String {
@@ -375,6 +432,33 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
       return "\(actor) completed \(title)"
     case .failed:
       return "\(actor) failed \(title)"
+    }
+  }
+
+  var statusDisplayText: String {
+    switch status {
+    case .started:
+      "In progress"
+    case .completed:
+      "Completed"
+    case .failed:
+      "Failed"
+    }
+  }
+
+  var formattedStopReason: String? {
+    guard let stopReason, !stopReason.isEmpty else {
+      return nil
+    }
+    switch stopReason {
+    case "end_turn":
+      return "Ended turn"
+    case "error":
+      return "Error"
+    default:
+      return stopReason
+        .replacingOccurrences(of: "_", with: " ")
+        .localizedCapitalized
     }
   }
 
@@ -390,133 +474,5 @@ struct ToolCallTimelineRow: Identifiable, Equatable {
       return self
     }
     return older
-  }
-
-  private static func payloadMetadata(from entry: TimelineEntry) -> PayloadMetadata? {
-    guard
-      case .object(let payload) = entry.payload,
-      case .object(let metadata)? = payload["tool_call_timeline"]
-    else {
-      return nil
-    }
-    return PayloadMetadata(
-      acpAgentID: metadata.stringValue(for: "acp_agent_id"),
-      agentDisplayName: metadata.stringValue(for: "agent_display_name"),
-      capabilityTags: metadata.arrayStringValues(for: "capability_tags"),
-      sequence: metadata.uint64Value(for: "sequence"),
-      stopReason: metadata.stringValue(for: "stop_reason")
-    )
-  }
-
-  private static func toolEventPayload(from entry: TimelineEntry) -> [String: JSONValue]? {
-    let canonicalKinds = ["tool_invocation", "tool_result", "tool_result_error"]
-    guard canonicalKinds.contains(entry.kind) || entry.kind == "conversation_event",
-      case .object(let payload) = entry.payload
-    else {
-      return nil
-    }
-    let eventPayload = payload["event"] ?? payload["kind"]
-    guard case .object(let event)? = eventPayload else {
-      return nil
-    }
-    return event
-  }
-
-  private static func toolName(from entry: TimelineEntry, event: [String: JSONValue]) -> String {
-    if case .object(let payload) = entry.payload,
-      case .object(let metadata)? = payload["tool_call_timeline"],
-      let metadataToolName = metadata.stringValue(for: "tool_name")
-    {
-      return metadataToolName
-    }
-    return event.stringValue(for: "tool_name") ?? "Tool"
-  }
-
-  private static func toolCallID(from entry: TimelineEntry, event: [String: JSONValue]) -> String {
-    if case .object(let payload) = entry.payload,
-      case .object(let metadata)? = payload["tool_call_timeline"],
-      let metadataToolCallID = metadata.stringValue(for: "tool_call_id")
-    {
-      return metadataToolCallID
-    }
-    return event.stringValue(for: "invocation_id") ?? entry.entryId
-  }
-
-  private static func status(
-    for entry: TimelineEntry,
-    event: [String: JSONValue]
-  ) -> Status? {
-    if case .object(let payload) = entry.payload,
-      case .object(let metadata)? = payload["tool_call_timeline"],
-      let rawStatus = metadata.stringValue(for: "status")
-    {
-      return Status(rawValue: rawStatus)
-    }
-
-    guard let eventType = event.stringValue(for: "type") else {
-      return nil
-    }
-    switch entry.kind {
-    case "tool_invocation":
-      return .started
-    case "tool_result_error":
-      return .failed
-    case "tool_result":
-      return event.boolValue(for: "is_error") == true ? .failed : .completed
-    case "conversation_event":
-      switch eventType {
-      case "tool_invocation":
-        return .started
-      case "tool_result":
-        return event.boolValue(for: "is_error") == true ? .failed : .completed
-      default:
-        return nil
-      }
-    default:
-      return nil
-    }
-  }
-
-  private struct PayloadMetadata: Equatable {
-    let acpAgentID: String?
-    let agentDisplayName: String?
-    let capabilityTags: [String]
-    let sequence: UInt64?
-    let stopReason: String?
-  }
-}
-
-extension [String: JSONValue] {
-  fileprivate func stringValue(for key: String) -> String? {
-    guard case .string(let value)? = self[key] else {
-      return nil
-    }
-    return value
-  }
-
-  fileprivate func boolValue(for key: String) -> Bool? {
-    guard case .bool(let value)? = self[key] else {
-      return nil
-    }
-    return value
-  }
-
-  fileprivate func arrayStringValues(for key: String) -> [String] {
-    guard case .array(let values)? = self[key] else {
-      return []
-    }
-    return values.compactMap {
-      guard case .string(let value) = $0 else {
-        return nil
-      }
-      return value
-    }
-  }
-
-  fileprivate func uint64Value(for key: String) -> UInt64? {
-    guard case .number(let value)? = self[key], value >= 0 else {
-      return nil
-    }
-    return UInt64(value)
   }
 }

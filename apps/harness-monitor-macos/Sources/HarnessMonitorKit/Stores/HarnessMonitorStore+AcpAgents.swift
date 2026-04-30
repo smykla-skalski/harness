@@ -383,9 +383,23 @@ extension HarnessMonitorStore {
     guard payload.sessionId == selectedSessionID else {
       return
     }
+    toolCallTimelineOverflowNotice =
+      if payload.rawCount > payload.events.count {
+        ToolCallTimelineOverflowNotice(
+          sessionID: payload.sessionId,
+          rawUpdateCount: payload.rawCount,
+          displayedEventCount: payload.events.count,
+          recordedAt: recordedAt
+        )
+      } else {
+        nil
+      }
     let entries = payload.timelineEntries(
       fallbackRecordedAt: recordedAt,
       toolCallMetadata: acpToolCallTimelineMetadata(for: payload)
+    )
+    liveToolCallAnnouncementRowIDs = Set(
+      entries.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
     )
     guard !entries.isEmpty else {
       return
@@ -533,6 +547,8 @@ extension HarnessMonitorStore {
   func resetSelectedAcpAgents() {
     selectedAcpAgents = []
     selectedAcpInspectState = nil
+    liveToolCallAnnouncementRowIDs = []
+    toolCallTimelineOverflowNotice = nil
     standaloneAcpPermissionBatches = []
     presentingAcpPermissionBatch = nil
     resolvingAcpPermissionBatchID = nil
@@ -772,17 +788,18 @@ extension HarnessMonitorStore {
     var normalizedIncoming: [TimelineEntry] = []
 
     for entry in current {
-      guard let phaseKey = Self.acpToolCallPhaseKey(for: entry) else {
+      guard let metadata = entry.toolCallTimelineEntryMetadata() else {
         continue
       }
-      phaseLocations[phaseKey] = .current(entry.entryId)
+      phaseLocations[AcpToolCallPhaseKey(metadata: metadata)] = .current(entry.entryId)
     }
 
     for entry in incoming {
-      guard let phaseKey = Self.acpToolCallPhaseKey(for: entry) else {
+      guard let metadata = entry.toolCallTimelineEntryMetadata() else {
         normalizedIncoming.append(entry)
         continue
       }
+      let phaseKey = AcpToolCallPhaseKey(metadata: metadata)
       guard let existingLocation = phaseLocations[phaseKey] else {
         phaseLocations[phaseKey] = .incoming(normalizedIncoming.count)
         normalizedIncoming.append(entry)
@@ -791,7 +808,7 @@ extension HarnessMonitorStore {
 
       HarnessMonitorLogger.store.warning(
         """
-        Coalescing duplicate ACP tool call id \(phaseKey.toolCallID, privacy: .public) \
+        Coalescing duplicate ACP tool call id \(phaseKey.rowID, privacy: .public) \
         for \(phaseKey.status, privacy: .public) before timeline merge
         """
       )
@@ -829,8 +846,8 @@ extension HarnessMonitorStore {
     if lhs.recordedAt != rhs.recordedAt {
       return lhs.recordedAt > rhs.recordedAt
     }
-    if let lhsSequence = timelineSequence(from: lhs),
-      let rhsSequence = timelineSequence(from: rhs),
+    if let lhsSequence = lhs.toolCallTimelineEntryMetadata()?.sequence,
+      let rhsSequence = rhs.toolCallTimelineEntryMetadata()?.sequence,
       lhsSequence != rhsSequence
     {
       return lhsSequence > rhsSequence
@@ -843,38 +860,6 @@ extension HarnessMonitorStore {
     over rhs: TimelineEntry
   ) -> TimelineEntry {
     timelineEntrySortOrder(lhs: lhs, rhs: rhs) ? lhs : rhs
-  }
-
-  private static func acpToolCallPhaseKey(for entry: TimelineEntry) -> AcpToolCallPhaseKey? {
-    guard let metadata = toolCallTimelineMetadataObject(from: entry),
-      let toolCallID = metadata.stringValue(for: "tool_call_id"),
-      let status = metadata.stringValue(for: "status"),
-      !toolCallID.isEmpty
-    else {
-      return nil
-    }
-    return AcpToolCallPhaseKey(toolCallID: toolCallID, status: status)
-  }
-
-  private static func timelineSequence(from entry: TimelineEntry) -> UInt64? {
-    guard let metadata = toolCallTimelineMetadataObject(from: entry),
-      case .number(let value)? = metadata["sequence"],
-      value >= 0
-    else {
-      return nil
-    }
-    return UInt64(value)
-  }
-
-  private static func toolCallTimelineMetadataObject(
-    from entry: TimelineEntry
-  ) -> [String: JSONValue]? {
-    guard case .object(let payload) = entry.payload,
-      case .object(let metadata)? = payload["tool_call_timeline"]
-    else {
-      return nil
-    }
-    return metadata
   }
 
   private func makeAcpPermissionDecisionPayload(
@@ -1088,22 +1073,18 @@ extension HarnessMonitorStore {
 }
 
 private struct AcpToolCallPhaseKey: Hashable {
-  let toolCallID: String
+  let rowID: String
   let status: String
+
+  init(metadata: ToolCallTimelineEntryMetadata) {
+    rowID = metadata.rowID
+    status = metadata.status
+  }
 }
 
 private enum AcpToolCallPhaseLocation {
   case current(String)
   case incoming(Int)
-}
-
-private extension [String: JSONValue] {
-  func stringValue(for key: String) -> String? {
-    guard case .string(let value)? = self[key] else {
-      return nil
-    }
-    return value
-  }
 }
 
 extension AcpAgentSnapshot {
