@@ -39,10 +39,18 @@ extension HarnessMonitorStore {
   public func startAcpAgent(
     agentID: String,
     prompt: String?,
-    projectDir: String? = nil
+    projectDir: String? = nil,
+    sessionID: String? = nil
   ) async -> AcpAgentSnapshot? {
     let actionName = "Agent started"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return nil }
+    let explicitSessionID = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let action =
+      if let explicitSessionID, !explicitSessionID.isEmpty {
+        prepareSessionAction(named: actionName, sessionID: explicitSessionID)
+      } else {
+        prepareSelectedSessionAction(named: actionName)
+      }
+    guard let action else { return nil }
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedProjectDir = projectDir?.trimmingCharacters(in: .whitespacesAndNewlines)
 

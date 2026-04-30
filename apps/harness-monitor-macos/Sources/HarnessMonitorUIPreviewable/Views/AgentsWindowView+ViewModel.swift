@@ -325,6 +325,7 @@ extension AgentsWindowView {
     var cols = 120
     var isSubmitting = false
     var selection: WorkspaceSelection = .create
+    var createSessionID: String?
     var wrapLines = false
     var selectedPersona: String?
     var availablePersonas: [AgentPersona] = []
@@ -366,12 +367,14 @@ extension AgentsWindowView {
     var displayState: AgentTuiDisplayState
     init(
       selection: WorkspaceSelection = .create,
-      displayState: AgentTuiDisplayState = AgentTuiDisplayState()
+      displayState: AgentTuiDisplayState = AgentTuiDisplayState(),
+      createSessionID: String? = nil
     ) {
       let preferredLaunchSelection = HarnessMonitorAgentLaunchDefaults.preferredSelection()
       runtime = preferredLaunchSelection.preferredRuntime
       selectedLaunchSelection = preferredLaunchSelection
       self.selection = selection
+      self.createSessionID = createSessionID ?? selection.sessionID
       self.displayState = displayState
     }
   }

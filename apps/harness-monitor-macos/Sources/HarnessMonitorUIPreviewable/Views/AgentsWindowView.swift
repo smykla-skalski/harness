@@ -25,6 +25,7 @@ public struct AgentsWindowView: View {
     let ids: [String]
     let count: Int
     let filterSignature: String
+    let scopeDescription: String
     let capturedAt: Date
   }
 
@@ -72,7 +73,8 @@ public struct AgentsWindowView: View {
     _stateViewModel = State(
       wrappedValue: ViewModel(
         selection: initialSelection,
-        displayState: initialDisplayState
+        displayState: initialDisplayState,
+        createSessionID: store.selectedSessionID
       )
     )
   }
@@ -251,8 +253,9 @@ public struct AgentsWindowView: View {
         store: store,
         selection: selection,
         decisionFilters: $decisionFilters,
-        decisions: decisionItems,
+        decisionScope: decisionWorkspaceScope,
         currentSessionID: store.selectedSessionID,
+        currentSessionTitle: store.selectedSession?.session.title,
         agentTuis: displayState.sortedAgentTuis,
         sessionTitlesByID: displayState.sessionTitlesByID,
         codexRuns: displayState.sortedCodexRuns,

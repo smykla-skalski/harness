@@ -35,10 +35,6 @@ extension AgentsWindowView {
       updateNavigationState()
     }
 
-    if !newValue.isDecisionRoute {
-      isDecisionInspectorVisible = false
-    }
-
     Task {
       await handleSelectionChange(from: oldValue, to: newValue)
     }
@@ -57,7 +53,15 @@ extension AgentsWindowView {
     to newValue: WorkspaceSelection
   ) async {
     if let sessionID = newValue.sessionID, sessionID != store.selectedSessionID {
+      viewModel.createSessionID = sessionID
       await store.selectSession(sessionID)
+    } else if let sessionID = newValue.sessionID {
+      viewModel.createSessionID = sessionID
+    } else if case .create = newValue, let previousSessionID = oldValue.sessionID {
+      viewModel.createSessionID = previousSessionID
+      if store.selectedSessionID == nil {
+        await store.selectSession(previousSessionID)
+      }
     }
 
     switch newValue {
@@ -108,11 +112,11 @@ extension AgentsWindowView {
       date: .abbreviated,
       time: .standard
     )
-    return "Scope: \(snapshot.filterSignature)\nCaptured: \(capturedAt)"
+    return "Scope: \(snapshot.scopeDescription)\nCaptured: \(capturedAt)"
   }
 
   func beginDismissAllVisible() {
-    let ids = visibleOpenDecisionIDs
+    let ids = decisionWorkspaceScope.visibleDecisionIDs
     guard !ids.isEmpty else {
       return
     }
@@ -120,7 +124,8 @@ extension AgentsWindowView {
     currentPendingDismissBatch = DismissBatchSnapshot(
       ids: ids,
       count: ids.count,
-      filterSignature: visibleDecisionSnapshot.signature,
+      filterSignature: decisionWorkspaceScope.visibleSnapshot.signature,
+      scopeDescription: decisionWorkspaceScope.scopeDescription,
       capturedAt: Date()
     )
     dismissAllVisibleDraftText = ""
@@ -136,10 +141,10 @@ extension AgentsWindowView {
       return
     }
 
-    let currentIDs = visibleOpenDecisionIDs
+    let currentIDs = decisionWorkspaceScope.visibleDecisionIDs
     guard
       currentIDs == snapshot.ids,
-      visibleDecisionSnapshot.signature == snapshot.filterSignature
+      decisionWorkspaceScope.visibleSnapshot.signature == snapshot.filterSignature
     else {
       store.presentFailureFeedback("Visible decisions changed. Bulk dismiss aborted.")
       return
@@ -154,6 +159,7 @@ extension AgentsWindowView {
     )
     currentPendingDismissBatch = nil
     dismissAllVisibleDraftText = ""
+    await refreshDecisionWorkspaceAfterMutation()
   }
 
   func dismissSelectedDecision() async {
@@ -161,12 +167,14 @@ extension AgentsWindowView {
       return
     }
     await decisionActionHandler.dismiss(decisionID: decisionID)
+    await refreshDecisionWorkspaceAfterMutation()
   }
 
   func dismissAllInfo() async {
     for id in infoDecisionIDs {
       await decisionActionHandler.dismiss(decisionID: id)
     }
+    await refreshDecisionWorkspaceAfterMutation()
   }
 
   func snoozeAllCritical() async {
@@ -174,6 +182,7 @@ extension AgentsWindowView {
     for id in criticalDecisionIDs {
       await decisionActionHandler.snooze(decisionID: id, duration: oneHour)
     }
+    await refreshDecisionWorkspaceAfterMutation()
   }
 
   func reopenDismissedBatch(_ batch: ReopenBatchState) async {
@@ -204,6 +213,12 @@ extension AgentsWindowView {
         store.presentFailureFeedback("Failed to reopen \(id): \(error.localizedDescription)")
       }
     }
+    await refreshDecisionWorkspaceAfterMutation()
+  }
+
+  func refreshDecisionWorkspaceAfterMutation() async {
+    await reloadDecisions()
+    syncSupervisorDecisionRoute(recordHistory: false)
   }
 
   private func handleDecisionSelectionChange(
