@@ -89,6 +89,18 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       rows: Int,
       cols: Int
     )
+    case startAcpAgent(
+      sessionID: String,
+      agentID: String,
+      role: SessionRole,
+      fallbackRole: SessionRole?,
+      capabilities: [String],
+      name: String?,
+      prompt: String?,
+      projectDir: String?,
+      persona: String?,
+      recordPermissions: Bool
+    )
     case sendAgentTuiInput(tuiID: String, request: AgentTuiInputRequest)
     case resizeAgentTui(tuiID: String, rows: Int, cols: Int)
     case stopAgentTui(tuiID: String)
@@ -204,6 +216,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var agentTuiReadSnapshotsByID: [String: [AgentTuiSnapshot]] = [:]
   var codexStartError: (any Error)?
   var queuedCodexStartErrors: [any Error] = []
+  var acpStartError: (any Error)?
+  var queuedAcpStartErrors: [any Error] = []
   var agentTuiStartError: (any Error)?
   var hostBridgeReconfigureError: (any Error)?
   var hostBridgeStatusReport = BridgeStatusReport(running: false)

@@ -9,7 +9,7 @@ extension HarnessMonitorAgentsE2ETests {
     selectSegment(
       in: app,
       controlIdentifier: Accessibility.agentTuiCreateModePicker,
-      title: "Codex"
+      title: "Codex Run"
     )
     selectFastModelForCodex(in: app)
     replaceText(
@@ -88,7 +88,7 @@ extension HarnessMonitorAgentsE2ETests {
     selectSegment(
       in: app,
       controlIdentifier: Accessibility.agentTuiCreateModePicker,
-      title: "Codex"
+      title: "Codex Run"
     )
     selectSegment(
       in: app,

@@ -117,12 +117,25 @@ struct AgentsSidebarDecisionSection: View {
   }
 
   private var decisionSearchRow: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      TextField(decisionSearchScope.label, text: $decisionQuery)
-        .textFieldStyle(.roundedBorder)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
-      decisionSearchScopeMenu
-      decisionFilterToggle
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        TextField(decisionSearchScope.label, text: $decisionQuery)
+          .textFieldStyle(.roundedBorder)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
+        decisionSearchScopeMenu
+        decisionFilterToggle
+      }
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          TextField(decisionSearchScope.label, text: $decisionQuery)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
+          decisionFilterToggle
+        }
+
+        decisionSearchScopeMenu
+      }
     }
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
   }
@@ -163,7 +176,7 @@ struct AgentsSidebarDecisionSection: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .menuStyle(.borderlessButton)
-    .fixedSize()
+    .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityLabel("Search scope — \(decisionSearchScope.label)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearchScopeMenu)
   }
@@ -225,6 +238,7 @@ struct AgentsSidebarDecisionSection: View {
       Text(scope.emptyStateDescription)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
       if scope.hasActiveFilters {
         Button("Clear filters") {
           clearFilters()

@@ -152,4 +152,81 @@ extension AgentsWindowView {
       ""
     }
   }
+
+  var acpUnavailableBanner: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label(acpBridgeTitle, systemImage: "exclamationmark.triangle")
+        .scaledFont(.headline)
+        .foregroundStyle(.orange)
+      Text(acpBridgeMessage)
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if acpBridgeState == .excluded && hostBridge.running {
+        Button("Enable now") {
+          Task {
+            _ = await store.setHostBridgeCapability("acp", enabled: true)
+          }
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .disabled(store.isDaemonActionInFlight || viewModel.isSubmitting)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentsAcpEnableBridgeButton)
+      }
+      CopyableCommandBox(
+        command: acpBridgeCommand,
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentsAcpCopyCommandButton
+      )
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsAcpRecoveryBanner)
+  }
+
+  var acpBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
+    store.hostBridgeCapabilityState(for: "acp")
+  }
+
+  var acpBridgeCommand: String {
+    store.hostBridgeStartCommand(for: "acp")
+  }
+
+  var acpBridgeCapabilityPresent: Bool {
+    hostBridge.capabilities["acp"] != nil
+  }
+
+  var acpBridgeTitle: String {
+    switch acpBridgeState {
+    case .excluded:
+      "ACP is excluded from the host bridge"
+    case .unavailable:
+      if hostBridge.running && acpBridgeCapabilityPresent {
+        "ACP host bridge is unavailable"
+      } else {
+        "ACP host bridge is not running"
+      }
+    case .ready:
+      "ACP host bridge ready"
+    }
+  }
+
+  var acpBridgeMessage: String {
+    switch acpBridgeState {
+    case .excluded:
+      "The shared host bridge is running without ACP enabled. Enable it now or run this in a terminal:"
+    case .unavailable:
+      if hostBridge.running && acpBridgeCapabilityPresent {
+        """
+        The shared host bridge is running, but ACP project access is unavailable.
+        Re-enable ACP or run this in a terminal:
+        """
+      } else {
+        """
+        Harness Monitor runs sandboxed and needs the host bridge to grant ACP
+        project access. Run this in a terminal:
+        """
+      }
+    case .ready:
+      ""
+    }
+  }
 }

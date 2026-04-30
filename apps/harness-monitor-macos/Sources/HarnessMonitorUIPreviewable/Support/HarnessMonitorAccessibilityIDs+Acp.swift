@@ -43,6 +43,9 @@ extension HarnessMonitorAccessibility {
   public static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
   public static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
   public static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
+  public static let agentsAcpRecoveryBanner = "harness.window.agents.acp.recovery-banner"
+  public static let agentsAcpEnableBridgeButton = "harness.window.agents.acp.enable-bridge"
+  public static let agentsAcpCopyCommandButton = "harness.window.agents.acp.copy-command"
 
   public static func agentCapabilityRow(_ identifier: String) -> String {
     "harness.window.agents.capability.\(slug(identifier))"
