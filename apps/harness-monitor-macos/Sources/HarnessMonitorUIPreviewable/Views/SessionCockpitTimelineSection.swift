@@ -62,6 +62,10 @@ struct SessionCockpitTimelineSection: View {
 
   private var currentEntries: [TimelineEntry] { visibleDisplay.entries }
 
+  private var currentPresentation: SessionCockpitTimelinePresentation {
+    Self.materialisePresentation(from: currentEntries)
+  }
+
   private var placeholderCount: Int { visibleDisplay.placeholderCount }
 
   private var pageCount: Int { presentation.pageCount }
@@ -184,9 +188,9 @@ struct SessionCockpitTimelineSection: View {
 
   private func timelineRows(shimmerPhase: CGFloat) -> some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      ForEach(currentEntries) { entry in
-        SessionCockpitTimelineEntryRow(
-          entry: entry,
+      ForEach(currentPresentation.sections) { section in
+        SessionCockpitTimelineSectionGroupRow(
+          section: section,
           dateTimeConfiguration: dateTimeConfiguration
         )
       }
@@ -252,6 +256,67 @@ struct SessionCockpitTimelineSection: View {
     }
     retainedPage = snapshot
   }
+
+  static func materialisePresentation(
+    from entries: [TimelineEntry]
+  ) -> SessionCockpitTimelinePresentation {
+    var sections: [SessionCockpitTimelineGroupSection] = []
+    for entry in entries {
+      if let lastSection = sections.last,
+        lastSection.canAppend(entry)
+      {
+        sections[sections.count - 1].entries.append(entry)
+      } else {
+        sections.append(SessionCockpitTimelineGroupSection(firstEntry: entry))
+      }
+    }
+    return SessionCockpitTimelinePresentation(sections: sections)
+  }
+}
+
+struct SessionCockpitTimelinePresentation: Equatable {
+  let sections: [SessionCockpitTimelineGroupSection]
+}
+
+struct SessionCockpitTimelineGroupSection: Identifiable, Equatable {
+  let id: String
+  let acpAgentID: String?
+  let agentDisplayName: String?
+  let capabilityTags: [String]
+  var entries: [TimelineEntry]
+
+  init(firstEntry: TimelineEntry) {
+    let metadata = firstEntry.toolCallTimelineEntryMetadata()
+    let firstAgentID = Self.normalizedAgentID(from: metadata)
+    id = "\(firstAgentID ?? "ungrouped")-\(firstEntry.entryId)"
+    acpAgentID = firstAgentID
+    agentDisplayName = metadata?.agentDisplayName
+    capabilityTags = metadata?.capabilityTags ?? []
+    entries = [firstEntry]
+  }
+
+  var showsHeader: Bool {
+    let title = agentDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return acpAgentID != nil && !(title?.isEmpty ?? true)
+  }
+
+  func canAppend(_ entry: TimelineEntry) -> Bool {
+    guard let acpAgentID else {
+      return false
+    }
+    return Self.normalizedAgentID(from: entry.toolCallTimelineEntryMetadata()) == acpAgentID
+  }
+
+  private static func normalizedAgentID(
+    from metadata: ToolCallTimelineEntryMetadata?
+  ) -> String? {
+    guard let acpAgentID = metadata?.acpAgentID?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !acpAgentID.isEmpty
+    else {
+      return nil
+    }
+    return acpAgentID
+  }
 }
 
 private struct SessionTimelineEntryMarker: View {
@@ -312,6 +377,59 @@ private struct SessionCockpitTimelineEntryRow: View {
         }
       }
     }
+  }
+}
+
+private struct SessionCockpitTimelineSectionGroupRow: View {
+  let section: SessionCockpitTimelineGroupSection
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      if section.showsHeader,
+        let title = section.agentDisplayName
+      {
+        SessionCockpitTimelineAttributionHeader(
+          title: title,
+          capabilityTags: section.capabilityTags
+        )
+      }
+      ForEach(section.entries) { entry in
+        SessionCockpitTimelineEntryRow(
+          entry: entry,
+          dateTimeConfiguration: dateTimeConfiguration
+        )
+      }
+    }
+  }
+}
+
+private struct SessionCockpitTimelineAttributionHeader: View {
+  let title: String
+  let capabilityTags: [String]
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+      if !capabilityTags.isEmpty {
+        ForEach(capabilityTags.prefix(3), id: \.self) { tag in
+          Text(tag)
+            .scaledFont(.caption2)
+            .padding(.horizontal, HarnessMonitorTheme.spacingXS)
+            .padding(.vertical, 2)
+            .background(
+              Capsule(style: .continuous)
+                .fill(HarnessMonitorTheme.secondaryInk.opacity(0.12))
+            )
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
   }
 }
 
