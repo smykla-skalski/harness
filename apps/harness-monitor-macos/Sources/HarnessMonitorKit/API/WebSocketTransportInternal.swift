@@ -8,6 +8,21 @@ import Foundation
 private typealias VoidPingContinuation = CheckedContinuation<Void, Error>
 private typealias IntPingContinuation = CheckedContinuation<Int, Error>
 
+final class ContinuationResumeGate: @unchecked Sendable {
+  private let lock = NSLock()
+  private var didResume = false
+
+  func tryBeginResume() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard !didResume else {
+      return false
+    }
+    didResume = true
+    return true
+  }
+}
+
 extension WebSocketTransport {
   func sendPing() async throws {
     guard let webSocketTask else {
@@ -15,7 +30,14 @@ extension WebSocketTransport {
     }
     let task = webSocketTask
     try await withCheckedThrowingContinuation { (continuation: VoidPingContinuation) in
+      let gate = ContinuationResumeGate()
       task.sendPing { error in
+        guard gate.tryBeginResume() else {
+          HarnessMonitorLogger.websocket.warning(
+            "Ignoring duplicate WebSocket ping completion callback"
+          )
+          return
+        }
         if let error {
           continuation.resume(throwing: error)
         } else {
@@ -32,7 +54,14 @@ extension WebSocketTransport {
     let task = webSocketTask
     let startedAt = ContinuousClock.now
     return try await withCheckedThrowingContinuation { (continuation: IntPingContinuation) in
+      let gate = ContinuationResumeGate()
       task.sendPing { error in
+        guard gate.tryBeginResume() else {
+          HarnessMonitorLogger.websocket.warning(
+            "Ignoring duplicate WebSocket latency ping completion callback"
+          )
+          return
+        }
         let duration = startedAt.duration(to: ContinuousClock.now)
         let ms =
           max(0, Int(duration.components.seconds * 1_000))
