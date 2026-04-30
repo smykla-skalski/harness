@@ -11,10 +11,12 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
   let store: HarnessMonitorStore
 
   func body(content: Content) -> some View {
-    content.sheet(item: acpPermissionBatchBinding) { batch in
-      let payload = store.acpPermissionDecisionPayload(for: batch)
+    content.popover(
+      item: acpPermissionBatchBinding,
+      attachmentAnchor: .rect(.bounds),
+      arrowEdge: .top
+    ) { batch in
       AcpPermissionModal(store: store, batch: batch)
-        .interactiveDismissDisabled(payload.isRenderable)
     }
   }
 
