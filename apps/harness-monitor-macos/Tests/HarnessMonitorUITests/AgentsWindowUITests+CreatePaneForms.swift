@@ -84,7 +84,13 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview()
 
     openAgentsWindow(in: app)
-    tapButton(in: app, title: "Codex")
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiCreateModePicker,
+        option: "Codex"
+      )
+    )
 
     selectMenuOption(
       in: app,
@@ -110,15 +116,11 @@ extension AgentsWindowUITests {
 
     // Pick Gemini 2.5 Flash-Lite which the daemon publishes with
     // effort_kind = none. The effort segmented picker should not render.
-    let flashLite = app.buttons[
-      HarnessMonitorUITestAccessibility.segmentedOption(
-        Accessibility.agentsModelPicker,
-        option: "Gemini 2.5 Flash-Lite"
-      )
-    ]
-    if waitForElement(flashLite, timeout: Self.fastActionTimeout) {
-      flashLite.click()
-    }
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.agentsModelPicker,
+      optionTitle: "Gemini 2.5 Flash-Lite"
+    )
 
     let effortPicker = element(in: app, identifier: Accessibility.agentsEffortPicker)
     XCTAssertFalse(
@@ -181,21 +183,26 @@ extension AgentsWindowUITests {
 
     openAgentsWindow(in: app)
 
-    let runtimeHeader = app.staticTexts["Runtime"]
+    let providerHeader = app.staticTexts["Provider"]
+    let configurationHeader = app.staticTexts["Configuration"]
     let detailsHeader = app.staticTexts["Details"]
     let sizeHeader = app.staticTexts["Terminal size"]
 
     XCTAssertTrue(
-      waitForElement(runtimeHeader, timeout: Self.actionTimeout),
-      "Terminal mode should expose a native Runtime section header"
+      waitForElement(providerHeader, timeout: Self.actionTimeout),
+      "Terminal mode should expose a Provider section header"
+    )
+    XCTAssertTrue(
+      waitForElement(configurationHeader, timeout: Self.actionTimeout),
+      "Terminal mode should expose a Configuration section header"
     )
     XCTAssertTrue(
       waitForElement(detailsHeader, timeout: Self.actionTimeout),
-      "Terminal mode should expose a native Details section header"
+      "Terminal mode should expose a Details section header"
     )
     XCTAssertTrue(
       waitForElement(sizeHeader, timeout: Self.actionTimeout),
-      "Terminal mode should expose a native Terminal size section header"
+      "Terminal mode should expose a Terminal size section header"
     )
   }
 }

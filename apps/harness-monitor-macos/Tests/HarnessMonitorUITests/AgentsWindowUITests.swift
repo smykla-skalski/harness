@@ -46,7 +46,13 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     )
     openAgentsWindow(in: app)
 
-    tapButton(in: app, title: "Codex")
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiCreateModePicker,
+        option: "Codex"
+      )
+    )
     let promptField = editableField(in: app, identifier: Accessibility.agentsCodexPromptField)
     XCTAssertTrue(waitForElement(promptField, timeout: Self.actionTimeout))
     tapElement(in: app, identifier: Accessibility.agentsCodexPromptField)
