@@ -83,7 +83,7 @@ private struct AgentsToolbarButton: View {
       Label {
         Text("Agents")
       } icon: {
-        Image("ProviderSymbol-copilot")
+        HarnessMonitorUIAssets.image(named: "ToolbarAgentsBot")
           .renderingMode(.template)
           .resizable()
           .scaledToFit()
