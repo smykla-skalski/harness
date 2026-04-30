@@ -133,6 +133,9 @@ extension PreviewHarnessClientState {
       || ProcessInfo.processInfo.environment[
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
       ] == "1"
+    let permissionLogPath = ProcessInfo.processInfo.environment[
+      "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_LOG_PATH"
+    ] ?? "/tmp/harness/permission-log.ndjson"
     return AcpAgentInspectSnapshot(
       acpId: snapshot.acpId,
       sessionId: snapshot.sessionId,
@@ -145,6 +148,7 @@ extension PreviewHarnessClientState {
       lastClientCallAt: snapshot.updatedAt,
       watchdogState: "active",
       permissionMode: "allow_edits",
+      permissionLogPath: permissionLogPath,
       pendingPermissions: snapshot.pendingPermissions,
       permissionQueueDepth: snapshot.permissionQueueDepth,
       terminalCount: snapshot.terminalCount,
