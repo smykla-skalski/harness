@@ -64,10 +64,20 @@ extension RetiredInspectorEntryPointsUITests {
   }
 
   fileprivate func verifyCreateTaskSheet(in app: XCUIApplication) {
-    let newTaskButton = element(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
-    if !newTaskButton.waitForExistence(timeout: 1.5) {
+    if !waitForButtonReady(in: app, identifier: Accessibility.sessionTaskCreateOpenButton) {
       tapPreviewSession(in: app)
     }
+    let ready = waitForButtonReady(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
+    if !ready {
+      recordDiagnosticsSnapshot(in: app, named: "retired-inspector-create-task-not-ready")
+    }
+    XCTAssertTrue(
+      ready,
+      """
+      New Task should become tap-ready in cockpit preview
+      trace=\(diagnosticsTracePath() ?? "unavailable")
+      """
+    )
     tapButton(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
 
     let sheet = element(in: app, identifier: Accessibility.createTaskSheet)

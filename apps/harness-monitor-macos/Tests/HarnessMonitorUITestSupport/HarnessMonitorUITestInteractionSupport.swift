@@ -96,6 +96,34 @@ extension HarnessMonitorUITestCase {
     XCTFail("Failed to tap button \(identifier)")
   }
 
+  func waitForButtonReady(
+    in app: XCUIApplication,
+    identifier: String,
+    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout
+  ) -> Bool {
+    let deadline = Date.now.addingTimeInterval(timeout)
+
+    while Date.now < deadline {
+      if app.state != .runningForeground {
+        app.activate()
+      }
+
+      let buttonTarget = button(in: app, identifier: identifier)
+      if buttonTargetIsReady(in: app, element: buttonTarget, identifier: identifier) {
+        return true
+      }
+
+      let genericTarget = element(in: app, identifier: identifier)
+      if buttonTargetIsReady(in: app, element: genericTarget, identifier: identifier) {
+        return true
+      }
+
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    }
+
+    return false
+  }
+
   func tapButton(in app: XCUIApplication, title: String) {
     let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
@@ -223,6 +251,31 @@ extension HarnessMonitorUITestCase {
     return false
   }
 
+  private func buttonTargetIsReady(
+    in app: XCUIApplication,
+    element: XCUIElement,
+    identifier: String
+  ) -> Bool {
+    guard waitForElement(element, timeout: Self.fastPollInterval) else {
+      return false
+    }
+
+    guard element.isEnabled else {
+      return false
+    }
+
+    if !element.frame.isEmpty {
+      return true
+    }
+
+    let frameMarker = self.element(in: app, identifier: "\(identifier).frame")
+    guard waitForElement(frameMarker, timeout: Self.fastPollInterval) else {
+      return false
+    }
+
+    return !frameMarker.frame.isEmpty
+  }
+
   @discardableResult
   func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
     if element.isHittable {
@@ -278,6 +331,12 @@ extension HarnessMonitorUITestCase {
   ) -> XCUICoordinate? {
     _ = app
     guard element.exists || element.waitForExistence(timeout: 0.2) else {
+      return nil
+    }
+    // Empty-frame accessibility nodes frequently appear before SwiftUI finishes
+    // laying out the visible control. Defer those to explicit frame markers so
+    // we do not keep clicking a bogus coordinate while the real target exists.
+    guard !element.frame.isEmpty else {
       return nil
     }
     return element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

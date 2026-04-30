@@ -57,7 +57,10 @@ struct SessionTaskListSection: View {
         newTaskButton
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskListHeader)
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.sessionTaskListHeader,
+        label: "Tasks"
+      )
       .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionTaskListHeaderFrame)
       if tasks.isEmpty {
         SessionCockpitEmptyStateRow(section: .tasks)
