@@ -51,6 +51,8 @@ The wrapper and repo scripts resolve `xcode-derived` at the git common root, so 
 
 General monitor build/test lanes keep using the shared `xcode-derived` root. The swarm full-flow and agents e2e/UI lanes intentionally use the shared `xcode-derived-e2e` root so they do not contend with normal monitor builds.
 
+Generated Xcode projects stay under `apps/harness-monitor-macos`; only build-output roots are marked for Spotlight exclusion. `Scripts/post-generate.sh` and the lock-aware xcodebuild wrapper create `.metadata_never_index` inside `xcode-derived`, `xcode-derived-e2e`, and `xcode-derived-instruments` without moving source or generated project metadata into a hidden mirror directory. For the strongest Apple-supported exclusion, add those three ignored build roots to Spotlight Privacy in System Settings.
+
 `monitor:macos:lint` is the fast non-build lane. It generate-checks the workspace, runs strict `swift format` over Sources and Tests, and runs `swiftlint lint` with a cache rooted in the shared `tmp/swiftlint-cache/harness-monitor-macos`. It never invokes `xcodebuild`, daemon pre-actions, or daemon bundle validation.
 
 `monitor:macos:quality-gate` is the slower build-based validation lane. It runs `build-for-testing` against the shared `xcode-derived` with daemon embedding enabled, scans sandbox logs, and verifies the checked-in app/daemon entitlements expected by the built product.

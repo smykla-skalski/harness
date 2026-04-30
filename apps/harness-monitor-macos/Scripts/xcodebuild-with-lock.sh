@@ -20,6 +20,8 @@ LEGACY_TUIST_OPT_OUT="${HARNESS_MONITOR_USE_TUIST_TEST:-}"
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/non-indexable-roots.sh
+source "$SCRIPT_DIR/lib/non-indexable-roots.sh"
 # shellcheck source=scripts/lib/lease-lock.sh
 LEASE_LOCK_DIR=""
 LEASE_LOCK_RESOURCE=""
@@ -166,6 +168,8 @@ done
 if (( has_derived_data_path == 0 )); then
   args=("-derivedDataPath" "$derive_data_path" "${args[@]}")
 fi
+
+ensure_non_indexable_directory "$derive_data_path"
 
 lock_path="$derive_data_path/.xcodebuild.lock"
 LEASE_LOCK_DIR="$lock_path"

@@ -6,6 +6,8 @@ REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 BUILD_SERVER_VERSION="1.3.0"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
 source "$ROOT/Scripts/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/non-indexable-roots.sh
+source "$ROOT/Scripts/lib/non-indexable-roots.sh"
 sanitize_xcode_only_swift_environment
 
 write_build_server_config() {
@@ -71,51 +73,11 @@ write_build_server_config \
   "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
   "xcode-derived"
 
+ensure_monitor_build_artifact_roots_non_indexable "$REPO_ROOT"
+
 write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$REPO_ROOT/xcode-derived"
-
-generated_project_link="$(readlink "$ROOT/HarnessMonitor.xcodeproj" || true)"
-GENERATED_APP_ROOT="$ROOT"
-if [ -n "$generated_project_link" ]; then
-  GENERATED_APP_ROOT="$(cd "$ROOT" && cd "$(dirname "$generated_project_link")" && pwd)"
-fi
-
-stage_generated_project_link() {
-  local name="$1"
-  local source_path="$ROOT/$name"
-  local target_path="$GENERATED_APP_ROOT/$name"
-
-  if [ "$GENERATED_APP_ROOT" = "$ROOT" ] || [ ! -e "$source_path" ]; then
-    return 0
-  fi
-
-  if [ -e "$target_path" ] && [ ! -L "$target_path" ]; then
-    return 0
-  fi
-
-  ln -sfn "$source_path" "$target_path"
-}
-
-for staged_path in \
-  Sources \
-  Tests \
-  Resources \
-  Scripts \
-  features \
-  docs \
-  HarnessMonitor.entitlements \
-  HarnessMonitorDaemon.entitlements \
-  HarnessMonitorPreviewHost.entitlements \
-  HarnessMonitorUITestHost.entitlements \
-  Previews.json \
-  Project.swift \
-  Tuist.swift \
-  .swift-format \
-  .swiftlint.yml
-do
-  stage_generated_project_link "$staged_path"
-done
 
 WORKSPACE_CONTENTS="$ROOT/HarnessMonitor.xcworkspace/contents.xcworkspacedata"
 if [ -f "$WORKSPACE_CONTENTS" ]; then
