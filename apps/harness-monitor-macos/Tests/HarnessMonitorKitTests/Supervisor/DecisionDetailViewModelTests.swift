@@ -167,6 +167,37 @@ final class DecisionDetailViewModelTests: XCTestCase {
     XCTAssertEqual(handler.dismissCalls, ["d1"])
   }
 
+  func test_nonAcpDecisionInjectsDismissWhenPersistedActionsMissingDismiss() {
+    let actions = [
+      SuggestedAction(id: "investigate", title: "Investigate", kind: .custom, payloadJSON: "{}")
+    ]
+    let decision = makeDecision(
+      ruleID: "stuck-agent",
+      suggestedActionsJSON: encodedActions(actions)
+    )
+
+    let viewModel = DecisionDetailViewModel(
+      decision: decision,
+      handler: RecordingDecisionActionHandler()
+    )
+
+    XCTAssertTrue(viewModel.suggestedActions.contains(where: { $0.kind == .dismiss }))
+  }
+
+  func test_acpDecisionDoesNotInjectDismissFallback() {
+    let decision = makeDecision(
+      ruleID: AcpPermissionDecisionPayload.ruleID,
+      suggestedActionsJSON: "[]"
+    )
+
+    let viewModel = DecisionDetailViewModel(
+      decision: decision,
+      handler: RecordingDecisionActionHandler()
+    )
+
+    XCTAssertTrue(viewModel.suggestedActions.isEmpty)
+  }
+
   func test_primaryActionIsFirstNonTerminal() {
     let actions = [
       SuggestedAction(id: "accept", title: "Accept", kind: .custom, payloadJSON: "{}"),
