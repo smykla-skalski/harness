@@ -6,7 +6,7 @@ extension AgentsWindowView {
         "Open terminal-backed agents stay pinned in the sidebar so you can launch "
           + "another agent without losing the active viewport."
       } else {
-        "Start a terminal-backed agent to inspect the live screen and steer it from Harness Monitor."
+        "Choose a provider and launch mode, then start a terminal-backed agent from this window."
       }
     case .codex:
       if displayState.hasCodexRuns {
