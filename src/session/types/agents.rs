@@ -4,6 +4,47 @@ use serde::{Deserialize, Serialize, de};
 use crate::agents::kind::{DisconnectReason, RuntimeKind};
 use crate::agents::runtime::RuntimeCapabilities;
 
+/// Stable reference to a daemon-managed agent instance that owns this session registration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManagedAgentRef {
+    pub kind: ManagedAgentKind,
+    pub id: String,
+}
+
+impl ManagedAgentRef {
+    #[must_use]
+    pub fn new(kind: ManagedAgentKind, id: impl Into<String>) -> Self {
+        Self {
+            kind,
+            id: id.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn tui(id: impl Into<String>) -> Self {
+        Self::new(ManagedAgentKind::Tui, id)
+    }
+
+    #[must_use]
+    pub fn acp(id: impl Into<String>) -> Self {
+        Self::new(ManagedAgentKind::Acp, id)
+    }
+
+    #[must_use]
+    pub fn codex(id: impl Into<String>) -> Self {
+        Self::new(ManagedAgentKind::Codex, id)
+    }
+}
+
+/// Transport family for a daemon-managed agent reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManagedAgentKind {
+    Tui,
+    Acp,
+    Codex,
+}
+
 /// An agent registered in a multi-agent session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRegistration {
@@ -23,6 +64,9 @@ pub struct AgentRegistration {
     /// Link to the agent's individual session in the agents ledger.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session_id: Option<String>,
+    /// Stable daemon-managed identity for control-plane owned agents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub managed_agent: Option<ManagedAgentRef>,
     /// Most recent observed activity for this agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_activity_at: Option<String>,

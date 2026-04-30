@@ -87,6 +87,85 @@ fn sync_session_with_agents_and_tasks() {
 }
 
 #[test]
+fn sync_session_projects_managed_agent_identity_for_all_kinds() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    let state = sample_session_state_with_managed_agents();
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    assert_eq!(
+        session_agent_identity_rows(&db.conn, &state.session_id),
+        vec![
+            (
+                "acp-worker".into(),
+                Some("acp".into()),
+                Some("acp-agent-1".into()),
+            ),
+            (
+                "claude-leader".into(),
+                Some("tui".into()),
+                Some("agent-tui-1".into()),
+            ),
+            (
+                "codex-worker".into(),
+                Some("codex".into()),
+                Some("codex-run-1".into()),
+            ),
+            ("unmanaged-reviewer".into(), None, None),
+        ]
+    );
+}
+
+#[test]
+fn load_session_state_round_trips_managed_agent_identity_after_sync() {
+    use crate::session::types::ManagedAgentRef;
+
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    let state = sample_session_state_with_managed_agents();
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let loaded = db
+        .load_session_state(&state.session_id)
+        .expect("load session")
+        .expect("session present");
+    assert_eq!(
+        loaded
+            .agents
+            .get("claude-leader")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::tui("agent-tui-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("acp-worker")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::acp("acp-agent-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("codex-worker")
+            .and_then(|agent| agent.managed_agent.clone()),
+        Some(ManagedAgentRef::codex("codex-run-1"))
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get("unmanaged-reviewer")
+            .and_then(|agent| agent.managed_agent.clone()),
+        None
+    );
+}
+
+#[test]
 fn sync_session_replaces_agents_on_update() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let project = sample_project();

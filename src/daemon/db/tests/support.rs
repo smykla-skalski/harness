@@ -110,6 +110,7 @@ pub(super) fn sample_session_state() -> SessionState {
             updated_at: "2026-04-03T12:05:00Z".into(),
             status: AgentStatus::Active,
             agent_session_id: Some("claude-session-1".into()),
+            managed_agent: None,
             last_activity_at: Some("2026-04-03T12:05:00Z".into()),
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
@@ -181,6 +182,81 @@ pub(super) fn sample_session_state_with_id(session_id: &str) -> SessionState {
     let mut state = sample_session_state();
     state.session_id = session_id.to_string();
     state.title = session_id.to_string();
+    state
+}
+
+pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
+    use crate::agents::runtime::RuntimeCapabilities;
+    use crate::session::types::{
+        AgentRegistration, AgentStatus, CURRENT_VERSION, ManagedAgentRef, SessionMetrics,
+        SessionRole,
+    };
+
+    let mut state = sample_session_state();
+    state.schema_version = CURRENT_VERSION;
+    state
+        .agents
+        .get_mut("claude-leader")
+        .expect("leader agent present")
+        .managed_agent = Some(ManagedAgentRef::tui("agent-tui-1"));
+    state.agents.insert(
+        "acp-worker".into(),
+        AgentRegistration {
+            agent_id: "acp-worker".into(),
+            name: "ACP Worker".into(),
+            runtime: "claude".into(),
+            role: SessionRole::Worker,
+            capabilities: vec!["general".into()],
+            joined_at: "2026-04-03T12:02:00Z".into(),
+            updated_at: "2026-04-03T12:06:00Z".into(),
+            status: AgentStatus::Active,
+            agent_session_id: Some("claude-session-2".into()),
+            managed_agent: Some(ManagedAgentRef::acp("acp-agent-1")),
+            last_activity_at: Some("2026-04-03T12:06:00Z".into()),
+            current_task_id: None,
+            runtime_capabilities: RuntimeCapabilities::default(),
+            persona: None,
+        },
+    );
+    state.agents.insert(
+        "codex-worker".into(),
+        AgentRegistration {
+            agent_id: "codex-worker".into(),
+            name: "Codex Worker".into(),
+            runtime: "codex".into(),
+            role: SessionRole::Worker,
+            capabilities: vec!["general".into()],
+            joined_at: "2026-04-03T12:03:00Z".into(),
+            updated_at: "2026-04-03T12:06:30Z".into(),
+            status: AgentStatus::Active,
+            agent_session_id: Some("codex-session-1".into()),
+            managed_agent: Some(ManagedAgentRef::codex("codex-run-1")),
+            last_activity_at: Some("2026-04-03T12:06:30Z".into()),
+            current_task_id: None,
+            runtime_capabilities: RuntimeCapabilities::default(),
+            persona: None,
+        },
+    );
+    state.agents.insert(
+        "unmanaged-reviewer".into(),
+        AgentRegistration {
+            agent_id: "unmanaged-reviewer".into(),
+            name: "Unmanaged Reviewer".into(),
+            runtime: "copilot".into(),
+            role: SessionRole::Reviewer,
+            capabilities: vec!["review".into()],
+            joined_at: "2026-04-03T12:04:00Z".into(),
+            updated_at: "2026-04-03T12:07:00Z".into(),
+            status: AgentStatus::Idle,
+            agent_session_id: Some("copilot-session-1".into()),
+            managed_agent: None,
+            last_activity_at: Some("2026-04-03T12:07:00Z".into()),
+            current_task_id: None,
+            runtime_capabilities: RuntimeCapabilities::default(),
+            persona: None,
+        },
+    );
+    state.metrics = SessionMetrics::recalculate(&state);
     state
 }
 
@@ -260,6 +336,74 @@ pub(super) fn sample_conversation_event(sequence: u64, content: &str) -> Convers
     }
 }
 
+pub(super) fn agent_columns(conn: &Connection) -> Vec<String> {
+    conn.prepare("PRAGMA table_info(agents)")
+        .expect("prepare agents table info")
+        .query_map([], |row| row.get(1))
+        .expect("query agents table info")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("collect agents table columns")
+}
+
+pub(super) fn session_agent_identity_rows(
+    conn: &Connection,
+    session_id: &str,
+) -> Vec<(String, Option<String>, Option<String>)> {
+    conn.prepare(
+        "SELECT agent_id, managed_agent_kind, managed_agent_id
+         FROM agents
+         WHERE session_id = ?1
+         ORDER BY agent_id",
+    )
+    .expect("prepare agent identity rows")
+    .query_map([session_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, Option<String>>(2)?,
+        ))
+    })
+    .expect("query agent identity rows")
+    .collect::<Result<Vec<_>, _>>()
+    .expect("collect agent identity rows")
+}
+
+pub(super) fn simulate_pre_v11_agents_table(conn: &Connection) {
+    conn.execute_batch(
+        "CREATE TABLE agents_legacy (
+             agent_id                  TEXT NOT NULL,
+             session_id                TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+             name                      TEXT NOT NULL,
+             runtime                   TEXT NOT NULL,
+             role                      TEXT NOT NULL,
+             capabilities_json         TEXT NOT NULL DEFAULT '[]',
+             status                    TEXT NOT NULL,
+             agent_session_id          TEXT,
+             joined_at                 TEXT NOT NULL,
+             updated_at                TEXT NOT NULL,
+             last_activity_at          TEXT,
+             current_task_id           TEXT,
+             runtime_capabilities_json TEXT NOT NULL DEFAULT '{}',
+             PRIMARY KEY (session_id, agent_id)
+         ) WITHOUT ROWID;
+         INSERT INTO agents_legacy (
+             agent_id, session_id, name, runtime, role, capabilities_json,
+             status, agent_session_id, joined_at, updated_at,
+             last_activity_at, current_task_id, runtime_capabilities_json
+         )
+         SELECT
+             agent_id, session_id, name, runtime, role, capabilities_json,
+             status, agent_session_id, joined_at, updated_at,
+             last_activity_at, current_task_id, runtime_capabilities_json
+         FROM agents;
+         DROP TABLE agents;
+         ALTER TABLE agents_legacy RENAME TO agents;
+         CREATE INDEX idx_agents_runtime_session ON agents(runtime, agent_session_id);
+         UPDATE schema_meta SET value = '10' WHERE key = 'version';",
+    )
+    .expect("simulate pre-v11 agents table");
+}
+
 pub(super) fn performance_session_state(
     project_index: usize,
     session_index: usize,
@@ -294,6 +438,7 @@ pub(super) fn performance_session_state(
             updated_at: timestamp.clone(),
             status: AgentStatus::Active,
             agent_session_id: Some(format!("{leader_id}-session")),
+            managed_agent: None,
             last_activity_at: Some(timestamp.clone()),
             current_task_id: Some(task_id.clone()),
             runtime_capabilities: RuntimeCapabilities::default(),

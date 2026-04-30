@@ -26,6 +26,7 @@ pub(super) fn agent_registration(
         updated_at: "2026-03-28T12:00:00Z".into(),
         status,
         agent_session_id: None,
+        managed_agent: None,
         last_activity_at: None,
         current_task_id: None,
         runtime_capabilities: RuntimeCapabilities::default(),

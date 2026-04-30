@@ -306,6 +306,62 @@ fn all_tables_exist() {
         );
     }
 }
+
+#[test]
+fn fresh_schema_agents_table_includes_managed_agent_identity_columns() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let columns = agent_columns(&db.conn);
+    assert!(columns.iter().any(|column| column == "managed_agent_kind"));
+    assert!(columns.iter().any(|column| column == "managed_agent_id"));
+}
+
+#[test]
+fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_rows() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+
+    {
+        let db = DaemonDb::open(&path).expect("open fresh db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state_with_managed_agents();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+        simulate_pre_v11_agents_table(&db.conn);
+    }
+
+    let db = DaemonDb::open(&path).expect("open migrated db");
+    assert_eq!(db.schema_version().expect("version"), "11");
+
+    let columns = agent_columns(&db.conn);
+    assert!(columns.iter().any(|column| column == "managed_agent_kind"));
+    assert!(columns.iter().any(|column| column == "managed_agent_id"));
+
+    assert_eq!(
+        session_agent_identity_rows(&db.conn, "sess-test-1"),
+        vec![
+            ("acp-worker".into(), None, None),
+            ("claude-leader".into(), None, None),
+            ("codex-worker".into(), None, None),
+            ("unmanaged-reviewer".into(), None, None),
+        ]
+    );
+
+    let (name, runtime, session_key): (String, String, Option<String>) = db
+        .conn
+        .query_row(
+            "SELECT name, runtime, agent_session_id
+             FROM agents
+             WHERE session_id = ?1 AND agent_id = ?2",
+            rusqlite::params!["sess-test-1", "claude-leader"],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("load migrated agent row");
+    assert_eq!(name, "Claude Leader");
+    assert_eq!(runtime, "claude");
+    assert_eq!(session_key.as_deref(), Some("claude-session-1"));
+}
+
 #[test]
 fn wal_mode_is_active() {
     let tmp = tempfile::tempdir().expect("tempdir");

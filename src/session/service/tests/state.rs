@@ -19,6 +19,7 @@ fn apply_join_session_idempotent_by_marker() {
         None,
         now,
         None,
+        None,
     )
     .expect("first join");
 
@@ -30,6 +31,7 @@ fn apply_join_session_idempotent_by_marker() {
         &caps,
         None,
         now,
+        None,
         None,
     )
     .expect("second join");
@@ -62,6 +64,7 @@ fn apply_join_session_different_markers_create_distinct() {
         None,
         now,
         None,
+        None,
     )
     .expect("first join");
 
@@ -73,6 +76,7 @@ fn apply_join_session_different_markers_create_distinct() {
         &caps_b,
         None,
         now,
+        None,
         None,
     )
     .expect("second join");

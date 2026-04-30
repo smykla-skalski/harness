@@ -366,9 +366,9 @@ fn replace_agents(
         .prepare(
             "INSERT INTO agents (
                 agent_id, session_id, name, runtime, role, capabilities_json,
-                status, agent_session_id, joined_at, updated_at,
+                status, agent_session_id, managed_agent_kind, managed_agent_id, joined_at, updated_at,
                 last_activity_at, current_task_id, runtime_capabilities_json
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         )
         .map_err(|error| db_error(format!("prepare agent insert: {error}")))?;
 
@@ -376,6 +376,18 @@ fn replace_agents(
         let capabilities_json = serde_json::to_string(&agent.capabilities).unwrap_or_default();
         let runtime_capabilities_json =
             serde_json::to_string(&agent.runtime_capabilities).unwrap_or_default();
+        let managed_agent_kind = agent
+            .managed_agent
+            .as_ref()
+            .map(|managed| match managed.kind {
+                crate::session::types::ManagedAgentKind::Tui => "tui",
+                crate::session::types::ManagedAgentKind::Acp => "acp",
+                crate::session::types::ManagedAgentKind::Codex => "codex",
+            });
+        let managed_agent_id = agent
+            .managed_agent
+            .as_ref()
+            .map(|managed| managed.id.as_str());
 
         statement
             .execute(rusqlite::params![
@@ -387,6 +399,8 @@ fn replace_agents(
                 capabilities_json,
                 agent_status_db_label(&agent.status),
                 agent.agent_session_id,
+                managed_agent_kind,
+                managed_agent_id,
                 agent.joined_at,
                 agent.updated_at,
                 agent.last_activity_at,

@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
@@ -8,24 +7,19 @@ use tokio::sync::broadcast;
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    write_cancel_recording_acp_agent, write_exiting_acp_agent, write_prompt_delaying_acp_agent,
-    write_sleeping_acp_agent,
+    seeded_manager, seeded_manager_with_events, write_cancel_recording_acp_agent,
+    write_exiting_acp_agent, write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
 };
 
 fn manager() -> AcpAgentManagerHandle {
-    let (sender, _) = broadcast::channel(16);
-    AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()))
+    seeded_manager()
 }
 
 fn manager_with_events() -> (
     AcpAgentManagerHandle,
     broadcast::Receiver<crate::daemon::protocol::StreamEvent>,
 ) {
-    let (sender, receiver) = broadcast::channel(64);
-    (
-        AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new())),
-        receiver,
-    )
+    seeded_manager_with_events()
 }
 
 fn descriptor(command: &Path) -> AcpAgentDescriptor {
@@ -114,9 +108,8 @@ async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
             let descriptor = descriptor(&script);
             let request = AcpAgentStartRequest {
                 agent: "fake".to_string(),
-                prompt: None,
                 project_dir: Some(temp.path().display().to_string()),
-                record_permissions: false,
+                ..AcpAgentStartRequest::default()
             };
             let manager = manager();
             let first = manager
@@ -175,9 +168,8 @@ async fn stopping_reused_session_cancels_only_target_protocol_session() {
         let descriptor = descriptor(&script);
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let manager = manager();
 
@@ -220,7 +212,7 @@ async fn prompted_reuse_rejects_busy_prompt_without_saturation_spawn() {
             agent: "fake".to_string(),
             prompt: Some("first".to_string()),
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
         let manager = manager();
 
@@ -277,9 +269,8 @@ fn shared_fake_runtime() -> (
     let descriptor = descriptor(&script);
     let request = AcpAgentStartRequest {
         agent: "fake".to_string(),
-        prompt: None,
         project_dir: Some(temp.path().display().to_string()),
-        record_permissions: false,
+        ..AcpAgentStartRequest::default()
     };
     (temp, manager(), descriptor, request)
 }
@@ -295,9 +286,8 @@ async fn process_exit_disconnects_every_reused_logical_session() {
         let (manager, mut events) = manager_with_events();
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
 
         let first = manager
@@ -346,9 +336,8 @@ async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
         let (manager, mut events) = manager_with_events();
         let request = AcpAgentStartRequest {
             agent: "fake".to_string(),
-            prompt: None,
             project_dir: Some(temp.path().display().to_string()),
-            record_permissions: false,
+            ..AcpAgentStartRequest::default()
         };
 
         let first = manager

@@ -186,17 +186,24 @@ impl AcpAgentManagerHandle {
             || permissions.mode(PERMISSION_RESPONSE_DEADLINE),
             |log_path| PermissionMode::Recording { log_path },
         );
+        let display_name = input
+            .request
+            .name
+            .clone()
+            .unwrap_or_else(|| input.descriptor.display_name.clone());
         let protocol = spawn_protocol_task(
             &mut child,
             SpawnProtocolInput {
                 request: input.request,
                 acp_id: input.acp_id,
                 session_id: input.session_id,
-                agent_name: input.descriptor.display_name.clone(),
+                agent_name: display_name.clone(),
+                runtime_name: input.descriptor.id.clone(),
                 project_dir: input.project_dir.to_path_buf(),
                 supervisor: &supervisor,
                 permission_mode,
                 initial_prompt_lease,
+                manager: self.clone(),
             },
         )
         .map_err(|error| {
@@ -205,12 +212,35 @@ impl AcpAgentManagerHandle {
                 input.descriptor.id
             ))
         })?;
+        let registration = self
+            .register_orchestration_agent(
+                input.session_id,
+                input.acp_id,
+                input.request,
+                input.descriptor,
+                &display_name,
+            )
+            .inspect_err(|_| {
+                protocol.protocol.abort();
+                protocol.batcher.abort();
+                let _ = child.kill();
+            })?;
         let event_task = spawn_event_forwarder(self.sender(), protocol.events);
+        protocol.start.send(()).map_err(|_| {
+            protocol.protocol.abort();
+            protocol.batcher.abort();
+            let _ = child.kill();
+            CliErrorKind::workflow_io(format!(
+                "ACP protocol task exited before startup for '{}'",
+                input.descriptor.id
+            ))
+        })?;
         let snapshot = started_snapshot(StartedSnapshotInput {
             acp_id: input.acp_id,
             session_id: input.session_id,
             request: input.request,
-            descriptor: input.descriptor,
+            agent_id: &registration.agent_id,
+            display_name: &registration.display_name,
             supervisor: &supervisor,
             project_dir: input.project_dir,
             process_key: input.process_key,
@@ -389,7 +419,8 @@ struct StartedSnapshotInput<'a> {
     acp_id: &'a str,
     session_id: &'a str,
     request: &'a AcpAgentStartRequest,
-    descriptor: &'a AcpAgentDescriptor,
+    agent_id: &'a str,
+    display_name: &'a str,
     supervisor: &'a AcpSessionSupervisor,
     project_dir: &'a Path,
     process_key: &'a str,
@@ -421,7 +452,8 @@ fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
         acp_id,
         session_id,
         request,
-        descriptor,
+        agent_id,
+        display_name,
         supervisor,
         project_dir,
         process_key,
@@ -431,8 +463,8 @@ fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
     AcpAgentSnapshot {
         acp_id: acp_id.to_string(),
         session_id: session_id.to_string(),
-        agent_id: descriptor.id.clone(),
-        display_name: descriptor.display_name.clone(),
+        agent_id: agent_id.to_string(),
+        display_name: display_name.to_string(),
         status: AgentStatus::Active,
         pid: supervisor.pid(),
         pgid: supervisor.pgid(),

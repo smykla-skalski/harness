@@ -15,11 +15,22 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
-use crate::session::types::AgentStatus;
+use crate::session::service as orchestration_service;
+use crate::session::types::{AgentStatus, ManagedAgentRef, SessionRole};
 use crate::workspace::utc_now;
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
+
+fn default_acp_role() -> SessionRole {
+    SessionRole::Worker
+}
+
+#[derive(Debug, Clone)]
+pub(in crate::daemon::agent_acp) struct AcpOrchestrationRegistration {
+    pub agent_id: String,
+    pub display_name: String,
+}
 
 mod process_fault;
 mod process_pool;
@@ -32,12 +43,38 @@ pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
 pub struct AcpAgentStartRequest {
     #[serde(alias = "agent_id")]
     pub agent: String,
+    #[serde(default = "default_acp_role")]
+    pub role: SessionRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_role: Option<SessionRole>,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<String>,
     #[serde(default)]
     pub record_permissions: bool,
+}
+
+impl Default for AcpAgentStartRequest {
+    fn default() -> Self {
+        Self {
+            agent: String::new(),
+            role: default_acp_role(),
+            fallback_role: None,
+            capabilities: Vec::new(),
+            name: None,
+            prompt: None,
+            project_dir: None,
+            persona: None,
+            record_permissions: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -149,7 +186,7 @@ impl AcpAgentManagerHandle {
         session_id: &str,
         request: &AcpAgentStartRequest,
     ) -> Result<AcpAgentSnapshot, CliError> {
-        self.start_with_pooling_disabled(session_id, request, false)
+        self.start_with_pooling_disabled(session_id, request, true)
     }
 
     pub(crate) fn start_with_pooling_disabled(
@@ -184,6 +221,143 @@ impl AcpAgentManagerHandle {
             descriptor,
             disable_pooling,
         )
+    }
+
+    pub(in crate::daemon::agent_acp) fn register_orchestration_agent(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        request: &AcpAgentStartRequest,
+        descriptor: &catalog::AcpAgentDescriptor,
+        display_name: &str,
+    ) -> Result<AcpOrchestrationRegistration, CliError> {
+        let db =
+            self.state.db.get().cloned().ok_or_else(|| {
+                CliErrorKind::workflow_io("daemon database unavailable".to_string())
+            })?;
+        let db = db.lock().map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
+        })?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Err(service::session_not_found(session_id));
+        };
+        let now = utc_now();
+        let joined_role =
+            orchestration_service::resolve_join_role(&state, request.role, request.fallback_role)?;
+        let agent_id = orchestration_service::apply_join_session(
+            &mut state,
+            display_name,
+            &descriptor.id,
+            joined_role,
+            &request.capabilities,
+            None,
+            &now,
+            request.persona.as_deref(),
+            Some(ManagedAgentRef::acp(acp_id)),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&service::build_log_entry(
+            session_id,
+            orchestration_service::log_agent_joined(&agent_id, joined_role, &descriptor.id),
+            None,
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        Ok(AcpOrchestrationRegistration {
+            agent_id,
+            display_name: display_name.to_string(),
+        })
+    }
+
+    pub(in crate::daemon::agent_acp) fn bind_orchestration_runtime_session(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        runtime_name: &str,
+        agent_session_id: &str,
+    ) -> Result<bool, CliError> {
+        let db =
+            self.state.db.get().cloned().ok_or_else(|| {
+                CliErrorKind::workflow_io("daemon database unavailable".to_string())
+            })?;
+        let db = db.lock().map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
+        })?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Ok(false);
+        };
+        let now = utc_now();
+        let registered = orchestration_service::apply_register_agent_runtime_session(
+            &mut state,
+            runtime_name,
+            &ManagedAgentRef::acp(acp_id),
+            agent_session_id,
+            &now,
+        )?;
+        if !registered {
+            return Ok(false);
+        }
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
+    }
+
+    pub(in crate::daemon::agent_acp) fn sync_orchestration_disconnect(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+    ) -> Result<bool, CliError> {
+        let AgentStatus::Disconnected {
+            reason,
+            stderr_tail,
+        } = &snapshot.status
+        else {
+            return Ok(false);
+        };
+        let db =
+            self.state.db.get().cloned().ok_or_else(|| {
+                CliErrorKind::workflow_io("daemon database unavailable".to_string())
+            })?;
+        let db = db.lock().map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
+        })?;
+        let Some(mut state) = db.load_session_state_for_mutation(&snapshot.session_id)? else {
+            return Ok(false);
+        };
+        let now = utc_now();
+        let disconnected = orchestration_service::apply_agent_disconnected_with_reason(
+            &mut state,
+            &snapshot.agent_id,
+            reason.clone(),
+            stderr_tail.clone(),
+            &now,
+        );
+        if !disconnected {
+            return Ok(false);
+        }
+        let project_id = db
+            .project_id_for_session(&snapshot.session_id)?
+            .ok_or_else(|| service::session_not_found(&snapshot.session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&service::build_log_entry(
+            &snapshot.session_id,
+            orchestration_service::log_agent_disconnected(
+                &snapshot.agent_id,
+                disconnect_reason_label(reason),
+            ),
+            None,
+            None,
+        ))?;
+        db.bump_change(&snapshot.session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
     }
 
     /// Resolve a pending ACP permission batch and return the updated snapshot.
@@ -307,6 +481,7 @@ impl AcpAgentManagerHandle {
             self.remove_process_if_empty(&process_key);
         }
         let snapshot = session.snapshot_with_live_counts();
+        self.sync_orchestration_disconnect_best_effort(&snapshot);
         self.broadcast("acp_agent_stopped", &snapshot);
         Ok(snapshot)
     }
@@ -336,6 +511,8 @@ impl AcpAgentManagerHandle {
                 .expect("ACP process lifecycle lock");
             let process_key = session.process_key();
             let pending_permissions = session.disconnect(DisconnectReason::DaemonShutdown, false);
+            let snapshot = session.snapshot_with_live_counts();
+            self.sync_orchestration_disconnect_best_effort(&snapshot);
             if session.process().logical_session_count() == 0 {
                 session.terminate_process(pending_permissions);
                 self.remove_process_if_empty(&process_key);
@@ -371,6 +548,7 @@ impl AcpAgentManagerHandle {
             }
             (snapshot, incidents)
         };
+        self.sync_orchestration_disconnect_best_effort(&snapshot);
         for incident in incidents {
             let _ = self.state.sender.send(incident);
         }
@@ -437,6 +615,9 @@ impl AcpAgentManagerHandle {
         let before = session.snapshot_with_live_counts();
         session.refresh();
         let after = session.snapshot_with_live_counts();
+        if !before.status.is_disconnected() && after.status.is_disconnected() {
+            self.sync_orchestration_disconnect_best_effort(&after);
+        }
         if !before.status.is_disconnected()
             && after.status.is_disconnected()
             && let Some(event) = process_incident_from_snapshot(&after)
@@ -502,6 +683,34 @@ impl AcpAgentManagerHandle {
             .into());
         }
         Ok(())
+    }
+
+    fn sync_orchestration_disconnect_best_effort(&self, snapshot: &AcpAgentSnapshot) {
+        if let Err(error) = self.sync_orchestration_disconnect(snapshot) {
+            tracing::warn!(
+                acp_id = %snapshot.acp_id,
+                session_id = %snapshot.session_id,
+                agent_id = %snapshot.agent_id,
+                %error,
+                "failed to sync ACP disconnect into session orchestration"
+            );
+        }
+    }
+}
+
+fn disconnect_reason_label(reason: &DisconnectReason) -> &'static str {
+    match reason {
+        DisconnectReason::ProcessExited { .. } => "process_exited",
+        DisconnectReason::StdioClosed => "stdio_closed",
+        DisconnectReason::TransportClosed => "transport_closed",
+        DisconnectReason::InitializeTimeout => "initialize_timeout",
+        DisconnectReason::PromptTimeout => "prompt_timeout",
+        DisconnectReason::WatchdogFired => "watchdog_fired",
+        DisconnectReason::UserCancelled => "user_cancelled",
+        DisconnectReason::SessionStopped => "session_stopped",
+        DisconnectReason::DaemonShutdown => "daemon_shutdown",
+        DisconnectReason::OomKilled => "oom_killed",
+        DisconnectReason::Unknown { .. } => "unknown",
     }
 }
 

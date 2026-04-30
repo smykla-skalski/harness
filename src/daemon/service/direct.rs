@@ -156,6 +156,7 @@ pub fn join_session_direct(
             agent_session_id.as_deref(),
             &now,
             request.persona.as_deref(),
+            None,
         )?;
         let project_id = db
             .project_id_for_session(session_id)?
@@ -219,6 +220,7 @@ pub(crate) async fn join_session_direct_async(
                 agent_session_id.as_deref(),
                 &now,
                 request.persona.as_deref(),
+                None,
             )?;
             Ok((agent_id, joined_role, state.clone()))
         })
@@ -253,7 +255,7 @@ pub fn register_agent_runtime_session_direct(
         let registered = session_service::apply_register_agent_runtime_session(
             &mut state,
             &request.runtime,
-            &request.tui_id,
+            &crate::session::types::ManagedAgentRef::tui(&request.tui_id),
             &request.agent_session_id,
             &now,
         )?;
@@ -289,7 +291,7 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
             session_service::apply_register_agent_runtime_session(
                 state,
                 &request.runtime,
-                &request.tui_id,
+                &crate::session::types::ManagedAgentRef::tui(&request.tui_id),
                 &request.agent_session_id,
                 &now,
             )

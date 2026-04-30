@@ -107,12 +107,27 @@ pub struct AcpAgentStartArgs {
     /// ACP descriptor ID to launch.
     #[arg(long)]
     pub agent: String,
+    /// Role to register the ACP agent as.
+    #[arg(long, value_enum, default_value = "worker")]
+    pub role: SessionRole,
+    /// Fallback role to use when joining as leader and a leader already exists.
+    #[arg(long, value_enum)]
+    pub fallback_role: Option<SessionRole>,
+    /// Capability tag. May be repeated or comma-separated.
+    #[arg(long = "capability")]
+    pub capabilities: Vec<String>,
+    /// Human-readable agent display name.
+    #[arg(long)]
+    pub name: Option<String>,
     /// Optional first prompt to submit after launch.
     #[arg(long)]
     pub prompt: Option<String>,
     /// Project directory. Defaults to the daemon's session project.
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
+    /// Persona identifier to attach to the agent registration.
+    #[arg(long)]
+    pub persona: Option<String>,
     /// Record ACP permission decisions without granting permission requests.
     #[arg(long)]
     pub record_permissions: bool,
@@ -122,11 +137,16 @@ impl Execute for AcpAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let request = AcpAgentStartRequest {
             agent: self.agent.clone(),
+            role: self.role,
+            fallback_role: self.fallback_role,
+            capabilities: capability_args(&self.capabilities),
+            name: self.name.clone(),
             prompt: self.prompt.clone(),
             project_dir: self
                 .project_dir
                 .as_deref()
                 .map(|hint| resolve_project_dir(Some(hint))),
+            persona: self.persona.clone(),
             record_permissions: self.record_permissions,
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;

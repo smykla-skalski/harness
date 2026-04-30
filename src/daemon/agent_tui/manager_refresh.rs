@@ -153,7 +153,7 @@ impl AgentTuiManagerHandle {
             .get(&snapshot.tui_id)
             .and_then(|active| active.process.clone())
         else {
-            return Ok(snapshot);
+            return Ok(self.orphaned_inactive_snapshot(snapshot));
         };
 
         if let Some(status) = process.try_wait()? {
@@ -173,6 +173,28 @@ impl AgentTuiManagerHandle {
         }
 
         Ok(snapshot)
+    }
+
+    pub(super) fn orphaned_inactive_snapshot(
+        &self,
+        mut snapshot: AgentTuiSnapshot,
+    ) -> AgentTuiSnapshot {
+        let orphaned_status = match snapshot.status {
+            AgentTuiStatus::Starting => Some(AgentTuiStatus::Failed),
+            AgentTuiStatus::Running => Some(AgentTuiStatus::Exited),
+            AgentTuiStatus::Exited | AgentTuiStatus::Failed | AgentTuiStatus::Stopped => None,
+        };
+        let Some(orphaned_status) = orphaned_status else {
+            return snapshot;
+        };
+
+        snapshot.status = orphaned_status;
+        snapshot.updated_at = utc_now();
+        if snapshot.error.is_none() {
+            snapshot.error =
+                Some("managed terminal agent process missing from daemon runtime".into());
+        }
+        snapshot
     }
 
     fn try_resolve_agent_id(&self, snapshot: &mut AgentTuiSnapshot) {
@@ -219,7 +241,9 @@ impl AgentTuiManagerHandle {
         if !Self::snapshot_changed(previous, refreshed) {
             return Ok(());
         }
-        self.save_and_broadcast("agent_tui_updated", refreshed)
+        let snapshot = self.persist_snapshot_event("agent_tui_updated", refreshed)?;
+        self.reconcile_refreshed_snapshot(&snapshot);
+        Ok(())
     }
 
     fn snapshot_changed(previous: &AgentTuiSnapshot, refreshed: &AgentTuiSnapshot) -> bool {
@@ -312,6 +336,16 @@ impl AgentTuiManagerHandle {
         event_name: &str,
         snapshot: &AgentTuiSnapshot,
     ) -> Result<(), CliError> {
+        let snapshot = self.persist_snapshot_event(event_name, snapshot)?;
+        self.reconcile_terminal_agent_state(&snapshot)?;
+        Ok(())
+    }
+
+    fn persist_snapshot_event(
+        &self,
+        event_name: &str,
+        snapshot: &AgentTuiSnapshot,
+    ) -> Result<AgentTuiSnapshot, CliError> {
         let snapshot = self.normalize_snapshot(snapshot.clone());
         let persisted = snapshot.clone();
         if let Some(result) = self
@@ -333,8 +367,19 @@ impl AgentTuiManagerHandle {
             payload,
         };
         let _ = self.state.sender.send(event);
-        self.reconcile_terminal_agent_state(&snapshot)?;
-        Ok(())
+        Ok(snapshot)
+    }
+
+    fn reconcile_refreshed_snapshot(&self, snapshot: &AgentTuiSnapshot) {
+        if let Err(error) = self.reconcile_terminal_agent_state(snapshot) {
+            tracing::warn!(
+                tui_id = %snapshot.tui_id,
+                session_id = %snapshot.session_id,
+                agent_id = %snapshot.agent_id,
+                %error,
+                "terminal agent refresh persisted but session reconciliation failed"
+            );
+        }
     }
 
     fn reconcile_terminal_agent_state(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
