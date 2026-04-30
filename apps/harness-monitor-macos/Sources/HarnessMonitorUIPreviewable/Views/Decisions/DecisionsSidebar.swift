@@ -215,23 +215,7 @@ public struct DecisionsSidebar: View {
       setSelectedSeverities([])
     } label: {
       Text("All")
-        .scaledFont(.caption.bold())
-        .fixedSize(horizontal: true, vertical: false)
-        .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-        .background(
-          Capsule().fill(isActive ? HarnessMonitorTheme.accent : Color.clear)
-        )
-        .overlay(
-          Capsule().strokeBorder(
-            HarnessMonitorTheme.accent.opacity(isActive ? 0 : 0.35),
-            lineWidth: 1
-          )
-        )
-        .foregroundStyle(
-          isActive ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.secondaryInk
-        )
-        .contentShape(Capsule())
+        .scaledFont(.caption.weight(.semibold))
     }
     .harnessFilterChipButtonStyle(isSelected: isActive)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarAllChip)
@@ -240,13 +224,6 @@ public struct DecisionsSidebar: View {
 
   private func severityChip(_ severity: DecisionSeverity) -> some View {
     let isActive = selectedSeverities.contains(severity)
-    let visualLabel: String
-    switch severity {
-    case .needsUser:
-      visualLabel = "Needs"
-    default:
-      visualLabel = severity.chipLabel
-    }
     return Button {
       var next = selectedSeverities
       if next.contains(severity) {
@@ -256,25 +233,9 @@ public struct DecisionsSidebar: View {
       }
       setSelectedSeverities(next)
     } label: {
-      Text(visualLabel)
-        .scaledFont(.caption)
-        .fixedSize(horizontal: true, vertical: false)
+      Text(severity.chipLabel)
+        .scaledFont(.caption.weight(.semibold))
         .lineLimit(1)
-        .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-        .background(
-          Capsule().fill(isActive ? severity.chipColor : Color.clear)
-        )
-        .overlay(
-          Capsule().strokeBorder(
-            severity.chipColor.opacity(isActive ? 0 : 0.35),
-            lineWidth: 1
-          )
-        )
-        .foregroundStyle(
-          isActive ? HarnessMonitorTheme.onContrast : severity.chipColor.opacity(0.85)
-        )
-        .contentShape(Capsule())
     }
     .harnessFilterChipButtonStyle(isSelected: isActive)
     .accessibilityIdentifier(
@@ -309,7 +270,7 @@ public struct DecisionsSidebar: View {
       Image(systemName: "bell.slash")
         .font(.title2)
         .foregroundStyle(.secondary)
-      Text("No decisions match")
+      Text("Nothing matches right now")
         .scaledFont(.body)
         .foregroundStyle(.secondary)
     }
@@ -341,10 +302,9 @@ public struct DecisionsSidebar: View {
     _ group: DecisionsSidebarViewModel.SessionGroup
   ) -> some View {
     HStack {
-      Text(group.sessionID ?? "No session")
-        .scaledFont(.caption)
+      Text(group.sessionID.map(humanizedWorkspaceLabel) ?? "Shared context")
+        .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
-        .textCase(.uppercase)
       Spacer()
       Text("\(group.decisions.count)")
         .scaledFont(.caption)

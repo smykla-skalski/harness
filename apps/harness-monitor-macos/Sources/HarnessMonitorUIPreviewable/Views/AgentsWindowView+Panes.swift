@@ -34,6 +34,15 @@ extension AgentsWindowView {
         }
         .id(scrollContainerIdentity)
         .overlay { agentsStateMarkerOverlay() }
+    } else if viewModel.selection.isDecisionRoute {
+      paneContent
+        .onGeometryChange(for: CGSize.self) { proxy in
+          proxy.size
+        } action: { detailSize in
+          updateDetailColumnGeometry(detailSize)
+        }
+        .id(scrollContainerIdentity)
+        .overlay { agentsStateMarkerOverlay() }
     } else {
       ScrollView {
         paneContent
@@ -46,29 +55,6 @@ extension AgentsWindowView {
       }
       .id(scrollContainerIdentity)
       .overlay { agentsStateMarkerOverlay() }
-    }
-  }
-
-  @ViewBuilder var paneContent: some View {
-    switch viewModel.selection {
-    case .create:
-      createPane
-    case .terminal:
-      if let selectedSessionTui {
-        sessionPane(selectedSessionTui)
-      } else {
-        unavailableSessionPane
-      }
-    case .codex:
-      if let selectedCodexRun {
-        codexPane(selectedCodexRun)
-      } else {
-        unavailableSessionPane
-      }
-    case .agent(let agentID):
-      agentDetailPane(agentID: agentID)
-    case .task(let taskID):
-      taskDetailPane(taskID: taskID)
     }
   }
 
@@ -395,4 +381,5 @@ extension AgentsWindowView {
       }
     }
   }
+
 }

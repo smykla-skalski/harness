@@ -71,7 +71,12 @@ printf '{}\n'
             )
 
             env = os.environ.copy()
-            env["PATH"] = f"{fake_bin}:/usr/bin:/bin"
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                }
+            )
             file_arg = "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift"
             if use_repo_root_relative:
                 file_arg = (

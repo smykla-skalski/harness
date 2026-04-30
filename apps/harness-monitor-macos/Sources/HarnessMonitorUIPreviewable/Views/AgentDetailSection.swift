@@ -56,10 +56,10 @@ struct AgentDetailSection: View {
   private var facts: [InspectorFact] {
     [
       .init(title: "Role", value: agent.role.title),
-      .init(title: "Current Task", value: agent.currentTaskId ?? "Idle"),
+      .init(title: "Current Task", value: currentTaskTitle),
       .init(title: "Last Activity", value: formatTimestamp(agent.lastActivityAt)),
       .init(
-        title: "Signal Pickup",
+        title: "Pickup Time",
         value: "\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s typical"
       ),
     ]
@@ -71,6 +71,16 @@ struct AgentDetailSection: View {
 
   private var assignedTasks: [WorkItem] {
     (store.selectedSession?.tasks ?? []).filter { $0.assignedTo == agent.agentId }
+  }
+
+  private var currentTaskTitle: String {
+    guard
+      let currentTaskID = agent.currentTaskId,
+      let task = store.selectedSession?.tasks.first(where: { $0.taskId == currentTaskID })
+    else {
+      return agent.currentTaskId ?? "Idle"
+    }
+    return task.title
   }
 
   private var agentTimelineEntries: [TimelineEntry] {
@@ -118,7 +128,7 @@ struct AgentDetailSection: View {
       }
       Text(agent.name)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
-      Text("\(agent.runtime) • \(agent.role.title)")
+      Text("\(runtimeDisplayLabel(agent.runtime)) • \(agent.role.title)")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       InspectorSection(title: "Runtime Capabilities") {
@@ -154,17 +164,17 @@ struct AgentDetailSection: View {
         }
       }
       if let activity {
-        InspectorSection(title: "Tool Activity") {
+        InspectorSection(title: "Activity Summary") {
           InspectorFactGrid(
             facts: [
-              .init(title: "Invocations", value: "\(activity.toolInvocationCount)"),
+              .init(title: "Actions", value: "\(activity.toolInvocationCount)"),
               .init(title: "Results", value: "\(activity.toolResultCount)"),
-              .init(title: "Errors", value: "\(activity.toolErrorCount)"),
-              .init(title: "Latest Tool", value: activity.latestToolName ?? "Unknown"),
+              .init(title: "Issues", value: "\(activity.toolErrorCount)"),
+              .init(title: "Latest Action", value: activity.latestToolName ?? "Unknown"),
             ]
           )
           if !activity.recentTools.isEmpty {
-            Text("Recent Tools")
+            Text("Recent Activity")
               .scaledFont(.caption.bold())
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             Text(activity.recentTools.joined(separator: " · "))
@@ -223,8 +233,8 @@ struct AgentDetailSection: View {
                 Text(entry.summary)
                   .scaledFont(.subheadline)
                 HStack(spacing: HarnessMonitorTheme.spacingXS) {
-                  Text(entry.kind)
-                    .scaledFont(.caption.monospaced())
+                  Text(humanizedWorkspaceLabel(entry.kind))
+                    .scaledFont(.caption.weight(.semibold))
                     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
                   Text(formatTimestamp(entry.recordedAt))
                     .scaledFont(.caption)
@@ -279,8 +289,12 @@ struct AgentDetailSection: View {
       .task(id: roleStateKey) {
         selectedRole = agent.role
       }
-      InspectorSection(title: "Send Signal") {
-        TextField("Command", text: $signalCommand)
+      InspectorSection(title: "Send Update") {
+        Text("Share a short instruction or context update with this agent.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+        TextField("Update Type", text: $signalCommand)
           .harnessNativeFormControl()
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalCommand)
           .submitLabel(.send)
@@ -289,12 +303,12 @@ struct AgentDetailSection: View {
           .lineLimit(3, reservesSpace: true)
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalMessage)
           .submitLabel(.send)
-        TextField("Action Hint", text: $signalActionHint)
+        TextField("Optional Context", text: $signalActionHint)
           .harnessNativeFormControl()
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalAction)
           .submitLabel(.send)
         HarnessInlineActionButton(
-          title: "Send Signal",
+          title: "Send Update",
           actionID: .sendSignal(
             sessionID: store.selectedSessionID ?? "",
             agentID: agent.agentId
@@ -357,7 +371,7 @@ struct AgentDetailSection: View {
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
-    openWindow(id: HarnessMonitorWindowID.decisions)
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 
   static func submittedRoleSelection(

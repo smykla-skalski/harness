@@ -15,13 +15,15 @@ struct SessionCockpitView: View {
   private var openWindow
 
   private func openAgent(_ agentID: String) {
-    store.requestAgentsWindowSelection(.agent(agentID))
-    openWindow(id: HarnessMonitorWindowID.agents)
+    store.requestWorkspaceSelection(
+      .agent(sessionID: detail.session.sessionId, agentID: agentID)
+    )
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 
   private func focusObserver() {
-    store.requestObserverFocusInDecisions()
-    openWindow(id: HarnessMonitorWindowID.decisions)
+    store.requestWorkspaceSelection(.decisions(sessionID: detail.session.sessionId))
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 
   var body: some View {
@@ -46,18 +48,13 @@ struct SessionCockpitView: View {
           }
           HarnessMonitorAdaptiveGridLayout(
             minimumColumnWidth: 340,
-            maximumColumns: 2,
+            maximumColumns: 3,
             spacing: 16
           ) {
             taskSection
             agentSection
+            signalSection
           }
-          SessionCockpitSignalsSection(
-            store: store,
-            signals: detail.signals,
-            isExtensionsLoading: isExtensionsLoading,
-            isSessionReadOnly: isSessionReadOnly
-          )
           SessionCockpitTimelineSection(
             sessionID: detail.session.sessionId,
             timeline: timeline,
@@ -99,6 +96,15 @@ struct SessionCockpitView: View {
       isSessionReadOnly: isSessionReadOnly,
       openAgent: openAgent,
       tuiStatusByAgent: tuiStatusByAgent
+    )
+  }
+
+  private var signalSection: some View {
+    SessionCockpitSignalsSection(
+      store: store,
+      signals: detail.signals,
+      isExtensionsLoading: isExtensionsLoading,
+      isSessionReadOnly: isSessionReadOnly
     )
   }
 }

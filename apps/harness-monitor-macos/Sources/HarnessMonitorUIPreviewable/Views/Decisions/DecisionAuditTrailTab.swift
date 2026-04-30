@@ -14,69 +14,98 @@ public struct DecisionAuditTrailTab: View {
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       if events.isEmpty {
-        SidebarEmptyState(
-          title: "No Audit Events",
-          systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-          message: "Matching supervisor events will appear here as the decision evolves."
-        )
+        emptyState
       } else {
-        ForEach(events, id: \.id) { event in
-          AuditTrailEventRow(
+        ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+          AuditTrailTimelineRow(
             event: event,
             timestamp: formatTimestamp(event.createdAt, configuration: dateTimeConfiguration)
           )
+          if index < events.count - 1 {
+            Divider()
+          }
         }
       }
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionAuditTrail)
   }
+
+  private var emptyState: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        Text("No audit events yet")
+          .scaledFont(.callout.weight(.semibold))
+        Text("Changes to this decision appear here as the workspace responds.")
+          .scaledFont(.footnote)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        .fill(HarnessMonitorTheme.ink.opacity(0.04))
+    }
+  }
 }
 
-private struct AuditTrailEventRow: View {
+private struct AuditTrailTimelineRow: View {
   let event: SupervisorEvent
   let timestamp: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(displayTitle(for: event.kind))
-          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        if let severity = eventSeverity {
-          Text(severity.label)
-            .scaledFont(.caption.bold())
-            .foregroundStyle(severity.tint)
-            .harnessPillPadding()
-            .harnessControlPill(tint: severity.tint)
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      Circle()
+        .fill(eventSeverity?.tint ?? HarnessMonitorTheme.controlBorder)
+        .frame(width: 8, height: 8)
+        .padding(.top, 6)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
+          Text(displayTitle(for: event.kind))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+          Spacer(minLength: HarnessMonitorTheme.spacingSM)
+          Text(timestamp)
+            .scaledFont(.caption.monospacedDigit())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
-        Text(timestamp)
-          .scaledFont(.caption.monospacedDigit())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          if let severity = eventSeverity {
+            Text(severity.label)
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(severity.tint)
+          }
+          if let ruleID = event.ruleID, !ruleID.isEmpty {
+            Text("Source · \(humanizedWorkspaceLabel(ruleID))")
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+        }
+        if let summary = payloadSummary(event.payloadJSON) {
+          Text(summary)
+            .scaledFont(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if let prettyPayload = formattedPayload(event.payloadJSON) {
+          DisclosureGroup("Details") {
+            Text(verbatim: prettyPayload)
+              .scaledFont(.caption.monospaced())
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .textSelection(.enabled)
+              .padding(.top, HarnessMonitorTheme.spacingXS)
+          }
+          .scaledFont(.caption)
+        }
       }
-      if let ruleID = event.ruleID, !ruleID.isEmpty {
-        Text(ruleID)
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      Text(formattedPayload(event.payloadJSON))
-        .scaledFont(.callout.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
     }
-    .padding(HarnessMonitorTheme.cardPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.04))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
-    }
   }
 
   private var eventSeverity: (label: String, tint: Color)? {
@@ -98,19 +127,55 @@ private struct AuditTrailEventRow: View {
   }
 
   private func displayTitle(for kind: String) -> String {
-    kind
-      .replacingOccurrences(of: "_", with: " ")
-      .replacingOccurrences(of: ".", with: " ")
-      .capitalized
+    humanizedWorkspaceLabel(kind)
   }
 
-  private func formattedPayload(_ payloadJSON: String) -> String {
+  private func payloadSummary(_ payloadJSON: String) -> String? {
     guard let data = payloadJSON.data(using: .utf8) else {
-      return payloadJSON
+      return nil
+    }
+    let object = try? JSONSerialization.jsonObject(with: data)
+    return firstString(forKeys: ["summary", "message", "action", "mode"], in: object)
+  }
+
+  private func firstString(forKeys keys: [String], in object: Any?) -> String? {
+    guard let object else {
+      return nil
+    }
+    if let dictionary = object as? [String: Any] {
+      for key in keys {
+        if let value = dictionary[key] as? String,
+          !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+          return value
+        }
+      }
+      for value in dictionary.values {
+        if let nested = firstString(forKeys: keys, in: value) {
+          return nested
+        }
+      }
+    } else if let array = object as? [Any] {
+      for value in array {
+        if let nested = firstString(forKeys: keys, in: value) {
+          return nested
+        }
+      }
+    }
+    return nil
+  }
+
+  private func formattedPayload(_ payloadJSON: String) -> String? {
+    let trimmed = payloadJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != "{}", trimmed != "[]" else {
+      return nil
+    }
+    guard let data = payloadJSON.data(using: .utf8) else {
+      return trimmed
     }
     let object = try? JSONSerialization.jsonObject(with: data)
     guard JSONSerialization.isValidJSONObject(object as Any) else {
-      return payloadJSON
+      return trimmed
     }
     guard
       let prettyData = try? JSONSerialization.data(
@@ -119,7 +184,7 @@ private struct AuditTrailEventRow: View {
       ),
       let pretty = String(data: prettyData, encoding: .utf8)
     else {
-      return payloadJSON
+      return trimmed
     }
     return pretty
   }

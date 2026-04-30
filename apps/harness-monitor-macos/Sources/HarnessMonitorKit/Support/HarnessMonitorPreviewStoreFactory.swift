@@ -48,6 +48,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case emptyCockpit
     case toolbarCountRegression
     case codexApprovalUnification
+    case agentTuiSingle
     case agentTuiOverflow
     case taskDropCockpit
     case offlineCached

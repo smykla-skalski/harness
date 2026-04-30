@@ -18,8 +18,8 @@ public struct DecisionsLiveTickView: View {
     let metrics = VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Grid(alignment: .leading, horizontalSpacing: HarnessMonitorTheme.spacingLG) {
         GridRow {
-          LiveTickMetricCell(title: "Last Snapshot", value: snapshot.lastSnapshotID ?? "n/a")
-          LiveTickMetricCell(title: "Observers", value: "\(snapshot.activeObserverCount)")
+          LiveTickMetricCell(title: "Last refresh", value: snapshot.lastSnapshotID ?? "n/a")
+          LiveTickMetricCell(title: "Watching", value: "\(snapshot.activeObserverCount)")
         }
         GridRow {
           LiveTickMetricCell(title: "Latency p50", value: latencyLabel(snapshot.tickLatencyP50Ms))
@@ -27,12 +27,12 @@ public struct DecisionsLiveTickView: View {
         }
       }
       if snapshot.quarantinedRuleIDs.isEmpty {
-        Text("No quarantined rules.")
+        Text("No paused checks.")
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Quarantined Rules")
+          Text("Paused checks")
             .scaledFont(.caption.bold())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           FlowQuarantinedRules(ruleIDs: snapshot.quarantinedRuleIDs)
@@ -106,8 +106,8 @@ private struct FlowQuarantinedRules: View {
   }
 
   private func ruleBadge(_ ruleID: String) -> some View {
-    Text(ruleID)
-      .scaledFont(.caption.monospaced())
+    Text(humanizedWorkspaceLabel(ruleID))
+      .scaledFont(.caption.weight(.semibold))
       .foregroundStyle(HarnessMonitorTheme.caution)
       .harnessPillPadding()
       .harnessControlPill(tint: HarnessMonitorTheme.caution)

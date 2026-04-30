@@ -27,11 +27,11 @@ public struct AcpPermissionAttentionEvent: Equatable, Sendable, Identifiable {
   public var id: String { batchID }
 
   public var toastMessage: String {
-    "Permission requested by \(agentName). Decisions window."
+    "Permission requested by \(agentName). Workspace."
   }
 
   public var notificationBody: String {
-    "Permission requested by \(agentName). Open the Decisions window."
+    "Permission requested by \(agentName). Open the workspace."
   }
 
   public var notificationSubtitle: String {

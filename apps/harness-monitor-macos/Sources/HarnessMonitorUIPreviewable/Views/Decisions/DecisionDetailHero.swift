@@ -2,49 +2,53 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Hero panel shown at the top of the Decisions detail column. Glass-backed so it reads as a
-/// single canonical header: severity role badge, summary title, rule id, timestamps, and the
-/// session / agent / task deeplink chips.
+/// single canonical header: severity role, summary title, rule id, timestamps, and lightweight
+/// scope context. Keep this calm so the decision reads like a document header instead of a card.
 struct DecisionDetailHero: View {
   let viewModel: DecisionDetailViewModel
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        severityBadge
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          severityLabel
           Text(viewModel.decision.summary)
             .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
             .multilineTextAlignment(.leading)
-          Text(viewModel.decision.ruleID)
-            .scaledFont(.caption.monospaced())
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+          Text("Source · \(humanizedWorkspaceLabel(viewModel.decision.ruleID))")
+            .scaledFont(.caption.weight(.semibold))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
         timestampBlock
       }
       if !viewModel.deeplinks.isEmpty {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.itemSpacing,
+          lineSpacing: HarnessMonitorTheme.itemSpacing
+        ) {
           ForEach(viewModel.deeplinks, id: \.stableKey) { deeplink in
-            deeplinkBadge(deeplink)
+            scopeItem(deeplink)
           }
         }
       }
     }
-    .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessPanelGlass()
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetailHero)
   }
 
-  private var severityBadge: some View {
-    Text(severityTitle(for: viewModel.severity))
-      .scaledFont(.caption.bold())
-      .foregroundStyle(severityTint(for: viewModel.severity))
-      .harnessPillPadding()
-      .harnessControlPill(tint: severityTint(for: viewModel.severity))
+  private var severityLabel: some View {
+    Label(
+      severityTitle(for: viewModel.severity),
+      systemImage: severitySymbol(for: viewModel.severity)
+    )
+    .scaledFont(.subheadline.weight(.semibold))
+    .foregroundStyle(severityTint(for: viewModel.severity))
   }
 
   private var timestampBlock: some View {
@@ -58,25 +62,29 @@ struct DecisionDetailHero: View {
     }
   }
 
-  private func deeplinkBadge(_ deeplink: DecisionDetailViewModel.Deeplink) -> some View {
+  private func scopeItem(_ deeplink: DecisionDetailViewModel.Deeplink) -> some View {
     Label {
-      Text(deeplink.id)
-        .scaledFont(.caption.monospaced())
+      Text(scopeItemTitle(deeplink))
+        .lineLimit(1)
+        .truncationMode(.middle)
     } icon: {
       Image(systemName: deeplinkSymbol(deeplink.kind))
-        .scaledFont(.caption.bold())
+        .accessibilityHidden(true)
     }
+    .scaledFont(.caption)
     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .harnessPillPadding()
-    .harnessControlPill(tint: HarnessMonitorTheme.ink.opacity(0.6))
   }
 
   private var accessibilityLabel: String {
     let severity = severityTitle(for: viewModel.severity)
     let age = viewModel.formattedAge(reference: .now)
-    let ruleID = viewModel.decision.ruleID
+    let source = humanizedWorkspaceLabel(viewModel.decision.ruleID)
     let summary = viewModel.decision.summary
-    return "\(severity) decision. \(summary). Rule \(ruleID). \(age)."
+    return "\(severity) decision. \(summary). Source \(source). \(age)."
+  }
+
+  private func scopeItemTitle(_ deeplink: DecisionDetailViewModel.Deeplink) -> String {
+    humanizedWorkspaceLabel(deeplink.id)
   }
 
   private func severityTitle(for severity: DecisionSeverity) -> String {
@@ -94,6 +102,19 @@ struct DecisionDetailHero: View {
     case .warn: HarnessMonitorTheme.caution
     case .needsUser: HarnessMonitorTheme.warmAccent
     case .critical: HarnessMonitorTheme.danger
+    }
+  }
+
+  private func severitySymbol(for severity: DecisionSeverity) -> String {
+    switch severity {
+    case .info:
+      "info.circle.fill"
+    case .warn:
+      "exclamationmark.triangle.fill"
+    case .needsUser:
+      "person.fill.questionmark"
+    case .critical:
+      "exclamationmark.octagon.fill"
     }
   }
 

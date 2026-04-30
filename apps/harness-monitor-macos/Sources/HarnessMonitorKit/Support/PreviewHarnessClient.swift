@@ -1,6 +1,10 @@
 import Foundation
 
 public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable {
+  private enum EnvironmentKeys {
+    static let agentTuisDelay = "HARNESS_MONITOR_PREVIEW_AGENT_TUIS_DELAY_MS"
+  }
+
   private let fixtures: Fixtures
   private let state: PreviewHarnessClientState
   private let isLaunchAgentInstalled: Bool
@@ -54,6 +58,18 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     if let actionDelay {
       try await Task.sleep(for: actionDelay)
     }
+  }
+
+  private func performReadDelay(for environmentKey: String) async throws {
+    guard
+      let rawValue = ProcessInfo.processInfo.environment[environmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      let milliseconds = Int(rawValue),
+      milliseconds > 0
+    else {
+      return
+    }
+    try await Task.sleep(for: .milliseconds(milliseconds))
   }
 
   public func health() async throws -> HealthResponse {
@@ -338,7 +354,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
-    AgentTuiListResponse(tuis: await state.agentTuis(sessionID: sessionID))
+    try await performReadDelay(for: EnvironmentKeys.agentTuisDelay)
+    return AgentTuiListResponse(tuis: await state.agentTuis(sessionID: sessionID))
   }
 
   public func agentTui(tuiID: String) async throws -> AgentTuiSnapshot {

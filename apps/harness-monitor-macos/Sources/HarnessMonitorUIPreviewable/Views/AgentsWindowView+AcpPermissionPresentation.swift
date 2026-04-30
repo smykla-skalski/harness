@@ -33,6 +33,6 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
     }
     store.supervisorSelectedDecisionID = payload.decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: payload.decisionID)
-    openWindow(id: HarnessMonitorWindowID.decisions)
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

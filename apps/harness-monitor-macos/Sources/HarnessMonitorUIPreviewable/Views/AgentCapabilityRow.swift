@@ -1,6 +1,45 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum AgentCapabilityAvailabilityState {
+  case projectAccessAvailable
+  case checkingAccess
+  case setupRequired
+  case bridgeAccessRequired
+  case terminalOnly
+  case unavailable
+
+  var title: String {
+    switch self {
+    case .projectAccessAvailable:
+      "Project access available"
+    case .checkingAccess:
+      "Checking access"
+    case .setupRequired:
+      "Setup required"
+    case .bridgeAccessRequired:
+      "Bridge access required"
+    case .terminalOnly:
+      "Terminal only"
+    case .unavailable:
+      "Unavailable"
+    }
+  }
+
+  var tint: Color {
+    switch self {
+    case .projectAccessAvailable:
+      HarnessMonitorTheme.success
+    case .terminalOnly:
+      HarnessMonitorTheme.accent
+    case .checkingAccess, .unavailable:
+      HarnessMonitorTheme.secondaryInk
+    case .setupRequired, .bridgeAccessRequired:
+      HarnessMonitorTheme.caution
+    }
+  }
+}
+
 struct AgentCapabilityOption: Identifiable, Equatable {
   let id: String
   let title: String
@@ -20,16 +59,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   }
 
   var statusText: String {
-    if showsInstallCTA {
-      return "Install required"
-    }
-    if hasPendingAcpProbe {
-      return "Checking"
-    }
-    if transportChoices.contains(where: { $0.id.isAcp }) {
-      return isEnabled ? "Ready" : "Unavailable"
-    }
-    return "Terminal ready"
+    availabilityState.title
   }
 
   var accessibilityLabel: String {
@@ -44,18 +74,18 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   var doctorProbeText: String? {
     guard let probeCommand else { return nil }
     let probeStatus =
-      if sandboxed, !acpHostBridgeReady, transportChoices.contains(where: { $0.id.isAcp }) {
-        "Host bridge required"
+      if requiresBridgeAccess {
+        "Bridge access required"
       } else if showsInstallCTA {
-        "Missing"
+        "Setup required"
       } else if let probe, let version = probe.version, !version.isEmpty {
         "Installed \(version)"
       } else if probe != nil {
         "Installed"
       } else {
-        "Probe pending"
+        "Checking access"
       }
-    return "Doctor probe: \(probeCommand) · \(probeStatus)"
+    return "Setup check: \(probeCommand) · \(probeStatus)"
   }
 
   var installActionTitle: String {
@@ -75,6 +105,48 @@ struct AgentCapabilityOption: Identifiable, Equatable {
 
   var acpChoice: AgentCapabilityTransportChoice? {
     transportChoices.first { $0.id.isAcp }
+  }
+
+  var requiresBridgeAccess: Bool {
+    sandboxed && !acpHostBridgeReady && acpChoice != nil
+  }
+
+  var availabilityState: AgentCapabilityAvailabilityState {
+    if showsInstallCTA {
+      return .setupRequired
+    }
+    if hasPendingAcpProbe {
+      return .checkingAccess
+    }
+    if requiresBridgeAccess {
+      return .bridgeAccessRequired
+    }
+    if let acpChoice, isEnabled(acpChoice) {
+      return .projectAccessAvailable
+    }
+    if isEnabled {
+      return .terminalOnly
+    }
+    return .unavailable
+  }
+
+  var projectAccessGuidanceText: String? {
+    switch availabilityState {
+    case .projectAccessAvailable:
+      nil
+    case .checkingAccess:
+      "Project access is still being checked."
+    case .setupRequired:
+      "Install the \(title) CLI to add project access here."
+    case .bridgeAccessRequired:
+      "Turn on bridge access to use project access here."
+    case .terminalOnly:
+      transportChoices.contains(where: { $0.id.isAcp })
+        ? "Project access isn't available here yet."
+        : "This provider opens in Terminal only."
+    case .unavailable:
+      installHint ?? "This provider isn't available here yet."
+    }
   }
 
   func normalizedSelection(for selection: AgentLaunchSelection) -> AgentLaunchSelection {
@@ -172,18 +244,14 @@ struct AgentCapabilityRow: View {
   }
 
   private var unavailableReason: String? {
-    if case .acp = currentChoice.id, option.sandboxed, !option.acpHostBridgeReady {
-      return
-        "Filesystem + terminal tools require the ACP host bridge while the daemon runs sandboxed."
+    if case .acp = currentChoice.id {
+      return option.projectAccessGuidanceText
     }
-    if option.showsInstallCTA {
-      return "Install \(option.title) CLI to enable"
-    }
-    return option.installHint
+    return nil
   }
 
   private var statusTint: Color {
-    option.showsInstallCTA ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk
+    option.availabilityState.tint
   }
 
   private var installHintText: String {
@@ -245,13 +313,20 @@ struct AgentCapabilityRow: View {
   }
 
   private var transportAvailabilityText: String? {
-    if option.transportChoices.count == 1, option.acpChoice == nil {
-      return "Filesystem + terminal tools are not available for this provider."
+    switch option.availabilityState {
+    case .projectAccessAvailable:
+      if !currentChoice.id.isAcp {
+        return "Project access is also available."
+      }
+      return "Starts with project access available."
+    case .checkingAccess, .setupRequired, .bridgeAccessRequired:
+      if !currentChoice.id.isAcp {
+        return option.projectAccessGuidanceText
+      }
+      return nil
+    case .terminalOnly, .unavailable:
+      return option.projectAccessGuidanceText
     }
-    if let acpChoice = option.acpChoice, !option.isEnabled(acpChoice) {
-      return "Filesystem + terminal tools are not available for this provider."
-    }
-    return nil
   }
 
   @ViewBuilder
@@ -330,15 +405,15 @@ struct AgentCapabilityRow: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
       }
 
-      Button(diagnosticsExpanded ? "Hide diagnostics" : "Show diagnostics") {
+      Button(diagnosticsExpanded ? "Hide setup details" : "Show setup details") {
         diagnosticsExpanded.toggle()
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .accessibilityLabel(
-        "\(diagnosticsExpanded ? "Hide" : "Show") diagnostics for \(option.title)"
+        "\(diagnosticsExpanded ? "Hide" : "Show") setup details for \(option.title)"
       )
-      .accessibilityHint(option.statusText)
+      .accessibilityHint(doctorProbeText)
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id))
     }
   }

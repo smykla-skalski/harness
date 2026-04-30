@@ -1,9 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Single row in the Decisions sidebar. Severity dot + summary (wrapped to two lines) + a
-/// meta line showing agent, task, and relative age so operators can triage without opening
-/// each decision. A fresh-pill appears for decisions under two minutes old.
+/// Single row in the Decisions sidebar. Keep the first line focused on the decision itself and
+/// the second line on quieter scope metadata so operators can scan the queue quickly.
 struct DecisionRow: View {
   let decision: Decision
   let isSelected: Bool
@@ -34,8 +33,6 @@ struct DecisionRow: View {
     return formatter
   }()
 
-  private static let freshWindow: TimeInterval = 120
-
   private var severity: DecisionSeverity {
     DecisionSeverity(rawValue: decision.severityRaw) ?? .info
   }
@@ -45,19 +42,16 @@ struct DecisionRow: View {
     return Self.ageFormatter.localizedString(fromTimeInterval: -interval)
   }
 
-  private var isFresh: Bool {
-    Date.now.timeIntervalSince(decision.createdAt) <= Self.freshWindow
-  }
-
   private var metaLine: String {
-    var parts: [String] = []
+    var parts: [String] = [severity.chipLabel]
     if let agentID = decision.agentID, !agentID.isEmpty {
-      parts.append(agentID)
+      parts.append(humanizedWorkspaceLabel(agentID))
     }
     if let taskID = decision.taskID, !taskID.isEmpty {
-      parts.append(taskID)
+      parts.append(humanizedWorkspaceLabel(taskID))
+    } else if let sessionID = decision.sessionID, !sessionID.isEmpty {
+      parts.append(humanizedWorkspaceLabel(sessionID))
     }
-    parts.append(age)
     return parts.joined(separator: " · ")
   }
 
@@ -86,20 +80,21 @@ struct DecisionRow: View {
           .frame(width: 8, height: 8)
           .padding(.top, 6)
         VStack(alignment: .leading, spacing: 2) {
-          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+          HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXS) {
             Text(decision.summary)
               .scaledFont(.callout.weight(isSelected ? .semibold : .regular))
               .lineLimit(2)
               .multilineTextAlignment(.leading)
               .frame(maxWidth: .infinity, alignment: .leading)
-            if isFresh {
-              freshPill
-            }
+            Text(age)
+              .scaledFont(.caption.monospacedDigit())
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .lineLimit(1)
           }
           Text(metaLine)
-            .scaledFont(.caption.monospaced())
+            .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
+            .lineLimit(2)
           if let acpPayload {
             AcpPermissionDeadlineStatusView(
               payload: acpPayload,
@@ -115,24 +110,21 @@ struct DecisionRow: View {
       .padding(.vertical, HarnessMonitorTheme.spacingSM * fontScale)
       .background(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.30) : Color.clear)
+          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.16) : Color.clear)
       )
       .overlay(
-        HStack(spacing: 0) {
-          RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-            .fill(isSelected ? HarnessMonitorTheme.accent : Color.clear)
-            .frame(width: 3)
-          Spacer(minLength: 0)
-        }
-        .clipShape(
-          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        )
-      )
-      .contentShape(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+          .strokeBorder(
+            isSelected ? HarnessMonitorTheme.accent.opacity(0.28) : Color.clear,
+            lineWidth: 1
+          )
       )
     }
-    .harnessDismissButtonStyle()
+    .harnessInteractiveCardButtonStyle(
+      cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
+      tint: isSelected ? HarnessMonitorTheme.accent : nil,
+      extraHoverHint: isSelected
+    )
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabelText(deadlineStatus: deadlineStatus))
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
@@ -154,16 +146,5 @@ struct DecisionRow: View {
   ) -> String {
     _ = deadlineStatus
     return isSelected ? "selected" : "not selected"
-  }
-
-  private var freshPill: some View {
-    Text("NEW")
-      .scaledFont(.caption2.bold())
-      .foregroundStyle(HarnessMonitorTheme.onContrast)
-      .padding(.horizontal, 6)
-      .padding(.vertical, 1)
-      .background(
-        Capsule().fill(severity.chipColor)
-      )
   }
 }

@@ -19,32 +19,21 @@ extension AgentsWindowView {
     for option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> String? {
-    if case .acp = choice.id, option.sandboxed, !option.acpHostBridgeReady {
-      return
-        "Filesystem + terminal tools require the ACP host bridge "
-        + "while the daemon runs sandboxed."
+    if case .acp = choice.id {
+      return option.projectAccessGuidanceText
     }
-    if option.showsInstallCTA {
-      return "Install \(option.title) CLI to enable filesystem + terminal tools."
-    }
-    return option.installHint
+    return nil
   }
 
   func providerStatusTint(for option: AgentCapabilityOption) -> Color {
-    if option.showsInstallCTA {
-      return HarnessMonitorTheme.caution
-    }
-    if option.transportChoices.contains(where: { $0.id.isAcp }) {
-      return option.isEnabled ? HarnessMonitorTheme.success : HarnessMonitorTheme.secondaryInk
-    }
-    return HarnessMonitorTheme.accent
+    option.availabilityState.tint
   }
 
   func transportChoiceSummary(for choice: AgentCapabilityTransportChoice) -> String {
     if choice.id.isAcp {
-      return "Starts with filesystem + terminal tools."
+      return "Starts with project access available."
     }
-    return "Starts in a terminal screen."
+    return "Opens in Terminal."
   }
 
   func transportSummary(
@@ -52,26 +41,23 @@ extension AgentsWindowView {
     choice: AgentCapabilityTransportChoice
   ) -> String {
     if choice.id.isAcp {
-      return "Starts with filesystem + terminal tools for richer project access."
+      return "Starts with project access available."
     }
 
-    if let acpChoice = option.acpChoice {
-      if option.isEnabled(acpChoice) {
-        return "Starts in a terminal screen. Filesystem + terminal tools are also available."
-      }
-      if option.showsInstallCTA {
-        return
-          "Starts in a terminal screen. Install filesystem + terminal tools "
-          + "for richer project access."
-      }
-      if option.hasPendingAcpProbe {
-        return
-          "Starts in a terminal screen while Harness Monitor checks "
-          + "filesystem + terminal tools."
-      }
+    switch option.availabilityState {
+    case .projectAccessAvailable:
+      return "Opens in Terminal. Project access is also available."
+    case .checkingAccess:
+      return "Opens in Terminal while project access is checked."
+    case .setupRequired:
+      return "Opens in Terminal. Set up project access when you're ready."
+    case .bridgeAccessRequired:
+      return "Opens in Terminal. Turn on bridge access to use project access."
+    case .terminalOnly:
+      return "Opens in Terminal."
+    case .unavailable:
+      return option.projectAccessGuidanceText ?? "This provider isn't available yet."
     }
-
-    return "Starts in a terminal screen."
   }
 
   var roleAndPersonaSection: some View {
@@ -118,7 +104,7 @@ extension AgentsWindowView {
         title: "Launch with",
         help:
           "Choose whether this provider opens in a terminal first "
-          + "or starts with filesystem tools when available."
+          + "or starts with project access when available."
       ) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
           HStack(spacing: HarnessMonitorTheme.spacingSM) {

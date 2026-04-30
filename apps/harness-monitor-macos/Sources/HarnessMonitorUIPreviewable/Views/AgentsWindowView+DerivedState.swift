@@ -2,6 +2,14 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  var decisionWorkspaceScope: DecisionWorkspaceScope {
+    DecisionWorkspaceScope(
+      decisions: decisionItems,
+      filters: currentDecisionFilters,
+      selectedDecisionID: viewModel.selection.decisionID
+    )
+  }
+
   var selectedSessionTui: AgentTuiSnapshot? {
     guard let selectedTuiID = viewModel.selection.terminalID else {
       return nil
@@ -17,10 +25,7 @@ extension AgentsWindowView {
   }
 
   var selectedDecision: Decision? {
-    guard let selectedDecisionID = viewModel.selection.decisionID else {
-      return nil
-    }
-    return decisionItems.first { $0.id == selectedDecisionID }
+    decisionWorkspaceScope.selectedDecision
   }
 
   var trimmedInput: String {
@@ -113,25 +118,18 @@ extension AgentsWindowView {
   }
 
   var visibleDecisionSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
-    DecisionsSidebarViewModel.visibleSnapshot(
-      decisions: decisionItems,
-      filters: currentDecisionFilters
-    )
+    decisionWorkspaceScope.visibleSnapshot
   }
 
   var visibleOpenDecisionIDs: [String] {
-    visibleDecisionSnapshot.decisionIDs
+    decisionWorkspaceScope.visibleDecisionIDs
   }
 
   var criticalDecisionIDs: [String] {
-    decisionItems
-      .filter { $0.severityRaw == DecisionSeverity.critical.rawValue }
-      .map(\.id)
+    decisionWorkspaceScope.visibleCriticalDecisionIDs
   }
 
   var infoDecisionIDs: [String] {
-    decisionItems
-      .filter { $0.severityRaw == DecisionSeverity.info.rawValue }
-      .map(\.id)
+    decisionWorkspaceScope.visibleInfoDecisionIDs
   }
 }

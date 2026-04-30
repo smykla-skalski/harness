@@ -22,7 +22,7 @@ enum HarnessMonitorUITestAccessibility {
   static let agentsWindow = "harness.agents.window"
   static let agentsWindowDetailAwaitingDecisionState =
     "harness.agents.detail.awaiting-decision.state"
-  static let decisionsWindow = "harness.decisions.window"
+  static let decisionsWindow = agentsWindow
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"
   static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
@@ -101,6 +101,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sessionsBoardRoot = "harness.board.root"
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
+  static let contentRoot = "harness.content.root"
   static let contentRootFrame = "harness.content.root.frame"
   static let contentAcpBridgeBanner = "harness.content.acp-bridge.banner"
   static let contentAcpBridgeOpenLogButton = "harness.content.acp-bridge.open-log"

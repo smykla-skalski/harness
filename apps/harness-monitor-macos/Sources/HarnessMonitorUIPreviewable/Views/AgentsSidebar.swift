@@ -2,7 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct AgentsSidebar: View {
-  @Binding var selection: AgentTuiSheetSelection
+  let store: HarnessMonitorStore
+  @Binding var selection: WorkspaceSelection
+  @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
+  let decisionScope: DecisionWorkspaceScope
+  let currentSessionID: String?
+  let currentSessionTitle: String?
   let agentTuis: [AgentTuiSnapshot]
   let sessionTitlesByID: [String: String]
   let codexRuns: [CodexRunSnapshot]
@@ -12,6 +17,14 @@ struct AgentsSidebar: View {
   let openPendingDecisions: (String) -> Void
   let tasks: [WorkItem]
   let refresh: () -> Void
+
+  @State private var decisionQuery = ""
+  @AppStorage("harness.decisions.sidebar.filterExpanded")
+  private var decisionFilterExpanded = true
+  @AppStorage("harness.decisions.sidebar.severitiesCSV")
+  private var decisionSeveritiesCSV = ""
+  @AppStorage("harness.decisions.sidebar.searchScope")
+  private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @Environment(\.fontScale)
   private var fontScale
 
@@ -19,7 +32,7 @@ struct AgentsSidebar: View {
     HarnessMonitorTheme.spacingXS * fontScale
   }
 
-  private var selectionBinding: Binding<AgentTuiSheetSelection?> {
+  private var selectionBinding: Binding<WorkspaceSelection?> {
     Binding(
       get: { selection },
       set: { selection = $0 ?? .create }
@@ -44,154 +57,93 @@ struct AgentsSidebar: View {
 
   var body: some View {
     List(selection: selectionBinding) {
-      Label("New", systemImage: "plus.rectangle")
+      Label("New Session", systemImage: "plus.rectangle")
         .scaledFont(.body)
         .padding(.vertical, rowPadding)
-        .tag(AgentTuiSheetSelection.create)
+        .tag(WorkspaceSelection.create)
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
+      AgentsSidebarDecisionSection(
+        selection: $selection,
+        decisionFilters: $decisionFilters,
+        scope: decisionScope,
+        currentSessionID: currentSessionID,
+        currentSessionTitle: currentSessionTitle,
+        fontScale: fontScale,
+        decisionQuery: $decisionQuery,
+        decisionFilterExpanded: $decisionFilterExpanded,
+        decisionSeveritiesCSV: $decisionSeveritiesCSV,
+        decisionSearchScopeRaw: $decisionSearchScopeRaw,
+        acpPayload: acpPayload(for:),
+        lastMessageAt: lastAcpMessageAt(for:)
+      )
+
       if !externalAgents.isEmpty {
-        Section("Agents") {
+        Section("Connected Agents") {
           ForEach(externalAgents) { agent in
-            let pendingDecisionBadgeID =
-              HarnessMonitorAccessibility
-              .agentPendingDecisionBadge(agent.agentId)
-            let pendingDecisionAttention = pendingDecisionAttention[agent.agentId]
-            if let attention = pendingDecisionAttention {
-              HStack(spacing: HarnessMonitorTheme.spacingSM) {
-                Image(systemName: "person.crop.circle")
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(agent.name)
-                    .scaledFont(.body)
-                  Text("\(agent.runtime) • \(agent.role.title)")
-                    .scaledFont(.caption)
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                }
-                Spacer(minLength: HarnessMonitorTheme.spacingSM)
-                AgentAttentionBadge(
-                  count: attention.count,
-                  accessibilityIdentifier: HarnessMonitorUITestEnvironment
-                    .accessibilityMarkersEnabled ? nil : pendingDecisionBadgeID
-                ) {
-                  openPendingDecisions(agent.agentId)
-                }
-                .harnessUITestValue(
-                  "count=\(attention.count) batch=\(attention.oldestBatchID)"
-                )
-              }
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .contentShape(Rectangle())
-              .onTapGesture {
-                selection = .agent(agent.agentId)
-              }
-              .overlay(alignment: .topTrailing) {
-                if agent.isAutoSpawned {
-                  AutoSpawnedBadgeView(agentID: agent.agentId)
-                    .allowsHitTesting(false)
-                }
-              }
-              .padding(.vertical, rowPadding)
-              .tag(AgentTuiSheetSelection.agent(agent.agentId))
+            externalAgentRow(agent)
+              .tag(WorkspaceSelection.agent(sessionID: currentSessionID, agentID: agent.agentId))
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
               )
               .accessibilityFrameMarker(
                 "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
               )
-              .accessibilityTestProbe(
-                pendingDecisionBadgeID,
-                label: "Pending decisions",
-                value: "count=\(attention.count) batch=\(attention.oldestBatchID)"
-              )
-            } else {
-              HStack(spacing: HarnessMonitorTheme.spacingSM) {
-                Image(systemName: "person.crop.circle")
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(agent.name)
-                    .scaledFont(.body)
-                  Text("\(agent.runtime) • \(agent.role.title)")
-                    .scaledFont(.caption)
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                }
-                Spacer(minLength: HarnessMonitorTheme.spacingSM)
-              }
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .contentShape(Rectangle())
-              .onTapGesture {
-                selection = .agent(agent.agentId)
-              }
-              .overlay(alignment: .topTrailing) {
-                if agent.isAutoSpawned {
-                  AutoSpawnedBadgeView(agentID: agent.agentId)
-                    .allowsHitTesting(false)
-                }
-              }
-              .padding(.vertical, rowPadding)
-              .tag(AgentTuiSheetSelection.agent(agent.agentId))
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)
-              )
-              .accessibilityFrameMarker(
-                "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
-              )
-            }
           }
         }
       }
 
       if !activeTuis.isEmpty {
-        Section("Interactive") {
+        Section("Open Sessions") {
           ForEach(activeTuis) { tui in
             AgentsSidebarRow(
               snapshot: tui,
-              title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
+              title: sessionTitlesByID[tui.tuiId] ?? "Session"
             )
             .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.terminal(tui.tuiId))
+            .tag(WorkspaceSelection.terminal(sessionID: tui.sessionId, terminalID: tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
         }
       }
 
       if !inactiveTuis.isEmpty {
-        Section("Past Terminals") {
+        Section("Past Sessions") {
           ForEach(inactiveTuis) { tui in
             AgentsSidebarRow(
               snapshot: tui,
-              title: sessionTitlesByID[tui.tuiId] ?? "Agent session"
+              title: sessionTitlesByID[tui.tuiId] ?? "Session"
             )
             .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.terminal(tui.tuiId))
+            .tag(WorkspaceSelection.terminal(sessionID: tui.sessionId, terminalID: tui.tuiId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(tui.tuiId))
           }
         }
       }
 
       if !activeCodexRuns.isEmpty {
-        Section("Codex Threads") {
+        Section("Open Runs") {
           ForEach(activeCodexRuns) { run in
             CodexRunSidebarRow(
               snapshot: run,
-              title: codexTitlesByID[run.runId] ?? "Codex run"
+              title: codexTitlesByID[run.runId] ?? "Run"
             )
             .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.codex(run.runId))
+            .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(run.runId))
           }
         }
       }
 
       if !inactiveCodexRuns.isEmpty {
-        Section("Past Codex Threads") {
+        Section("Past Runs") {
           ForEach(inactiveCodexRuns) { run in
             CodexRunSidebarRow(
               snapshot: run,
-              title: codexTitlesByID[run.runId] ?? "Codex run"
+              title: codexTitlesByID[run.runId] ?? "Run"
             )
             .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.codex(run.runId))
+            .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiTab(run.runId))
           }
         }
@@ -214,7 +166,7 @@ struct AgentsSidebar: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, rowPadding)
-            .tag(AgentTuiSheetSelection.task(task.taskId))
+            .tag(WorkspaceSelection.task(sessionID: currentSessionID, taskID: task.taskId))
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentsTaskTab(task.taskId))
           }
         }
@@ -230,4 +182,68 @@ struct AgentsSidebar: View {
       }
     }
   }
+
+  @ViewBuilder
+  private func externalAgentRow(_ agent: AgentRegistration) -> some View {
+    let pendingDecisionBadgeID =
+      HarnessMonitorAccessibility.agentPendingDecisionBadge(agent.agentId)
+    let attention = pendingDecisionAttention[agent.agentId]
+
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "person.crop.circle")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(agent.name)
+          .scaledFont(.body)
+        Text("\(runtimeDisplayLabel(agent.runtime)) • \(agent.role.title)")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      if let attention {
+        AgentAttentionBadge(
+          count: attention.count,
+          accessibilityIdentifier: HarnessMonitorUITestEnvironment
+            .accessibilityMarkersEnabled ? nil : pendingDecisionBadgeID
+        ) {
+          openPendingDecisions(agent.agentId)
+        }
+        .harnessUITestValue("count=\(attention.count) batch=\(attention.oldestBatchID)")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .onTapGesture {
+      selection = .agent(sessionID: currentSessionID, agentID: agent.agentId)
+    }
+    .overlay(alignment: .topTrailing) {
+      if agent.isAutoSpawned {
+        AutoSpawnedBadgeView(agentID: agent.agentId)
+          .allowsHitTesting(false)
+      }
+    }
+    .padding(.vertical, rowPadding)
+    .accessibilityTestProbe(
+      pendingDecisionBadgeID,
+      label: "Pending decisions",
+      value: attention.map { "count=\($0.count) batch=\($0.oldestBatchID)" } ?? "count=0"
+    )
+  }
+
+  private func lastAcpMessageAt(
+    for decision: Decision
+  ) -> Date? {
+    store.acpPermissionLastSignalAt(sessionID: decision.sessionID)
+  }
+
+  private func acpPayload(
+    for decision: Decision
+  ) -> AcpPermissionDecisionPayload? {
+    guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
+      return nil
+    }
+    return store.acpPermissionDecisionPayload(for: decision.id)
+      ?? AcpPermissionDecisionPayload.decode(from: decision)
+  }
+
 }

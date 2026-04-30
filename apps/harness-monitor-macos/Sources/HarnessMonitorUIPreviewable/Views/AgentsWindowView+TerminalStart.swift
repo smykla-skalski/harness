@@ -47,13 +47,13 @@ extension AgentsWindowView {
       rows: startSize.rows,
       cols: startSize.cols
     )
-    guard success, let startedTuiID = store.selectedAgentTui?.tuiId else {
+    guard success, let startedTui = store.selectedAgentTui else {
       return
     }
-    resetTerminalCreateForm(startedTuiID: startedTuiID)
+    resetTerminalCreateForm(startedTui: startedTui)
   }
 
-  private func resetTerminalCreateForm(startedTuiID: String) {
+  private func resetTerminalCreateForm(startedTui: AgentTuiSnapshot) {
     viewModel.name = ""
     viewModel.prompt = ""
     viewModel.projectDir = ""
@@ -61,7 +61,10 @@ extension AgentsWindowView {
     viewModel.inputText = ""
     viewModel.selectedPersona = nil
     viewModel.selectedRole = .worker
-    viewModel.selection = .terminal(startedTuiID)
+    viewModel.selection = .terminal(
+      sessionID: startedTui.sessionId,
+      terminalID: startedTui.tuiId
+    )
     focusedField = .input
   }
 }
