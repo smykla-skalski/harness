@@ -17,14 +17,41 @@ resolve_repo_root() {
   printf '%s\n' "${PROJECT_DIR:-.}"
 }
 
+resolve_repo_cache_root() {
+  local resolved_repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local cache_root="$resolved_repo_root/.cache"
+
+  if [ -L "$cache_root" ]; then
+    local link_target
+    link_target="$(readlink "$cache_root")"
+    case "$link_target" in
+      *".spotlight-build-artifacts.noindex"*)
+        /bin/rm -f "$cache_root"
+        ;;
+      *)
+        if [ "${link_target#/}" = "$link_target" ]; then
+          cache_root="$(dirname "$cache_root")/$link_target"
+        else
+          cache_root="$link_target"
+        fi
+        ;;
+    esac
+  fi
+
+  /bin/mkdir -p "$cache_root"
+  printf '%s\n' "$cache_root"
+}
+
 default_cargo_target_dir() {
   local resolved_repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
   local common_repo_root
   common_repo_root="$(resolve_common_repo_root "$resolved_repo_root")"
+  local cache_root
+  cache_root="$(resolve_repo_cache_root "$common_repo_root")"
   # Keep the shared daemon cargo cache out of target/ because raw Xcode builds
   # surface spurious SWIFT_DEBUG_INFORMATION_* warnings for that location.
   # Also avoid repo tmp/ so IDE indexing does not traverse Rust build outputs.
-  printf '%s/.cache/harness-monitor-xcode-daemon\n' "$common_repo_root"
+  printf '%s/harness-monitor-xcode-daemon\n' "$cache_root"
 }
 
 resolve_cargo_target_dir() {
