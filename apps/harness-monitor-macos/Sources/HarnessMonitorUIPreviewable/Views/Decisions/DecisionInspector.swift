@@ -55,19 +55,42 @@ public struct DecisionInspector: View {
         if let snoozeLabel {
           metadataRow("Snoozed Until", value: snoozeLabel, monospaced: true)
         }
-        DisclosureGroup("Identifiers", isExpanded: $showIdentifierDetails) {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            metadataRow("Rule", value: decision.ruleID, monospaced: true)
-            metadataRow("Session", value: decision.sessionID ?? "—", monospaced: true)
-            metadataRow("Agent", value: decision.agentID ?? "—", monospaced: true)
-            metadataRow("Task", value: decision.taskID ?? "—", monospaced: true)
+        if hasIdentifierDetails(decision) {
+          DisclosureGroup("Identifiers", isExpanded: $showIdentifierDetails) {
+            VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+              metadataRow("Rule", value: decision.ruleID, monospaced: true)
+              if let sessionID = nonEmpty(decision.sessionID) {
+                metadataRow("Session", value: sessionID, monospaced: true)
+              }
+              if let agentID = nonEmpty(decision.agentID) {
+                metadataRow("Agent", value: agentID, monospaced: true)
+              }
+              if let taskID = nonEmpty(decision.taskID) {
+                metadataRow("Task", value: taskID, monospaced: true)
+              }
+            }
+            .padding(.top, HarnessMonitorTheme.spacingXS)
           }
-          .padding(.top, HarnessMonitorTheme.spacingXS)
+          .scaledFont(.caption)
         }
-        .scaledFont(.caption)
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.decisionInspectorMetadata)
     }
+  }
+
+  private func hasIdentifierDetails(_ decision: Decision) -> Bool {
+    nonEmpty(decision.sessionID) != nil
+      || nonEmpty(decision.agentID) != nil
+      || nonEmpty(decision.taskID) != nil
+      || !decision.ruleID.isEmpty
+  }
+
+  private func nonEmpty(_ value: String?) -> String? {
+    guard let value else {
+      return nil
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 
   private func metadataRow(_ label: String, value: String, monospaced: Bool = false) -> some View {

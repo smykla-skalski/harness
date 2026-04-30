@@ -170,14 +170,26 @@ public struct DecisionDetailView: View {
       decision: viewModel.decision,
       store: store
     )
+    let isAcpDecision: Bool
+    switch contextAdapter.kind {
+    case .acpPermission:
+      isAcpDecision = true
+    case .generic:
+      isAcpDecision = false
+    }
     return ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         DecisionDetailHero(
           viewModel: viewModel,
           dateTimeConfiguration: dateTimeConfiguration
         )
-        suggestedActions(viewModel, contextAdapter: contextAdapter)
-        detailTabs(viewModel, contextAdapter: contextAdapter)
+        if isAcpDecision {
+          detailTabs(viewModel, contextAdapter: contextAdapter)
+          suggestedActions(viewModel, contextAdapter: contextAdapter)
+        } else {
+          suggestedActions(viewModel, contextAdapter: contextAdapter)
+          detailTabs(viewModel, contextAdapter: contextAdapter)
+        }
       }
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -250,7 +262,7 @@ public struct DecisionDetailView: View {
             viewModel: viewModel,
             contextAdapter: contextAdapter,
             isPrimary: true,
-            fillsWidth: true
+            fillsWidth: false
           )
           let secondaryActions = actions.filter { $0.id != primaryActionID }
           if !secondaryActions.isEmpty {
@@ -293,7 +305,7 @@ public struct DecisionDetailView: View {
     let button = HarnessMonitorAsyncActionButton(
       title: action.title,
       tint: tint(for: action, severity: viewModel.severity),
-      variant: isPrimary ? .prominent : .bordered,
+      variant: isPrimary && !contextAdapter.prefersSubtlePrimaryAction ? .prominent : .bordered,
       role: role,
       isLoading: false,
       accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id),
@@ -310,9 +322,11 @@ public struct DecisionDetailView: View {
       button
         .keyboardShortcut(.defaultAction)
     } else if action.kind == .dismiss {
-      button.keyboardShortcut(".", modifiers: [.command])
-    } else {
       button
+        .keyboardShortcut(".", modifiers: [.command])
+        .harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.danger)
+    } else {
+      button.harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.secondaryInk)
     }
   }
 
