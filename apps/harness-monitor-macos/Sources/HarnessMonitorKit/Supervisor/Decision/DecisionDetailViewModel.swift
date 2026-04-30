@@ -64,7 +64,8 @@ public final class DecisionDetailViewModel {
   public init(decision: Decision, handler: any DecisionActionHandler) {
     self.decision = decision
     self.handler = handler
-    self.suggestedActions = Self.parseActions(from: decision.suggestedActionsJSON)
+    let parsedActions = Self.parseActions(from: decision.suggestedActionsJSON)
+    self.suggestedActions = Self.effectiveActions(for: decision, parsedActions: parsedActions)
     self.contextSections = Self.parseContext(from: decision.contextJSON)
     self.deeplinks = Self.buildDeeplinks(from: decision)
   }
@@ -136,6 +137,26 @@ public final class DecisionDetailViewModel {
       return []
     }
     return actions
+  }
+
+  private static func effectiveActions(
+    for decision: Decision,
+    parsedActions: [SuggestedAction]
+  ) -> [SuggestedAction] {
+    guard decision.ruleID != AcpPermissionDecisionPayload.ruleID else {
+      return parsedActions
+    }
+    if parsedActions.contains(where: { $0.kind == .dismiss }) {
+      return parsedActions
+    }
+    return parsedActions + [
+      SuggestedAction(
+        id: "dismiss-\(decision.id)",
+        title: "Dismiss",
+        kind: .dismiss,
+        payloadJSON: "{}"
+      )
+    ]
   }
 
   private static func parseContext(from json: String) -> [ContextSection] {

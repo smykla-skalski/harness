@@ -27,6 +27,7 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionDetail = "harness.decisions.detail"
   static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
   static let decisionDetailTabs = "harness.decisions.detail.tabs"
+  static let decisionAcpDeadline = "harness.decisions.context.acp.deadline"
   static let decisionAcpPanel = "harness.decisions.context.acp"
   static let decisionAcpSelectionSummary = "harness.decisions.context.acp.selection-summary"
   static let decisionAcpError = "harness.decisions.context.acp.error"
@@ -37,6 +38,13 @@ enum HarnessMonitorUITestAccessibility {
   static let decisionBulkActions = "harness.decisions.bulk-actions"
   static let decisionBulkSnoozeCritical = "harness.decisions.bulk-actions.snooze-critical"
   static let decisionBulkDismissInfo = "harness.decisions.bulk-actions.dismiss-info"
+  static let decisionBulkDismissSelected = "harness.decisions.bulk-actions.dismiss-selected"
+  static let decisionBulkDismissVisible = "harness.decisions.bulk-actions.dismiss-visible"
+  static let decisionBulkDismissVisibleInput =
+    "harness.decisions.bulk-actions.dismiss-visible.input"
+  static let decisionBulkDismissVisibleConfirm =
+    "harness.decisions.bulk-actions.dismiss-visible.confirm"
+  static let decisionBulkReopenBatch = "harness.decisions.bulk-actions.reopen-batch"
   static let decisionsObserverPanel = "harness.decisions.observer.panel"
   static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"
   static let acpPermissionModal = "harness.acp-permission.modal"
@@ -46,6 +54,9 @@ enum HarnessMonitorUITestAccessibility {
   }
   static func decisionAction(_ id: String) -> String {
     "harness.decisions.action.\(slug(id))"
+  }
+  static func decisionDeadline(_ id: String) -> String {
+    "harness.decisions.deadline.\(slug(id))"
   }
   static func decisionAcpRequest(_ id: String) -> String {
     "harness.decisions.context.acp.request.\(slug(id))"
@@ -106,6 +117,9 @@ enum HarnessMonitorUITestAccessibility {
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let recentSessionsCardFrame = "harness.board.recent-sessions-card.frame"
   static let contentRootFrame = "harness.content.root.frame"
+  static let contentAcpBridgeBanner = "harness.content.acp-bridge.banner"
+  static let contentAcpBridgeOpenLogButton = "harness.content.acp-bridge.open-log"
+  static let contentAcpBridgeRunDoctorButton = "harness.content.acp-bridge.run-doctor"
   static let observeSummaryButton = "harness.session.observe.summary"
   static let observeSessionButton = "harness.session.action.observe"
   static let endSessionButton = "harness.session.action.end"
@@ -359,6 +373,14 @@ enum HarnessMonitorUITestAccessibility {
 
   static func preferencesBackgroundTile(_ key: String) -> String {
     "harness.preferences.background.\(slug(key))"
+  }
+
+  static func preferencesAcpPermissionLogRevealButton(_ runID: String) -> String {
+    "harness.preferences.diagnostics.acp-permission-log.reveal.\(slug(runID))"
+  }
+
+  static func preferencesAcpPermissionLogError(_ runID: String) -> String {
+    "harness.preferences.diagnostics.acp-permission-log.error.\(slug(runID))"
   }
 
   static func sidebarSortSegment(_ order: String) -> String {

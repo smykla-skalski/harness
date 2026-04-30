@@ -8,6 +8,7 @@ final class DecisionsDetailUITests: HarnessMonitorUITestCase {
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let decisionID = "decision-detail-ui-seed"
   private static let dismissActionID = "dismiss-decision-detail-ui-seed"
+  private static let fallbackDecisionID = "decision-detail-ui-fallback"
 
   func testSeededDecisionOpensDetailAndAuditTrail() throws {
     let app = launch(
@@ -62,6 +63,46 @@ final class DecisionsDetailUITests: HarnessMonitorUITestCase {
           "payloadJSON": "{}",
         ]
       ]),
+    ]
+    return serializeJSONObject(["decisions": [decision]])
+  }
+
+  func testNonAcpDecisionWithoutPersistedActionsStillShowsDismiss() throws {
+    let app = launch(
+      mode: "empty",
+      additionalEnvironment: [
+        Self.uiTestsKey: "1",
+        Self.decisionSeedEnvKey: makeFallbackSeededDecisionsPayload(),
+      ]
+    )
+
+    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    XCTAssertTrue(
+      waitForElement(
+        button(in: app, identifier: Accessibility.decisionRow(Self.fallbackDecisionID)),
+        timeout: Self.uiTimeout
+      )
+    )
+    tapButton(in: app, identifier: Accessibility.decisionRow(Self.fallbackDecisionID))
+    XCTAssertTrue(
+      waitForElement(
+        button(
+          in: app,
+          identifier: Accessibility.decisionAction("dismiss-\(Self.fallbackDecisionID)")
+        ),
+        timeout: Self.actionTimeout
+      )
+    )
+  }
+
+  private func makeFallbackSeededDecisionsPayload() -> String {
+    let decision: [String: Any] = [
+      "id": Self.fallbackDecisionID,
+      "severity": "warn",
+      "ruleID": "stuck-agent",
+      "summary": "Fallback action decision",
+      "contextJSON": "{\"agentID\":\"agent-fallback-ui\"}",
+      "suggestedActionsJSON": "[]",
     ]
     return serializeJSONObject(["decisions": [decision]])
   }

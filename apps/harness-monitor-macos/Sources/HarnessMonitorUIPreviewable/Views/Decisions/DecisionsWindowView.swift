@@ -57,11 +57,32 @@ private final class DecisionsWindowRuntime {
 }
 
 public struct DecisionsWindowView: View {
+  private struct DismissBatchSnapshot: Equatable {
+    let ids: [String]
+    let count: Int
+    let filterSignature: String
+    let capturedAt: Date
+  }
+
+  private struct ReopenBatchState: Equatable {
+    let ids: [String]
+    let expiresAt: Date
+  }
+
   private let store: HarnessMonitorStore?
 
   @State private var selection: String?
   @State private var detailTab: DecisionDetailTab = .context
   @State private var runtime = DecisionsWindowRuntime()
+  @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
+    query: "",
+    severities: [],
+    scope: .summary
+  )
+  @State private var dismissAllVisibleDraft = ""
+  @State private var pendingDismissBatch: DismissBatchSnapshot?
+  @State private var showDismissAllVisibleConfirmation = false
+  @State private var reopenBatch: ReopenBatchState?
 
   @AppStorage("harness.decisions.inspector.visible")
   private var inspectorVisible: Bool = true
@@ -119,6 +140,17 @@ public struct DecisionsWindowView: View {
     store?.selectedSession?.observer
   }
 
+  private var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
+    DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: runtime.decisions,
+      filters: sidebarFilters
+    )
+  }
+
+  private var visibleOpenDecisionIDs: [String] {
+    visibleSnapshot.decisionIDs
+  }
+
   @ViewBuilder private var detailColumn: some View {
     if let selectedDecision {
       DecisionDetailView(
@@ -138,8 +170,13 @@ public struct DecisionsWindowView: View {
 
   public var body: some View {
     NavigationSplitView {
-      DecisionsSidebar(decisions: runtime.decisions, selection: $selection)
-        .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
+      DecisionsSidebar(
+        decisions: runtime.decisions,
+        selection: $selection,
+        filters: $sidebarFilters,
+        store: store
+      )
+      .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
     } detail: {
       detailColumn
         .inspector(isPresented: $inspectorVisible) {
@@ -182,6 +219,25 @@ public struct DecisionsWindowView: View {
       selection = requestedID
       detailTab = .context
     }
+    .confirmationDialog(
+      "Dismiss all visible decisions",
+      isPresented: $showDismissAllVisibleConfirmation,
+      titleVisibility: .visible
+    ) {
+      TextField(
+        "Type \(pendingDismissBatch?.count ?? 0) to confirm",
+        text: $dismissAllVisibleDraft
+      )
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleInput)
+      Button("Dismiss selected visible") {
+        Task { await confirmDismissAllVisible() }
+      }
+      .disabled(dismissAllVisibleDraft != "\(pendingDismissBatch?.count ?? -1)")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleConfirm)
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(dismissConfirmationMessage)
+    }
   }
 
   @ToolbarContentBuilder private var windowToolbar: some ToolbarContent {
@@ -193,6 +249,25 @@ public struct DecisionsWindowView: View {
 
   private var bulkActionsMenu: some View {
     Menu {
+      Button("Dismiss selected") {
+        Task { await dismissSelected() }
+      }
+      .disabled(selection == nil)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissSelected)
+
+      Button("Dismiss all visible") {
+        beginDismissAllVisible()
+      }
+      .disabled(visibleOpenDecisionIDs.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisible)
+
+      if let reopenBatch {
+        Button("Reopen dismissed batch") {
+          Task { await reopenDismissedBatch(reopenBatch) }
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkReopenBatch)
+      }
+
       Button("Snooze all critical for 1h") {
         Task { await snoozeAllCritical() }
       }
@@ -235,6 +310,91 @@ public struct DecisionsWindowView: View {
     let handler = actionHandler
     for id in infoDecisionIDs {
       await handler.dismiss(decisionID: id)
+    }
+  }
+
+  private func dismissSelected() async {
+    guard let selection else {
+      return
+    }
+    await actionHandler.dismiss(decisionID: selection)
+  }
+
+  private func beginDismissAllVisible() {
+    let ids = visibleOpenDecisionIDs
+    guard !ids.isEmpty else {
+      return
+    }
+    pendingDismissBatch = DismissBatchSnapshot(
+      ids: ids,
+      count: ids.count,
+      filterSignature: visibleSnapshot.signature,
+      capturedAt: Date()
+    )
+    dismissAllVisibleDraft = ""
+    showDismissAllVisibleConfirmation = true
+  }
+
+  private var dismissConfirmationMessage: String {
+    guard let snapshot = pendingDismissBatch else {
+      return "No visible decisions to dismiss."
+    }
+    return
+      "Scope: \(snapshot.filterSignature)\nCaptured: \(snapshot.capturedAt.formatted(date: .abbreviated, time: .standard))"
+  }
+
+  private func confirmDismissAllVisible() async {
+    guard let snapshot = pendingDismissBatch else {
+      return
+    }
+    guard dismissAllVisibleDraft == "\(snapshot.count)" else {
+      store?.presentFailureFeedback("Typed count did not match.")
+      return
+    }
+    let currentIDs = visibleOpenDecisionIDs
+    guard currentIDs == snapshot.ids, visibleSnapshot.signature == snapshot.filterSignature else {
+      store?.presentFailureFeedback("Visible decisions changed. Bulk dismiss aborted.")
+      return
+    }
+    let handler = actionHandler
+    for id in snapshot.ids {
+      await handler.dismiss(decisionID: id)
+    }
+    reopenBatch = ReopenBatchState(
+      ids: snapshot.ids,
+      expiresAt: Date().addingTimeInterval(15)
+    )
+    pendingDismissBatch = nil
+    dismissAllVisibleDraft = ""
+  }
+
+  private func reopenDismissedBatch(_ batch: ReopenBatchState) async {
+    guard Date() <= batch.expiresAt else {
+      store?.presentFailureFeedback("Recovery window expired.")
+      reopenBatch = nil
+      return
+    }
+    guard let decisionStore = store?.supervisorDecisionStore else {
+      store?.presentFailureFeedback("Cannot reopen dismissed batch: decision store unavailable.")
+      return
+    }
+    for id in batch.ids {
+      do {
+        guard let decision = try await decisionStore.decision(id: id) else {
+          store?.presentFailureFeedback("Cannot reopen \(id): decision missing.")
+          continue
+        }
+        guard decision.statusRaw == "dismissed" else {
+          store?.presentFailureFeedback("Cannot reopen \(id): decision state changed.")
+          continue
+        }
+        decision.statusRaw = "open"
+        decision.resolutionJSON = nil
+      } catch {
+        store?.presentFailureFeedback(
+          "Failed to reopen \(id): \(error.localizedDescription)"
+        )
+      }
     }
   }
 

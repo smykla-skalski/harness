@@ -39,6 +39,28 @@ extension DecisionSeverity {
 /// Pure grouping / sorting / filtering helpers for `DecisionsSidebar`. Split out so the
 /// behaviour can be covered by unit tests without spinning up a view hierarchy.
 public enum DecisionsSidebarViewModel {
+  public struct FilterState: Equatable {
+    public let query: String
+    public let severities: Set<DecisionSeverity>
+    public let scope: DecisionsSidebarSearchScope
+
+    public init(
+      query: String,
+      severities: Set<DecisionSeverity>,
+      scope: DecisionsSidebarSearchScope
+    ) {
+      self.query = query
+      self.severities = severities
+      self.scope = scope
+    }
+  }
+
+  public struct VisibleSnapshot: Equatable {
+    public let groups: [SessionGroup]
+    public let decisionIDs: [String]
+    public let signature: String
+  }
+
   public struct SessionGroup: Equatable {
     public let sessionID: String?
     public let decisions: [Decision]
@@ -78,6 +100,29 @@ public enum DecisionsSidebarViewModel {
     }.sorted(by: sessionGroupOrdering)
   }
 
+  public static func visibleSnapshot(
+    decisions: [Decision],
+    filters: FilterState
+  ) -> VisibleSnapshot {
+    let trimmed = filters.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    let scoped: [Decision]
+    if trimmed.isEmpty {
+      scoped = decisions
+    } else {
+      scoped = decisions.filter { filters.scope.matches($0, trimmedQuery: trimmed) }
+    }
+    let summaryQuery = filters.scope == .summary ? trimmed : ""
+    let groups = grouped(
+      decisions: scoped,
+      query: summaryQuery,
+      severities: filters.severities
+    )
+    let ids = groups.flatMap(\.decisions).map(\.id)
+    let severitySignature = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
+    let signature = "scope=\(filters.scope.rawValue);query=\(trimmed);sev=\(severitySignature)"
+    return VisibleSnapshot(groups: groups, decisionIDs: ids, signature: signature)
+  }
+
   private static func sortedBySeverity(_ decisions: [Decision]) -> [Decision] {
     decisions.sorted { lhs, rhs in
       let leftKey = DecisionSeverity(rawValue: lhs.severityRaw)?.sortKey ?? 0
@@ -113,7 +158,9 @@ public enum DecisionsSidebarViewModel {
 /// column can render the chosen decision by id.
 public struct DecisionsSidebar: View {
   @Binding private var selectedDecisionID: String?
+  @Binding private var filters: DecisionsSidebarViewModel.FilterState
   private let decisions: [Decision]
+  private let store: HarnessMonitorStore?
 
   @State private var query: String = ""
 
@@ -131,10 +178,16 @@ public struct DecisionsSidebar: View {
 
   public init(
     decisions: [Decision] = [],
-    selection: Binding<String?> = .constant(nil)
+    selection: Binding<String?> = .constant(nil),
+    filters: Binding<DecisionsSidebarViewModel.FilterState> = .constant(
+      .init(query: "", severities: [], scope: .summary)
+    ),
+    store: HarnessMonitorStore? = nil
   ) {
     self.decisions = decisions
+    self.store = store
     _selectedDecisionID = selection
+    _filters = filters
   }
 
   private var selectedSeverities: Set<DecisionSeverity> {
@@ -153,21 +206,29 @@ public struct DecisionsSidebar: View {
     severitiesCSV = newValue.map(\.rawValue).sorted().joined(separator: ",")
   }
 
-  private var groups: [DecisionsSidebarViewModel.SessionGroup] {
-    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    let scope = searchScope
-    let scoped: [Decision]
-    if trimmed.isEmpty {
-      scoped = decisions
-    } else {
-      scoped = decisions.filter { scope.matches($0, trimmedQuery: trimmed) }
-    }
-    let summaryQuery = scope == .summary ? trimmed : ""
-    return DecisionsSidebarViewModel.grouped(
-      decisions: scoped,
-      query: summaryQuery,
-      severities: selectedSeverities
+  private var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
+    DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: decisions,
+      filters: .init(
+        query: query,
+        severities: selectedSeverities,
+        scope: searchScope
+      )
     )
+  }
+
+  private var lastDaemonMessageAt: Date? {
+    store?.connectionMetrics.lastMessageAt
+  }
+
+  private func acpPayload(
+    for decision: Decision
+  ) -> AcpPermissionDecisionPayload? {
+    guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
+      return nil
+    }
+    return store?.acpPermissionDecisionPayload(for: decision.id)
+      ?? AcpPermissionDecisionPayload.decode(from: decision)
   }
 
   public var body: some View {
@@ -178,6 +239,22 @@ public struct DecisionsSidebar: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebar)
+    .onAppear {
+      applyExternalFilters()
+      publishFilters()
+    }
+    .onChange(of: query) { _, _ in
+      publishFilters()
+    }
+    .onChange(of: severitiesCSV) { _, _ in
+      publishFilters()
+    }
+    .onChange(of: searchScopeRaw) { _, _ in
+      publishFilters()
+    }
+    .onChange(of: filters) { _, newValue in
+      applyExternalFilters(newValue)
+    }
   }
 
   private var header: some View {
@@ -241,6 +318,27 @@ public struct DecisionsSidebar: View {
     .fixedSize()
     .accessibilityLabel("Search scope — \(searchScope.label)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearchScopeMenu)
+  }
+
+  private func publishFilters() {
+    filters = DecisionsSidebarViewModel.FilterState(
+      query: query,
+      severities: selectedSeverities,
+      scope: searchScope
+    )
+  }
+
+  private func applyExternalFilters(_ incoming: DecisionsSidebarViewModel.FilterState? = nil) {
+    let source = incoming ?? filters
+    if query != source.query {
+      query = source.query
+    }
+    if selectedSeverities != source.severities {
+      setSelectedSeverities(source.severities)
+    }
+    if searchScopeRaw != source.scope.rawValue {
+      searchScopeRaw = source.scope.rawValue
+    }
   }
 
   private var severityChipRow: some View {
@@ -318,7 +416,7 @@ public struct DecisionsSidebar: View {
   }
 
   @ViewBuilder private var content: some View {
-    let visibleGroups = groups
+    let visibleGroups = visibleSnapshot.groups
     if visibleGroups.isEmpty {
       emptyState
     } else {
@@ -358,7 +456,9 @@ public struct DecisionsSidebar: View {
         DecisionRow(
           decision: decision,
           isSelected: selectedDecisionID == decision.id,
-          fontScale: fontScale
+          fontScale: fontScale,
+          acpPayload: acpPayload(for: decision),
+          lastMessageAt: lastDaemonMessageAt
         ) {
           selectedDecisionID = decision.id
         }

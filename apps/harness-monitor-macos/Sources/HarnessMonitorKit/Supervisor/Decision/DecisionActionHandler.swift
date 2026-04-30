@@ -59,19 +59,19 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
       )
 
       try await store.withSupervisorAutoActionsSuppressed {
+        if let action {
+          try await Self.executeSuggestedActionBeforeResolve(
+            action,
+            for: decisionSnapshot,
+            store: self.store
+          )
+        }
         if outcome.chosenActionID == HarnessMonitorNotificationActionID.acknowledge {
           try await Self.handleNotificationAcknowledgement(
             for: decisionSnapshot,
             decisions: self.decisions
           )
           return
-        }
-        if let action {
-          try await Self.handleCustomAction(
-            action,
-            for: decisionSnapshot,
-            store: self.store
-          )
         }
         try await self.decisions.resolve(id: decisionID, outcome: outcome)
       }
@@ -122,14 +122,113 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     return actions.first(where: { $0.id == actionID })
   }
 
+  private static func executeSuggestedActionBeforeResolve(
+    _ action: SuggestedAction,
+    for decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws {
+    switch action.kind {
+    case .nudge:
+      try await executeNudgeAction(action, decision: decision, store: store)
+    case .assignTask:
+      try await executeAssignTaskAction(action, decision: decision, store: store)
+    case .dropTask:
+      try await executeDropTaskAction(action, decision: decision, store: store)
+    case .custom:
+      try await handleCustomAction(action, for: decision, store: store)
+    case .dismiss, .snooze:
+      return
+    }
+  }
+
+  private static func executeNudgeAction(
+    _ action: SuggestedAction,
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws {
+    guard let agentID = resolveAgentID(from: action, decision: decision) else {
+      throw StoreDecisionActionError.missingTargetMetadata("agentID")
+    }
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
+    let input = resolveNudgeInput(from: action)
+    do {
+      _ = try await client.sendManagedAgentInput(
+        agentID: agentID,
+        request: AgentTuiInputRequest(input: .text(input))
+      )
+    } catch {
+      throw StoreDecisionActionError.daemonRejected(error)
+    }
+  }
+
+  private static func executeAssignTaskAction(
+    _ action: SuggestedAction,
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws {
+    let payload = try decodeTaskActionPayload(action.payloadJSON)
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
+    guard let sessionID = try await resolveSessionIDForTask(
+      payload.taskID,
+      decision: decision,
+      store: store
+    ) else {
+      throw StoreDecisionActionError.missingTargetMetadata("sessionID")
+    }
+    do {
+      _ = try await client.assignTask(
+        sessionID: sessionID,
+        taskID: payload.taskID,
+        request: TaskAssignRequest(actor: "harness-supervisor", agentId: payload.agentID)
+      )
+    } catch {
+      throw StoreDecisionActionError.daemonRejected(error)
+    }
+  }
+
+  private static func executeDropTaskAction(
+    _ action: SuggestedAction,
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws {
+    let payload = try decodeTaskActionPayload(action.payloadJSON)
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
+    guard let location = try await resolveTaskLocation(
+      payload.taskID,
+      decision: decision,
+      store: store
+    ) else {
+      throw StoreDecisionActionError.missingTargetMetadata("sessionID")
+    }
+    guard let assignedAgentID = location.assignedAgentID else {
+      throw StoreDecisionActionError.missingTargetMetadata("assignedAgentID")
+    }
+    do {
+      _ = try await client.dropTask(
+        sessionID: location.sessionID,
+        taskID: payload.taskID,
+        request: TaskDropRequest(
+          actor: "harness-supervisor",
+          target: .agent(agentId: assignedAgentID),
+          queuePolicy: .locked
+        )
+      )
+    } catch {
+      throw StoreDecisionActionError.daemonRejected(error)
+    }
+  }
+
   private static func handleCustomAction(
     _ action: SuggestedAction,
     for decision: DecisionActionSnapshot,
     store: HarnessMonitorStore
   ) async throws {
-    guard action.kind == .custom else {
-      return
-    }
     switch decision.ruleID {
     case "codex-approval":
       let payload = try JSONDecoder().decode(
@@ -158,6 +257,107 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     default:
       return
     }
+  }
+
+  private static func resolveAgentID(
+    from action: SuggestedAction,
+    decision: DecisionActionSnapshot
+  ) -> String? {
+    if let payload = try? JSONDecoder().decode(
+      NudgeActionPayload.self,
+      from: Data(action.payloadJSON.utf8)
+    ),
+      let agentID = payload.agentID?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !agentID.isEmpty
+    {
+      return agentID
+    }
+    if let context = DecisionContextEnvelope(decision.contextJSON),
+      let agentID = context.agentID
+    {
+      return agentID
+    }
+    return decision.agentID
+  }
+
+  private static func resolveNudgeInput(from action: SuggestedAction) -> String {
+    if let payload = try? JSONDecoder().decode(
+      NudgeActionPayload.self,
+      from: Data(action.payloadJSON.utf8)
+    ),
+      let message = payload.input?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !message.isEmpty
+    {
+      return message
+    }
+    return "Quick check-in from Harness Monitor supervisor."
+  }
+
+  private static func decodeTaskActionPayload(_ json: String) throws -> TaskActionPayload {
+    guard let payload = try? JSONDecoder().decode(
+      TaskActionPayload.self,
+      from: Data(json.utf8)
+    ),
+      !payload.taskID.isEmpty,
+      !payload.agentID.isEmpty
+    else {
+      throw StoreDecisionActionError.missingTargetMetadata("task action payload")
+    }
+    return payload
+  }
+
+  private static func resolveSessionIDForTask(
+    _ taskID: String,
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws -> String? {
+    if let location = try await resolveTaskLocation(taskID, decision: decision, store: store) {
+      return location.sessionID
+    }
+    return decision.sessionID
+  }
+
+  private static func resolveTaskLocation(
+    _ taskID: String,
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async throws -> TaskLocation? {
+    if let selectedSession = await MainActor.run(body: { store.selectedSession }),
+      let task = selectedSession.tasks.first(where: { $0.taskId == taskID })
+    {
+      return TaskLocation(
+        sessionID: selectedSession.session.sessionId,
+        assignedAgentID: task.assignedTo
+      )
+    }
+
+    let sessionIDHint = decision.sessionID
+    let (sessionIDs, cacheService) = await MainActor.run {
+      (store.sessionIndex.sessions.map(\.sessionId), store.cacheService)
+    }
+    guard let cacheService else {
+      return nil
+    }
+
+    let prioritizedSessionIDs = prioritizeSessionIDs(sessionIDs, hint: sessionIDHint)
+    let cachedSessions = await cacheService.loadSessionDetails(sessionIDs: prioritizedSessionIDs)
+    for sessionID in prioritizedSessionIDs {
+      guard let detail = cachedSessions[sessionID]?.detail else {
+        continue
+      }
+      guard let task = detail.tasks.first(where: { $0.taskId == taskID }) else {
+        continue
+      }
+      return TaskLocation(sessionID: sessionID, assignedAgentID: task.assignedTo)
+    }
+    return nil
+  }
+
+  private static func prioritizeSessionIDs(_ sessionIDs: [String], hint: String?) -> [String] {
+    guard let hint, sessionIDs.contains(hint) else {
+      return sessionIDs
+    }
+    return [hint] + sessionIDs.filter { $0 != hint }
   }
 
   private static func resolveCodexRunID(
@@ -202,16 +402,51 @@ private struct CodexApprovalSuggestedActionPayload: Decodable {
   let decision: String
 }
 
+private struct TaskActionPayload: Decodable {
+  let taskID: String
+  let agentID: String
+}
+
+private struct NudgeActionPayload: Decodable {
+  let agentID: String?
+  let input: String?
+}
+
+private struct DecisionContextEnvelope {
+  let agentID: String?
+
+  init?(_ json: String) {
+    guard let data = json.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data),
+      let dictionary = object as? [String: Any]
+    else {
+      return nil
+    }
+    agentID = dictionary["agentID"] as? String
+  }
+}
+
+private struct TaskLocation {
+  let sessionID: String
+  let assignedAgentID: String?
+}
+
 private struct DecisionActionSnapshot: Sendable {
   let id: String
   let ruleID: String
   let sessionID: String?
+  let agentID: String?
+  let taskID: String?
+  let contextJSON: String
   let suggestedActionsJSON: String
 
   init(decision: Decision) {
     id = decision.id
     ruleID = decision.ruleID
     sessionID = decision.sessionID
+    agentID = decision.agentID
+    taskID = decision.taskID
+    contextJSON = decision.contextJSON
     suggestedActionsJSON = decision.suggestedActionsJSON
   }
 }
@@ -221,6 +456,9 @@ private enum StoreDecisionActionError: LocalizedError {
   case missingClient
   case missingCodexRun(String)
   case invalidCodexPayload
+  case missingTargetMetadata(String)
+  case daemonUnavailable
+  case daemonRejected(any Error)
 
   var errorDescription: String? {
     switch self {
@@ -232,6 +470,12 @@ private enum StoreDecisionActionError: LocalizedError {
       "Could not locate the Codex run for approval \(approvalID)."
     case .invalidCodexPayload:
       "The Codex approval action payload is invalid."
+    case .missingTargetMetadata(let field):
+      "Cannot run action: missing target metadata (\(field))."
+    case .daemonUnavailable:
+      "Cannot run action: daemon unavailable."
+    case .daemonRejected(let error):
+      "Action rejected by daemon: \(error.localizedDescription)"
     }
   }
 }
