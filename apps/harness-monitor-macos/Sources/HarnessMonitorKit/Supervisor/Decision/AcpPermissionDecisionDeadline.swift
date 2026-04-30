@@ -26,12 +26,12 @@ public struct AcpPermissionDeadlineStatus: Equatable, Sendable {
   }
 }
 
-public extension AcpPermissionDecisionPayload {
-  var expiresAtDate: Date? {
+extension AcpPermissionDecisionPayload {
+  public var expiresAtDate: Date? {
     Self.parseExpiresAt(rawBatch.expiresAt)
   }
 
-  func deadlineStatus(
+  public func deadlineStatus(
     now: Date,
     lastMessageAt: Date?
   ) -> AcpPermissionDeadlineStatus? {
@@ -46,12 +46,12 @@ public extension AcpPermissionDecisionPayload {
   }
 }
 
-private extension AcpPermissionDecisionPayload {
-  static let expiringWindow: TimeInterval = 30
-  static let staleTrafficWindow: TimeInterval = 30
-  static let expiringSymbolName = "clock.badge.exclamationmark"
+extension AcpPermissionDecisionPayload {
+  fileprivate static let expiringWindow: TimeInterval = 30
+  fileprivate static let staleTrafficWindow: TimeInterval = 30
+  fileprivate static let expiringSymbolName = "clock.badge.exclamationmark"
 
-  static func parseExpiresAt(_ value: String?) -> Date? {
+  fileprivate static func parseExpiresAt(_ value: String?) -> Date? {
     guard let value else {
       return nil
     }
@@ -64,26 +64,26 @@ private extension AcpPermissionDecisionPayload {
     return try? Date.ISO8601FormatStyle().parse(value)
   }
 
-  static func makeDeadlineStatus(
+  fileprivate static func makeDeadlineStatus(
     expiresAt: Date,
     now: Date,
     lastMessageAt: Date?
   ) -> AcpPermissionDeadlineStatus {
-    if isTrafficStale(now: now, lastMessageAt: lastMessageAt) {
-      return AcpPermissionDeadlineStatus(
-        phase: .stale,
-        label: "expires soon",
-        accessibilityValue: "expires soon",
-        symbolName: expiringSymbolName
-      )
-    }
-
     let remainingSeconds = Int(ceil(expiresAt.timeIntervalSince(now)))
     if remainingSeconds <= 0 {
       return AcpPermissionDeadlineStatus(
         phase: .expired,
         label: "expired",
         accessibilityValue: "expired",
+        symbolName: expiringSymbolName
+      )
+    }
+
+    if isTrafficStale(now: now, lastMessageAt: lastMessageAt) {
+      return AcpPermissionDeadlineStatus(
+        phase: .stale,
+        label: "expires soon",
+        accessibilityValue: "expires soon, daemon status stale",
         symbolName: expiringSymbolName
       )
     }
@@ -108,7 +108,7 @@ private extension AcpPermissionDecisionPayload {
     )
   }
 
-  static func isTrafficStale(
+  fileprivate static func isTrafficStale(
     now: Date,
     lastMessageAt: Date?
   ) -> Bool {
@@ -118,13 +118,13 @@ private extension AcpPermissionDecisionPayload {
     return now.timeIntervalSince(lastMessageAt) > staleTrafficWindow
   }
 
-  static func countdownString(_ remainingSeconds: Int) -> String {
+  fileprivate static func countdownString(_ remainingSeconds: Int) -> String {
     let minutes = remainingSeconds / 60
     let seconds = remainingSeconds % 60
     return "\(minutes):\(String(format: "%02d", seconds))"
   }
 
-  static func spokenDurationString(_ remainingSeconds: Int) -> String {
+  fileprivate static func spokenDurationString(_ remainingSeconds: Int) -> String {
     let minutes = remainingSeconds / 60
     let seconds = remainingSeconds % 60
     var parts: [String] = []

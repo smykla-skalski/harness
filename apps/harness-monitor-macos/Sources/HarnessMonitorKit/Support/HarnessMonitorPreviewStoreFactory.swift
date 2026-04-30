@@ -87,7 +87,10 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
     store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health
-    store.daemonStatus = configuration.statusReport
+    store.daemonStatus = previewStatusReport(
+      configuration.statusReport,
+      hostBridgeOverride: hostBridgeOverride
+    )
     store.connectionMetrics = configuration.connectionMetrics
     store.connectionEvents = configuration.connectionEvents
     store.sessionIndex.replaceSnapshot(
@@ -106,52 +109,112 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
     store.timeline = configuration.timeline
-    if let selectedSessionID = configuration.selectedSessionID {
-      let initialAgentTuis = configuration.fixtures.agentTuisBySessionID[selectedSessionID] ?? []
-      let roleByAgent = Dictionary(
-        uniqueKeysWithValues: (configuration.selectedDetail?.agents ?? []).map {
-          ($0.agentId, $0.role)
-        }
-      )
-      let sortedAgentTuis = AgentTuiListResponse(tuis: initialAgentTuis)
-        .canonicallySorted(roleByAgent: roleByAgent)
-        .tuis
-      store.selectedAgentTuis = sortedAgentTuis
-      store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
-      let seedsPendingAcp =
-        ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-          == "1"
-      if seedsPendingAcp {
-        let pendingBatch = previewAcpPermissionBatch(sessionID: selectedSessionID)
-        let previewAcpAgent = previewAcpAgentSnapshot(
-          sessionID: selectedSessionID,
-          pendingBatch: pendingBatch
-        )
-        store.selectedAcpAgents = [previewAcpAgent]
-        store.selectedAcpInspectState = AcpInspectSample(
-          sessionID: selectedSessionID,
-          sampledAt: HarnessMonitorStore.acpInspectSampledAt(
-            from: PreviewHarnessClientState.mutationTimestamp
-          ),
-          agents: [
-            PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
-          ]
-        )
-        if ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-          == "1"
-        {
-          store.presentingAcpPermissionBatch = pendingBatch
-        }
-        store.reconcileAcpPermissionDecisions()
-      }
-    }
+    seedSelectedSessionState(store: store, configuration: configuration)
     store.isSelectionLoading = false
     store.isShowingCachedData = configuration.isShowingCachedData
     store.persistedSessionCount = configuration.persistedSessionCount
     store.lastPersistedSnapshotAt = configuration.lastPersistedSnapshotAt
+    seedAcpBridgeOutageIfNeeded(
+      store: store,
+      hostBridgeOverride: hostBridgeOverride
+    )
     store.synchronizeActionActor()
     return store
+  }
+
+  private static func seedSelectedSessionState(
+    store: HarnessMonitorStore,
+    configuration: PreviewStoreConfiguration
+  ) {
+    guard let selectedSessionID = configuration.selectedSessionID else {
+      return
+    }
+    let initialAgentTuis = configuration.fixtures.agentTuisBySessionID[selectedSessionID] ?? []
+    let roleByAgent = Dictionary(
+      uniqueKeysWithValues: (configuration.selectedDetail?.agents ?? []).map {
+        ($0.agentId, $0.role)
+      }
+    )
+    let sortedAgentTuis = AgentTuiListResponse(tuis: initialAgentTuis)
+      .canonicallySorted(roleByAgent: roleByAgent)
+      .tuis
+    store.selectedAgentTuis = sortedAgentTuis
+    store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
+    seedPendingAcpIfNeeded(store: store, sessionID: selectedSessionID)
+  }
+
+  private static func seedPendingAcpIfNeeded(
+    store: HarnessMonitorStore,
+    sessionID: String
+  ) {
+    let seedsPendingAcp =
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
+        == "1"
+    guard seedsPendingAcp else {
+      return
+    }
+    let pendingBatch = previewAcpPermissionBatch(sessionID: sessionID)
+    let previewAcpAgent = previewAcpAgentSnapshot(
+      sessionID: sessionID,
+      pendingBatch: pendingBatch
+    )
+    store.selectedAcpAgents = [previewAcpAgent]
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: sessionID,
+      sampledAt: previewAcpInspectSampledAt(),
+      agents: [
+        PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
+      ]
+    )
+    let presentsPermissionOnStart =
+      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
+    if presentsPermissionOnStart {
+      store.presentingAcpPermissionBatch = pendingBatch
+    }
+    store.reconcileAcpPermissionDecisions()
+  }
+
+  private static func seedAcpBridgeOutageIfNeeded(
+    store: HarnessMonitorStore,
+    hostBridgeOverride: PreviewHostBridgeOverride?
+  ) {
+    guard ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1" else {
+      return
+    }
+    guard hostBridgeOverride?.bridgeStatus.running == false else {
+      return
+    }
+    store.markHostBridgeIssue(for: "codex", statusCode: 503)
+  }
+
+  private static func previewStatusReport(
+    _ statusReport: DaemonStatusReport,
+    hostBridgeOverride: PreviewHostBridgeOverride?
+  ) -> DaemonStatusReport {
+    guard let hostBridgeOverride, let manifest = statusReport.manifest else {
+      return statusReport
+    }
+    let previewManifest = DaemonManifest(
+      version: manifest.version,
+      pid: manifest.pid,
+      endpoint: manifest.endpoint,
+      startedAt: manifest.startedAt,
+      tokenPath: manifest.tokenPath,
+      sandboxed: true,
+      hostBridge: hostBridgeOverride.hostBridgeManifest,
+      revision: manifest.revision,
+      updatedAt: manifest.updatedAt,
+      binaryStamp: manifest.binaryStamp
+    )
+    return DaemonStatusReport(
+      manifest: previewManifest,
+      launchAgent: statusReport.launchAgent,
+      projectCount: statusReport.projectCount,
+      worktreeCount: statusReport.worktreeCount,
+      sessionCount: statusReport.sessionCount,
+      diagnostics: statusReport.diagnostics
+    )
   }
 
   private static func previewAcpAgentSnapshot(
@@ -174,6 +237,10 @@ public enum HarnessMonitorPreviewStoreFactory {
       createdAt: PreviewHarnessClientState.mutationTimestamp,
       updatedAt: PreviewHarnessClientState.mutationTimestamp
     )
+  }
+
+  private static func previewAcpInspectSampledAt() -> Date {
+    ISO8601DateFormatter().date(from: PreviewHarnessClientState.mutationTimestamp) ?? Date()
   }
 
   private static func previewAcpPermissionBatch(sessionID: String) -> AcpPermissionBatch {

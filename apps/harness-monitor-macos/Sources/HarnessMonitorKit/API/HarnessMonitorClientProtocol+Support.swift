@@ -65,9 +65,15 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
   private static func sandboxDisabledDescription(feature: String?) -> String {
     switch feature {
     case "acp.host-bridge":
-      "ACP sessions can't make tool calls because the shared host bridge isn't running. Start the host bridge and try again."
+      """
+      ACP sessions can't make tool calls because the shared host bridge isn't \
+      running. Start the host bridge and try again.
+      """
     case "agent-tui.host-bridge":
-      "Terminal agents can't start because the shared host bridge isn't running. Start the host bridge and try again."
+      """
+      Terminal agents can't start because the shared host bridge isn't running. \
+      Start the host bridge and try again.
+      """
     case "codex.host-bridge":
       "Codex can't start because the shared host bridge isn't running. Start the host bridge and try again."
     default:

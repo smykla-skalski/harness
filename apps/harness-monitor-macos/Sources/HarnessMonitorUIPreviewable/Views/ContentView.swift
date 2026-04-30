@@ -109,14 +109,6 @@ public struct ContentView<CornerContent: View>: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
-    .safeAreaInset(edge: .top, spacing: 0) {
-      ContentAcpBridgeBannerBridge(
-        store: store,
-        contentChrome: contentChrome,
-        keyWindowObserver: keyWindowObserver,
-        windowID: HarnessMonitorWindowID.main
-      )
-    }
     .overlay(contentAccessibilityOverlay)
     .overlay(alignment: .topTrailing) {
       ContentFloatingOverlay(
@@ -221,6 +213,7 @@ public struct ContentView<CornerContent: View>: View {
   private var detailColumn: some View {
     ContentDetailColumn(
       store: store,
+      keyWindowObserver: keyWindowObserver,
       toast: toast,
       selection: store.selection,
       contentChrome: contentChrome,

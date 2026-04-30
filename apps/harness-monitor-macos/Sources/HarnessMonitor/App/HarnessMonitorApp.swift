@@ -13,7 +13,7 @@ struct HarnessMonitorApp: App {
   private let isUITesting: Bool
   private let isTestRun: Bool
   private let launchMode: HarnessMonitorLaunchMode
-  private let defersInitialMainWindowContentUntilBootstrap: Bool
+  private let defersInitialMainWindowUntilBootstrap: Bool
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
   private let keyWindowObserver: KeyWindowObserver
@@ -63,8 +63,8 @@ struct HarnessMonitorApp: App {
     isUITesting = configuration.isUITesting
     self.isTestRun = isTestRun
     launchMode = configuration.launchMode
-    defersInitialMainWindowContentUntilBootstrap =
-      configuration.defersInitialMainWindowContentUntilBootstrap
+    defersInitialMainWindowUntilBootstrap =
+      configuration.defersInitialMainWindowUntilBootstrap
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
     let notificationController =
       isTestRun
@@ -205,7 +205,7 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowContentUntilBootstrap
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )
         .modelContainer(container)
       } else {
@@ -219,7 +219,7 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           preferencesSelectedSection: $preferencesSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowContentUntilBootstrap
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )
       }
     }

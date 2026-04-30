@@ -60,6 +60,17 @@ struct AcpRuntimeStatusStrip: View {
     return AcpRuntimeWatchdogSignal(runtimeID: runtimeState.id, state: state)
   }
 
+  private var watchdogAccessibilityMarkerText: String {
+    [
+      """
+      live-region=\(AcpRuntimeWatchdogAnnouncementPolicy.liveRegion(
+        for: runtimeState.watchdogDisplayState
+      ))
+      """,
+      "state=\(runtimeState.watchdogDisplayState)",
+    ].joined(separator: " ")
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -95,6 +106,18 @@ struct AcpRuntimeStatusStrip: View {
       HarnessMonitorAccessibility.agentRuntimeStrip(runtimeState.agentId)
     )
     .accessibilityLabel("ACP runtime status")
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.agentRuntimeWatchdogAccessibilityState,
+        text: watchdogAccessibilityMarkerText
+      )
+    }
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.toolCallTimelineAccessibilityState,
+        text: ToolCallTimelineView.accessibilityStateMarkerText
+      )
+    }
     .onChange(of: watchdogSignal, initial: true) { oldValue, newValue in
       applyWatchdogAnnouncementEffect(
         AcpRuntimeWatchdogAnnouncementCoordinator.effect(
@@ -108,8 +131,7 @@ struct AcpRuntimeStatusStrip: View {
     }
   }
 
-  @ViewBuilder
-  private var statusChips: some View {
+  @ViewBuilder private var statusChips: some View {
     AcpRuntimeChip(
       title: "Watchdog",
       value: AcpRuntimeWatchdogAnnouncementPolicy.label(for: runtimeState.watchdogDisplayState),
@@ -262,6 +284,10 @@ enum AcpRuntimeWatchdogAnnouncementPolicy {
     }
     let debounce = isAssertive(state) ? 60.0 : 30.0
     return now.timeIntervalSince(lastAnnouncement.announcedAt) >= debounce
+  }
+
+  static func liveRegion(for state: String) -> String {
+    isAssertive(state) ? "assertive" : "polite"
   }
 
   private static func isAssertive(_ state: String) -> Bool {

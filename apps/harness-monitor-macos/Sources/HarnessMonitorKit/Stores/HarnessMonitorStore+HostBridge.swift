@@ -9,8 +9,8 @@ public struct AcpBridgeHTTPIncident: Equatable, Sendable {
     self.retryCount = retryCount
   }
 
-  func incrementingRetryCount() -> AcpBridgeHTTPIncident {
-    AcpBridgeHTTPIncident(
+  func incrementingRetryCount() -> Self {
+    Self(
       firstDetectedAt: firstDetectedAt,
       retryCount: retryCount + 1
     )

@@ -16,7 +16,7 @@ struct HarnessMonitorAppConfiguration {
   let launchMode: HarnessMonitorLaunchMode
   let initialThemeMode: HarnessMonitorThemeMode
   let isUITesting: Bool
-  let defersInitialMainWindowContentUntilBootstrap: Bool
+  let defersInitialMainWindowUntilBootstrap: Bool
   let mainWindowDefaultSize: CGSize
   let perfScenario: HarnessMonitorPerfScenario?
   let preferencesInitialSection: PreferencesSection
@@ -69,7 +69,7 @@ struct HarnessMonitorAppConfiguration {
       launchMode: launchMode,
       initialThemeMode: uiTestOverrides.themeMode,
       isUITesting: isUITesting,
-      defersInitialMainWindowContentUntilBootstrap:
+      defersInitialMainWindowUntilBootstrap:
         shouldDeferInitialMainWindowContentUntilBootstrap(
           isUITesting: isUITesting,
           hasPerfScenario: perfScenario != nil

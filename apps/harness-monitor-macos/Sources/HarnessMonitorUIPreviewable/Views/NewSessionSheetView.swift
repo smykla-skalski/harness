@@ -4,20 +4,6 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct NewSessionSheetView: View {
-  private enum SheetTab: String, CaseIterable, Hashable {
-    case create
-    case runtime
-
-    var title: String {
-      switch self {
-      case .create:
-        "Create Session"
-      case .runtime:
-        "Runtime Setup"
-      }
-    }
-  }
-
   private enum Field: Hashable {
     case title
     case context
@@ -31,9 +17,8 @@ struct NewSessionSheetView: View {
   @State private var bookmarks: [BookmarkStore.Record] = []
   @State private var availableAcpAgents: [AcpAgentDescriptor] = []
   @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
-  @State var selectedLaunchSelection =
+  @State private var selectedLaunchSelection =
     HarnessMonitorAgentLaunchDefaults.preferredSelection()
-  @State private var selectedTab = SheetTab.create
   @State private var showImporter = false
   @FocusState private var focusedField: Field?
 
@@ -76,13 +61,10 @@ struct NewSessionSheetView: View {
   // MARK: - Header
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text("New Session")
-        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
-      Text("Start a harness session in a project folder")
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
+    HarnessMonitorActionHeader(
+      title: "New Session",
+      subtitle: "Start a harness session in a project folder."
+    )
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -92,38 +74,19 @@ struct NewSessionSheetView: View {
   private var formContent: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        tabSelector
-
-        switch selectedTab {
-        case .create:
-          createSessionTab
-        case .runtime:
-          runtimeSetupTab
-        }
+        createSessionContent
 
         if let error = viewModel.lastError {
           errorBanner(for: error)
         }
       }
       .padding(HarnessMonitorTheme.spacingLG)
+      .frame(maxWidth: 680, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
-  private var tabSelector: some View {
-    Picker("Session sheet section", selection: $selectedTab) {
-      Text(SheetTab.create.title)
-        .tag(SheetTab.create)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateTab)
-      Text(SheetTab.runtime.title)
-        .tag(SheetTab.runtime)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionRuntimeTab)
-    }
-    .pickerStyle(.segmented)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionTabPicker)
-  }
-
-  private var createSessionTab: some View {
+  private var createSessionContent: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
       projectSection
       detailsSection
@@ -131,14 +94,6 @@ struct NewSessionSheetView: View {
       advancedSection
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreatePanel)
-  }
-
-  private var runtimeSetupTab: some View {
-    NewSessionRuntimeStatusSection(
-      options: agentCapabilityOptions,
-      selection: $selectedLaunchSelection
-    )
-    .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionRuntimePanel)
   }
 
   private var projectSection: some View {
@@ -245,6 +200,14 @@ struct NewSessionSheetView: View {
     )
   }
 
+  var preferredLaunchSelection: AgentLaunchSelection {
+    selectedLaunchSelection
+  }
+
+  var preferredLaunchSelectionBinding: Binding<AgentLaunchSelection> {
+    $selectedLaunchSelection
+  }
+
   func fieldBlock<Content: View>(
     _ title: String,
     help: String? = nil,
@@ -318,32 +281,23 @@ struct NewSessionSheetView: View {
   // MARK: - Footer
 
   private var footer: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      if let disabledReason = createDisabledReason {
-        Text(disabledReason)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateDisabledReason)
+    HStack {
+      Button("Cancel") {
+        dismiss()
       }
-
-      HStack {
-        Button("Cancel") {
-          dismiss()
-        }
-        .keyboardShortcut(.cancelAction)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCancelButton)
-        Spacer()
-        Button("Create") {
-          Task { await submitAndDismiss() }
-        }
-        .keyboardShortcut(.defaultAction)
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .disabled(!canCreate)
-        .accessibilityValue(createDisabledReason ?? "Ready")
-        .accessibilityHint(createDisabledReason ?? "Create a new session")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateButton)
+      .keyboardShortcut(.cancelAction)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCancelButton)
+      Spacer()
+      Button("Create") {
+        Task { await submitAndDismiss() }
       }
+      .keyboardShortcut(.defaultAction)
+      .harnessActionButtonStyle(variant: .prominent, tint: nil)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(!canCreate)
+      .accessibilityValue(createDisabledReason ?? "Ready")
+      .accessibilityHint(createDisabledReason ?? "Create a new session")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCreateButton)
     }
     .padding(HarnessMonitorTheme.spacingLG)
   }

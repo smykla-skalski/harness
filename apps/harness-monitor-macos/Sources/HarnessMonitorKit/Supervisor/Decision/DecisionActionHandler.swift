@@ -172,11 +172,13 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard let sessionID = try await resolveSessionIDForTask(
-      payload.taskID,
-      decision: decision,
-      store: store
-    ) else {
+    guard
+      let sessionID = try await resolveSessionIDForTask(
+        payload.taskID,
+        decision: decision,
+        store: store
+      )
+    else {
       throw StoreDecisionActionError.missingTargetMetadata("sessionID")
     }
     do {
@@ -199,11 +201,13 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard let location = try await resolveTaskLocation(
-      payload.taskID,
-      decision: decision,
-      store: store
-    ) else {
+    guard
+      let location = try await resolveTaskLocation(
+        payload.taskID,
+        decision: decision,
+        store: store
+      )
+    else {
       throw StoreDecisionActionError.missingTargetMetadata("sessionID")
     }
     guard let assignedAgentID = location.assignedAgentID else {
@@ -294,10 +298,11 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
   }
 
   private static func decodeTaskActionPayload(_ json: String) throws -> TaskActionPayload {
-    guard let payload = try? JSONDecoder().decode(
-      TaskActionPayload.self,
-      from: Data(json.utf8)
-    ),
+    guard
+      let payload = try? JSONDecoder().decode(
+        TaskActionPayload.self,
+        from: Data(json.utf8)
+      ),
       !payload.taskID.isEmpty,
       !payload.agentID.isEmpty
     else {
@@ -392,90 +397,5 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     runs.first { run in
       run.pendingApprovals.contains { $0.approvalId == approvalID }
     }?.runId
-  }
-}
-
-private struct CodexApprovalSuggestedActionPayload: Decodable {
-  let mode: String
-  let agentID: String
-  let approvalID: String
-  let decision: String
-}
-
-private struct TaskActionPayload: Decodable {
-  let taskID: String
-  let agentID: String
-}
-
-private struct NudgeActionPayload: Decodable {
-  let agentID: String?
-  let input: String?
-}
-
-private struct DecisionContextEnvelope {
-  let agentID: String?
-
-  init?(_ json: String) {
-    guard let data = json.data(using: .utf8),
-      let object = try? JSONSerialization.jsonObject(with: data),
-      let dictionary = object as? [String: Any]
-    else {
-      return nil
-    }
-    agentID = dictionary["agentID"] as? String
-  }
-}
-
-private struct TaskLocation {
-  let sessionID: String
-  let assignedAgentID: String?
-}
-
-private struct DecisionActionSnapshot: Sendable {
-  let id: String
-  let ruleID: String
-  let sessionID: String?
-  let agentID: String?
-  let taskID: String?
-  let contextJSON: String
-  let suggestedActionsJSON: String
-
-  init(decision: Decision) {
-    id = decision.id
-    ruleID = decision.ruleID
-    sessionID = decision.sessionID
-    agentID = decision.agentID
-    taskID = decision.taskID
-    contextJSON = decision.contextJSON
-    suggestedActionsJSON = decision.suggestedActionsJSON
-  }
-}
-
-private enum StoreDecisionActionError: LocalizedError {
-  case missingDecision(String)
-  case missingClient
-  case missingCodexRun(String)
-  case invalidCodexPayload
-  case missingTargetMetadata(String)
-  case daemonUnavailable
-  case daemonRejected(any Error)
-
-  var errorDescription: String? {
-    switch self {
-    case .missingDecision(let decisionID):
-      "Decision \(decisionID) is no longer available."
-    case .missingClient:
-      "Monitor is not connected to the daemon."
-    case .missingCodexRun(let approvalID):
-      "Could not locate the Codex run for approval \(approvalID)."
-    case .invalidCodexPayload:
-      "The Codex approval action payload is invalid."
-    case .missingTargetMetadata(let field):
-      "Cannot run action: missing target metadata (\(field))."
-    case .daemonUnavailable:
-      "Cannot run action: daemon unavailable."
-    case .daemonRejected(let error):
-      "Action rejected by daemon: \(error.localizedDescription)"
-    }
   }
 }

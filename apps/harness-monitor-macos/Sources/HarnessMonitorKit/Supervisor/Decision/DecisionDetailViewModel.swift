@@ -244,12 +244,14 @@ private struct AuditPayloadScope {
   let sessionID: String?
   let agentID: String?
   let taskID: String?
+  let decisionID: String?
 
   init(payloadJSON: String) {
     guard let data = payloadJSON.data(using: .utf8) else {
       sessionID = nil
       agentID = nil
       taskID = nil
+      decisionID = nil
       return
     }
     let object = try? JSONSerialization.jsonObject(with: data)
@@ -265,10 +267,15 @@ private struct AuditPayloadScope {
       forKeys: ["taskID", "taskId", "task_id"],
       in: object
     )
+    decisionID = Self.firstString(
+      forKeys: ["decisionID", "decisionId", "decision_id"],
+      in: object
+    )
   }
 
   func matches(decision: Decision) -> Bool {
-    matches(expected: decision.sessionID, actual: sessionID)
+    matches(expected: decision.id, actual: decisionID)
+      && matches(expected: decision.sessionID, actual: sessionID)
       && matches(expected: decision.agentID, actual: agentID)
       && matches(expected: decision.taskID, actual: taskID)
   }

@@ -220,39 +220,7 @@ extension HarnessMonitorStore {
     case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
       break
     case .sessionUpdated(let payload):
-      guard let sessionID = event.sessionId else {
-        return
-      }
-      let detail = sessionDetailPreservingSelectedExtensions(
-        sessionID: sessionID,
-        detail: payload.detail,
-        extensionsPending: payload.extensionsPending == true
-      )
-      if payload.extensionsPending != true {
-        isExtensionsLoading = false
-      }
-      let timeline = payload.timeline ?? self.timeline
-      applySelectedSessionSnapshot(
-        sessionID: sessionID,
-        detail: detail,
-        timeline: timeline,
-        timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
-          ?? timelineWindow,
-        clearBurstState: payload.timeline != nil,
-        showingCachedData: false,
-        cancelPendingTimelineRefresh: payload.timeline != nil
-      )
-      if let freshTimeline = payload.timeline {
-        scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            detail,
-            timeline: freshTimeline,
-            timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
-          )
-        }
-      } else if let client {
-        scheduleSessionPushFallback(using: client, sessionID: sessionID)
-      }
+      handleSelectedSessionPushUpdate(event: event, payload: payload)
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
@@ -262,8 +230,55 @@ extension HarnessMonitorStore {
     }
   }
 
+  private func handleSelectedSessionPushUpdate(
+    event: DaemonPushEvent,
+    payload: SessionUpdatedPayload
+  ) {
+    guard let sessionID = event.sessionId else {
+      return
+    }
+    let detail = sessionDetailPreservingSelectedExtensions(
+      sessionID: sessionID,
+      detail: payload.detail,
+      extensionsPending: payload.extensionsPending == true
+    )
+    if payload.extensionsPending != true {
+      isExtensionsLoading = false
+    }
+    let timeline = payload.timeline ?? self.timeline
+    applySelectedSessionSnapshot(
+      sessionID: sessionID,
+      detail: detail,
+      timeline: timeline,
+      timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
+        ?? timelineWindow,
+      clearBurstState: payload.timeline != nil,
+      showingCachedData: false,
+      cancelPendingTimelineRefresh: payload.timeline != nil
+    )
+    if let freshTimeline = payload.timeline {
+      scheduleCacheWrite { service in
+        await service.cacheSessionDetail(
+          detail,
+          timeline: freshTimeline,
+          timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+        )
+      }
+    } else if let client {
+      scheduleSessionPushFallback(using: client, sessionID: sessionID)
+    }
+  }
+
   @discardableResult
   private func applyManagedAgentPushEvent(_ event: DaemonPushEvent) -> Bool {
+    if applyCoreManagedAgentPushEvent(event) {
+      return true
+    }
+    return applyAcpManagedAgentPushEvent(event)
+  }
+
+  @discardableResult
+  private func applyCoreManagedAgentPushEvent(_ event: DaemonPushEvent) -> Bool {
     switch event.kind {
     case .codexRunUpdated(let run):
       applyCodexRun(run)
@@ -271,6 +286,15 @@ extension HarnessMonitorStore {
       applyCodexApprovalRequested(payload)
     case .agentTuiUpdated(let tui):
       applyAgentTui(tui)
+    default:
+      return false
+    }
+    return true
+  }
+
+  @discardableResult
+  private func applyAcpManagedAgentPushEvent(_ event: DaemonPushEvent) -> Bool {
+    switch event.kind {
     case .acpAgentUpdated(let snapshot):
       applyAcpAgent(snapshot)
     case .acpInspect(let response):

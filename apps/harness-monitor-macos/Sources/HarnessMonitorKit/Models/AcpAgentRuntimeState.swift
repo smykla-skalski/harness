@@ -79,8 +79,8 @@ public struct AcpInspectSample: Equatable, Sendable {
     return snapshotsByIdentity[identity]
   }
 
-  func filtered(keeping identities: Set<AcpRuntimeIdentity>) -> AcpInspectSample {
-    AcpInspectSample(
+  func filtered(keeping identities: Set<AcpRuntimeIdentity>) -> Self {
+    Self(
       sessionID: sessionID,
       sampledAt: sampledAt,
       agents: orderedIdentities.compactMap { identity in
@@ -92,8 +92,8 @@ public struct AcpInspectSample: Equatable, Sendable {
     )
   }
 
-  func filtered(removingMatching shouldRemove: (AcpRuntimeIdentity) -> Bool) -> AcpInspectSample {
-    AcpInspectSample(
+  func filtered(removingMatching shouldRemove: (AcpRuntimeIdentity) -> Bool) -> Self {
+    Self(
       sessionID: sessionID,
       sampledAt: sampledAt,
       agents: orderedIdentities.compactMap { identity in

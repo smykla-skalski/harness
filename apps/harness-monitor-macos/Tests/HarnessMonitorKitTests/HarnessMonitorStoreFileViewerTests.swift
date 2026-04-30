@@ -67,7 +67,8 @@ struct HarnessMonitorStoreFileViewerTests {
 
     #expect(result == .revealed)
     #expect(fileViewer.revealedBatches.count == 1)
-    #expect(fileViewer.revealedBatches[0] == [URL(fileURLWithPath: "/tmp/harness/permission-log.ndjson")])
+    #expect(
+      fileViewer.revealedBatches[0] == [URL(fileURLWithPath: "/tmp/harness/permission-log.ndjson")])
   }
 
   @Test("Reveal ACP permission log reports missing path")

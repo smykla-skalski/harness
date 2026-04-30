@@ -346,13 +346,12 @@ struct AgentDetailSection: View {
   private func openPendingDecisions() {
     let oldestOpenDecisionID = store.supervisorOpenDecisions
       .filter { $0.agentID == agent.agentId }
-      .sorted {
+      .min {
         if $0.createdAt != $1.createdAt {
           return $0.createdAt < $1.createdAt
         }
         return $0.id < $1.id
-      }
-      .first?.id
+      }?.id
 
     if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
       store.supervisorSelectedDecisionID = decisionID

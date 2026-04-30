@@ -1,6 +1,11 @@
 import XCTest
 
 extension HarnessMonitorUITestCase {
+  private struct LaunchSetup {
+    let app: XCUIApplication
+    let dataHomeRoot: URL
+  }
+
   func launch(mode: String, additionalEnvironment: [String: String] = [:]) -> XCUIApplication {
     let signature = HarnessMonitorUITestLaunchSignature(
       mode: mode,
@@ -18,20 +23,11 @@ extension HarnessMonitorUITestCase {
       return cached
     }
 
-    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    terminateIfRunning(app)
-    app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
-    app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
-    app.launchEnvironment[Self.launchModeKey] = mode
-    guard
-      let dataHomeRoot = configureIsolatedDataHome(
-        for: app,
-        purpose: mode,
-        registerPerTestCleanup: !Self.reuseLaunchedApp
-      )
-    else {
-      return app
+    guard let setup = prepareLaunchSetup(mode: mode) else {
+      return XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     }
+    let app = setup.app
+    let dataHomeRoot = setup.dataHomeRoot
     var shouldTerminateOnReturn = false
     var shouldCleanupDataHomeOnReturn = Self.reuseLaunchedApp
     defer {
@@ -102,6 +98,24 @@ extension HarnessMonitorUITestCase {
     return app
   }
 
+  private func prepareLaunchSetup(mode: String) -> LaunchSetup? {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    terminateIfRunning(app)
+    app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+    app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
+    app.launchEnvironment[Self.launchModeKey] = mode
+    guard
+      let dataHomeRoot = configureIsolatedDataHome(
+        for: app,
+        purpose: mode,
+        registerPerTestCleanup: !Self.reuseLaunchedApp
+      )
+    else {
+      return nil
+    }
+    return LaunchSetup(app: app, dataHomeRoot: dataHomeRoot)
+  }
+
   private func reusableCachedApp(
     matching signature: HarnessMonitorUITestLaunchSignature
   ) -> XCUIApplication? {
@@ -156,7 +170,7 @@ extension HarnessMonitorUITestCase {
 
   private func waitForLaunchForeground(_ app: XCUIApplication, mode: String) -> Bool {
     let foregroundReady = waitUntil(timeout: Self.uiTimeout) {
-      return app.state == .runningForeground || self.mainWindow(in: app).exists
+      app.state == .runningForeground || self.mainWindow(in: app).exists
     }
     if !foregroundReady {
       recordDiagnosticsTrace(

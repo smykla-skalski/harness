@@ -268,6 +268,35 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.presentingAcpPermissionBatch == nil)
   }
 
+  @Test("Preview store factory seeds ACP bridge outage state when preview bridge is down")
+  func previewStoreFactorySeedsAcpBridgeOutageState() {
+    let previousValue = Foundation.ProcessInfo.processInfo.environment[
+      "HARNESS_MONITOR_PREVIEW_ACP_PENDING"
+    ]
+    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", "1", 1)
+    defer {
+      if let previousValue {
+        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", previousValue, 1)
+      } else {
+        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING")
+      }
+    }
+
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(
+      for: .cockpitLoaded,
+      hostBridgeOverride: PreviewHostBridgeOverride(
+        bridgeStatus: BridgeStatusReport(running: false),
+        reconfigureBehavior: .unsupported
+      )
+    )
+
+    #expect(store.daemonStatus?.manifest?.sandboxed == true)
+    #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
+    #expect(store.codexUnavailable == true)
+    #expect(store.acpBridgeHTTPIncident != nil)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
+  }
+
   @Test("Preview store factory seeds empty state without stale selection")
   func previewStoreFactorySeedsEmptyState() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)

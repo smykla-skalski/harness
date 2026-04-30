@@ -1,5 +1,6 @@
 extension HarnessMonitorAccessibility {
-  public static let newSessionCapabilityPickerSection = "harness.new-session.capability-picker.section"
+  public static let newSessionCapabilityPickerSection =
+    "harness.new-session.capability-picker.section"
   public static let newSessionCapabilityPicker = "harness.new-session.capability-picker"
 
   public static func newSessionCapabilityRow(_ identifier: String) -> String {

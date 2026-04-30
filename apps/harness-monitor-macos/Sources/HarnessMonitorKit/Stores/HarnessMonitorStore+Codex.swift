@@ -365,7 +365,8 @@ extension HarnessMonitorStore {
     guard !trimmedPrompt.isEmpty else {
       return run.runId
     }
-    let firstLine = trimmedPrompt
+    let firstLine =
+      trimmedPrompt
       .components(separatedBy: .newlines)
       .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
       ?? trimmedPrompt

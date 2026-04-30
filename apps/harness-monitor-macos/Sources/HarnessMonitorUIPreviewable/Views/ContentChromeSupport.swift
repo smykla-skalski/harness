@@ -1,95 +1,30 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
-  public let store: HarnessMonitorStore
-  public let shellUI: HarnessMonitorStore.ContentShellSlice
-
-  public init(store: HarnessMonitorStore, shellUI: HarnessMonitorStore.ContentShellSlice) {
-    self.store = store
-    self.shellUI = shellUI
-  }
-
-  public func body(content: Content) -> some View {
-    content
-      .confirmationDialog(
-        title,
-        isPresented: Binding(
-          get: { shellUI.pendingConfirmation != nil },
-          set: { isPresented in
-            if !isPresented {
-              store.cancelConfirmation()
-            }
-          }
-        ),
-        titleVisibility: .visible
-      ) {
-        switch shellUI.pendingConfirmation {
-        case .endSession, .removeAgent, .interruptCodexRun:
-          Button(confirmButtonTitle, role: .destructive) {
-            Task { await store.confirmPendingAction() }
-          }
-        case nil:
-          EmptyView()
-        }
-        Button("Cancel", role: .cancel) {
-          store.cancelConfirmation()
-        }
-      } message: {
-        if !message.isEmpty {
-          Text(message)
-        }
-      }
-  }
-
-  private var title: String {
-    switch shellUI.pendingConfirmation {
-    case .endSession: "End Session?"
-    case .removeAgent: "Remove Agent?"
-    case .interruptCodexRun: "Interrupt Whole Run?"
-    case nil: ""
-    }
-  }
-
-  private var confirmButtonTitle: String {
-    switch shellUI.pendingConfirmation {
-    case .endSession:
-      "End Session Now"
-    case .removeAgent:
-      "Remove Agent Now"
-    case .interruptCodexRun:
-      "Interrupt Whole Run Now"
-    case nil:
-      ""
-    }
-  }
-
-  private var message: String {
-    switch shellUI.pendingConfirmation {
-    case .endSession(let sessionID, _):
-      "This ends \(store.confirmationSessionSubject(sessionID: sessionID)). Active task work must already be closed."
-    case .removeAgent(let sessionID, let agentID, _):
-      "This removes \(store.confirmationAgentSubject(sessionID: sessionID, agentID: agentID)) and returns any active work to the queue."
-    case .interruptCodexRun(_, _, let runTitle):
-      "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately."
-    case nil:
-      ""
-    }
-  }
-}
-
 struct ContentDetailChrome<Content: View>: View {
+  let store: HarnessMonitorStore
+  let contentChrome: HarnessMonitorStore.ContentChromeSlice
+  let keyWindowObserver: KeyWindowObserver?
+  let windowID: String
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
   let arbitrationTasks: [WorkItem]
   @ViewBuilder let content: Content
 
   init(
+    store: HarnessMonitorStore,
+    contentChrome: HarnessMonitorStore.ContentChromeSlice,
+    keyWindowObserver: KeyWindowObserver? = nil,
+    windowID: String = HarnessMonitorWindowID.main,
     persistenceError: String?,
     sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability,
     arbitrationTasks: [WorkItem] = [],
     @ViewBuilder content: () -> Content
   ) {
+    self.store = store
+    self.contentChrome = contentChrome
+    self.keyWindowObserver = keyWindowObserver
+    self.windowID = windowID
     self.persistenceError = persistenceError
     self.sessionDataAvailability = sessionDataAvailability
     self.arbitrationTasks = arbitrationTasks
@@ -107,6 +42,7 @@ struct ContentDetailChrome<Content: View>: View {
   private var showsTopChrome: Bool {
     persistenceError != nil
       || sessionDataAvailability != .live
+      || contentChrome.acpBridgeBanner != nil
       || !arbitrationTasks.isEmpty
   }
 
@@ -126,6 +62,15 @@ struct ContentDetailChrome<Content: View>: View {
         }
         if isStale {
           SessionDataAvailabilityBanner(availability: sessionDataAvailability)
+          chromeDivider(tint: HarnessMonitorTheme.caution)
+        }
+        if contentChrome.acpBridgeBanner != nil {
+          ContentAcpBridgeBannerBridge(
+            store: store,
+            contentChrome: contentChrome,
+            keyWindowObserver: keyWindowObserver,
+            windowID: windowID
+          )
           chromeDivider(tint: HarnessMonitorTheme.caution)
         }
         ForEach(arbitrationTasks) { task in
@@ -282,7 +227,7 @@ struct SessionStatusCornerOverlay: View {
   }
 }
 
-private struct ChromeBannerSurfaceModifier: ViewModifier {
+struct ChromeBannerSurfaceModifier: ViewModifier {
   let tint: Color
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast

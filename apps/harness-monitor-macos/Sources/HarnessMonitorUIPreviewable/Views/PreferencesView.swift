@@ -70,7 +70,10 @@ public struct PreferencesView: View {
           PreferencesDiagnosticsSection(
             snapshot: snapshot,
             revealPermissionLog: { runID, path in
-              store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
+              guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return .unavailable
+              }
+              return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
             }
           )
         }

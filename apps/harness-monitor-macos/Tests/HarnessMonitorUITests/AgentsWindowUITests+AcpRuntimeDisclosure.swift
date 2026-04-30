@@ -59,6 +59,28 @@ extension AgentsWindowUITests {
       disclosure.frame.minY,
       "The always-visible runtime strip should appear above the disclosure"
     )
+
+    let watchdogAccessibilityState = element(
+      in: app,
+      identifier: Accessibility.agentRuntimeWatchdogAccessibilityState
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.markerText(for: watchdogAccessibilityState).contains("live-region=polite")
+      },
+      "Runtime watchdog should publish a polite live-region marker while healthy"
+    )
+
+    let timelineAccessibilityState = element(
+      in: app,
+      identifier: Accessibility.toolCallTimelineAccessibilityState
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.markerText(for: timelineAccessibilityState).contains("live-region=polite")
+      },
+      "Tool-call timeline should publish the polite live-region marker"
+    )
   }
 
   func testNonAcpAgentDetailOmitsRuntimeStrip() throws {
@@ -79,5 +101,21 @@ extension AgentsWindowUITests {
       waitForElement(runtimeStrip, timeout: Self.fastPollInterval),
       "Non-ACP agent detail should not surface ACP runtime chrome"
     )
+  }
+
+  private func markerText(for element: XCUIElement) -> String {
+    if let value = element.value {
+      let rendered = String(describing: value)
+      if rendered != "nil", !rendered.isEmpty {
+        return rendered
+      }
+    }
+    if let value = element.value as? String, !value.isEmpty {
+      return value
+    }
+    if !element.label.isEmpty {
+      return element.label
+    }
+    return element.debugDescription
   }
 }

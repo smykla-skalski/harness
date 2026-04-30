@@ -25,7 +25,9 @@ public enum HarnessMonitorStartupRegistrationDefaults {
     #endif
     dict.merge(HarnessMonitorVoicePreferences.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorMCPPreferencesDefaults.registrationDefaults()) { _, new in new }
-    dict.merge(HarnessMonitorToolCallAnnouncementPreferences.registrationDefaults()) { _, new in new }
+    dict.merge(HarnessMonitorToolCallAnnouncementPreferences.registrationDefaults()) { _, new in
+      new
+    }
     return dict
   }
 

@@ -9,22 +9,30 @@ extension View {
 
 private struct AcpPermissionPresentationModifier: ViewModifier {
   let store: HarnessMonitorStore
+  @Environment(\.openWindow)
+  private var openWindow
 
   func body(content: Content) -> some View {
-    content.popover(
-      item: acpPermissionBatchBinding,
-      attachmentAnchor: .rect(.bounds),
-      arrowEdge: .top
-    ) { batch in
-      AcpPermissionModal(store: store, batch: batch)
-    }
+    content
+      .task(id: store.presentingAcpPermissionBatch?.batchId) {
+        routeToDecisionsIfNeeded()
+      }
+      .onChange(of: store.presentingAcpPermissionBatch?.batchId) { _, _ in
+        routeToDecisionsIfNeeded()
+      }
   }
 
-  private var acpPermissionBatchBinding: Binding<AcpPermissionBatch?> {
-    Binding {
-      store.presentingAcpPermissionBatch
-    } set: { batch in
-      store.presentingAcpPermissionBatch = batch
+  private func routeToDecisionsIfNeeded() {
+    guard let batch = store.presentingAcpPermissionBatch else {
+      return
     }
+    let payload = store.acpPermissionDecisionPayload(for: batch)
+    store.presentingAcpPermissionBatch = nil
+    guard payload.isRenderable else {
+      return
+    }
+    store.supervisorSelectedDecisionID = payload.decisionID
+    store.requestPrimaryDecisionActionFocus(decisionID: payload.decisionID)
+    openWindow(id: HarnessMonitorWindowID.decisions)
   }
 }

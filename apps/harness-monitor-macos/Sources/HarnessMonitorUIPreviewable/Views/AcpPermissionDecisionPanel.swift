@@ -102,7 +102,6 @@ private struct AcpPermissionDecisionErrorView: View {
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.regularMaterial)
-    .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD))
+    .harnessPanelGlass()
   }
 }

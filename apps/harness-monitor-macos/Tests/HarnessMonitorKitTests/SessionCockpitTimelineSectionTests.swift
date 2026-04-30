@@ -3,8 +3,8 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Session cockpit timeline section")
 @MainActor
+@Suite("Session cockpit timeline section")
 struct SessionCockpitTimelineSectionTests {
   @Test("Cockpit attribution headers group consecutive ACP agent rows")
   func cockpitAttributionHeadersGroupConsecutiveAcpAgentRows() {
