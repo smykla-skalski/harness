@@ -131,9 +131,6 @@ struct SessionCockpitTimelineSection: View {
           actionHandler: actionHandler
         )
       }
-      .background {
-        SessionTimelineScrollStickinessConfigurator(isEnabled: presentation.needsStickyScroll)
-      }
       .id(contentIdentity)
       .frame(maxWidth: .infinity, alignment: .leading)
     }

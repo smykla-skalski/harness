@@ -12,7 +12,6 @@ struct SessionTimelineSectionPresentation {
   let placeholderCount: Int
   let shouldAnimatePlaceholders: Bool
   let viewportHeight: CGFloat
-  let needsStickyScroll: Bool
   let scrollNodeIDs: [String]
 
   init(
@@ -52,8 +51,6 @@ struct SessionTimelineSectionPresentation {
         Self.minimumViewportHeight),
       Self.maximumViewportHeight
     )
-    needsStickyScroll =
-      loadedCount > Self.maximumVisibleRows || navigation.hasOlder || navigation.hasNewer
     scrollNodeIDs = nodes.map(\.id)
   }
 
