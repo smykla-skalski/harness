@@ -1,5 +1,11 @@
 import Foundation
 
+private enum AcpAgentSnapshotLookupResult {
+  case none
+  case unique(AcpAgentSnapshot)
+  case ambiguous
+}
+
 extension HarnessMonitorStore {
   /// Pending ACP queue for the selected session.
   ///
@@ -34,11 +40,48 @@ extension HarnessMonitorStore {
   }
 
   public func acpAgentSnapshot(for agentID: String) -> AcpAgentSnapshot? {
-    selectedAcpAgents.first { $0.agentId == agentID }
+    guard case .unique(let snapshot) = acpAgentSnapshotLookup(for: agentID) else {
+      return nil
+    }
+    return snapshot
+  }
+
+  private func acpAgentSnapshotLookup(for agentID: String) -> AcpAgentSnapshotLookupResult {
+    var match: AcpAgentSnapshot?
+    for snapshot in selectedAcpAgents where snapshot.agentId == agentID {
+      guard match == nil else {
+        return .ambiguous
+      }
+      match = snapshot
+    }
+    guard let match else {
+      return .none
+    }
+    return .unique(match)
   }
 
   public func acpInspectSnapshot(for agentID: String) -> AcpAgentInspectSnapshot? {
-    selectedAcpInspectAgents.first { $0.agentId == agentID }
+    selectedAcpInspectState?.uniqueSnapshot(forAgentID: agentID)
+  }
+
+  public func acpRuntimeState(for agentID: String) -> AcpAgentRuntimeState? {
+    let snapshot: AcpAgentSnapshot?
+    let inspect: AcpAgentInspectSnapshot?
+    switch acpAgentSnapshotLookup(for: agentID) {
+    case .ambiguous:
+      return nil
+    case .none:
+      snapshot = nil
+      inspect = selectedAcpInspectState?.uniqueSnapshot(forAgentID: agentID)
+    case .unique(let resolvedSnapshot):
+      snapshot = resolvedSnapshot
+      inspect = selectedAcpInspectState?.snapshot(for: AcpRuntimeIdentity(snapshot: resolvedSnapshot))
+    }
+    return AcpAgentRuntimeState(
+      snapshot: snapshot,
+      inspect: inspect,
+      inspectSampledAt: selectedAcpInspectState?.sampledAt
+    )
   }
 
   @discardableResult
@@ -275,6 +318,7 @@ extension HarnessMonitorStore {
       ),
       into: selectedAcpAgents
     )
+    dropAcpInspectSnapshot(acpID: snapshot.acpId, agentID: snapshot.agentId)
     reconcilePresentedAcpPermissionBatch()
     reconcileAcpPermissionDecisions()
   }
@@ -303,6 +347,10 @@ extension HarnessMonitorStore {
         }
       )
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
+    reconcileAcpInspectState(
+      sessionID: payload.sessionId,
+      activeAgents: selectedAcpAgents
+    )
     reconcilePresentedAcpPermissionBatch(
       allowAutoPresentation: allowAutoPresentation || hadPresentedBatch
     )
@@ -311,15 +359,19 @@ extension HarnessMonitorStore {
 
   func replaceAcpInspect(
     _ response: AcpAgentInspectResponse,
-    sessionID: String
+    sessionID: String,
+    sampledAt: Date
   ) {
     guard sessionID == selectedSessionID else {
       return
     }
-    selectedAcpInspectAgents = sortedAcpInspectSnapshots(
-      response.agents.filter { $0.sessionId == sessionID }
+    selectedAcpInspectState = AcpInspectSample(
+      sessionID: sessionID,
+      sampledAt: sampledAt,
+      agents: sortedAcpInspectSnapshots(
+        response.agents.filter { $0.sessionId == sessionID }
+      )
     )
-    selectedAcpInspectObservedAt = Date()
   }
 
   /// Apply an already-decoded ACP event push to the in-memory timeline.
@@ -338,37 +390,21 @@ extension HarnessMonitorStore {
     guard !entries.isEmpty else {
       return
     }
-
-    let mergedTimeline = mergedTimelineEntries(timeline, with: entries)
-    guard mergedTimeline != timeline else {
-      return
-    }
-    timeline = mergedTimeline
-    timelineWindow = normalizedTimelineWindow(timelineWindow, loadedTimeline: mergedTimeline)
-
-    guard let selectedSession else {
-      return
-    }
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        selectedSession,
-        timeline: mergedTimeline,
-        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: mergedTimeline)
-      )
-    }
+    applyAcpTimelineEntries(entries)
   }
 
   private func acpToolCallTimelineMetadata(
     for payload: AcpEventBatchPayload
   ) -> AcpToolCallTimelineMetadata {
     let snapshot = selectedAcpAgents.first { $0.acpId == payload.acpId }
-    let descriptorID = snapshot?.agentId ?? payload.acpId
+    let fallbackAgentID = payload.events.lazy.map(\.agent).first { !$0.isEmpty } ?? payload.acpId
+    let descriptorID = snapshot?.agentId ?? fallbackAgentID
     let descriptor = acpAgentDescriptorsByID[descriptorID]
     return AcpToolCallTimelineMetadata(
       acpAgentId: payload.acpId,
-      agentId: snapshot?.agentId ?? descriptor?.id ?? payload.acpId,
+      agentId: snapshot?.agentId ?? descriptor?.id ?? fallbackAgentID,
       displayName: snapshot?.displayName ?? descriptor?.displayName ?? snapshot?.agentId
-        ?? payload.acpId,
+        ?? fallbackAgentID,
       capabilityTags: descriptor?.capabilities ?? []
     )
   }
@@ -496,8 +532,7 @@ extension HarnessMonitorStore {
 
   func resetSelectedAcpAgents() {
     selectedAcpAgents = []
-    selectedAcpInspectAgents = []
-    selectedAcpInspectObservedAt = nil
+    selectedAcpInspectState = nil
     standaloneAcpPermissionBatches = []
     presentingAcpPermissionBatch = nil
     resolvingAcpPermissionBatchID = nil
@@ -550,7 +585,11 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else {
         return true
       }
-      replaceAcpInspect(measuredInspect.value, sessionID: sessionID)
+      replaceAcpInspect(
+        measuredInspect.value,
+        sessionID: sessionID,
+        sampledAt: Date()
+      )
       return true
     } catch {
       guard selectedSessionID == sessionID else {
@@ -662,6 +701,10 @@ extension HarnessMonitorStore {
     }
   }
 
+  static func acpInspectSampledAt(from recordedAt: String?) -> Date {
+    parsedAcpInspectRecordedAt(recordedAt) ?? Date()
+  }
+
   private func mergedPermissionBatches(
     primary: [AcpPermissionBatch],
     secondary: [AcpPermissionBatch],
@@ -723,14 +766,115 @@ extension HarnessMonitorStore {
     _ current: [TimelineEntry],
     with incoming: [TimelineEntry]
   ) -> [TimelineEntry] {
-    Dictionary(grouping: current + incoming, by: \.entryId)
-      .compactMap { _, entries in entries.last }
-      .sorted {
-        if $0.recordedAt != $1.recordedAt {
-          return $0.recordedAt > $1.recordedAt
-        }
-        return $0.entryId < $1.entryId
+    let currentByEntryID = Dictionary(uniqueKeysWithValues: current.map { ($0.entryId, $0) })
+    var phaseLocations: [AcpToolCallPhaseKey: AcpToolCallPhaseLocation] = [:]
+    var replacementsByCurrentEntryID: [String: TimelineEntry] = [:]
+    var normalizedIncoming: [TimelineEntry] = []
+
+    for entry in current {
+      guard let phaseKey = Self.acpToolCallPhaseKey(for: entry) else {
+        continue
       }
+      phaseLocations[phaseKey] = .current(entry.entryId)
+    }
+
+    for entry in incoming {
+      guard let phaseKey = Self.acpToolCallPhaseKey(for: entry) else {
+        normalizedIncoming.append(entry)
+        continue
+      }
+      guard let existingLocation = phaseLocations[phaseKey] else {
+        phaseLocations[phaseKey] = .incoming(normalizedIncoming.count)
+        normalizedIncoming.append(entry)
+        continue
+      }
+
+      HarnessMonitorLogger.store.warning(
+        """
+        Coalescing duplicate ACP tool call id \(phaseKey.toolCallID, privacy: .public) \
+        for \(phaseKey.status, privacy: .public) before timeline merge
+        """
+      )
+
+      switch existingLocation {
+      case .current(let currentEntryID):
+        let existingEntry = replacementsByCurrentEntryID[currentEntryID]
+          ?? currentByEntryID[currentEntryID]
+          ?? entry
+        replacementsByCurrentEntryID[currentEntryID] = Self.preferredTimelineEntry(
+          existingEntry,
+          over: entry
+        )
+      case .incoming(let index):
+        normalizedIncoming[index] = Self.preferredTimelineEntry(
+          normalizedIncoming[index],
+          over: entry
+        )
+      }
+    }
+
+    let normalizedCurrent = current.map { entry in
+      replacementsByCurrentEntryID[entry.entryId] ?? entry
+    }
+
+    return Dictionary(grouping: normalizedCurrent + normalizedIncoming, by: \.entryId)
+      .compactMap { _, entries in entries.last }
+      .sorted(by: Self.timelineEntrySortOrder)
+  }
+
+  private static func timelineEntrySortOrder(
+    lhs: TimelineEntry,
+    rhs: TimelineEntry
+  ) -> Bool {
+    if lhs.recordedAt != rhs.recordedAt {
+      return lhs.recordedAt > rhs.recordedAt
+    }
+    if let lhsSequence = timelineSequence(from: lhs),
+      let rhsSequence = timelineSequence(from: rhs),
+      lhsSequence != rhsSequence
+    {
+      return lhsSequence > rhsSequence
+    }
+    return lhs.entryId < rhs.entryId
+  }
+
+  private static func preferredTimelineEntry(
+    _ lhs: TimelineEntry,
+    over rhs: TimelineEntry
+  ) -> TimelineEntry {
+    timelineEntrySortOrder(lhs: lhs, rhs: rhs) ? lhs : rhs
+  }
+
+  private static func acpToolCallPhaseKey(for entry: TimelineEntry) -> AcpToolCallPhaseKey? {
+    guard let metadata = toolCallTimelineMetadataObject(from: entry),
+      let toolCallID = metadata.stringValue(for: "tool_call_id"),
+      let status = metadata.stringValue(for: "status"),
+      !toolCallID.isEmpty
+    else {
+      return nil
+    }
+    return AcpToolCallPhaseKey(toolCallID: toolCallID, status: status)
+  }
+
+  private static func timelineSequence(from entry: TimelineEntry) -> UInt64? {
+    guard let metadata = toolCallTimelineMetadataObject(from: entry),
+      case .number(let value)? = metadata["sequence"],
+      value >= 0
+    else {
+      return nil
+    }
+    return UInt64(value)
+  }
+
+  private static func toolCallTimelineMetadataObject(
+    from entry: TimelineEntry
+  ) -> [String: JSONValue]? {
+    guard case .object(let payload) = entry.payload,
+      case .object(let metadata)? = payload["tool_call_timeline"]
+    else {
+      return nil
+    }
+    return metadata
   }
 
   private func makeAcpPermissionDecisionPayload(
@@ -875,6 +1019,51 @@ extension HarnessMonitorStore {
     )
   }
 
+  private func dropAcpInspectSnapshot(acpID: String, agentID: String) {
+    guard let selectedAcpInspectState else {
+      return
+    }
+    self.selectedAcpInspectState = selectedAcpInspectState.filtered(removingMatching: {
+      identity in
+      identity.acpID == acpID || identity.agentID == agentID
+    })
+  }
+
+  private func reconcileAcpInspectState(
+    sessionID: String,
+    activeAgents: [AcpAgentSnapshot]
+  ) {
+    guard let selectedAcpInspectState, selectedAcpInspectState.sessionID == sessionID else {
+      return
+    }
+    let activeIdentities = Set(activeAgents.map(AcpRuntimeIdentity.init(snapshot:)))
+    self.selectedAcpInspectState = selectedAcpInspectState.filtered(
+      keeping: activeIdentities
+    )
+  }
+
+  private static func parsedAcpInspectRecordedAt(_ recordedAt: String?) -> Date? {
+    guard let recordedAt else {
+      return nil
+    }
+    return acpInspectRecordedAtFormatterWithFractionalSeconds.date(from: recordedAt)
+      ?? acpInspectRecordedAtFormatter.date(from: recordedAt)
+  }
+
+  nonisolated(unsafe) private static let acpInspectRecordedAtFormatterWithFractionalSeconds:
+    ISO8601DateFormatter =
+      {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+      }()
+
+  nonisolated(unsafe) private static let acpInspectRecordedAtFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
   private func applyAcpTimelineEntries(_ entries: [TimelineEntry]) {
     guard !entries.isEmpty else {
       return
@@ -895,6 +1084,25 @@ extension HarnessMonitorStore {
         timelineWindow: TimelineWindowResponse.fallbackMetadata(for: mergedTimeline)
       )
     }
+  }
+}
+
+private struct AcpToolCallPhaseKey: Hashable {
+  let toolCallID: String
+  let status: String
+}
+
+private enum AcpToolCallPhaseLocation {
+  case current(String)
+  case incoming(Int)
+}
+
+private extension [String: JSONValue] {
+  func stringValue(for key: String) -> String? {
+    guard case .string(let value)? = self[key] else {
+      return nil
+    }
+    return value
   }
 }
 

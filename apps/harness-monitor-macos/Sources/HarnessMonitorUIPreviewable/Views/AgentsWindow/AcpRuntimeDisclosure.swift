@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -11,17 +12,18 @@ struct AcpRuntimeDisclosure: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
 
-  let agentID: String
-  let inspect: AcpAgentInspectSnapshot?
+  let runtimeState: AcpAgentRuntimeState
 
   @SceneStorage private var isExpanded: Bool
 
-  init(agentID: String, inspect: AcpAgentInspectSnapshot?) {
-    self.agentID = agentID
-    self.inspect = inspect
+  init(runtimeState: AcpAgentRuntimeState) {
+    self.runtimeState = runtimeState
     _isExpanded = SceneStorage(
       wrappedValue: false,
-      Self.sceneStorageKey(agentID: agentID)
+      Self.sceneStorageKey(
+        sessionID: runtimeState.sessionId,
+        agentID: runtimeState.agentId
+      )
     )
   }
 
@@ -29,19 +31,25 @@ struct AcpRuntimeDisclosure: View {
     DisclosureGroup(isExpanded: $isExpanded) {
       detailContent
         .padding(.top, HarnessMonitorTheme.spacingXS)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimeDisclosureContent(agentID))
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.agentRuntimeDisclosureContent(runtimeState.agentId)
+        )
     } label: {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         Text("Runtime details")
           .scaledFont(.caption.weight(.semibold))
-        if inspect == nil {
+        if runtimeState.hasInspect == false {
           Text("Syncing…")
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
       }
       .accessibilityElement(children: .combine)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentRuntimeDisclosure(agentID))
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.agentRuntimeDisclosure(runtimeState.agentId)
+      )
+      .accessibilityLabel("ACP runtime details")
+      .accessibilityValue(accessibilityStatus)
     }
     .accessibilityElement(children: .contain)
     .animation(
@@ -50,18 +58,19 @@ struct AcpRuntimeDisclosure: View {
     )
   }
 
-  static func sceneStorageKey(agentID: String) -> String {
-    "harness.agents.runtime-disclosure.\(HarnessMonitorAccessibility.slug(agentID))"
+  static func sceneStorageKey(sessionID: String, agentID: String) -> String {
+    "harness.agents.runtime-disclosure.\(storageKeyComponent(sessionID)).\(storageKeyComponent(agentID))"
   }
 
   @ViewBuilder
   private var detailContent: some View {
-    if let inspect {
+    if let inspect = runtimeState.inspect {
       InspectorFactGrid(
         facts: [
           .init(title: "PID", value: inspect.pid.formatted()),
           .init(title: "PGID", value: inspect.pgid.formatted()),
           .init(title: "Uptime", value: formatRuntimeUptime(milliseconds: inspect.uptimeMs)),
+          .init(title: "Sampled", value: sampledAtLabel),
           .init(
             title: "Last Update",
             value: formatTimestamp(inspect.lastUpdateAt, configuration: dateTimeConfiguration)
@@ -78,6 +87,23 @@ struct AcpRuntimeDisclosure: View {
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
+  }
+
+  private static func storageKeyComponent(_ value: String) -> String {
+    Data(value.utf8).map { byte in
+      String(format: "%02x", byte)
+    }.joined()
+  }
+
+  private var accessibilityStatus: String {
+    runtimeState.hasInspect ? "Sampled \(sampledAtLabel)" : "Syncing"
+  }
+
+  private var sampledAtLabel: String {
+    guard let sampledAt = runtimeState.inspectSampledAt else {
+      return "n/a"
+    }
+    return formatTimestamp(sampledAt, configuration: dateTimeConfiguration)
   }
 }
 
