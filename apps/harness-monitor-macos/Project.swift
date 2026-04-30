@@ -5,7 +5,7 @@ private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
 private let xcodeVisibleAppEntitlementsPath: Path = "HarnessMonitorBase.entitlements"
 private let generatedAppEntitlements: SettingValue =
-    "$(DERIVED_FILE_DIR)/$(TARGET_NAME).codesign.entitlements"
+    "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements"
 
 private let monitorAppSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitor/**/*.swift", excluding: ["Sources/HarnessMonitor/Features/**"])
@@ -79,13 +79,8 @@ private let uiPreviewableTarget: Target = {
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
             ],
             configurations: [
-                .debug(name: "Debug"),
-                .debug(name: "Preview", settings: [
-                    "COMPILER_INDEX_STORE_ENABLE": "NO",
-                    "ONLY_ACTIVE_ARCH": "YES",
-                    "SWIFT_ENABLE_EAGER_LINKING": "NO",
-                    "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
-                ]),
+                .debug(name: "Debug", settings: BuildSettings.canvasPreviewCompilationOverrides),
+                .debug(name: "Preview", settings: BuildSettings.canvasPreviewCompilationOverrides),
                 .release(name: "Release")
             ]
         ),
@@ -172,7 +167,6 @@ private let monitorAppTarget: Target = .target(
     ],
     entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
     scripts: [
-        BuildPhases.prepareAppEntitlements(variant: .monitorApp),
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
     ],
@@ -214,7 +208,6 @@ private let uiTestHostTarget: Target = .target(
     ],
     entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
     scripts: [
-        BuildPhases.prepareAppEntitlements(variant: .uiTestHost),
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .uiTestHost)
     ],
@@ -250,7 +243,10 @@ private let appTestsTarget: Target = .target(
 private let appTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorAppTests",
     shared: true,
-    buildAction: .buildAction(targets: [.target("HarnessMonitorAppTests")]),
+    buildAction: .buildAction(
+        targets: [.target("HarnessMonitorAppTests")],
+        preActions: [BuildPhases.prepareAppEntitlementsPreAction()]
+    ),
     testAction: .targets(
         [.testableTarget(target: .target("HarnessMonitorAppTests"))],
         arguments: Arguments.arguments(environmentVariables: appTestsEnv),
@@ -355,7 +351,10 @@ private let monitorScheme: Scheme = .scheme(
             .target("HarnessMonitorKit"),
             .target("HarnessMonitorUIPreviewable")
         ],
-        preActions: [BuildPhases.daemonBuildPreAction()]
+        preActions: [
+            BuildPhases.prepareAppEntitlementsPreAction(),
+            BuildPhases.daemonBuildPreAction()
+        ]
     ),
     testAction: .targets(
         [
@@ -393,7 +392,7 @@ private let externalDaemonScheme: Scheme = .scheme(
         .target("HarnessMonitor"),
         .target("HarnessMonitorKit"),
         .target("HarnessMonitorUIPreviewable")
-    ]),
+    ], preActions: [BuildPhases.prepareAppEntitlementsPreAction()]),
     runAction: .runAction(
         configuration: "Debug",
         executable: .target("HarnessMonitor"),
@@ -410,7 +409,10 @@ private let agentsE2EScheme: Scheme = .scheme(
             .target("HarnessMonitorKit"),
             .target("HarnessMonitorUIPreviewable")
         ],
-        preActions: [BuildPhases.daemonBuildPreAction()]
+        preActions: [
+            BuildPhases.prepareAppEntitlementsPreAction(),
+            BuildPhases.daemonBuildPreAction()
+        ]
     ),
     testAction: .targets(
         [.testableTarget(target: .target("HarnessMonitorAgentsE2ETests"))],
