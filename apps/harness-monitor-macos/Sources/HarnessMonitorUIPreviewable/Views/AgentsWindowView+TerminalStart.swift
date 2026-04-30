@@ -6,6 +6,7 @@ extension AgentsWindowView {
       return
     }
 
+    let selectedRuntime = viewModel.selectedLaunchSelection.preferredRuntime
     let startSize =
       viewModel.lastMeasuredViewportSize
       ?? viewModel.lastDetailColumnSize.map {
@@ -19,21 +20,21 @@ extension AgentsWindowView {
     syncTerminalResizeControls(to: startSize)
     viewModel.expectedSize = startSize
     let catalog = viewModel.availableRuntimeModels.first {
-      $0.runtime == viewModel.runtime.rawValue
+      $0.runtime == selectedRuntime.rawValue
     }
     let pickerValue =
-      viewModel.selectedTerminalModelByRuntime[viewModel.runtime]
+      viewModel.selectedTerminalModelByRuntime[selectedRuntime]
       ?? catalog?.default
       ?? ""
-    let customValue = viewModel.customTerminalModelByRuntime[viewModel.runtime] ?? ""
+    let customValue = viewModel.customTerminalModelByRuntime[selectedRuntime] ?? ""
     let resolved = AgentsWindowView.effectiveModelId(
       pickerValue: pickerValue,
       customValue: customValue,
       catalogDefault: catalog?.default ?? ""
     )
-    let effort = viewModel.selectedTerminalEffortByRuntime[viewModel.runtime]
+    let effort = viewModel.selectedTerminalEffortByRuntime[selectedRuntime]
     let success = await store.startAgentTui(
-      runtime: viewModel.runtime,
+      runtime: selectedRuntime,
       role: viewModel.selectedRole,
       name: viewModel.name,
       prompt: viewModel.prompt,
