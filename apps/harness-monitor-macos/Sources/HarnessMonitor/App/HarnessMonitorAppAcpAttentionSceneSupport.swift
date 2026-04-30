@@ -67,14 +67,6 @@ final class AcpPermissionAttentionState {
       return
     }
 
-    if shouldSuppressForegroundAttention(for: nextAttention, store: store) {
-      handledBatchIDs.insert(nextAttention.batchID)
-      if activeToast?.batchID == nextAttention.batchID {
-        activeToast = nil
-      }
-      return
-    }
-
     if prefersUserNotificationDelivery {
       activeToast = nil
       deliveringBatchIDs.insert(nextAttention.batchID)
@@ -92,6 +84,9 @@ final class AcpPermissionAttentionState {
   }
 
   func dismissToast() {
+    if let activeToast {
+      handledBatchIDs.insert(activeToast.batchID)
+    }
     activeToast = nil
   }
 
@@ -180,18 +175,6 @@ final class AcpPermissionAttentionState {
     }
   }
 
-  private func shouldSuppressForegroundAttention(
-    for attention: AcpPermissionAttentionEvent,
-    store: HarnessMonitorStore
-  ) -> Bool {
-    guard keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.decisions),
-      let selectedDecisionID = store.supervisorSelectedDecisionID
-    else {
-      return false
-    }
-    return selectedDecisionID != attention.decisionID
-  }
-
   private func publishRouteEvent(source: String, decisionID: String, batchID: String?) {
     routeEventTick += 1
     lastRouteSource = source
@@ -233,13 +216,20 @@ final class AcpPermissionAttentionState {
   }
 
   private static func focusDecisionsWindow() async {
-    for _ in 0..<3 {
+    for _ in 0..<20 {
       await Task.yield()
       guard let window = decisionsWindow() else {
+        try? await Task.sleep(for: .milliseconds(25))
         continue
       }
       window.makeKeyAndOrderFront(nil)
-      return
+      if window.isKeyWindow {
+        return
+      }
+      try? await Task.sleep(for: .milliseconds(25))
+      if window.isKeyWindow {
+        return
+      }
     }
   }
 
