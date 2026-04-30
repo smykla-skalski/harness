@@ -281,7 +281,7 @@ private struct SessionTimelineBadge: View {
 
   var body: some View {
     Text(label)
-      .scaledFont(.caption.weight(.semibold))
+      .scaledFont(.caption2.weight(.semibold))
       .lineLimit(1)
       .fixedSize(horizontal: true, vertical: false)
       .padding(.horizontal, horizontalPadding)
@@ -301,27 +301,27 @@ private struct SessionTimelineBadge: View {
   private var horizontalPadding: CGFloat {
     switch style {
     case .quiet:
-      HarnessMonitorTheme.spacingSM
+      6
     case .prominent:
-      HarnessMonitorTheme.spacingMD
+      HarnessMonitorTheme.spacingSM
     }
   }
 
   private var verticalPadding: CGFloat {
     switch style {
     case .quiet:
-      4
+      2
     case .prominent:
-      5
+      3
     }
   }
 
   private var minimumHeight: CGFloat {
     switch style {
     case .quiet:
-      24
+      20
     case .prominent:
-      28
+      22
     }
   }
 
