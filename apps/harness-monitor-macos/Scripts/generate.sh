@@ -46,6 +46,27 @@ generation_outputs=(
   "$REPO_ROOT/buildServer.json"
 )
 
+remove_legacy_spotlight_link() {
+  local path="$1"
+  local link_target
+
+  link_target="$(readlink "$path" || true)"
+  if [[ "$link_target" == *".spotlight-build-artifacts.noindex"* ]]; then
+    /bin/rm -f "$path"
+  fi
+}
+
+remove_legacy_spotlight_link "$ROOT/HarnessMonitor.xcodeproj"
+remove_legacy_spotlight_link "$ROOT/HarnessMonitor.xcworkspace"
+remove_legacy_spotlight_link "$ROOT/.build"
+remove_legacy_spotlight_link "$ROOT/.sourcekit-lsp"
+remove_legacy_spotlight_link "$ROOT/Derived"
+remove_legacy_spotlight_link "$ROOT/DerivedData"
+remove_legacy_spotlight_link "$ROOT/build"
+remove_legacy_spotlight_link "$ROOT/tmp"
+remove_legacy_spotlight_link "$ROOT/xcode-derived"
+remove_legacy_spotlight_link "$ROOT/Tuist/.build"
+
 latest_mtime() {
   local latest=0 path mtime
   for path in "$@"; do

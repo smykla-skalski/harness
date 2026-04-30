@@ -24,7 +24,7 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
         source = BUILD_PHASES_SOURCE.read_text()
 
         self.assertIn("scriptPhaseBody(", source)
-        self.assertIn(".spotlight-build-artifacts.noindex/apps/harness-monitor-macos", source)
+        self.assertNotIn(".spotlight-build-artifacts.noindex", source)
         self.assertIn(
             'script: "build-daemon-agent.sh"',
             source,
