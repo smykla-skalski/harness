@@ -47,6 +47,13 @@ struct DecisionKindContextAdapter {
     return payload.isActionDisabled(actionID, resolutionState: resolutionState)
   }
 
+  func suggestedActions(from actions: [SuggestedAction]) -> [SuggestedAction] {
+    guard case .acpPermission(let payload) = kind else {
+      return actions
+    }
+    return payload.suggestedActions()
+  }
+
   private static func resolveKind(
     decision: Decision,
     store: HarnessMonitorStore?
@@ -54,10 +61,13 @@ struct DecisionKindContextAdapter {
     guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
       return .generic
     }
+    // ACP decisions stay on the ACP-specific detail path even when persisted context can only
+    // decode into a render-error fallback. That keeps the UI contract stable at the routing seam.
     guard
       let payload = store?.acpPermissionDecisionPayload(for: decision.id)
         ?? AcpPermissionDecisionPayload.decode(from: decision)
     else {
+      assertionFailure("ACP decisions must decode into a renderable or fallback payload")
       return .generic
     }
     return .acpPermission(payload)
