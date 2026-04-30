@@ -82,10 +82,12 @@ private struct SessionTimelineNodeRow: View {
   }
 
   private var wideContent: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-          kindBadge
+          if node.kind != .event {
+            kindBadge
+          }
           Text(node.title)
             .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             .foregroundStyle(HarnessMonitorTheme.ink)
@@ -110,8 +112,10 @@ private struct SessionTimelineNodeRow: View {
 
   private var compactContent: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        kindBadge
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+        if node.kind != .event {
+          kindBadge
+        }
         Text(node.sourceLabel)
           .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -140,7 +144,7 @@ private struct SessionTimelineNodeRow: View {
   }
 
   private var rightBadges: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       ForEach(statusBadges) { badge in
         SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
       }
@@ -237,18 +241,18 @@ private struct SessionTimelineDot: View {
   let tint: Color
 
   var body: some View {
-    Circle()
-      .fill(tint)
-      .frame(width: 11, height: 11)
-      .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
-      .padding(.top, 6)
-      .shadow(color: tint.opacity(0.4), radius: 8)
-      .background {
-        Circle()
-          .fill(.background)
-          .frame(width: 19, height: 19)
-      }
-      .accessibilityHidden(true)
+    ZStack {
+      Circle()
+        .fill(.background)
+        .frame(width: 19, height: 19)
+      Circle()
+        .fill(tint)
+        .frame(width: 11, height: 11)
+    }
+    .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
+    .padding(.top, 6)
+    .shadow(color: tint.opacity(0.4), radius: 8)
+    .accessibilityHidden(true)
   }
 }
 
@@ -277,23 +281,56 @@ private struct SessionTimelineBadge: View {
 
   var body: some View {
     Text(label)
-      .scaledFont(.caption2.weight(.semibold))
+      .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
-      .padding(.horizontal, HarnessMonitorTheme.spacingXS)
-      .padding(.vertical, 3)
+      .fixedSize(horizontal: true, vertical: false)
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
+      .frame(minHeight: minimumHeight)
       .background {
         Capsule(style: .continuous)
           .fill(backgroundTint)
       }
+      .overlay {
+        Capsule(style: .continuous)
+          .stroke(tint.opacity(0.26), lineWidth: 1)
+      }
       .foregroundStyle(tint)
+  }
+
+  private var horizontalPadding: CGFloat {
+    switch style {
+    case .quiet:
+      HarnessMonitorTheme.spacingSM
+    case .prominent:
+      HarnessMonitorTheme.spacingMD
+    }
+  }
+
+  private var verticalPadding: CGFloat {
+    switch style {
+    case .quiet:
+      4
+    case .prominent:
+      5
+    }
+  }
+
+  private var minimumHeight: CGFloat {
+    switch style {
+    case .quiet:
+      24
+    case .prominent:
+      28
+    }
   }
 
   private var backgroundTint: Color {
     switch style {
     case .quiet:
-      tint.opacity(0.11)
+      tint.opacity(0.12)
     case .prominent:
-      tint.opacity(0.20)
+      tint.opacity(0.22)
     }
   }
 }
