@@ -17,6 +17,10 @@ public struct AcpPermissionAttentionToastView: View {
     return "\(attention.requestCount) permission requests are waiting."
   }
 
+  private var announcementMessage: String {
+    "\(attention.toastMessage). \(requestSummary)"
+  }
+
   private var stateMarkerText: String {
     [
       "batch=\(attention.batchID)",
@@ -125,10 +129,10 @@ public struct AcpPermissionAttentionToastView: View {
       }
     }
     .onAppear {
-      AccessibilityNotification.Announcement(attention.toastMessage).post()
+      AccessibilityNotification.Announcement(announcementMessage).post()
     }
     .onChange(of: attention.batchID) { _, _ in
-      AccessibilityNotification.Announcement(attention.toastMessage).post()
+      AccessibilityNotification.Announcement(announcementMessage).post()
     }
   }
 }

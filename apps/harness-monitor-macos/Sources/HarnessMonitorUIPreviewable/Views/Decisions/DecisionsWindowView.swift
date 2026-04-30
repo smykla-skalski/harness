@@ -157,9 +157,6 @@ public struct DecisionsWindowView: View {
       store?.supervisorSelectedDecisionID = newValue
     }
     .onChange(of: store?.supervisorObserverFocusTick ?? 0) { _, _ in
-      guard store?.supervisorSelectedDecisionID == nil else {
-        return
-      }
       selection = nil
       store?.supervisorSelectedDecisionID = nil
     }
