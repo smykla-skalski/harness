@@ -1,253 +1,76 @@
-import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("SessionTimelinePagination page adjustment")
-struct SessionTimelinePaginationTests {
-  @Test("Adjusted page returns nil when the clamped page is unchanged")
-  func adjustedPageReturnsNilWhenUnchanged() {
+@Suite("SessionTimeline cursor navigation")
+struct SessionTimelineNavigationTests {
+  @Test("Navigation exposes cursor-backed requests and status text")
+  func navigationExposesCursorBackedRequestsAndStatusText() throws {
+    let entries = makeTimelineEntries(count: 6, startingAt: 6)
+    let oldestCursor = TimelineCursor(
+      recordedAt: entries.last!.recordedAt,
+      entryId: entries.last!.entryId
+    )
+    let newestCursor = TimelineCursor(
+      recordedAt: entries.first!.recordedAt,
+      entryId: entries.first!.entryId
+    )
+    let window = TimelineWindowResponse(
+      revision: 4,
+      totalCount: 32,
+      windowStart: 6,
+      windowEnd: 12,
+      hasOlder: true,
+      hasNewer: true,
+      oldestCursor: oldestCursor,
+      newestCursor: newestCursor,
+      entries: nil,
+      unchanged: false
+    )
+
+    let navigation = SessionTimelineWindowNavigation(
+      timeline: entries,
+      timelineWindow: window,
+      isLoading: false
+    )
+
+    #expect(navigation.statusText == "Showing 7-12 of 32")
     #expect(
-      SessionTimelinePagination.adjustedPage(
-        currentPage: 0,
-        itemCount: 24,
-        pageSize: SessionTimelinePageSize.defaultSize.rawValue
-      ) == nil
+      navigation.request(for: .older)
+        == TimelineWindowRequest(scope: .summary, limit: 6, before: oldestCursor)
     )
-  }
-
-  @Test("Adjusted page returns corrected value when the current page becomes out of range")
-  func adjustedPageReturnsCorrectedValueWhenOutOfRange() {
+    #expect(navigation.request(for: .latest) == .latest(limit: 6))
     #expect(
-      SessionTimelinePagination.adjustedPage(
-        currentPage: 3,
-        itemCount: 18,
-        pageSize: SessionTimelinePageSize.defaultSize.rawValue
-      ) == 1
+      navigation.request(for: .newer)
+        == TimelineWindowRequest(scope: .summary, limit: 6, after: newestCursor)
     )
   }
 
-  @Test("Timeline growth does not request page reconciliation")
-  func timelineGrowthDoesNotRequestPageReconciliation() {
-    #expect(
-      SessionTimelinePagination.adjustedPageAfterTimelineCountChange(
-        currentPage: 3,
-        oldItemCount: 20,
-        newItemCount: 45,
-        pageSize: SessionTimelinePageSize.defaultSize.rawValue
-      ) == nil
-    )
-  }
-
-  @Test("Presentation uses authoritative total count for range and page count")
-  func presentationUsesAuthoritativeTotalCount() {
-    let timeline = makeTimelineEntries(count: 10)
-    let presentation = SessionTimelinePresentation(
-      timeline: timeline,
-      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
-      currentPage: 1,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: true
-    )
-
-    #expect(presentation.pageCount == 5)
-    #expect(presentation.rangeText == "Showing 11-20 of 42")
-    #expect(presentation.entries.isEmpty)
-    #expect(presentation.placeholderCount == 10)
-  }
-
-  @Test("Presentation keeps requested page changes when only the first window is loaded")
-  func presentationKeepsRequestedPageChangesWhenOnlyFirstWindowIsLoaded() {
-    let presentation = SessionTimelinePresentation(
-      timeline: makeTimelineEntries(count: 10),
-      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
+  @Test("Navigation disables unavailable older and newer directions")
+  func navigationDisablesUnavailableOlderAndNewerDirections() {
+    let entries = makeTimelineEntries(count: 4)
+    let window = TimelineWindowResponse.fallbackMetadata(for: entries)
+    let navigation = SessionTimelineWindowNavigation(
+      timeline: entries,
+      timelineWindow: window,
       isLoading: false
     )
 
-    #expect(presentation.interactivePage(forRequestedPage: 1) == 1)
-    #expect(presentation.interactivePage(forRequestedPage: 9) == 4)
+    #expect(navigation.statusText == "Latest 4 of 4")
+    #expect(navigation.request(for: .older) == nil)
+    #expect(navigation.request(for: .newer) == nil)
+    #expect(navigation.request(for: .latest) == .latest(limit: 6))
   }
 
-  @Test("Presentation fills only the unresolved slots with placeholders")
-  func presentationFillsOnlyUnresolvedSlotsWithPlaceholders() {
-    let timeline = makeTimelineEntries(count: 10)
-    let presentation = SessionTimelinePresentation(
-      timeline: timeline,
-      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.fifteen.rawValue,
-      isLoading: true
-    )
-
-    #expect(presentation.rangeText == "Showing 1-15 of 42")
-    #expect(presentation.entries.count == 10)
-    #expect(presentation.placeholderCount == 5)
-  }
-
-  @Test("Presentation renders every loaded entry when metadata matches loaded count")
-  func presentationRendersEveryLoadedEntryWhenMetadataMatchesLoadedCount() {
-    let timeline = makeTimelineEntries(count: 3)
-    let presentation = SessionTimelinePresentation(
-      timeline: timeline,
-      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 3),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    #expect(presentation.entries.count == 3)
-    #expect(presentation.entries.map(\.entryId) == timeline.map(\.entryId))
-    #expect(presentation.rangeText == "Showing 1-3 of 3")
-    #expect(presentation.placeholderCount == 0)
-  }
-
-  @Test("Presentation keeps header and rendered rows in lockstep when not loading")
-  func presentationKeepsHeaderAndRenderedRowsInLockstepWhenNotLoading() {
-    let presentation = SessionTimelinePresentation(
-      timeline: [],
-      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 0),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    #expect(presentation.entries.isEmpty)
-    #expect(presentation.placeholderCount == 0)
-    #expect(presentation.rangeText == "Showing 0-0 of 3")
-    #expect(
-      presentation.needsRefresh,
-      "stale window with zero loaded entries must ask the view to reload"
-    )
-  }
-
-  @Test("Presentation does not request a refresh while the fetch is in flight")
-  func presentationDoesNotRequestRefreshWhileLoading() {
-    let presentation = SessionTimelinePresentation(
-      timeline: [],
-      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 0),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: true
-    )
-
-    #expect(!presentation.needsRefresh)
-  }
-
-  @Test("Presentation does not request a refresh when entries are visible")
-  func presentationDoesNotRequestRefreshWhenEntriesAreVisible() {
-    let timeline = makeTimelineEntries(count: 3)
-    let presentation = SessionTimelinePresentation(
-      timeline: timeline,
-      timelineWindow: makeTimelineWindow(totalCount: 3, loadedCount: 3),
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    #expect(!presentation.needsRefresh)
-  }
-
-  @Test("Presentation does not request a refresh when no entries are expected")
-  func presentationDoesNotRequestRefreshWhenNoEntriesAreExpected() {
-    let presentation = SessionTimelinePresentation(
-      timeline: [],
-      timelineWindow: nil,
-      currentPage: 0,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    #expect(!presentation.needsRefresh)
-  }
-
-  @Test("Presentation keeps the last visible page while hydration reloads only the latest prefix")
-  func presentationKeepsTheLastVisiblePageWhileHydrationReloadsOnlyTheLatestPrefix() {
-    let retainedPage = SessionTimelineRetainedPage(
-      sessionID: "sess-pagination",
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      display: SessionTimelinePageDisplay(
-        page: 2,
-        entries: makeTimelineEntries(count: 10, startingAt: 20),
-        placeholderCount: 0,
-        rangeText: "Showing 21-30 of 42",
-        pageStatusText: "Page 3 of 5",
-        isWaitingForRequestedPage: false
-      )
-    )
-    let presentation = SessionTimelinePresentation(
-      timeline: makeTimelineEntries(count: 10),
-      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
-      currentPage: 2,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    let display = presentation.visibleDisplay(
-      forRequestedPage: 2,
-      sessionID: "sess-pagination",
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      retainedPage: retainedPage
-    )
-
-    #expect(display.page == 2)
-    #expect(display.entries.map(\.entryId) == retainedPage.display.entries.map(\.entryId))
-    #expect(display.rangeText == retainedPage.display.rangeText)
-    #expect(display.pageStatusText == retainedPage.display.pageStatusText)
-    #expect(display.placeholderCount == 0)
-  }
-
-  @Test("Presentation clears retained pages when the session changes")
-  func presentationClearsRetainedPagesWhenTheSessionChanges() {
-    let retainedPage = SessionTimelineRetainedPage(
-      sessionID: "sess-previous",
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      display: SessionTimelinePageDisplay(
-        page: 1,
-        entries: makeTimelineEntries(count: 10, startingAt: 10),
-        placeholderCount: 0,
-        rangeText: "Showing 11-20 of 42",
-        pageStatusText: "Page 2 of 5",
-        isWaitingForRequestedPage: false
-      )
-    )
-    let presentation = SessionTimelinePresentation(
-      timeline: makeTimelineEntries(count: 10),
-      timelineWindow: makeTimelineWindow(totalCount: 42, loadedCount: 10),
-      currentPage: 1,
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      isLoading: false
-    )
-
-    let display = presentation.visibleDisplay(
-      forRequestedPage: 1,
-      sessionID: "sess-current",
-      pageSize: SessionTimelinePageSize.ten.rawValue,
-      retainedPage: retainedPage
-    )
-
-    #expect(display.page == 1)
-    #expect(display.entries.isEmpty)
-    #expect(display.rangeText == "Showing 0-0 of 42")
-    #expect(display.pageStatusText == "Page 2 of 5")
-  }
-
-  @Test("Timeline content identity changes when the selected session changes")
-  func timelineContentIdentityChangesWhenSessionChanges() {
+  @Test("Timeline content identity changes only across sessions")
+  func timelineContentIdentityChangesOnlyAcrossSessions() {
     let primary = SessionTimelineContentIdentity(sessionID: "sess-primary")
+    let sameSession = SessionTimelineContentIdentity(sessionID: "sess-primary")
     let secondary = SessionTimelineContentIdentity(sessionID: "sess-secondary")
 
+    #expect(primary == sameSession)
     #expect(primary != secondary)
-  }
-
-  @Test("Timeline content identity stays stable across pagination changes")
-  func timelineContentIdentityStaysStableAcrossPaginationChanges() {
-    let firstPage = SessionTimelineContentIdentity(sessionID: "sess-primary")
-    let laterPage = SessionTimelineContentIdentity(sessionID: "sess-primary")
-
-    #expect(firstPage == laterPage)
   }
 
   private func makeTimelineEntries(count: Int, startingAt startIndex: Int = 0) -> [TimelineEntry] {
@@ -264,63 +87,5 @@ struct SessionTimelinePaginationTests {
         payload: .object([:])
       )
     }
-  }
-
-  private func makeTimelineWindow(totalCount: Int, loadedCount: Int) -> TimelineWindowResponse {
-    TimelineWindowResponse(
-      revision: 7,
-      totalCount: totalCount,
-      windowStart: 0,
-      windowEnd: loadedCount,
-      hasOlder: loadedCount < totalCount,
-      hasNewer: false,
-      oldestCursor: nil,
-      newestCursor: nil,
-      entries: nil,
-      unchanged: false
-    )
-  }
-}
-
-@Suite("SessionTimeline placeholder shimmer")
-struct SessionTimelinePlaceholderShimmerTests {
-  @Test("Shared shimmer animates only when unresolved placeholders are visible")
-  func sharedShimmerAnimatesOnlyWhenNeeded() {
-    #expect(
-      SessionTimelinePlaceholderShimmer.shouldAnimate(
-        reduceMotion: false,
-        placeholderCount: 4
-      )
-    )
-    #expect(
-      SessionTimelinePlaceholderShimmer.shouldAnimate(
-        reduceMotion: true,
-        placeholderCount: 4
-      ) == false
-    )
-    #expect(
-      SessionTimelinePlaceholderShimmer.shouldAnimate(
-        reduceMotion: false,
-        placeholderCount: 0
-      ) == false
-    )
-  }
-
-  @Test("Shared shimmer phase stays in the expected horizontal travel range")
-  func sharedShimmerPhaseStaysInExpectedRange() {
-    let cycleDuration = SessionTimelinePlaceholderShimmer.cycleDuration
-    let phaseAtStart = SessionTimelinePlaceholderShimmer.phase(
-      at: Date(timeIntervalSinceReferenceDate: 0)
-    )
-    let phaseMidCycle = SessionTimelinePlaceholderShimmer.phase(
-      at: Date(timeIntervalSinceReferenceDate: cycleDuration / 2)
-    )
-    let phaseAtWrap = SessionTimelinePlaceholderShimmer.phase(
-      at: Date(timeIntervalSinceReferenceDate: cycleDuration)
-    )
-
-    #expect(phaseAtStart == -0.6)
-    #expect(phaseMidCycle == 0.6)
-    #expect(phaseAtWrap == -0.6)
   }
 }

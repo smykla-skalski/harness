@@ -1,119 +1,4 @@
-import HarnessMonitorKit
 import SwiftUI
-
-struct SessionTimelineEntryMarker: View {
-  @ScaledMetric(relativeTo: .body)
-  private var markerHeight = 18.0
-  @ScaledMetric(relativeTo: .body)
-  private var markerWidth = 6.0
-
-  var body: some View {
-    RoundedRectangle(cornerRadius: markerWidth / 2, style: .continuous)
-      .fill(HarnessMonitorTheme.accent.opacity(0.45))
-      .frame(width: markerWidth, height: markerHeight)
-      .accessibilityHidden(true)
-  }
-}
-
-struct SessionCockpitTimelineEntryRow: View {
-  let entry: TimelineEntry
-  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
-
-  var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-      SessionTimelineEntryMarker()
-      Text(formatTimelineTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
-      Text(entry.summary)
-        .scaledFont(.system(.body, design: .rounded, weight: .semibold))
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .layoutPriority(1)
-      Text(entry.kind)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(HarnessMonitorTheme.cardPadding)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(.primary.opacity(0.04))
-    }
-    .contextMenu {
-      Button {
-        HarnessMonitorClipboard.copy(entry.summary)
-      } label: {
-        Label("Copy Summary", systemImage: "doc.on.doc")
-      }
-      if let taskID = entry.taskId {
-        Button {
-          HarnessMonitorClipboard.copy(taskID)
-        } label: {
-          Label("Copy Task ID", systemImage: "doc.on.doc")
-        }
-      }
-    }
-  }
-}
-
-struct SessionCockpitTimelineSectionGroupRow: View {
-  let section: SessionCockpitTimelineGroupSection
-  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      if section.showsHeader,
-        let title = section.agentDisplayName
-      {
-        SessionCockpitTimelineAttributionHeader(
-          title: title,
-          capabilityTags: section.capabilityTags
-        )
-      }
-      ForEach(section.entries) { entry in
-        SessionCockpitTimelineEntryRow(
-          entry: entry,
-          dateTimeConfiguration: dateTimeConfiguration
-        )
-      }
-    }
-  }
-}
-
-struct SessionCockpitTimelineAttributionHeader: View {
-  let title: String
-  let capabilityTags: [String]
-
-  var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(title)
-        .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-      if !capabilityTags.isEmpty {
-        ForEach(capabilityTags.prefix(3), id: \.self) { tag in
-          Text(tag)
-            .scaledFont(.caption2)
-            .padding(.horizontal, HarnessMonitorTheme.spacingXS)
-            .padding(.vertical, 2)
-            .background(
-              Capsule(style: .continuous)
-                .fill(HarnessMonitorTheme.secondaryInk.opacity(0.12))
-            )
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-      }
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityAddTraits(.isHeader)
-  }
-}
 
 struct SessionCockpitTimelinePlaceholderRow: View {
   let seed: Int
@@ -127,34 +12,43 @@ struct SessionCockpitTimelinePlaceholderRow: View {
     return widths[seed % widths.count]
   }
 
-  private var kindWidth: CGFloat {
+  private var detailWidth: CGFloat {
     let widths: [CGFloat] = [54, 66, 58]
     return widths[seed % widths.count]
   }
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-      shimmerBar(width: 6, height: 18, opacity: 0.18)
-        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-      shimmerBar(width: 108)
-      shimmerBar(width: summaryWidth)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      shimmerBar(width: kindWidth)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(HarnessMonitorTheme.cardPadding)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(.primary.opacity(0.03))
-    }
-    .overlay {
-      if showsShimmer {
-        shimmerOverlay
-          .clipShape(
-            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          )
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+      shimmerBar(width: SessionTimelineLayout.timeColumnWidth, height: 14)
+      shimmerBar(width: 11, height: 11, opacity: 0.16)
+        .clipShape(Circle())
+        .frame(width: SessionTimelineLayout.railWidth)
+        .padding(.top, 6)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          shimmerBar(width: 72, height: 16, opacity: 0.10)
+          shimmerBar(width: 96, height: 16, opacity: 0.08)
+        }
+        shimmerBar(width: summaryWidth, height: 14, opacity: 0.10)
+        shimmerBar(width: detailWidth, height: 12, opacity: 0.08)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, HarnessMonitorTheme.cardPadding)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .background {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .fill(.primary.opacity(0.03))
+      }
+      .overlay {
+        if showsShimmer {
+          shimmerOverlay
+            .clipShape(
+              RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+            )
+        }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityHidden(true)
   }
 

@@ -27,65 +27,35 @@ struct SessionCockpitTimelineSection: View {
   let sessionID: String
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
+  let decisions: [Decision]
   let isTimelineLoading: Bool
-  let loadPage: @Sendable (_ page: Int, _ pageSize: Int) async -> Void
+  let actionHandler: any DecisionActionHandler
+  let loadWindow: @Sendable (TimelineWindowRequest) async -> Void
+
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var currentPage = 0
-  @State private var pageSize = SessionTimelinePageSize.defaultSize
-  @State private var retainedPage: SessionTimelineRetainedPage?
 
-  private var presentation: SessionTimelinePresentation {
-    SessionTimelinePresentation(
+  private var navigation: SessionTimelineWindowNavigation {
+    SessionTimelineWindowNavigation(
       timeline: timeline,
       timelineWindow: timelineWindow,
-      currentPage: currentPage,
-      pageSize: pageSize.rawValue,
       isLoading: isTimelineLoading
     )
   }
 
-  private var requestedDisplay: SessionTimelinePageDisplay {
-    presentation.display(forRequestedPage: currentPage)
-  }
-
-  private var visibleDisplay: SessionTimelinePageDisplay {
-    presentation.visibleDisplay(
-      forRequestedPage: currentPage,
+  private var nodes: [SessionTimelineNode] {
+    SessionTimelineNodeBuilder(
       sessionID: sessionID,
-      pageSize: pageSize.rawValue,
-      retainedPage: retainedPage
+      entries: timeline,
+      decisions: decisions
     )
+    .build()
   }
 
-  private var currentEntries: [TimelineEntry] { visibleDisplay.entries }
-
-  private var currentPresentation: SessionCockpitTimelinePresentation {
-    Self.materialisePresentation(from: currentEntries)
-  }
-
-  private var placeholderCount: Int { visibleDisplay.placeholderCount }
-
-  private var pageCount: Int { presentation.pageCount }
-
-  private var requestedPage: Int { requestedDisplay.page }
-
-  private var visiblePage: Int { visibleDisplay.page }
-
-  private var pageStatusText: String { visibleDisplay.pageStatusText }
-
-  private var pageRangeText: String { visibleDisplay.rangeText }
-
-  private var showsPagination: Bool { presentation.showsPagination }
-
-  private var contentIdentity: SessionTimelineContentIdentity {
-    SessionTimelineContentIdentity(sessionID: sessionID)
-  }
-
-  private var pageChangeAnimation: Animation? {
-    reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)
+  private var placeholderCount: Int {
+    isTimelineLoading && nodes.isEmpty ? navigation.limit : 0
   }
 
   private var shouldAnimatePlaceholders: Bool {
@@ -95,248 +65,138 @@ struct SessionCockpitTimelineSection: View {
     )
   }
 
+  private var showsEmptyState: Bool {
+    !isTimelineLoading && navigation.totalCount == 0 && nodes.isEmpty
+  }
+
+  private var contentIdentity: SessionTimelineContentIdentity {
+    SessionTimelineContentIdentity(sessionID: sessionID)
+  }
+
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         Text("Timeline")
           .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
           .accessibilityAddTraits(.isHeader)
-        if presentation.totalCount == 0 && isTimelineLoading == false {
+
+        if showsEmptyState {
           SessionCockpitEmptyStateRow(section: .timeline)
         } else {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-            SessionTimelinePageSummary(
-              rangeText: pageRangeText,
-              pageSize: $pageSize
-            )
-
-            placeholderAwareTimelineRows
-              .id(contentIdentity)
-
-            if showsPagination {
-              SessionTimelinePaginationFooter(
-                currentPage: visiblePage,
-                pageCount: pageCount,
-                pageStatusText: pageStatusText,
-                visiblePages: SessionTimelinePagination.visiblePages(
-                  currentPage: visiblePage,
-                  pageCount: pageCount
-                ),
-                goToPreviousPage: { changePage(to: visiblePage - 1) },
-                goToNextPage: { changePage(to: visiblePage + 1) },
-                goToPage: changePage(to:)
-              )
-              .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelinePagination)
-            }
-          }
-          .padding(HarnessMonitorTheme.spacingLG)
-          .background {
-            RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-              .fill(.primary.opacity(0.035))
-              .overlay {
-                RoundedRectangle(
-                  cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-                  style: .continuous
-                )
-                .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
-              }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .onChange(of: sessionID) { _, _ in
-            retainedPage = nil
-            updateCurrentPageIfNeeded(0, animated: false)
-            requestVisiblePageIfNeeded(page: 0)
-          }
-          .onChange(of: pageSize) { oldPageSize, newPageSize in
-            retainedPage = nil
-            let rebasedPage = SessionTimelinePagination.rebasedPage(
-              currentPage,
-              itemCount: presentation.totalCount,
-              oldPageSize: oldPageSize.rawValue,
-              newPageSize: newPageSize.rawValue
-            )
-            updateCurrentPageIfNeeded(rebasedPage, animated: true)
-            requestVisiblePageIfNeeded(page: rebasedPage)
-          }
-          .onChange(of: timeline.count) { _, _ in
-            rememberVisiblePageIfNeeded()
-            requestVisiblePageIfNeeded(page: requestedPage)
-          }
-          .onChange(of: presentation.needsRefresh, initial: true) { _, needsRefresh in
-            // Safety net: if metadata reports entries but the list arrived empty
-            // (stale cache/window survived an entry wipe, daemon responded with
-            // an unchanged revision while we had nothing loaded, etc.) reload
-            // the page so the user never sees a frozen "Showing 0-0 of N" card.
-            guard needsRefresh else { return }
-            requestVisiblePageIfNeeded(page: requestedPage)
-          }
-          .onAppear {
-            rememberVisiblePageIfNeeded()
-          }
-          .onChange(of: requestedDisplay) { _, _ in
-            rememberVisiblePageIfNeeded()
-          }
+          timelineSurface
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .onAppear {
+        requestLatestWindowIfNeeded()
+      }
+      .onChange(of: sessionID) { _, _ in
+        requestLatestWindow()
+      }
     }
   }
 
-  @ViewBuilder private var placeholderAwareTimelineRows: some View {
-    timelineRows(shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase)
-  }
-
-  private func timelineRows(shimmerPhase: CGFloat) -> some View {
-    LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      ForEach(currentPresentation.sections) { section in
-        SessionCockpitTimelineSectionGroupRow(
-          section: section,
-          dateTimeConfiguration: dateTimeConfiguration
+  private var timelineSurface: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+      if navigation.showsNavigation {
+        SessionTimelineNavigationControls(
+          navigation: navigation,
+          loadWindow: loadWindow
         )
       }
 
-      ForEach(Array(0..<placeholderCount), id: \.self) { index in
-        SessionCockpitTimelinePlaceholderRow(
-          seed: index,
-          shimmerPhase: shimmerPhase,
-          showsShimmer: shouldAnimatePlaceholders
-        )
-      }
+      SessionTimelineCards(
+        nodes: nodes,
+        placeholderCount: placeholderCount,
+        shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
+        showsShimmer: shouldAnimatePlaceholders,
+        dateTimeConfiguration: dateTimeConfiguration,
+        actionHandler: actionHandler
+      )
+      .id(contentIdentity)
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+        .fill(.primary.opacity(0.035))
+        .overlay {
+          RoundedRectangle(
+            cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+            style: .continuous
+          )
+          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+        }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func changePage(to page: Int) {
-    let clampedPage = presentation.interactivePage(forRequestedPage: page)
-    guard clampedPage != currentPage else {
+  private func requestLatestWindowIfNeeded() {
+    guard !hasLatestWindow else {
       return
     }
-
-    updateCurrentPageIfNeeded(clampedPage, animated: true)
-    requestVisiblePageIfNeeded(page: clampedPage)
+    requestLatestWindow()
   }
 
-  private func updateCurrentPageIfNeeded(_ page: Int, animated: Bool) {
-    guard page != currentPage else {
-      return
-    }
-
-    if animated, let pageChangeAnimation {
-      withAnimation(pageChangeAnimation) {
-        currentPage = page
-      }
-    } else {
-      currentPage = page
-    }
-  }
-
-  private func requestVisiblePageIfNeeded(page: Int) {
-    let targetPage = presentation.interactivePage(forRequestedPage: page)
-    guard targetPage >= 0 else {
-      return
-    }
-
+  private func requestLatestWindow() {
     Task {
-      await loadPage(targetPage, pageSize.rawValue)
+      await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
     }
   }
 
-  private func rememberVisiblePageIfNeeded() {
-    guard !requestedDisplay.entries.isEmpty else {
-      return
-    }
-
-    let snapshot = SessionTimelineRetainedPage(
-      sessionID: sessionID,
-      pageSize: pageSize.rawValue,
-      display: requestedDisplay
-    )
-    guard retainedPage != snapshot else {
-      return
-    }
-    retainedPage = snapshot
-  }
-
-  static func materialisePresentation(
-    from entries: [TimelineEntry]
-  ) -> SessionCockpitTimelinePresentation {
-    var sections: [SessionCockpitTimelineGroupSection] = []
-    for entry in entries {
-      if let lastSection = sections.last,
-        lastSection.canAppend(entry)
-      {
-        sections[sections.count - 1].entries.append(entry)
-      } else {
-        sections.append(SessionCockpitTimelineGroupSection(firstEntry: entry))
-      }
-    }
-    return SessionCockpitTimelinePresentation(sections: sections)
-  }
-}
-
-struct SessionCockpitTimelinePresentation: Equatable {
-  let sections: [SessionCockpitTimelineGroupSection]
-}
-
-struct SessionCockpitTimelineGroupSection: Identifiable, Equatable {
-  let id: String
-  let acpAgentID: String?
-  let agentDisplayName: String?
-  let capabilityTags: [String]
-  var entries: [TimelineEntry]
-
-  init(firstEntry: TimelineEntry) {
-    let metadata = firstEntry.toolCallTimelineEntryMetadata()
-    let firstAgentID = Self.normalizedAgentID(from: metadata)
-    id = "\(firstAgentID ?? "ungrouped")-\(firstEntry.entryId)"
-    acpAgentID = firstAgentID
-    agentDisplayName = metadata?.agentDisplayName
-    capabilityTags = metadata?.capabilityTags ?? []
-    entries = [firstEntry]
-  }
-
-  var showsHeader: Bool {
-    let title = agentDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines)
-    return acpAgentID != nil && !(title?.isEmpty ?? true)
-  }
-
-  func canAppend(_ entry: TimelineEntry) -> Bool {
-    guard let acpAgentID else {
+  private var hasLatestWindow: Bool {
+    guard let timelineWindow else {
       return false
     }
-    return Self.normalizedAgentID(from: entry.toolCallTimelineEntryMetadata()) == acpAgentID
-  }
-
-  private static func normalizedAgentID(
-    from metadata: ToolCallTimelineEntryMetadata?
-  ) -> String? {
-    guard let acpAgentID = metadata?.acpAgentID?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !acpAgentID.isEmpty
-    else {
-      return nil
-    }
-    return acpAgentID
+    return timelineWindow.windowStart == 0
+      && timelineWindow.hasNewer == false
+      && timelineWindow.pageSize == SessionTimelineWindowNavigation.defaultLimit
   }
 }
 
-#Preview("Timeline Pagination") {
+struct SessionTimelineContentIdentity: Hashable, Sendable {
+  let sessionID: String
+}
+
+#Preview("Timeline Cursor") {
   SessionCockpitTimelineSection(
     sessionID: PreviewFixtures.summary.sessionId,
-    timeline: PreviewFixtures.pagedTimeline,
-    timelineWindow: .fallbackMetadata(for: PreviewFixtures.pagedTimeline),
+    timeline: Array(PreviewFixtures.pagedTimeline.prefix(6)),
+    timelineWindow: TimelineWindowResponse(
+      revision: 1,
+      totalCount: PreviewFixtures.pagedTimeline.count,
+      windowStart: 0,
+      windowEnd: 6,
+      hasOlder: true,
+      hasNewer: false,
+      oldestCursor: TimelineCursor(
+        recordedAt: PreviewFixtures.pagedTimeline[5].recordedAt,
+        entryId: PreviewFixtures.pagedTimeline[5].entryId
+      ),
+      newestCursor: TimelineCursor(
+        recordedAt: PreviewFixtures.pagedTimeline[0].recordedAt,
+        entryId: PreviewFixtures.pagedTimeline[0].entryId
+      ),
+      entries: nil,
+      unchanged: false
+    ),
+    decisions: [],
     isTimelineLoading: false,
-    loadPage: { _, _ in }
+    actionHandler: NullDecisionActionHandler(),
+    loadWindow: { _ in }
   )
   .padding()
   .frame(width: 960)
 }
+
 #Preview("Timeline") {
   SessionCockpitTimelineSection(
     sessionID: PreviewFixtures.summary.sessionId,
     timeline: PreviewFixtures.timeline,
     timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+    decisions: [],
     isTimelineLoading: false,
-    loadPage: { _, _ in }
+    actionHandler: NullDecisionActionHandler(),
+    loadWindow: { _ in }
   )
   .padding()
   .frame(width: 960)

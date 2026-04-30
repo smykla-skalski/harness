@@ -132,6 +132,12 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
   public static let sessionTimelinePaginationStatus =
     "harness.session.timeline.pagination.status"
+  public static let sessionTimelineNavigation = "harness.session.timeline.navigation"
+  public static let sessionTimelineNavigationStatus =
+    "harness.session.timeline.navigation.status"
+  public static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
+  public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
+  public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
   public static let connectionCard = "harness.preferences.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
   public static let agentsActionButton = "harness.session.agents"
@@ -360,6 +366,14 @@ public enum HarnessMonitorAccessibility {
 
   public static func sessionTimelinePaginationPageButton(_ pageNumber: Int) -> String {
     "harness.session.timeline.pagination.page.\(pageNumber)"
+  }
+
+  public static func sessionTimelineNode(_ key: String) -> String {
+    "harness.session.timeline.node.\(slug(key))"
+  }
+
+  public static func sessionTimelineActionButton(decisionID: String, actionID: String) -> String {
+    "harness.session.timeline.action.\(slug(decisionID)).\(slug(actionID))"
   }
 
   public static func preferencesMetricCard(_ key: String) -> String {
