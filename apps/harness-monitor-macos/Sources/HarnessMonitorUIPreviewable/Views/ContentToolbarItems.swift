@@ -63,7 +63,35 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
+      AgentsToolbarButton()
+    }
+    ToolbarSpacer(.fixed, placement: .primaryAction)
+    ToolbarItem(placement: .primaryAction) {
       SupervisorToolbarItem(slice: store.supervisorToolbarSlice)
     }
+  }
+}
+
+private struct AgentsToolbarButton: View {
+  @Environment(\.openWindow)
+  private var openWindow
+
+  var body: some View {
+    Button {
+      openWindow(id: HarnessMonitorWindowID.agents)
+    } label: {
+      Label {
+        Text("Agents")
+      } icon: {
+        Image("ProviderSymbol-copilot")
+          .renderingMode(.template)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 14, height: 14)
+          .accessibilityHidden(true)
+      }
+    }
+    .help("Open Agents window")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsActionButton)
   }
 }

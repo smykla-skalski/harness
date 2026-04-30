@@ -51,6 +51,60 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCockpitUsesSingleAgentsToolbarAction() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let agentsButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.agentsButton
+    )
+
+    let hasSingleToolbarAction = waitUntil(timeout: Self.actionTimeout) {
+      self.distinctVisibleToolbarFrames(for: agentsButtons).count == 1
+    }
+
+    if !hasSingleToolbarAction {
+      attachWindowScreenshot(in: app, named: "cockpit-agents-toolbar")
+      attachAppHierarchy(in: app, named: "cockpit-agents-toolbar-hierarchy")
+    }
+
+    XCTAssertTrue(
+      hasSingleToolbarAction,
+      "Expected exactly one visible Agents toolbar control in cockpit"
+    )
+  }
+
+  func testCockpitPlacesAgentsToolbarActionBetweenRefreshAndDecisions() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
+    let agentsButton = toolbarButton(in: app, identifier: Accessibility.agentsButton)
+    let decisionsButton = toolbarButton(in: app, identifier: Accessibility.supervisorBadge)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        refreshButton.exists && !refreshButton.frame.isEmpty
+          && agentsButton.exists && !agentsButton.frame.isEmpty
+          && decisionsButton.exists && !decisionsButton.frame.isEmpty
+      },
+      "Expected refresh, agents, and decisions toolbar buttons to be visible"
+    )
+
+    XCTAssertLessThan(
+      refreshButton.frame.maxX,
+      agentsButton.frame.minX,
+      "Agents toolbar button should sit after the refresh group"
+    )
+    XCTAssertLessThan(
+      agentsButton.frame.maxX,
+      decisionsButton.frame.minX,
+      "Agents toolbar button should sit before the Decisions badge"
+    )
+  }
+
   func testToolbarUsesNativeConciseWindowTitle() throws {
     let app = launch(
       mode: "preview",
