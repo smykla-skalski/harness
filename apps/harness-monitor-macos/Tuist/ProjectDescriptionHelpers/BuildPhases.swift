@@ -8,14 +8,10 @@ public enum BuildPhases {
     ) -> String {
         """
         set -euo pipefail
-        project_dir="${\(projectVariable):-}"
-        if [ ! -f "$project_dir/Scripts/lib/xcode-build-phase-entry.sh" ]; then
-          case "$project_dir" in
-            */.spotlight-build-artifacts.noindex/apps/harness-monitor-macos)
-              checkout_root="${project_dir%%/.spotlight-build-artifacts.noindex/*}"
-              project_dir="$checkout_root/apps/harness-monitor-macos"
-              ;;
-          esac
+        project_dir="${\(projectVariable):-${PROJECT_DIR:-}}"
+        if [ -z "$project_dir" ]; then
+          echo "missing project_dir for build phase script \(script)" >&2
+          exit 65
         fi
         /bin/sh "$project_dir/Scripts/lib/xcode-build-phase-entry.sh" "$project_dir/Scripts/\(script)"\(arguments)
         """

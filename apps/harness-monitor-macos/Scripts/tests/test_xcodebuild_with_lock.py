@@ -566,6 +566,12 @@ shift
         self.assertIn('"$xcodebuild_bin" "$@"', rtk_shell)
         self.assertNotIn("\n  xcodebuild \"$@\"", rtk_shell)
 
+    def test_runner_marks_derived_data_root_non_indexable(self) -> None:
+        wrapper_source = SCRIPT_PATH.read_text()
+
+        self.assertIn('source "$SCRIPT_DIR/lib/non-indexable-roots.sh"', wrapper_source)
+        self.assertIn('ensure_non_indexable_directory "$derive_data_path"', wrapper_source)
+
     def test_can_disable_xcbeautify_for_unfiltered_test_output(self) -> None:
         completed, log = self.run_script(
             "-scheme",
