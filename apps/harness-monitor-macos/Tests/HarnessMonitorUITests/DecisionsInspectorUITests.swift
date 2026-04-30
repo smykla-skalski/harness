@@ -52,6 +52,11 @@ final class DecisionsInspectorUITests: HarnessMonitorUITestCase {
     let toggle = button(in: app, identifier: Accessibility.decisionInspectorToggle)
     XCTAssertTrue(waitForElement(toggle, timeout: Self.actionTimeout))
 
+    tapButton(in: app, identifier: Accessibility.decisionBulkActions)
+    XCTAssertTrue(waitForElement(app.menuItems["Dismiss selected"], timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(app.menuItems["Dismiss all visible"], timeout: Self.actionTimeout))
+    app.typeKey(.escape, modifierFlags: [])
+
     app.typeKey("i", modifierFlags: [.command, .option])
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { !inspector.exists },

@@ -182,6 +182,38 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     XCTAssertTrue(groups.isEmpty)
   }
 
+  func test_visibleSnapshotProvidesStableVisibleOrderingAndIDs() {
+    let decisions = [
+      makeDecision(id: "d1", severity: .warn, summary: "agent warning", sessionID: "s1"),
+      makeDecision(id: "d2", severity: .critical, summary: "critical", sessionID: "s1"),
+      makeDecision(id: "d3", severity: .info, summary: "quiet", sessionID: "s2"),
+    ]
+    let snapshot = DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: decisions,
+      filters: .init(query: "", severities: [], scope: .summary)
+    )
+
+    XCTAssertEqual(snapshot.decisionIDs, ["d2", "d1", "d3"])
+    XCTAssertTrue(snapshot.signature.contains("scope=summary"))
+  }
+
+  func test_visibleSnapshotScopeFilteringChangesVisibleSet() {
+    let decisions = [
+      makeDecision(id: "d1", severity: .warn, summary: "summary", sessionID: "s1"),
+      makeDecision(id: "d2", severity: .critical, summary: "summary", sessionID: "s1"),
+    ]
+    decisions[0].agentID = "agent-a"
+    decisions[1].agentID = "agent-b"
+
+    let snapshot = DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: decisions,
+      filters: .init(query: "agent-b", severities: [], scope: .agent)
+    )
+
+    XCTAssertEqual(snapshot.decisionIDs, ["d2"])
+    XCTAssertTrue(snapshot.signature.contains("scope=agent"))
+  }
+
   func test_grouped_stableSessionOrderingByEarliestCreatedAt() {
     // Two sessions — seed in reverse insertion order, still expect sorted by first createdAt.
     let later = makeDecision(id: "later", severity: .warn, summary: "x", sessionID: "s-late")
