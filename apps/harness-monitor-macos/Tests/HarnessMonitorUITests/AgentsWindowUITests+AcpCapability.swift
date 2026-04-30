@@ -35,9 +35,17 @@ extension AgentsWindowUITests {
     )
 
     let probe = element(in: app, identifier: Accessibility.agentCapabilityProbe("copilot"))
+    XCTAssertFalse(
+      probe.exists,
+      "Doctor probe should stay hidden until diagnostics disclosure is expanded"
+    )
+    tapElement(
+      in: app,
+      identifier: Accessibility.newSessionDiagnosticsToggle("copilot")
+    )
     XCTAssertTrue(
       waitForElement(probe, timeout: Self.actionTimeout),
-      "Doctor probe should be visible in the capability row at rest"
+      "Doctor probe should become visible after opening diagnostics disclosure"
     )
   }
 
@@ -66,21 +74,20 @@ extension AgentsWindowUITests {
       "Install CTA should remain visible before the user interacts with the row"
     )
 
-    let acpButton = button(
+    let acpChoice = element(
       in: app,
       identifier: Accessibility.agentCapabilityTransportButton(
         "copilot",
         transportID: "managed:copilot"
       )
     )
-    XCTAssertTrue(waitForElement(acpButton, timeout: Self.actionTimeout))
-    XCTAssertFalse(
-      acpButton.isEnabled,
-      "Missing ACP binary should disable the ACP transport choice"
+    XCTAssertTrue(
+      waitForElement(acpChoice, timeout: Self.actionTimeout),
+      "Missing ACP binary should keep ACP mode discoverable while install CTA is shown"
     )
   }
 
-  func testPermissionModalCoalesce() throws {
+  func testPermissionModalIsReaderOnlyAndRoutesToDecisions() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
     )
@@ -88,9 +95,6 @@ extension AgentsWindowUITests {
 
     let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
     XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
-    XCTAssertTrue(
-      waitForElement(button(in: app, title: "Approve Selected"), timeout: Self.actionTimeout)
-    )
     XCTAssertTrue(
       waitForElement(
         element(in: app, identifier: Accessibility.acpPermissionModalItem("preview-request-write")),
@@ -107,15 +111,30 @@ extension AgentsWindowUITests {
       )
     )
 
-    let approveSelected = button(in: app, title: "Approve Selected")
-    XCTAssertTrue(waitForElement(approveSelected, timeout: Self.actionTimeout))
-    approveSelected.tap()
+    XCTAssertFalse(
+      button(in: app, title: "Approve Selected").exists,
+      "Reader-only modal must not expose independent resolve actions"
+    )
+    XCTAssertFalse(
+      button(in: app, title: "Approve All").exists,
+      "Reader-only modal must not expose independent resolve actions"
+    )
+    XCTAssertFalse(
+      button(in: app, title: "Deny All").exists,
+      "Reader-only modal must not expose independent resolve actions"
+    )
+
+    tapButton(in: app, identifier: Accessibility.acpPermissionModalOpenDecisions)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        !modal.exists
+        self.element(in: app, identifier: Accessibility.decisionsWindow).exists
+          && self.element(
+            in: app,
+            identifier: Accessibility.decisionRow("acp-permission:preview-acp-permission-1")
+          ).exists
       },
-      "Approving the coalesced ACP batch should dismiss the compatibility modal"
+      "Reader-only modal should route to Decisions instead of resolving directly"
     )
   }
 
@@ -142,7 +161,10 @@ extension AgentsWindowUITests {
       identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
     )
     XCTAssertTrue(waitForElement(terminalToggle, timeout: Self.actionTimeout))
-    tapElement(in: app, identifier: Accessibility.decisionAcpRequest("preview-request-terminal"))
+    tapElement(
+      in: app,
+      identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
+    )
     let decisionSelectionSummary = element(
       in: app,
       identifier: Accessibility.decisionAcpSelectionSummary
@@ -154,7 +176,8 @@ extension AgentsWindowUITests {
       },
       """
       The Decisions panel should reflect the updated ACP selection \
-      (summaryLabel=\(decisionSelectionSummary.label), toggleValue=\(String(describing: terminalToggle.value)))
+      (summaryLabel=\(decisionSelectionSummary.label), \
+      toggleValue=\(String(describing: terminalToggle.value)))
       """
     )
 

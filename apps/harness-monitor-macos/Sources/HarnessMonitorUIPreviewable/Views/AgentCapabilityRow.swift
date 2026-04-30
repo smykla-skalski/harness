@@ -141,6 +141,7 @@ struct AgentCapabilityTransportChoice: Identifiable, Hashable {
 struct AgentCapabilityRow: View {
   let option: AgentCapabilityOption
   @Binding var selection: AgentLaunchSelection
+  @State private var diagnosticsExpanded = false
 
   private var normalizedSelection: AgentLaunchSelection {
     option.normalizedSelection(for: selection)
@@ -150,12 +151,12 @@ struct AgentCapabilityRow: View {
     option.transportChoice(for: normalizedSelection)
   }
 
-  private var capabilityTags: [String] {
-    currentChoice.capabilityLabels
-  }
-
   private var accessibilityCapabilityTags: [String] {
     option.acpChoice?.capabilityLabels ?? capabilityTags
+  }
+
+  private var capabilityTags: [String] {
+    currentChoice.capabilityLabels
   }
 
   private var accessibilityCapabilitySummary: String {
@@ -175,6 +176,9 @@ struct AgentCapabilityRow: View {
       return
         "Filesystem + terminal tools require the ACP host bridge while the daemon runs sandboxed."
     }
+    if option.showsInstallCTA {
+      return "Install \(option.title) CLI to enable"
+    }
     return option.installHint
   }
 
@@ -190,9 +194,9 @@ struct AgentCapabilityRow: View {
   }
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       leadingColumn
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      diagnosticsDisclosure
       transportColumn
     }
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
@@ -204,8 +208,7 @@ struct AgentCapabilityRow: View {
   private var leadingColumn: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       titleRow
-      capabilityTagRow()
-      probeRow()
+      capabilitySummaryRow
       unavailableReasonRow()
       installActionRow()
     }
@@ -224,26 +227,31 @@ struct AgentCapabilityRow: View {
     }
   }
 
-  @ViewBuilder
-  private func capabilityTagRow() -> some View {
-    if !capabilityTags.isEmpty {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(capabilityTags.prefix(3), id: \.self) { capability in
-          CapabilityChip(title: capability)
-        }
+  private var capabilitySummaryRow: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(currentChoice.capabilitySummary)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(2)
+
+      if let transportAvailabilityText {
+        Text(transportAvailabilityText)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(2)
+          .accessibilityIdentifier(transportAvailabilityText)
       }
     }
   }
 
-  @ViewBuilder
-  private func probeRow() -> some View {
-    if let doctorProbeText = option.doctorProbeText {
-      Text(doctorProbeText)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
+  private var transportAvailabilityText: String? {
+    if option.transportChoices.count == 1, option.acpChoice == nil {
+      return "Filesystem + terminal tools are not available for this provider."
     }
+    if let acpChoice = option.acpChoice, !option.isEnabled(acpChoice) {
+      return "Filesystem + terminal tools are not available for this provider."
+    }
+    return nil
   }
 
   @ViewBuilder
@@ -310,17 +318,29 @@ struct AgentCapabilityRow: View {
       )
     )
   }
-}
 
-private struct CapabilityChip: View {
-  let title: String
+  @ViewBuilder
+  private var diagnosticsDisclosure: some View {
+    if let doctorProbeText = option.doctorProbeText {
+      Button(diagnosticsExpanded ? "Hide diagnostics" : "Show diagnostics") {
+        diagnosticsExpanded.toggle()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .accessibilityLabel(
+        "\(diagnosticsExpanded ? "Hide" : "Show") diagnostics for \(option.title)"
+      )
+      .accessibilityHint(option.statusText)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id))
 
-  var body: some View {
-    Text(title)
-      .scaledFont(.caption.weight(.semibold))
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-      .background(HarnessMonitorTheme.secondaryInk.opacity(0.08), in: Capsule())
+      if diagnosticsExpanded {
+        Text(doctorProbeText)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(3)
+          .textSelection(.enabled)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
+      }
+    }
   }
 }
