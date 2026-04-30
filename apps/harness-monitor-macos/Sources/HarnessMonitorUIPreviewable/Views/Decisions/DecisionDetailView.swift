@@ -121,8 +121,23 @@ public struct DecisionDetailView: View {
   @ViewBuilder private var detailBody: some View {
     if let viewModel {
       populatedBody(viewModel)
-        .sheet(item: snoozeBinding(for: viewModel)) { _ in
-          DecisionSnoozeSheet(viewModel: viewModel)
+        .confirmationDialog(
+          "Snooze Decision",
+          isPresented: snoozeDialogBinding(for: viewModel),
+          titleVisibility: .visible
+        ) {
+          ForEach(SnoozeOption.allCases) { option in
+            Button(option.title) {
+              Task {
+                await viewModel.confirmSnooze(duration: option.duration)
+              }
+            }
+          }
+          Button("Cancel", role: .cancel) {
+            viewModel.cancelSnooze()
+          }
+        } message: {
+          Text("Pause this decision for a fixed interval.")
         }
     } else {
       emptyState
@@ -272,13 +287,13 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private func snoozeBinding(
+  private func snoozeDialogBinding(
     for viewModel: DecisionDetailViewModel
-  ) -> Binding<DecisionDetailViewModel.SnoozeRequest?> {
+  ) -> Binding<Bool> {
     Binding(
-      get: { viewModel.snoozeRequest },
-      set: { request in
-        if request == nil {
+      get: { viewModel.snoozeRequest != nil },
+      set: { isPresented in
+        if !isPresented {
           viewModel.cancelSnooze()
         }
       }
@@ -334,73 +349,37 @@ public struct DecisionDetailView: View {
   }
 }
 
-private struct DecisionSnoozeSheet: View {
-  enum SnoozeOption: String, CaseIterable, Identifiable {
-    case fifteenMinutes
-    case oneHour
-    case fourHours
-    case oneDay
+private enum SnoozeOption: String, CaseIterable, Identifiable {
+  case fifteenMinutes
+  case oneHour
+  case fourHours
+  case oneDay
 
-    var id: Self { self }
+  var id: Self { self }
 
-    var title: String {
-      switch self {
-      case .fifteenMinutes:
-        "15 minutes"
-      case .oneHour:
-        "1 hour"
-      case .fourHours:
-        "4 hours"
-      case .oneDay:
-        "24 hours"
-      }
-    }
-
-    var duration: TimeInterval {
-      switch self {
-      case .fifteenMinutes:
-        15 * 60
-      case .oneHour:
-        60 * 60
-      case .fourHours:
-        4 * 60 * 60
-      case .oneDay:
-        24 * 60 * 60
-      }
+  var title: String {
+    switch self {
+    case .fifteenMinutes:
+      "15 minutes"
+    case .oneHour:
+      "1 hour"
+    case .fourHours:
+      "4 hours"
+    case .oneDay:
+      "24 hours"
     }
   }
 
-  let viewModel: DecisionDetailViewModel
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-      Text("Snooze Decision")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-      Text("Pause this decision for a fixed interval.")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        ForEach(SnoozeOption.allCases) { option in
-          HarnessMonitorAsyncActionButton(
-            title: option.title,
-            tint: HarnessMonitorTheme.caution,
-            variant: .bordered,
-            isLoading: false,
-            accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(
-              "snooze-\(option.rawValue)"
-            ),
-            fillsWidth: true
-          ) {
-            await viewModel.confirmSnooze(duration: option.duration)
-          }
-        }
-      }
-      Button("Cancel") {
-        viewModel.cancelSnooze()
-      }
-      .harnessActionButtonStyle(variant: .borderless, tint: nil)
+  var duration: TimeInterval {
+    switch self {
+    case .fifteenMinutes:
+      15 * 60
+    case .oneHour:
+      60 * 60
+    case .fourHours:
+      4 * 60 * 60
+    case .oneDay:
+      24 * 60 * 60
     }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .frame(minWidth: 320)
   }
 }
