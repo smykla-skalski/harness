@@ -2,14 +2,14 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
-  @ViewBuilder var paneContent: some View {
+  @ViewBuilder func paneContent(decisionScope: DecisionWorkspaceScope) -> some View {
     switch viewModel.selection {
     case .create:
       createPane
     case .decisions:
-      decisionDeskPane
+      decisionDeskPane(decisionScope: decisionScope)
     case .decision:
-      decisionDetailPane
+      decisionDetailPane(decisionScope: decisionScope)
     case .terminal:
       if let selectedSessionTui {
         sessionPane(selectedSessionTui)
@@ -29,18 +29,18 @@ extension AgentsWindowView {
     }
   }
 
-  @ViewBuilder var decisionDeskPane: some View {
+  @ViewBuilder func decisionDeskPane(decisionScope: DecisionWorkspaceScope) -> some View {
     DecisionDetailView(
       selectedTab: decisionDetailTabBinding,
       observer: sessionObserver,
-      decisionScope: decisionWorkspaceScope,
+      decisionScope: decisionScope,
       primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
       primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
     )
   }
 
-  @ViewBuilder var decisionDetailPane: some View {
-    if let selectedDecision {
+  @ViewBuilder func decisionDetailPane(decisionScope: DecisionWorkspaceScope) -> some View {
+    if let selectedDecision = decisionScope.selectedDecision {
       DecisionDetailView(
         decision: selectedDecision,
         store: store,
@@ -61,20 +61,22 @@ extension AgentsWindowView {
     }
   }
 
-  @ToolbarContentBuilder var decisionToolbarItems: some ToolbarContent {
+  @ToolbarContentBuilder func decisionToolbarItems(
+    decisionScope: DecisionWorkspaceScope
+  ) -> some ToolbarContent {
     if viewModel.selection.isDecisionRoute {
       ToolbarItemGroup(placement: .primaryAction) {
         Menu {
           Button("Dismiss selected") {
             Task { await dismissSelectedDecision() }
           }
-          .disabled(selectedDecision == nil)
+          .disabled(decisionScope.selectedDecision == nil)
           .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissSelected)
 
           Button("Dismiss all visible") {
             beginDismissAllVisible()
           }
-          .disabled(visibleOpenDecisionIDs.isEmpty)
+          .disabled(decisionScope.visibleDecisionIDs.isEmpty)
           .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisible)
 
           if let reopenBatch = currentReopenBatch {
@@ -85,23 +87,23 @@ extension AgentsWindowView {
           }
 
           Button(
-            decisionWorkspaceScope.hasActiveFilters
+            decisionScope.hasActiveFilters
               ? "Snooze filtered critical for 1h"
               : "Snooze visible critical for 1h"
           ) {
             Task { await snoozeAllCritical() }
           }
-          .disabled(criticalDecisionIDs.isEmpty)
+          .disabled(decisionScope.visibleCriticalDecisionIDs.isEmpty)
           .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkSnoozeCritical)
 
           Button(
-            decisionWorkspaceScope.hasActiveFilters
+            decisionScope.hasActiveFilters
               ? "Dismiss filtered info"
               : "Dismiss visible info"
           ) {
             Task { await dismissAllInfo() }
           }
-          .disabled(infoDecisionIDs.isEmpty)
+          .disabled(decisionScope.visibleInfoDecisionIDs.isEmpty)
           .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissInfo)
         } label: {
           Label("Bulk actions", systemImage: "ellipsis.circle")
