@@ -2,6 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct PreferencesDiagnosticsSnapshot {
+  public struct AcpPermissionLogRun: Equatable {
+    public let runID: String
+    public let displayName: String
+    public let path: String?
+  }
+
   public let launchAgent: LaunchAgentStatus?
   public let tokenPresent: Bool
   public let projectCount: Int
@@ -13,6 +19,7 @@ public struct PreferencesDiagnosticsSnapshot {
   public let lastEvent: DaemonAuditEvent?
   public let paths: PreferencesDiagnosticsPaths
   public let recentEvents: [DaemonAuditEvent]
+  public let acpPermissionLogRuns: [AcpPermissionLogRun]
 
   @MainActor
   public init(store: HarnessMonitorStore) {
@@ -40,14 +47,36 @@ public struct PreferencesDiagnosticsSnapshot {
       databasePath: workspaceDiagnostics?.databasePath ?? "Unavailable"
     )
     recentEvents = Array((store.diagnostics?.recentEvents ?? []).prefix(10))
+    acpPermissionLogRuns = store.selectedAcpInspectAgents
+      .map { snapshot in
+        AcpPermissionLogRun(
+          runID: snapshot.sessionId,
+          displayName: snapshot.displayName,
+          path: snapshot.permissionLogPath
+        )
+      }
+      .sorted { left, right in
+        if left.displayName != right.displayName {
+          return left.displayName.localizedStandardCompare(right.displayName) == .orderedAscending
+        }
+        return left.runID < right.runID
+      }
   }
 }
 
 public struct PreferencesDiagnosticsSection: View {
   public let snapshot: PreferencesDiagnosticsSnapshot
+  public let revealPermissionLog: (String, String?) -> RevealAcpPermissionLogResult
+  @State private var permissionLogErrorsByRunID: [String: String] = [:]
 
-  public init(snapshot: PreferencesDiagnosticsSnapshot) {
+  public init(
+    snapshot: PreferencesDiagnosticsSnapshot,
+    revealPermissionLog: @escaping (String, String?) -> RevealAcpPermissionLogResult = { _, _ in
+      .unavailable
+    }
+  ) {
     self.snapshot = snapshot
+    self.revealPermissionLog = revealPermissionLog
   }
 
   public var body: some View {
@@ -63,10 +92,73 @@ public struct PreferencesDiagnosticsSection: View {
         lastExternalSessionAttachSucceeded: snapshot.lastExternalSessionAttachSucceeded,
         lastEvent: snapshot.lastEvent
       )
+      PreferencesAcpPermissionLogSection(
+        runs: snapshot.acpPermissionLogRuns,
+        errorsByRunID: permissionLogErrorsByRunID,
+        reveal: revealPermissionLog,
+        onError: { runID, message in
+          permissionLogErrorsByRunID[runID] = message
+        },
+        clearError: { runID in
+          permissionLogErrorsByRunID.removeValue(forKey: runID)
+        }
+      )
       PreferencesPathsSection(paths: snapshot.paths)
       PreferencesRecentEventsSection(events: snapshot.recentEvents)
     }
     .preferencesDetailFormStyle()
+    .onChange(of: snapshot.acpPermissionLogRuns.map(\.runID)) { _, runIDs in
+      let activeIDs = Set(runIDs)
+      permissionLogErrorsByRunID = permissionLogErrorsByRunID.filter { entry in
+        activeIDs.contains(entry.key)
+      }
+    }
+  }
+}
+
+private struct PreferencesAcpPermissionLogSection: View {
+  let runs: [PreferencesDiagnosticsSnapshot.AcpPermissionLogRun]
+  let errorsByRunID: [String: String]
+  let reveal: (String, String?) -> RevealAcpPermissionLogResult
+  let onError: (String, String) -> Void
+  let clearError: (String) -> Void
+
+  @ViewBuilder
+  var body: some View {
+    if !runs.isEmpty {
+      Section("ACP Permission Logs") {
+        ForEach(runs, id: \.runID) { run in
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+            HarnessMonitorActionButton(
+              title: "Reveal permission-log.ndjson in Finder (\(run.displayName))",
+              tint: .secondary,
+              variant: .bordered,
+              accessibilityIdentifier:
+                "harness.preferences.diagnostics.acp-permission-log.reveal.\(run.runID)",
+            ) {
+              let result = reveal(run.runID, run.path)
+              if result == .revealed {
+                clearError(run.runID)
+              } else {
+                onError(
+                  run.runID,
+                  "ACP permission log for this run is unavailable."
+                )
+              }
+            }
+            if let error = errorsByRunID[run.runID] {
+              Text(error)
+                .scaledFont(.caption)
+                .foregroundStyle(HarnessMonitorTheme.danger)
+                .accessibilityLiveRegion(.assertive)
+                .accessibilityIdentifier(
+                  "harness.preferences.diagnostics.acp-permission-log.error.\(run.runID)"
+                )
+            }
+          }
+        }
+      }
+    }
   }
 }
 
