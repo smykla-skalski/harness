@@ -162,8 +162,10 @@ public struct AgentsWindowView: View {
   public var body: some View {
     @Bindable var viewModel = viewModel
     let displayState = displayState
+    let decisionScope = decisionWorkspaceScope
     let splitView = workspaceSplitView(
       displayState: displayState,
+      decisionScope: decisionScope,
       selection: $viewModel.selection
     )
 
@@ -173,7 +175,7 @@ public struct AgentsWindowView: View {
       .toolbar {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
-        decisionToolbarItems
+        decisionToolbarItems(decisionScope: decisionScope)
       }
       .toolbarBaselineOverlay()
       .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
@@ -246,6 +248,7 @@ public struct AgentsWindowView: View {
 
   private func workspaceSplitView(
     displayState: AgentTuiDisplayState,
+    decisionScope: DecisionWorkspaceScope,
     selection: Binding<WorkspaceSelection>
   ) -> some View {
     NavigationSplitView {
@@ -253,7 +256,7 @@ public struct AgentsWindowView: View {
         store: store,
         selection: selection,
         decisionFilters: $decisionFilters,
-        decisionScope: decisionWorkspaceScope,
+        decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,
         currentSessionTitle: store.selectedSession?.session.title,
         agentTuis: displayState.sortedAgentTuis,
@@ -273,11 +276,11 @@ public struct AgentsWindowView: View {
       )
       .toolbarBaselineFrame(.sidebar)
     } detail: {
-      detailColumnContent
+      detailColumnContent(decisionScope: decisionScope)
         .inspector(isPresented: decisionInspectorBinding) {
           if viewModel.selection.isDecisionRoute {
             DecisionInspector(
-              decision: selectedDecision,
+              decision: decisionScope.selectedDecision,
               liveTick: decisionLiveTick
             )
             .inspectorColumnWidth(min: 200, ideal: 220, max: 280)

@@ -13,7 +13,7 @@ extension AgentsWindowView {
     }
   }
 
-  @ViewBuilder var detailColumnContent: some View {
+  @ViewBuilder func detailColumnContent(decisionScope: DecisionWorkspaceScope) -> some View {
     if usesLiveViewportSplitLayout, let selectedSessionTui {
       sessionPane(selectedSessionTui)
         .padding(HarnessMonitorTheme.spacingLG)
@@ -23,7 +23,6 @@ extension AgentsWindowView {
         } action: { detailSize in
           updateDetailColumnGeometry(detailSize)
         }
-        .id(scrollContainerIdentity)
         .overlay { agentsStateMarkerOverlay() }
     } else if case .create = viewModel.selection {
       createPane
@@ -32,20 +31,18 @@ extension AgentsWindowView {
         } action: { detailSize in
           updateDetailColumnGeometry(detailSize)
         }
-        .id(scrollContainerIdentity)
         .overlay { agentsStateMarkerOverlay() }
     } else if viewModel.selection.isDecisionRoute {
-      paneContent
+      paneContent(decisionScope: decisionScope)
         .onGeometryChange(for: CGSize.self) { proxy in
           proxy.size
         } action: { detailSize in
           updateDetailColumnGeometry(detailSize)
         }
-        .id(scrollContainerIdentity)
         .overlay { agentsStateMarkerOverlay() }
     } else {
       ScrollView {
-        paneContent
+        paneContent(decisionScope: decisionScope)
           .padding(HarnessMonitorTheme.spacingLG)
       }
       .onGeometryChange(for: CGSize.self) { proxy in
@@ -53,7 +50,6 @@ extension AgentsWindowView {
       } action: { detailSize in
         updateDetailColumnGeometry(detailSize)
       }
-      .id(scrollContainerIdentity)
       .overlay { agentsStateMarkerOverlay() }
     }
   }
