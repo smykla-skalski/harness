@@ -54,6 +54,15 @@ struct DecisionKindContextAdapter {
     return payload.suggestedActions()
   }
 
+  var prefersSubtlePrimaryAction: Bool {
+    switch kind {
+    case .acpPermission:
+      true
+    case .generic:
+      false
+    }
+  }
+
   private static func resolveKind(
     decision: Decision,
     store: HarnessMonitorStore?

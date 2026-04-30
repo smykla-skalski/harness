@@ -129,7 +129,7 @@ public struct DecisionsWindowView: View {
             decision: selectedDecision,
             liveTick: runtime.liveTick
           )
-          .inspectorColumnWidth(min: 260, ideal: 320, max: 420)
+          .inspectorColumnWidth(min: 220, ideal: 250, max: 300)
         }
     }
     .navigationSplitViewStyle(.balanced)
