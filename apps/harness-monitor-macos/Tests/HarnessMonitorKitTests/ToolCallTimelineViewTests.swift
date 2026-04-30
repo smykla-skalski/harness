@@ -3,6 +3,7 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
+@MainActor
 @Suite("Tool call timeline view")
 struct ToolCallTimelineViewTests {
   @Test("Canonical timeline rows fold invocation and result by invocation id")
@@ -35,7 +36,7 @@ struct ToolCallTimelineViewTests {
 
     let row = try #require(ToolCallTimelineView.materialiseRows(from: entries).first)
 
-    #expect(row.id == "call-1")
+    #expect(row.id == "session-1::acp-1::call-1")
     #expect(row.title == "Write")
     #expect(row.status == .completed)
     #expect(row.detail == "copilot received a result from Write")
@@ -55,13 +56,14 @@ struct ToolCallTimelineViewTests {
         "kind": .object([
           "type": .string("tool_invocation"),
           "tool_name": .string("Bash"),
+          "invocation_id": .string("call-legacy"),
         ])
       ])
     )
 
     let row = try #require(ToolCallTimelineView.materialiseRows(from: [entry]).first)
 
-    #expect(row.id == "legacy-event-1")
+    #expect(row.id == "session-1::agent-1::call-legacy")
     #expect(row.title == "Bash")
     #expect(row.status == .started)
   }
@@ -137,8 +139,24 @@ struct ToolCallTimelineViewTests {
     ])
   }
 
-  @Test("Duplicate tool call ids drop one deterministically")
-  func duplicateToolCallIDsDropOneDeterministically() throws {
+  @Test("Section accessibility label explains capability tags")
+  func sectionAccessibilityLabelExplainsCapabilityTags() {
+    #expect(
+      ToolCallTimelineView.sectionAccessibilityLabel(
+        title: "Copilot",
+        capabilityTags: ["filesystem", "terminal"]
+      ) == "Copilot. Capabilities: filesystem, terminal."
+    )
+    #expect(
+      ToolCallTimelineView.sectionAccessibilityLabel(
+        title: "Copilot",
+        capabilityTags: []
+      ) == "Copilot"
+    )
+  }
+
+  @Test("Renderer still collapses duplicate tool call ids deterministically")
+  func rendererStillCollapsesDuplicateToolCallIDsDeterministically() throws {
     let entries = [
       makeCanonicalEntry(
         entryId: "dup-1",
@@ -167,14 +185,13 @@ struct ToolCallTimelineViewTests {
     let presentation = ToolCallTimelineView.materialisePresentation(from: entries)
     let row = try #require(presentation.rows.first)
 
-    #expect(presentation.duplicateToolCallIDs == ["call-dup"])
     #expect(presentation.rows.count == 1)
-    #expect(row.id == "call-dup")
+    #expect(row.id == "session-1::acp-1::call-dup")
     #expect(row.detail == "copilot invoked Bash again")
   }
 
-  @Test("Stop reason and terminal states drive the default announcement policy")
-  func stopReasonAndTerminalStatesDriveTheDefaultAnnouncementPolicy() throws {
+  @Test("Default announcements only fire for terminal states")
+  func defaultAnnouncementsOnlyFireForTerminalStates() throws {
     let startedRow = try #require(
       ToolCallTimelineRow(
         entry: makeAnnotatedToolCallEntry(
@@ -206,9 +223,11 @@ struct ToolCallTimelineViewTests {
       )
     )
 
-    #expect(startedRow.liveRegion == nil)
-    #expect(completedRow.liveRegion == .polite)
-    #expect(failedRow.liveRegion == .polite)
+    #expect(startedRow.stopReason == nil)
+    #expect(completedRow.stopReason == "end_turn")
+    #expect(failedRow.stopReason == "error")
+    #expect(completedRow.announcementText == "Copilot completed Write. Ended turn.")
+    #expect(failedRow.announcementText == "Copilot failed Write. Error.")
     #expect(
       ToolCallTimelineView.shouldAnnounceToolCallStatusChange(
         previousStatus: nil,
@@ -230,6 +249,116 @@ struct ToolCallTimelineViewTests {
         verboseAnnouncements: false
       )
     )
+  }
+
+  @Test("Rows with matching timestamps keep daemon sequence order")
+  func rowsWithMatchingTimestampsKeepDaemonSequenceOrder() {
+    let rows = ToolCallTimelineView.materialiseRows(
+      from: makeEnrichedAcpEntries(
+        acpID: "acp-a",
+        agentID: "copilot",
+        displayName: "Copilot",
+        capabilityTags: ["filesystem"],
+        events: [
+          makeAcpEvent(
+            recordedAt: "2026-04-28T00:00:00Z",
+            sequence: 2,
+            type: "tool_invocation",
+            toolName: "Read",
+            invocationID: "call-2"
+          ),
+          makeAcpEvent(
+            recordedAt: "2026-04-28T00:00:00Z",
+            sequence: 10,
+            type: "tool_invocation",
+            toolName: "Write",
+            invocationID: "call-10"
+          ),
+        ]
+      )
+    )
+
+    #expect(rows.map(\.id) == ["session-1::acp-a::call-10", "session-1::acp-a::call-2"])
+  }
+
+  @Test("Announcement helper suppresses backlog hydration and session replacement")
+  func announcementHelperSuppressesBacklogHydrationAndSessionReplacement() throws {
+    let terminalRow = try #require(
+      ToolCallTimelineRow(
+        entry: makeAnnotatedToolCallEntry(
+          entryId: "call-terminal",
+          recordedAt: "2026-04-28T00:00:01Z",
+          status: "completed",
+          stopReason: "end_turn"
+        )
+      )
+    )
+
+    #expect(
+      ToolCallTimelineView.orderedAnnouncementRows(
+        previousStates: [:],
+        rows: [terminalRow],
+        liveAnnouncementRowIDs: [],
+        verboseAnnouncements: false
+      )
+      .isEmpty
+    )
+    #expect(
+      ToolCallTimelineView.orderedAnnouncementRows(
+        previousStates: ["other-session-call": .started],
+        rows: [terminalRow],
+        liveAnnouncementRowIDs: [],
+        verboseAnnouncements: false
+      )
+      .isEmpty
+    )
+    #expect(
+      ToolCallTimelineView.orderedAnnouncementRows(
+        previousStates: [:],
+        rows: [terminalRow],
+        liveAnnouncementRowIDs: [terminalRow.id],
+        verboseAnnouncements: false
+      )
+      .map(\.id) == [terminalRow.id]
+    )
+  }
+
+  @Test("Announcement helper follows visible timeline order")
+  func announcementHelperFollowsVisibleTimelineOrder() throws {
+    let newerRow = try #require(
+      ToolCallTimelineRow(
+        entry: makeAnnotatedToolCallEntry(
+          entryId: "call-newer",
+          recordedAt: "2026-04-28T00:00:02Z",
+          status: "completed",
+          stopReason: "end_turn",
+          sequence: 20
+        )
+      )
+    )
+    let olderRow = try #require(
+      ToolCallTimelineRow(
+        entry: makeAnnotatedToolCallEntry(
+          entryId: "call-older",
+          recordedAt: "2026-04-28T00:00:01Z",
+          status: "failed",
+          stopReason: "error",
+          sequence: 10
+        )
+      )
+    )
+
+    let announcedRows = ToolCallTimelineView.orderedAnnouncementRows(
+      previousStates: [
+        newerRow.id: .started,
+        olderRow.id: .started,
+      ],
+      rows: [newerRow, olderRow],
+      liveAnnouncementRowIDs: [newerRow.id, olderRow.id],
+      verboseAnnouncements: false
+    )
+
+    #expect(announcedRows.map(\.id) == [newerRow.id, olderRow.id])
   }
 
   @Test("Verbose announcements opt into per-state updates")
@@ -345,7 +474,8 @@ struct ToolCallTimelineViewTests {
     entryId: String,
     recordedAt: String,
     status: String,
-    stopReason: String?
+    stopReason: String?,
+    sequence: UInt64 = 0
   ) -> TimelineEntry {
     TimelineEntry(
       entryId: entryId,
@@ -372,6 +502,7 @@ struct ToolCallTimelineViewTests {
           "agent_id": .string("copilot"),
           "agent_display_name": .string("Copilot"),
           "capability_tags": .array([.string("filesystem")]),
+          "sequence": .number(Double(sequence)),
           "stop_reason": stopReason.map(JSONValue.string) ?? .null,
         ]),
       ])

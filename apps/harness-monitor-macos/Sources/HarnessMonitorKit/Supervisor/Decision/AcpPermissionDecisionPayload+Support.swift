@@ -19,7 +19,8 @@ extension AcpPermissionDecisionPayload {
       acpId: decision.agentID ?? "unknown-managed-agent",
       sessionId: decision.sessionID ?? "",
       requests: [],
-      createdAt: ISO8601DateFormatter().string(from: decision.createdAt)
+      createdAt: ISO8601DateFormatter().string(from: decision.createdAt),
+      expiresAt: nil
     )
     return Self(
       decisionID: decision.id,

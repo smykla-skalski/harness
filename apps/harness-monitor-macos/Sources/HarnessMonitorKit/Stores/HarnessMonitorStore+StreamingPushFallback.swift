@@ -91,8 +91,11 @@ extension HarnessMonitorStore {
       }
       let resolvedTimeline = measuredTimeline.value.entries ?? timeline
       let resolvedTimelineWindow = measuredTimeline.value.metadataOnly
-      timeline = resolvedTimeline
-      self.timelineWindow = resolvedTimelineWindow
+      replaceSelectedTimelineSnapshot(
+        resolvedTimeline,
+        timelineWindow: resolvedTimelineWindow,
+        clearBurstState: true
+      )
       if let selectedSession {
         scheduleCacheWrite { service in
           await service.cacheSessionDetail(

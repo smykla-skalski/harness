@@ -151,6 +151,129 @@ struct WebSocketStreamTests {
       Issue.record("expected reconnect-ready session event")
     }
   }
+
+  @Test("ACP event pushes coalesce overflow batches and log once per burst")
+  func acpEventPushesCoalesceOverflowBatchesAndLogOncePerBurst() async throws {
+    let transport = makeTransport()
+    let sessionID = "sess-acp-burst"
+    let (sessionStream, sessionContinuation) = AsyncThrowingStream<DaemonPushEvent, Error>
+      .makeStream()
+
+    await transport.installTestSessionStreamContinuation(sessionContinuation, sessionID: sessionID)
+    await transport.setAcpEventAutoFlushEnabledForTests(false)
+
+    for sequence in 0..<1_024 {
+      await transport.enqueueAcpEventPush(
+        recordedAt: isoTimestamp(sequence),
+        sessionId: sessionID,
+        payload: makeAcpEventBatchPayloadJSON(
+          acpID: "acp-1",
+          sessionID: sessionID,
+          rawCount: 1,
+          events: [
+            makeAcpConversationEvent(
+              recordedAt: isoTimestamp(sequence),
+              sequence: UInt64(sequence)
+            )
+          ]
+        )
+      )
+    }
+
+    await transport.flushPendingAcpEventPushes()
+
+    var iterator = sessionStream.makeAsyncIterator()
+    let push = try await #require(iterator.next())
+
+    if case .acpEvents(let batch) = push.kind {
+      #expect(batch.rawCount == 1_024)
+      #expect(batch.events.count == 256)
+      #expect(batch.events.first?.sequence == 768)
+      #expect(batch.events.last?.sequence == 1_023)
+      #expect(push.recordedAt == isoTimestamp(1_023))
+    } else {
+      Issue.record("expected coalesced ACP event batch push")
+    }
+
+    #expect(await transport.acpOverflowLogBurstCountForTests() == 1)
+  }
+
+  @Test("ACP overflow logging stays at one burst across multiple ACP queues")
+  func acpOverflowLoggingStaysAtOneBurstAcrossMultipleAcpQueues() async {
+    let transport = makeTransport()
+    let sessionID = "sess-acp-multi-burst"
+
+    await transport.setAcpEventAutoFlushEnabledForTests(false)
+
+    for acpID in ["acp-1", "acp-2"] {
+      for sequence in 0..<512 {
+        await transport.enqueueAcpEventPush(
+          recordedAt: isoTimestamp(sequence),
+          sessionId: sessionID,
+          payload: makeAcpEventBatchPayloadJSON(
+            acpID: acpID,
+            sessionID: sessionID,
+            rawCount: 1,
+            events: [
+              makeAcpConversationEvent(
+                recordedAt: isoTimestamp(sequence),
+                sequence: UInt64(sequence)
+              )
+            ]
+          )
+        )
+      }
+    }
+
+    await transport.flushPendingAcpEventPushes()
+
+    #expect(await transport.acpOverflowLogBurstCountForTests() == 1)
+  }
+
+  private func makeAcpEventBatchPayloadJSON(
+    acpID: String,
+    sessionID: String,
+    rawCount: Int,
+    events: [AcpConversationEvent]
+  ) -> JSONValue {
+    .object([
+      "acpId": .string(acpID),
+      "sessionId": .string(sessionID),
+      "rawCount": .number(Double(rawCount)),
+      "events": .array(
+        events.map { event in
+          .object([
+            "timestamp": event.timestamp.map(JSONValue.string) ?? .null,
+            "sequence": .number(Double(event.sequence)),
+            "kind": event.kind,
+            "agent": .string(event.agent),
+            "sessionId": .string(event.sessionId),
+          ])
+        }
+      ),
+    ])
+  }
+
+  private func makeAcpConversationEvent(
+    recordedAt: String,
+    sequence: UInt64
+  ) -> AcpConversationEvent {
+    AcpConversationEvent(
+      timestamp: recordedAt,
+      sequence: sequence,
+      kind: .object([
+        "type": .string("tool_invocation"),
+        "tool_name": .string("Read"),
+        "invocation_id": .string("call-\(sequence)"),
+      ]),
+      agent: "copilot",
+      sessionId: "sess-acp-burst"
+    )
+  }
+
+  private func isoTimestamp(_ secondOffset: Int) -> String {
+    String(format: "2026-04-28T00:00:%02dZ", secondOffset % 60)
+  }
 }
 
 @Suite("PendingRequestStore behavior")

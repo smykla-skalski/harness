@@ -11,6 +11,25 @@ public enum HarnessMonitorPushEventError: Error, LocalizedError, Equatable {
   }
 }
 
+public enum AcpPermissionBatchRemovalReason: String, Equatable, Sendable {
+  case resolved
+  case shutdown
+  case timeout
+}
+
+public struct AcpPermissionBatchRemovedPayload: Equatable, Sendable {
+  public let batch: AcpPermissionBatch
+  public let reason: AcpPermissionBatchRemovalReason
+
+  public init(
+    batch: AcpPermissionBatch,
+    reason: AcpPermissionBatchRemovalReason
+  ) {
+    self.batch = batch
+    self.reason = reason
+  }
+}
+
 public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   public enum Kind: Equatable, Sendable {
     case ready
@@ -28,7 +47,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpProcessIncident(AcpProcessIncidentPayload)
     case acpBridgeResyncIncident(AcpBridgeResyncIncidentPayload)
     case acpPermissionBatch(AcpPermissionBatch)
-    case acpPermissionBatchRemoved(AcpPermissionBatch)
+    case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -187,11 +206,38 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatch(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
       )
-    case "acp_permission_resolved", "acp_permission_shutdown", "acp_permission_timeout":
+    case "acp_permission_resolved":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpPermissionBatchRemoved(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
+        kind: .acpPermissionBatchRemoved(
+          AcpPermissionBatchRemovedPayload(
+            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            reason: .resolved
+          )
+        )
+      )
+    case "acp_permission_shutdown":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpPermissionBatchRemoved(
+          AcpPermissionBatchRemovedPayload(
+            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            reason: .shutdown
+          )
+        )
+      )
+    case "acp_permission_timeout":
+      return Self(
+        recordedAt: at,
+        sessionId: sessionId,
+        kind: .acpPermissionBatchRemoved(
+          AcpPermissionBatchRemovedPayload(
+            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            reason: .timeout
+          )
+        )
       )
     default:
       return nil

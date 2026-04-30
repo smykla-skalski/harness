@@ -16,6 +16,7 @@ struct HarnessMonitorApp: App {
   private let defersInitialMainWindowContentUntilBootstrap: Bool
   private let mainWindowDefaultSize: CGSize
   private let notificationController: HarnessMonitorUserNotificationController
+  private let keyWindowObserver: KeyWindowObserver
   private let acpAttentionState: AcpPermissionAttentionState
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
@@ -76,8 +77,10 @@ struct HarnessMonitorApp: App {
         return controller
       }()
     self.notificationController = notificationController
+    let keyWindowObserver = KeyWindowObserver()
+    self.keyWindowObserver = keyWindowObserver
     acpAttentionState = AcpPermissionAttentionState(
-      keyWindowObserver: KeyWindowObserver(),
+      keyWindowObserver: keyWindowObserver,
       notifications: notificationController
     )
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
@@ -196,6 +199,7 @@ struct HarnessMonitorApp: App {
           delegate: delegate,
           store: store,
           notifications: notificationController,
+          keyWindowObserver: keyWindowObserver,
           acpAttentionState: acpAttentionState,
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,
@@ -209,6 +213,7 @@ struct HarnessMonitorApp: App {
           delegate: delegate,
           store: store,
           notifications: notificationController,
+          keyWindowObserver: keyWindowObserver,
           acpAttentionState: acpAttentionState,
           windowCommandRouting: windowCommandRouting,
           themeMode: $themeMode,

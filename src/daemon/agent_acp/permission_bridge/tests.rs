@@ -231,6 +231,36 @@ async fn timeout_removes_pending_batch_and_broadcasts_removal() {
     assert!(saw_timeout, "timeout should broadcast removal event");
 }
 
+#[tokio::test]
+async fn requested_batches_include_absolute_expiration_timestamp() {
+    let (sender, mut receiver) = broadcast::channel(8);
+    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let (mut request, _rx) = permission_request("tool-a");
+    request.deadline = Duration::from_secs(45);
+
+    bridge.tx.send(request).await.expect("send request");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let requested = (0..4)
+        .find_map(|_| receiver.try_recv().ok())
+        .expect("permission request event");
+    assert_eq!(requested.event, "acp_permission_requested");
+    let expires_at = requested
+        .payload
+        .get("expires_at")
+        .and_then(|value| value.as_str())
+        .expect("expires_at should be present");
+    let created_at = requested
+        .payload
+        .get("created_at")
+        .and_then(|value| value.as_str())
+        .expect("created_at should be present");
+    assert_ne!(
+        expires_at, created_at,
+        "absolute deadline should not collapse to the created_at timestamp"
+    );
+}
+
 fn permission_requested_sessions(receiver: &mut broadcast::Receiver<StreamEvent>) -> Vec<String> {
     let mut sessions = Vec::new();
     for _ in 0..8 {

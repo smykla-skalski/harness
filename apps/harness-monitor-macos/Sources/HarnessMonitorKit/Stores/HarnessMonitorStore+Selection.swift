@@ -11,6 +11,7 @@ extension HarnessMonitorStore {
     set {
       guard selection.selectedSessionID != newValue else { return }
       selection.selectedSessionID = newValue
+      resetToolCallTimelineBurstState()
     }
   }
 
@@ -36,6 +37,32 @@ extension HarnessMonitorStore {
       guard selection.timelineWindow != newValue else { return }
       selection.timelineWindow = newValue
     }
+  }
+
+  func resetToolCallTimelineBurstState() {
+    liveToolCallAnnouncementRowIDs = []
+    toolCallTimelineOverflowNotice = nil
+  }
+
+  func replaceSelectedTimelineSnapshot(
+    _ timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
+    clearBurstState: Bool = true
+  ) {
+    if clearBurstState {
+      resetToolCallTimelineBurstState()
+    }
+    self.timeline = timeline
+    self.timelineWindow = normalizedTimelineWindow(
+      timelineWindow,
+      loadedTimeline: timeline
+    )
+  }
+
+  func clearSelectedTimelineSnapshot() {
+    resetToolCallTimelineBurstState()
+    timeline = []
+    timelineWindow = nil
   }
 
   public var actionActorID: String? {
@@ -130,14 +157,12 @@ extension HarnessMonitorStore {
         isSelectionLoading = false
         isTimelineLoading = false
         selectedSession = nil
-        timeline = []
-        timelineWindow = nil
+        clearSelectedTimelineSnapshot()
       } else if isChangingSelectedSession {
         isSelectionLoading = true
         isTimelineLoading = false
         selectedSession = nil
-        timeline = []
-        timelineWindow = nil
+        clearSelectedTimelineSnapshot()
       }
     }
 

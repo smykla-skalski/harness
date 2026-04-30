@@ -259,6 +259,7 @@ extension HarnessMonitorStore {
           detail: detail,
           timeline: visibleTimelineSnapshot?.timeline ?? timeline,
           timelineWindow: visibleTimelineSnapshot?.timelineWindow ?? timelineWindow,
+          clearBurstState: visibleTimelineSnapshot == nil,
           showingCachedData: false,
           cancelPendingTimelineRefresh: false
         )

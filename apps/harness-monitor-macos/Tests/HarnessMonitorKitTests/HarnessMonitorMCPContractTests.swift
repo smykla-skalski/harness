@@ -162,7 +162,11 @@ struct HarnessMonitorMCPContractTests {
     let enabledKey = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
     defaults.defaults.set(false, forKey: enabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
-    await Task.yield()
+    try await awaitRuntimeState(
+      controller,
+      equals: .disabled,
+      timeoutSeconds: 1
+    )
 
     #expect(controller.runtimeState == .disabled)
 
@@ -175,6 +179,21 @@ struct HarnessMonitorMCPContractTests {
     #expect(controller.runtimeState == .healthy(socketPath: "/tmp/mcp.sock"))
 
     await controller.stop()
+  }
+
+  private func awaitRuntimeState(
+    _ controller: HarnessMonitorMCPStartupController,
+    equals expected: HarnessMonitorMCPRuntimeState,
+    timeoutSeconds: TimeInterval
+  ) async throws {
+    let deadline = Date().addingTimeInterval(timeoutSeconds)
+    while Date() < deadline {
+      if controller.runtimeState == expected {
+        return
+      }
+      try await Task.sleep(nanoseconds: 20_000_000)
+    }
+    #expect(controller.runtimeState == expected)
   }
 
   // MARK: - Real service behavior

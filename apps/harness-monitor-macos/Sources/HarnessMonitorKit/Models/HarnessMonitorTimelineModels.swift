@@ -288,8 +288,23 @@ extension AcpConversationEvent {
 
     let toolName = event.stringValue(for: "tool_name") ?? "Tool"
     let acpAgentId = toolCallMetadata?.acpAgentId ?? acpID
-    let agentId = toolCallMetadata?.agentId ?? (agent.isEmpty ? acpID : agent)
-    let summaryActor = toolCallMetadata?.displayName ?? agentId
+    let fallbackAgentID = agent.isEmpty ? acpID : agent
+    let agentId =
+      if let metadataAgentID = toolCallMetadata?.agentId,
+        metadataAgentID != acpID || agent.isEmpty
+      {
+        metadataAgentID
+      } else {
+        fallbackAgentID
+      }
+    let summaryActor =
+      if let metadataDisplayName = toolCallMetadata?.displayName,
+        metadataDisplayName != acpID || agent.isEmpty
+      {
+        metadataDisplayName
+      } else {
+        fallbackAgentID
+      }
     let status = Self.toolCallStatus(for: entryKind)
     let summary: String =
       switch entryKind {
@@ -322,6 +337,7 @@ extension AcpConversationEvent {
           "capability_tags": .array(
             (toolCallMetadata?.capabilityTags ?? []).map(JSONValue.string)
           ),
+          "sequence": .number(Double(sequence)),
           "stop_reason": event["stop_reason"] ?? .null,
         ]),
       ])
@@ -353,6 +369,161 @@ extension [String: JSONValue] {
       return nil
     }
     return value
+  }
+
+  fileprivate func arrayStringValues(for key: String) -> [String] {
+    guard case .array(let values)? = self[key] else {
+      return []
+    }
+    return values.compactMap {
+      guard case .string(let value) = $0 else {
+        return nil
+      }
+      return value
+    }
+  }
+
+  fileprivate func uint64Value(for key: String) -> UInt64? {
+    guard case .number(let value)? = self[key], value >= 0 else {
+      return nil
+    }
+    return UInt64(value)
+  }
+}
+
+public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
+  public let rowID: String
+  public let phaseID: String
+  public let toolCallID: String
+  public let toolName: String
+  public let status: String
+  public let acpAgentID: String?
+  public let agentID: String?
+  public let agentDisplayName: String?
+  public let capabilityTags: [String]
+  public let sequence: UInt64?
+  public let stopReason: String?
+
+  public init(
+    rowID: String,
+    phaseID: String,
+    toolCallID: String,
+    toolName: String,
+    status: String,
+    acpAgentID: String?,
+    agentID: String?,
+    agentDisplayName: String?,
+    capabilityTags: [String],
+    sequence: UInt64?,
+    stopReason: String?
+  ) {
+    self.rowID = rowID
+    self.phaseID = phaseID
+    self.toolCallID = toolCallID
+    self.toolName = toolName
+    self.status = status
+    self.acpAgentID = acpAgentID
+    self.agentID = agentID
+    self.agentDisplayName = agentDisplayName
+    self.capabilityTags = capabilityTags
+    self.sequence = sequence
+    self.stopReason = stopReason
+  }
+}
+
+public extension TimelineEntry {
+  func toolCallTimelineEntryMetadata() -> ToolCallTimelineEntryMetadata? {
+    let payloadMetadata = toolCallTimelinePayloadMetadata()
+    let event = toolCallTimelineEventPayload()
+    let toolCallID =
+      payloadMetadata?.stringValue(for: "tool_call_id")
+      ?? event?.stringValue(for: "invocation_id")
+    guard let toolCallID, !toolCallID.isEmpty else {
+      return nil
+    }
+
+    let status =
+      payloadMetadata?.stringValue(for: "status")
+      ?? Self.derivedToolCallStatus(for: kind, event: event)
+    guard let status else {
+      return nil
+    }
+
+    let agentNamespace =
+      payloadMetadata?.stringValue(for: "acp_agent_id")
+      ?? payloadMetadata?.stringValue(for: "agent_id")
+      ?? agentId
+      ?? "session"
+    let rowID = [sessionId, agentNamespace, toolCallID].joined(separator: "::")
+    let toolName =
+      payloadMetadata?.stringValue(for: "tool_name")
+      ?? event?.stringValue(for: "tool_name")
+      ?? "Tool"
+
+    return ToolCallTimelineEntryMetadata(
+      rowID: rowID,
+      phaseID: "\(rowID)::\(status)",
+      toolCallID: toolCallID,
+      toolName: toolName,
+      status: status,
+      acpAgentID: payloadMetadata?.stringValue(for: "acp_agent_id"),
+      agentID: payloadMetadata?.stringValue(for: "agent_id") ?? agentId,
+      agentDisplayName: payloadMetadata?.stringValue(for: "agent_display_name"),
+      capabilityTags: payloadMetadata?.arrayStringValues(for: "capability_tags") ?? [],
+      sequence: payloadMetadata?.uint64Value(for: "sequence"),
+      stopReason: payloadMetadata?.stringValue(for: "stop_reason")
+    )
+  }
+
+  private func toolCallTimelinePayloadMetadata() -> [String: JSONValue]? {
+    guard case .object(let payload) = payload,
+      case .object(let metadata)? = payload["tool_call_timeline"]
+    else {
+      return nil
+    }
+    return metadata
+  }
+
+  private func toolCallTimelineEventPayload() -> [String: JSONValue]? {
+    let canonicalKinds = ["tool_invocation", "tool_result", "tool_result_error"]
+    guard canonicalKinds.contains(kind) || kind == "conversation_event",
+      case .object(let payload) = payload
+    else {
+      return nil
+    }
+    let eventPayload = payload["event"] ?? payload["kind"]
+    guard case .object(let event)? = eventPayload else {
+      return nil
+    }
+    return event
+  }
+
+  private static func derivedToolCallStatus(
+    for entryKind: String,
+    event: [String: JSONValue]?
+  ) -> String? {
+    switch entryKind {
+    case "tool_invocation":
+      return "started"
+    case "tool_result_error":
+      return "failed"
+    case "tool_result":
+      return event?.boolValue(for: "is_error") == true ? "failed" : "completed"
+    case "conversation_event":
+      guard let eventType = event?.stringValue(for: "type") else {
+        return nil
+      }
+      switch eventType {
+      case "tool_invocation":
+        return "started"
+      case "tool_result":
+        return event?.boolValue(for: "is_error") == true ? "failed" : "completed"
+      default:
+        return nil
+      }
+    default:
+      return nil
+    }
   }
 }
 

@@ -691,6 +691,291 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(timelineEntries.count == 1)
     #expect(timelineEntries.first?.recordedAt == "2026-04-28T00:00:21Z")
   }
+
+  @Test("ACP event push keeps same invocation id distinct across ACP agents")
+  func acpEventPushKeepsSameInvocationIDDistinctAcrossAcpAgents() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:31Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-2",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "claude",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let rowIDs = store.timeline.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
+
+    #expect(rowIDs.contains("sess-acp-events::acp-1::call-read"))
+    #expect(rowIDs.contains("sess-acp-events::acp-2::call-read"))
+  }
+
+  @Test("ACP event push tracks live announcement rows from the latest burst")
+  func acpEventPushTracksLiveAnnouncementRowsFromLatestBurst() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+    #expect(store.liveToolCallAnnouncementRowIDs == ["sess-acp-events::acp-1::call-read"])
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:31Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_result"),
+                  "tool_name": .string("Write"),
+                  "invocation_id": .string("call-write"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    #expect(store.liveToolCallAnnouncementRowIDs == ["sess-acp-events::acp-1::call-write"])
+  }
+
+  @Test("ACP event push exposes and clears overflow notice by burst")
+  func acpEventPushExposesAndClearsOverflowNoticeByBurst() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-events"
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 4,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              ),
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_result"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let overflowNotice = try #require(store.toolCallTimelineOverflowNotice)
+    #expect(overflowNotice.rawUpdateCount == 4)
+    #expect(overflowNotice.displayedEventCount == 1)
+    #expect(overflowNotice.sessionID == "sess-acp-events")
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:31Z",
+        sessionId: "sess-acp-events",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-events",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_result"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: "sess-acp-events"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    #expect(store.toolCallTimelineOverflowNotice == nil)
+  }
+
+  @Test("Session timeline replacement clears ACP burst provenance")
+  func sessionTimelineReplacementClearsAcpBurstProvenance() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-acp-events",
+        context: "ACP timeline",
+        status: .active,
+        leaderId: "leader-acp",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-acp",
+      workerName: "Worker ACP"
+    )
+    store.selectedSessionID = summary.sessionId
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: summary.sessionId,
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: summary.sessionId,
+            rawCount: 4,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("tool_invocation"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: summary.sessionId
+              ),
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:21Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("tool_result"),
+                  "tool_name": .string("Read"),
+                  "invocation_id": .string("call-read"),
+                ]),
+                agent: "copilot",
+                sessionId: summary.sessionId
+              ),
+            ]
+          )
+        )
+      )
+    )
+
+    #expect(store.liveToolCallAnnouncementRowIDs == ["sess-acp-events::acp-1::call-read"])
+    #expect(store.toolCallTimelineOverflowNotice != nil)
+
+    store.applySessionPushEvent(
+      .sessionUpdated(
+        recordedAt: "2026-04-28T00:00:31Z",
+        sessionId: summary.sessionId,
+        detail: detail,
+        timeline: makeTimelineEntries(
+          sessionID: summary.sessionId,
+          agentID: "worker-acp",
+          summary: "Refreshed timeline"
+        )
+      )
+    )
+
+    #expect(store.liveToolCallAnnouncementRowIDs.isEmpty)
+    #expect(store.toolCallTimelineOverflowNotice == nil)
+  }
 }
 
 func makeAcpPermissionBatch(

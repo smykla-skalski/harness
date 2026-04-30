@@ -44,6 +44,26 @@ extension HarnessMonitorStore {
   public enum PendingConfirmation: Equatable {
     case endSession(sessionID: String, actorID: String)
     case removeAgent(sessionID: String, agentID: String, actorID: String)
+    case interruptCodexRun(sessionID: String, runID: String, runTitle: String)
+  }
+
+  public struct ToolCallTimelineOverflowNotice: Equatable, Sendable {
+    public let sessionID: String
+    public let rawUpdateCount: Int
+    public let displayedEventCount: Int
+    public let recordedAt: String
+
+    public init(
+      sessionID: String,
+      rawUpdateCount: Int,
+      displayedEventCount: Int,
+      recordedAt: String
+    ) {
+      self.sessionID = sessionID
+      self.rawUpdateCount = rawUpdateCount
+      self.displayedEventCount = displayedEventCount
+      self.recordedAt = recordedAt
+    }
   }
 
   public enum HostBridgeCapabilityIssue: Equatable {

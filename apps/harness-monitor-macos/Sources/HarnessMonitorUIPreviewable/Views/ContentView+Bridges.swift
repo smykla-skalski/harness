@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -25,6 +26,109 @@ struct ContentFloatingOverlay: View {
         .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
     }
+  }
+}
+
+struct ContentAcpBridgeBannerBridge: View {
+  let store: HarnessMonitorStore
+  let contentChrome: HarnessMonitorStore.ContentChromeSlice
+  let keyWindowObserver: KeyWindowObserver?
+  let windowID: String
+
+  private var bannerState: AcpBridgeBannerState? {
+    contentChrome.acpBridgeBanner
+  }
+
+  private var shouldShowBanner: Bool {
+    guard bannerState != nil else {
+      return false
+    }
+    guard let keyWindowObserver else {
+      return true
+    }
+    let snapshot = keyWindowObserver.snapshot
+    guard !snapshot.prefersUserNotificationDelivery else {
+      return false
+    }
+    return keyWindowObserver.isKey(windowID: windowID)
+  }
+
+  var body: some View {
+    Group {
+      if shouldShowBanner, let bannerState {
+        ContentAcpBridgeBanner(
+          store: store,
+          state: bannerState
+        )
+      }
+    }
+  }
+}
+
+private struct ContentAcpBridgeBanner: View {
+  let store: HarnessMonitorStore
+  let state: AcpBridgeBannerState
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(HarnessMonitorTheme.caution)
+          .padding(.top, 2)
+          .accessibilityHidden(true)
+
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+          Text(state.factText)
+            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+            .foregroundStyle(.primary)
+          Text(AcpBridgeBannerState.blastRadiusText)
+            .scaledFont(.system(.callout, design: .rounded, weight: .regular))
+            .foregroundStyle(.secondary)
+
+          HarnessMonitorWrapLayout(
+            spacing: HarnessMonitorTheme.itemSpacing,
+            lineSpacing: HarnessMonitorTheme.itemSpacing
+          ) {
+            HarnessMonitorActionButton(
+              title: "Open daemon log",
+              tint: .secondary,
+              variant: .bordered,
+              accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeOpenLogButton
+            ) {
+              _ = store.revealDaemonLogInFinder()
+            }
+            .disabled(!state.daemonLogAvailable)
+
+            HarnessMonitorAsyncActionButton(
+              title: "Run doctor",
+              tint: nil,
+              variant: .prominent,
+              isLoading: store.isDiagnosticsRefreshInFlight,
+              accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeRunDoctorButton
+            ) {
+              await store.refreshDiagnostics()
+            }
+          }
+        }
+
+        Spacer(minLength: HarnessMonitorTheme.spacingLG)
+      }
+      .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+
+      Rectangle()
+        .fill(HarnessMonitorTheme.caution.opacity(0.35))
+        .frame(height: 1)
+        .accessibilityHidden(true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      Color(nsColor: .windowBackgroundColor)
+        .overlay(HarnessMonitorTheme.caution.opacity(0.08))
+    )
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.contentAcpBridgeBanner)
   }
 }
 

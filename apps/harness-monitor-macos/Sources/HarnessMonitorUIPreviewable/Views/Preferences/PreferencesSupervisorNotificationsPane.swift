@@ -60,6 +60,8 @@ public struct PreferencesSupervisorNotificationsPane: View {
   }
 
   @ViewBuilder private var acpStatusSection: some View {
+    let verboseAnnouncementHelp =
+      "When off, VoiceOver announces only completed or failed tool calls. Turn this on to announce every tool-call state change."
     Section {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         LabeledContent("Background ACP alerts", value: acpAuthorizationStatus.displayTitle)
@@ -76,8 +78,10 @@ public struct PreferencesSupervisorNotificationsPane: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.preferencesAcpVerboseToolCallAnnouncements
         )
+        .accessibilityHint(verboseAnnouncementHelp)
+        .help(verboseAnnouncementHelp)
         Text(
-          "When off, VoiceOver announces only completed or failed tool calls. Turn this on to announce every tool-call state change."
+          verboseAnnouncementHelp
         )
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)

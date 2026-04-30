@@ -7,6 +7,7 @@ struct HarnessMonitorWindowRootView: View {
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let keyWindowObserver: KeyWindowObserver
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
   @Binding var themeMode: HarnessMonitorThemeMode
@@ -100,12 +101,13 @@ struct HarnessMonitorWindowRootView: View {
       #if HARNESS_FEATURE_LOTTIE
         ContentView(
           store: store,
+          keyWindowObserver: keyWindowObserver,
           showsCornerAnimation: cornerAnimationEnabled
         ) {
           HarnessMonitorAppLlamaAnimation()
         }
       #else
-        ContentView(store: store)
+        ContentView(store: store, keyWindowObserver: keyWindowObserver)
       #endif
     }
     .modifier(

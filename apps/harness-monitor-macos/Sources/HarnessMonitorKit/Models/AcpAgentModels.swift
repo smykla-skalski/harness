@@ -22,12 +22,31 @@ public struct AcpPermissionItem: Codable, Equatable, Sendable {
 /// - `createdAt` is daemon-authored ordering data. When the UI later renders decisions instead of
 ///   the modal, sticky selection must keep the currently focused batch while preserving this
 ///   oldest-first queue order for newly materialised rows.
+/// - `expiresAt` is the daemon-authored absolute permission deadline. Countdown and expiry UI must
+///   derive from this field instead of re-creating a local deadline from `createdAt`.
 public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public let batchId: String
   public let acpId: String
   public let sessionId: String
   public let requests: [AcpPermissionItem]
   public let createdAt: String
+  public let expiresAt: String?
+
+  public init(
+    batchId: String,
+    acpId: String,
+    sessionId: String,
+    requests: [AcpPermissionItem],
+    createdAt: String,
+    expiresAt: String? = nil
+  ) {
+    self.batchId = batchId
+    self.acpId = acpId
+    self.sessionId = sessionId
+    self.requests = requests
+    self.createdAt = createdAt
+    self.expiresAt = expiresAt
+  }
 
   public var id: String { batchId }
 }
