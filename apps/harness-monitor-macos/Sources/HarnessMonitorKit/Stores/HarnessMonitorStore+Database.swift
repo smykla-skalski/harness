@@ -5,6 +5,16 @@ import SwiftData
 public protocol FileViewerActivating {
   @MainActor
   func reveal(itemsAt urls: [URL])
+
+  @MainActor
+  func open(itemAt url: URL)
+}
+
+public extension FileViewerActivating {
+  @MainActor
+  func open(itemAt url: URL) {
+    reveal(itemsAt: [url])
+  }
 }
 
 public struct WorkspaceFileViewer: FileViewerActivating {
@@ -13,6 +23,11 @@ public struct WorkspaceFileViewer: FileViewerActivating {
   @MainActor
   public func reveal(itemsAt urls: [URL]) {
     NSWorkspace.shared.activateFileViewerSelecting(urls)
+  }
+
+  @MainActor
+  public func open(itemAt url: URL) {
+    _ = NSWorkspace.shared.open(url)
   }
 }
 
@@ -191,12 +206,12 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func revealDaemonLogInFinder() -> Bool {
+  public func openDaemonLog() -> Bool {
     guard let url = daemonLogURL() else {
       presentFailureFeedback("Daemon log is unavailable.")
       return false
     }
-    fileViewer.reveal(itemsAt: [url])
+    fileViewer.open(itemAt: url)
     return true
   }
 

@@ -34,6 +34,7 @@ struct ContentAcpBridgeBannerBridge: View {
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let keyWindowObserver: KeyWindowObserver?
   let windowID: String
+  @State private var lastAnnouncedIncidentAt: Date?
 
   private var bannerState: AcpBridgeBannerState? {
     contentChrome.acpBridgeBanner
@@ -53,6 +54,30 @@ struct ContentAcpBridgeBannerBridge: View {
     return keyWindowObserver.isKey(windowID: windowID)
   }
 
+  private var visibleBannerAnnouncement: ContentAcpBridgeBannerAnnouncement? {
+    ContentAcpBridgeBannerAnnouncement(
+      state: bannerState,
+      isVisible: shouldShowBanner
+    )
+  }
+
+  private func announceVisibleBannerIfNeeded(
+    _ announcement: ContentAcpBridgeBannerAnnouncement? = nil
+  ) {
+    let announcement = announcement ?? visibleBannerAnnouncement
+    guard let announcement else {
+      return
+    }
+    guard ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
+      announcement,
+      lastAnnouncedIncidentAt: lastAnnouncedIncidentAt
+    ) else {
+      return
+    }
+    AccessibilityNotification.Announcement(announcement.message).post()
+    lastAnnouncedIncidentAt = announcement.incidentID
+  }
+
   var body: some View {
     Group {
       if shouldShowBanner, let bannerState {
@@ -60,8 +85,38 @@ struct ContentAcpBridgeBannerBridge: View {
           store: store,
           state: bannerState
         )
+        .onAppear {
+          announceVisibleBannerIfNeeded()
+        }
       }
     }
+    .onChange(of: visibleBannerAnnouncement) { _, newValue in
+      announceVisibleBannerIfNeeded(newValue)
+    }
+  }
+}
+
+@MainActor
+struct ContentAcpBridgeBannerAnnouncement: Equatable {
+  let incidentID: Date
+  let message: String
+
+  init?(state: AcpBridgeBannerState?, isVisible: Bool) {
+    guard isVisible, let state else {
+      return nil
+    }
+    incidentID = state.firstDetectedAt
+    message = "ACP bridge outage. \(state.factText). \(AcpBridgeBannerState.blastRadiusText)."
+  }
+
+  static func shouldAnnounce(
+    _ announcement: Self?,
+    lastAnnouncedIncidentAt: Date?
+  ) -> Bool {
+    guard let announcement else {
+      return false
+    }
+    return announcement.incidentID != lastAnnouncedIncidentAt
   }
 }
 
@@ -96,7 +151,7 @@ private struct ContentAcpBridgeBanner: View {
               variant: .bordered,
               accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeOpenLogButton
             ) {
-              _ = store.revealDaemonLogInFinder()
+              _ = store.openDaemonLog()
             }
             .disabled(!state.daemonLogAvailable)
 

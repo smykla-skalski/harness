@@ -18,7 +18,8 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     sessionID: String,
     request: CodexRunRequest,
-    error: HarnessMonitorAPIError
+    error: HarnessMonitorAPIError,
+    firstFailureRecordedAt: Date
   ) async -> CodexStartRecoveryOutcome {
     guard case .server(let code, _) = error, code == 503 else {
       return .notAttempted
@@ -32,9 +33,13 @@ extension HarnessMonitorStore {
 
     let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
     guard hostBridge.running, hostBridge.capabilities["codex"]?.healthy == true else {
-      markHostBridgeIssue(for: "codex", statusCode: code)
       return .notAttempted
     }
+
+    noteAcpBridgeRetryAttempt(
+      for: "codex",
+      recordedAt: firstFailureRecordedAt
+    )
 
     do {
       let measuredRun = try await measureCodexRunStart(
@@ -45,12 +50,19 @@ extension HarnessMonitorStore {
       applyCodexRunStartSuccess(measuredRun.value)
       return .succeeded(measuredRun.value)
     } catch let retryError as HarnessMonitorAPIError {
-      if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
-        markHostBridgeIssue(for: "codex", statusCode: retryCode)
+      if case .server(let retryCode, _) = retryError {
+        if retryCode == 501 || retryCode == 503 {
+          markHostBridgeIssue(
+            for: "codex",
+            statusCode: retryCode,
+            recordedAt: firstFailureRecordedAt
+          )
+        }
       }
       presentFailureFeedback(retryError.localizedDescription)
       return .failed
     } catch {
+      reconcileAcpBridgeIncidentVisibility()
       presentFailureFeedback(error.localizedDescription)
       return .failed
     }
