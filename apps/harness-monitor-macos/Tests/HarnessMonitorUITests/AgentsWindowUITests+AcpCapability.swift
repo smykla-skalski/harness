@@ -39,6 +39,7 @@ extension AgentsWindowUITests {
       probe.exists,
       "Doctor probe should stay hidden until diagnostics disclosure is expanded"
     )
+    tapButton(in: app, title: "Copilot")
     tapElement(
       in: app,
       identifier: Accessibility.newSessionDiagnosticsToggle("copilot")
@@ -64,6 +65,8 @@ extension AgentsWindowUITests {
       waitForElement(modelPicker, timeout: Self.actionTimeout),
       "Missing ACP binary should fall back to the TUI-backed form state"
     )
+
+    tapButton(in: app, title: "Copilot")
 
     let installButton = button(
       in: app,
