@@ -53,7 +53,7 @@ extension AgentsWindowView {
           transportChoices: [
             AgentCapabilityTransportChoice(
               id: .acp(descriptor.id),
-              title: "Filesystem + terminal tools",
+              title: "Project access",
               capabilities: descriptor.capabilities
             )
           ],
@@ -105,7 +105,7 @@ extension AgentsWindowView {
       choices.append(
         AgentCapabilityTransportChoice(
           id: .acp(descriptor.id),
-          title: "Filesystem + terminal tools",
+          title: "Project access",
           capabilities: descriptor.capabilities
         )
       )

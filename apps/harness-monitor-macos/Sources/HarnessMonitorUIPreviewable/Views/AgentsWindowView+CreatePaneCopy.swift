@@ -3,15 +3,16 @@ extension AgentsWindowView {
     switch viewModel.createMode {
     case .terminal:
       if displayState.hasAgentTuis {
-        "Open terminal agents stay pinned in the sidebar, so you can launch another one without losing the active viewport."
+        "Open sessions stay pinned in the sidebar, "
+          + "so you can launch another one without losing the active view."
       } else {
-        "Choose a provider, tune the launch defaults, and start a terminal-backed agent from this window."
+        "Choose a provider, tune the launch defaults, and start a new session from this workspace."
       }
     case .codex:
       if displayState.hasCodexRuns {
-        "Codex threads stay pinned in the sidebar, so you can continue active work without losing context."
+        "Open runs stay pinned in the sidebar, so you can continue work without losing context."
       } else {
-        "Write a prompt, pick the run mode, and start a Codex thread from the same Agents window."
+        "Write a prompt, pick the run mode, and start a new run from the same workspace."
       }
     }
   }

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code when working in the Harness Monitor macOS app. The repo-root `CLAUDE.md` covers the Rust harness CLI and everything outside this directory.
+This file provides guidance to coding agents when working in the Harness Monitor macOS app. The repo-root `AGENTS.md` covers the Rust harness CLI and everything outside this directory.
 
 ## Build and test
 

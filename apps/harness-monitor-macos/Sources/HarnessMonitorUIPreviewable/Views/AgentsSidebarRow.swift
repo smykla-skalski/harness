@@ -48,7 +48,7 @@ struct AgentsSidebarRow: View {
     .clipped()
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
-      "\(title), \(brandSymbol?.rawValue ?? snapshot.runtime), \(snapshot.status.title)"
+      "\(title), \(runtimeDisplayLabel(brandSymbol?.rawValue ?? snapshot.runtime)), \(snapshot.status.title)"
     )
   }
 }
@@ -125,6 +125,6 @@ struct CodexRunSidebarRow: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(title), Codex, \(snapshot.status.title)")
+    .accessibilityLabel("\(title), run, \(snapshot.status.title)")
   }
 }

@@ -66,14 +66,12 @@ extension HarnessMonitorUITestCase {
         app.activate()
       }
 
-      let frameMarker = element(in: app, identifier: "\(identifier).frame")
       let button = button(in: app, identifier: identifier)
       if waitForElement(button, timeout: Self.fastPollInterval) {
         if tapButtonElementReliably(in: app, element: button) {
           return
         }
-        if let coordinate = centerCoordinate(in: app, for: frameMarker) {
-          coordinate.click()
+        if clickVisibleFrameMarker(in: app, identifier: identifier) {
           return
         }
       }
@@ -83,16 +81,12 @@ extension HarnessMonitorUITestCase {
         if tapButtonElementReliably(in: app, element: genericTarget) {
           return
         }
-        if let coordinate = centerCoordinate(in: app, for: frameMarker) {
-          coordinate.click()
+        if clickVisibleFrameMarker(in: app, identifier: identifier) {
           return
         }
       }
 
-      if waitForElement(frameMarker, timeout: Self.fastPollInterval),
-        let coordinate = centerCoordinate(in: app, for: frameMarker)
-      {
-        coordinate.click()
+      if clickVisibleFrameMarker(in: app, identifier: identifier) {
         return
       }
 
@@ -306,8 +300,57 @@ extension HarnessMonitorUITestCase {
       return nil
     }
 
-    let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
-    return centerCoordinate(in: app, for: frameMarker)
+    return visibleFrameMarkerCoordinate(in: app, identifier: identifier)
+  }
+
+  @discardableResult
+  func clickVisibleFrameMarker(
+    in app: XCUIApplication,
+    identifier: String
+  ) -> Bool {
+    guard let coordinate = visibleFrameMarkerCoordinate(in: app, identifier: identifier) else {
+      return false
+    }
+    coordinate.click()
+    return true
+  }
+
+  private func visibleFrameMarkerCoordinate(
+    in app: XCUIApplication,
+    identifier: String
+  ) -> XCUICoordinate? {
+    let frameMarker = self.element(in: app, identifier: "\(identifier).frame")
+    guard waitForElement(frameMarker, timeout: Self.fastPollInterval) else {
+      return nil
+    }
+
+    let containingWindow = window(in: app, containing: frameMarker)
+    guard waitForElement(containingWindow, timeout: Self.fastPollInterval) else {
+      return nil
+    }
+
+    let visibleFrame = containingWindow.frame.intersection(frameMarker.frame)
+    guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
+      return nil
+    }
+
+    let clampedFrame = visibleFrame.insetBy(
+      dx: min(4, max(visibleFrame.width / 4, 0)),
+      dy: min(4, max(visibleFrame.height / 4, 0))
+    )
+    let targetFrame = clampedFrame.isEmpty ? visibleFrame : clampedFrame
+    let targetPoint = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+    guard !targetPoint.x.isNaN, !targetPoint.y.isNaN else {
+      return nil
+    }
+
+    let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
+    return origin.withOffset(
+      CGVector(
+        dx: targetPoint.x - containingWindow.frame.minX,
+        dy: targetPoint.y - containingWindow.frame.minY
+      )
+    )
   }
 
   private func clampedWindowCoordinate(

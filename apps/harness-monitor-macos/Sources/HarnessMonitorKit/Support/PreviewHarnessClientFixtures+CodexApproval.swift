@@ -7,7 +7,7 @@ extension PreviewHarnessClient.Fixtures {
       requestId: "request-preview-1",
       kind: "command",
       title: "Approve workspace write",
-      detail: "Allow Codex to edit the preview worktree from the Agents window.",
+      detail: "Allow Codex to edit the preview worktree from the workspace.",
       threadId: "thread-preview-1",
       turnId: "turn-preview-1",
       itemId: "item-preview-1",

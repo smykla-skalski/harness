@@ -5,8 +5,8 @@ extension NewSessionSheetView {
   @MainActor var preferredLeaderSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       fieldBlock(
-        "Start with",
-        help: "Choose the leader that opens first when the session starts."
+        "Launch with",
+        help: "Choose the provider that starts first when the session begins."
       ) {
         NewSessionPreferredLeaderPicker(
           options: agentCapabilityOptions,
@@ -59,14 +59,14 @@ private struct NewSessionProviderDetailsDisclosure: View {
   private var summary: String {
     var installCount = 0
     var checkingCount = 0
-    var hostBridgeCount = 0
+    var bridgeAccessCount = 0
     var otherCount = 0
 
     for option in options {
       if option.showsInstallCTA {
         installCount += 1
-      } else if option.requiresHostBridgeInNewSession {
-        hostBridgeCount += 1
+      } else if option.requiresBridgeAccessInNewSession {
+        bridgeAccessCount += 1
       } else if option.hasPendingAcpProbe {
         checkingCount += 1
       } else {
@@ -74,7 +74,7 @@ private struct NewSessionProviderDetailsDisclosure: View {
       }
     }
 
-    switch (installCount, checkingCount, hostBridgeCount, otherCount, options.count) {
+    switch (installCount, checkingCount, bridgeAccessCount, otherCount, options.count) {
     case (0, 0, 0, 0, 1):
       return "1 provider needs attention."
     case (0, 0, 0, 0, let total):
@@ -82,25 +82,25 @@ private struct NewSessionProviderDetailsDisclosure: View {
     case (0, let checking, 0, 0, _):
       return
         checking == 1
-        ? "1 provider is still checking."
-        : "\(checking) providers are still checking."
+        ? "1 provider is still checking access."
+        : "\(checking) providers are still checking access."
     case (let install, 0, 0, 0, _):
       return install == 1 ? "1 provider needs setup." : "\(install) providers need setup."
-    case (0, 0, let hostBridge, 0, _):
+    case (0, 0, let bridgeAccess, 0, _):
       return
-        hostBridge == 1
-        ? "1 provider needs host bridge."
-        : "\(hostBridge) providers need host bridge."
+        bridgeAccess == 1
+        ? "1 provider needs bridge access."
+        : "\(bridgeAccess) providers need bridge access."
     default:
       var parts: [String] = []
       if installCount > 0 {
         parts.append("\(installCount) need setup")
       }
       if checkingCount > 0 {
-        parts.append("\(checkingCount) still checking")
+        parts.append("\(checkingCount) still checking access")
       }
-      if hostBridgeCount > 0 {
-        parts.append("\(hostBridgeCount) need host bridge")
+      if bridgeAccessCount > 0 {
+        parts.append("\(bridgeAccessCount) need bridge access")
       }
       if otherCount > 0 {
         parts.append("\(otherCount) need review")
@@ -119,7 +119,7 @@ private struct NewSessionProviderDetailsDisclosure: View {
       .padding(.top, HarnessMonitorTheme.spacingSM)
     } label: {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Text("Provider details")
+        Text("Providers needing attention")
           .scaledFont(.caption.bold())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Text(summary)
@@ -195,7 +195,7 @@ private struct NewSessionProviderSupportActions: View {
       }
 
       if let doctorProbeText = option.doctorProbeText, option.needsAttentionInNewSession {
-        Button(showDiagnostics ? "Hide diagnostics" : "Show diagnostics") {
+        Button(showDiagnostics ? "Hide setup details" : "Show setup details") {
           if reduceMotion {
             showDiagnostics.toggle()
           } else {
@@ -207,9 +207,9 @@ private struct NewSessionProviderSupportActions: View {
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .accessibilityLabel(
-          "\(showDiagnostics ? "Hide" : "Show") diagnostics for \(option.title)"
+          "\(showDiagnostics ? "Hide" : "Show") setup details for \(option.title)"
         )
-        .accessibilityHint(option.statusText)
+        .accessibilityHint(doctorProbeText)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id)
         )
@@ -249,106 +249,48 @@ private struct NewSessionCapabilityPresentation {
 
 extension AgentCapabilityOption {
   fileprivate var needsAttentionInNewSession: Bool {
-    showsInstallCTA || hasPendingAcpProbe || requiresHostBridgeInNewSession || !isEnabled
+    showsInstallCTA || hasPendingAcpProbe || requiresBridgeAccessInNewSession || !isEnabled
   }
 
-  fileprivate var requiresHostBridgeInNewSession: Bool {
-    sandboxed && !acpHostBridgeReady && acpChoice != nil
+  fileprivate var requiresBridgeAccessInNewSession: Bool {
+    requiresBridgeAccess
   }
 
   fileprivate func newSessionPresentation(
     for selection: AgentLaunchSelection? = nil
   ) -> NewSessionCapabilityPresentation {
     let choice = selection.map(transportChoice(for:)) ?? transportChoices[0]
-    let acpIsReady = acpChoice.map(isEnabled) == true
-    let startsWithTools = choice.id.isAcp
+    let startsWithProjectAccess = choice.id.isAcp && isEnabled(choice)
 
     let launchText =
-      startsWithTools
-      ? "Starts with filesystem + terminal tools."
-      : "Starts in Terminal screen."
+      startsWithProjectAccess
+      ? "Starts with project access available."
+      : "Opens in Terminal."
 
-    if !isEnabled {
-      if requiresHostBridgeInNewSession {
-        return NewSessionCapabilityPresentation(
-          title: "Host bridge required",
-          detail:
-            "Filesystem + terminal tools require the ACP host bridge while the daemon runs sandboxed.",
-          tint: HarnessMonitorTheme.caution
-        )
+    let detail: String =
+      switch availabilityState {
+      case .projectAccessAvailable:
+        startsWithProjectAccess ? launchText : "\(launchText) Project access is also available."
+      case .checkingAccess:
+        startsWithProjectAccess
+          ? "Project access is still being checked."
+          : "\(launchText) Project access is still being checked."
+      case .setupRequired:
+        startsWithProjectAccess
+          ? "Set up project access to launch this provider with project access."
+          : "\(launchText) Set up project access when you're ready."
+      case .bridgeAccessRequired:
+        "Turn on bridge access to use project access while the daemon runs sandboxed."
+      case .terminalOnly:
+        "Opens in Terminal only."
+      case .unavailable:
+        projectAccessGuidanceText ?? "This provider isn't available in New Session yet."
       }
-
-      if hasPendingAcpProbe {
-        return NewSessionCapabilityPresentation(
-          title: "Checking",
-          detail: "Harness is still checking whether this provider can be used from New Session.",
-          tint: HarnessMonitorTheme.secondaryInk
-        )
-      }
-
-      if showsInstallCTA {
-        return NewSessionCapabilityPresentation(
-          title: "Setup required",
-          detail: installHint ?? "Install this provider to make it available in New Session.",
-          tint: HarnessMonitorTheme.caution
-        )
-      }
-
-      return NewSessionCapabilityPresentation(
-        title: "Unavailable",
-        detail: installHint ?? "This provider is not available in New Session yet.",
-        tint: HarnessMonitorTheme.secondaryInk
-      )
-    }
-
-    if requiresHostBridgeInNewSession {
-      return NewSessionCapabilityPresentation(
-        title: "Terminal ready",
-        detail:
-          """
-          \(launchText) Filesystem + terminal tools require the ACP host bridge \
-          while the daemon runs sandboxed.
-          """,
-        tint: HarnessMonitorTheme.caution
-      )
-    }
-
-    if showsInstallCTA {
-      return NewSessionCapabilityPresentation(
-        title: "Terminal ready",
-        detail: "\(launchText) Install filesystem + terminal tools for richer project access.",
-        tint: HarnessMonitorTheme.caution
-      )
-    }
-
-    if hasPendingAcpProbe {
-      let checkingDetail =
-        startsWithTools
-        ? "Filesystem + terminal tools are still being checked."
-        : "Harness is still checking filesystem + terminal tools."
-      return NewSessionCapabilityPresentation(
-        title: "Checking tools",
-        detail: "\(launchText) \(checkingDetail)",
-        tint: HarnessMonitorTheme.secondaryInk
-      )
-    }
-
-    if acpIsReady {
-      let readyDetail =
-        startsWithTools
-        ? launchText
-        : "\(launchText) Filesystem + terminal tools are also available."
-      return NewSessionCapabilityPresentation(
-        title: "Ready with tools",
-        detail: readyDetail,
-        tint: HarnessMonitorTheme.success
-      )
-    }
 
     return NewSessionCapabilityPresentation(
-      title: "Terminal ready",
-      detail: launchText,
-      tint: HarnessMonitorTheme.success
+      title: availabilityState.title,
+      detail: detail,
+      tint: availabilityState.tint
     )
   }
 }

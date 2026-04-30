@@ -10,51 +10,65 @@ public struct DecisionContextPanel: View {
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       if sections.isEmpty {
-        SidebarEmptyState(
-          title: "No Context Yet",
-          systemImage: "doc.text.magnifyingglass",
-          message: "Supervisor context will appear here when the decision includes extra details."
-        )
+        emptyState
       } else {
-        ForEach(sections) { section in
-          ContextSectionCard(section: section)
+        ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+          ContextSectionBlock(section: section)
+          if index < sections.count - 1 {
+            Divider()
+          }
         }
       }
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionContextPanel)
   }
+
+  private var emptyState: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "info.circle")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        Text("No extra context yet")
+          .scaledFont(.callout.weight(.semibold))
+        Text(
+          "This decision does not include additional notes yet. "
+            + "Check the history or related workspace activity instead."
+        )
+        .scaledFont(.footnote)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        .fill(HarnessMonitorTheme.ink.opacity(0.04))
+    }
+  }
 }
 
-private struct ContextSectionCard: View {
+private struct ContextSectionBlock: View {
   let section: DecisionDetailViewModel.ContextSection
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(section.title)
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(Array(section.lines.enumerated()), id: \.offset) { _, line in
-          Text(line)
-            .scaledFont(.body)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(verbatim: line)
+            .scaledFont(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
         }
       }
     }
-    .padding(HarnessMonitorTheme.cardPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.04))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
-    }
   }
 }
 

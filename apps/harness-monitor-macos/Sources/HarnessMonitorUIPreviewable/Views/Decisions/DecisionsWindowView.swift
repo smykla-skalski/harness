@@ -6,6 +6,7 @@ public struct DecisionsWindowView: View {
     let ids: [String]
     let count: Int
     let filterSignature: String
+    let scopeDescription: String
     let capturedAt: Date
   }
 
@@ -29,8 +30,7 @@ public struct DecisionsWindowView: View {
   @State private var showDismissAllVisibleConfirmation = false
   @State private var reopenBatch: ReopenBatchState?
 
-  @AppStorage("harness.decisions.inspector.visible")
-  private var inspectorVisible: Bool = true
+  @State private var inspectorVisible = false
 
   public init(store: HarnessMonitorStore? = nil) {
     self.store = store
@@ -40,33 +40,30 @@ public struct DecisionsWindowView: View {
     store?.supervisorDecisionActionHandler() ?? NullDecisionActionHandler()
   }
 
-  private var selectedDecision: Decision? {
-    if let selection {
-      return runtime.decisions.first(where: { $0.id == selection }) ?? runtime.decisions.first
-    }
-    return runtime.decisions.first
+  private var decisionWorkspaceScope: DecisionWorkspaceScope {
+    DecisionWorkspaceScope(
+      decisions: runtime.decisions,
+      filters: sidebarFilters,
+      selectedDecisionID: selection
+    )
   }
 
-  private var openDecisionCount: Int { runtime.decisions.count }
+  private var selectedDecision: Decision? {
+    decisionWorkspaceScope.selectedDecision
+  }
+
+  private var openDecisionCount: Int { decisionWorkspaceScope.totalCount }
 
   private var criticalDecisionCount: Int {
-    runtime.decisions.reduce(into: 0) { count, decision in
-      if decision.severityRaw == DecisionSeverity.critical.rawValue {
-        count += 1
-      }
-    }
+    decisionWorkspaceScope.criticalCount
   }
 
   private var infoDecisionIDs: [String] {
-    runtime.decisions
-      .filter { $0.severityRaw == DecisionSeverity.info.rawValue }
-      .map(\.id)
+    decisionWorkspaceScope.visibleInfoDecisionIDs
   }
 
   private var criticalDecisionIDs: [String] {
-    runtime.decisions
-      .filter { $0.severityRaw == DecisionSeverity.critical.rawValue }
-      .map(\.id)
+    decisionWorkspaceScope.visibleCriticalDecisionIDs
   }
 
   private var navigationSubtitle: String {
@@ -86,14 +83,11 @@ public struct DecisionsWindowView: View {
   }
 
   private var visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
-    DecisionsSidebarViewModel.visibleSnapshot(
-      decisions: runtime.decisions,
-      filters: sidebarFilters
-    )
+    decisionWorkspaceScope.visibleSnapshot
   }
 
   private var visibleOpenDecisionIDs: [String] {
-    visibleSnapshot.decisionIDs
+    decisionWorkspaceScope.visibleDecisionIDs
   }
 
   @ViewBuilder private var detailColumn: some View {
@@ -105,11 +99,16 @@ public struct DecisionsWindowView: View {
         auditEvents: runtime.auditEvents,
         selectedTab: $detailTab,
         observer: sessionObserver,
+        decisionScope: decisionWorkspaceScope,
         primaryActionFocusDecisionID: store?.supervisorPrimaryActionFocusDecisionID,
         primaryActionFocusRequestTick: store?.supervisorPrimaryActionFocusRequestTick ?? 0
       )
     } else {
-      DecisionDetailView(selectedTab: $detailTab, observer: sessionObserver)
+      DecisionDetailView(
+        selectedTab: $detailTab,
+        observer: sessionObserver,
+        decisionScope: decisionWorkspaceScope
+      )
     }
   }
 
@@ -129,7 +128,7 @@ public struct DecisionsWindowView: View {
             decision: selectedDecision,
             liveTick: runtime.liveTick
           )
-          .inspectorColumnWidth(min: 220, ideal: 250, max: 300)
+          .inspectorColumnWidth(min: 200, ideal: 220, max: 280)
         }
     }
     .navigationSplitViewStyle(.balanced)
@@ -216,13 +215,21 @@ public struct DecisionsWindowView: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkReopenBatch)
       }
 
-      Button("Snooze all critical for 1h") {
+      Button(
+        decisionWorkspaceScope.hasActiveFilters
+          ? "Snooze filtered critical for 1h"
+          : "Snooze visible critical for 1h"
+      ) {
         Task { await snoozeAllCritical() }
       }
       .disabled(criticalDecisionIDs.isEmpty)
       .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkSnoozeCritical)
 
-      Button("Dismiss all info") {
+      Button(
+        decisionWorkspaceScope.hasActiveFilters
+          ? "Dismiss filtered info"
+          : "Dismiss visible info"
+      ) {
         Task { await dismissAllInfo() }
       }
       .disabled(infoDecisionIDs.isEmpty)
@@ -286,6 +293,7 @@ public struct DecisionsWindowView: View {
       ids: ids,
       count: ids.count,
       filterSignature: visibleSnapshot.signature,
+      scopeDescription: decisionWorkspaceScope.scopeDescription,
       capturedAt: Date()
     )
     dismissAllVisibleDraft = ""
@@ -300,7 +308,7 @@ public struct DecisionsWindowView: View {
       date: .abbreviated,
       time: .standard
     )
-    return "Scope: \(snapshot.filterSignature)\nCaptured: \(capturedAt)"
+    return "Scope: \(snapshot.scopeDescription)\nCaptured: \(capturedAt)"
   }
 
   private func confirmDismissAllVisible() async {

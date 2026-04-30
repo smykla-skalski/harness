@@ -59,7 +59,7 @@ private struct AcpPermissionDecisionDetailContent: View {
       Text("Agent permission request")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("Review the requested tool actions and choose what to allow before the agent continues.")
+      Text("Review the requested actions and choose what to allow before the agent continues.")
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       AcpPermissionDeadlineStatusView(

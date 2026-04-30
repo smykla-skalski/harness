@@ -29,100 +29,10 @@ extension PreviewHarnessClient {
 
   public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
     [
-      RuntimeModelCatalog(
-        runtime: "codex",
-        models: [
-          RuntimeModel(
-            id: "gpt-5.3-codex-spark",
-            displayName: "GPT-5.3 Codex Spark",
-            tier: .fast,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.4-mini",
-            displayName: "GPT-5.4 mini",
-            tier: .fast,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.5",
-            displayName: "GPT-5.5",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.4",
-            displayName: "GPT-5.4",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.3-codex",
-            displayName: "GPT-5.3 Codex",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.2",
-            displayName: "GPT-5.2",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-        ],
-        default: "gpt-5.5",
-        cheapestFastest: "gpt-5.3-codex-spark"
-      ),
-      RuntimeModelCatalog(
-        runtime: "claude",
-        models: [
-          RuntimeModel(id: "claude-haiku-4-5", displayName: "Haiku 4.5", tier: .fast),
-          RuntimeModel(id: "claude-sonnet-4-6", displayName: "Sonnet 4.6", tier: .balanced),
-        ],
-        default: "claude-sonnet-4-6",
-        cheapestFastest: "claude-haiku-4-5"
-      ),
-      RuntimeModelCatalog(
-        runtime: "gemini",
-        models: [
-          RuntimeModel(id: "gemini-2.5-flash-lite", displayName: "Gemini 2.5 Flash-Lite", tier: .fast),
-          RuntimeModel(
-            id: "gemini-2.5-pro",
-            displayName: "Gemini 2.5 Pro",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high"]
-          ),
-        ],
-        default: "gemini-2.5-pro",
-        cheapestFastest: "gemini-2.5-flash-lite"
-      ),
-      RuntimeModelCatalog(
-        runtime: "copilot",
-        models: [
-          RuntimeModel(
-            id: "gpt-5.4-mini",
-            displayName: "GPT-5.4 mini",
-            tier: .fast,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-          RuntimeModel(
-            id: "gpt-5.5",
-            displayName: "GPT-5.5",
-            tier: .balanced,
-            effortKind: .reasoningEffort,
-            effortValues: ["low", "medium", "high", "xhigh"]
-          ),
-        ],
-        default: "gpt-5.5",
-        cheapestFastest: "gpt-5.4-mini"
-      ),
+      codexRuntimeModelCatalog(),
+      claudeRuntimeModelCatalog(),
+      geminiRuntimeModelCatalog(),
+      copilotRuntimeModelCatalog(),
     ]
   }
 
@@ -198,6 +108,82 @@ extension PreviewHarnessClient {
         ),
       ],
       checkedAt: "2026-04-28T00:00:00Z"
+    )
+  }
+
+  private func codexRuntimeModelCatalog() -> RuntimeModelCatalog {
+    RuntimeModelCatalog(
+      runtime: "codex",
+      models: [
+        reasoningModel("gpt-5.3-codex-spark", displayName: "GPT-5.3 Codex Spark", tier: .fast),
+        reasoningModel("gpt-5.4-mini", displayName: "GPT-5.4 mini", tier: .fast),
+        reasoningModel("gpt-5.5", displayName: "GPT-5.5", tier: .balanced),
+        reasoningModel("gpt-5.4", displayName: "GPT-5.4", tier: .balanced),
+        reasoningModel("gpt-5.3-codex", displayName: "GPT-5.3 Codex", tier: .balanced),
+        reasoningModel("gpt-5.2", displayName: "GPT-5.2", tier: .balanced),
+      ],
+      default: "gpt-5.5",
+      cheapestFastest: "gpt-5.3-codex-spark"
+    )
+  }
+
+  private func claudeRuntimeModelCatalog() -> RuntimeModelCatalog {
+    RuntimeModelCatalog(
+      runtime: "claude",
+      models: [
+        RuntimeModel(id: "claude-haiku-4-5", displayName: "Haiku 4.5", tier: .fast),
+        RuntimeModel(id: "claude-sonnet-4-6", displayName: "Sonnet 4.6", tier: .balanced),
+      ],
+      default: "claude-sonnet-4-6",
+      cheapestFastest: "claude-haiku-4-5"
+    )
+  }
+
+  private func geminiRuntimeModelCatalog() -> RuntimeModelCatalog {
+    RuntimeModelCatalog(
+      runtime: "gemini",
+      models: [
+        RuntimeModel(
+          id: "gemini-2.5-flash-lite",
+          displayName: "Gemini 2.5 Flash-Lite",
+          tier: .fast
+        ),
+        RuntimeModel(
+          id: "gemini-2.5-pro",
+          displayName: "Gemini 2.5 Pro",
+          tier: .balanced,
+          effortKind: .reasoningEffort,
+          effortValues: ["low", "medium", "high"]
+        ),
+      ],
+      default: "gemini-2.5-pro",
+      cheapestFastest: "gemini-2.5-flash-lite"
+    )
+  }
+
+  private func copilotRuntimeModelCatalog() -> RuntimeModelCatalog {
+    RuntimeModelCatalog(
+      runtime: "copilot",
+      models: [
+        reasoningModel("gpt-5.4-mini", displayName: "GPT-5.4 mini", tier: .fast),
+        reasoningModel("gpt-5.5", displayName: "GPT-5.5", tier: .balanced),
+      ],
+      default: "gpt-5.5",
+      cheapestFastest: "gpt-5.4-mini"
+    )
+  }
+
+  private func reasoningModel(
+    _ id: String,
+    displayName: String,
+    tier: RuntimeModelTier
+  ) -> RuntimeModel {
+    RuntimeModel(
+      id: id,
+      displayName: displayName,
+      tier: tier,
+      effortKind: .reasoningEffort,
+      effortValues: ["low", "medium", "high", "xhigh"]
     )
   }
 }

@@ -106,13 +106,13 @@ struct AgentsCreateProviderRow: View {
 
   private var subtitle: String {
     if currentChoice.id.isAcp {
-      return "Starts with filesystem + terminal tools."
+      return "Starts with project access ready."
     }
     if let acpChoice = option.acpChoice, option.isEnabled(acpChoice) {
-      return "Starts in a terminal screen. Filesystem + terminal tools are also available."
+      return "Starts in a terminal screen. Project access is also available."
     }
     if option.showsInstallCTA {
-      return "Starts in a terminal screen. Install tools for richer project access."
+      return "Starts in a terminal screen. Install project access for richer project context."
     }
     return "Starts in a terminal screen."
   }
@@ -211,7 +211,7 @@ struct AgentsCreateTransportChoiceButton: View {
   let unavailableReason: String?
 
   private var shortTitle: String {
-    choice.id.isAcp ? "Tools" : "Terminal"
+    choice.id.isAcp ? "Project Access" : "Terminal"
   }
 
   var body: some View {

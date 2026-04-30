@@ -10,6 +10,7 @@ extension HarnessMonitorPreviewStoreFactory {
       .emptyCockpit: emptyCockpitConfiguration,
       .toolbarCountRegression: toolbarCountRegressionConfiguration,
       .codexApprovalUnification: codexApprovalUnificationConfiguration,
+      .agentTuiSingle: agentTuiSingleConfiguration,
       .agentTuiOverflow: agentTuiOverflowConfiguration,
       .taskDropCockpit: taskDropConfiguration,
       .offlineCached: offlineCachedConfiguration,
@@ -119,6 +120,37 @@ extension HarnessMonitorPreviewStoreFactory {
   static func codexApprovalUnificationConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.codexApprovalUnification
     let metrics = makeConnectionMetrics(latencyMs: 18, messagesPerSecond: 4.2)
+    return liveConfiguration(
+      mode: .populated,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.summary.sessionId,
+        selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    )
+  }
+
+  static func agentTuiSingleConfiguration() -> PreviewStoreConfiguration {
+    let baseFixtures = PreviewHarnessClient.Fixtures.populated
+    let fixtures = PreviewHarnessClient.Fixtures(
+      health: baseFixtures.health,
+      projects: baseFixtures.projects,
+      sessions: baseFixtures.sessions,
+      detail: baseFixtures.detail,
+      timeline: baseFixtures.timeline,
+      readySessionID: baseFixtures.readySessionID,
+      detailsBySessionID: baseFixtures.detailsBySessionID,
+      coreDetailsBySessionID: baseFixtures.coreDetailsBySessionID,
+      timelinesBySessionID: baseFixtures.timelinesBySessionID,
+      agentTuisBySessionID: [
+        PreviewFixtures.summary.sessionId: AgentTuiPreviewSupport.runningSingle
+      ]
+    )
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
       mode: .populated,
       fixtures: fixtures,

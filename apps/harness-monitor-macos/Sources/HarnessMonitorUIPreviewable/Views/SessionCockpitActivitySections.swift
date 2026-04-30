@@ -2,12 +2,18 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionCockpitSignalsSection: View {
+  private static let eagerRenderLimit = 8
+
   let store: HarnessMonitorStore
   let signals: [SessionSignalRecord]
   let isExtensionsLoading: Bool
   let isSessionReadOnly: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+
+  private var shouldEagerlyRenderSignals: Bool {
+    signals.count <= Self.eagerRenderLimit
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -17,20 +23,35 @@ struct SessionCockpitSignalsSection: View {
       if signals.isEmpty && !isExtensionsLoading {
         SessionCockpitEmptyStateRow(section: .signals)
       } else {
-        LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          ForEach(signals) { signal in
-            SessionCockpitSignalCard(
-              store: store,
-              signal: signal,
-              isSessionReadOnly: isSessionReadOnly,
-              dateTimeConfiguration: dateTimeConfiguration
-            )
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        signalList
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder private var signalList: some View {
+    if shouldEagerlyRenderSignals {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        signalCards
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    } else {
+      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        signalCards
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  private var signalCards: some View {
+    ForEach(signals) { signal in
+      SessionCockpitSignalCard(
+        store: store,
+        signal: signal,
+        isSessionReadOnly: isSessionReadOnly,
+        dateTimeConfiguration: dateTimeConfiguration
+      )
+    }
   }
 }
 
@@ -105,6 +126,9 @@ private struct SessionCockpitSignalCard: View {
       .harnessInteractiveCardButtonStyle(extraHoverHint: isHovered && showsActions)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)
+      )
+      .accessibilityFrameMarker(
+        "\(HarnessMonitorAccessibility.sessionSignalCard(signal.signal.signalId)).frame"
       )
       .contextMenu {
         Button {
