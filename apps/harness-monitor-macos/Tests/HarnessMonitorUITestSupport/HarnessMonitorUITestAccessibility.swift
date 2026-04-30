@@ -411,6 +411,8 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.task.\(slug(taskID))"
   }
 
+  static let sessionTaskListHeader = "harness.session.tasks.header"
+  static let sessionTaskListHeaderFrame = "\(sessionTaskListHeader).frame"
   static let sessionTaskListState = "harness.session.tasks.state"
   static func agentRowPersonaChip(_ agentID: String) -> String {
     "\(sessionAgentCard(agentID)).persona"

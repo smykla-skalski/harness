@@ -24,10 +24,6 @@ struct SessionCockpitView: View {
     openWindow(id: HarnessMonitorWindowID.decisions)
   }
 
-  private func openCreateTaskSheet() {
-    store.requestCreateTaskSheet()
-  }
-
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
@@ -41,11 +37,9 @@ struct SessionCockpitView: View {
           SessionCockpitHeaderCard(
             store: store,
             detail: detail,
-            isSessionReadOnly: isSessionReadOnly,
             observeSelectedSession: { Task { await store.observeSelectedSession() } },
             requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-            inspectObserver: focusObserver,
-            createTask: openCreateTaskSheet
+            inspectObserver: focusObserver
           )
           SessionActionDock(
             detail: detail,
