@@ -31,7 +31,6 @@ struct SessionCockpitTimelineSection: View {
   let isTimelineLoading: Bool
   let actionHandler: any DecisionActionHandler
   let loadWindow: @Sendable (TimelineWindowRequest) async -> Void
-  let scrollToTimelineTarget: (SessionTimelineScrollTarget) -> Void
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -74,6 +73,12 @@ struct SessionCockpitTimelineSection: View {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
+  private var timelineViewportHeight: CGFloat {
+    let rowCount = max(nodes.count + placeholderCount, 1)
+    let naturalHeight = CGFloat(rowCount) * 78 + HarnessMonitorTheme.spacingLG
+    return min(max(naturalHeight, 260), 620)
+  }
+
   var body: some View {
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -98,39 +103,55 @@ struct SessionCockpitTimelineSection: View {
   }
 
   private var timelineSurface: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-      if navigation.showsNavigation {
-        SessionTimelineNavigationControls(
-          navigation: navigation,
-          performAction: performNavigationAction(_:)
-        )
-      }
-
-      edgeAnchor(.top)
-      SessionTimelineCards(
-        nodes: nodes,
-        placeholderCount: placeholderCount,
-        shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
-        showsShimmer: shouldAnimatePlaceholders,
-        dateTimeConfiguration: dateTimeConfiguration,
-        actionHandler: actionHandler
-      )
-      .id(contentIdentity)
-      edgeAnchor(.bottom)
-    }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-        .fill(.primary.opacity(0.035))
-        .overlay {
-          RoundedRectangle(
-            cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-            style: .continuous
+    ScrollViewReader { scrollProxy in
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        if navigation.showsNavigation {
+          SessionTimelineNavigationControls(
+            navigation: navigation,
+            performAction: { action in
+              performNavigationAction(action, scrollProxy: scrollProxy)
+            }
           )
-          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
         }
+
+        timelineScrollContent
+      }
+      .padding(HarnessMonitorTheme.spacingLG)
+      .background {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+          .fill(.primary.opacity(0.035))
+          .overlay {
+            RoundedRectangle(
+              cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+              style: .continuous
+            )
+            .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+          }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var timelineScrollContent: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        edgeAnchor(.top)
+        SessionTimelineCards(
+          nodes: nodes,
+          placeholderCount: placeholderCount,
+          shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
+          showsShimmer: shouldAnimatePlaceholders,
+          dateTimeConfiguration: dateTimeConfiguration,
+          actionHandler: actionHandler
+        )
+        edgeAnchor(.bottom)
+      }
+      .id(contentIdentity)
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .frame(height: timelineViewportHeight)
+    .scrollIndicators(.visible)
+    .scrollClipDisabled(false)
   }
 
   private func requestLatestWindowIfNeeded() {
@@ -165,20 +186,25 @@ struct SessionCockpitTimelineSection: View {
     }
   }
 
-  private func performNavigationAction(_ action: SessionTimelineWindowAction) {
+  private func performNavigationAction(
+    _ action: SessionTimelineWindowAction,
+    scrollProxy: ScrollViewProxy
+  ) {
     Task {
       switch action {
       case .older:
+        await scroll(to: .bottom, using: scrollProxy)
         await loadWindowIfAvailable(for: .older)
-        await scroll(afterLoadTo: .bottom)
+        await scroll(to: .bottom, using: scrollProxy)
       case .latest:
         if !hasLatestWindow || navigation.hasNewer {
           await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
         }
-        await scroll(afterLoadTo: .top)
+        await scroll(to: .top, using: scrollProxy)
       case .newer:
+        await scroll(to: .top, using: scrollProxy)
         await loadWindowIfAvailable(for: .newer)
-        await scroll(afterLoadTo: .top)
+        await scroll(to: .top, using: scrollProxy)
       }
     }
   }
@@ -190,10 +216,15 @@ struct SessionCockpitTimelineSection: View {
     await loadWindow(request)
   }
 
-  private func scroll(afterLoadTo target: SessionTimelineScrollTarget) async {
+  private func scroll(
+    to target: SessionTimelineScrollTarget,
+    using scrollProxy: ScrollViewProxy
+  ) async {
     await Task.yield()
     await MainActor.run {
-      scrollToTimelineTarget(target)
+      withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) {
+        scrollProxy.scrollTo(target.id, anchor: target.anchor)
+      }
     }
   }
 
@@ -251,8 +282,7 @@ struct SessionTimelineContentIdentity: Hashable, Sendable {
     decisions: [],
     isTimelineLoading: false,
     actionHandler: NullDecisionActionHandler(),
-    loadWindow: { _ in },
-    scrollToTimelineTarget: { _ in }
+    loadWindow: { _ in }
   )
   .padding()
   .frame(width: 960)
@@ -266,8 +296,7 @@ struct SessionTimelineContentIdentity: Hashable, Sendable {
     decisions: [],
     isTimelineLoading: false,
     actionHandler: NullDecisionActionHandler(),
-    loadWindow: { _ in },
-    scrollToTimelineTarget: { _ in }
+    loadWindow: { _ in }
   )
   .padding()
   .frame(width: 960)
