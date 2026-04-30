@@ -5,6 +5,7 @@ use super::{
     stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry, utc_now,
 };
 use crate::session::service::{agent_status_db_label, canonicalize_active_session_without_leader};
+use crate::session::types::ManagedAgentKind;
 
 impl DaemonDb {
     /// Upsert a discovered project into the database.
@@ -380,9 +381,8 @@ fn replace_agents(
             .managed_agent
             .as_ref()
             .map(|managed| match managed.kind {
-                crate::session::types::ManagedAgentKind::Tui => "tui",
-                crate::session::types::ManagedAgentKind::Acp => "acp",
-                crate::session::types::ManagedAgentKind::Codex => "codex",
+                ManagedAgentKind::Tui => "tui",
+                ManagedAgentKind::Acp => "acp",
             });
         let managed_agent_id = agent
             .managed_agent

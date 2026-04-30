@@ -1,4 +1,4 @@
-use crate::agents::kind::RuntimeKind;
+use crate::agents::kind::{DisconnectReason, RuntimeKind};
 use crate::session::types::ManagedAgentRef;
 
 use super::{
@@ -309,7 +309,10 @@ pub(crate) fn apply_end_session(
     touch_agent(state, actor_id, now);
     for agent in state.agents.values_mut() {
         if agent.status.is_alive() {
-            agent.status = AgentStatus::disconnected_unknown();
+            agent.status = AgentStatus::Disconnected {
+                reason: DisconnectReason::SessionEnded,
+                stderr_tail: None,
+            };
             agent.current_task_id = None;
             agent.updated_at = now.to_string();
             agent.last_activity_at = Some(now.to_string());

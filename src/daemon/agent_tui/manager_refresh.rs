@@ -153,7 +153,7 @@ impl AgentTuiManagerHandle {
             .get(&snapshot.tui_id)
             .and_then(|active| active.process.clone())
         else {
-            return Ok(self.orphaned_inactive_snapshot(snapshot));
+            return Ok(Self::orphaned_inactive_snapshot(snapshot));
         };
 
         if let Some(status) = process.try_wait()? {
@@ -175,10 +175,7 @@ impl AgentTuiManagerHandle {
         Ok(snapshot)
     }
 
-    pub(super) fn orphaned_inactive_snapshot(
-        &self,
-        mut snapshot: AgentTuiSnapshot,
-    ) -> AgentTuiSnapshot {
+    pub(super) fn orphaned_inactive_snapshot(mut snapshot: AgentTuiSnapshot) -> AgentTuiSnapshot {
         let orphaned_status = match snapshot.status {
             AgentTuiStatus::Starting => Some(AgentTuiStatus::Failed),
             AgentTuiStatus::Running => Some(AgentTuiStatus::Exited),
@@ -370,6 +367,10 @@ impl AgentTuiManagerHandle {
         Ok(snapshot)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion in a leaf logging helper"
+    )]
     fn reconcile_refreshed_snapshot(&self, snapshot: &AgentTuiSnapshot) {
         if let Err(error) = self.reconcile_terminal_agent_state(snapshot) {
             tracing::warn!(

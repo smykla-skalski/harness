@@ -350,7 +350,7 @@ fn sync_session_backfills_managed_agent_identity_after_v10_schema_migration() {
             .agents
             .get("codex-worker")
             .and_then(|agent| agent.managed_agent.clone()),
-        Some(ManagedAgentRef::codex("codex-run-1"))
+        None
     );
     assert_eq!(
         loaded
@@ -379,11 +379,7 @@ fn sync_session_backfills_managed_agent_identity_after_v10_schema_migration() {
                 Some("tui".into()),
                 Some("agent-tui-1".into()),
             ),
-            (
-                "codex-worker".into(),
-                Some("codex".into()),
-                Some("codex-run-1".into()),
-            ),
+            ("codex-worker".into(), None, None,),
             ("unmanaged-reviewer".into(), None, None),
         ]
     );

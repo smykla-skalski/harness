@@ -2,7 +2,7 @@ use serde_json::json;
 
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
-    migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11,
+    migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11, migrate_v11_to_v12,
 };
 use super::registry::{ProjectOriginRecord, merge_project_origin};
 
@@ -295,6 +295,69 @@ fn migrate_v10_to_v11_is_idempotent_on_already_tagged_state() {
     assert_eq!(
         migrated["agents"]["a-already-tagged"]["status"],
         json!("active")
+    );
+}
+
+#[test]
+fn migrate_v11_to_v12_backfills_tui_managed_agent_from_legacy_capability() {
+    let migrated = migrate_v11_to_v12(json!({
+        "schema_version": 11,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "capabilities": ["review", "agent-tui: agent-tui-1 "]
+            }
+        },
+        "tasks": {}
+    }))
+    .expect("migrate v11");
+
+    assert_eq!(migrated["schema_version"], json!(12));
+    assert_eq!(
+        migrated["agents"]["agent-1"]["managed_agent"],
+        json!({ "kind": "tui", "id": "agent-tui-1" })
+    );
+}
+
+#[test]
+fn migrate_v11_to_v12_rejects_blank_tui_marker_ids() {
+    let error = migrate_v11_to_v12(json!({
+        "schema_version": 11,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "capabilities": ["agent-tui:   "]
+            }
+        },
+        "tasks": {}
+    }))
+    .expect_err("blank marker should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("session state agent 'agent-1' has malformed managed terminal capability")
+    );
+}
+
+#[test]
+fn migrate_v11_to_v12_rejects_conflicting_tui_marker_ids() {
+    let error = migrate_v11_to_v12(json!({
+        "schema_version": 11,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "capabilities": ["agent-tui:one", "agent-tui:two"]
+            }
+        },
+        "tasks": {}
+    }))
+    .expect_err("conflicting markers should fail");
+
+    assert!(
+        error.to_string().contains(
+            "session state agent 'agent-1' has conflicting managed terminal capabilities"
+        )
     );
 }
 

@@ -26,7 +26,7 @@ async fn connect_reads_current_schema_version() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4]
+        vec![1, 2, 3, 4, 5]
     );
 }
 
@@ -51,7 +51,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4]
+        vec![1, 2, 3, 4, 5]
     );
 }
 
@@ -136,7 +136,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4]
+        vec![1, 2, 3, 4, 5]
     );
 }
 
@@ -180,7 +180,7 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4]
+        vec![1, 2, 3, 4, 5]
     );
 }
 
@@ -270,7 +270,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4]
+        vec![1, 2, 3, 4, 5]
     );
     drop(async_db);
 

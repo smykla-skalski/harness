@@ -89,24 +89,25 @@ impl DaemonDb {
     }
 
     fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
-        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7") {
-            self.migrate_v7_to_v8()?;
-        }
-        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8") {
-            self.migrate_v8_to_v9()?;
-        }
-        if matches!(version, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9") {
-            self.migrate_v9_to_v10()?;
-        }
-        if matches!(
-            version,
-            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10"
-        ) {
-            self.migrate_v10_to_v11()?;
-        } else if version != "11" {
+        let version_number = version.parse::<u8>().map_err(|error| {
+            db_error(format!("invalid daemon database schema version '{version}': {error}"))
+        })?;
+        if version_number > 11 {
             return Err(db_error(format!(
                 "daemon database schema version '{version}' is newer than expected '11'; downgrade is not supported"
             )));
+        }
+        if version_number <= 7 {
+            self.migrate_v7_to_v8()?;
+        }
+        if version_number <= 8 {
+            self.migrate_v8_to_v9()?;
+        }
+        if version_number <= 9 {
+            self.migrate_v9_to_v10()?;
+        }
+        if version_number <= 10 {
+            self.migrate_v10_to_v11()?;
         }
         Ok(())
     }

@@ -71,7 +71,11 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
             async_db_slot.clone(),
             false,
         ),
-        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
+        acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(
+            sender.clone(),
+            db_slot.clone(),
+            async_db_slot.clone(),
+        ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender,
             db_slot,

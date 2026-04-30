@@ -10,6 +10,7 @@ use crate::daemon::agent_acp::manager::test_support::{
     seeded_manager, seeded_manager_with_events, write_cancel_recording_acp_agent,
     write_exiting_acp_agent, write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
 };
+use crate::session::types::ManagedAgentRef;
 
 fn manager() -> AcpAgentManagerHandle {
     seeded_manager()
@@ -54,9 +55,26 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
             .expect("start second");
 
         assert_ne!(first.acp_id, second.acp_id);
+        assert_ne!(first.agent_id, second.agent_id);
         assert_eq!(first.process_key, second.process_key);
         assert_eq!(first.pid, second.pid);
         assert_eq!(first.pgid, second.pgid);
+        assert_eq!(
+            session_managed_agent_id(&manager, "sess-1", &first.acp_id),
+            Some(first.agent_id.clone())
+        );
+        assert_eq!(
+            session_managed_agent_id(&manager, "sess-2", &second.acp_id),
+            Some(second.agent_id.clone())
+        );
+        assert!(
+            session_runtime_session_id(&manager, "sess-1", &first.acp_id).is_some(),
+            "reused ACP registration should persist the runtime session id"
+        );
+        assert!(
+            session_runtime_session_id(&manager, "sess-2", &second.acp_id).is_some(),
+            "reused ACP registration should persist the runtime session id"
+        );
         assert_eq!(manager.list("sess-1").expect("list first").len(), 1);
         assert_eq!(manager.list("sess-2").expect("list second").len(), 1);
 
@@ -373,6 +391,41 @@ fn process_count(manager: &AcpAgentManagerHandle) -> usize {
         .lock()
         .expect("ACP processes lock")
         .len()
+}
+
+fn session_managed_agent_id(
+    manager: &AcpAgentManagerHandle,
+    session_id: &str,
+    acp_id: &str,
+) -> Option<String> {
+    session_managed_agent(manager, session_id, acp_id).map(|agent| agent.agent_id.clone())
+}
+
+fn session_runtime_session_id(
+    manager: &AcpAgentManagerHandle,
+    session_id: &str,
+    acp_id: &str,
+) -> Option<String> {
+    session_managed_agent(manager, session_id, acp_id)
+        .and_then(|agent| agent.agent_session_id.clone())
+}
+
+fn session_managed_agent(
+    manager: &AcpAgentManagerHandle,
+    session_id: &str,
+    acp_id: &str,
+) -> Option<crate::session::types::AgentRegistration> {
+    let db = manager.state.db.get().cloned().expect("seeded manager db");
+    let db = db.lock().expect("seeded manager db lock");
+    let state = db
+        .load_session_state(session_id)
+        .expect("load session state")
+        .expect("session present");
+    state
+        .agents
+        .values()
+        .find(|agent| agent.managed_agent == Some(ManagedAgentRef::acp(acp_id)))
+        .cloned()
 }
 
 #[cfg(unix)]

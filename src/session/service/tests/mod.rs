@@ -155,7 +155,10 @@ fn session_service_round_trip_smoke_covers_public_surface() {
         assert_eq!(status.tasks[&task.task_id].status, TaskStatus::Done);
         assert_eq!(
             status.agents[&worker_id].status,
-            AgentStatus::disconnected_unknown()
+            AgentStatus::Disconnected {
+                reason: crate::agents::kind::DisconnectReason::UserCancelled,
+                stderr_tail: None,
+            }
         );
         assert_eq!(
             list_tasks(session_id, Some(TaskStatus::Done), project)
