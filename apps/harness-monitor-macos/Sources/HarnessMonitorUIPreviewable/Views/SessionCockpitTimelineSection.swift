@@ -31,6 +31,7 @@ struct SessionCockpitTimelineSection: View {
   let isTimelineLoading: Bool
   let actionHandler: any DecisionActionHandler
   let loadWindow: @Sendable (TimelineWindowRequest) async -> Void
+  let scrollToTimelineTarget: (SessionTimelineScrollTarget) -> Void
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -101,10 +102,11 @@ struct SessionCockpitTimelineSection: View {
       if navigation.showsNavigation {
         SessionTimelineNavigationControls(
           navigation: navigation,
-          loadWindow: loadWindow
+          performAction: performNavigationAction(_:)
         )
       }
 
+      edgeAnchor(.top)
       SessionTimelineCards(
         nodes: nodes,
         placeholderCount: placeholderCount,
@@ -114,6 +116,7 @@ struct SessionCockpitTimelineSection: View {
         actionHandler: actionHandler
       )
       .id(contentIdentity)
+      edgeAnchor(.bottom)
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .background {
@@ -141,6 +144,72 @@ struct SessionCockpitTimelineSection: View {
     Task {
       await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
     }
+  }
+
+  private func requestOlderWindowIfNeeded() {
+    requestWindowIfNeeded(for: .older)
+  }
+
+  private func requestNewerWindowIfNeeded() {
+    requestWindowIfNeeded(for: .newer)
+  }
+
+  private func requestWindowIfNeeded(for action: SessionTimelineWindowAction) {
+    guard !isTimelineLoading,
+      let request = navigation.request(for: action)
+    else {
+      return
+    }
+    Task {
+      await loadWindow(request)
+    }
+  }
+
+  private func performNavigationAction(_ action: SessionTimelineWindowAction) {
+    Task {
+      switch action {
+      case .older:
+        await loadWindowIfAvailable(for: .older)
+        await scroll(afterLoadTo: .bottom)
+      case .latest:
+        if !hasLatestWindow || navigation.hasNewer {
+          await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
+        }
+        await scroll(afterLoadTo: .top)
+      case .newer:
+        await loadWindowIfAvailable(for: .newer)
+        await scroll(afterLoadTo: .top)
+      }
+    }
+  }
+
+  private func loadWindowIfAvailable(for action: SessionTimelineWindowAction) async {
+    guard let request = navigation.request(for: action) else {
+      return
+    }
+    await loadWindow(request)
+  }
+
+  private func scroll(afterLoadTo target: SessionTimelineScrollTarget) async {
+    await Task.yield()
+    await MainActor.run {
+      scrollToTimelineTarget(target)
+    }
+  }
+
+  private func edgeAnchor(_ target: SessionTimelineScrollTarget) -> some View {
+    Color.clear
+      .frame(height: 1)
+      .id(target.id)
+      .accessibilityHidden(true)
+      .onAppear {
+        switch target {
+        case .top:
+          requestNewerWindowIfNeeded()
+        case .bottom:
+          requestOlderWindowIfNeeded()
+        }
+      }
   }
 
   private var hasLatestWindow: Bool {
@@ -182,7 +251,8 @@ struct SessionTimelineContentIdentity: Hashable, Sendable {
     decisions: [],
     isTimelineLoading: false,
     actionHandler: NullDecisionActionHandler(),
-    loadWindow: { _ in }
+    loadWindow: { _ in },
+    scrollToTimelineTarget: { _ in }
   )
   .padding()
   .frame(width: 960)
@@ -196,7 +266,8 @@ struct SessionTimelineContentIdentity: Hashable, Sendable {
     decisions: [],
     isTimelineLoading: false,
     actionHandler: NullDecisionActionHandler(),
-    loadWindow: { _ in }
+    loadWindow: { _ in },
+    scrollToTimelineTarget: { _ in }
   )
   .padding()
   .frame(width: 960)
