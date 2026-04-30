@@ -114,9 +114,7 @@ extension AgentsWindowView {
           }
         }
         .onChange(of: formModel.selectedLaunchSelection, initial: true) { _, newValue in
-          if case .tui(let runtime) = newValue {
-            formModel.runtime = runtime
-          }
+          formModel.runtime = newValue.preferredRuntime
         }
         .onChange(of: agentCapabilityOptions, initial: true) { _, options in
           let normalizedSelection = Self.normalizedLaunchSelection(
@@ -155,17 +153,18 @@ extension AgentsWindowView {
     @Bindable var formModel = viewModel
     let normalizedSelection = option.normalizedSelection(for: formModel.selectedLaunchSelection)
     let choice = option.transportChoice(for: normalizedSelection)
-    let catalog = terminalRuntimeCatalog(formModel)
+    let selectedRuntime = normalizedSelection.preferredRuntime
+    let catalog = formModel.availableRuntimeModels.first { $0.runtime == selectedRuntime.rawValue }
     let modelBinding = Binding<String>(
       get: {
-        formModel.selectedTerminalModelByRuntime[formModel.runtime]
+        formModel.selectedTerminalModelByRuntime[selectedRuntime]
           ?? catalog?.default ?? RuntimeCustomModel.tag
       },
-      set: { formModel.selectedTerminalModelByRuntime[formModel.runtime] = $0 }
+      set: { formModel.selectedTerminalModelByRuntime[selectedRuntime] = $0 }
     )
     let customModelBinding = Binding<String>(
-      get: { formModel.customTerminalModelByRuntime[formModel.runtime] ?? "" },
-      set: { formModel.customTerminalModelByRuntime[formModel.runtime] = $0 }
+      get: { formModel.customTerminalModelByRuntime[selectedRuntime] ?? "" },
+      set: { formModel.customTerminalModelByRuntime[selectedRuntime] = $0 }
     )
     let catalogModels = catalog?.models ?? []
     let effortValues =
@@ -175,12 +174,12 @@ extension AgentsWindowView {
       } ?? AgentsWindowView.allEffortLevels
     let effortBinding = Binding<String>(
       get: {
-        guard let current = formModel.selectedTerminalEffortByRuntime[formModel.runtime],
+        guard let current = formModel.selectedTerminalEffortByRuntime[selectedRuntime],
           effortValues.contains(current)
         else { return AgentsWindowView.defaultEffortLevel(from: effortValues) }
         return current
       },
-      set: { formModel.selectedTerminalEffortByRuntime[formModel.runtime] = $0 }
+      set: { formModel.selectedTerminalEffortByRuntime[selectedRuntime] = $0 }
     )
 
     return AgentsCreateSectionCard {
