@@ -344,7 +344,7 @@ struct AgentDetailSection: View {
   }
 
   private func openPendingDecisions() {
-    let directDecisionID = store.supervisorOpenDecisions
+    let oldestOpenDecisionID = store.supervisorOpenDecisions
       .filter { $0.agentID == agent.agentId }
       .sorted {
         if $0.createdAt != $1.createdAt {
@@ -354,7 +354,7 @@ struct AgentDetailSection: View {
       }
       .first?.id
 
-    if let decisionID = directDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
+    if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
