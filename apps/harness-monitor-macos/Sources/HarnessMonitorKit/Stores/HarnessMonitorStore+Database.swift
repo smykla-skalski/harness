@@ -16,6 +16,11 @@ public struct WorkspaceFileViewer: FileViewerActivating {
   }
 }
 
+public enum RevealAcpPermissionLogResult: Equatable {
+  case revealed
+  case unavailable
+}
+
 public struct DatabaseStatistics: Sendable {
   public let sessionCount: Int
   public let projectCount: Int
@@ -185,7 +190,50 @@ extension HarnessMonitorStore {
     fileViewer.reveal(itemsAt: [url])
   }
 
+  @discardableResult
+  public func revealDaemonLogInFinder() -> Bool {
+    guard let url = daemonLogURL() else {
+      presentFailureFeedback("Daemon log is unavailable.")
+      return false
+    }
+    fileViewer.reveal(itemsAt: [url])
+    return true
+  }
+
+  @discardableResult
+  public func revealAcpPermissionLogInFinder(
+    runID: String,
+    rawPath: String?
+  ) -> RevealAcpPermissionLogResult {
+    guard let url = acpPermissionLogURL(rawPath: rawPath) else {
+      presentFailureFeedback("ACP permission log for \(runID) is unavailable.")
+      return .unavailable
+    }
+    fileViewer.reveal(itemsAt: [url])
+    return .revealed
+  }
+
   // MARK: - Private helpers
+
+  func daemonLogURL() -> URL? {
+    let rawPath =
+      daemonStatus?.diagnostics.eventsPath ?? diagnostics?.workspace.eventsPath ?? ""
+    let trimmedPath = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedPath.isEmpty else {
+      return nil
+    }
+    return URL(fileURLWithPath: trimmedPath)
+  }
+
+  private func acpPermissionLogURL(rawPath: String?) -> URL? {
+    guard let rawPath else {
+      return nil
+    }
+    guard !rawPath.isEmpty else {
+      return nil
+    }
+    return URL(fileURLWithPath: rawPath)
+  }
 
   private func countModel<T: PersistentModel>(_ type: T.Type) -> Int {
     guard let modelContext, persistenceError == nil else { return 0 }

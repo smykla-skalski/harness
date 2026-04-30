@@ -67,7 +67,12 @@ public struct PreferencesView: View {
           PreferencesDatabaseSection(store: store)
         case .diagnostics:
           let snapshot = PreferencesDiagnosticsSnapshot(store: store)
-          PreferencesDiagnosticsSection(snapshot: snapshot)
+          PreferencesDiagnosticsSection(
+            snapshot: snapshot,
+            revealPermissionLog: { runID, path in
+              store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
+            }
+          )
         }
       }
     }
