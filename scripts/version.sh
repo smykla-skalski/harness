@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
 source "$ROOT/apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcode-version.sh
+source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
@@ -13,7 +15,8 @@ MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor-macos/Tuist/ProjectDescriptio
 MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
 MONITOR_GENERATED_PBXPROJ="$MONITOR_APP_ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 MONITOR_TUIST_PATCHER="$MONITOR_APP_ROOT/Scripts/patch-tuist-pbxproj.py"
-MONITOR_LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
+MONITOR_DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
+MONITOR_LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-$MONITOR_DEFAULT_LAST_UPGRADE_CHECK}"
 MONITOR_LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$MONITOR_LAST_UPGRADE_CHECK}"
 MONITOR_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PROJECT_OBJECT_VERSION:-77}"
 MONITOR_PREFERRED_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION:-$MONITOR_PROJECT_OBJECT_VERSION}"
