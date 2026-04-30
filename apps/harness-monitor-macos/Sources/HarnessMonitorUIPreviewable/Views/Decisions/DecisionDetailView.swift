@@ -92,32 +92,30 @@ public struct DecisionDetailView: View {
   }
 
   public var body: some View {
-    Group {
-      detailBody
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .backgroundExtensionEffect()
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        detailTabPicker
+    detailBody
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .backgroundExtensionEffect()
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
+      .toolbar {
+        ToolbarItem(placement: .principal) {
+          detailTabPicker
+        }
       }
-    }
-    .overlay {
-      if let viewModel {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.decisionPrimaryActionFocusState,
-          text: focusMarkerValue(for: viewModel)
-        )
+      .overlay {
+        if let viewModel {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.decisionPrimaryActionFocusState,
+            text: focusMarkerValue(for: viewModel)
+          )
+        }
       }
-    }
-    .onAppear {
-      applyPrimaryActionFocusIfNeeded()
-    }
-    .onChange(of: primaryActionFocusRequestTick) { _, _ in
-      applyPrimaryActionFocusIfNeeded()
-    }
+      .onAppear {
+        applyPrimaryActionFocusIfNeeded()
+      }
+      .onChange(of: primaryActionFocusRequestTick) { _, _ in
+        applyPrimaryActionFocusIfNeeded()
+      }
   }
 
   @ViewBuilder private var detailBody: some View {
@@ -198,22 +196,25 @@ public struct DecisionDetailView: View {
     _ viewModel: DecisionDetailViewModel,
     contextAdapter: DecisionKindContextAdapter
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    let effectiveActions = contextAdapter.suggestedActions(from: viewModel.suggestedActions)
+    let primaryActionID = primaryActionID(for: effectiveActions)
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Suggested Actions")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if viewModel.suggestedActions.isEmpty {
+      if effectiveActions.isEmpty {
         Text("No actions are available for this decision yet.")
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            ForEach(viewModel.suggestedActions) { action in
+            ForEach(effectiveActions) { action in
               actionButton(
                 for: action,
                 viewModel: viewModel,
-                contextAdapter: contextAdapter
+                contextAdapter: contextAdapter,
+                isPrimary: primaryActionID == action.id
               )
             }
           }
@@ -226,9 +227,9 @@ public struct DecisionDetailView: View {
   private func actionButton(
     for action: SuggestedAction,
     viewModel: DecisionDetailViewModel,
-    contextAdapter: DecisionKindContextAdapter
+    contextAdapter: DecisionKindContextAdapter,
+    isPrimary: Bool
   ) -> some View {
-    let isPrimary = viewModel.isPrimary(action)
     let role: ButtonRole? = action.kind == .dismiss ? .destructive : nil
     let button = HarnessMonitorAsyncActionButton(
       title: action.title,
@@ -284,26 +285,19 @@ public struct DecisionDetailView: View {
     )
   }
 
-  private func tint(for action: SuggestedAction, severity: DecisionSeverity) -> Color? {
-    switch action.kind {
-    case .dismiss:
-      return HarnessMonitorTheme.danger
-    case .snooze:
-      return HarnessMonitorTheme.caution
-    default:
-      if severity == .critical || severity == .needsUser {
-        return HarnessMonitorTheme.accent
-      }
-      return nil
-    }
-  }
-
   private func applyPrimaryActionFocusIfNeeded() {
-    guard let viewModel,
+    guard
+      let viewModel,
       primaryActionFocusDecisionID == viewModel.decision.id,
       primaryActionFocusRequestTick != 0,
       primaryActionFocusRequestTick != handledPrimaryActionFocusTick,
-      viewModel.primaryActionID != nil
+      primaryActionID(
+        for: DecisionKindContextAdapter(
+          decision: viewModel.decision,
+          store: store
+        )
+        .suggestedActions(from: viewModel.suggestedActions)
+      ) != nil
     else {
       return
     }
