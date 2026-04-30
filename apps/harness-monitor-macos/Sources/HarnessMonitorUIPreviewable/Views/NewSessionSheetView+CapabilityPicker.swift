@@ -6,18 +6,11 @@ extension NewSessionSheetView {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       fieldBlock(
         "Start with",
-        help: providerSectionHelpText
+        help: "Choose the leader that opens first when the session starts."
       ) {
         NewSessionPreferredLeaderPicker(
           options: agentCapabilityOptions,
           selection: preferredLaunchSelectionBinding
-        )
-      }
-
-      if let selectedLeaderOption {
-        NewSessionSelectedLeaderSummary(
-          option: selectedLeaderOption,
-          selection: preferredLaunchSelection
         )
       }
 
@@ -28,26 +21,13 @@ extension NewSessionSheetView {
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityPickerSection)
   }
 
-  private var providerSectionHelpText: String {
-    if providerAttentionOptions.isEmpty {
-      return "Choose the leader that opens first when the session starts."
-    }
-
-    return """
-      Choose the leader that opens first when the session starts.
-      Provider details only appear below when setup still needs attention.
-      """
-  }
-
-  private var selectedLeaderOption: AgentCapabilityOption? {
-    agentCapabilityOptions.first { option in
-      option.transportChoices.contains { $0.id == preferredLaunchSelection }
-    }
-  }
-
   private var providerAttentionOptions: [AgentCapabilityOption] {
-    agentCapabilityOptions.filter { option in
-      option.needsAttentionInNewSession && option.id != selectedLeaderOption?.id
+    let selectedLeaderID =
+      agentCapabilityOptions.first { option in
+        option.transportChoices.contains { $0.id == preferredLaunchSelection }
+      }?.id
+    return agentCapabilityOptions.filter { option in
+      option.needsAttentionInNewSession && option.id != selectedLeaderID
     }
   }
 }
@@ -70,51 +50,6 @@ private struct NewSessionPreferredLeaderPicker: View {
   }
 }
 
-private struct NewSessionSelectedLeaderSummary: View {
-  let option: AgentCapabilityOption
-  let selection: AgentLaunchSelection
-
-  private var presentation: NewSessionCapabilityPresentation {
-    option.newSessionPresentation(for: selection)
-  }
-
-  private var selectedChoice: AgentCapabilityTransportChoice {
-    option.transportChoice(for: selection)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Selected leader")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(option.title)
-          .scaledFont(.body.weight(.semibold))
-        NewSessionProviderStatusBadge(
-          title: presentation.title,
-          tint: presentation.tint
-        )
-      }
-
-      LabeledContent("Launches in") {
-        Text(selectedChoice.title)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .scaledFont(.caption)
-
-      Text(presentation.detail)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
-
-      NewSessionProviderSupportActions(option: option)
-    }
-    .newSessionProviderCard(tint: presentation.tint)
-  }
-}
-
 private struct NewSessionProviderDetailsDisclosure: View {
   let options: [AgentCapabilityOption]
   @Environment(\.accessibilityReduceMotion)
@@ -122,11 +57,22 @@ private struct NewSessionProviderDetailsDisclosure: View {
   @State private var isExpanded = false
 
   private var summary: String {
-    let installCount = options.filter(\.showsInstallCTA).count
-    let checkingCount = options.filter(\.hasPendingAcpProbe).count
-    let hostBridgeCount = options.filter(\.requiresHostBridgeInNewSession).count
-    let otherCount =
-      options.count - installCount - checkingCount - hostBridgeCount
+    var installCount = 0
+    var checkingCount = 0
+    var hostBridgeCount = 0
+    var otherCount = 0
+
+    for option in options {
+      if option.showsInstallCTA {
+        installCount += 1
+      } else if option.requiresHostBridgeInNewSession {
+        hostBridgeCount += 1
+      } else if option.hasPendingAcpProbe {
+        checkingCount += 1
+      } else {
+        otherCount += 1
+      }
+    }
 
     switch (installCount, checkingCount, hostBridgeCount, otherCount, options.count) {
     case (0, 0, 0, 0, 1):
@@ -404,21 +350,5 @@ extension AgentCapabilityOption {
       detail: launchText,
       tint: HarnessMonitorTheme.success
     )
-  }
-}
-
-extension View {
-  fileprivate func newSessionProviderCard(tint: Color) -> some View {
-    self
-      .padding(HarnessMonitorTheme.cardPadding)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .fill(tint.opacity(0.08))
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .stroke(tint.opacity(0.18), lineWidth: 1)
-      }
   }
 }
