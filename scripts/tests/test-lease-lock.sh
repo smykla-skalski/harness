@@ -145,6 +145,75 @@ scenario_waiter_cleanup_removes_heartbeat() {
   pass
 }
 
+scenario_heartbeat_helper_exits_when_owner_dir_is_removed() {
+  start_test "lease lock heartbeat helper exits quietly when owner dir disappears"
+  local lock_dir="$SANDBOX/heartbeat-helper-race"
+  local owner_dir="$lock_dir/owner"
+  local heartbeat_file="$owner_dir/heartbeat"
+  local metadata_file="$owner_dir/lease.env"
+  local helper_pid target_pid
+
+  mkdir -p "$owner_dir"
+  cat >"$metadata_file" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=owner
+LOCK_OWNER_ID=owner-helper
+LOCK_AGENT_ID=test
+LOCK_PID=$$
+LOCK_HOSTNAME=$(hostname)
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=test
+LOCK_ACQUIRED_AT_EPOCH=$(date +%s)
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=8
+LOCK_WAITER_TIMEOUT_SEC=9
+LOCK_LEASE_TIMEOUT_SEC=8
+LOCK_LAST_HEARTBEAT_EPOCH=$(date +%s)
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=$(( $(date +%s) + 1 ))
+LOCK_STATE=holding
+EOF
+  printf '0\n' >"$heartbeat_file"
+
+  /bin/sleep 300 &
+  target_pid=$!
+  SPAWNED_PIDS+=("$target_pid")
+
+  "$ROOT/scripts/lib/lease-lock-heartbeat.sh" \
+    "$target_pid" \
+    1 \
+    "$heartbeat_file" \
+    "$metadata_file" \
+    owner-helper \
+    owner \
+    holding \
+    test-resource \
+    "$target_pid" \
+    "$(date +%s)" \
+    "$ROOT" >/dev/null 2>&1 &
+  helper_pid=$!
+  SPAWNED_PIDS+=("$helper_pid")
+
+  wait_for_file_change "$heartbeat_file" "0" || {
+    fail "heartbeat helper never refreshed the owner heartbeat"
+    return
+  }
+
+  rm -rf "$owner_dir"
+
+  if ! wait "$helper_pid"; then
+    fail "heartbeat helper surfaced an error after owner dir cleanup"
+    return
+  fi
+
+  if [[ -e "$owner_dir" ]]; then
+    fail "heartbeat helper recreated the owner dir after cleanup"
+    return
+  fi
+
+  pass
+}
+
 scenario_waiter_observes_live_heartbeat() {
   start_test "waiter observes live owner heartbeat and acquires after release"
   local lock_dir="$SANDBOX/live-heartbeat"
@@ -467,15 +536,122 @@ scenario_active_owner_not_hijacked() {
   pass
 }
 
+scenario_stale_waiter_metadata_is_cleaned() {
+  start_test "stale dead waiter metadata is pruned before acquisition"
+  local lock_dir="$SANDBOX/stale-waiter-cleanup"
+  local now_epoch
+  mkdir -p "$lock_dir/waiters"
+  now_epoch="$(date +%s)"
+  cat >"$lock_dir/waiters/stale-dead.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=waiter
+LOCK_OWNER_ID=stale-dead
+LOCK_AGENT_ID=test
+LOCK_PID=999999
+LOCK_HOSTNAME=$(hostname)
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=stale-waiter
+LOCK_PROCESS_START=
+LOCK_ACQUIRED_AT_EPOCH=1
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=2
+LOCK_WAITER_TIMEOUT_SEC=2
+LOCK_LEASE_TIMEOUT_SEC=2
+LOCK_LAST_HEARTBEAT_EPOCH=$((now_epoch - 20))
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=$((now_epoch - 19))
+LOCK_STATE=waiting
+EOF
+  printf '%s\n' "$((now_epoch - 20))" >"$lock_dir/waiters/stale-dead.env.heartbeat"
+
+  # shellcheck disable=SC2016
+  if ! with_lock_env "$lock_dir" env \
+      LEASE_LOCK_WAITER_TIMEOUT_SECONDS=2 \
+      bash -c '
+        set -euo pipefail
+        export LEASE_LOCK_WAITER_ID=cleanup-owner
+        source "$LOCK_HELPER_PATH"
+        lease_lock_acquire
+        [[ ! -e "$LEASE_LOCK_WAITERS_DIR/stale-dead.env" ]]
+        [[ ! -e "$LEASE_LOCK_WAITERS_DIR/stale-dead.env.heartbeat" ]]
+        lease_lock_cleanup
+      '; then
+    fail "stale waiter metadata was not pruned"
+    return
+  fi
+
+  pass
+}
+
+scenario_wait_timeout_reports_owner_details() {
+  start_test "wait timeout includes owner summary details"
+  local lock_dir="$SANDBOX/wait-timeout-owner-summary"
+  local now_epoch owner_hostname timeout_output
+  owner_hostname="$(/bin/hostname)"
+  now_epoch="$(date +%s)"
+  mkdir -p "$lock_dir/owner" "$lock_dir/waiters"
+  cat >"$lock_dir/owner/lease.env" <<EOF
+LOCK_PROTOCOL_VERSION=1
+LOCK_RESOURCE=test-resource
+LOCK_ROLE=owner
+LOCK_OWNER_ID=timeout-owner
+LOCK_AGENT_ID=test
+LOCK_PID=999999
+LOCK_HOSTNAME=$owner_hostname
+LOCK_REPO_ROOT=$ROOT
+LOCK_COMMAND=timeout-holder
+LOCK_ACQUIRED_AT_EPOCH=$now_epoch
+LOCK_HEARTBEAT_EVERY_SEC=1
+LOCK_OWNER_STALE_AFTER_SEC=30
+LOCK_WAITER_TIMEOUT_SEC=2
+LOCK_LEASE_TIMEOUT_SEC=30
+LOCK_LAST_HEARTBEAT_EPOCH=$now_epoch
+LOCK_NEXT_HEARTBEAT_DUE_EPOCH=$((now_epoch + 1))
+LOCK_STATE=holding
+EOF
+  printf '%s\n' "$now_epoch" >"$lock_dir/owner/heartbeat"
+
+  # shellcheck disable=SC2016
+  timeout_output="$(
+    with_lock_env "$lock_dir" env \
+      LEASE_LOCK_OWNER_STALE_AFTER_SECONDS=30 \
+      LEASE_LOCK_WAITER_TIMEOUT_SECONDS=2 \
+      LEASE_LOCK_POLL_SECONDS=1 \
+      bash -c '
+        set -euo pipefail
+        export LEASE_LOCK_WAITER_ID=timeout-waiter
+        source "$LOCK_HELPER_PATH"
+        lease_lock_acquire
+      ' 2>&1 || true
+  )"
+
+  if ! grep -q "Timed out waiting for test-resource lease at $lock_dir" <<<"$timeout_output"; then
+    fail "missing timeout headline"
+    return
+  fi
+  if ! grep -q "timeout owner summary: owner_id=timeout-owner" <<<"$timeout_output"; then
+    fail "missing owner summary in timeout output"
+    return
+  fi
+  if ! grep -q "timeout waiters observed:" <<<"$timeout_output"; then
+    fail "missing waiter count in timeout output"
+    return
+  fi
+  pass
+}
+
 run_all() {
   scenario_acquire_release
   scenario_waiter_cleanup_removes_heartbeat
+  scenario_heartbeat_helper_exits_when_owner_dir_is_removed
   scenario_waiter_observes_live_heartbeat
   scenario_stale_owner_reclaimed
   scenario_waiter_reclaims_after_owner_becomes_stale_while_waiting
   scenario_live_owner_with_stale_heartbeat_not_reclaimed
   scenario_live_mutator_with_dead_owner_not_reclaimed
   scenario_active_owner_not_hijacked
+  scenario_stale_waiter_metadata_is_cleaned
+  scenario_wait_timeout_reports_owner_details
 }
 
 run_all
