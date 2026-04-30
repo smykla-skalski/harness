@@ -45,7 +45,7 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
       for: "acp-1"
     )
 
-    let store = await selectedActionStore(client: client)
+    let store = try await selectedActionStoreWithPersistence(client: client)
     store.applyAcpAgent(
       makeAcpSnapshot(
         acpID: "acp-1",
@@ -98,7 +98,7 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
     )
   }
 
-  func test_timeoutRemovalAutoResolvesDecisionAndWritesAuditEntry() async throws {
+  func test_timeoutRemovalAutoResolvesDecisionOnceAndWritesAuditEntry() async throws {
     let client = RecordingHarnessClient()
     let sessionID = PreviewFixtures.summary.sessionId
     let batch = AcpPermissionBatch(
@@ -120,7 +120,7 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
       expiresAt: "2026-04-28T00:05:00Z"
     )
 
-    let store = await selectedActionStore(client: client)
+    let store = try await selectedActionStoreWithPersistence(client: client)
     store.applyAcpAgent(
       makeAcpSnapshot(
         acpID: "acp-1",
@@ -135,11 +135,23 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
     await settleObservation()
 
     store.removeAcpPermissionBatch(batch, reason: .timeout)
+    store.removeAcpPermissionBatch(batch, reason: .timeout)
 
     await waitUntil {
       store.pendingAcpPermissionBatches.isEmpty
     } failureMessage: {
       "timed-out ACP batch stayed pending: \(store.pendingAcpPermissionBatches.map(\.batchId))"
+    }
+    await waitUntil {
+      !store.acpPermissionPendingTimeoutDecisionIDs.contains(decisionID)
+    } failureMessage: {
+      let pendingIDs = store.acpPermissionPendingTimeoutDecisionIDs
+      let payloadPresent = store.acpPermissionDecisionPayload(for: decisionID) != nil
+      return """
+        deadline auto-resolution stayed pending for \(decisionID); pending=\(pendingIDs); \
+        payloadPresent=\(payloadPresent); \
+        failure=\(store.currentFailureFeedbackMessage ?? "none")
+        """
     }
 
     let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
@@ -147,26 +159,121 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
       id: decisionID,
       in: decisionStore
     ) { decision in
-      decision.statusRaw == "dismissed" || decision.statusRaw == "resolved"
+      decision.statusRaw == "resolved"
     }
-    XCTAssertTrue(["dismissed", "resolved"].contains(resolvedDecision.statusRaw))
-    if resolvedDecision.statusRaw == "resolved" {
-      XCTAssertEqual(
-        decodeOutcome(resolvedDecision.resolutionJSON),
-        DecisionOutcome(
-          chosenActionID: nil,
-          note: "client_deadline_exceeded"
-        )
+    XCTAssertEqual(resolvedDecision.statusRaw, "resolved")
+    XCTAssertEqual(
+      decodeOutcome(resolvedDecision.resolutionJSON),
+      DecisionOutcome(
+        chosenActionID: nil,
+        note: "client_deadline_exceeded"
       )
-      let container = try XCTUnwrap(store.modelContext?.container)
-      let timeoutEvent = try await waitForSupervisorEvent(in: container) { event in
-        event.kind == "acp_permission_deadline_expired"
-          && event.ruleID == AcpPermissionDecisionPayload.ruleID
-          && event.payloadJSON.contains(#""decisionID":"acp-permission:batch-deadline-timeout""#)
-          && event.payloadJSON.contains(#""reason":"client_deadline_exceeded""#)
-      }
-      XCTAssertEqual(timeoutEvent.kind, "acp_permission_deadline_expired")
+    )
+    let container = try XCTUnwrap(store.modelContext?.container)
+    let timeoutEvent = try await waitForSupervisorEvent(in: container) { event in
+      event.kind == "acp_permission_deadline_expired"
+        && event.ruleID == AcpPermissionDecisionPayload.ruleID
+        && event.payloadJSON.contains(#""decisionID":"acp-permission:batch-deadline-timeout""#)
+        && event.payloadJSON.contains(#""reason":"client_deadline_exceeded""#)
     }
+    XCTAssertEqual(timeoutEvent.kind, "acp_permission_deadline_expired")
+
+    let auditContext = ModelContext(container)
+    let timeoutEvents = try auditContext.fetch(FetchDescriptor<SupervisorEvent>())
+      .filter { event in
+        event.kind == "acp_permission_deadline_expired"
+          && event.payloadJSON.contains(#""decisionID":"acp-permission:batch-deadline-timeout""#)
+      }
+    XCTAssertEqual(timeoutEvents.count, 1)
+  }
+
+  func test_timeoutResolutionPreventsStaleBatchReopen() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    let batch = AcpPermissionBatch(
+      batchId: "batch-timeout-no-reopen",
+      acpId: "acp-1",
+      sessionId: sessionID,
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-timeout",
+          sessionId: sessionID,
+          toolCall: .object(["kind": .string("write"), "path": .string("README.md")]),
+          options: [.string("allow"), .string("deny")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:01Z",
+      expiresAt: "2026-04-28T00:05:00Z"
+    )
+    let store = try await selectedActionStoreWithPersistence(client: client)
+    store.applyAcpAgent(
+      makeAcpSnapshot(acpID: "acp-1", sessionID: sessionID, pendingBatches: [batch])
+    )
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+    let payload = try XCTUnwrap(store.acpPermissionDecisionPayload(for: decisionID))
+    try await store.insertDecisionForTesting(payload.decisionDraft)
+    await settleObservation()
+    store.removeAcpPermissionBatch(batch, reason: .timeout)
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    _ = try await waitForDecision(
+      id: decisionID,
+      in: decisionStore
+    ) { decision in
+      decision.statusRaw == "resolved"
+    }
+
+    store.applyAcpPermissionBatch(batch)
+
+    XCTAssertTrue(store.pendingAcpPermissionBatches.isEmpty)
+  }
+
+  func test_shutdownRemovalResolvesCancelledDecisionWithAuditAnnotation() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    let batch = AcpPermissionBatch(
+      batchId: "batch-daemon-shutdown",
+      acpId: "acp-1",
+      sessionId: sessionID,
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-1",
+          sessionId: sessionID,
+          toolCall: .object(["kind": .string("write"), "path": .string("README.md")]),
+          options: [.string("allow"), .string("deny")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:01Z"
+    )
+    let store = try await selectedActionStoreWithPersistence(client: client)
+    store.applyAcpAgent(
+      makeAcpSnapshot(acpID: "acp-1", sessionID: sessionID, pendingBatches: [batch])
+    )
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+    let payload = try XCTUnwrap(store.acpPermissionDecisionPayload(for: decisionID))
+    try await store.insertDecisionForTesting(payload.decisionDraft)
+    await settleObservation()
+
+    store.removeAcpPermissionBatch(batch, reason: .shutdown)
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    let resolvedDecision = try await waitForDecision(
+      id: decisionID,
+      in: decisionStore
+    ) { decision in
+      decision.statusRaw == "resolved"
+    }
+    XCTAssertEqual(
+      decodeOutcome(resolvedDecision.resolutionJSON),
+      DecisionOutcome(chosenActionID: nil, note: "daemon_shutdown")
+    )
+
+    let container = try XCTUnwrap(store.modelContext?.container)
+    let shutdownEvent = try await waitForSupervisorEvent(in: container) { event in
+      event.kind == "acp_permission_daemon_shutdown"
+        && event.payloadJSON.contains(#""reason":"daemon_shutdown""#)
+        && event.payloadJSON.contains(#""uiAnnotation":"removed_after_daemon_shutdown""#)
+    }
+    XCTAssertEqual(shutdownEvent.kind, "acp_permission_daemon_shutdown")
   }
 
   private func settleObservation() async {
@@ -240,5 +347,25 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
       return nil
     }
     return try? JSONDecoder().decode(DecisionOutcome.self, from: Data(json.utf8))
+  }
+
+  private func selectedActionStoreWithPersistence(
+    client: RecordingHarnessClient
+  ) async throws -> HarnessMonitorStore {
+    let container = try ModelContainer(
+      for: SupervisorEvent.self,
+      Decision.self,
+      PolicyConfigRow.self,
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let daemon = RecordingDaemonController(client: client)
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      modelContainer: container
+    )
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.stopAllStreams(resetSubscriptions: false)
+    return store
   }
 }

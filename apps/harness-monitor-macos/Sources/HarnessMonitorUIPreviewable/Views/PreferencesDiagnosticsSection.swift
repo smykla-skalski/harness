@@ -68,6 +68,7 @@ public struct PreferencesDiagnosticsSection: View {
   public let snapshot: PreferencesDiagnosticsSnapshot
   public let revealPermissionLog: (String, String?) -> RevealAcpPermissionLogResult
   @State private var permissionLogErrorsByRunID: [String: String] = [:]
+  @State private var permissionLogRevealStatusesByRunID: [String: String] = [:]
 
   public init(
     snapshot: PreferencesDiagnosticsSnapshot,
@@ -95,8 +96,13 @@ public struct PreferencesDiagnosticsSection: View {
       PreferencesAcpPermissionLogSection(
         runs: snapshot.acpPermissionLogRuns,
         errorsByRunID: permissionLogErrorsByRunID,
+        revealStatusesByRunID: permissionLogRevealStatusesByRunID,
         reveal: revealPermissionLog,
+        onRevealed: { runID, message in
+          permissionLogRevealStatusesByRunID[runID] = message
+        },
         onError: { runID, message in
+          permissionLogRevealStatusesByRunID.removeValue(forKey: runID)
           permissionLogErrorsByRunID[runID] = message
         },
         clearError: { runID in
@@ -112,6 +118,9 @@ public struct PreferencesDiagnosticsSection: View {
       permissionLogErrorsByRunID = permissionLogErrorsByRunID.filter { entry in
         activeIDs.contains(entry.key)
       }
+      permissionLogRevealStatusesByRunID = permissionLogRevealStatusesByRunID.filter { entry in
+        activeIDs.contains(entry.key)
+      }
     }
   }
 }
@@ -119,12 +128,13 @@ public struct PreferencesDiagnosticsSection: View {
 private struct PreferencesAcpPermissionLogSection: View {
   let runs: [PreferencesDiagnosticsSnapshot.AcpPermissionLogRun]
   let errorsByRunID: [String: String]
+  let revealStatusesByRunID: [String: String]
   let reveal: (String, String?) -> RevealAcpPermissionLogResult
+  let onRevealed: (String, String) -> Void
   let onError: (String, String) -> Void
   let clearError: (String) -> Void
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if !runs.isEmpty {
       Section("ACP Permission Logs") {
         ForEach(runs, id: \.runID) { run in
@@ -139,6 +149,10 @@ private struct PreferencesAcpPermissionLogSection: View {
               let result = reveal(run.runID, run.path)
               if result == .revealed {
                 clearError(run.runID)
+                onRevealed(
+                  run.runID,
+                  "Reveal requested in Finder."
+                )
               } else {
                 onError(
                   run.runID,
@@ -146,18 +160,77 @@ private struct PreferencesAcpPermissionLogSection: View {
                 )
               }
             }
+            if let status = revealStatusesByRunID[run.runID] {
+              PreferencesAcpPermissionLogRevealStatusRow(
+                runID: run.runID,
+                message: status
+              )
+            }
             if let error = errorsByRunID[run.runID] {
-              Text(error)
-                .scaledFont(.caption)
-                .foregroundStyle(HarnessMonitorTheme.danger)
-                .accessibilityLiveRegion(.assertive)
-                .accessibilityIdentifier(
-                  "harness.preferences.diagnostics.acp-permission-log.error.\(run.runID)"
-                )
+              PreferencesAcpPermissionLogErrorRow(
+                runID: run.runID,
+                message: error
+              )
             }
           }
         }
       }
+    }
+  }
+}
+
+private struct PreferencesAcpPermissionLogRevealStatusRow: View {
+  let runID: String
+  let message: String
+
+  private var identifier: String {
+    HarnessMonitorAccessibility.preferencesAcpPermissionLogRevealStatus(runID)
+  }
+
+  var body: some View {
+    LabeledContent("Status") {
+      Text(message)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.success)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Status")
+    .accessibilityValue(message)
+    .accessibilityLiveRegion(.polite)
+    .accessibilityIdentifier(identifier)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: "\(identifier).probe",
+        text: message
+      )
+    }
+  }
+}
+
+private struct PreferencesAcpPermissionLogErrorRow: View {
+  let runID: String
+  let message: String
+
+  private var identifier: String {
+    "harness.preferences.diagnostics.acp-permission-log.error.\(runID)"
+  }
+
+  var body: some View {
+    LabeledContent("Error") {
+      Text(message)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.danger)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Error")
+    .accessibilityValue(message)
+    .accessibilityLiveRegion(.polite)
+    .accessibilityIdentifier(identifier)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: "\(identifier).probe",
+        text: message
+      )
     }
   }
 }

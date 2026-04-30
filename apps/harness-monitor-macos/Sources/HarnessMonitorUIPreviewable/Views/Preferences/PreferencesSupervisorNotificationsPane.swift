@@ -4,7 +4,8 @@ import SwiftUI
 public struct PreferencesSupervisorNotificationsPane: View {
   let notifications: HarnessMonitorUserNotificationController
   @State private var viewModel: PreferencesSupervisorNotificationsViewModel
-  @Environment(\.openURL) private var openURL
+  @Environment(\.openURL)
+  private var openURL
 
   public init(
     notifications: HarnessMonitorUserNotificationController,
@@ -18,6 +19,7 @@ public struct PreferencesSupervisorNotificationsPane: View {
 
   public var body: some View {
     Form {
+      acpCatalogSection
       acpStatusSection
       Section {
         LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
@@ -48,7 +50,8 @@ public struct PreferencesSupervisorNotificationsPane: View {
     .overlay {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.preferencesAcpNotificationStatusState,
-        text: "authorization=\(acpAuthorizationStatus.rawValue)"
+        text:
+          "authorization=\(acpAuthorizationStatus.rawValue) feature-acp=\(viewModel.acpCatalogEnabled)"
       )
     }
   }
@@ -59,9 +62,50 @@ public struct PreferencesSupervisorNotificationsPane: View {
     )
   }
 
+  @ViewBuilder private var acpCatalogSection: some View {
+    Section {
+      Toggle(
+        "Enable ACP catalog",
+        isOn: Binding(
+          get: { viewModel.acpCatalogEnabled },
+          set: { enabled in
+            let shouldRequestAuthorization =
+              enabled
+              && !viewModel.acpCatalogEnabled
+              && acpAuthorizationStatus == .notDetermined
+            viewModel.setAcpCatalogEnabled(enabled)
+            guard shouldRequestAuthorization else {
+              return
+            }
+            Task {
+              await notifications.requestAuthorization(profile: .standard)
+              await notifications.refreshStatus()
+            }
+          }
+        )
+      )
+      .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesAcpCatalogToggle)
+      .disabled(viewModel.acpCatalogForcedByEnvironment)
+
+      LabeledContent("Notification permission", value: acpAuthorizationStatus.displayTitle)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesAcpCatalogPermission)
+      if viewModel.acpCatalogForcedByEnvironment {
+        Text("Managed by HARNESS_FEATURE_ACP environment value.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    } header: {
+      Text("ACP Catalog")
+    } footer: {
+      Text("When enabled, ACP catalog surfaces can request Notification Center permission.")
+    }
+  }
+
   @ViewBuilder private var acpStatusSection: some View {
-    let verboseAnnouncementHelp =
-      "When off, VoiceOver announces only completed or failed tool calls. Turn this on to announce every tool-call state change."
+    let verboseAnnouncementHelp = """
+      When off, VoiceOver announces only completed or failed tool calls. \
+      Turn this on to announce every tool-call state change.
+      """
     Section {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         LabeledContent("Background ACP alerts", value: acpAuthorizationStatus.displayTitle)
@@ -76,7 +120,7 @@ public struct PreferencesSupervisorNotificationsPane: View {
           )
         )
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.preferencesAcpVerboseToolCallAnnouncements
+          HarnessMonitorAccessibility.preferencesAcpVerboseAnnounceToggle
         )
         .accessibilityHint(verboseAnnouncementHelp)
         .help(verboseAnnouncementHelp)
@@ -104,7 +148,11 @@ public struct PreferencesSupervisorNotificationsPane: View {
       Text("ACP Attention")
     } footer: {
       Text(
-        "Notification Center delivery is optional. Dock, badge, and Decisions routes stay available when system permission is denied, and the tool-call announcement toggle only changes VoiceOver verbosity."
+        """
+        Notification Center delivery is optional. Dock, badge, and Decisions routes stay available \
+        when system permission is denied, and the tool-call announcement toggle only changes \
+        VoiceOver verbosity.
+        """
       )
     }
   }

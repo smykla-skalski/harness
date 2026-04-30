@@ -4,6 +4,8 @@ import SwiftUI
 struct AcpPermissionModal: View {
   @Bindable var store: HarnessMonitorStore
   let batch: AcpPermissionBatch
+  @Environment(\.openWindow)
+  private var openWindow
 
   private var payload: AcpPermissionDecisionPayload {
     store.acpPermissionDecisionPayload(for: batch)
@@ -42,18 +44,13 @@ struct AcpPermissionModal: View {
           .acpPermissionModalSelectionSummary,
         panelAccessibilityID: HarnessMonitorAccessibility.acpPermissionModal,
         requestAccessibilityID: HarnessMonitorAccessibility.acpPermissionModalItem
-      ) { requestID, isSelected in
-        store.setAcpPermissionRequestSelection(
-          decisionID: decisionID,
-          requestID: requestID,
-          isSelected: isSelected
-        )
-      }
+      ) { _, _ in }
 
+      Divider()
       actionRow
     }
     .padding(HarnessMonitorTheme.spacingLG)
-    .frame(width: 520)
+    .frame(minWidth: 520, idealWidth: 580, maxWidth: 680)
     .onAppear {
       AccessibilityNotification.Announcement(openingAnnouncement).post()
     }
@@ -80,60 +77,24 @@ struct AcpPermissionModal: View {
     "Selection updated. \(selectionSummary)"
   }
 
-  @ViewBuilder
-  private var actionRow: some View {
+  @ViewBuilder private var actionRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Button("Close") {
+        store.presentingAcpPermissionBatch = nil
+      }
+      .keyboardShortcut(payload.isRenderable ? .cancelAction : .defaultAction)
+      .disabled(isResolving)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalClose)
+      Spacer()
       if payload.isRenderable {
-        Button(payload.requestCount == 1 ? "Deny" : "Deny All") {
-          resolve(
-            actionID: payload.requestCount == 1
-              ? AcpPermissionDecisionActionID.deny
-              : AcpPermissionDecisionActionID.denyAll)
-        }
-        .keyboardShortcut(.cancelAction)
-        .disabled(isResolving)
-
-        Spacer()
-
-        if payload.requestCount == 1 {
-          Button("Approve") {
-            resolve(actionID: AcpPermissionDecisionActionID.approve)
-          }
-          .keyboardShortcut(.defaultAction)
-          .disabled(isResolving)
-        } else {
-          Button("Approve Selected") {
-            resolve(actionID: AcpPermissionDecisionActionID.approveSelected)
-          }
-          .disabled(
-            isResolving
-              || payload.isActionDisabled(
-                AcpPermissionDecisionActionID.approveSelected,
-                resolutionState: resolutionState
-              )
-          )
-          Button("Approve All") {
-            resolve(actionID: AcpPermissionDecisionActionID.approveAll)
-          }
-          .keyboardShortcut(.defaultAction)
-          .disabled(isResolving)
-        }
-      } else {
-        Spacer()
-        Button("Close") {
-          store.presentingAcpPermissionBatch = nil
+        Button("Review in Decisions") {
+          store.supervisorSelectedDecisionID = decisionID
+          store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+          openWindow(id: HarnessMonitorWindowID.decisions)
         }
         .keyboardShortcut(.defaultAction)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenDecisions)
       }
-    }
-  }
-
-  private func resolve(actionID: String) {
-    Task {
-      await store.submitAcpPermissionDecisionAction(
-        decisionID: decisionID,
-        actionID: actionID
-      )
     }
   }
 }

@@ -16,16 +16,18 @@ struct AcpRuntimeViewTests {
     )
 
     #expect(
-      key == AcpRuntimeDisclosure.sceneStorageKey(
-        sessionID: "sess-harness/main",
-        agentID: "Worker/1"
-      )
+      key
+        == AcpRuntimeDisclosure.sceneStorageKey(
+          sessionID: "sess-harness/main",
+          agentID: "Worker/1"
+        )
     )
     #expect(
-      key != AcpRuntimeDisclosure.sceneStorageKey(
-        sessionID: "sess-harness/main",
-        agentID: "Worker_2f1"
-      )
+      key
+        != AcpRuntimeDisclosure.sceneStorageKey(
+          sessionID: "sess-harness/main",
+          agentID: "Worker_2f1"
+        )
     )
   }
 
@@ -87,6 +89,13 @@ struct AcpRuntimeViewTests {
     )
   }
 
+  @Test("Watchdog accessibility live-region policy is assertive only for fired state")
+  func watchdogAccessibilityLiveRegionPolicy() {
+    #expect(AcpRuntimeWatchdogAnnouncementPolicy.liveRegion(for: "active") == "polite")
+    #expect(AcpRuntimeWatchdogAnnouncementPolicy.liveRegion(for: " warning ") == "polite")
+    #expect(AcpRuntimeWatchdogAnnouncementPolicy.liveRegion(for: "fired") == "assertive")
+  }
+
   @Test("Watchdog announcement state resets when runtime identity changes")
   func watchdogAnnouncementCoordinatorSeedsOnRuntimeIdentityChange() {
     let now = Date(timeIntervalSince1970: 200)
@@ -102,9 +111,10 @@ struct AcpRuntimeViewTests {
     )
 
     #expect(
-      effect == .seed(
-        AcpRuntimeWatchdogAnnouncement(state: "active", announcedAt: now)
-      )
+      effect
+        == .seed(
+          AcpRuntimeWatchdogAnnouncement(state: "active", announcedAt: now)
+        )
     )
   }
 
@@ -123,10 +133,11 @@ struct AcpRuntimeViewTests {
     )
 
     #expect(
-      effect == .announce(
-        message: "Worker watchdog fired",
-        announcement: AcpRuntimeWatchdogAnnouncement(state: "fired", announcedAt: now)
-      )
+      effect
+        == .announce(
+          message: "Worker watchdog fired",
+          announcement: AcpRuntimeWatchdogAnnouncement(state: "fired", announcedAt: now)
+        )
     )
   }
 }

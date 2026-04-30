@@ -50,6 +50,20 @@ public enum AcpPermissionDecisionActionError: LocalizedError, Equatable, Sendabl
 /// The payload stores the raw daemon batch plus a validated renderable view-model so the UI pays
 /// semantic validation once per batch push instead of rebuilding it in every view body.
 public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
+  public enum Kind: String, Codable, Equatable, Sendable {
+    case acpPermission = "acp_permission"
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case decisionKind
+    case decisionID
+    case summary
+    case agent
+    case rawBatch
+    case renderableBatch
+    case renderError
+  }
+
   public struct AgentContext: Codable, Equatable, Sendable {
     public let agentID: String
     public let agentName: String
@@ -87,9 +101,11 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   }
 
   public static let ruleID = "acp-permission"
+  public static let decisionKind = Kind.acpPermission
   static let maximumRequestCount = 8
   static let unavailableSummary = "ACP permission request unavailable"
 
+  public let decisionKind: Kind
   public let decisionID: String
   public let summary: String
   public let agent: AgentContext
@@ -97,7 +113,7 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   public let renderableBatch: RenderableBatch?
   public let renderError: RenderableError?
 
-  private static let encoder: JSONEncoder = {
+  static let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     return encoder
@@ -106,6 +122,7 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   private static let decoder = JSONDecoder()
 
   public init(
+    decisionKind: Kind = Self.decisionKind,
     decisionID: String,
     summary: String,
     agent: AgentContext,
@@ -113,12 +130,24 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     renderableBatch: RenderableBatch?,
     renderError: RenderableError?
   ) {
+    self.decisionKind = decisionKind
     self.decisionID = decisionID
     self.summary = summary
     self.agent = agent
     self.rawBatch = rawBatch
     self.renderableBatch = renderableBatch
     self.renderError = renderError
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    decisionKind = try container.decodeIfPresent(Kind.self, forKey: .decisionKind) ?? .acpPermission
+    decisionID = try container.decode(String.self, forKey: .decisionID)
+    summary = try container.decode(String.self, forKey: .summary)
+    agent = try container.decode(AgentContext.self, forKey: .agent)
+    rawBatch = try container.decode(AcpPermissionBatch.self, forKey: .rawBatch)
+    renderableBatch = try container.decodeIfPresent(RenderableBatch.self, forKey: .renderableBatch)
+    renderError = try container.decodeIfPresent(RenderableError.self, forKey: .renderError)
   }
 
   public static func decisionID(for batchID: String) -> String {
@@ -164,6 +193,12 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
       return decodeFailure(
         for: decision,
         message: "Decision payload could not be decoded."
+      )
+    }
+    guard payload.decisionKind == decisionKind else {
+      return decodeFailure(
+        for: decision,
+        message: "Persisted ACP payload decision kind did not match the ACP contract."
       )
     }
     return revalidatedDecodedPayload(payload, decision: decision)
@@ -290,126 +325,4 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
     return false
   }
 
-  private static func suggestedAction(id: String, title: String) -> SuggestedAction {
-    SuggestedAction(
-      id: id,
-      title: title,
-      kind: .custom,
-      payloadJSON: "{\"action\":\"\(id)\"}"
-    )
-  }
-
-  private static func validate(
-    batch: AcpPermissionBatch
-  ) -> (batch: RenderableBatch?, error: RenderableError?) {
-    guard !batch.batchId.isEmpty else {
-      return (nil, invalidBatchError("The daemon sent an ACP batch without a batch id."))
-    }
-    guard !batch.sessionId.isEmpty else {
-      return (nil, invalidBatchError("The daemon sent an ACP batch without a session id."))
-    }
-    guard !batch.acpId.isEmpty else {
-      return (nil, invalidBatchError("The daemon sent an ACP batch without a managed agent id."))
-    }
-    guard !batch.requests.isEmpty else {
-      return (nil, invalidBatchError("The ACP batch does not contain any permission requests."))
-    }
-    guard batch.requests.count <= maximumRequestCount else {
-      return (
-        nil,
-        invalidBatchError(
-          "The ACP batch exceeded the supported \(maximumRequestCount)-request limit."
-        )
-      )
-    }
-
-    var requests: [RenderableBatch.Request] = []
-    requests.reserveCapacity(batch.requests.count)
-    var seenRequestIDs = Set<String>()
-
-    for request in batch.requests {
-      let validatedPermissionRequest: ValidatedAcpPermissionRequest
-      do {
-        validatedPermissionRequest = try Self.validatedRequest(
-          request,
-          batchSessionID: batch.sessionId,
-          seenRequestIDs: &seenRequestIDs
-        )
-      } catch let error as InvalidAcpPermissionRequestError {
-        return (nil, error.renderError)
-      } catch {
-        return (nil, invalidBatchError("ACP permission items could not be rendered."))
-      }
-      let title =
-        toolCallLabel(
-          validatedPermissionRequest.toolCall,
-          keys: ["kind", "name", "tool"]
-        ) ?? "Tool call"
-      let detail =
-        toolCallLabel(validatedPermissionRequest.toolCall, keys: ["path", "command"])
-        ?? compactJSON(validatedPermissionRequest.toolCall)
-      let breadcrumb =
-        toolCallLabel(validatedPermissionRequest.toolCall, keys: ["kind", "tool", "name"])
-        ?? title
-      requests.append(
-        RenderableBatch.Request(
-          id: validatedPermissionRequest.requestID,
-          title: title,
-          detail: detail,
-          breadcrumb: breadcrumb
-        )
-      )
-    }
-
-    return (RenderableBatch(batch: batch, requests: requests), nil)
-  }
-
-  static func validateToolCallContext(
-    in toolCallObject: [String: JSONValue]
-  ) -> RenderableError? {
-    guard
-      let toolCallContext = toolCallObject["tool_call_context"] ?? toolCallObject["toolCallContext"]
-    else {
-      return nil
-    }
-    guard case .object(let toolCallContextObject) = toolCallContext else {
-      return invalidBatchError("ACP tool_call_context must be an object when provided.")
-    }
-
-    let identifierKeys = [
-      "tool_call_id",
-      "toolCallId",
-      "invocation_id",
-      "invocationId",
-      "id",
-    ]
-    let hasIdentifier = identifierKeys.contains { key in
-      guard case .string(let value)? = toolCallContextObject[key] else {
-        return false
-      }
-      return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-    guard hasIdentifier else {
-      return invalidBatchError("ACP tool_call_context is missing a tool-call identifier.")
-    }
-    return nil
-  }
-
-  static func invalidBatchError(_ message: String) -> RenderableError {
-    RenderableError(
-      title: "ACP payload could not be rendered",
-      message: message,
-      recoverySuggestion: "Refresh the session or wait for a fresh ACP permission request."
-    )
-  }
-
-  private static func compactJSON(_ value: JSONValue) -> String {
-    guard
-      let data = try? encoder.encode(value),
-      let string = String(data: data, encoding: .utf8)
-    else {
-      return "Permission request"
-    }
-    return string
-  }
 }

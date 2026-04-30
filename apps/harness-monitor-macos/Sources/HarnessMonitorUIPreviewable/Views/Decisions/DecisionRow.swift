@@ -61,8 +61,7 @@ struct DecisionRow: View {
     return parts.joined(separator: " · ")
   }
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if acpPayload?.expiresAtDate != nil {
       TimelineView(.periodic(from: .now, by: 1)) { context in
         rowButton(referenceDate: context.date)
@@ -116,7 +115,14 @@ struct DecisionRow: View {
       .padding(.vertical, HarnessMonitorTheme.spacingSM * fontScale)
       .background(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.16) : Color.clear)
+          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.24) : Color.clear)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+          .strokeBorder(
+            isSelected ? HarnessMonitorTheme.accent.opacity(0.45) : Color.clear,
+            lineWidth: 1
+          )
       )
       .contentShape(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
@@ -133,8 +139,8 @@ struct DecisionRow: View {
     deadlineStatus: AcpPermissionDeadlineStatus?
   ) -> String {
     var parts = ["\(severity.chipLabel). \(decision.summary). \(metaLine)"]
-    if let deadlineStatus {
-      parts.append(deadlineStatus.label)
+    if deadlineStatus != nil {
+      parts.append("deadline shown below")
     }
     return parts.joined(separator: ". ")
   }
@@ -142,11 +148,8 @@ struct DecisionRow: View {
   private func accessibilityValueText(
     deadlineStatus: AcpPermissionDeadlineStatus?
   ) -> String {
-    var parts = [isSelected ? "selected" : "not selected"]
-    if let deadlineStatus {
-      parts.append(deadlineStatus.accessibilityValue)
-    }
-    return parts.joined(separator: ", ")
+    _ = deadlineStatus
+    return isSelected ? "selected" : "not selected"
   }
 
   private var freshPill: some View {

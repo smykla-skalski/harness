@@ -40,9 +40,12 @@ struct ContentAcpBridgeBannerBridge: View {
     contentChrome.acpBridgeBanner
   }
 
-  private var shouldShowBanner: Bool {
+  private var shouldAnnounceBanner: Bool {
     guard bannerState != nil else {
       return false
+    }
+    if HarnessMonitorUITestEnvironment.isEnabled {
+      return true
     }
     guard let keyWindowObserver else {
       return true
@@ -57,7 +60,7 @@ struct ContentAcpBridgeBannerBridge: View {
   private var visibleBannerAnnouncement: ContentAcpBridgeBannerAnnouncement? {
     ContentAcpBridgeBannerAnnouncement(
       state: bannerState,
-      isVisible: shouldShowBanner
+      isVisible: shouldAnnounceBanner
     )
   }
 
@@ -68,10 +71,12 @@ struct ContentAcpBridgeBannerBridge: View {
     guard let announcement else {
       return
     }
-    guard ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
-      announcement,
-      lastAnnouncedIncidentAt: lastAnnouncedIncidentAt
-    ) else {
+    guard
+      ContentAcpBridgeBannerAnnouncement.shouldAnnounce(
+        announcement,
+        lastAnnouncedIncidentAt: lastAnnouncedIncidentAt
+      )
+    else {
       return
     }
     AccessibilityNotification.Announcement(announcement.message).post()
@@ -80,7 +85,7 @@ struct ContentAcpBridgeBannerBridge: View {
 
   var body: some View {
     Group {
-      if shouldShowBanner, let bannerState {
+      if let bannerState {
         ContentAcpBridgeBanner(
           store: store,
           state: bannerState
@@ -125,63 +130,53 @@ private struct ContentAcpBridgeBanner: View {
   let state: AcpBridgeBannerState
 
   var body: some View {
-    VStack(spacing: 0) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-        Image(systemName: "exclamationmark.triangle.fill")
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .padding(.top, 2)
-          .accessibilityHidden(true)
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .padding(.top, 2)
+        .accessibilityHidden(true)
 
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-          Text(state.factText)
-            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
-            .foregroundStyle(.primary)
-          Text(AcpBridgeBannerState.blastRadiusText)
-            .scaledFont(.system(.callout, design: .rounded, weight: .regular))
-            .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        Text(state.factText)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.primary)
+        Text(AcpBridgeBannerState.blastRadiusText)
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
 
-          HarnessMonitorWrapLayout(
-            spacing: HarnessMonitorTheme.itemSpacing,
-            lineSpacing: HarnessMonitorTheme.itemSpacing
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.itemSpacing,
+          lineSpacing: HarnessMonitorTheme.itemSpacing
+        ) {
+          HarnessMonitorActionButton(
+            title: "Open daemon log",
+            tint: .secondary,
+            variant: .bordered,
+            accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeOpenLogButton
           ) {
-            HarnessMonitorActionButton(
-              title: "Open daemon log",
-              tint: .secondary,
-              variant: .bordered,
-              accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeOpenLogButton
-            ) {
-              _ = store.openDaemonLog()
-            }
-            .disabled(!state.daemonLogAvailable)
+            _ = store.openDaemonLog()
+          }
+          .disabled(!state.daemonLogAvailable)
 
-            HarnessMonitorAsyncActionButton(
-              title: "Run doctor",
-              tint: nil,
-              variant: .prominent,
-              isLoading: store.isDiagnosticsRefreshInFlight,
-              accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeRunDoctorButton
-            ) {
-              await store.refreshDiagnostics()
-            }
+          HarnessMonitorAsyncActionButton(
+            title: "Run doctor",
+            tint: nil,
+            variant: .prominent,
+            isLoading: store.isDiagnosticsRefreshInFlight,
+            accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeRunDoctorButton
+          ) {
+            await store.refreshDiagnostics()
           }
         }
-
-        Spacer(minLength: HarnessMonitorTheme.spacingLG)
       }
-      .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
 
-      Rectangle()
-        .fill(HarnessMonitorTheme.caution.opacity(0.35))
-        .frame(height: 1)
-        .accessibilityHidden(true)
+      Spacer(minLength: HarnessMonitorTheme.spacingLG)
     }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Color(nsColor: .windowBackgroundColor)
-        .overlay(HarnessMonitorTheme.caution.opacity(0.08))
-    )
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.contentAcpBridgeBanner)
   }

@@ -162,6 +162,23 @@ public actor DecisionStore {
     yield(.init(kind: .resolved, decisionID: id))
   }
 
+  public func resolveTerminal(id: String, outcome: DecisionOutcome) async throws {
+    guard isTerminalResolutionOutcome(outcome) else {
+      return
+    }
+    let updated = try withMutationContext { context in
+      guard let decision = try fetchDecision(id: id, context: context) else { return false }
+      guard isUnresolved(decision) || decision.statusRaw == Status.dismissed else { return false }
+      let encodedOutcome = try encodeOutcome(outcome)
+      decision.statusRaw = Status.resolved
+      decision.resolutionJSON = encodedOutcome
+      decision.snoozedUntil = nil
+      return true
+    }
+    guard updated else { return }
+    yield(.init(kind: .resolved, decisionID: id))
+  }
+
   public func expire(beforeAge: TimeInterval) async throws -> Int {
     let cutoff = Date().addingTimeInterval(-beforeAge)
     let ids = try withMutationContext { context in
@@ -263,13 +280,27 @@ public actor DecisionStore {
       decision.suggestedActionsJSON = draft.suggestedActionsJSON
       changed = true
     }
-    if reopen, decision.statusRaw != Status.open {
+    if reopen, decision.statusRaw != Status.open, !hasTerminalResolutionOutcome(decision) {
       decision.statusRaw = Status.open
       decision.snoozedUntil = nil
       decision.resolutionJSON = nil
       changed = true
     }
     return changed
+  }
+
+  nonisolated private func hasTerminalResolutionOutcome(_ decision: Decision) -> Bool {
+    guard let resolutionJSON = decision.resolutionJSON,
+      let data = resolutionJSON.data(using: .utf8),
+      let outcome = try? JSONDecoder().decode(DecisionOutcome.self, from: data)
+    else {
+      return false
+    }
+    return isTerminalResolutionOutcome(outcome)
+  }
+
+  nonisolated private func isTerminalResolutionOutcome(_ outcome: DecisionOutcome) -> Bool {
+    outcome.note == "client_deadline_exceeded" || outcome.note == "daemon_shutdown"
   }
 
   private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {

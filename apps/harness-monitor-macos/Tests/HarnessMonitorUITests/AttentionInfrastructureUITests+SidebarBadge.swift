@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class AttentionInfrastructureUITests_SidebarBadge:
+final class AttentionInfrastructureUITestsSidebarBadge:
   HarnessMonitorUITestCase,
   AgentsWindowUITestSupporting
 {

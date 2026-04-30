@@ -29,11 +29,12 @@ extension HarnessMonitorStore {
   }
 
   public func confirmationAgentSubject(sessionID: String, agentID: String) -> String {
-    let agentName: String? = if selectedSession?.session.sessionId == sessionID {
-      selectedSession?.agents.first(where: { $0.agentId == agentID })?.name
-    } else {
-      nil
-    }
+    let agentName: String? =
+      if selectedSession?.session.sessionId == sessionID {
+        selectedSession?.agents.first(where: { $0.agentId == agentID })?.name
+      } else {
+        nil
+      }
     return confirmationSubject(agentName, fallback: "this agent")
   }
 

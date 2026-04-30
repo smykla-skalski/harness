@@ -111,12 +111,12 @@ extension AgentsWindowView {
     {
       Divider()
         .padding(.vertical, HarnessMonitorTheme.spacingSM)
-        AgentDetailSection(
-          store: store,
-          agent: agent,
-          activity: session.agentActivity.first(where: { $0.agentId == agentID }),
-          runtimePresentation: AcpRuntimePresentation.compact
-        )
+      AgentDetailSection(
+        store: store,
+        agent: agent,
+        activity: session.agentActivity.first(where: { $0.agentId == agentID }),
+        runtimePresentation: AcpRuntimePresentation.compact
+      )
       .id("agents.agent.inline.\(agentID)")
     }
   }

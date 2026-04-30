@@ -39,7 +39,8 @@ struct AcpPermissionDeadlineStatusView: View {
     _ status: AcpPermissionDeadlineStatus
   ) -> some View {
     let label = statusLabel(status)
-      .accessibilityValue(status.accessibilityValue)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(status.accessibilityValue)
     if let accessibilityIdentifier {
       label.accessibilityIdentifier(accessibilityIdentifier)
     } else {
@@ -55,6 +56,7 @@ struct AcpPermissionDeadlineStatusView: View {
     let content = HStack(spacing: HarnessMonitorTheme.spacingXS) {
       Image(systemName: status.symbolName)
         .imageScale(.small)
+        .accessibilityHidden(true)
       Text(status.label)
         .monospacedDigit()
     }

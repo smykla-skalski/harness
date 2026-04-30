@@ -115,7 +115,8 @@ extension PreviewHarnessClientState {
         Array(acpAgentsBySessionID.keys)
       }
 
-    let sortedAgents = sessions
+    let sortedAgents =
+      sessions
       .flatMap { acpAgentsBySessionID[$0] ?? [] }
       .map(Self.inspectSnapshot(from:))
       .sorted {
@@ -133,9 +134,7 @@ extension PreviewHarnessClientState {
       || ProcessInfo.processInfo.environment[
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
       ] == "1"
-    let permissionLogPath = ProcessInfo.processInfo.environment[
-      "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_LOG_PATH"
-    ] ?? "/tmp/harness/permission-log.ndjson"
+    let permissionLogPath = previewAcpPermissionLogPath()
     return AcpAgentInspectSnapshot(
       acpId: snapshot.acpId,
       sessionId: snapshot.sessionId,
@@ -154,6 +153,15 @@ extension PreviewHarnessClientState {
       terminalCount: snapshot.terminalCount,
       promptDeadlineRemainingMs: seedsPendingDeadline ? 95_000 : 0
     )
+  }
+
+  private static func previewAcpPermissionLogPath() -> String? {
+    let key = "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_LOG_PATH"
+    if let rawValue = getenv(key) {
+      let value = String(cString: rawValue)
+      return value.isEmpty || value == "__missing__" ? nil : value
+    }
+    return "/tmp/harness/permission-log.ndjson"
   }
 
   private func previewPermissionBatches(

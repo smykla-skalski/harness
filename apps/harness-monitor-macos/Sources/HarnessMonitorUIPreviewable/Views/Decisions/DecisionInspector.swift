@@ -11,6 +11,7 @@ public struct DecisionInspector: View {
 
   private let decision: Decision?
   private let liveTick: DecisionLiveTickSnapshot
+  @State private var showIdentifierDetails = false
 
   public init(
     decision: Decision? = nil,
@@ -50,14 +51,20 @@ public struct DecisionInspector: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         metadataRow("Severity", value: severityTitle(severity))
         metadataRow("Status", value: decision.statusRaw.capitalized)
-        metadataRow("Rule", value: decision.ruleID, monospaced: true)
-        metadataRow("Session", value: decision.sessionID ?? "—", monospaced: true)
-        metadataRow("Agent", value: decision.agentID ?? "—", monospaced: true)
-        metadataRow("Task", value: decision.taskID ?? "—", monospaced: true)
         metadataRow("Created", value: createdLabel, monospaced: true)
         if let snoozeLabel {
           metadataRow("Snoozed Until", value: snoozeLabel, monospaced: true)
         }
+        DisclosureGroup("Identifiers", isExpanded: $showIdentifierDetails) {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+            metadataRow("Rule", value: decision.ruleID, monospaced: true)
+            metadataRow("Session", value: decision.sessionID ?? "—", monospaced: true)
+            metadataRow("Agent", value: decision.agentID ?? "—", monospaced: true)
+            metadataRow("Task", value: decision.taskID ?? "—", monospaced: true)
+          }
+          .padding(.top, HarnessMonitorTheme.spacingXS)
+        }
+        .scaledFont(.caption)
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.decisionInspectorMetadata)
     }

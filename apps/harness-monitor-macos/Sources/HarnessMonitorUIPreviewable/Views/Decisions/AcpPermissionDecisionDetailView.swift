@@ -36,7 +36,7 @@ private struct InteractiveAcpPermissionDecisionDetailView: View {
       resolutionState: resolutionState,
       isResolving: resolutionState.isSubmitting
         || store.resolvingAcpPermissionBatchID == payload.rawBatch.batchId,
-      lastMessageAt: store.connectionMetrics.lastMessageAt
+      lastMessageAt: store.acpPermissionLastSignalAt(sessionID: payload.rawBatch.sessionId)
     ) { requestID, isSelected in
       store.setAcpPermissionRequestSelection(
         decisionID: payload.decisionID,

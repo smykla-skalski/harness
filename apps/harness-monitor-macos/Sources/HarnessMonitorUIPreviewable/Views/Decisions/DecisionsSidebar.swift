@@ -1,157 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension DecisionSeverity {
-  /// Severity ordering used by the Decisions sidebar: higher value renders first.
-  public var sortKey: Int {
-    switch self {
-    case .critical: 4
-    case .needsUser: 3
-    case .warn: 2
-    case .info: 1
-    }
-  }
-
-  /// Short chip label for the sidebar filter row.
-  public var chipLabel: String {
-    switch self {
-    case .critical: "Critical"
-    case .needsUser: "Needs user"
-    case .warn: "Warn"
-    case .info: "Info"
-    }
-  }
-
-  var chipColor: Color {
-    switch self {
-    case .critical: HarnessMonitorTheme.danger
-    case .needsUser: HarnessMonitorTheme.warmAccent
-    case .warn: HarnessMonitorTheme.caution
-    case .info: HarnessMonitorTheme.accent
-    }
-  }
-
-  static var sidebarOrdering: [DecisionSeverity] {
-    allCases.sorted { $0.sortKey > $1.sortKey }
-  }
-}
-
-/// Pure grouping / sorting / filtering helpers for `DecisionsSidebar`. Split out so the
-/// behaviour can be covered by unit tests without spinning up a view hierarchy.
-public enum DecisionsSidebarViewModel {
-  public struct FilterState: Equatable {
-    public let query: String
-    public let severities: Set<DecisionSeverity>
-    public let scope: DecisionsSidebarSearchScope
-
-    public init(
-      query: String,
-      severities: Set<DecisionSeverity>,
-      scope: DecisionsSidebarSearchScope
-    ) {
-      self.query = query
-      self.severities = severities
-      self.scope = scope
-    }
-  }
-
-  public struct VisibleSnapshot: Equatable {
-    public let groups: [SessionGroup]
-    public let decisionIDs: [String]
-    public let signature: String
-  }
-
-  public struct SessionGroup: Equatable {
-    public let sessionID: String?
-    public let decisions: [Decision]
-
-    public init(sessionID: String?, decisions: [Decision]) {
-      self.sessionID = sessionID
-      self.decisions = decisions
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-      lhs.sessionID == rhs.sessionID && lhs.decisions.map(\.id) == rhs.decisions.map(\.id)
-    }
-  }
-
-  /// Groups decisions by `sessionID`, filters by case-insensitive `query` substring over
-  /// summary and by an explicit severity set, then sorts each group's rows by severity
-  /// descending (stable by `createdAt` then `id`). An empty `severities` set means "show all
-  /// severities"; any non-empty set keeps only decisions whose severity is a member. Sessions
-  /// sort by earliest `createdAt` ascending so the long-lived ones stay at the top; ties fall
-  /// back to `sessionID` alphabetically. The session-less bucket (`sessionID == nil`) sorts last.
-  public static func grouped(
-    decisions: [Decision],
-    query: String,
-    severities: Set<DecisionSeverity>
-  ) -> [SessionGroup] {
-    let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    let filtered = decisions.filter { decision in
-      guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else { return false }
-      if !severities.isEmpty, !severities.contains(severity) { return false }
-      if trimmedQuery.isEmpty { return true }
-      return decision.summary.range(of: trimmedQuery, options: .caseInsensitive) != nil
-    }
-
-    let buckets = Dictionary(grouping: filtered) { $0.sessionID }
-    return buckets.map { key, rows in
-      SessionGroup(sessionID: key, decisions: sortedBySeverity(rows))
-    }.sorted(by: sessionGroupOrdering)
-  }
-
-  public static func visibleSnapshot(
-    decisions: [Decision],
-    filters: FilterState
-  ) -> VisibleSnapshot {
-    let trimmed = filters.query.trimmingCharacters(in: .whitespacesAndNewlines)
-    let scoped: [Decision]
-    if trimmed.isEmpty {
-      scoped = decisions
-    } else {
-      scoped = decisions.filter { filters.scope.matches($0, trimmedQuery: trimmed) }
-    }
-    let summaryQuery = filters.scope == .summary ? trimmed : ""
-    let groups = grouped(
-      decisions: scoped,
-      query: summaryQuery,
-      severities: filters.severities
-    )
-    let ids = groups.flatMap(\.decisions).map(\.id)
-    let severitySignature = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
-    let signature = "scope=\(filters.scope.rawValue);query=\(trimmed);sev=\(severitySignature)"
-    return VisibleSnapshot(groups: groups, decisionIDs: ids, signature: signature)
-  }
-
-  private static func sortedBySeverity(_ decisions: [Decision]) -> [Decision] {
-    decisions.sorted { lhs, rhs in
-      let leftKey = DecisionSeverity(rawValue: lhs.severityRaw)?.sortKey ?? 0
-      let rightKey = DecisionSeverity(rawValue: rhs.severityRaw)?.sortKey ?? 0
-      if leftKey != rightKey { return leftKey > rightKey }
-      if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
-      return lhs.id < rhs.id
-    }
-  }
-
-  private static func sessionGroupOrdering(_ lhs: SessionGroup, _ rhs: SessionGroup) -> Bool {
-    switch (lhs.sessionID, rhs.sessionID) {
-    case (nil, nil):
-      return false
-    case (nil, _):
-      return false
-    case (_, nil):
-      return true
-    case (let left?, let right?):
-      let leftEarliest = lhs.decisions.map(\.createdAt).min() ?? Date.distantFuture
-      let rightEarliest = rhs.decisions.map(\.createdAt).min() ?? Date.distantFuture
-      if leftEarliest != rightEarliest {
-        return leftEarliest < rightEarliest
-      }
-      return left < right
-    }
-  }
-}
-
 /// Decisions window sidebar. Search + severity chip filters at the top, ScrollView + LazyVStack
 /// body (never List per memory `feedback_sidebar_no_list.md`), one section per session, severity
 /// chip next to each row. Selection writes back through a `Binding<String?>` so the detail
@@ -217,8 +66,10 @@ public struct DecisionsSidebar: View {
     )
   }
 
-  private var lastDaemonMessageAt: Date? {
-    store?.connectionMetrics.lastMessageAt
+  private func lastAcpMessageAt(
+    for decision: Decision
+  ) -> Date? {
+    store?.acpPermissionLastSignalAt(sessionID: decision.sessionID)
   }
 
   private func acpPayload(
@@ -342,11 +193,15 @@ public struct DecisionsSidebar: View {
   }
 
   private var severityChipRow: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      allChip
-      ForEach(DecisionSeverity.sidebarOrdering, id: \.self) { severity in
-        severityChip(severity)
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        allChip
+        ForEach(DecisionSeverity.sidebarOrdering, id: \.self) { severity in
+          severityChip(severity)
+        }
       }
+      .fixedSize(horizontal: true, vertical: false)
+      .padding(.vertical, 1)
     }
   }
 
@@ -357,6 +212,7 @@ public struct DecisionsSidebar: View {
     } label: {
       Text("All")
         .scaledFont(.caption.bold())
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
         .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
         .background(
@@ -391,6 +247,7 @@ public struct DecisionsSidebar: View {
     } label: {
       Text(severity.chipLabel)
         .scaledFont(.caption)
+        .fixedSize(horizontal: true, vertical: false)
         .lineLimit(1)
         .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
         .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
@@ -458,7 +315,7 @@ public struct DecisionsSidebar: View {
           isSelected: selectedDecisionID == decision.id,
           fontScale: fontScale,
           acpPayload: acpPayload(for: decision),
-          lastMessageAt: lastDaemonMessageAt
+          lastMessageAt: lastAcpMessageAt(for: decision)
         ) {
           selectedDecisionID = decision.id
         }
@@ -485,16 +342,5 @@ public struct DecisionsSidebar: View {
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .background(.background)
-  }
-}
-
-extension HarnessMonitorAccessibility {
-  public static let decisionsSidebarSearch = "harness.decisions.sidebar.search"
-  public static let decisionsSidebarSearchScopeMenu = "harness.decisions.sidebar.search.scope"
-  public static let decisionsSidebarFilterToggle = "harness.decisions.sidebar.filter.toggle"
-  public static let decisionsSidebarAllChip = "harness.decisions.sidebar.chip.all"
-
-  public static func decisionsSidebarSeverityChip(_ raw: String) -> String {
-    "harness.decisions.sidebar.chip.\(slug(raw))"
   }
 }

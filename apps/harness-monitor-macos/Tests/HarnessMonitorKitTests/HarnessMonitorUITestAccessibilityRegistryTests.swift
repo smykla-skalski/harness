@@ -151,6 +151,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(contentBridges.contains("contentAcpBridgeBanner"))
     #expect(contentBridges.contains("contentAcpBridgeOpenLogButton"))
     #expect(contentBridges.contains("contentAcpBridgeRunDoctorButton"))
+    let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
+    let contentView = try sourceFile(named: "ContentView.swift")
+    #expect(contentChrome.contains("ContentAcpBridgeBannerBridge("))
+    #expect(!contentView.contains("ContentAcpBridgeBannerBridge("))
   }
 
   @Test("New session capability identifiers match UI-test mirror")
@@ -197,6 +201,14 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDisclosureContent("worker-codex")
         == "harness.agents.detail.runtime.disclosure-content.worker-codex"
+    )
+    #expect(
+      HarnessMonitorAccessibility.agentRuntimeWatchdogAccessibilityState
+        == "harness.agents.detail.runtime.watchdog.accessibility.state"
+    )
+    #expect(
+      HarnessMonitorAccessibility.toolCallTimelineAccessibilityState
+        == "harness.window.agents.tool-call-timeline.accessibility.state"
     )
   }
 

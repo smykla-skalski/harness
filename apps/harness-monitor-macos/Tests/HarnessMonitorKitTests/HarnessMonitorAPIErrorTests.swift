@@ -40,7 +40,10 @@ struct HarnessMonitorAPIErrorTests {
 
     #expect(
       error.errorDescription
-        == "ACP sessions can't make tool calls because the shared host bridge isn't running. Start the host bridge and try again."
+        == """
+        ACP sessions can't make tool calls because the shared host bridge isn't running. \
+        Start the host bridge and try again.
+        """
     )
     #expect(error.serverMessage == "sandbox-disabled - acp.host-bridge")
     #expect(error.serverSemanticCode == nil)
