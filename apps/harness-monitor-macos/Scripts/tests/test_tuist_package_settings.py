@@ -40,8 +40,8 @@ PREVIEW_OVERRIDE_SETTINGS = (
 PROJECT_MANIFEST_SETTINGS = (
     '"REGISTER_APP_GROUPS": "NO"',
     '"CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements',
-    "BuildPhases.prepareAppEntitlements(variant: .monitorApp)",
-    "BuildPhases.prepareAppEntitlements(variant: .uiTestHost)",
+    "BuildSettings.canvasPreviewCompilationOverrides",
+    "BuildPhases.prepareAppEntitlementsPreAction()",
 )
 
 PREVIEW_SCHEME_MACRO_EXPANSIONS = (
@@ -94,6 +94,8 @@ class TuistPackageSettingsTests(unittest.TestCase):
             2,
             "app targets must expose app-group-free entitlements to Xcode",
         )
+        self.assertIn("$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements", manifest)
+        self.assertNotIn("BuildPhases.prepareAppEntitlements(variant:", manifest)
         self.assertNotIn('"OTHER_CODE_SIGN_FLAGS"', manifest)
         for setting in PREVIEW_SCHEME_MACRO_EXPANSIONS:
             with self.subTest(setting=setting):

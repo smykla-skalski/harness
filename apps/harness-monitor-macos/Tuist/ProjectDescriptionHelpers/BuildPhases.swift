@@ -28,6 +28,17 @@ public enum BuildPhases {
         )
     }
 
+    public static func prepareAppEntitlementsPreAction() -> ExecutionAction {
+        .executionAction(
+            title: "Prepare app entitlements",
+            scriptText: scriptPhaseBody(
+                projectVariable: "SRCROOT",
+                script: "prepare-app-entitlements.sh"
+            ),
+            target: .target("HarnessMonitor")
+        )
+    }
+
     public static func bundleDaemonAgent() -> TargetScript {
         .post(
             script: scriptPhaseBody(
@@ -47,15 +58,6 @@ public enum BuildPhases {
         case monitorApp = "monitor-app"
         case uiTestHost = "ui-test-host"
 
-        var appEntitlementInputPaths: [FileListGlob] {
-            switch self {
-            case .monitorApp:
-                [.glob("$(PROJECT_DIR)/HarnessMonitor.entitlements")]
-            case .uiTestHost:
-                [.glob("$(PROJECT_DIR)/HarnessMonitorUITestHost.entitlements")]
-            }
-        }
-
         var inputPaths: [String] {
             var paths: [String] = [
                 "$(PROJECT_DIR)/HarnessMonitorBase.entitlements",
@@ -70,6 +72,7 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Resources",
                 "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/inject-build-provenance.sh",
+                "$(PROJECT_DIR)/Scripts/prepare-app-entitlements.sh",
                 "$(PROJECT_DIR)/Scripts/run-xcode-build-server.sh",
                 "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
                 "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh",
@@ -81,22 +84,6 @@ public enum BuildPhases {
             }
             return paths
         }
-    }
-
-    public static func prepareAppEntitlements(variant: ProvenanceVariant) -> TargetScript {
-        .pre(
-            script: scriptPhaseBody(
-                projectVariable: "PROJECT_DIR",
-                script: "copy-app-entitlements.sh",
-                arguments: " \(variant.rawValue)"
-            ),
-            name: "Prepare App Entitlements",
-            inputPaths: variant.appEntitlementInputPaths,
-            outputPaths: [
-                "$(DERIVED_FILE_DIR)/$(TARGET_NAME).codesign.entitlements"
-            ],
-            basedOnDependencyAnalysis: true
-        )
     }
 
     public static func clearGatekeeperMetadata(variant: ProvenanceVariant) -> TargetScript {
