@@ -8,6 +8,61 @@ extension HarnessMonitorStore {
     return isBookmarked(sessionId: sessionID) ? "Remove Bookmark" : "Bookmark Session"
   }
 
+  public func refreshSessionDetail(sessionID: String) async {
+    guard let client else {
+      await selectSession(sessionID)
+      return
+    }
+
+    if selectedSessionID != sessionID || selectedSession?.session.sessionId != sessionID {
+      pendingListSelectionTask?.cancel()
+      pendingListSelectionTask = nil
+      pendingListSelectionTaskToken &+= 1
+      selectionTask?.cancel()
+      selectionTask = nil
+      primeSessionSelection(sessionID)
+    }
+
+    let preservedTimelineSnapshot = visiblePresentedTimelineSnapshot(sessionID: sessionID)
+    let requestID = beginSessionLoad()
+    defer {
+      completeSessionLoad(requestID)
+    }
+
+    do {
+      let measuredDetail = try await Self.measureOperation {
+        try await client.sessionDetail(id: sessionID, scope: nil)
+      }
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+      recordRequestSuccess()
+
+      let detail = sessionDetailPreservingFresherSelectedSummary(
+        sessionID: sessionID,
+        detail: measuredDetail.value
+      )
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: detail,
+        timeline: preservedTimelineSnapshot?.timeline ?? [],
+        timelineWindow: preservedTimelineSnapshot?.timelineWindow,
+        showingCachedData: false
+      )
+
+      if maintainsLiveDaemonObservation {
+        startSessionStream(using: client, sessionID: sessionID)
+      }
+    } catch is CancellationError {
+      return
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      presentFailureFeedback(error.localizedDescription)
+    }
+  }
+
   public func toggleSelectedSessionBookmark() {
     guard let sessionID = selectedSessionID else { return }
     let projectID =

@@ -16,7 +16,7 @@ extension HarnessMonitorStore {
 }
 
 extension TimelineEntry {
-  var timelineCursor: TimelineCursor {
+  public var timelineCursor: TimelineCursor {
     TimelineCursor(recordedAt: recordedAt, entryId: entryId)
   }
 }

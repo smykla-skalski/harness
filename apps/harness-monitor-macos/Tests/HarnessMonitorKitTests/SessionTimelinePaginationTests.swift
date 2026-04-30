@@ -38,12 +38,12 @@ struct SessionTimelineNavigationTests {
     #expect(navigation.statusText == "Showing 7-12 of 32")
     #expect(
       navigation.request(for: .older)
-        == TimelineWindowRequest(scope: .summary, limit: 6, before: oldestCursor)
+        == TimelineWindowRequest(scope: .summary, limit: 10, before: oldestCursor)
     )
-    #expect(navigation.request(for: .latest) == .latest(limit: 6))
+    #expect(navigation.request(for: .latest) == .latest(limit: 10))
     #expect(
       navigation.request(for: .newer)
-        == TimelineWindowRequest(scope: .summary, limit: 6, after: newestCursor)
+        == TimelineWindowRequest(scope: .summary, limit: 10, after: newestCursor)
     )
   }
 
@@ -60,7 +60,30 @@ struct SessionTimelineNavigationTests {
     #expect(navigation.statusText == "Latest 4 of 4")
     #expect(navigation.request(for: .older) == nil)
     #expect(navigation.request(for: .newer) == nil)
-    #expect(navigation.request(for: .latest) == .latest(limit: 6))
+    #expect(navigation.request(for: .latest) == .latest(limit: 10))
+  }
+
+  @Test("Scroll boundary state enters bottom edge repeatedly as scrolling advances")
+  func scrollBoundaryStateEntersBottomEdgeRepeatedlyAsScrollingAdvances() {
+    let outsideBottom = SessionTimelineScrollBoundaryState(
+      visibleMinY: 200,
+      visibleMaxY: 880,
+      contentHeight: 1_000
+    )
+    let firstBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 250,
+      visibleMaxY: 920,
+      contentHeight: 1_000
+    )
+    let advancedBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 275,
+      visibleMaxY: 950,
+      contentHeight: 1_000
+    )
+
+    #expect(firstBottomEntry.enteredBottomEdge(from: outsideBottom))
+    #expect(!firstBottomEntry.enteredBottomEdge(from: firstBottomEntry))
+    #expect(advancedBottomEntry.enteredBottomEdge(from: firstBottomEntry))
   }
 
   @Test("Timeline content identity changes only across sessions")
