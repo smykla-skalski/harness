@@ -59,9 +59,11 @@ struct SessionCockpitView: View {
             sessionID: detail.session.sessionId,
             timeline: timeline,
             timelineWindow: timelineWindow,
+            decisions: store.supervisorOpenDecisions,
             isTimelineLoading: isTimelineLoading,
-            loadPage: { page, pageSize in
-              await store.loadSelectedTimelinePage(page: page, pageSize: pageSize)
+            actionHandler: store.supervisorDecisionActionHandler(),
+            loadWindow: { request in
+              await store.loadSelectedTimelineWindow(request: request)
             }
           )
         }

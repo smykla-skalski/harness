@@ -250,6 +250,7 @@ extension HarnessMonitorStore {
     selectedTimelinePageLoadTask = nil
     selectedTimelinePageLoadKey = nil
     selectedTimelinePageLoadSequence &+= 1
+    cancelSelectedTimelineWindowLoad()
   }
 
   func performSessionSelection(sessionID: String) async {
