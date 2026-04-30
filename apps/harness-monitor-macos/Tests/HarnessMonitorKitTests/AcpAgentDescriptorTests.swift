@@ -49,11 +49,16 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertNil(configuration.runtimeProbe)
   }
 
-  func testStartRequestEncodesRecordingPermissionToggle() throws {
+  func testStartRequestEncodesOrchestrationFieldsAndRecordingPermissionToggle() throws {
     let request = AcpAgentStartRequest(
       agent: "copilot",
+      role: .reviewer,
+      fallbackRole: .observer,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: "Copilot Reviewer",
       prompt: "Run the task",
       projectDir: "/tmp/harness",
+      persona: "reviewer",
       recordPermissions: true
     )
 
@@ -63,6 +68,11 @@ final class AcpAgentDescriptorTests: XCTestCase {
     let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
     XCTAssertEqual(json?["agent"] as? String, "copilot")
+    XCTAssertEqual(json?["role"] as? String, "reviewer")
+    XCTAssertEqual(json?["fallback_role"] as? String, "observer")
+    XCTAssertEqual(json?["capabilities"] as? [String], ["fs.read", "terminal.spawn"])
+    XCTAssertEqual(json?["name"] as? String, "Copilot Reviewer")
+    XCTAssertEqual(json?["persona"] as? String, "reviewer")
     XCTAssertEqual(json?["record_permissions"] as? Bool, true)
   }
 

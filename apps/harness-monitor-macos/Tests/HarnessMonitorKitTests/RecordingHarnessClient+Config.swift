@@ -332,6 +332,20 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureAcpStartError(_ error: (any Error)?) {
+    lock.withLock {
+      acpStartError = error
+      queuedAcpStartErrors = []
+    }
+  }
+
+  func configureAcpStartErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedAcpStartErrors = errors
+      acpStartError = nil
+    }
+  }
+
   func configureAgentTuiStartError(_ error: (any Error)?) {
     lock.withLock { agentTuiStartError = error }
   }
@@ -360,6 +374,16 @@ extension RecordingHarnessClient {
 
   func configuredAgentTuiStartError() -> (any Error)? {
     lock.withLock { agentTuiStartError }
+  }
+
+  func dequeueConfiguredAcpStartError() -> (any Error)? {
+    lock.withLock {
+      guard let error = queuedAcpStartErrors.first else {
+        return acpStartError
+      }
+      queuedAcpStartErrors.removeFirst()
+      return error
+    }
   }
 
   func configuredHostBridgeReconfigureError() -> (any Error)? {

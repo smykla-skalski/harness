@@ -67,6 +67,10 @@ import SwiftUI
   )
 }
 
+#Preview("Agents - ACP Leader Create") {
+  agentsWindowAcpLeaderPreview()
+}
+
 @MainActor
 private func agentsWindowPreview(
   width: CGFloat = 980,
@@ -74,6 +78,37 @@ private func agentsWindowPreview(
   store: HarnessMonitorStore
 ) -> some View {
   AgentsWindowView(store: store)
+    .frame(width: width, height: height)
+    .padding()
+}
+
+@MainActor
+private func agentsWindowAcpLeaderPreview(
+  width: CGFloat = 1_140,
+  height: CGFloat = 900
+) -> some View {
+  let store = AgentTuiPreviewSupport.makeStore(tuis: [], bridgeState: .ready)
+  let view = AgentsWindowView(store: store)
+  view.viewModel.createMode = .terminal
+  view.viewModel.selectedLaunchSelection = .acp("copilot")
+  view.viewModel.runtime = .copilot
+  view.viewModel.availableAcpAgents = PreviewHarnessClient.previewAcpAgentDescriptors
+  view.viewModel.availablePersonas = PreviewHarnessClient.previewPersonas
+  view.viewModel.availableRuntimeModels = PreviewHarnessClient.previewRuntimeModelCatalogs
+  view.viewModel.runtimeProbeResults = PreviewHarnessClient.previewRuntimeProbeResults()
+  view.viewModel.selectedRole = .leader
+  view.viewModel.selectedAcpFallbackRole = .observer
+  view.viewModel.selectedPersona = "reviewer"
+  if let copilotCatalog = PreviewHarnessClient.previewRuntimeModelCatalogs.first(
+    where: { $0.runtime == AgentTuiRuntime.copilot.rawValue }
+  ) {
+    view.viewModel.selectedTerminalModelByRuntime[.copilot] = copilotCatalog.default
+    view.viewModel.selectedTerminalEffortByRuntime[.copilot] = "medium"
+  }
+  view.viewModel.name = "Copilot Reviewer"
+  view.viewModel.prompt = "Review the latest ACP wiring and call out the next risky change."
+  view.viewModel.projectDir = "/tmp/ui-acp"
+  return view
     .frame(width: width, height: height)
     .padding()
 }

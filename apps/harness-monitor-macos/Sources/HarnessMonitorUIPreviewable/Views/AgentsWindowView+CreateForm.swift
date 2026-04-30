@@ -17,7 +17,6 @@ extension AgentsWindowView {
         }
       }
       .padding(HarnessMonitorTheme.spacingLG)
-      .frame(maxWidth: createPaneContentWidth, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.automatic)
@@ -27,7 +26,7 @@ extension AgentsWindowView {
 
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("New agent")
+      Text(viewModel.createMode.headerTitle)
         .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text(createPaneDescription)
@@ -41,31 +40,114 @@ extension AgentsWindowView {
     @Bindable var formModel = viewModel
     return AgentsCreateSectionCard {
       AgentsCreateFieldBlock(
-        title: "Mode",
-        help: "Choose the launch flow for this window."
+        title: "Create",
+        help: "Choose whether this window starts an agent or a Codex run."
       ) {
-        Picker("Mode", selection: $formModel.createMode) {
-          ForEach(AgentTuiCreateMode.allCases) { mode in
-            Text(mode.title)
-              .tag(mode)
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.segmentedOption(
-                  HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                  option: mode.title
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          Picker("Create", selection: $formModel.createMode) {
+            ForEach(AgentTuiCreateMode.allCases) { mode in
+              Text(mode.title)
+                .tag(mode)
+                .accessibilityIdentifier(
+                  HarnessMonitorAccessibility.segmentedOption(
+                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                    option: mode.title
+                  )
                 )
-              )
+            }
           }
+          .pickerStyle(.segmented)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateModePicker)
+
+          AgentsCreateSummaryFactsView(facts: createSummaryFacts)
         }
-        .pickerStyle(.segmented)
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateModePicker)
       }
     }
   }
 
+  private var createSummaryFacts: [AgentsCreateSummaryFact] {
+    switch viewModel.createMode {
+    case .terminal:
+      terminalCreateSummaryFacts
+    case .codex:
+      codexCreateSummaryFacts
+    }
+  }
+
+  private var terminalCreateSummaryFacts: [AgentsCreateSummaryFact] {
+    let facts = [
+      AgentsCreateSummaryFact(title: "Provider", value: selectedAgentLaunchTitle),
+      AgentsCreateSummaryFact(title: "Starts with", value: selectedTransportSummaryTitle),
+    ]
+
+    return facts
+  }
+
+  private var codexCreateSummaryFacts: [AgentsCreateSummaryFact] {
+    var facts = [
+      AgentsCreateSummaryFact(title: "Run mode", value: viewModel.codexMode.title),
+      AgentsCreateSummaryFact(title: "Model", value: selectedCodexModelTitle),
+    ]
+
+    if let selectedEffort = selectedCodexEffortTitle {
+      facts.append(AgentsCreateSummaryFact(title: "Effort", value: selectedEffort))
+    }
+
+    return facts
+  }
+
+  var selectedTransportSummaryTitle: String {
+    guard let option = selectedCapabilityOption else {
+      return "Choose a provider"
+    }
+
+    let selectedChoice = option.transportChoice(
+      for: option.normalizedSelection(for: viewModel.selectedLaunchSelection)
+    )
+    return selectedChoice.id.isAcp ? "Project Access" : "Terminal"
+  }
+
+  private var selectedPersonaName: String? {
+    guard let selectedPersona = viewModel.selectedPersona else {
+      return nil
+    }
+
+    return viewModel.availablePersonas.first { $0.identifier == selectedPersona }?.name
+  }
+
+  private var selectedCodexModelTitle: String {
+    let catalog = codexCatalog(viewModel)
+    let selectedModelID = viewModel.selectedCodexModel ?? catalog?.default ?? RuntimeCustomModel.tag
+    if selectedModelID == RuntimeCustomModel.tag {
+      return "Custom model"
+    }
+    return catalog?.models.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
+  }
+
+  private var selectedCodexEffortTitle: String? {
+    let catalog = codexCatalog(viewModel)
+    let selectedModelID = viewModel.selectedCodexModel ?? catalog?.default ?? RuntimeCustomModel.tag
+    let availableEffortValues =
+      catalog.map { Self.effortValues(catalog: $0, selectedModelId: selectedModelID) }
+      ?? Self.allEffortLevels
+    guard !availableEffortValues.isEmpty else {
+      return nil
+    }
+    let selectedEffort =
+      viewModel.selectedCodexEffort ?? Self.defaultEffortLevel(from: availableEffortValues)
+    return selectedEffort.capitalized
+  }
+
   @ViewBuilder var createPaneBanners: some View {
-    if viewModel.createMode == .terminal && displayState.agentTuiUnavailable {
-      agentTuiUnavailableBanner
+    if viewModel.createMode == .terminal {
+      if viewModel.selectedLaunchSelection.isAcp {
+        if displayState.acpUnavailable {
+          acpUnavailableBanner
+        }
+      } else if displayState.agentTuiUnavailable {
+        agentTuiUnavailableBanner
+      }
     }
     if viewModel.createMode == .codex && displayState.codexUnavailable {
       codexUnavailableBanner

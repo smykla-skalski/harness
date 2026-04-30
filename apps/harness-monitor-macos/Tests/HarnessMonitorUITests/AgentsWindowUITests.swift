@@ -97,7 +97,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
       in: app,
       identifier: Accessibility.segmentedOption(
         Accessibility.agentTuiCreateModePicker,
-        option: "Codex"
+        option: "Codex Run"
       )
     )
     let promptField = editableField(in: app, identifier: Accessibility.agentsCodexPromptField)

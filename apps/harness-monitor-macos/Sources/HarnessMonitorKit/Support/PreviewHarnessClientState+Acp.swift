@@ -6,6 +6,15 @@ extension PreviewHarnessClientState {
     request: AcpAgentStartRequest
   ) -> AcpAgentSnapshot {
     nextAcpAgentSequence += 1
+    let trimmedName = request.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let displayName =
+      if let trimmedName, !trimmedName.isEmpty {
+        trimmedName
+      } else if request.agent == "copilot" {
+        "GitHub Copilot"
+      } else {
+        request.agent.capitalized
+      }
     let permissionBatches = previewPermissionBatches(
       sessionID: sessionID,
       acpID: "preview-managed-agent-\(nextAcpAgentSequence)"
@@ -14,7 +23,7 @@ extension PreviewHarnessClientState {
       acpId: "preview-managed-agent-\(nextAcpAgentSequence)",
       sessionId: sessionID,
       agentId: request.agent,
-      displayName: request.agent == "copilot" ? "GitHub Copilot" : request.agent.capitalized,
+      displayName: displayName,
       status: .active,
       pid: UInt32(40_000 + nextAcpAgentSequence),
       pgid: Int32(40_000 + nextAcpAgentSequence),

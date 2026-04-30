@@ -3,10 +3,10 @@ extension AgentsWindowView {
     switch viewModel.createMode {
     case .terminal:
       if displayState.hasAgentTuis {
-        "Open sessions stay pinned in the sidebar, "
+        "Open agents stay pinned in the sidebar, "
           + "so you can launch another one without losing the active view."
       } else {
-        "Choose a provider, tune the launch defaults, and start a new session from this workspace."
+        "Choose a provider, tune the launch defaults, and start a new agent from this workspace."
       }
     case .codex:
       if displayState.hasCodexRuns {
