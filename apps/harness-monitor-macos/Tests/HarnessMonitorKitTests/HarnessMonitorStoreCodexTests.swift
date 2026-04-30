@@ -194,13 +194,14 @@ struct HarnessMonitorStoreCodexTests {
 
     #expect(started == false)
     #expect(store.codexUnavailable == true)
-    #expect(store.acpBridgeHTTPIncident?.retryCount == 1)
-    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 1)
+    #expect(store.acpBridgeHTTPIncident?.retryCount == 0)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
     #expect(
       store.contentUI.chrome.acpBridgeBanner?.factText.contains(
         "Daemon process not responding to ACP HTTP since "
       ) == true
     )
+    #expect(store.contentUI.chrome.acpBridgeBanner?.factText.contains("0 retries") == true)
     #expect(
       AcpBridgeBannerState.blastRadiusText
         == "ACP sessions cannot make tool calls; existing TUI agents unaffected"
@@ -317,12 +318,70 @@ struct HarnessMonitorStoreCodexTests {
         ]
     )
     #expect(store.codexUnavailable == true)
-    #expect(store.acpBridgeHTTPIncident?.retryCount == 0)
-    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
+    #expect(store.acpBridgeHTTPIncident?.retryCount == 1)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 1)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.factText.contains("1 retry") == true)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .unavailable)
     #expect(
       store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
+  }
+
+  @Test("Sandboxed 503 retry still counts when the retry fails with 501")
+  func startCodexRunCountsRetryWhenRetryFailsWith501() async {
+    let client = RecordingHarnessClient()
+    client.configureCodexStartErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "codex-unavailable"),
+      HarnessMonitorAPIError.server(code: 501, message: "codex-excluded"),
+    ])
+    let daemon = RecordingDaemonController(
+      client: client,
+      statusReport: sandboxedStatus(
+        hostBridge: HostBridgeManifest(
+          running: true,
+          socketPath: "/tmp/bridge.sock",
+          capabilities: [
+            "codex": HostBridgeCapabilityManifest(
+              healthy: true,
+              transport: "websocket",
+              endpoint: "ws://127.0.0.1:4500"
+            )
+          ]
+        )
+      )
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
+
+    let started = await store.startCodexRun(prompt: "Test.", mode: .report)
+
+    #expect(started == false)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Test.",
+            mode: .report,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          ),
+        ]
+    )
+    #expect(store.codexUnavailable == true)
+    #expect(store.acpBridgeHTTPIncident?.retryCount == 1)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 1)
+    #expect(store.contentUI.chrome.acpBridgeBanner?.factText.contains("1 retry") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("codex-excluded") == true)
   }
 
   @Test("Start Codex run keeps host bridge ready when daemon is not sandboxed")

@@ -143,7 +143,11 @@ extension HarnessMonitorStore {
     reconcileAcpBridgeIncidentVisibility()
   }
 
-  public func markHostBridgeIssue(for capability: String, statusCode: Int) {
+  public func markHostBridgeIssue(
+    for capability: String,
+    statusCode: Int,
+    recordedAt: Date = .now
+  ) {
     switch statusCode {
     case 501:
       let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
@@ -157,7 +161,11 @@ extension HarnessMonitorStore {
     default:
       break
     }
-    recordAcpBridgeIncidentIfNeeded(for: capability, statusCode: statusCode)
+    recordAcpBridgeIncidentIfNeeded(
+      for: capability,
+      statusCode: statusCode,
+      recordedAt: recordedAt
+    )
     reconcileAcpBridgeIncidentVisibility()
   }
 
@@ -187,6 +195,23 @@ extension HarnessMonitorStore {
     scheduleUISync([.contentChrome])
   }
 
+  func noteAcpBridgeRetryAttempt(
+    for capability: String,
+    recordedAt: Date = .now
+  ) {
+    guard capability == "codex", daemonStatus?.manifest?.sandboxed == true else {
+      return
+    }
+    if let incident = acpBridgeHTTPIncident {
+      acpBridgeHTTPIncident = incident.incrementingRetryCount()
+    } else {
+      acpBridgeHTTPIncident = AcpBridgeHTTPIncident(
+        firstDetectedAt: recordedAt,
+        retryCount: 1
+      )
+    }
+  }
+
   private func recordAcpBridgeIncidentIfNeeded(
     for capability: String,
     statusCode: Int,
@@ -195,13 +220,10 @@ extension HarnessMonitorStore {
     guard capability == "codex", statusCode == 503, daemonStatus?.manifest?.sandboxed == true else {
       return
     }
-    if let incident = acpBridgeHTTPIncident {
-      acpBridgeHTTPIncident = incident.incrementingRetryCount()
-    } else {
-      acpBridgeHTTPIncident = AcpBridgeHTTPIncident(
-        firstDetectedAt: recordedAt,
-        retryCount: 0
-      )
-    }
+    guard acpBridgeHTTPIncident == nil else { return }
+    acpBridgeHTTPIncident = AcpBridgeHTTPIncident(
+      firstDetectedAt: recordedAt,
+      retryCount: 0
+    )
   }
 }

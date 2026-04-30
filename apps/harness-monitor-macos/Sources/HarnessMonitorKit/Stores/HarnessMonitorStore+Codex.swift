@@ -101,11 +101,13 @@ extension HarnessMonitorStore {
       applyCodexRunStartSuccess(measuredRun.value)
       return measuredRun.value
     } catch let apiError as HarnessMonitorAPIError {
+      let firstFailureRecordedAt = Date.now
       switch await recoverCodexStartAfterTransientBridgeFailure(
         using: action.client,
         sessionID: action.sessionID,
         request: request,
-        error: apiError
+        error: apiError,
+        firstFailureRecordedAt: firstFailureRecordedAt
       ) {
       case .succeeded(let run):
         return run
@@ -115,7 +117,11 @@ extension HarnessMonitorStore {
         break
       }
       if case .server(let code, _) = apiError, code == 501 || code == 503 {
-        markHostBridgeIssue(for: "codex", statusCode: code)
+        markHostBridgeIssue(
+          for: "codex",
+          statusCode: code,
+          recordedAt: firstFailureRecordedAt
+        )
       }
       presentFailureFeedback(apiError.localizedDescription)
       return nil

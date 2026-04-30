@@ -20,8 +20,8 @@ struct HarnessMonitorStoreFileViewerTests {
     #expect(fileViewer.revealedBatches[0] == [HarnessMonitorPaths.harnessRoot()])
   }
 
-  @Test("Open daemon log reveals the daemon events log")
-  func openDaemonLogRevealsDaemonEventsLog() {
+  @Test("Open daemon log opens the daemon events log")
+  func openDaemonLogOpensDaemonEventsLog() {
     let fileViewer = RecordingFileViewer()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
@@ -29,11 +29,11 @@ struct HarnessMonitorStoreFileViewerTests {
     )
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
 
-    let opened = store.revealDaemonLogInFinder()
+    let opened = store.openDaemonLog()
 
     #expect(opened)
-    #expect(fileViewer.revealedBatches.count == 1)
-    #expect(fileViewer.revealedBatches[0] == [URL(fileURLWithPath: "/tmp/harness/daemon/events.jsonl")])
+    #expect(fileViewer.openedItems == [URL(fileURLWithPath: "/tmp/harness/daemon/events.jsonl")])
+    #expect(fileViewer.revealedBatches.isEmpty)
   }
 
   @Test("Open daemon log reports when diagnostics do not expose a log path")
@@ -44,9 +44,10 @@ struct HarnessMonitorStoreFileViewerTests {
       fileViewer: fileViewer
     )
 
-    let opened = store.revealDaemonLogInFinder()
+    let opened = store.openDaemonLog()
 
     #expect(opened == false)
+    #expect(fileViewer.openedItems.isEmpty)
     #expect(fileViewer.revealedBatches.isEmpty)
     #expect(store.currentFailureFeedbackMessage == "Daemon log is unavailable.")
   }
@@ -91,8 +92,13 @@ struct HarnessMonitorStoreFileViewerTests {
 @MainActor
 private final class RecordingFileViewer: FileViewerActivating {
   private(set) var revealedBatches: [[URL]] = []
+  private(set) var openedItems: [URL] = []
 
   func reveal(itemsAt urls: [URL]) {
     revealedBatches.append(urls)
+  }
+
+  func open(itemAt url: URL) {
+    openedItems.append(url)
   }
 }
