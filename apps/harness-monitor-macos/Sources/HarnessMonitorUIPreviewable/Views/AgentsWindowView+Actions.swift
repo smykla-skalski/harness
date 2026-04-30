@@ -255,17 +255,17 @@ extension AgentsWindowView {
     guard viewModel.selection.terminalID == tui.tuiId, tui.status.isActive else {
       return
     }
-    viewModel.lastMeasuredViewportPoints = viewportSize
+    recordMeasuredViewportPoints(viewportSize)
     guard
       let measuredTerminalSize = TerminalViewportSizing.terminalSize(
         for: viewportSize,
         fontScale: fontScale
       )
     else {
-      viewModel.lastMeasuredViewportTerminalSize = nil
+      clearMeasuredViewportTerminalSize()
       return
     }
-    viewModel.lastMeasuredViewportTerminalSize = measuredTerminalSize
+    recordMeasuredViewportTerminalSize(measuredTerminalSize)
     let resizeBaseline = TerminalViewportSizing.automaticResizeBaseline(
       serverSize: tui.size,
       pendingTarget: viewModel.pendingViewportResizeTarget,
@@ -275,7 +275,7 @@ extension AgentsWindowView {
       measured: measuredTerminalSize,
       baseline: resizeBaseline
     )
-    viewModel.lastMeasuredViewportSize = terminalSize
+    recordAutomaticViewportSize(terminalSize)
     syncTerminalResizeControls(to: terminalSize)
     guard terminalSize != tui.size,
       terminalSize != viewModel.pendingViewportResizeTarget
@@ -283,7 +283,7 @@ extension AgentsWindowView {
       return
     }
     viewModel.pendingViewportResizeTarget = terminalSize
-    viewModel.expectedSize = terminalSize
+    recordExpectedViewportSize(terminalSize)
     viewModel.viewportResizeTask?.cancel()
     let tuiID = tui.tuiId
     viewModel.viewportResizeTask = Task { @MainActor in

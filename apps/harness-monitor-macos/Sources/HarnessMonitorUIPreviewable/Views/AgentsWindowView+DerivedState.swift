@@ -14,12 +14,24 @@ extension AgentsWindowView {
     guard let selectedTuiID = viewModel.selection.terminalID else {
       return nil
     }
+    if viewModel.hasFreshManagedAgentTuis,
+      let selectedTui = store.selectedAgentTui,
+      selectedTui.tuiId == selectedTuiID
+    {
+      return selectedTui
+    }
     return displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
   var selectedCodexRun: CodexRunSnapshot? {
     guard let selectedRunID = viewModel.selection.codexRunID else {
       return nil
+    }
+    if viewModel.hasFreshManagedCodexRuns,
+      let selectedRun = store.selectedCodexRun,
+      selectedRun.runId == selectedRunID
+    {
+      return selectedRun
     }
     return displayState.sortedCodexRuns.first { $0.runId == selectedRunID }
   }
