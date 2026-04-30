@@ -30,6 +30,27 @@ fn strip_test_bundle_xattrs_declares_script_input_path() {
 }
 
 #[test]
+fn prepare_app_entitlements_declares_derived_output_path() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let build_phases = read_repo_file(
+        root,
+        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildPhases.swift",
+    );
+
+    let phase = section_between(
+        &build_phases,
+        "public static func prepareAppEntitlements(variant: ProvenanceVariant) -> TargetScript {",
+        "public static func clearGatekeeperMetadata(variant: ProvenanceVariant) -> TargetScript {",
+    );
+    assert!(
+        phase.contains("script: \"copy-app-entitlements.sh\"")
+            && phase.contains("inputPaths: variant.appEntitlementInputPaths")
+            && phase.contains("\"$(DERIVED_FILE_DIR)/$(TARGET_NAME).codesign.entitlements\""),
+        "prepareAppEntitlements must declare the generated CODE_SIGN_ENTITLEMENTS file so Xcode orders entitlement generation before ProcessProductPackaging"
+    );
+}
+
+#[test]
 fn previewable_and_app_targets_package_monitor_asset_catalog() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
@@ -147,6 +168,14 @@ fn monitor_targets_disable_xcode_managed_app_group_registration() {
         monitor_app.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
         "HarnessMonitor should keep local macOS app-group ownership and must explicitly disable Xcode-managed app-group registration"
     );
+    assert!(
+        monitor_app.contains("\"CODE_SIGN_ENTITLEMENTS\": generatedAppEntitlements"),
+        "HarnessMonitor should code sign with the generated derived entitlements file so full app-group entitlements remain local to the build"
+    );
+    assert!(
+        project.contains("BuildPhases.prepareAppEntitlements(variant: .monitorApp)"),
+        "HarnessMonitor should generate full local app-group entitlements before code signing"
+    );
 
     let ui_test_host = section_between(
         &project,
@@ -156,5 +185,17 @@ fn monitor_targets_disable_xcode_managed_app_group_registration() {
     assert!(
         ui_test_host.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
         "HarnessMonitorUITestHost should also disable Xcode-managed app-group registration so Xcode stops re-recommending the portal-managed app-group flow"
+    );
+    assert!(
+        ui_test_host.contains("\"CODE_SIGN_ENTITLEMENTS\": generatedAppEntitlements"),
+        "HarnessMonitorUITestHost should code sign with the generated derived entitlements file so full app-group entitlements remain local to the build"
+    );
+    assert!(
+        project.contains("BuildPhases.prepareAppEntitlements(variant: .uiTestHost)"),
+        "HarnessMonitorUITestHost should generate full local app-group entitlements before code signing"
+    );
+    assert!(
+        !project.contains("\"OTHER_CODE_SIGN_FLAGS\""),
+        "app targets must not use OTHER_CODE_SIGN_FLAGS for entitlements because Xcode's generated xcent is passed later to codesign"
     );
 }

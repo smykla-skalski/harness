@@ -3,6 +3,9 @@ import ProjectDescriptionHelpers
 
 private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
+private let xcodeVisibleAppEntitlementsPath: Path = "HarnessMonitorBase.entitlements"
+private let generatedAppEntitlements: SettingValue =
+    "$(DERIVED_FILE_DIR)/$(TARGET_NAME).codesign.entitlements"
 
 private let monitorAppSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitor/**/*.swift", excluding: ["Sources/HarnessMonitor/Features/**"])
@@ -138,7 +141,7 @@ private let monitorAppDependencies: [TargetDependency] = {
 
 private let monitorAppSettings: Settings = .settings(
     base: [
-        "CODE_SIGN_ENTITLEMENTS": "HarnessMonitor.entitlements",
+        "CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements,
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_STYLE": "Automatic",
         "ENABLE_APP_SANDBOX": "YES",
@@ -167,8 +170,9 @@ private let monitorAppTarget: Target = .target(
         "Sources/HarnessMonitor/Assets.xcassets",
         "Resources/PrivacyInfo.xcprivacy",
     ],
-    entitlements: .file(path: "HarnessMonitor.entitlements"),
+    entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
     scripts: [
+        BuildPhases.prepareAppEntitlements(variant: .monitorApp),
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .monitorApp)
     ],
@@ -179,7 +183,7 @@ private let monitorAppTarget: Target = .target(
 
 private let uiTestHostSettings: Settings = .settings(
     base: [
-        "CODE_SIGN_ENTITLEMENTS": "HarnessMonitorUITestHost.entitlements",
+        "CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements,
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGN_INJECT_BASE_ENTITLEMENTS": "NO",
         "CODE_SIGN_STYLE": "Automatic",
@@ -208,8 +212,9 @@ private let uiTestHostTarget: Target = .target(
         "Sources/HarnessMonitor/Assets.xcassets",
         "Resources/PrivacyInfo.xcprivacy",
     ],
-    entitlements: .file(path: "HarnessMonitorUITestHost.entitlements"),
+    entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
     scripts: [
+        BuildPhases.prepareAppEntitlements(variant: .uiTestHost),
         BuildPhases.bundleDaemonAgent(),
         BuildPhases.clearGatekeeperMetadata(variant: .uiTestHost)
     ],
