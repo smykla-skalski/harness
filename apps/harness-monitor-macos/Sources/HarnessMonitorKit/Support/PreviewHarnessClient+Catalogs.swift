@@ -87,6 +87,42 @@ extension PreviewHarnessClient {
         default: "claude-sonnet-4-6",
         cheapestFastest: "claude-haiku-4-5"
       ),
+      RuntimeModelCatalog(
+        runtime: "gemini",
+        models: [
+          RuntimeModel(id: "gemini-2.5-flash-lite", displayName: "Gemini 2.5 Flash-Lite", tier: .fast),
+          RuntimeModel(
+            id: "gemini-2.5-pro",
+            displayName: "Gemini 2.5 Pro",
+            tier: .balanced,
+            effortKind: .reasoningEffort,
+            effortValues: ["low", "medium", "high"]
+          ),
+        ],
+        default: "gemini-2.5-pro",
+        cheapestFastest: "gemini-2.5-flash-lite"
+      ),
+      RuntimeModelCatalog(
+        runtime: "copilot",
+        models: [
+          RuntimeModel(
+            id: "gpt-5.4-mini",
+            displayName: "GPT-5.4 mini",
+            tier: .fast,
+            effortKind: .reasoningEffort,
+            effortValues: ["low", "medium", "high", "xhigh"]
+          ),
+          RuntimeModel(
+            id: "gpt-5.5",
+            displayName: "GPT-5.5",
+            tier: .balanced,
+            effortKind: .reasoningEffort,
+            effortValues: ["low", "medium", "high", "xhigh"]
+          ),
+        ],
+        default: "gpt-5.5",
+        cheapestFastest: "gpt-5.4-mini"
+      ),
     ]
   }
 

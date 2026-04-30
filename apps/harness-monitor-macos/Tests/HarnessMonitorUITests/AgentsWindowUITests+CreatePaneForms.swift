@@ -109,7 +109,13 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview()
 
     openAgentsWindow(in: app)
-    tapButton(in: app, title: "Gemini")
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiRuntimePicker,
+        option: "Gemini"
+      )
+    )
 
     let picker = element(in: app, identifier: Accessibility.agentsModelPicker)
     XCTAssertTrue(waitForElement(picker, timeout: Self.uiTimeout))
@@ -133,6 +139,13 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview()
 
     openAgentsWindow(in: app)
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiRuntimePicker,
+        option: "Codex"
+      )
+    )
 
     let effortPicker = element(in: app, identifier: Accessibility.agentsEffortPicker)
     XCTAssertTrue(waitForElement(effortPicker, timeout: Self.uiTimeout))
@@ -148,8 +161,20 @@ extension AgentsWindowUITests {
 
     // Navigate away (switch runtime to Gemini) and back to Codex; the stored
     // Codex effort selection should still be "high" when we return.
-    tapButton(in: app, title: "Gemini")
-    tapButton(in: app, title: "Codex")
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiRuntimePicker,
+        option: "Gemini"
+      )
+    )
+    tapButton(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.agentTuiRuntimePicker,
+        option: "Codex"
+      )
+    )
 
     let stillHigh = app.buttons[
       HarnessMonitorUITestAccessibility.segmentedOption(
