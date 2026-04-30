@@ -21,15 +21,6 @@ private enum WorkspaceChromeMetrics {
 }
 
 public struct AgentsWindowView: View {
-  struct WorkspaceRefreshState: Equatable {
-    let selectedAgentTuis: [AgentTuiSnapshot]
-    let selectedCodexRuns: [CodexRunSnapshot]
-    let selectedSession: SessionDetail?
-    let agentTuiUnavailable: Bool
-    let acpUnavailable: Bool
-    let codexUnavailable: Bool
-  }
-
   struct DismissBatchSnapshot: Equatable {
     let ids: [String]
     let count: Int
@@ -166,17 +157,6 @@ public struct AgentsWindowView: View {
   var isDecisionInspectorVisible: Bool {
     get { decisionInspectorVisible }
     nonmutating set { decisionInspectorVisible = newValue }
-  }
-
-  var workspaceRefreshState: WorkspaceRefreshState {
-    WorkspaceRefreshState(
-      selectedAgentTuis: store.selectedAgentTuis,
-      selectedCodexRuns: store.selectedCodexRuns,
-      selectedSession: store.selectedSession,
-      agentTuiUnavailable: store.agentTuiUnavailable,
-      acpUnavailable: store.acpUnavailable,
-      codexUnavailable: store.codexUnavailable
-    )
   }
 
   public var body: some View {

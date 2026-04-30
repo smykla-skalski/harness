@@ -31,7 +31,74 @@ struct AgentsWindowManagedFreshnessTests {
     #expect(view.displayState.sortedAgentTuis.map(\.tuiId) == ["agent-tui-1"])
   }
 
-  private func makeTuiSnapshot(status: AgentTuiStatus) -> AgentTuiSnapshot {
+  @Test("Workspace refresh state ignores volatile terminal screen text")
+  func workspaceRefreshStateIgnoresVolatileTerminalScreenText() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSession = SessionDetail(
+      session: PreviewFixtures.detail.session,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let initialTui = makeTuiSnapshot(status: .running, text: "first")
+    store.selectedAgentTuis = [initialTui]
+    store.selectedAgentTui = initialTui
+
+    let view = AgentsWindowView(store: store)
+    view.viewModel.hasFreshManagedAgentTuis = true
+    view.viewModel.selection = .terminal(
+      sessionID: initialTui.sessionId,
+      terminalID: initialTui.tuiId
+    )
+    view.refreshDisplayState()
+    let initialState = view.workspaceRefreshState
+
+    let updatedTui = makeTuiSnapshot(
+      status: .running,
+      text: "second",
+      updatedAt: "2026-04-30T12:02:00Z"
+    )
+    store.selectedAgentTuis = [updatedTui]
+    store.selectedAgentTui = updatedTui
+
+    #expect(view.workspaceRefreshState == initialState)
+    #expect(view.selectedSessionTui?.screen.text == "second")
+  }
+
+  @Test("Workspace refresh state tracks terminal chrome changes")
+  func workspaceRefreshStateTracksTerminalChromeChanges() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSession = SessionDetail(
+      session: PreviewFixtures.detail.session,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let initialTui = makeTuiSnapshot(status: .running)
+    store.selectedAgentTuis = [initialTui]
+    store.selectedAgentTui = initialTui
+
+    let view = AgentsWindowView(store: store)
+    view.viewModel.hasFreshManagedAgentTuis = true
+    view.refreshDisplayState()
+    let initialState = view.workspaceRefreshState
+
+    let updatedTui = makeTuiSnapshot(status: .exited)
+    store.selectedAgentTuis = [updatedTui]
+    store.selectedAgentTui = updatedTui
+
+    #expect(view.workspaceRefreshState != initialState)
+  }
+
+  private func makeTuiSnapshot(
+    status: AgentTuiStatus,
+    text: String = "ready",
+    updatedAt: String = "2026-04-30T12:01:00Z"
+  ) -> AgentTuiSnapshot {
     AgentTuiSnapshot(
       tuiId: "agent-tui-1",
       sessionId: PreviewFixtures.summary.sessionId,
@@ -46,14 +113,14 @@ struct AgentsWindowManagedFreshnessTests {
         cols: 80,
         cursorRow: 0,
         cursorCol: 0,
-        text: "ready"
+        text: text
       ),
       transcriptPath: "/tmp/agent-tui-1.log",
       exitCode: nil,
       signal: nil,
       error: nil,
       createdAt: "2026-04-30T12:00:00Z",
-      updatedAt: "2026-04-30T12:01:00Z"
+      updatedAt: updatedAt
     )
   }
 }
