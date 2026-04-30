@@ -115,7 +115,11 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             async_db.clone(),
             false,
         ),
-        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db.clone()),
+        acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(
+            sender.clone(),
+            db.clone(),
+            async_db.clone(),
+        ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(sender, db, async_db, false),
     }
 }
@@ -157,6 +161,11 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
     } else {
         AgentTuiManagerHandle::new(sender.clone(), db.clone(), false)
     };
+    let acp_agent_manager = if install_db {
+        AcpAgentManagerHandle::new_with_async_db(sender.clone(), db.clone(), async_db.clone())
+    } else {
+        AcpAgentManagerHandle::new(sender.clone(), db.clone())
+    };
 
     DaemonHttpState {
         token: "token".into(),
@@ -168,7 +177,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
         db_path,
         codex_controller,
-        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db.clone()),
+        acp_agent_manager,
         agent_tui_manager,
     }
 }

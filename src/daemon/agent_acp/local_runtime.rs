@@ -1,34 +1,41 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::process::Child;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
 use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use self::snapshots::{
+    ReusedSnapshotInput, StartedSnapshotInput, preferred_project_dir, reused_snapshot,
+    started_snapshot, stream_event,
+};
 use crate::agents::acp::catalog::AcpAgentDescriptor;
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
+use crate::agents::kind::DisconnectReason;
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::AgentStatus;
-use crate::workspace::utc_now;
 
 use super::active::{
     ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
     spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
 };
 use super::manager::{
-    AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, PERMISSION_RESPONSE_DEADLINE,
-    process_fault_policy_enabled, process_pooling_disabled,
+    AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, AcpOrchestrationRegistration,
+    PERMISSION_RESPONSE_DEADLINE, process_fault_policy_enabled, process_pooling_disabled,
 };
 use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
 use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
-use super::protocol::{SpawnProtocolInput, spawn_protocol_task};
+use super::protocol::{SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task};
+
+mod snapshots;
 
 impl AcpAgentManagerHandle {
     #[cfg(test)]
@@ -97,7 +104,54 @@ impl AcpAgentManagerHandle {
         let Some(existing) = self.reusable_session_for_process_key(input.process_key) else {
             return Ok(None);
         };
-        if let Some(prompt) = prompt_text(input.request.prompt.as_deref()) {
+        let runtime_session_id = Self::attach_reused_protocol_session(&existing, input)?;
+        let display_name = input
+            .request
+            .name
+            .clone()
+            .unwrap_or_else(|| input.descriptor.display_name.clone());
+        let registration = self.register_reused_orchestration_agent(
+            &existing,
+            &runtime_session_id,
+            input,
+            &display_name,
+        )?;
+        let snapshot = reused_snapshot(ReusedSnapshotInput {
+            acp_id: input.acp_id,
+            session_id: input.session_id,
+            request: input.request,
+            agent_id: &registration.agent_id,
+            display_name: &registration.display_name,
+            source: &existing.snapshot_with_live_counts(),
+            project_dir: input.project_dir,
+            permission_log_path: input
+                .request
+                .record_permissions
+                .then(|| recording_log_path_for_session(input.session_id)),
+        });
+        let active = Arc::new(ActiveAcpSession::new(
+            snapshot.clone(),
+            PermissionBridgeHandle::spawn(
+                input.acp_id.to_string(),
+                input.session_id.to_string(),
+                self.sender(),
+            ),
+            existing.process(),
+        ));
+        self.state
+            .sessions
+            .lock()
+            .expect("ACP sessions lock")
+            .insert(input.acp_id.to_string(), active);
+        self.broadcast("acp_agent_started", &snapshot);
+        Ok(Some(snapshot))
+    }
+
+    fn attach_reused_protocol_session(
+        existing: &Arc<ActiveAcpSession>,
+        input: DescriptorStartInput<'_>,
+    ) -> Result<String, CliError> {
+        (if let Some(prompt) = prompt_text(input.request.prompt.as_deref()) {
             existing.prompt_protocol_session(
                 input.acp_id,
                 input.session_id,
@@ -110,42 +164,51 @@ impl AcpAgentManagerHandle {
                 input.session_id,
                 input.project_dir.to_path_buf(),
             )
-        }
+        })
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(
                 "attach reused ACP session '{}': {error}",
                 input.descriptor.id
             ))
-        })?;
-        let snapshot = reused_snapshot(ReusedSnapshotInput {
-            acp_id: input.acp_id,
-            session_id: input.session_id,
-            request: input.request,
-            descriptor: input.descriptor,
-            source: &existing.snapshot_with_live_counts(),
-            project_dir: input.project_dir,
-            permission_log_path: input
-                .request
-                .record_permissions
-                .then(|| recording_log_path_for_session(input.session_id)),
-        });
-        let permissions = PermissionBridgeHandle::spawn(
-            input.acp_id.to_string(),
-            input.session_id.to_string(),
-            self.sender(),
-        );
-        let active = Arc::new(ActiveAcpSession::new(
-            snapshot.clone(),
-            permissions,
-            existing.process(),
-        ));
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .insert(input.acp_id.to_string(), active);
-        self.broadcast("acp_agent_started", &snapshot);
-        Ok(Some(snapshot))
+            .into()
+        })
+    }
+
+    fn register_reused_orchestration_agent(
+        &self,
+        existing: &Arc<ActiveAcpSession>,
+        runtime_session_id: &str,
+        input: DescriptorStartInput<'_>,
+        display_name: &str,
+    ) -> Result<AcpOrchestrationRegistration, CliError> {
+        self.register_orchestration_agent(
+            input.session_id,
+            input.acp_id,
+            input.request,
+            input.descriptor,
+            display_name,
+            Some(runtime_session_id),
+        )
+        .inspect_err(|_| Self::detach_reused_session_after_registration_failure(existing, input))
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion in leaf logging helper"
+    )]
+    fn detach_reused_session_after_registration_failure(
+        existing: &Arc<ActiveAcpSession>,
+        input: DescriptorStartInput<'_>,
+    ) {
+        if let Err(detach_error) = existing.detach_protocol_session(input.acp_id, input.session_id)
+        {
+            tracing::warn!(
+                acp_id = input.acp_id,
+                session_id = input.session_id,
+                %detach_error,
+                "failed to detach reused ACP session after orchestration registration failure"
+            );
+        }
     }
 
     fn start_new_process_session(
@@ -212,21 +275,10 @@ impl AcpAgentManagerHandle {
                 input.descriptor.id
             ))
         })?;
-        let registration = self
-            .register_orchestration_agent(
-                input.session_id,
-                input.acp_id,
-                input.request,
-                input.descriptor,
-                &display_name,
-            )
-            .inspect_err(|_| {
-                protocol.protocol.abort();
-                protocol.batcher.abort();
-                let _ = child.kill();
-            })?;
+        let registration =
+            self.register_started_orchestration_agent(input, input.descriptor.id.as_str(), &display_name, &mut child, &protocol)?;
         let event_task = spawn_event_forwarder(self.sender(), protocol.events);
-        protocol.start.send(()).map_err(|_| {
+        protocol.start.send(()).map_err(|()| {
             protocol.protocol.abort();
             protocol.batcher.abort();
             let _ = child.kill();
@@ -258,15 +310,58 @@ impl AcpAgentManagerHandle {
                 event: event_task,
             },
         ));
+        self.activate_started_session(input, snapshot.clone(), permissions, process, protocol.disconnects, supervisor);
+        self.broadcast("acp_agent_started", &snapshot);
+        Ok(snapshot)
+    }
+
+    fn register_started_orchestration_agent(
+        &self,
+        input: DescriptorStartInput<'_>,
+        descriptor_id: &str,
+        display_name: &str,
+        child: &mut Child,
+        protocol: &SpawnedAcpProtocol,
+    ) -> Result<AcpOrchestrationRegistration, CliError> {
+        self.register_orchestration_agent(
+            input.session_id,
+            input.acp_id,
+            input.request,
+            input.descriptor,
+            display_name,
+            None,
+        )
+        .inspect_err(|_| {
+            protocol.protocol.abort();
+            protocol.batcher.abort();
+            let _ = child.kill();
+        })
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "register ACP orchestration for '{descriptor_id}': {error}"
+            ))
+            .into()
+        })
+    }
+
+    fn activate_started_session(
+        &self,
+        input: DescriptorStartInput<'_>,
+        snapshot: AcpAgentSnapshot,
+        permissions: PermissionBridgeHandle,
+        process: Arc<ActiveAcpProcess>,
+        disconnects: mpsc::Receiver<DisconnectReason>,
+        supervisor: Arc<AcpSessionSupervisor>,
+    ) {
         let active = Arc::new(ActiveAcpSession::new(
-            snapshot.clone(),
+            snapshot,
             permissions,
             Arc::clone(&process),
         ));
         active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
             self.clone(),
             Arc::downgrade(&active),
-            protocol.disconnects,
+            disconnects,
         ));
         active.set_watchdog_task(spawn_watchdog_forwarder(
             self.clone(),
@@ -279,8 +374,6 @@ impl AcpAgentManagerHandle {
             .expect("ACP sessions lock")
             .insert(input.acp_id.to_string(), active);
         self.insert_process(input.process_key.to_string(), process);
-        self.broadcast("acp_agent_started", &snapshot);
-        Ok(snapshot)
     }
 
     pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {
@@ -415,18 +508,6 @@ impl AcpAgentManagerHandle {
     }
 }
 
-struct StartedSnapshotInput<'a> {
-    acp_id: &'a str,
-    session_id: &'a str,
-    request: &'a AcpAgentStartRequest,
-    agent_id: &'a str,
-    display_name: &'a str,
-    supervisor: &'a AcpSessionSupervisor,
-    project_dir: &'a Path,
-    process_key: &'a str,
-    permission_log_path: Option<PathBuf>,
-}
-
 #[derive(Clone, Copy)]
 struct DescriptorStartInput<'a> {
     acp_id: &'a str,
@@ -435,118 +516,4 @@ struct DescriptorStartInput<'a> {
     descriptor: &'a AcpAgentDescriptor,
     project_dir: &'a Path,
     process_key: &'a str,
-}
-
-struct ReusedSnapshotInput<'a> {
-    acp_id: &'a str,
-    session_id: &'a str,
-    request: &'a AcpAgentStartRequest,
-    descriptor: &'a AcpAgentDescriptor,
-    source: &'a AcpAgentSnapshot,
-    project_dir: &'a Path,
-    permission_log_path: Option<PathBuf>,
-}
-
-fn started_snapshot(input: StartedSnapshotInput<'_>) -> AcpAgentSnapshot {
-    let StartedSnapshotInput {
-        acp_id,
-        session_id,
-        request,
-        agent_id,
-        display_name,
-        supervisor,
-        project_dir,
-        process_key,
-        permission_log_path,
-    } = input;
-    let now = utc_now();
-    AcpAgentSnapshot {
-        acp_id: acp_id.to_string(),
-        session_id: session_id.to_string(),
-        agent_id: agent_id.to_string(),
-        display_name: display_name.to_string(),
-        status: AgentStatus::Active,
-        pid: supervisor.pid(),
-        pgid: supervisor.pgid(),
-        project_dir: project_dir.display().to_string(),
-        process_key: process_key.to_string(),
-        pending_permissions: 0,
-        permission_queue_depth: 0,
-        pending_permission_batches: Vec::new(),
-        permission_mode: if request.record_permissions {
-            "recording".to_string()
-        } else {
-            "daemon_bridge".to_string()
-        },
-        permission_log_path: permission_log_path.map(|path| path.display().to_string()),
-        terminal_count: 0,
-        created_at: now.clone(),
-        updated_at: now,
-    }
-}
-
-fn reused_snapshot(input: ReusedSnapshotInput<'_>) -> AcpAgentSnapshot {
-    let ReusedSnapshotInput {
-        acp_id,
-        session_id,
-        request,
-        descriptor,
-        source,
-        project_dir,
-        permission_log_path,
-    } = input;
-    let now = utc_now();
-    AcpAgentSnapshot {
-        acp_id: acp_id.to_string(),
-        session_id: session_id.to_string(),
-        agent_id: descriptor.id.clone(),
-        display_name: descriptor.display_name.clone(),
-        status: AgentStatus::Active,
-        pid: source.pid,
-        pgid: source.pgid,
-        project_dir: project_dir.display().to_string(),
-        process_key: source.process_key.clone(),
-        pending_permissions: 0,
-        permission_queue_depth: 0,
-        pending_permission_batches: Vec::new(),
-        permission_mode: if request.record_permissions {
-            "recording".to_string()
-        } else {
-            "daemon_bridge".to_string()
-        },
-        permission_log_path: permission_log_path.map(|path| path.display().to_string()),
-        terminal_count: 0,
-        created_at: now.clone(),
-        updated_at: now,
-    }
-}
-
-fn stream_event(event: &str, payload: &impl Serialize) -> Option<StreamEvent> {
-    let payload = serde_json::to_value(payload).ok()?;
-    let session_id = payload
-        .get("session_id")
-        .and_then(serde_json::Value::as_str)
-        .map(ToOwned::to_owned);
-    Some(StreamEvent {
-        event: event.to_string(),
-        recorded_at: utc_now(),
-        session_id,
-        payload,
-    })
-}
-
-fn preferred_project_dir(
-    worktree_path: &Path,
-    project_dir: Option<&Path>,
-    repository_root: Option<&Path>,
-    context_root: &Path,
-) -> PathBuf {
-    if worktree_path.as_os_str().is_empty() {
-        project_dir
-            .or(repository_root)
-            .unwrap_or(context_root)
-            .to_path_buf()
-    } else {
-        worktree_path.to_path_buf()
-    }
 }

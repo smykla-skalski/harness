@@ -87,7 +87,7 @@ fn sync_session_with_agents_and_tasks() {
 }
 
 #[test]
-fn sync_session_projects_managed_agent_identity_for_all_kinds() {
+fn sync_session_projects_managed_agent_identity_for_supported_kinds() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let project = sample_project();
     db.sync_project(&project).expect("sync project");
@@ -109,11 +109,7 @@ fn sync_session_projects_managed_agent_identity_for_all_kinds() {
                 Some("tui".into()),
                 Some("agent-tui-1".into()),
             ),
-            (
-                "codex-worker".into(),
-                Some("codex".into()),
-                Some("codex-run-1".into()),
-            ),
+            ("codex-worker".into(), None, None,),
             ("unmanaged-reviewer".into(), None, None),
         ]
     );
@@ -154,7 +150,7 @@ fn load_session_state_round_trips_managed_agent_identity_after_sync() {
             .agents
             .get("codex-worker")
             .and_then(|agent| agent.managed_agent.clone()),
-        Some(ManagedAgentRef::codex("codex-run-1"))
+        None
     );
     assert_eq!(
         loaded

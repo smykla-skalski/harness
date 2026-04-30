@@ -6,6 +6,7 @@ use super::{
     sync_file_state_from_async_db, utc_now,
 };
 use crate::errors::CliErrorKind;
+use crate::session::types::ManagedAgentRef;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 /// Creates a per-session linked checkout and records the state file under the
@@ -255,7 +256,7 @@ pub fn register_agent_runtime_session_direct(
         let registered = session_service::apply_register_agent_runtime_session(
             &mut state,
             &request.runtime,
-            &crate::session::types::ManagedAgentRef::tui(&request.tui_id),
+            &ManagedAgentRef::tui(&request.tui_id),
             &request.agent_session_id,
             &now,
         )?;
@@ -291,7 +292,7 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
             session_service::apply_register_agent_runtime_session(
                 state,
                 &request.runtime,
-                &crate::session::types::ManagedAgentRef::tui(&request.tui_id),
+                &ManagedAgentRef::tui(&request.tui_id),
                 &request.agent_session_id,
                 &now,
             )

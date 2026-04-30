@@ -38,7 +38,13 @@ fn sync_liveness_transitions_stale_agent_to_disconnected() {
 
         let state = session_status("sync-1", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(worker.status, AgentStatus::disconnected_unknown());
+        assert_eq!(
+            worker.status,
+            AgentStatus::Disconnected {
+                reason: crate::agents::kind::DisconnectReason::Unknown { raw_kind: None },
+                stderr_tail: None,
+            }
+        );
 
         let leader = state.agents.get(&leader_id).expect("leader");
         assert_eq!(leader.status, AgentStatus::Active);
@@ -419,7 +425,13 @@ fn leave_session_marks_agent_disconnected() {
 
         let state = session_status("leave-1", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
-        assert_eq!(worker.status, AgentStatus::disconnected_unknown());
+        assert_eq!(
+            worker.status,
+            AgentStatus::Disconnected {
+                reason: crate::agents::kind::DisconnectReason::UserCancelled,
+                stderr_tail: None,
+            }
+        );
 
         let task = state.tasks.get(&task.task_id).expect("task");
         assert_eq!(task.status, TaskStatus::Open, "task returned to open");
@@ -494,7 +506,10 @@ fn leave_session_marks_session_leaderless_degraded_without_successor() {
         );
         assert_eq!(
             updated.agents.get(&leader_id).expect("leader").status,
-            AgentStatus::disconnected_unknown()
+            AgentStatus::Disconnected {
+                reason: crate::agents::kind::DisconnectReason::UserCancelled,
+                stderr_tail: None,
+            }
         );
     });
 }

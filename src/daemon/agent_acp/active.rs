@@ -98,6 +98,14 @@ impl ActiveAcpSession {
             .prompt_protocol_session(acp_id, session_id, project_dir, prompt)
     }
 
+    pub(super) fn detach_protocol_session(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+    ) -> Result<(), String> {
+        self.process.detach_protocol_session(acp_id, session_id)
+    }
+
     pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
         self.process.set_protocol_disconnect_task(task);
     }
@@ -409,6 +417,7 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
         DisconnectReason::InitializeTimeout | DisconnectReason::PromptTimeout => "protocol_desync",
         DisconnectReason::WatchdogFired => "watchdog_fired",
         DisconnectReason::SessionStopped
+        | DisconnectReason::SessionEnded
         | DisconnectReason::UserCancelled
         | DisconnectReason::DaemonShutdown
         | DisconnectReason::OomKilled
@@ -460,6 +469,7 @@ fn reason_kind(reason: &DisconnectReason) -> String {
         DisconnectReason::WatchdogFired => "watchdog_fired".to_string(),
         DisconnectReason::UserCancelled => "user_cancelled".to_string(),
         DisconnectReason::SessionStopped => "session_stopped".to_string(),
+        DisconnectReason::SessionEnded => "session_ended".to_string(),
         DisconnectReason::DaemonShutdown => "daemon_shutdown".to_string(),
         DisconnectReason::OomKilled => "oom_killed".to_string(),
         DisconnectReason::Unknown { raw_kind } => {

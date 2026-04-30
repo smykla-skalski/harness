@@ -92,7 +92,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         async_db.clone(),
         config.sandboxed,
     );
-    let acp_agent_manager = AcpAgentManagerHandle::new(sender.clone(), db.clone());
+    let acp_agent_manager =
+        AcpAgentManagerHandle::new_with_async_db(sender.clone(), db.clone(), async_db.clone());
     let _bridge_watcher = bridge::spawn_manifest_watcher();
 
     let app_state = DaemonHttpState {

@@ -2,12 +2,13 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
 use crate::daemon::service::{broadcast, tokio_watch, utc_now};
 use std::collections::BTreeSet;
+use tokio::task::JoinHandle;
 
 pub(super) fn spawn_acp_inspect_publisher(
     sender: broadcast::Sender<StreamEvent>,
     shutdown_rx: tokio_watch::Receiver<bool>,
     acp_agent_manager: AcpAgentManagerHandle,
-) -> tokio::task::JoinHandle<()> {
+) -> JoinHandle<()> {
     tokio::spawn(run_acp_inspect_publisher(
         sender,
         shutdown_rx,
@@ -29,17 +30,8 @@ async fn run_acp_inspect_publisher(
                 }
             }
             received = event_rx.recv() => {
-                match received {
-                    Ok(event) => {
-                        if let Some(session_id) = acp_inspect_trigger_session_id(&event) {
-                            publish_acp_inspect_event(&sender, &acp_agent_manager, session_id);
-                        }
-                    }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        publish_catchup_acp_inspect_events(&sender, &acp_agent_manager);
-                        continue;
-                    }
-                    Err(broadcast::error::RecvError::Closed) => break,
+                if handle_publisher_receive(&sender, &acp_agent_manager, received) {
+                    break;
                 }
             }
         }
@@ -65,7 +57,6 @@ fn acp_inspect_trigger_session_id(event: &StreamEvent) -> Option<&str> {
         | "acp_permission_shutdown"
         | "acp_permission_timeout"
         | "acp_permission_batch_resolved" => event.session_id.as_deref(),
-        "acp_inspect" => None,
         _ => None,
     }
 }
@@ -88,23 +79,33 @@ fn catchup_session_ids(acp_agent_manager: &AcpAgentManagerHandle) -> BTreeSet<St
         .collect()
 }
 
+fn handle_publisher_receive(
+    sender: &broadcast::Sender<StreamEvent>,
+    acp_agent_manager: &AcpAgentManagerHandle,
+    received: Result<StreamEvent, broadcast::error::RecvError>,
+) -> bool {
+    match received {
+        Ok(event) => {
+            if let Some(session_id) = acp_inspect_trigger_session_id(&event) {
+                publish_acp_inspect_event(sender, acp_agent_manager, session_id);
+            }
+            false
+        }
+        Err(broadcast::error::RecvError::Lagged(_)) => {
+            publish_catchup_acp_inspect_events(sender, acp_agent_manager);
+            false
+        }
+        Err(broadcast::error::RecvError::Closed) => true,
+    }
+}
+
 fn publish_acp_inspect_event(
     sender: &broadcast::Sender<StreamEvent>,
     acp_agent_manager: &AcpAgentManagerHandle,
     session_id: &str,
 ) {
-    let payload = match serde_json::to_value(WsAcpInspect {
-        inspect: acp_agent_manager.inspect(Some(session_id)),
-    }) {
-        Ok(payload) => payload,
-        Err(error) => {
-            tracing::warn!(
-                %error,
-                session_id,
-                "failed to serialize ACP inspect push payload"
-            );
-            return;
-        }
+    let Some(payload) = inspect_payload(acp_agent_manager, session_id) else {
+        return;
     };
     let _ = sender.send(StreamEvent {
         event: "acp_inspect".to_string(),
@@ -112,6 +113,31 @@ fn publish_acp_inspect_event(
         session_id: Some(session_id.to_string()),
         payload,
     });
+}
+
+fn inspect_payload(
+    acp_agent_manager: &AcpAgentManagerHandle,
+    session_id: &str,
+) -> Option<serde_json::Value> {
+    let payload = serde_json::to_value(WsAcpInspect {
+        inspect: acp_agent_manager.inspect(Some(session_id)),
+    });
+    if let Err(error) = &payload {
+        log_inspect_payload_error(session_id, error);
+    }
+    payload.ok()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_inspect_payload_error(session_id: &str, error: &serde_json::Error) {
+    tracing::warn!(
+        %error,
+        session_id,
+        "failed to serialize ACP inspect push payload"
+    );
 }
 
 #[cfg(test)]
