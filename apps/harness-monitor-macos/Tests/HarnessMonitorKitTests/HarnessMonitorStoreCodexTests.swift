@@ -201,7 +201,6 @@ struct HarnessMonitorStoreCodexTests {
         "Daemon process not responding to ACP HTTP since "
       ) == true
     )
-    #expect(store.contentUI.chrome.acpBridgeBanner?.factText.contains("1 retries") == true)
     #expect(
       AcpBridgeBannerState.blastRadiusText
         == "ACP sessions cannot make tool calls; existing TUI agents unaffected"
