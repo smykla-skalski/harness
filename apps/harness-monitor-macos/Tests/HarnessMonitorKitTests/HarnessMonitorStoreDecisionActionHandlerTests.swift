@@ -1,4 +1,3 @@
-import Foundation
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -35,7 +34,8 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     )
 
     let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
-    let decision = try XCTUnwrap(try await decisionStore.decision(id: decisionID))
+    let fetchedDecision = try await decisionStore.decision(id: decisionID)
+    let decision = try XCTUnwrap(fetchedDecision)
     XCTAssertEqual(decision.statusRaw, "open")
     XCTAssertEqual(client.recordedCalls().count, 0)
     XCTAssertTrue((store.currentFailureFeedbackMessage ?? "").contains("missing target metadata"))
@@ -76,7 +76,8 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     )
 
     let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
-    let decision = try XCTUnwrap(try await decisionStore.decision(id: decisionID))
+    let fetchedDecision = try await decisionStore.decision(id: decisionID)
+    let decision = try XCTUnwrap(fetchedDecision)
     XCTAssertEqual(decision.statusRaw, "open")
     XCTAssertTrue((store.currentFailureFeedbackMessage ?? "").contains("daemon"))
   }
