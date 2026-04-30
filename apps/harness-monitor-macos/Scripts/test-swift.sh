@@ -141,18 +141,39 @@ expand_only_testing_selector() {
   local selector="$1"
 
   if [[ "$selector" != */* ]]; then
-    printf '%s\n' "$selector"
+    normalize_fully_qualified_selector "$selector"
     return 0
   fi
 
   # Fully-qualified selectors already point to one test method.
   # Avoid enumerate-tests here because xcodebuild enumeration can stall.
   if [[ "$selector" == */*/* ]]; then
-    printf '%s\n' "$selector"
+    normalize_fully_qualified_selector "$selector"
     return 0
   fi
 
   enumerate_only_testing_selector "$selector"
+}
+
+normalize_fully_qualified_selector() {
+  local selector="$1"
+  local method_part
+
+  if [[ "$selector" == test://* ]]; then
+    selector="${selector#test://}"
+    selector="${selector#*/*/}"
+  fi
+  selector="${selector#/}"
+  selector="${selector%/}"
+
+  method_part="${selector##*/}"
+  if [[ "$selector" == */*/* ]] \
+      && [[ "$method_part" != test* ]] \
+      && [[ "$method_part" != *"()" ]]; then
+    selector="${selector}()"
+  fi
+
+  printf '%s\n' "$selector"
 }
 
 enumerate_only_testing_selector() {

@@ -79,13 +79,6 @@ write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$REPO_ROOT/xcode-derived"
 
-WORKSPACE_CONTENTS="$ROOT/HarnessMonitor.xcworkspace/contents.xcworkspacedata"
-if [ -f "$WORKSPACE_CONTENTS" ]; then
-  /usr/bin/sed -i '' \
-    's|location = "group:../../mcp-servers"|location = "group:../../../mcp-servers"|g' \
-    "$WORKSPACE_CONTENTS"
-fi
-
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
 LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$LAST_UPGRADE_CHECK}"
