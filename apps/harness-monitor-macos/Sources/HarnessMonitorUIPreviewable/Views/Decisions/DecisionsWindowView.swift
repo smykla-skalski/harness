@@ -1,60 +1,5 @@
 import HarnessMonitorKit
-import SwiftData
 import SwiftUI
-
-@MainActor
-@Observable
-private final class DecisionsWindowRuntime {
-  var decisions: [Decision] = []
-  var auditEvents: [SupervisorEvent] = []
-  var liveTick: DecisionLiveTickSnapshot = .placeholder
-
-  func reload(from store: HarnessMonitorStore?) async {
-    guard let store else {
-      decisions = []
-      auditEvents = []
-      liveTick = .placeholder
-      return
-    }
-
-    let decisionStore = await resolveDecisionStore(from: store)
-    guard let decisionStore else {
-      decisions = []
-      auditEvents = []
-      liveTick = .placeholder
-      return
-    }
-
-    decisions = (try? await decisionStore.openDecisions()) ?? []
-    auditEvents = Self.loadAuditEvents(from: store.modelContext)
-    liveTick = await store.supervisorLiveTickSnapshot()
-  }
-
-  private func resolveDecisionStore(from store: HarnessMonitorStore) async -> DecisionStore? {
-    if let decisionStore = store.supervisorDecisionStore {
-      return decisionStore
-    }
-
-    await store.startSupervisor()
-    return store.supervisorDecisionStore
-  }
-
-  private static func loadAuditEvents(from modelContext: ModelContext?) -> [SupervisorEvent] {
-    guard let modelContext else {
-      return []
-    }
-
-    do {
-      var descriptor = FetchDescriptor<SupervisorEvent>(
-        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-      )
-      descriptor.fetchLimit = 128
-      return try modelContext.fetch(descriptor)
-    } catch {
-      return []
-    }
-  }
-}
 
 public struct DecisionsWindowView: View {
   private struct DismissBatchSnapshot: Equatable {
@@ -194,10 +139,13 @@ public struct DecisionsWindowView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsWindow)
     .task {
+      syncSelectionFromStoreIfNeeded()
       await reload()
+      syncSelectionFromStoreIfNeeded()
     }
     .task(id: store?.supervisorDecisionRefreshTick ?? -1) {
       await reload()
+      syncSelectionFromStoreIfNeeded()
     }
     .onChange(of: store?.supervisorSelectedDecisionID) { _, requestedID in
       guard let requestedID else {
@@ -209,6 +157,9 @@ public struct DecisionsWindowView: View {
       store?.supervisorSelectedDecisionID = newValue
     }
     .onChange(of: store?.supervisorObserverFocusTick ?? 0) { _, _ in
+      guard store?.supervisorSelectedDecisionID == nil else {
+        return
+      }
       selection = nil
       store?.supervisorSelectedDecisionID = nil
     }
@@ -228,7 +179,7 @@ public struct DecisionsWindowView: View {
         "Type \(pendingDismissBatch?.count ?? 0) to confirm",
         text: $dismissAllVisibleDraft
       )
-        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleInput)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.decisionBulkDismissVisibleInput)
       Button("Dismiss selected visible") {
         Task { await confirmDismissAllVisible() }
       }
@@ -306,6 +257,15 @@ public struct DecisionsWindowView: View {
     }
   }
 
+  private func syncSelectionFromStoreIfNeeded() {
+    guard let requestedID = store?.supervisorSelectedDecisionID else {
+      return
+    }
+    if selection == nil || selection != requestedID {
+      selection = requestedID
+    }
+  }
+
   private func dismissAllInfo() async {
     let handler = actionHandler
     for id in infoDecisionIDs {
@@ -339,8 +299,11 @@ public struct DecisionsWindowView: View {
     guard let snapshot = pendingDismissBatch else {
       return "No visible decisions to dismiss."
     }
-    return
-      "Scope: \(snapshot.filterSignature)\nCaptured: \(snapshot.capturedAt.formatted(date: .abbreviated, time: .standard))"
+    let capturedAt = snapshot.capturedAt.formatted(
+      date: .abbreviated,
+      time: .standard
+    )
+    return "Scope: \(snapshot.filterSignature)\nCaptured: \(capturedAt)"
   }
 
   private func confirmDismissAllVisible() async {
