@@ -2,24 +2,22 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionTimelineCards: View {
-  let nodes: [SessionTimelineNode]
+  let rows: [SessionTimelineRow]
   let placeholderCount: Int
   let shimmerPhase: CGFloat
   let showsShimmer: Bool
-  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let actionHandler: any DecisionActionHandler
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      ForEach(nodes) { node in
-        SessionTimelineNodeRow(
-          node: node,
-          dateTimeConfiguration: dateTimeConfiguration,
+      ForEach(rows) { row in
+        SessionTimelineNodeCluster(
+          row: row,
           actionHandler: actionHandler
         )
       }
 
-      ForEach(Array(0..<placeholderCount), id: \.self) { index in
+      ForEach(0..<placeholderCount, id: \.self) { index in
         SessionCockpitTimelinePlaceholderRow(
           seed: index,
           shimmerPhase: shimmerPhase,
@@ -27,26 +25,48 @@ struct SessionTimelineCards: View {
         )
       }
     }
+    .scrollTargetLayout()
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(alignment: .topLeading) {
-      if !nodes.isEmpty || placeholderCount > 0 {
+      if !rows.isEmpty || placeholderCount > 0 {
         SessionTimelineRailBackground()
       }
     }
   }
 }
 
-private struct SessionTimelineNodeRow: View {
-  let node: SessionTimelineNode
-  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+private struct SessionTimelineNodeCluster: View {
+  let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
 
   var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      if let label = row.dayDividerLabel {
+        SessionTimelineDayDivider(label: label)
+      }
+      SessionTimelineNodeRow(
+        row: row,
+        actionHandler: actionHandler
+      )
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+private struct SessionTimelineNodeRow: View {
+  let row: SessionTimelineRow
+  let actionHandler: any DecisionActionHandler
+
+  private var node: SessionTimelineNode {
+    row.node
+  }
+
+  var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
-      Text(timestampText)
+      Text(row.timestampLabel)
         .scaledFont(.caption.monospaced())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
+        .lineLimit(1)
         .multilineTextAlignment(.trailing)
         .frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .trailing)
 
@@ -77,7 +97,7 @@ private struct SessionTimelineNodeRow: View {
       compactContent
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(accessibilityLabel)
+    .accessibilityLabel(row.accessibilityLabel)
     .accessibilityIdentifier(node.accessibilityIdentifier)
   }
 
@@ -150,33 +170,6 @@ private struct SessionTimelineNodeRow: View {
       }
     }
     .fixedSize(horizontal: true, vertical: false)
-  }
-
-  private var timestampText: String {
-    if let rawTimestamp = node.rawTimestamp {
-      return formatTimelineTimestamp(rawTimestamp, configuration: dateTimeConfiguration)
-    }
-    return formatTimelineTimestamp(node.timestamp, configuration: dateTimeConfiguration)
-  }
-
-  private var accessibilityLabel: String {
-    var parts = [
-      node.kind.label,
-      timestampText,
-      "Source \(node.sourceLabel)",
-    ]
-    if let eventTone = node.eventTone {
-      parts.append("Tone \(eventTone.label)")
-    }
-    if let decision = node.decision {
-      parts.append("Severity \(decision.severityLabel)")
-    }
-    parts.append(node.title)
-    if let detail = node.detail {
-      parts.append(detail)
-    }
-    parts.append(node.actionAvailabilityLabel)
-    return parts.joined(separator: ", ")
   }
 
   private var typeTint: Color {
@@ -266,134 +259,5 @@ private struct SessionTimelineCardBackground: View {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
           .stroke(tint.opacity(0.35), lineWidth: 1)
       }
-  }
-}
-
-private struct SessionTimelineBadge: View {
-  enum Style {
-    case quiet
-    case prominent
-  }
-
-  let label: String
-  let tint: Color
-  let style: Style
-
-  var body: some View {
-    Text(label)
-      .scaledFont(.caption2.weight(.semibold))
-      .lineLimit(1)
-      .fixedSize(horizontal: true, vertical: false)
-      .padding(.horizontal, horizontalPadding)
-      .padding(.vertical, verticalPadding)
-      .frame(minHeight: minimumHeight)
-      .background {
-        Capsule(style: .continuous)
-          .fill(backgroundTint)
-      }
-      .overlay {
-        Capsule(style: .continuous)
-          .stroke(tint.opacity(0.26), lineWidth: 1)
-      }
-      .foregroundStyle(tint)
-  }
-
-  private var horizontalPadding: CGFloat {
-    switch style {
-    case .quiet:
-      6
-    case .prominent:
-      HarnessMonitorTheme.spacingSM
-    }
-  }
-
-  private var verticalPadding: CGFloat {
-    switch style {
-    case .quiet:
-      2
-    case .prominent:
-      3
-    }
-  }
-
-  private var minimumHeight: CGFloat {
-    switch style {
-    case .quiet:
-      20
-    case .prominent:
-      22
-    }
-  }
-
-  private var backgroundTint: Color {
-    switch style {
-    case .quiet:
-      tint.opacity(0.12)
-    case .prominent:
-      tint.opacity(0.22)
-    }
-  }
-}
-
-private struct SessionTimelineStatusBadge: Identifiable {
-  let label: String
-  let tint: Color
-
-  var id: String { label }
-}
-
-extension SessionTimelineTone {
-  fileprivate var color: Color {
-    switch self {
-    case .info:
-      HarnessMonitorTheme.accent
-    case .success:
-      HarnessMonitorTheme.success
-    case .warning:
-      HarnessMonitorTheme.caution
-    case .critical:
-      HarnessMonitorTheme.danger
-    }
-  }
-
-  fileprivate var badgeLabel: String {
-    switch self {
-    case .info:
-      "INFO"
-    case .success:
-      "SUCCESS"
-    case .warning:
-      "WARN"
-    case .critical:
-      "DANGER"
-    }
-  }
-}
-
-extension DecisionSeverity {
-  fileprivate var color: Color {
-    switch self {
-    case .info:
-      HarnessMonitorTheme.accent
-    case .warn:
-      HarnessMonitorTheme.caution
-    case .needsUser:
-      HarnessMonitorTheme.accent
-    case .critical:
-      HarnessMonitorTheme.danger
-    }
-  }
-
-  fileprivate var badgeLabel: String {
-    switch self {
-    case .info:
-      "INFO"
-    case .warn:
-      "WARN"
-    case .needsUser:
-      "NEEDS USER"
-    case .critical:
-      "DANGER"
-    }
   }
 }

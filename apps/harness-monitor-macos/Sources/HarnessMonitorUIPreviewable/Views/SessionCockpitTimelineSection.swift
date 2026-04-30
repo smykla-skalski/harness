@@ -36,126 +36,126 @@ struct SessionCockpitTimelineSection: View {
   private var dateTimeConfiguration
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-
-  private var navigation: SessionTimelineWindowNavigation {
-    SessionTimelineWindowNavigation(
-      timeline: timeline,
-      timelineWindow: timelineWindow,
-      isLoading: isTimelineLoading
-    )
-  }
-
-  private var nodes: [SessionTimelineNode] {
-    SessionTimelineNodeBuilder(
-      sessionID: sessionID,
-      entries: timeline,
-      decisions: decisions
-    )
-    .build()
-  }
-
-  private var placeholderCount: Int {
-    isTimelineLoading && nodes.isEmpty ? navigation.limit : 0
-  }
-
-  private var shouldAnimatePlaceholders: Bool {
-    SessionTimelinePlaceholderShimmer.shouldAnimate(
-      reduceMotion: reduceMotion,
-      placeholderCount: placeholderCount
-    )
-  }
-
-  private var showsEmptyState: Bool {
-    !isTimelineLoading && navigation.totalCount == 0 && nodes.isEmpty
-  }
+  @State private var scrollTargetID: String?
 
   private var contentIdentity: SessionTimelineContentIdentity {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
-  private var timelineViewportHeight: CGFloat {
-    let rowCount = max(nodes.count + placeholderCount, 1)
-    let naturalHeight = CGFloat(rowCount) * 78 + HarnessMonitorTheme.spacingLG
-    return min(max(naturalHeight, 260), 620)
-  }
-
   var body: some View {
+    let presentation = makePresentation()
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        Text("Timeline")
-          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-          .accessibilityAddTraits(.isHeader)
-
-        if showsEmptyState {
-          SessionCockpitEmptyStateRow(section: .timeline)
-        } else {
-          timelineSurface
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .onAppear {
-        requestLatestWindowIfNeeded()
-      }
-      .onChange(of: sessionID) { _, _ in
-        requestLatestWindow()
-      }
+      content(for: presentation)
     }
   }
 
-  private var timelineSurface: some View {
-    ScrollViewReader { scrollProxy in
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        if navigation.showsNavigation {
-          SessionTimelineNavigationControls(
-            navigation: navigation,
-            performAction: { action in
-              performNavigationAction(action, scrollProxy: scrollProxy)
-            }
-          )
-        }
+  @MainActor
+  private func makePresentation() -> SessionTimelineSectionPresentation {
+    SessionTimelineSectionPresentation(
+      sessionID: sessionID,
+      timeline: timeline,
+      timelineWindow: timelineWindow,
+      decisions: decisions,
+      isTimelineLoading: isTimelineLoading,
+      reduceMotion: reduceMotion,
+      dateTimeConfiguration: dateTimeConfiguration
+    )
+  }
 
-        timelineScrollContent
+  private func content(for presentation: SessionTimelineSectionPresentation) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      Text("Timeline")
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
+
+      if presentation.showsEmptyState {
+        SessionCockpitEmptyStateRow(section: .timeline)
+      } else {
+        timelineSurface(for: presentation)
       }
-      .padding(HarnessMonitorTheme.spacingLG)
-      .background {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
-          .fill(.primary.opacity(0.035))
-          .overlay {
-            RoundedRectangle(
-              cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-              style: .continuous
-            )
-            .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .onAppear {
+      reconcileScrollTarget(with: presentation.scrollNodeIDs)
+      requestLatestWindowIfNeeded(presentation)
+    }
+    .onChange(of: sessionID) { _, _ in
+      scrollTargetID = nil
+      requestLatestWindow()
+    }
+    .onChange(of: presentation.scrollNodeIDs) { _, ids in
+      reconcileScrollTarget(with: ids)
+    }
+  }
+
+  private func timelineSurface(for presentation: SessionTimelineSectionPresentation) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+      if presentation.navigation.showsNavigation {
+        SessionTimelineNavigationControls(
+          navigation: presentation.navigation,
+          canScrollOlder: presentation.canScrollOlder(from: scrollTargetID),
+          canScrollNewer: presentation.canScrollNewer(from: scrollTargetID),
+          performAction: { action in
+            performNavigationAction(action, presentation: presentation)
           }
+        )
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+
+      timelineScrollContent(for: presentation)
     }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous)
+        .fill(.primary.opacity(0.035))
+        .overlay {
+          RoundedRectangle(
+            cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+            style: .continuous
+          )
+          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+        }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var timelineScrollContent: some View {
+  private func timelineScrollContent(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        edgeAnchor(.top)
         SessionTimelineCards(
-          nodes: nodes,
-          placeholderCount: placeholderCount,
+          rows: presentation.rows,
+          placeholderCount: presentation.placeholderCount,
           shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
-          showsShimmer: shouldAnimatePlaceholders,
-          dateTimeConfiguration: dateTimeConfiguration,
+          showsShimmer: presentation.shouldAnimatePlaceholders,
           actionHandler: actionHandler
         )
-        edgeAnchor(.bottom)
+      }
+      .background {
+        SessionTimelineScrollStickinessConfigurator(isEnabled: presentation.needsStickyScroll)
       }
       .id(contentIdentity)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(height: timelineViewportHeight)
+    .frame(height: presentation.viewportHeight)
     .scrollIndicators(.visible)
+    .scrollBounceBehavior(.always, axes: .vertical)
     .scrollClipDisabled(false)
+    .scrollPosition(id: $scrollTargetID, anchor: .top)
+    .onScrollGeometryChange(
+      for: SessionTimelineScrollBoundaryState.self,
+      of: SessionTimelineScrollBoundaryState.init(geometry:)
+    ) { oldValue, newValue in
+      handleScrollBoundaryChange(
+        from: oldValue,
+        to: newValue,
+        presentation: presentation
+      )
+    }
   }
 
-  private func requestLatestWindowIfNeeded() {
-    guard !hasLatestWindow else {
+  private func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    guard !presentation.hasLatestWindow else {
       return
     }
     requestLatestWindow()
@@ -167,17 +167,20 @@ struct SessionCockpitTimelineSection: View {
     }
   }
 
-  private func requestOlderWindowIfNeeded() {
-    requestWindowIfNeeded(for: .older)
+  private func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    requestWindowIfNeeded(for: .older, presentation: presentation)
   }
 
-  private func requestNewerWindowIfNeeded() {
-    requestWindowIfNeeded(for: .newer)
+  private func requestNewerWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    requestWindowIfNeeded(for: .newer, presentation: presentation)
   }
 
-  private func requestWindowIfNeeded(for action: SessionTimelineWindowAction) {
+  private func requestWindowIfNeeded(
+    for action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) {
     guard !isTimelineLoading,
-      let request = navigation.request(for: action)
+      let request = presentation.navigation.request(for: action)
     else {
       return
     }
@@ -188,68 +191,86 @@ struct SessionCockpitTimelineSection: View {
 
   private func performNavigationAction(
     _ action: SessionTimelineWindowAction,
-    scrollProxy: ScrollViewProxy
+    presentation: SessionTimelineSectionPresentation
   ) {
     Task {
       switch action {
       case .older:
-        await scroll(to: .bottom, using: scrollProxy)
-        await loadWindowIfAvailable(for: .older)
-        await scroll(to: .bottom, using: scrollProxy)
+        await loadOlderWindowBeforeSteppingIfNeeded(presentation)
+        await scroll(
+          to: presentation.nextOlderNodeID(from: scrollTargetID) ?? presentation.scrollNodeIDs.last
+        )
       case .latest:
-        if !hasLatestWindow || navigation.hasNewer {
+        if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
           await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
         }
-        await scroll(to: .top, using: scrollProxy)
+        await scroll(to: presentation.scrollNodeIDs.first)
       case .newer:
-        await scroll(to: .top, using: scrollProxy)
-        await loadWindowIfAvailable(for: .newer)
-        await scroll(to: .top, using: scrollProxy)
+        if presentation.nextNewerNodeID(from: scrollTargetID) == nil {
+          await loadWindowIfAvailable(for: .newer, presentation: presentation)
+        }
+        await scroll(
+          to: presentation.nextNewerNodeID(from: scrollTargetID) ?? presentation.scrollNodeIDs.first
+        )
       }
     }
   }
 
-  private func loadWindowIfAvailable(for action: SessionTimelineWindowAction) async {
-    guard let request = navigation.request(for: action) else {
+  private func loadOlderWindowBeforeSteppingIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation
+  ) async {
+    guard presentation.shouldLoadOlderBeforeStepping(from: scrollTargetID) else {
+      return
+    }
+    await loadWindowIfAvailable(for: .older, presentation: presentation)
+  }
+
+  private func loadWindowIfAvailable(
+    for action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) async {
+    guard let request = presentation.navigation.request(for: action) else {
       return
     }
     await loadWindow(request)
   }
 
-  private func scroll(
-    to target: SessionTimelineScrollTarget,
-    using scrollProxy: ScrollViewProxy
-  ) async {
-    await Task.yield()
+  private func scroll(to targetID: String?) async {
+    guard let targetID else {
+      return
+    }
     await MainActor.run {
       withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) {
-        scrollProxy.scrollTo(target.id, anchor: target.anchor)
+        scrollTargetID = targetID
       }
     }
   }
 
-  private func edgeAnchor(_ target: SessionTimelineScrollTarget) -> some View {
-    Color.clear
-      .frame(height: 1)
-      .id(target.id)
-      .accessibilityHidden(true)
-      .onAppear {
-        switch target {
-        case .top:
-          requestNewerWindowIfNeeded()
-        case .bottom:
-          requestOlderWindowIfNeeded()
-        }
-      }
+  private func reconcileScrollTarget(with ids: [String]) {
+    guard !ids.isEmpty else {
+      scrollTargetID = nil
+      return
+    }
+    guard let scrollTargetID else {
+      self.scrollTargetID = ids.first
+      return
+    }
+    if !ids.contains(scrollTargetID) {
+      self.scrollTargetID = ids.first
+    }
   }
 
-  private var hasLatestWindow: Bool {
-    guard let timelineWindow else {
-      return false
+  private func handleScrollBoundaryChange(
+    from oldValue: SessionTimelineScrollBoundaryState,
+    to newValue: SessionTimelineScrollBoundaryState,
+    presentation: SessionTimelineSectionPresentation
+  ) {
+    if newValue.enteredTopEdge(from: oldValue) {
+      requestNewerWindowIfNeeded(presentation)
     }
-    return timelineWindow.windowStart == 0
-      && timelineWindow.hasNewer == false
-      && timelineWindow.pageSize == SessionTimelineWindowNavigation.defaultLimit
+    if newValue.enteredBottomEdge(from: oldValue) {
+      requestOlderWindowIfNeeded(presentation)
+    }
   }
 }
 

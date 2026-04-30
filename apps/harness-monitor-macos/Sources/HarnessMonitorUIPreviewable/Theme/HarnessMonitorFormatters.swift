@@ -181,6 +181,27 @@ public func formatTimestamp(_ date: Date) -> String {
   return formatter
 }()
 
+@MainActor private let timelineTimeFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "HH:mm:ss"
+  return formatter
+}()
+
+@MainActor private let sameYearTimelineDayDividerFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "d MMM"
+  return formatter
+}()
+
+@MainActor private let crossYearTimelineDayDividerFormatter: DateFormatter = {
+  let formatter = DateFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.dateFormat = "d MMM yyyy"
+  return formatter
+}()
+
 @MainActor
 public func formatTimestamp(
   _ date: Date,
@@ -210,6 +231,52 @@ public func formatTimelineTimestamp(
   dayCalendar.timeZone = timeZone
   let day = dayCalendar.component(.day, from: date)
   return String(format: "%2d %@", day, restFormatter.string(from: date))
+}
+
+@MainActor
+public func formatTimelineTime(
+  _ date: Date,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  timelineTimeFormatter.calendar = Calendar.autoupdatingCurrent
+  timelineTimeFormatter.timeZone = configuration.effectiveTimeZone
+  return timelineTimeFormatter.string(from: date)
+}
+
+@MainActor
+public func formatTimelineTime(
+  _ value: String?,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  guard let value, let date = parsedTimestampDate(from: value) else {
+    return value ?? "n/a"
+  }
+  return formatTimelineTime(date, configuration: configuration)
+}
+
+@MainActor
+public func formatTimelineDayDivider(
+  _ date: Date,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  let timeZone = configuration.effectiveTimeZone
+  let calendar = Calendar.autoupdatingCurrent
+  let isSameYear = calendar.isDate(date, equalTo: .now, toGranularity: .year)
+  let formatter =
+    isSameYear ? sameYearTimelineDayDividerFormatter : crossYearTimelineDayDividerFormatter
+  formatter.calendar = calendar
+  formatter.timeZone = timeZone
+  return formatter.string(from: date)
+}
+
+@MainActor
+public func timelineDayStart(
+  for date: Date,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> Date {
+  var calendar = Calendar.autoupdatingCurrent
+  calendar.timeZone = configuration.effectiveTimeZone
+  return calendar.startOfDay(for: date)
 }
 
 @MainActor
