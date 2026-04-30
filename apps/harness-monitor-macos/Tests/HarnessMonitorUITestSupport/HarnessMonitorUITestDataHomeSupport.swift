@@ -15,6 +15,12 @@ extension HarnessMonitorUITestCase {
         storageDirectoryName(for: purpose),
         isDirectory: true
       )
+    let previousArtifactsDirectory = ProcessInfo.processInfo.environment[Self.artifactsDirectoryKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let shouldSeedArtifactsDirectory =
+      previousArtifactsDirectory == nil || previousArtifactsDirectory?.isEmpty == true
+    let seededArtifactsDirectory = root
+      .appendingPathComponent("ui-test-artifacts", isDirectory: true)
 
     recordDiagnosticsTrace(
       event: "data-home.configure.begin",
@@ -51,9 +57,20 @@ extension HarnessMonitorUITestCase {
     }
 
     app.launchEnvironment[Self.daemonDataHomeKey] = root.path
+    if shouldSeedArtifactsDirectory {
+      setenv(Self.artifactsDirectoryKey, seededArtifactsDirectory.path, 1)
+    }
+    let effectiveArtifactsDirectory =
+      shouldSeedArtifactsDirectory ? seededArtifactsDirectory.path : previousArtifactsDirectory!
+    app.launchEnvironment[Self.artifactsDirectoryKey] = effectiveArtifactsDirectory
     if registerPerTestCleanup {
       addTeardownBlock { @MainActor in
         Self.cleanupIsolatedDataHome(at: root)
+      }
+    }
+    if shouldSeedArtifactsDirectory {
+      addTeardownBlock { @MainActor in
+        unsetenv(Self.artifactsDirectoryKey)
       }
     }
     return root
