@@ -93,6 +93,8 @@ struct HarnessMonitorWindowBackdropView: View {
         colors: [
           baseBackground,
           baseBackground,
+          baseBackground.opacity(0.85),
+          baseBackground.opacity(0.6),
           HarnessMonitorTheme.ink.opacity(colorScheme == .dark ? 0.08 : 0.03),
         ],
         startPoint: .top,

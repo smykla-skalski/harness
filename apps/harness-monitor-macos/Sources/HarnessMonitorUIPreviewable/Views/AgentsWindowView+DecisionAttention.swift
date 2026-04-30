@@ -10,6 +10,6 @@ extension AgentsWindowView {
     if let decisionID = store.selectOldestDecision(for: agentID) {
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
-    openWindow(id: HarnessMonitorWindowID.decisions)
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

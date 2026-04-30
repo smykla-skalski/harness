@@ -69,14 +69,14 @@ public struct AcpPermissionAttentionToastView: View {
         Button {
           openDecisions()
         } label: {
-          Label("Open Decisions", systemImage: "arrow.up.right.square")
+          Label("Open Workspace", systemImage: "arrow.up.right.square")
             .labelStyle(.titleAndIcon)
             .lineLimit(1)
             .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
         }
         .harnessFlatActionButtonStyle(tint: HarnessMonitorTheme.ink)
         .fixedSize(horizontal: true, vertical: false)
-        .accessibilityLabel("Open Decisions")
+        .accessibilityLabel("Open Workspace")
         .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionToastActionButton)
         .accessibilityFrameMarker(
           "\(HarnessMonitorAccessibility.acpPermissionToastActionButton).frame"

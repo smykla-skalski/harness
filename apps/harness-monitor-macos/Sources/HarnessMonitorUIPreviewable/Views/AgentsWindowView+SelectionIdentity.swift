@@ -3,13 +3,17 @@ extension AgentsWindowView {
     switch viewModel.selection {
     case .create:
       "create"
-    case .terminal(let sessionID):
-      "terminal:\(sessionID)"
-    case .codex(let runID):
+    case .decisions(let sessionID):
+      "decisions:\(sessionID ?? "none")"
+    case .decision(let sessionID, let decisionID):
+      "decision:\(sessionID ?? "none"):\(decisionID)"
+    case .terminal(_, let terminalID):
+      "terminal:\(terminalID)"
+    case .codex(_, let runID):
       "codex:\(runID)"
-    case .agent(let agentID):
+    case .agent(_, let agentID):
       "agent:\(agentID)"
-    case .task(let taskID):
+    case .task(_, let taskID):
       "task:\(taskID)"
     }
   }

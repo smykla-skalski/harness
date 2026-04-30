@@ -327,7 +327,7 @@ struct AgentsWindowRootView: View {
     AgentsWindowView(store: store, navigationBridge: navigationBridge)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindow)
       .writingToolsBehavior(.disabled)
-      .frame(minWidth: 860, minHeight: 620)
+      .frame(minWidth: 1_020, minHeight: 680)
       .modifier(
         HarnessMonitorWindowBackdropModifier(
           mode: backdropMode,

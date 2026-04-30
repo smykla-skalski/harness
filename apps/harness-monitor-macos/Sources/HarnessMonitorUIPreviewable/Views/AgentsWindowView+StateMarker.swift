@@ -54,7 +54,23 @@ extension AgentsWindowView {
         codexPromptLengthLabel,
         toastLabel,
       ].joined(separator: ",")
-    case .terminal(let sessionID):
+    case .decisions(let sessionID):
+      return [
+        "selection=decisions:\(sessionID ?? "none")",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
+    case .decision(let sessionID, let decisionID):
+      return [
+        "selection=decision:\(sessionID ?? "none"):\(decisionID)",
+        selectedSessionLabel,
+        readOnlyLabel,
+        codexStartLabel,
+        toastLabel,
+      ].joined(separator: ",")
+    case .terminal(_, let sessionID):
       let status = selectedSessionTui?.status.rawValue ?? "missing"
       let sizeLabel: String = {
         guard let selectedSessionTui else {
@@ -80,7 +96,7 @@ extension AgentsWindowView {
         codexStartLabel,
         toastLabel,
       ].joined(separator: ",")
-    case .codex(let runID):
+    case .codex(_, let runID):
       let status = selectedCodexRun?.status.rawValue ?? "missing"
       let approvalCount = selectedCodexApprovalItems.count
       return [
@@ -92,7 +108,7 @@ extension AgentsWindowView {
         codexStartLabel,
         toastLabel,
       ].joined(separator: ",")
-    case .agent(let agentID):
+    case .agent(_, let agentID):
       let agentStatus =
         store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.status.rawValue
         ?? "missing"
@@ -104,7 +120,7 @@ extension AgentsWindowView {
         codexStartLabel,
         toastLabel,
       ].joined(separator: ",")
-    case .task(let taskID):
+    case .task(_, let taskID):
       let taskStatus =
         store.selectedSession?.tasks.first(where: { $0.taskId == taskID })?.status.rawValue
         ?? "missing"

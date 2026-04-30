@@ -2,10 +2,10 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
-  func consumePendingAgentsWindowSelection() {
-    guard let pending = store.consumePendingAgentsWindowSelection() else {
+  func consumePendingWorkspaceSelection() {
+    guard let pending = store.consumePendingWorkspaceSelection() else {
       return
     }
-    applyProgrammaticSelection(pending)
+    applyProgrammaticSelection(pending, recordHistory: true)
   }
 }

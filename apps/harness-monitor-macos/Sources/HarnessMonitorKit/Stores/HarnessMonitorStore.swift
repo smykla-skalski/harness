@@ -43,7 +43,7 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentShell])
     }
   }
-  public var pendingAgentsWindowSelection: AgentTuiSheetSelection?
+  public var pendingWorkspaceSelection: WorkspaceSelection?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
     didSet {

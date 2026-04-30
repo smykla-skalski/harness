@@ -34,12 +34,14 @@ public struct DecisionDetailView: View {
   private let store: HarnessMonitorStore?
   private let auditEvents: [SupervisorEvent]
   private let observer: ObserverSummary?
+  private let decisionScope: DecisionWorkspaceScope?
   private let primaryActionFocusDecisionID: String?
   private let primaryActionFocusRequestTick: Int
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
     primaryActionFocusRequestTick: Int = 0
   ) {
@@ -47,6 +49,7 @@ public struct DecisionDetailView: View {
     store = nil
     auditEvents = []
     self.observer = observer
+    self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
     _selectedTab = selectedTab
@@ -58,6 +61,7 @@ public struct DecisionDetailView: View {
     auditEvents: [SupervisorEvent] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
     primaryActionFocusRequestTick: Int = 0
   ) {
@@ -65,6 +69,7 @@ public struct DecisionDetailView: View {
     self.store = store
     self.auditEvents = auditEvents
     self.observer = observer
+    self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
     _selectedTab = selectedTab
@@ -77,6 +82,7 @@ public struct DecisionDetailView: View {
     auditEvents: [SupervisorEvent] = [],
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
     primaryActionFocusRequestTick: Int = 0
   ) {
@@ -86,6 +92,7 @@ public struct DecisionDetailView: View {
       auditEvents: auditEvents,
       selectedTab: selectedTab,
       observer: observer,
+      decisionScope: decisionScope,
       primaryActionFocusDecisionID: primaryActionFocusDecisionID,
       primaryActionFocusRequestTick: primaryActionFocusRequestTick
     )
@@ -97,11 +104,6 @@ public struct DecisionDetailView: View {
       .backgroundExtensionEffect()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
-      .toolbar {
-        ToolbarItem(placement: .principal) {
-          detailTabPicker
-        }
-      }
       .overlay {
         if let viewModel {
           AccessibilityTextMarker(
@@ -127,7 +129,7 @@ public struct DecisionDetailView: View {
           titleVisibility: .visible
         ) {
           ForEach(SnoozeOption.allCases) { option in
-            Button(option.title) {
+            Button(option.actionTitle) {
               Task {
                 await viewModel.confirmSnooze(duration: option.duration)
               }
@@ -170,26 +172,21 @@ public struct DecisionDetailView: View {
       decision: viewModel.decision,
       store: store
     )
-    let isAcpDecision: Bool
-    switch contextAdapter.kind {
-    case .acpPermission:
-      isAcpDecision = true
-    case .generic:
-      isAcpDecision = false
-    }
     return ScrollView {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         DecisionDetailHero(
           viewModel: viewModel,
           dateTimeConfiguration: dateTimeConfiguration
         )
-        if isAcpDecision {
-          detailTabs(viewModel, contextAdapter: contextAdapter)
-          suggestedActions(viewModel, contextAdapter: contextAdapter)
-        } else {
-          suggestedActions(viewModel, contextAdapter: contextAdapter)
-          detailTabs(viewModel, contextAdapter: contextAdapter)
-        }
+        suggestedActions(viewModel, contextAdapter: contextAdapter)
+        DecisionRelatedAgentContextSection(
+          decision: viewModel.decision,
+          store: store
+        )
+        evidenceSection(
+          viewModel,
+          contextAdapter: contextAdapter
+        )
       }
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -197,9 +194,9 @@ public struct DecisionDetailView: View {
   }
 
   @ViewBuilder private var emptyState: some View {
-    if let observer = observer {
+    if decisionScope != nil || observer != nil {
       ScrollView {
-        ObserverSummaryPanel(observer: observer)
+        ObserverSummaryPanel(scope: decisionScope, observer: observer)
           .padding(HarnessMonitorTheme.spacingLG)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -210,7 +207,7 @@ public struct DecisionDetailView: View {
           .foregroundStyle(.secondary)
         Text("Select a decision")
           .font(.title3)
-        Text("The Monitor supervisor will surface decisions here.")
+        Text("Decisions and related activity appear here.")
           .font(.callout)
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)
@@ -251,41 +248,37 @@ public struct DecisionDetailView: View {
     viewModel: DecisionDetailViewModel,
     contextAdapter: DecisionKindContextAdapter
   ) -> some View {
-    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      if
-        let primaryActionID,
-        let primaryAction = actions.first(where: { $0.id == primaryActionID })
+    let emphasizedPrimaryActionID =
+      primaryActionID.flatMap { candidateID in
+        actions.first { $0.id == candidateID && isProminentActionCandidate($0) }?.id
+      }
+    let wrappedActions = actions.filter { $0.id != emphasizedPrimaryActionID }
+
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      if let emphasizedPrimaryActionID,
+        let primaryAction = actions.first(where: { $0.id == emphasizedPrimaryActionID })
       {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          actionButton(
-            for: primaryAction,
-            viewModel: viewModel,
-            contextAdapter: contextAdapter,
-            isPrimary: true,
-            fillsWidth: false
-          )
-          let secondaryActions = actions.filter { $0.id != primaryActionID }
-          if !secondaryActions.isEmpty {
-            HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-              ForEach(secondaryActions) { action in
-                actionButton(
-                  for: action,
-                  viewModel: viewModel,
-                  contextAdapter: contextAdapter,
-                  isPrimary: false
-                )
-              }
-            }
-          }
-        }
-      } else {
-        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-          ForEach(actions) { action in
+        actionButton(
+          for: primaryAction,
+          viewModel: viewModel,
+          contextAdapter: contextAdapter,
+          isPrimaryFocusTarget: primaryActionID == emphasizedPrimaryActionID,
+          emphasizesAction: true,
+          fillsWidth: true
+        )
+      }
+      if !wrappedActions.isEmpty {
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.itemSpacing,
+          lineSpacing: HarnessMonitorTheme.spacingXS
+        ) {
+          ForEach(wrappedActions) { action in
             actionButton(
               for: action,
               viewModel: viewModel,
               contextAdapter: contextAdapter,
-              isPrimary: false
+              isPrimaryFocusTarget: action.id == primaryActionID,
+              emphasizesAction: false
             )
           }
         }
@@ -298,35 +291,38 @@ public struct DecisionDetailView: View {
     for action: SuggestedAction,
     viewModel: DecisionDetailViewModel,
     contextAdapter: DecisionKindContextAdapter,
-    isPrimary: Bool,
+    isPrimaryFocusTarget: Bool,
+    emphasizesAction: Bool,
     fillsWidth: Bool = false
   ) -> some View {
     let role: ButtonRole? = action.kind == .dismiss ? .destructive : nil
     let button = HarnessMonitorAsyncActionButton(
       title: action.title,
       tint: tint(for: action, severity: viewModel.severity),
-      variant: isPrimary && !contextAdapter.prefersSubtlePrimaryAction ? .prominent : .bordered,
+      variant:
+        emphasizesAction && !contextAdapter.prefersSubtlePrimaryAction
+        ? .prominent
+        : .bordered,
       role: role,
       isLoading: false,
       accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id),
       fillsWidth: fillsWidth,
-      accessibilityFocusBinding: isPrimary ? $focusedPrimaryActionDecisionID : nil,
-      accessibilityFocusValue: isPrimary ? viewModel.decision.id : nil,
-      keyboardFocusBinding: isPrimary ? $keyboardFocusedPrimaryActionDecisionID : nil,
-      keyboardFocusValue: isPrimary ? viewModel.decision.id : nil
+      accessibilityFocusBinding: isPrimaryFocusTarget ? $focusedPrimaryActionDecisionID : nil,
+      accessibilityFocusValue: isPrimaryFocusTarget ? viewModel.decision.id : nil,
+      keyboardFocusBinding: isPrimaryFocusTarget ? $keyboardFocusedPrimaryActionDecisionID : nil,
+      keyboardFocusValue: isPrimaryFocusTarget ? viewModel.decision.id : nil
     ) {
       await viewModel.invoke(action: action)
     }
     .disabled(contextAdapter.isActionDisabled(action.id))
-    if isPrimary {
+    if isPrimaryFocusTarget && isProminentActionCandidate(action) {
       button
         .keyboardShortcut(.defaultAction)
     } else if action.kind == .dismiss {
       button
         .keyboardShortcut(".", modifiers: [.command])
-        .harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.danger)
     } else {
-      button.harnessActionButtonStyle(variant: .borderless, tint: HarnessMonitorTheme.secondaryInk)
+      button
     }
   }
 
@@ -343,6 +339,21 @@ public struct DecisionDetailView: View {
       )
     case .audit:
       DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
+    }
+  }
+
+  private func evidenceSection(
+    _ viewModel: DecisionDetailViewModel,
+    contextAdapter: DecisionKindContextAdapter
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Evidence")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityAddTraits(.isHeader)
+      detailTabPicker
+        .frame(maxWidth: .infinity, alignment: .leading)
+      detailTabs(viewModel, contextAdapter: contextAdapter)
     }
   }
 
@@ -405,40 +416,5 @@ public struct DecisionDetailView: View {
       "keyboardFocused=\(isKeyboardFocused)",
       "tick=\(handledPrimaryActionFocusTick)",
     ].joined(separator: " ")
-  }
-}
-
-private enum SnoozeOption: String, CaseIterable, Identifiable {
-  case fifteenMinutes
-  case oneHour
-  case fourHours
-  case oneDay
-
-  var id: Self { self }
-
-  var title: String {
-    switch self {
-    case .fifteenMinutes:
-      "15 minutes"
-    case .oneHour:
-      "1 hour"
-    case .fourHours:
-      "4 hours"
-    case .oneDay:
-      "24 hours"
-    }
-  }
-
-  var duration: TimeInterval {
-    switch self {
-    case .fifteenMinutes:
-      15 * 60
-    case .oneHour:
-      60 * 60
-    case .fourHours:
-      4 * 60 * 60
-    case .oneDay:
-      24 * 60 * 60
-    }
   }
 }

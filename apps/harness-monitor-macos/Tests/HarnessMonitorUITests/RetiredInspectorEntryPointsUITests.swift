@@ -41,6 +41,9 @@ final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
 extension RetiredInspectorEntryPointsUITests {
   fileprivate func verifySignalDetailSheet(in app: XCUIApplication) {
     let signalCard = button(in: app, identifier: Accessibility.previewSignalCard)
+    if !signalCard.waitForExistence(timeout: 1.5) {
+      tapPreviewSession(in: app)
+    }
     XCTAssertTrue(
       signalCard.waitForExistence(timeout: Self.uiTimeout),
       "Cockpit signal card should render in cockpit preview"
@@ -61,13 +64,10 @@ extension RetiredInspectorEntryPointsUITests {
   }
 
   fileprivate func verifyCreateTaskSheet(in app: XCUIApplication) {
-    let newTaskButton = button(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        newTaskButton.exists && !newTaskButton.frame.isEmpty
-      },
-      "Tasks section should expose a New Task button"
-    )
+    let newTaskButton = element(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
+    if !newTaskButton.waitForExistence(timeout: 1.5) {
+      tapPreviewSession(in: app)
+    }
     tapButton(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
 
     let sheet = element(in: app, identifier: Accessibility.createTaskSheet)

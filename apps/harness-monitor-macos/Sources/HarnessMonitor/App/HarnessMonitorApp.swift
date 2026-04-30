@@ -101,7 +101,6 @@ struct HarnessMonitorApp: App {
     mainWindowScene
     settingsWindowScene
     agentsWindowScene
-    decisionsWindowScene
   }
 
   private var allowsWindowRestoration: Bool {
@@ -141,7 +140,7 @@ struct HarnessMonitorApp: App {
         store: store,
         displayState: store.commandsDisplayState
       )
-      WindowMenuCommands(supervisorToolbarSlice: store.supervisorToolbarSlice)
+      WindowMenuCommands()
     }
   }
 
@@ -164,7 +163,7 @@ struct HarnessMonitorApp: App {
   }
 
   private var agentsWindowScene: some Scene {
-    Window("Agents", id: HarnessMonitorWindowID.agents) {
+    Window("Workspace", id: HarnessMonitorWindowID.workspace) {
       AgentsWindowRootView(
         store: store,
         notifications: notificationController,
@@ -177,18 +176,7 @@ struct HarnessMonitorApp: App {
       .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowStyle(.titleBar)
-    .defaultSize(width: 980, height: 620)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-  }
-
-  private var decisionsWindowScene: some Scene {
-    Window("Decisions", id: HarnessMonitorWindowID.decisions) {
-      DecisionsWindowView(store: store)
-        .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-        .modifier(HarnessMonitorMainWindowLauncherBinder())
-    }
-    .windowStyle(.titleBar)
-    .defaultSize(width: 900, height: 640)
+    .defaultSize(width: 1_140, height: 700)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 

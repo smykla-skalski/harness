@@ -9,7 +9,7 @@ struct ContentWindowToolbarModel: Equatable {
   let sleepPreventionEnabled: Bool
 
   var sleepPreventionTitle: String {
-    sleepPreventionEnabled ? "Sleep Prevention On" : "Prevent Sleep"
+    sleepPreventionEnabled ? "Allow Sleep" : "Prevent Sleep"
   }
 
   var sleepPreventionSystemImage: String {
@@ -52,8 +52,8 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
       .tint(model.sleepPreventionEnabled ? .orange : nil)
       .help(
         model.sleepPreventionEnabled
-          ? "Click to allow system sleep"
-          : "Prevent sleep while sessions are active"
+          ? "Allow system sleep"
+          : "Keep the system awake while sessions are active"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
       RefreshToolbarButton(isRefreshing: model.isRefreshing) {
@@ -67,7 +67,7 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
-      SupervisorToolbarItem(slice: store.supervisorToolbarSlice)
+      SupervisorToolbarItem(store: store, slice: store.supervisorToolbarSlice)
     }
   }
 }
@@ -78,10 +78,10 @@ private struct AgentsToolbarButton: View {
 
   var body: some View {
     Button {
-      openWindow(id: HarnessMonitorWindowID.agents)
+      openWindow(id: HarnessMonitorWindowID.workspace)
     } label: {
       Label {
-        Text("Agents")
+        Text("Workspace")
       } icon: {
         HarnessMonitorUIAssets.image(named: "ToolbarAgentsBot")
           .renderingMode(.template)
@@ -91,7 +91,7 @@ private struct AgentsToolbarButton: View {
           .accessibilityHidden(true)
       }
     }
-    .help("Open Agents window")
+    .help("Open workspace")
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentsActionButton)
   }
 }

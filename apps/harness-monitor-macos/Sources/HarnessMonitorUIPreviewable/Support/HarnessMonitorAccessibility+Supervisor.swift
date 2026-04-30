@@ -15,6 +15,8 @@ extension HarnessMonitorAccessibility {
   public static let decisionAcpSelectionSummary = "harness.decisions.context.acp.selection-summary"
   public static let decisionAcpError = "harness.decisions.context.acp.error"
   public static let decisionAuditTrail = "harness.decisions.audit"
+  public static let decisionRelatedAgentContext = "harness.decisions.related-agent"
+  public static let decisionOpenInAgents = "harness.decisions.related-agent.open"
   public static let decisionsLiveTick = "harness.decisions.live-tick"
   public static let decisionInspector = "harness.decisions.inspector"
   public static let decisionInspectorMetadata = "harness.decisions.inspector.metadata"

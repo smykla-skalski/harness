@@ -29,7 +29,9 @@ public struct DecisionInspector: View {
         } else {
           emptyState
         }
-        liveTickSection
+        if showsLiveTickSection {
+          liveTickSection
+        }
       }
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,17 +58,17 @@ public struct DecisionInspector: View {
           metadataRow("Snoozed Until", value: snoozeLabel, monospaced: true)
         }
         if hasIdentifierDetails(decision) {
-          DisclosureGroup("Identifiers", isExpanded: $showIdentifierDetails) {
+          DisclosureGroup("Reference details", isExpanded: $showIdentifierDetails) {
             VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-              metadataRow("Rule", value: decision.ruleID, monospaced: true)
+              metadataRow("Source", value: humanizedWorkspaceLabel(decision.ruleID))
               if let sessionID = nonEmpty(decision.sessionID) {
-                metadataRow("Session", value: sessionID, monospaced: true)
+                metadataRow("Workspace", value: humanizedWorkspaceLabel(sessionID))
               }
               if let agentID = nonEmpty(decision.agentID) {
-                metadataRow("Agent", value: agentID, monospaced: true)
+                metadataRow("Agent", value: humanizedWorkspaceLabel(agentID))
               }
               if let taskID = nonEmpty(decision.taskID) {
-                metadataRow("Task", value: taskID, monospaced: true)
+                metadataRow("Task", value: humanizedWorkspaceLabel(taskID))
               }
             }
             .padding(.top, HarnessMonitorTheme.spacingXS)
@@ -113,11 +115,19 @@ public struct DecisionInspector: View {
 
   private var liveTickSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Live Tick")
+      Text("Live activity")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       DecisionsLiveTickView(snapshot: liveTick, chrome: false)
     }
+  }
+
+  private var showsLiveTickSection: Bool {
+    liveTick.lastSnapshotID != nil
+      || liveTick.tickLatencyP50Ms > 0
+      || liveTick.tickLatencyP95Ms > 0
+      || liveTick.activeObserverCount > 0
+      || !liveTick.quarantinedRuleIDs.isEmpty
   }
 
   private func severityTitle(_ severity: DecisionSeverity) -> String {
@@ -134,7 +144,7 @@ public struct DecisionInspector: View {
       Text("No decision selected")
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text("Select a decision from the sidebar to inspect metadata.")
+      Text("Select a decision from the list to inspect its details.")
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }

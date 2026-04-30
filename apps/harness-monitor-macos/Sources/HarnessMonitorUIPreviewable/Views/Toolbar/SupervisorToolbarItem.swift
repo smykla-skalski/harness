@@ -6,9 +6,11 @@ public struct SupervisorToolbarItem: View {
   @Environment(\.openWindow)
   private var openWindow
 
+  private let store: HarnessMonitorStore
   private let slice: SupervisorToolbarSlice
 
-  public init(slice: SupervisorToolbarSlice) {
+  public init(store: HarnessMonitorStore, slice: SupervisorToolbarSlice) {
+    self.store = store
     self.slice = slice
   }
 
@@ -16,9 +18,10 @@ public struct SupervisorToolbarItem: View {
     @Bindable var slice = slice
 
     Button {
-      openWindow(id: HarnessMonitorWindowID.decisions)
+      store.requestWorkspaceSelection(.decisions(sessionID: store.selectedSessionID))
+      openWindow(id: HarnessMonitorWindowID.workspace)
     } label: {
-      Label("Decisions", systemImage: toolbarSymbolName(for: slice.count))
+      Label("Needs Attention", systemImage: toolbarSymbolName(for: slice.count))
         .symbolRenderingMode(.hierarchical)
         .foregroundStyle(toolbarTint(for: slice.maxSeverity))
         .overlay(alignment: .topTrailing) {
@@ -27,8 +30,12 @@ public struct SupervisorToolbarItem: View {
           }
         }
     }
-    .help("Open Decisions window")
+    .help("Open items needing attention in the workspace")
     .accessibilityIdentifier(HarnessMonitorAccessibility.supervisorBadge)
+    .accessibilityLabel("Needs attention")
+    .accessibilityValue(
+      attentionAccessibilityValue(count: slice.count, maxSeverity: slice.maxSeverity)
+    )
     .harnessUITestValue(
       badgeStateLabel(count: slice.count, maxSeverity: slice.maxSeverity)
     )
@@ -71,6 +78,26 @@ public struct SupervisorToolbarItem: View {
     }
   }
 
+  private func attentionAccessibilityValue(count: Int, maxSeverity: DecisionSeverity?) -> String {
+    guard count > .zero else { return "No items need attention" }
+
+    let itemLabel = count == 1 ? "item" : "items"
+    return "\(count) \(itemLabel), \(spokenSeverityLabel(for: maxSeverity))"
+  }
+
+  private func spokenSeverityLabel(for severity: DecisionSeverity?) -> String {
+    switch severity {
+    case .none, .info:
+      "informational"
+    case .warn:
+      "warning"
+    case .needsUser:
+      "action needed"
+    case .critical:
+      "critical"
+    }
+  }
+
   @ViewBuilder
   private func badge(count: Int, maxSeverity: DecisionSeverity?) -> some View {
     Text(count.formatted())
@@ -86,6 +113,9 @@ public struct SupervisorToolbarItem: View {
 }
 
 #Preview("Supervisor Toolbar Item — empty") {
-  SupervisorToolbarItem(slice: SupervisorToolbarSlice())
-    .padding()
+  SupervisorToolbarItem(
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
+    slice: SupervisorToolbarSlice()
+  )
+  .padding()
 }

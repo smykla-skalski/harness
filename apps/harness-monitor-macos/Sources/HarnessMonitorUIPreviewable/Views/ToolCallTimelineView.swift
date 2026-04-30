@@ -54,7 +54,7 @@ struct ToolCallTimelineView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack {
-        Text("Tool calls")
+        Text("Action history")
           .scaledFont(.headline)
           .accessibilityAddTraits(.isHeader)
         Spacer()
@@ -67,7 +67,7 @@ struct ToolCallTimelineView: View {
         )
       }
       if presentation.rows.isEmpty {
-        Text("No tool calls yet.")
+        Text("No activity yet.")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
