@@ -7,10 +7,12 @@ extension AgentsWindowView {
     guard case .acp(let agentID) = viewModel.selectedLaunchSelection else {
       return false
     }
+    let startSessionID = viewModel.selection.sessionID ?? viewModel.createSessionID
     let started = await store.startAcpAgent(
       agentID: agentID,
       prompt: viewModel.prompt,
-      projectDir: trimmedProjectDir
+      projectDir: trimmedProjectDir,
+      sessionID: startSessionID
     )
     guard started != nil else {
       viewModel.startTuiPhase = "failed"
