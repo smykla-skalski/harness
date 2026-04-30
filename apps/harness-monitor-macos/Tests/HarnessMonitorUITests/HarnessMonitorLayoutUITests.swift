@@ -58,7 +58,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let sessionRow = previewSessionTrigger(in: app)
     let observeButton = button(in: app, title: "Observe")
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
-    let createTaskButton = button(in: app, title: "Create Task")
+    let createTaskButton = button(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
     let taskCard = element(in: app, identifier: Accessibility.taskUICard)
     let workerCard = element(in: app, identifier: Accessibility.workerAgentCard)
 
@@ -110,6 +110,47 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) { createTaskButton.isEnabled }
+    )
+  }
+
+  func testCockpitNewTaskButtonSharesTasksHeaderRow() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    let headerCardFrame = frameElement(
+      in: app, identifier: Accessibility.sessionHeaderCardFrame)
+    let tasksHeaderFrame = frameElement(
+      in: app, identifier: Accessibility.sessionTaskListHeaderFrame)
+    let createTaskButton = button(in: app, identifier: Accessibility.sessionTaskCreateOpenButton)
+    let createTaskButtonFrame = frameElement(
+      in: app, identifier: "\(Accessibility.sessionTaskCreateOpenButton).frame")
+
+    XCTAssertTrue(waitForElement(headerCardFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(tasksHeaderFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createTaskButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createTaskButtonFrame, timeout: Self.actionTimeout))
+
+    XCTAssertGreaterThan(
+      createTaskButtonFrame.frame.minY,
+      headerCardFrame.frame.maxY,
+      "New Task should render in the tasks section instead of the cockpit header"
+    )
+    XCTAssertEqual(
+      createTaskButtonFrame.frame.maxX,
+      tasksHeaderFrame.frame.maxX,
+      accuracy: 12,
+      "New Task should align with the trailing edge of the tasks header row"
+    )
+    XCTAssertEqual(
+      createTaskButtonFrame.frame.midY,
+      tasksHeaderFrame.frame.midY,
+      accuracy: 18,
+      "New Task should share the tasks header row"
     )
   }
 
