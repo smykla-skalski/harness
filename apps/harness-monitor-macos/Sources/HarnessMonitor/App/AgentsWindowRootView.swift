@@ -2,10 +2,6 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
-private enum AgentsWindowMounting {
-  static let firstFrameDelay: Duration = .milliseconds(60)
-}
-
 struct AgentsWindowRootView: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -100,25 +96,9 @@ struct AgentsWindowRootView: View {
 
     // Let AppKit commit the shell window before mounting the heavier workspace view tree.
     await Task.yield()
-    try? await Task.sleep(for: AgentsWindowMounting.firstFrameDelay)
     guard !Task.isCancelled else {
       return
     }
     showsWorkspaceContent = true
-  }
-}
-
-private struct AgentsWindowOpeningView: View {
-  var body: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingSM) {
-      ProgressView()
-        .controlSize(.small)
-      Text("Opening workspace")
-        .scaledFont(.headline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Opening workspace")
   }
 }
