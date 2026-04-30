@@ -111,17 +111,30 @@ stop_launchd_daemon() {
 }
 
 kill_orphan_harness_processes() {
+  local attempt=0
   local pids=()
   local pid
-  while IFS= read -r pid; do
-    [[ -n "$pid" ]] && pids+=("$pid")
-  done < <(stale_scan_matching_pids build)
-  (( ${#pids[@]} > 0 )) || return 0
+  while (( attempt < 3 )); do
+    stale_scan_refresh_ps
+    pids=()
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] && pids+=("$pid")
+    done < <(stale_scan_matching_pids build)
+    (( ${#pids[@]} > 0 )) || return 0
 
-  echo "killing orphan local cargo-built harness processes..."
-  signal_pids TERM "${pids[@]}"
-  sleep 1
-  signal_pids KILL "${pids[@]}"
+    if (( attempt == 0 )); then
+      echo "killing orphan local cargo-built harness processes..."
+      signal_pids TERM "${pids[@]}"
+    elif (( attempt == 1 )); then
+      echo "force-stopping stubborn orphan local cargo-built harness processes..."
+      signal_pids KILL "${pids[@]}"
+    else
+      echo "retrying stubborn orphan local cargo-built harness processes..."
+      signal_pids KILL "${pids[@]}"
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
 }
 
 orphan_monitor_wrapper_lock_dirs() {
