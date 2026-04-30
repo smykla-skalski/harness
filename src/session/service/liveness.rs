@@ -5,6 +5,7 @@ use super::{
     refresh_session, require_active, runtime, signal_context_root,
     signal_dirs_for_agent_in_context_root, signal_matches_session, storage, utc_now,
 };
+use crate::agents::kind::DisconnectReason;
 
 /// Result of a liveness synchronization pass.
 #[derive(Debug, Clone, Default)]
@@ -294,6 +295,16 @@ pub(crate) fn apply_agent_disconnected(
     agent_id: &str,
     now: &str,
 ) -> bool {
+    apply_agent_disconnected_with_reason(state, agent_id, DisconnectReason::default(), None, now)
+}
+
+pub(crate) fn apply_agent_disconnected_with_reason(
+    state: &mut SessionState,
+    agent_id: &str,
+    reason: DisconnectReason,
+    stderr_tail: Option<String>,
+    now: &str,
+) -> bool {
     let Some(current_alive) = state
         .agents
         .get(agent_id)
@@ -306,7 +317,10 @@ pub(crate) fn apply_agent_disconnected(
     }
 
     if let Some(agent) = state.agents.get_mut(agent_id) {
-        agent.status = AgentStatus::disconnected_unknown();
+        agent.status = AgentStatus::Disconnected {
+            reason,
+            stderr_tail,
+        };
         now.clone_into(&mut agent.updated_at);
         agent.last_activity_at = Some(now.to_string());
         agent.current_task_id = None;
@@ -414,6 +428,7 @@ mod inline_tests {
                 updated_at: "2026-04-24T00:00:00Z".into(),
                 status: AgentStatus::AwaitingReview,
                 agent_session_id: None,
+                managed_agent: None,
                 last_activity_at: Some("2026-04-24T00:00:00Z".into()),
                 current_task_id: None,
                 runtime_capabilities: Default::default(),

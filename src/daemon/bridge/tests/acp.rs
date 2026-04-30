@@ -237,7 +237,7 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
         agent: "claude".to_string(),
         prompt: Some("hello".to_string()),
         project_dir: Some("/tmp/project".to_string()),
-        record_permissions: false,
+        ..AcpAgentStartRequest::default()
     };
     assert!(client.acp_start("sess-1", &start_request, true).is_err());
     assert!(client.acp_list("sess-1").is_err());

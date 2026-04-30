@@ -273,6 +273,7 @@ fn sample_session_state() -> SessionState {
             updated_at: "2026-04-13T19:00:00Z".into(),
             status: AgentStatus::Active,
             agent_session_id: None,
+            managed_agent: None,
             last_activity_at: Some("2026-04-13T19:00:00Z".into()),
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),

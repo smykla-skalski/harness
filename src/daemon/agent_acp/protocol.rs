@@ -14,7 +14,7 @@ use agent_client_protocol::{
     Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
 };
 use tokio::process::{ChildStdin, ChildStdout};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio::time::timeout;
@@ -29,7 +29,7 @@ use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::prompt_gate::PromptLease;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
-use super::manager::AcpAgentStartRequest;
+use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 mod commands;
 mod context;
 mod session_guard;
@@ -45,6 +45,7 @@ pub(super) struct SpawnedAcpProtocol {
     pub(super) protocol: JoinHandle<()>,
     pub(super) batcher: JoinHandle<()>,
     pub(super) handle: AcpProtocolHandle,
+    pub(super) start: oneshot::Sender<()>,
 }
 
 pub(super) struct SpawnProtocolInput<'a> {
@@ -52,10 +53,12 @@ pub(super) struct SpawnProtocolInput<'a> {
     pub acp_id: &'a str,
     pub session_id: &'a str,
     pub agent_name: String,
+    pub runtime_name: String,
     pub project_dir: PathBuf,
     pub supervisor: &'a Arc<AcpSessionSupervisor>,
     pub permission_mode: PermissionMode,
     pub initial_prompt_lease: Option<PromptLease>,
+    pub manager: AcpAgentManagerHandle,
 }
 
 pub(super) fn spawn_protocol_task(
@@ -67,10 +70,12 @@ pub(super) fn spawn_protocol_task(
         acp_id,
         session_id,
         agent_name,
+        runtime_name,
         project_dir,
         supervisor,
         permission_mode,
         initial_prompt_lease,
+        manager,
     } = input;
     let stdin = child
         .stdin
@@ -98,6 +103,7 @@ pub(super) fn spawn_protocol_task(
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (disconnect_tx, disconnects) = mpsc::channel(1);
+    let (start_tx, start_rx) = oneshot::channel();
     let protocol_task = tokio::spawn(run_protocol(RunProtocolArgs {
         stdin,
         stdout,
@@ -105,6 +111,7 @@ pub(super) fn spawn_protocol_task(
         prompt: request.prompt.clone(),
         acp_id: acp_id.to_string(),
         session_id: session_id.to_string(),
+        runtime_name,
         notifications: batcher.notifications,
         client,
         supervisor: Arc::clone(supervisor),
@@ -112,6 +119,8 @@ pub(super) fn spawn_protocol_task(
         cancel_rx,
         command_rx,
         disconnect_tx,
+        start_rx,
+        manager,
     }));
     Ok(SpawnedAcpProtocol {
         events: batcher.events,
@@ -119,6 +128,7 @@ pub(super) fn spawn_protocol_task(
         protocol: protocol_task,
         batcher: batcher.task,
         handle: AcpProtocolHandle::new(cancel_tx, command_tx),
+        start: start_tx,
     })
 }
 
@@ -129,6 +139,7 @@ struct RunProtocolArgs {
     prompt: Option<String>,
     acp_id: String,
     session_id: String,
+    runtime_name: String,
     notifications: mpsc::Sender<RoutedSessionNotification>,
     client: Arc<HarnessAcpClient>,
     supervisor: Arc<AcpSessionSupervisor>,
@@ -136,6 +147,8 @@ struct RunProtocolArgs {
     cancel_rx: mpsc::UnboundedReceiver<()>,
     command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     disconnect_tx: mpsc::Sender<DisconnectReason>,
+    start_rx: oneshot::Receiver<()>,
+    manager: AcpAgentManagerHandle,
 }
 
 #[expect(
@@ -150,6 +163,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         prompt,
         acp_id,
         session_id,
+        runtime_name,
         notifications,
         client,
         supervisor,
@@ -157,7 +171,12 @@ async fn run_protocol(args: RunProtocolArgs) {
         cancel_rx,
         command_rx,
         disconnect_tx,
+        start_rx,
+        manager,
     } = args;
+    if start_rx.await.is_err() {
+        return;
+    }
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
@@ -240,11 +259,13 @@ async fn run_protocol(args: RunProtocolArgs) {
                 prompt,
                 acp_id,
                 session_id,
+                runtime_name,
                 supervisor,
                 initial_prompt_lease,
                 cancel_rx,
                 command_rx,
                 session_guard,
+                manager,
             })
             .await
         })
@@ -349,17 +370,33 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         prompt,
         acp_id,
         session_id,
+        runtime_name,
         supervisor,
         mut initial_prompt_lease,
         mut cancel_rx,
         mut command_rx,
         session_guard,
+        manager,
     } = args;
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
     send_initialize(&connection, initialize_timeout).await?;
     let acp_session_id = send_new_session(&connection, project_dir).await?;
+    let registered = manager
+        .bind_orchestration_runtime_session(
+            &session_id,
+            &acp_id,
+            &runtime_name,
+            &acp_session_id.to_string(),
+        )
+        .map_err(|error| AcpError::new(-32603, format!("bind ACP runtime session: {error}")))?;
+    if !registered {
+        return Err(AcpError::new(
+            -32603,
+            format!("bind ACP runtime session: missing orchestration agent for '{acp_id}'"),
+        ));
+    }
     let target = RouteTarget { acp_id, session_id };
     session_guard.start_session(&acp_session_id, target.clone());
     let run_result = async {
@@ -403,11 +440,13 @@ struct RunConnectionArgs {
     prompt: Option<String>,
     acp_id: String,
     session_id: String,
+    runtime_name: String,
     supervisor: Arc<AcpSessionSupervisor>,
     initial_prompt_lease: Option<PromptLease>,
     cancel_rx: mpsc::UnboundedReceiver<()>,
     command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     session_guard: Arc<SessionRouteGuard>,
+    manager: AcpAgentManagerHandle,
 }
 
 async fn send_initialize(

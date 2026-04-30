@@ -48,9 +48,9 @@ pub(super) const DELETE_SESSION_AGENTS_SQL: &str = "DELETE FROM agents WHERE ses
 
 pub(super) const INSERT_AGENT_SQL: &str = "INSERT INTO agents (
     agent_id, session_id, name, runtime, role, capabilities_json,
-    status, agent_session_id, joined_at, updated_at,
+    status, agent_session_id, managed_agent_kind, managed_agent_id, joined_at, updated_at,
     last_activity_at, current_task_id, runtime_capabilities_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)";
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)";
 
 pub(super) const DELETE_SESSION_TASKS_SQL: &str = "DELETE FROM tasks WHERE session_id = ?1";
 

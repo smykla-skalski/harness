@@ -373,6 +373,22 @@ async fn replace_agents(
             .bind(capabilities_json)
             .bind(agent_status_db_label(&agent.status))
             .bind(agent.agent_session_id.as_deref())
+            .bind(
+                agent
+                    .managed_agent
+                    .as_ref()
+                    .map(|managed| match managed.kind {
+                        crate::session::types::ManagedAgentKind::Tui => "tui",
+                        crate::session::types::ManagedAgentKind::Acp => "acp",
+                        crate::session::types::ManagedAgentKind::Codex => "codex",
+                    }),
+            )
+            .bind(
+                agent
+                    .managed_agent
+                    .as_ref()
+                    .map(|managed| managed.id.as_str()),
+            )
             .bind(&agent.joined_at)
             .bind(&agent.updated_at)
             .bind(agent.last_activity_at.as_deref())

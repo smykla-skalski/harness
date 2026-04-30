@@ -425,6 +425,7 @@ pub(super) fn sample_session_state() -> SessionState {
             updated_at: now.clone(),
             status: AgentStatus::Active,
             agent_session_id: None,
+            managed_agent: None,
             last_activity_at: Some(now.clone()),
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),

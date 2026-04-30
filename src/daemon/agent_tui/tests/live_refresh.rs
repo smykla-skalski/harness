@@ -226,6 +226,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
         Some("claude-leader-session"),
         &now,
         None,
+        None,
     )
     .expect("join leader");
     let worker_id = "codex-worker".to_string();
@@ -241,6 +242,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
             updated_at: "2026-04-12T09:00:00Z".into(),
             status: crate::session::types::AgentStatus::Active,
             agent_session_id: Some("codex-worker-session".into()),
+            managed_agent: None,
             last_activity_at: Some("2026-04-12T09:00:00Z".into()),
             current_task_id: None,
             runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),

@@ -211,6 +211,31 @@ pub(super) fn migrate_v10_to_v11(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
+/// Chunk-3 migrator: add the canonical managed-agent reference slot and backfill
+/// TUI-managed registrations from their marker capability.
+pub(super) fn migrate_v11_to_v12(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+    object.insert("schema_version".to_string(), json!(12));
+
+    if let Some(agents) = object.get_mut("agents").and_then(Value::as_object_mut) {
+        for agent in agents.values_mut() {
+            let Some(agent_object) = agent.as_object_mut() else {
+                continue;
+            };
+            if agent_object.contains_key("managed_agent") {
+                continue;
+            }
+            if let Some(managed_agent) = migrate_managed_agent_field(agent_object) {
+                agent_object.insert("managed_agent".to_string(), managed_agent);
+            }
+        }
+    }
+
+    Ok(value)
+}
+
 fn migrate_runtime_field(agent: &mut serde_json::Map<String, Value>) {
     let Some(runtime) = agent.get("runtime") else {
         return;
@@ -246,4 +271,20 @@ fn migrate_status_field(agent: &mut serde_json::Map<String, Value>) {
             }),
         );
     }
+}
+
+fn migrate_managed_agent_field(agent: &serde_json::Map<String, Value>) -> Option<Value> {
+    let capabilities = agent.get("capabilities")?.as_array()?;
+    let tui_id = capabilities
+        .iter()
+        .filter_map(Value::as_str)
+        .find_map(|capability| capability.strip_prefix("agent-tui:"))?
+        .trim();
+    if tui_id.is_empty() {
+        return None;
+    }
+    Some(json!({
+        "kind": "tui",
+        "id": tui_id,
+    }))
 }
