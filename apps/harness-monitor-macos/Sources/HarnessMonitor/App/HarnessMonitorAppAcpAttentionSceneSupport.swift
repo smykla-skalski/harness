@@ -127,6 +127,18 @@ final class AcpPermissionAttentionState {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) {
+    guard canRouteToDecision(attention.decisionID, store: store) else {
+      // Keep this path one-way for operators: unroutable attention is explicitly consumed
+      // instead of silently looping as an always-clickable dead toast.
+      handledBatchIDs.insert(attention.batchID)
+      if activeToast?.batchID == attention.batchID {
+        activeToast = nil
+      }
+      return
+    }
+    // Routing via the toast button is an explicit user decision to consume this batch.
+    // Mark it handled before any window/focus transitions to prevent re-queuing.
+    handledBatchIDs.insert(attention.batchID)
     publishRouteEvent(
       source: "toast",
       decisionID: attention.decisionID,
@@ -142,6 +154,11 @@ final class AcpPermissionAttentionState {
     }
   }
 
+  func canRouteToDecision(_ decisionID: String, store: HarnessMonitorStore) -> Bool {
+    store.supervisorOpenDecisions.contains(where: { $0.id == decisionID })
+      || store.acpPermissionDecisionPayload(for: decisionID) != nil
+  }
+
   func routeNotificationRequestIfNeeded(
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
@@ -149,6 +166,11 @@ final class AcpPermissionAttentionState {
     guard notifications.decisionRequestTick != handledDecisionRequestTick,
       let decisionID = notifications.decisionRequestedID
     else {
+      return
+    }
+    guard canRouteToDecision(decisionID, store: store) else {
+      // Consume stale/unroutable notification ticks so they do not spin forever.
+      handledDecisionRequestTick = notifications.decisionRequestTick
       return
     }
     handledDecisionRequestTick = notifications.decisionRequestTick
