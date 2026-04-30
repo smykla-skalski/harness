@@ -168,6 +168,9 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var selectedTimelinePageLoadTask: Task<Void, Never>?
   @ObservationIgnored var selectedTimelinePageLoadKey: SelectedTimelinePageLoadKey?
   @ObservationIgnored var selectedTimelinePageLoadSequence: UInt64 = 0
+  @ObservationIgnored var selectedTimelineWindowLoadTask: Task<Void, Never>?
+  @ObservationIgnored var selectedTimelineWindowLoadKey: SelectedTimelineWindowLoadKey?
+  @ObservationIgnored var selectedTimelineWindowLoadSequence: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
