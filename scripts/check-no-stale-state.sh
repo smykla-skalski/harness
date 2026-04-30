@@ -38,10 +38,6 @@ should_skip_live_daemon_lock_holder_check() {
   [[ "${HARNESS_CHECK_ALLOW_DAEMON_LOCK_HOLDERS:-0}" == "1" ]]
 }
 
-cleanup_stale_check_lease() {
-  lease_lock_cleanup
-}
-
 emit_pid_block() {
   local label="$1"
   local pids="$2"
@@ -205,7 +201,7 @@ if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
     fi
   fi
 
-  trap cleanup_stale_check_lease EXIT
+  trap 'lease_lock_cleanup' EXIT
   lease_lock_acquire
 
   {

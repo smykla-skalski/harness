@@ -127,7 +127,7 @@ scenario_waiter_cleanup_removes_heartbeat() {
   start_test "lease lock cleanup removes waiter heartbeat sidecars"
   local lock_dir="$SANDBOX/waiter-cleanup"
 
-  if ! with_lock_env "$lock_dir" bash -c '
+  if ! with_lock_env "$lock_dir" bash <<'EOF'
     set -euo pipefail
     export LEASE_LOCK_WAITER_ID=waiter-cleanup
     source "$LOCK_HELPER_PATH"
@@ -137,7 +137,8 @@ scenario_waiter_cleanup_removes_heartbeat() {
     lease_lock_cleanup
     [[ ! -e "$LEASE_LOCK_WAITER_FILE" ]]
     [[ ! -e "$LEASE_LOCK_WAITER_FILE.heartbeat" ]]
-  '; then
+EOF
+  then
     fail "waiter cleanup left metadata behind"
     return
   fi
@@ -358,7 +359,7 @@ EOF
       LEASE_LOCK_OWNER_STALE_AFTER_SECONDS=2 \
       LEASE_LOCK_WAITER_TIMEOUT_SECONDS=5 \
       LEASE_LOCK_POLL_SECONDS=1 \
-      bash -c '
+      bash <<'EOF'
         set -euo pipefail
         export LEASE_LOCK_WAITER_ID=waiter-stale-later
         source "$LOCK_HELPER_PATH"
@@ -367,7 +368,8 @@ EOF
           exit 1
         fi
         lease_lock_cleanup
-      '; then
+EOF
+      then
     fail "waiter did not reclaim once the owner became stale"
     return
   fi
@@ -406,14 +408,15 @@ LOCK_STATE=holding
 EOF
   printf '1\n' >"$lock_dir/owner/heartbeat"
 
-  if ! with_lock_env "$lock_dir" bash -c '
+  if ! with_lock_env "$lock_dir" bash <<'EOF'
     set -euo pipefail
     export LEASE_LOCK_WAITER_ID=waiter-live-owner
     source "$LOCK_HELPER_PATH"
     if lease_lock_try_reclaim_stale_owner; then
       exit 1
     fi
-  '; then
+EOF
+  then
     fail "stale owner was reclaimed despite a live owner pid"
     return
   fi
@@ -469,14 +472,15 @@ LOCK_MUTATOR_PROCESS_START=$mutator_start
 EOF
   printf '1\n' >"$lock_dir/owner/heartbeat"
 
-  if ! with_lock_env "$lock_dir" bash -c '
+  if ! with_lock_env "$lock_dir" bash <<'EOF'
     set -euo pipefail
     export LEASE_LOCK_WAITER_ID=waiter-live-mutator
     source "$LOCK_HELPER_PATH"
     if lease_lock_try_reclaim_stale_owner; then
       exit 1
     fi
-  '; then
+EOF
+  then
     fail "stale owner was reclaimed despite a live mutator pid"
     return
   fi
