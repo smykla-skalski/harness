@@ -210,9 +210,14 @@ extension AgentsWindowView {
       agentTuiUnavailable = false
       codexUnavailable = false
     }
+
     @MainActor
-    init(store: HarnessMonitorStore) {
-      let sortedAgentTuis = store.selectedAgentTuis.sorted { left, right in
+    init(
+      store: HarnessMonitorStore,
+      includeActiveAgentTuis: Bool = true,
+      includeActiveCodexRuns: Bool = true
+    ) {
+      let agentTuis = store.selectedAgentTuis.sorted { left, right in
         if left.status.sortPriority != right.status.sortPriority {
           return left.status.sortPriority < right.status.sortPriority
         }
@@ -221,7 +226,7 @@ extension AgentsWindowView {
         }
         return left.tuiId < right.tuiId
       }
-      let sortedCodexRuns = store.selectedCodexRuns.sorted { left, right in
+      let codexRuns = store.selectedCodexRuns.sorted { left, right in
         if left.status.isActive != right.status.isActive {
           return left.status.isActive && !right.status.isActive
         }
@@ -233,6 +238,10 @@ extension AgentsWindowView {
         }
         return left.runId < right.runId
       }
+      let sortedAgentTuis =
+        includeActiveAgentTuis ? agentTuis : agentTuis.filter { !$0.status.isActive }
+      let sortedCodexRuns =
+        includeActiveCodexRuns ? codexRuns : codexRuns.filter { !$0.status.isActive }
       var codexTitlesByID: [String: String] = [:]
       codexTitlesByID.reserveCapacity(sortedCodexRuns.count)
       for run in sortedCodexRuns {
@@ -261,6 +270,17 @@ extension AgentsWindowView {
       self.externalAgents = externalAgents
       self.agentTuiUnavailable = store.agentTuiUnavailable
       self.codexUnavailable = store.codexUnavailable
+    }
+
+    /// Hold back active managed items until the first refresh completes so reopening the window
+    /// cannot render stale live sessions from cached store state.
+    @MainActor
+    init(initialWindowStore store: HarnessMonitorStore) {
+      self.init(
+        store: store,
+        includeActiveAgentTuis: false,
+        includeActiveCodexRuns: false
+      )
     }
     static func codexTitle(for run: CodexRunSnapshot) -> String {
       let promptSummary =
@@ -304,7 +324,7 @@ extension AgentsWindowView {
     var rows = 32
     var cols = 120
     var isSubmitting = false
-    var selection: AgentTuiSheetSelection = .create
+    var selection: WorkspaceSelection = .create
     var wrapLines = false
     var selectedPersona: String?
     var availablePersonas: [AgentPersona] = []
@@ -329,8 +349,8 @@ extension AgentsWindowView {
     var codexStartAttemptCount = 0
     var codexStartResult = "idle"
     var resolvingCodexApprovalID: String?
-    var navigationBackStack: [AgentTuiSheetSelection] = []
-    var navigationForwardStack: [AgentTuiSheetSelection] = []
+    var navigationBackStack: [WorkspaceSelection] = []
+    var navigationForwardStack: [WorkspaceSelection] = []
     var suppressHistoryRecording = false
     var windowNavigation = WindowNavigationState()
     var lastDetailColumnSize: CGSize?
@@ -341,9 +361,11 @@ extension AgentsWindowView {
     var viewportResizeTask: Task<Void, Never>?
     var expectedSize: AgentTuiSize?
     var keySequenceBuffer = KeySequenceBuffer()
+    var hasFreshManagedAgentTuis = false
+    var hasFreshManagedCodexRuns = false
     var displayState: AgentTuiDisplayState
     init(
-      selection: AgentTuiSheetSelection = .create,
+      selection: WorkspaceSelection = .create,
       displayState: AgentTuiDisplayState = AgentTuiDisplayState()
     ) {
       let preferredLaunchSelection = HarnessMonitorAgentLaunchDefaults.preferredSelection()

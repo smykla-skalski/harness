@@ -15,6 +15,53 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     XCTAssertTrue(waitForElement(state, timeout: Self.fastActionTimeout))
     XCTAssertTrue(state.label.contains("selection=create"))
   }
+
+  func testAgentsWindowSuppressesStaleRunningTerminalUntilRefreshCompletes() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-single",
+        "HARNESS_MONITOR_PREVIEW_AGENT_TUI_REFRESH_STATUS": "exited",
+        "HARNESS_MONITOR_PREVIEW_AGENT_TUIS_DELAY_MS": "3000",
+      ]
+    )
+    openAgentsWindow(in: app)
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    XCTAssertTrue(waitForElement(state, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      state.label.contains("selection=create"),
+      """
+      Agents window should not render stale running terminals before its first refresh finishes.
+      state=\(state.label)
+      """
+    )
+
+    let sessionRow = element(
+      in: app,
+      identifier: Accessibility.agentTuiTab("preview-agent-tui-1")
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        sessionRow.exists
+      },
+      """
+      Once refresh completes, the stale terminal should reappear as a disconnected row.
+      state=\(state.label)
+      """
+    )
+    tapElement(in: app, identifier: Accessibility.agentTuiTab("preview-agent-tui-1"))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        state.label.contains("selection=session:preview-agent-tui-1")
+          && state.label.contains("status=exited")
+      },
+      """
+      Opening the reconciled row should show the exited snapshot instead of a stale live session.
+      state=\(state.label)
+      """
+    )
+  }
+
   func testStartingAgentTuiCreatesAndSelectsSessionRow() throws {
     let app = launchInCockpitPreview()
     openAgentsWindow(in: app)

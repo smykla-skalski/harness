@@ -1,6 +1,24 @@
 import HarnessMonitorKit
 
 extension AgentsWindowView {
+  struct ManagedSelectionRefreshOutcome {
+    let agentTuisDidRefresh: Bool
+    let codexRunsDidRefresh: Bool
+
+    var didRefreshManagedSelections: Bool {
+      agentTuisDidRefresh || codexRunsDidRefresh
+    }
+  }
+
+  func applyManagedSelectionFreshness(_ outcome: ManagedSelectionRefreshOutcome) {
+    if outcome.agentTuisDidRefresh {
+      viewModel.hasFreshManagedAgentTuis = true
+    }
+    if outcome.codexRunsDidRefresh {
+      viewModel.hasFreshManagedCodexRuns = true
+    }
+  }
+
   var canStartTerminal: Bool {
     guard !viewModel.isSubmitting else { return false }
     switch viewModel.selectedLaunchSelection {
@@ -19,9 +37,17 @@ extension AgentsWindowView {
   }
 
   @MainActor
-  func loadAgentPickerCatalogs() async {
+  func refreshManagedSelections() async -> ManagedSelectionRefreshOutcome {
     async let tuiRefresh = store.refreshSelectedAgentTuis()
     async let codexRefresh = store.refreshSelectedCodexRuns()
+    return ManagedSelectionRefreshOutcome(
+      agentTuisDidRefresh: await tuiRefresh,
+      codexRunsDidRefresh: await codexRefresh
+    )
+  }
+
+  @MainActor
+  func loadAgentPickerCatalogs() async {
     async let personas = store.fetchPersonas()
     async let runtimeModels = store.fetchRuntimeModelCatalogs()
     async let acpAgents = store.fetchAcpAgentDescriptors()
@@ -30,8 +56,6 @@ extension AgentsWindowView {
     let loadedRuntimeModels = await runtimeModels
     let loadedAcpAgents = await acpAgents
     let loadedRuntimeProbes = await runtimeProbes
-    _ = await tuiRefresh
-    _ = await codexRefresh
     applyLoadedCatalogs(
       personas: loadedPersonas,
       runtimeModels: loadedRuntimeModels,

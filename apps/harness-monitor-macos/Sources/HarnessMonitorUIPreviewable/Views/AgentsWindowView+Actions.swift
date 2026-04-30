@@ -3,6 +3,14 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  func managedDisplayState() -> AgentTuiDisplayState {
+    AgentTuiDisplayState(
+      store: store,
+      includeActiveAgentTuis: viewModel.hasFreshManagedAgentTuis,
+      includeActiveCodexRuns: viewModel.hasFreshManagedCodexRuns
+    )
+  }
+
   func updateDetailColumnGeometry(_ size: CGSize) {
     viewModel.lastDetailColumnSize = size
   }
@@ -20,23 +28,33 @@ extension AgentsWindowView {
     displayState: AgentTuiDisplayState,
     selectedTerminalID: String?,
     selectedCodexRunID: String?
-  ) -> AgentTuiSheetSelection {
-    let orderedSessionIDs = displayState.sortedAgentTuis.map(\.tuiId)
-    let orderedRunIDs = displayState.sortedCodexRuns.map(\.runId)
-    if let selectedTerminalID, orderedSessionIDs.contains(selectedTerminalID) {
-      return .terminal(selectedTerminalID)
+  ) -> WorkspaceSelection {
+    if let selectedTerminalID,
+      let selectedTerminal = displayState.sortedAgentTuis.first(
+        where: { $0.tuiId == selectedTerminalID }
+      )
+    {
+      return .terminal(sessionID: selectedTerminal.sessionId, terminalID: selectedTerminalID)
     }
-    if let selectedCodexRunID, orderedRunIDs.contains(selectedCodexRunID) {
-      return .codex(selectedCodexRunID)
+    if let selectedCodexRunID,
+      let selectedRun = displayState.sortedCodexRuns.first(
+        where: { $0.runId == selectedCodexRunID }
+      )
+    {
+      return .codex(sessionID: selectedRun.sessionId, runID: selectedCodexRunID)
     }
-    if let fallbackTuiID = orderedSessionIDs.first { return .terminal(fallbackTuiID) }
-    if let fallbackRunID = orderedRunIDs.first { return .codex(fallbackRunID) }
+    if let fallbackTui = displayState.sortedAgentTuis.first {
+      return .terminal(sessionID: fallbackTui.sessionId, terminalID: fallbackTui.tuiId)
+    }
+    if let fallbackRun = displayState.sortedCodexRuns.first {
+      return .codex(sessionID: fallbackRun.sessionId, runID: fallbackRun.runId)
+    }
     return .create
   }
   func selectCreateTab() { viewModel.selection = .create }
 
   func refreshDisplayState() {
-    let displayState = AgentTuiDisplayState(store: store)
+    let displayState = managedDisplayState()
     guard viewModel.displayState != displayState else {
       return
     }
@@ -48,24 +66,38 @@ extension AgentsWindowView {
     Task {
       await flushPendingKeySequenceIfNeeded()
       switch viewModel.selection {
-      case .create, .agent, .task:
-        async let tuiRefresh = store.refreshSelectedAgentTuis()
-        async let codexRefresh = store.refreshSelectedCodexRuns()
-        _ = await tuiRefresh
-        _ = await codexRefresh
-      case .terminal(let tuiID):
+      case .create,
+        .decisions,
+        .decision,
+        .agent,
+        .task:
+        applyManagedSelectionFreshness(await refreshManagedSelections())
+      case .terminal(_, let tuiID):
         if store.selectedAgentTui?.tuiId == tuiID {
-          _ = await store.refreshSelectedAgentTui()
+          let refreshed = await store.refreshSelectedAgentTui()
+          if refreshed {
+            viewModel.hasFreshManagedAgentTuis = true
+          }
         } else {
-          _ = await store.refreshSelectedAgentTuis()
+          let refreshed = await store.refreshSelectedAgentTuis()
+          if refreshed {
+            viewModel.hasFreshManagedAgentTuis = true
+          }
         }
-      case .codex(let runID):
+      case .codex(_, let runID):
         if store.selectedCodexRun?.runId == runID {
-          _ = await store.refreshSelectedCodexRun()
+          let refreshed = await store.refreshSelectedCodexRun()
+          if refreshed {
+            viewModel.hasFreshManagedCodexRuns = true
+          }
         } else {
-          _ = await store.refreshSelectedCodexRuns()
+          let refreshed = await store.refreshSelectedCodexRuns()
+          if refreshed {
+            viewModel.hasFreshManagedCodexRuns = true
+          }
         }
       }
+      refreshDisplayState()
       reconcileSheetState(afterRefresh: false)
       enforceExpectedSize()
       viewModel.isSubmitting = false
@@ -103,7 +135,7 @@ extension AgentsWindowView {
           viewModel.codexStartResult = "run"
           viewModel.codexPrompt = ""
           viewModel.codexContext = ""
-          viewModel.selection = .codex(startedRun.runId)
+          viewModel.selection = .codex(sessionID: startedRun.sessionId, runID: startedRun.runId)
         } else {
           viewModel.codexStartResult = "nil"
         }
@@ -311,38 +343,32 @@ extension AgentsWindowView {
       selectedTerminalID: store.selectedAgentTui?.tuiId,
       selectedCodexRunID: store.selectedCodexRun?.runId
     )
-    if afterRefresh {
+    guard !afterRefresh else {
       applyProgrammaticSelection(preferredSelection)
       return
     }
-    switch viewModel.selection {
-    case .create:
-      break
-    case .terminal(let selectedTuiID):
-      guard store.selectedAgentTuis.contains(where: { $0.tuiId == selectedTuiID }) else {
-        applyProgrammaticSelection(preferredSelection)
-        return
+
+    let keepsCurrentSelection =
+      switch viewModel.selection {
+      case .create, .decisions, .decision:
+        true
+      case .terminal(_, let selectedTuiID):
+        store.selectedAgentTuis.contains { $0.tuiId == selectedTuiID }
+      case .codex(_, let selectedRunID):
+        store.selectedCodexRuns.contains { $0.runId == selectedRunID }
+      case .agent(_, let selectedAgentID):
+        store.selectedSession?.agents.contains { $0.agentId == selectedAgentID } ?? false
+      case .task(_, let selectedTaskID):
+        store.selectedSession?.tasks.contains { $0.taskId == selectedTaskID } ?? false
       }
+
+    guard keepsCurrentSelection else {
+      applyProgrammaticSelection(preferredSelection)
+      return
+    }
+
+    if case .terminal = viewModel.selection {
       enforceExpectedSize()
-    case .codex(let selectedRunID):
-      guard store.selectedCodexRuns.contains(where: { $0.runId == selectedRunID }) else {
-        applyProgrammaticSelection(preferredSelection)
-        return
-      }
-    case .agent(let selectedAgentID):
-      guard
-        store.selectedSession?.agents.contains(where: { $0.agentId == selectedAgentID }) ?? false
-      else {
-        applyProgrammaticSelection(preferredSelection)
-        return
-      }
-    case .task(let selectedTaskID):
-      guard
-        store.selectedSession?.tasks.contains(where: { $0.taskId == selectedTaskID }) ?? false
-      else {
-        applyProgrammaticSelection(preferredSelection)
-        return
-      }
     }
   }
 }
