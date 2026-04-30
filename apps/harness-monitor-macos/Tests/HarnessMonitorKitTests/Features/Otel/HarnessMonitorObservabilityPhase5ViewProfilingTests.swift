@@ -235,8 +235,11 @@ struct Phase5ViewProfilingTests {
         sessionID: PreviewFixtures.summary.sessionId,
         timeline: PreviewFixtures.timeline,
         timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
+        decisions: [],
         isTimelineLoading: false,
-        loadPage: { _, _ in }
+        actionHandler: NullDecisionActionHandler(),
+        loadWindow: { _ in },
+        scrollToTimelineTarget: { _ in }
       ),
       width: 960,
       height: 720

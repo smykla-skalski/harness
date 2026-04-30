@@ -7,11 +7,35 @@ enum SessionTimelineWindowAction: Equatable, Sendable {
   case newer
 }
 
+enum SessionTimelineScrollTarget {
+  case top
+  case bottom
+
+  var id: String {
+    switch self {
+    case .top:
+      "session-timeline-top"
+    case .bottom:
+      "session-timeline-bottom"
+    }
+  }
+
+  var anchor: UnitPoint {
+    switch self {
+    case .top:
+      .top
+    case .bottom:
+      .bottom
+    }
+  }
+}
+
 struct SessionTimelineWindowNavigation: Equatable, Sendable {
-  static let defaultLimit = 6
+  static let defaultLimit = 10
 
   let limit: Int
   let totalCount: Int
+  let loadedCount: Int
   let windowStart: Int
   let windowEnd: Int
   let hasOlder: Bool
@@ -27,6 +51,7 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
     limit: Int = Self.defaultLimit
   ) {
     self.limit = limit
+    loadedCount = timeline.count
     totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
     windowStart = timelineWindow?.windowStart ?? 0
     windowEnd = timelineWindow?.windowEnd ?? timeline.count
@@ -49,10 +74,13 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
     if totalCount == 0 {
       return isLoading ? "Loading latest activity" : "No timeline events"
     }
-    if windowStart == 0 {
-      return "Latest \(visibleCount) of \(totalCount)"
+    if hasNewer {
+      return "Loaded \(loadedCount) of \(totalCount)"
     }
-    return "Showing \(windowStart + 1)-\(windowEnd) of \(totalCount)"
+    if windowStart == 0 {
+      return "Latest \(loadedCount) of \(totalCount)"
+    }
+    return "Loaded \(loadedCount) of \(totalCount)"
   }
 
   var showsNavigation: Bool {
@@ -75,15 +103,11 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
       return TimelineWindowRequest(scope: .summary, limit: limit, after: newestCursor)
     }
   }
-
-  private var visibleCount: Int {
-    max(0, windowEnd - windowStart)
-  }
 }
 
 struct SessionTimelineNavigationControls: View {
   let navigation: SessionTimelineWindowNavigation
-  let loadWindow: @Sendable (TimelineWindowRequest) async -> Void
+  let performAction: (SessionTimelineWindowAction) -> Void
 
   var body: some View {
     ViewThatFits(in: .horizontal) {
@@ -123,7 +147,7 @@ struct SessionTimelineNavigationControls: View {
         title: "Older",
         systemImage: "chevron.down",
         action: .older,
-        isEnabled: navigation.hasOlder,
+        isEnabled: navigation.loadedCount > 0,
         identifier: HarnessMonitorAccessibility.sessionTimelineOlderButton
       )
       navigationButton(
@@ -151,12 +175,7 @@ struct SessionTimelineNavigationControls: View {
     identifier: String
   ) -> some View {
     Button {
-      guard let request = navigation.request(for: action) else {
-        return
-      }
-      Task {
-        await loadWindow(request)
-      }
+      performAction(action)
     } label: {
       Label(title, systemImage: systemImage)
     }
