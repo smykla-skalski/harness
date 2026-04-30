@@ -238,8 +238,7 @@ struct Phase5ViewProfilingTests {
         decisions: [],
         isTimelineLoading: false,
         actionHandler: NullDecisionActionHandler(),
-        loadWindow: { _ in },
-        scrollToTimelineTarget: { _ in }
+        loadWindow: { _ in }
       ),
       width: 960,
       height: 720
