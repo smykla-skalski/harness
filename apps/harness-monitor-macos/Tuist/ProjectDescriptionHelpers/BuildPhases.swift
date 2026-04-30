@@ -47,8 +47,20 @@ public enum BuildPhases {
         case monitorApp = "monitor-app"
         case uiTestHost = "ui-test-host"
 
+        var appEntitlementInputPaths: [FileListGlob] {
+            switch self {
+            case .monitorApp:
+                [.glob("$(PROJECT_DIR)/HarnessMonitor.entitlements")]
+            case .uiTestHost:
+                [.glob("$(PROJECT_DIR)/HarnessMonitorUITestHost.entitlements")]
+            }
+        }
+
         var inputPaths: [String] {
-            var paths: [String] = ["$(PROJECT_DIR)/HarnessMonitor.entitlements"]
+            var paths: [String] = [
+                "$(PROJECT_DIR)/HarnessMonitorBase.entitlements",
+                "$(PROJECT_DIR)/HarnessMonitor.entitlements"
+            ]
             if self == .uiTestHost {
                 paths.append("$(PROJECT_DIR)/HarnessMonitorUITestHost.entitlements")
             }
@@ -69,6 +81,22 @@ public enum BuildPhases {
             }
             return paths
         }
+    }
+
+    public static func prepareAppEntitlements(variant: ProvenanceVariant) -> TargetScript {
+        .pre(
+            script: scriptPhaseBody(
+                projectVariable: "PROJECT_DIR",
+                script: "copy-app-entitlements.sh",
+                arguments: " \(variant.rawValue)"
+            ),
+            name: "Prepare App Entitlements",
+            inputPaths: variant.appEntitlementInputPaths,
+            outputPaths: [
+                "$(DERIVED_FILE_DIR)/$(TARGET_NAME).codesign.entitlements"
+            ],
+            basedOnDependencyAnalysis: true
+        )
     }
 
     public static func clearGatekeeperMetadata(variant: ProvenanceVariant) -> TargetScript {
