@@ -78,6 +78,27 @@ struct AcpPermissionAttentionStateTests {
     #expect(controller.lastResult == "Scheduled ACP permission batch-1.")
   }
 
+  @Test("route decision resolution gate rejects unresolved IDs")
+  func routeDecisionResolutionGateRejectsUnresolvedIDs() {
+    let center = AppTestNotificationCenter()
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: .preview
+    )
+    let application = AppTestWindowApplication(
+      keyWindowIdentifier: nil,
+      isActive: true,
+      isHidden: false,
+      windowStates: []
+    )
+    let state = AcpPermissionAttentionState(
+      keyWindowObserver: KeyWindowObserver(application: application),
+      notifications: controller
+    )
+    let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
+    #expect(state.canRouteToDecision("acp-permission:missing", store: store) == false)
+  }
+
   private func makeWorkerSnapshot(
     acpID: String,
     sessionID: String,
