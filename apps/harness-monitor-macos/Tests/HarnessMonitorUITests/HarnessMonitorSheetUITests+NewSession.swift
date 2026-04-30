@@ -99,7 +99,7 @@ extension HarnessMonitorSheetUITests {
     }
   }
 
-  func testNewSessionSheetCouncilPreviewSnapshots() throws {
+  func testNewSessionSheetPreviewSnapshots() throws {
     let app = launch(mode: "preview")
 
     tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
@@ -114,7 +114,7 @@ extension HarnessMonitorSheetUITests {
       app.staticTexts["Start with"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
       ),
-      "The redesigned sheet should show the inline leader selection section before capturing council preview"
+      "The redesigned sheet should show the inline leader selection section before capturing the preview snapshot"
     )
     recordDiagnosticsSnapshot(in: app, named: "new-session-sheet")
   }

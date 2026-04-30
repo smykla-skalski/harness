@@ -4,7 +4,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class CouncilSnapshotAcpPermissionDecisionsUITests:
+final class DecisionsAcpPermissionSnapshotUITests:
   HarnessMonitorUITestCase,
   AgentsWindowUITestSupporting
 {
@@ -40,19 +40,19 @@ final class CouncilSnapshotAcpPermissionDecisionsUITests:
 
     saveWindowSnapshot(
       decisionsWindow,
-      named: "council-acp-permission-decisions-window"
+      named: "decisions-acp-permission-window"
     )
   }
 
   private func saveWindowSnapshot(_ window: XCUIElement, named name: String) {
     guard window.exists else {
-      XCTFail("Cannot capture council snapshot for \(name): target window does not exist.")
+      XCTFail("Cannot capture preview snapshot for \(name): target window does not exist.")
       return
     }
     let screenshot = window.screenshot()
     let artifactsDirectory =
       diagnosticsArtifactsDirectory(for: Self.artifactsDirectoryKey)
-      ?? URL(fileURLWithPath: "/tmp/harness-monitor-council-snapshots", isDirectory: true)
+      ?? URL(fileURLWithPath: "/tmp/harness-monitor-design-snapshots", isDirectory: true)
     let outputURL = artifactsDirectory.appendingPathComponent("\(name).png")
     do {
       try FileManager.default.createDirectory(
