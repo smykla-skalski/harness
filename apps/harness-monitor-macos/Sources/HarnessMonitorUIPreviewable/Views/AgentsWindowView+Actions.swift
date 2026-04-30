@@ -122,13 +122,6 @@ extension AgentsWindowView {
       viewModel.isSubmitting = false
     }
   }
-  func interruptCodexRun(_ run: CodexRunSnapshot) {
-    viewModel.isSubmitting = true
-    Task {
-      _ = await store.interruptCodexRun(runID: run.runId)
-      viewModel.isSubmitting = false
-    }
-  }
   func sendInput(to tui: AgentTuiSnapshot) {
     let payload: AgentTuiInput =
       switch viewModel.inputMode {

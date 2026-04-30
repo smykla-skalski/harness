@@ -148,9 +148,36 @@ extension HarnessMonitorStore {
   public func interruptCodexRun(runID: String) async -> Bool {
     let actionName = "Codex run interrupted"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
-    return await mutateCodexRun(actionName: actionName) {
+    return await interruptCodexRun(sessionID: action.sessionID, runID: runID)
+  }
+
+  @discardableResult
+  public func interruptCodexRun(sessionID: String, runID: String) async -> Bool {
+    let actionName = "Codex run interrupted"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    return await mutateCodexRun(
+      actionName: actionName,
+      actionID: Self.codexInterruptActionID(for: runID)
+    ) {
       try await action.client.interruptCodexRun(runID: runID)
     }
+  }
+
+  public func requestInterruptCodexRunConfirmation(_ run: CodexRunSnapshot) {
+    let actionName = "Interrupt Codex run"
+    guard prepareSessionAction(named: actionName, sessionID: run.sessionId) != nil else { return }
+    let runTitle = Self.clippedCodexRunTitle(for: run)
+    pendingConfirmation = .interruptCodexRun(
+      sessionID: run.sessionId,
+      runID: run.runId,
+      runTitle: runTitle.isEmpty ? run.runId : runTitle
+    )
+  }
+
+  public func isInterruptCodexRunInFlight(_ runID: String) -> Bool {
+    inFlightActionID == Self.codexInterruptActionID(for: runID)
   }
 
   @discardableResult
@@ -288,10 +315,19 @@ extension HarnessMonitorStore {
 
   private func mutateCodexRun(
     actionName: String,
+    actionID: String? = nil,
     mutation: @escaping @Sendable () async throws -> CodexRunSnapshot
   ) async -> Bool {
     isSessionActionInFlight = true
-    defer { isSessionActionInFlight = false }
+    if let actionID {
+      inFlightActionID = actionID
+    }
+    defer {
+      isSessionActionInFlight = false
+      if let actionID, inFlightActionID == actionID {
+        inFlightActionID = nil
+      }
+    }
 
     do {
       let measuredRun = try await Self.measureOperation {
@@ -312,6 +348,26 @@ extension HarnessMonitorStore {
       presentFailureFeedback(error.localizedDescription)
       return false
     }
+  }
+
+  private static func codexInterruptActionID(for runID: String) -> String {
+    "codex/interrupt/\(runID)"
+  }
+
+  private static func clippedCodexRunTitle(for run: CodexRunSnapshot) -> String {
+    let trimmedPrompt = run.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedPrompt.isEmpty else {
+      return run.runId
+    }
+    let firstLine = trimmedPrompt
+      .components(separatedBy: .newlines)
+      .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+      ?? trimmedPrompt
+    let clipped = String(firstLine.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+    if firstLine.count > clipped.count {
+      return "\(clipped)..."
+    }
+    return clipped
   }
 
   private func preferredCodexRun(from runs: [CodexRunSnapshot]) -> CodexRunSnapshot? {

@@ -111,12 +111,12 @@ extension AgentsWindowView {
     {
       Divider()
         .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      AgentDetailSection(
-        store: store,
-        agent: agent,
-        activity: session.agentActivity.first(where: { $0.agentId == agentID }),
-        runtimePresentation: .compact
-      )
+        AgentDetailSection(
+          store: store,
+          agent: agent,
+          activity: session.agentActivity.first(where: { $0.agentId == agentID }),
+          runtimePresentation: AcpRuntimePresentation.compact
+        )
       .id("agents.agent.inline.\(agentID)")
     }
   }
@@ -185,9 +185,11 @@ extension AgentsWindowView {
         codexApprovalsSection(approvalItems, run: run)
       }
       if run.status.isActive {
-        ToolCallTimelineView(entries: store.timeline) {
-          interruptCodexRun(run)
-        }
+        ToolCallTimelineView(
+          entries: store.timeline,
+          liveAnnouncementRowIDs: store.liveToolCallAnnouncementRowIDs,
+          overflowNotice: store.toolCallTimelineOverflowNotice
+        )
         codexContextSection(run)
       }
     }
@@ -241,11 +243,14 @@ extension AgentsWindowView {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         Spacer()
         if run.status.isActive {
-          Button("Interrupt") {
-            interruptCodexRun(run)
+          let isInterrupting = store.isInterruptCodexRunInFlight(run.runId)
+          Button(isInterrupting ? "Interrupting..." : "Interrupt whole run") {
+            store.requestInterruptCodexRunConfirmation(run)
           }
           .harnessActionButtonStyle(variant: .bordered, tint: nil)
-          .disabled(viewModel.isSubmitting)
+          .disabled(viewModel.isSubmitting || isInterrupting)
+          .accessibilityLabel("Interrupt whole run")
+          .accessibilityValue(isInterrupting ? "Interrupting" : "")
           .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexInterruptButton)
         }
       }

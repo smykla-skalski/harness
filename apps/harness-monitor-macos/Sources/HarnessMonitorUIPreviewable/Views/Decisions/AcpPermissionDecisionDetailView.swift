@@ -16,6 +16,7 @@ struct AcpPermissionDecisionDetailView: View {
         payload: payload,
         resolutionState: payload.defaultResolutionState,
         isResolving: false,
+        lastMessageAt: nil,
         onSelectionChanged: nil
       )
     }
@@ -34,7 +35,8 @@ private struct InteractiveAcpPermissionDecisionDetailView: View {
       payload: payload,
       resolutionState: resolutionState,
       isResolving: resolutionState.isSubmitting
-        || store.resolvingAcpPermissionBatchID == payload.rawBatch.batchId
+        || store.resolvingAcpPermissionBatchID == payload.rawBatch.batchId,
+      lastMessageAt: store.connectionMetrics.lastMessageAt
     ) { requestID, isSelected in
       store.setAcpPermissionRequestSelection(
         decisionID: payload.decisionID,
@@ -49,6 +51,7 @@ private struct AcpPermissionDecisionDetailContent: View {
   let payload: AcpPermissionDecisionPayload
   let resolutionState: BatchResolutionState
   let isResolving: Bool
+  let lastMessageAt: Date?
   let onSelectionChanged: ((String, Bool) -> Void)?
 
   var body: some View {
@@ -59,6 +62,13 @@ private struct AcpPermissionDecisionDetailContent: View {
       Text("Review the requested tool actions and choose what to allow before the agent continues.")
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      AcpPermissionDeadlineStatusView(
+        payload: payload,
+        lastMessageAt: lastMessageAt,
+        style: .detail,
+        accessibilityIdentifier: HarnessMonitorAccessibility.decisionAcpDeadline,
+        referenceDate: nil
+      )
 
       AcpPermissionDecisionPanel(
         payload: payload,

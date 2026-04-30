@@ -205,6 +205,7 @@ extension HarnessMonitorStore {
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
     }
+    reconcileAcpBridgeIncidentVisibility()
     if recordConnectionTelemetry {
       recordRequestSuccess(
         latencyMs: measuredDiagnostics.latencyMs,

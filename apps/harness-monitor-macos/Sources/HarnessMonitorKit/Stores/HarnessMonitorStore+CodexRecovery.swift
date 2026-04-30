@@ -78,5 +78,6 @@ extension HarnessMonitorStore {
     } else {
       hostBridgeCapabilityIssues[capability] = .unavailable
     }
+    reconcileAcpBridgeIncidentVisibility()
   }
 }

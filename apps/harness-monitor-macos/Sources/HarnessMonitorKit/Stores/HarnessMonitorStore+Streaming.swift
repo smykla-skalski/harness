@@ -194,6 +194,7 @@ extension HarnessMonitorStore {
       timeline: timeline,
       timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
         ?? timelineWindow,
+      clearBurstState: payload.timeline != nil,
       showingCachedData: false,
       cancelPendingTimelineRefresh: payload.timeline != nil
     )
@@ -237,6 +238,7 @@ extension HarnessMonitorStore {
         timeline: timeline,
         timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
           ?? timelineWindow,
+        clearBurstState: payload.timeline != nil,
         showingCachedData: false,
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
@@ -294,8 +296,8 @@ extension HarnessMonitorStore {
       )
     case .acpPermissionBatch(let batch):
       applyAcpPermissionBatch(batch)
-    case .acpPermissionBatchRemoved(let batch):
-      removeAcpPermissionBatch(batch)
+    case .acpPermissionBatchRemoved(let removal):
+      removeAcpPermissionBatch(removal.batch, reason: removal.reason)
     default:
       return false
     }

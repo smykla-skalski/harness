@@ -42,6 +42,7 @@ pub struct AcpPermissionBatch {
     pub session_id: String,
     pub requests: Vec<AcpPermissionItem>,
     pub created_at: String,
+    pub expires_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -358,7 +359,6 @@ fn enqueue_batch_locked(
     requests: Vec<PermissionBridgeRequest>,
 ) -> (AcpPermissionBatch, Duration) {
     let (batch_id, sequence) = state.next_batch_id();
-    let created_at = utc_now();
     let mut items = Vec::with_capacity(requests.len());
     let mut responders = Vec::with_capacity(requests.len());
     let mut deadline = Duration::MAX;
@@ -380,12 +380,18 @@ fn enqueue_batch_locked(
         });
     }
 
+    let created_at = chrono::Utc::now();
+    let expires_at = (created_at
+        + chrono::Duration::from_std(deadline).expect("permission deadline should fit chrono"))
+    .format("%Y-%m-%dT%H:%M:%SZ")
+    .to_string();
     let batch = AcpPermissionBatch {
         batch_id: batch_id.clone(),
         acp_id: state.acp_id.clone(),
         session_id: state.session_id.clone(),
         requests: items,
-        created_at,
+        created_at: created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        expires_at,
     };
     pending.insert(
         batch_id,

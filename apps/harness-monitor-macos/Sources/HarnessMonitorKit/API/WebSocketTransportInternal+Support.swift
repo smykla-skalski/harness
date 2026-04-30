@@ -205,19 +205,20 @@ extension WebSocketTransport {
     let pendingBatches = pendingKeys.compactMap { key in
       pendingAcpEventPushes.removeValue(forKey: key)
     }
+    let overflowedBatches = pendingBatches.filter { $0.droppedRawCount > 0 }
+    if !overflowedBatches.isEmpty {
+      acpOverflowLogBurstCount += 1
+      HarnessMonitorLogger.websocket.info(
+        """
+        ACP event coalescer overflowed across \(overflowedBatches.count) pending batches; \
+        retained \(overflowedBatches.reduce(0) { $0 + $1.payload.events.count }) events from \
+        \(overflowedBatches.reduce(0) { $0 + $1.rawCount }) raw updates and dropped \
+        \(overflowedBatches.reduce(0) { $0 + $1.droppedRawCount }) oldest raw updates before flush. \
+        Widening review required.
+        """
+      )
+    }
     for batch in pendingBatches {
-      if batch.droppedRawCount > 0 {
-        acpOverflowLogBurstCount += 1
-        HarnessMonitorLogger.websocket.info(
-          """
-          ACP event coalescer overflowed for session \(batch.sessionId, privacy: .public) \
-          agent \(batch.acpId, privacy: .public); retained \(batch.payload.events.count) \
-          events from \(batch.rawCount) raw updates and dropped \
-          \(batch.droppedRawCount) oldest raw updates before flush. \
-          Widening review required.
-          """
-        )
-      }
       deliverPushEvent(
         DaemonPushEvent(
           recordedAt: batch.recordedAt,

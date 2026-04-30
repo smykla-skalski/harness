@@ -51,6 +51,9 @@ public enum HarnessMonitorAccessibility {
   public static let sessionsBoardRoot = "harness.board.root"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
   public static let contentRoot = "harness.content.root"
+  public static let contentAcpBridgeBanner = "harness.content.acp-bridge.banner"
+  public static let contentAcpBridgeOpenLogButton = "harness.content.acp-bridge.open-log"
+  public static let contentAcpBridgeRunDoctorButton = "harness.content.acp-bridge.run-doctor"
   public static let preferencesRoot = "harness.preferences.root"
   public static let preferencesState = "harness.preferences.state"
   public static let preferencesPanel = "harness.preferences.panel"
@@ -418,6 +421,14 @@ public enum HarnessMonitorAccessibility {
 
   public static func preferencesActionButton(_ key: String) -> String {
     "harness.preferences.action.\(slug(key))"
+  }
+
+  public static func preferencesAcpPermissionLogRevealButton(_ runID: String) -> String {
+    "harness.preferences.diagnostics.acp-permission-log.reveal.\(slug(runID))"
+  }
+
+  public static func preferencesAcpPermissionLogError(_ runID: String) -> String {
+    "harness.preferences.diagnostics.acp-permission-log.error.\(slug(runID))"
   }
 
   public static func preferencesBackgroundTile(_ key: String) -> String {

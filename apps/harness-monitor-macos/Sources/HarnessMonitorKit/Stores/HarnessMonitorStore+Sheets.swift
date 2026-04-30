@@ -18,6 +18,36 @@ extension HarnessMonitorStore {
     pendingConfirmation = .endSession(sessionID: action.sessionID, actorID: actorID)
   }
 
+  public func confirmationSessionSubject(sessionID: String) -> String {
+    let sessionTitle: String?
+    if selectedSession?.session.sessionId == sessionID {
+      sessionTitle = selectedSession?.session.title
+    } else {
+      sessionTitle = sessionIndex.sessionSummary(for: sessionID)?.title
+    }
+    return confirmationSubject(sessionTitle, fallback: "the selected session")
+  }
+
+  public func confirmationAgentSubject(sessionID: String, agentID: String) -> String {
+    let agentName: String? = if selectedSession?.session.sessionId == sessionID {
+      selectedSession?.agents.first(where: { $0.agentId == agentID })?.name
+    } else {
+      nil
+    }
+    return confirmationSubject(agentName, fallback: "this agent")
+  }
+
+  private func confirmationSubject(_ value: String?, fallback: String) -> String {
+    guard let value else {
+      return fallback
+    }
+    let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedValue.isEmpty else {
+      return fallback
+    }
+    return "\"\(trimmedValue)\""
+  }
+
   public func adoptExternalSession(
     bookmarkID: String,
     preview: SessionDiscoveryProbe.Preview
@@ -83,10 +113,12 @@ extension HarnessMonitorStore {
     self.pendingConfirmation = nil
 
     switch pendingConfirmation {
-    case .endSession(_, let actorID):
-      await endSelectedSession(actor: actorID)
-    case .removeAgent(_, let agentID, let actorID):
-      await removeAgent(agentID: agentID, actor: actorID)
+    case .endSession(let sessionID, let actorID):
+      _ = await endSession(sessionID: sessionID, actorID: actorID)
+    case .removeAgent(let sessionID, let agentID, let actorID):
+      _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
+    case .interruptCodexRun(let sessionID, let runID, _):
+      _ = await interruptCodexRun(sessionID: sessionID, runID: runID)
     }
   }
 

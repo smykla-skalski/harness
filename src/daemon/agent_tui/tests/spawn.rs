@@ -40,10 +40,7 @@ fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
                         ".claude/plugins/harness/skills/harness/SKILL.md",
                     ],
                 ),
-                (
-                    "codex",
-                    vec!["plugins/harness/skills/harness/SKILL.md"],
-                ),
+                ("codex", vec!["plugins/harness/skills/harness/SKILL.md"]),
                 ("gemini", vec![".gemini/settings.json"]),
                 (
                     "copilot",

@@ -69,6 +69,27 @@ struct HarnessMonitorStoreConfirmationTests {
     #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
+  @Test("Confirmed Codex interrupt uses the captured session")
+  func confirmPendingInterruptUsesCapturedSession() async {
+    let client = RecordingHarnessClient()
+    let run = client.codexRunFixture(
+      runID: "codex-run-captured",
+      sessionID: PreviewFixtures.summary.sessionId,
+      prompt: "Interrupt the active run."
+    )
+    client.configureCodexRuns([run], for: PreviewFixtures.summary.sessionId)
+    let store = await selectedActionStore(client: client)
+    let baselineCallCount = client.recordedCalls().count
+
+    store.requestInterruptCodexRunConfirmation(run)
+    store.selectedSessionID = "sess-other"
+    await store.confirmPendingAction()
+
+    let recordedCalls = Array(client.recordedCalls().dropFirst(baselineCallCount))
+    #expect(store.pendingConfirmation == nil)
+    #expect(recordedCalls == [.interruptCodexRun(runID: run.runId)])
+  }
+
   @Test("Awaiting-leader task creation uses the control-plane actor")
   func awaitingLeaderTaskCreationUsesControlPlaneActor() async {
     let client = actorlessActionClient()

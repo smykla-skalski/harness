@@ -130,7 +130,7 @@
       sessionIndex.replaceSnapshot(projects: [], sessions: [summary])
       selectedSessionID = summary.sessionId
       selectedSession = detail
-      timeline = []
+      clearSelectedTimelineSnapshot()
       selectedCodexRuns = []
       selectedCodexRun = nil
       codexRunsBySessionID = [:]

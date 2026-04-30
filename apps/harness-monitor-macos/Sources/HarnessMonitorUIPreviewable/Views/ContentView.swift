@@ -6,6 +6,7 @@ private let contentToolbarBackgroundMarker = "automatic"
 
 public struct ContentView<CornerContent: View>: View {
   let store: HarnessMonitorStore
+  let keyWindowObserver: KeyWindowObserver?
   let showsCornerAnimation: Bool
   let cornerAnimationContent: CornerContent
   let contentShell: HarnessMonitorStore.ContentShellSlice
@@ -62,10 +63,12 @@ public struct ContentView<CornerContent: View>: View {
   @MainActor
   public init(
     store: HarnessMonitorStore,
+    keyWindowObserver: KeyWindowObserver? = nil,
     showsCornerAnimation: Bool = true,
     @ViewBuilder cornerAnimationContent: () -> CornerContent
   ) {
     self.store = store
+    self.keyWindowObserver = keyWindowObserver
     self.showsCornerAnimation = showsCornerAnimation
     self.cornerAnimationContent = cornerAnimationContent()
     self.contentShell = store.contentUI.shell
@@ -106,6 +109,14 @@ public struct ContentView<CornerContent: View>: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.appChromeRoot)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      ContentAcpBridgeBannerBridge(
+        store: store,
+        contentChrome: contentChrome,
+        keyWindowObserver: keyWindowObserver,
+        windowID: HarnessMonitorWindowID.main
+      )
+    }
     .overlay(contentAccessibilityOverlay)
     .overlay(alignment: .topTrailing) {
       ContentFloatingOverlay(
@@ -230,7 +241,14 @@ public struct ContentView<CornerContent: View>: View {
 
 extension ContentView where CornerContent == EmptyView {
   @MainActor
-  public init(store: HarnessMonitorStore) {
-    self.init(store: store, showsCornerAnimation: false) { EmptyView() }
+  public init(
+    store: HarnessMonitorStore,
+    keyWindowObserver: KeyWindowObserver? = nil
+  ) {
+    self.init(
+      store: store,
+      keyWindowObserver: keyWindowObserver,
+      showsCornerAnimation: false
+    ) { EmptyView() }
   }
 }

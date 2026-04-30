@@ -182,6 +182,7 @@ extension HarnessMonitorStore {
         lastEvent: nil
       )
     )
+    reconcileAcpBridgeIncidentVisibility()
     markConnectionOffline(reason)
     await restorePersistedSessionState()
   }
@@ -272,6 +273,7 @@ extension HarnessMonitorStore {
   public func refreshDaemonStatus() async {
     do {
       daemonStatus = try await daemonController.daemonStatus()
+      reconcileAcpBridgeIncidentVisibility()
     } catch {
       presentFailureFeedback(error.localizedDescription)
     }

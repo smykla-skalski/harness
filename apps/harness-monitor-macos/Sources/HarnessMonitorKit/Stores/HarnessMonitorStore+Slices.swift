@@ -305,6 +305,7 @@ extension HarnessMonitorStore {
     public var persistenceError: String?
     public var sessionDataAvailability: SessionDataAvailability = .live
     public var sessionStatus: SessionStatus?
+    public var acpBridgeBanner: AcpBridgeBannerState?
   }
 
   public struct ContentSessionState: Equatable {

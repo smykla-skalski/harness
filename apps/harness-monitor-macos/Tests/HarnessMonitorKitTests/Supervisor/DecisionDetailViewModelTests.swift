@@ -45,9 +45,9 @@ final class DecisionDetailViewModelTests: XCTestCase {
     let handler = RecordingDecisionActionHandler()
     let viewModel = DecisionDetailViewModel(decision: decision, handler: handler)
 
-    XCTAssertEqual(viewModel.suggestedActions.count, 2)
+    XCTAssertEqual(viewModel.suggestedActions.count, 3)
     XCTAssertEqual(viewModel.suggestedActions.first?.id, "accept")
-    XCTAssertEqual(viewModel.suggestedActions.last?.title, "Decline")
+    XCTAssertEqual(viewModel.suggestedActions.last?.title, "Dismiss")
   }
 
   func test_parsesContextSectionsFromJSON() {
