@@ -14,6 +14,7 @@ Presentation can change from modal to Decisions window, but queue ownership, aud
 
 - `AcpPermissionDecision` in `Models/AcpAgentModels.swift`: approve, deny, and partial-approve semantics for ACP permission batches.
 - `AcpPermissionDecisionPayload` in `Supervisor/Decision/AcpPermissionDecision.swift`: deterministic ACP decision ids, semantic payload validation, and non-renderable fallback content for ACP Decisions rows.
+- `AcpPermissionDecisionPayload.decisionKind` in `Supervisor/Decision/AcpPermissionDecision.swift`: first-class ACP decision-kind contract marker used during decode/reconciliation, so ACP routing is not only a `ruleID`/payload-shape convention.
 - `AcpPermissionBatch` in `Models/AcpAgentModels.swift`: one queue element carries `1...N` permission items and uses `batchId` as the idempotency key.
 - `BatchResolutionState` in `Models/BatchResolutionState.swift`: shared per-request toggle and submission state for the Decisions detail pane and the compatibility ACP modal.
 - `SupervisorEvent` in `Supervisor/Audit/SupervisorEvent.swift`: current persisted audit-entry carrier, including the payload slot for approve-some request arrays and future `uiAnnotation` race notes.

@@ -121,7 +121,7 @@ public struct DecisionsWindowView: View {
         filters: $sidebarFilters,
         store: store
       )
-      .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
+      .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 380)
     } detail: {
       detailColumn
         .inspector(isPresented: $inspectorVisible) {

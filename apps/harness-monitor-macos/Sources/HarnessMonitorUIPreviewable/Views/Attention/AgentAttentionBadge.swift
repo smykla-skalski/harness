@@ -6,8 +6,7 @@ struct AgentAttentionBadge: View {
   let accessibilityIdentifier: String?
   let action: () -> Void
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     let button = Button(action: action) {
       HStack(spacing: 4) {
         Image(systemName: "hand.raised.fill")
@@ -23,7 +22,7 @@ struct AgentAttentionBadge: View {
           .fill(HarnessMonitorTheme.caution)
       )
     }
-    .buttonStyle(.plain)
+    .harnessDismissButtonStyle()
     .help("Open pending decisions")
 
     if let accessibilityIdentifier {

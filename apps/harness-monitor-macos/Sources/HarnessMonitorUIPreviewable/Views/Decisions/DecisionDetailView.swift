@@ -222,16 +222,59 @@ public struct DecisionDetailView: View {
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
-        HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            ForEach(effectiveActions) { action in
-              actionButton(
-                for: action,
-                viewModel: viewModel,
-                contextAdapter: contextAdapter,
-                isPrimary: primaryActionID == action.id
-              )
+        actionButtonGroup(
+          actions: effectiveActions,
+          primaryActionID: primaryActionID,
+          viewModel: viewModel,
+          contextAdapter: contextAdapter
+        )
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func actionButtonGroup(
+    actions: [SuggestedAction],
+    primaryActionID: String?,
+    viewModel: DecisionDetailViewModel,
+    contextAdapter: DecisionKindContextAdapter
+  ) -> some View {
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
+      if
+        let primaryActionID,
+        let primaryAction = actions.first(where: { $0.id == primaryActionID })
+      {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          actionButton(
+            for: primaryAction,
+            viewModel: viewModel,
+            contextAdapter: contextAdapter,
+            isPrimary: true,
+            fillsWidth: true
+          )
+          let secondaryActions = actions.filter { $0.id != primaryActionID }
+          if !secondaryActions.isEmpty {
+            HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+              ForEach(secondaryActions) { action in
+                actionButton(
+                  for: action,
+                  viewModel: viewModel,
+                  contextAdapter: contextAdapter,
+                  isPrimary: false
+                )
+              }
             }
+          }
+        }
+      } else {
+        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+          ForEach(actions) { action in
+            actionButton(
+              for: action,
+              viewModel: viewModel,
+              contextAdapter: contextAdapter,
+              isPrimary: false
+            )
           }
         }
       }
@@ -243,7 +286,8 @@ public struct DecisionDetailView: View {
     for action: SuggestedAction,
     viewModel: DecisionDetailViewModel,
     contextAdapter: DecisionKindContextAdapter,
-    isPrimary: Bool
+    isPrimary: Bool,
+    fillsWidth: Bool = false
   ) -> some View {
     let role: ButtonRole? = action.kind == .dismiss ? .destructive : nil
     let button = HarnessMonitorAsyncActionButton(
@@ -253,6 +297,7 @@ public struct DecisionDetailView: View {
       role: role,
       isLoading: false,
       accessibilityIdentifier: HarnessMonitorAccessibility.decisionAction(action.id),
+      fillsWidth: fillsWidth,
       accessibilityFocusBinding: isPrimary ? $focusedPrimaryActionDecisionID : nil,
       accessibilityFocusValue: isPrimary ? viewModel.decision.id : nil,
       keyboardFocusBinding: isPrimary ? $keyboardFocusedPrimaryActionDecisionID : nil,

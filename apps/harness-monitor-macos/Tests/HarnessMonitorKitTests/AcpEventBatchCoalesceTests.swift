@@ -178,8 +178,12 @@ private struct BatchMeasurementHistogram {
 
   var description: String {
     bucketCounts
-      .filter { $0.count > 0 }
-      .map { "\($0.label)=\($0.count)" }
+      .compactMap { bucket -> String? in
+        guard bucket.count >= 1 else {
+          return nil
+        }
+        return "\(bucket.label)=\(bucket.count)"
+      }
       .joined(separator: ", ")
   }
 }

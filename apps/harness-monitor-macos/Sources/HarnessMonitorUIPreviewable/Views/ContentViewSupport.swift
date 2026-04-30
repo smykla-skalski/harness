@@ -32,6 +32,7 @@ extension HarnessMonitorStore {
 
 public struct ContentDetailColumn: View {
   public let store: HarnessMonitorStore
+  public let keyWindowObserver: KeyWindowObserver?
   public let toast: ToastSlice
   public let selection: HarnessMonitorStore.SelectionSlice
   public let contentChrome: HarnessMonitorStore.ContentChromeSlice
@@ -42,6 +43,7 @@ public struct ContentDetailColumn: View {
 
   public init(
     store: HarnessMonitorStore,
+    keyWindowObserver: KeyWindowObserver? = nil,
     toast: ToastSlice,
     selection: HarnessMonitorStore.SelectionSlice,
     contentChrome: HarnessMonitorStore.ContentChromeSlice,
@@ -51,6 +53,7 @@ public struct ContentDetailColumn: View {
     toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   ) {
     self.store = store
+    self.keyWindowObserver = keyWindowObserver
     self.toast = toast
     self.selection = selection
     self.contentChrome = contentChrome
@@ -88,6 +91,10 @@ public struct ContentDetailColumn: View {
         sessionContent
       } else {
         ContentDetailChrome(
+          store: store,
+          contentChrome: contentChrome,
+          keyWindowObserver: keyWindowObserver,
+          windowID: HarnessMonitorWindowID.main,
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
           arbitrationTasks: contentSessionDetail.arbitrationBannerTasks

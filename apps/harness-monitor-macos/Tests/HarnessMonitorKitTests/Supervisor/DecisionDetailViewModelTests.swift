@@ -334,8 +334,20 @@ final class DecisionDetailViewModelTests: XCTestCase {
       payloadJSON: "{\"sessionID\":\"sess-1\",\"agentID\":\"agent-1\",\"taskID\":\"task-1\"}"
     )
     wrongRule.createdAt = Date(timeIntervalSince1970: 5)
+    let wrongDecision = SupervisorEvent(
+      id: "evt-other-decision",
+      tickID: "tick-5",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON:
+        #"{"decisionID":"other-decision","sessionID":"sess-1","agentID":"agent-1","taskID":"task-1"}"#
+    )
+    wrongDecision.createdAt = Date(timeIntervalSince1970: 18)
 
-    let scoped = viewModel.scopedAuditTrail(from: [nestedMatch, wrongAgent, wrongRule, oldest])
+    let scoped = viewModel.scopedAuditTrail(
+      from: [nestedMatch, wrongAgent, wrongRule, wrongDecision, oldest]
+    )
 
     XCTAssertEqual(scoped.map(\.id), ["evt-older", "evt-match"])
   }

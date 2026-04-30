@@ -85,46 +85,39 @@ extension AgentsWindowUITests {
       waitForElement(acpChoice, timeout: Self.actionTimeout),
       "Missing ACP binary should keep ACP mode discoverable while install CTA is shown"
     )
+    XCTAssertFalse(acpChoice.isEnabled, "Missing ACP binary should disable the ACP transport")
+    XCTAssertTrue(
+      acpChoice.label.localizedCaseInsensitiveContains("copilot"),
+      "Disabled ACP transport should keep the provider name in its accessible label"
+    )
+    XCTAssertTrue(
+      acpChoice.label.localizedCaseInsensitiveContains("filesystem + terminal tools"),
+      "Disabled ACP transport should describe the capability in user-facing language"
+    )
+    XCTAssertFalse(
+      acpChoice.label.localizedCaseInsensitiveContains("ACP"),
+      "Disabled ACP transport should not expose transport jargon through accessibility"
+    )
+
+    let tuiChoice = element(
+      in: app,
+      identifier: Accessibility.agentCapabilityTransportButton(
+        "copilot",
+        transportID: "tui:copilot"
+      )
+    )
+    XCTAssertTrue(
+      waitForElement(tuiChoice, timeout: Self.actionTimeout),
+      "TUI fallback should remain discoverable when ACP transport is disabled"
+    )
+    XCTAssertTrue(tuiChoice.isEnabled, "TUI fallback should remain enabled")
   }
 
-  func testPermissionModalIsReaderOnlyAndRoutesToDecisions() throws {
+  func testPermissionPromptRoutesDirectlyToDecisions() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
     )
     openAgentsWindow(in: app)
-
-    let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
-    XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
-    XCTAssertTrue(
-      waitForElement(
-        element(in: app, identifier: Accessibility.acpPermissionModalItem("preview-request-write")),
-        timeout: Self.actionTimeout
-      )
-    )
-    XCTAssertTrue(
-      waitForElement(
-        element(
-          in: app,
-          identifier: Accessibility.acpPermissionModalItem("preview-request-terminal")
-        ),
-        timeout: Self.actionTimeout
-      )
-    )
-
-    XCTAssertFalse(
-      button(in: app, title: "Approve Selected").exists,
-      "Reader-only modal must not expose independent resolve actions"
-    )
-    XCTAssertFalse(
-      button(in: app, title: "Approve All").exists,
-      "Reader-only modal must not expose independent resolve actions"
-    )
-    XCTAssertFalse(
-      button(in: app, title: "Deny All").exists,
-      "Reader-only modal must not expose independent resolve actions"
-    )
-
-    tapButton(in: app, identifier: Accessibility.acpPermissionModalOpenDecisions)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
@@ -134,19 +127,30 @@ extension AgentsWindowUITests {
             identifier: Accessibility.decisionRow("acp-permission:preview-acp-permission-1")
           ).exists
       },
-      "Reader-only modal should route to Decisions instead of resolving directly"
+      "ACP permission prompts should route directly into the Decisions window"
+    )
+
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.acpPermissionModal).exists,
+      "ACP permission flow should not present a separate sheet before routing"
     )
   }
 
-  func testDecisionPanelAndModalShareSelectionState() throws {
+  func testDecisionPanelSelectionStatePersistsWithoutSeparateModal() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
         "HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1",
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
       ]
     )
+    openAgentsWindow(in: app)
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        self.element(in: app, identifier: Accessibility.decisionsWindow).exists
+      },
+      "Permission prompt on start should immediately open the Decisions window"
+    )
 
     let acpDecisionID = "acp-permission:preview-acp-permission-1"
     let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
@@ -181,22 +185,9 @@ extension AgentsWindowUITests {
       """
     )
 
-    openAgentsWindow(in: app)
-
-    let modal = element(in: app, identifier: Accessibility.acpPermissionModal)
-    XCTAssertTrue(waitForElement(modal, timeout: Self.actionTimeout))
-    let modalSelectionSummary = element(
-      in: app,
-      identifier: Accessibility.acpPermissionModalSelectionSummary
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        modalSelectionSummary.exists && modalSelectionSummary.label.contains("1 of 2 selected")
-      },
-      """
-      The legacy ACP modal should mirror the shared selection state from the Decisions window \
-      (summaryLabel=\(modalSelectionSummary.label))
-      """
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.acpPermissionModal).exists,
+      "ACP decision state should live only in Decisions, without a duplicate modal surface"
     )
   }
 }

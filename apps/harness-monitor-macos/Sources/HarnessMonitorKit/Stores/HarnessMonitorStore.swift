@@ -95,11 +95,15 @@ public final class HarnessMonitorStore {
   public var presentingAcpPermissionBatch: AcpPermissionBatch?
   public var resolvingAcpPermissionBatchID: String?
   public var acpPermissionResolutionStateByDecisionID: [String: BatchResolutionState] = [:]
-  @ObservationIgnored var acpPermissionDecisionPayloadsByDecisionID:
+  @ObservationIgnored var acpPermissionPayloadsByDecisionID:
     [String: AcpPermissionDecisionPayload] =
       [:]
-  @ObservationIgnored var acpPermissionPendingDeadlineResolutionDecisionIDs: Set<String> = []
+  var acpPermissionLastSignalAtBySessionID: [String: Date] = [:]
+  @ObservationIgnored var acpPermissionPendingTimeoutDecisionIDs: Set<String> = []
+  @ObservationIgnored var acpPermissionPendingShutdownDecisionIDs: Set<String> = []
+  @ObservationIgnored var acpPermissionTerminalOutcomesByID: [String: DecisionOutcome] = [:]
   @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
+  @ObservationIgnored var acpPermissionDecisionSyncGeneration: UInt64 = 0
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }
@@ -265,166 +269,6 @@ public final class HarnessMonitorStore {
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()
-  }
-
-  private static func makeBookmarkStore() -> BookmarkStore? {
-    #if DEBUG
-      let environment = ProcessInfo.processInfo.environment
-      if environment["XCTestConfigurationFilePath"] != nil
-        || environment["HARNESS_MONITOR_UI_TESTS"] == "1"
-      {
-        // The dedicated UI-test host is not launched by `xctest`, so it does
-        // not inherit `XCTestConfigurationFilePath`. Treat the explicit
-        // HARNESS_MONITOR_UI_TESTS launch contract the same way so the host
-        // stays on a temp bookmark store and never touches the shared app-group
-        // container that triggers macOS app-data permission prompts.
-        return BookmarkStore(
-          containerURL: debugBookmarkStoreContainerURL(),
-          allowsUITestSeedRecords: true
-        )
-      }
-    #endif
-    if let groupContainer = SandboxPaths.appGroupContainerURL() {
-      return BookmarkStore(containerURL: groupContainer)
-    }
-    #if DEBUG
-      HarnessMonitorLogger.store.warning(
-        "App group container unavailable; using temp dir for BookmarkStore — check entitlements"
-      )
-      return BookmarkStore(containerURL: SandboxPaths.debugBookmarkFallbackContainerURL())
-    #else
-      HarnessMonitorLogger.store.warning(
-        "App group container unavailable; bookmark store disabled — check entitlements"
-      )
-      return nil
-    #endif
-  }
-
-  #if DEBUG
-    private static func debugBookmarkStoreContainerURL() -> URL {
-      SandboxPaths.debugBookmarkFallbackContainerURL()
-        .appendingPathComponent("xctest-bookmark-store", isDirectory: true)
-        .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    }
-  #endif
-
-  public func bootstrapIfNeeded() async {
-    guard !hasBootstrapped else {
-      return
-    }
-    hasBootstrapped = true
-    refreshBookmarkedSessionIds()
-    await refreshPersistedSessionMetadata()
-    await bootstrap()
-  }
-
-  public func bootstrap() async {
-    let startedAt = ContinuousClock.now
-    #if HARNESS_FEATURE_OTEL
-      let span = HarnessMonitorTelemetry.shared.startSpan(
-        name: "app.lifecycle.bootstrap",
-        kind: .internal,
-        attributes: [
-          "daemon.ownership": .string(daemonOwnership == .external ? "external" : "managed")
-        ]
-      )
-      defer {
-        let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
-        HarnessMonitorTelemetry.shared.recordAppLifecycleEvent(
-          event: "bootstrap",
-          launchMode: "live",
-          durationMs: durationMs
-        )
-        span.end()
-      }
-    #else
-      _ = startedAt
-    #endif
-
-    #if HARNESS_FEATURE_OTEL
-      await HarnessMonitorTelemetryTaskContext.$parentSpanContext.withValue(span.context) {
-        await bootstrapBody()
-      }
-    #else
-      await bootstrapBody()
-    #endif
-  }
-
-  func bootstrapManagedDaemon() async {
-    let registrationState: DaemonLaunchAgentRegistrationState
-    do {
-      registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {
-        try await ensureManagedLaunchAgentReady()
-      }
-    } catch {
-      await applyLaunchAgentOfflineState(reason: error.localizedDescription)
-      return
-    }
-
-    switch registrationState {
-    case .notRegistered, .notFound:
-      await applyLaunchAgentOfflineState(
-        reason: "Launch agent not installed. Install to start the daemon."
-      )
-      return
-    case .requiresApproval:
-      await applyLaunchAgentOfflineState(
-        reason: "Launch agent needs approval in System Settings > General > Login Items."
-      )
-      return
-    case .enabled:
-      break
-    }
-
-    do {
-      let client = try await withBootstrapTelemetryPhase(.managedDaemonWarmUp) {
-        try await awaitManagedDaemonWarmUpWithRecovery()
-      }
-      await withBootstrapTelemetryPhase(.managedInitialConnect) {
-        await connect(using: client)
-      }
-    } catch {
-      let recovered = await recoverManagedBootstrapFailure(from: error)
-      guard !recovered else {
-        return
-      }
-    }
-  }
-
-  func bootstrapExternalDaemon() async {
-    // Conflict detection: warn if the SMAppService launch agent is still
-    // registered. The Rust singleton lock prevents data corruption, but the
-    // two daemons race for the manifest and the user sees confusing startup
-    // behavior. Surface a clear, non-blocking hint in the connection log.
-    let registrationState = await daemonController.launchAgentRegistrationState()
-    if registrationState == .enabled {
-      appendConnectionEvent(
-        kind: .error,
-        detail: "SMAppService launch agent is still registered. Remove it in "
-          + "System Settings > General > Login Items to avoid conflicts with "
-          + "`harness daemon dev`."
-      )
-    }
-    do {
-      let client = try await withBootstrapTelemetryPhase(.externalDaemonWarmUp) {
-        try await daemonController.awaitManifestWarmUp(
-          timeout: bootstrapWarmUpTimeout
-        )
-      }
-      await withBootstrapTelemetryPhase(.externalInitialConnect) {
-        await connect(using: client)
-      }
-    } catch {
-      let message =
-        (error as? DaemonControlError)?.errorDescription
-        ?? "External daemon not running. Start it with `harness daemon dev` in a terminal."
-      markConnectionOffline(message)
-      presentFailureFeedback(message)
-      await restorePersistedSessionState()
-      // External mode: keep the manifest watcher running while offline so
-      // the first valid manifest write auto-reconnects without a user action.
-      startManifestWatcher()
-    }
   }
 
 }

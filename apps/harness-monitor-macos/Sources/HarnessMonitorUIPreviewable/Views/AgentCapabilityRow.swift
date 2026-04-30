@@ -319,9 +319,17 @@ struct AgentCapabilityRow: View {
     )
   }
 
-  @ViewBuilder
-  private var diagnosticsDisclosure: some View {
+  @ViewBuilder private var diagnosticsDisclosure: some View {
     if let doctorProbeText = option.doctorProbeText {
+      if diagnosticsExpanded {
+        Text(doctorProbeText)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(3)
+          .textSelection(.enabled)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
+      }
+
       Button(diagnosticsExpanded ? "Hide diagnostics" : "Show diagnostics") {
         diagnosticsExpanded.toggle()
       }
@@ -332,15 +340,6 @@ struct AgentCapabilityRow: View {
       )
       .accessibilityHint(option.statusText)
       .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id))
-
-      if diagnosticsExpanded {
-        Text(doctorProbeText)
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(3)
-          .textSelection(.enabled)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentCapabilityProbe(option.id))
-      }
     }
   }
 }

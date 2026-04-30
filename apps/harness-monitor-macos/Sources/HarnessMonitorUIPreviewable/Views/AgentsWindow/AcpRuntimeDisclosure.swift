@@ -9,8 +9,10 @@ enum AcpRuntimeDisclosureMotionPolicy {
 }
 
 struct AcpRuntimeDisclosure: View {
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   let runtimeState: AcpAgentRuntimeState
 
@@ -62,8 +64,7 @@ struct AcpRuntimeDisclosure: View {
     "harness.agents.runtime-disclosure.\(storageKeyComponent(sessionID)).\(storageKeyComponent(agentID))"
   }
 
-  @ViewBuilder
-  private var detailContent: some View {
+  @ViewBuilder private var detailContent: some View {
     if let inspect = runtimeState.inspect {
       InspectorFactGrid(
         facts: [

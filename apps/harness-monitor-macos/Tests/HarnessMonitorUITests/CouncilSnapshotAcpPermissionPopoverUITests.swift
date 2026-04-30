@@ -4,14 +4,15 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class CouncilSnapshotAcpPermissionPopoverUITests:
+final class CouncilSnapshotAcpPermissionDecisionsUITests:
   HarnessMonitorUITestCase,
   AgentsWindowUITestSupporting
 {
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let previewPermissionKey = "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
+  private static let decisionID = "acp-permission:preview-acp-permission-1"
 
-  func testCaptureAgentsWindowWithAcpPermissionPopover() throws {
+  func testCaptureDecisionsWindowForAcpPermissionPrompt() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
         Self.uiTestsKey: "1",
@@ -20,15 +21,26 @@ final class CouncilSnapshotAcpPermissionPopoverUITests:
     )
     openAgentsWindow(in: app)
 
-    let permissionPopover = element(in: app, identifier: Accessibility.acpPermissionModal)
+    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
     XCTAssertTrue(
-      waitForElement(permissionPopover, timeout: Self.actionTimeout),
-      "ACP permission popover should be visible before council snapshot capture"
+      waitForElement(decisionsWindow, timeout: Self.actionTimeout),
+      "ACP permission prompts should route directly to Decisions"
+    )
+    XCTAssertTrue(
+      waitForElement(
+        element(in: app, identifier: Accessibility.decisionRow(Self.decisionID)),
+        timeout: Self.actionTimeout
+      ),
+      "ACP permission decision should be visible in Decisions before snapshot capture"
+    )
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.acpPermissionModal).exists,
+      "ACP permission flow should not show a separate modal surface"
     )
 
     saveWindowSnapshot(
-      window(in: app, containing: permissionPopover),
-      named: "council-acp-permission-popover"
+      decisionsWindow,
+      named: "council-acp-permission-decisions-window"
     )
   }
 

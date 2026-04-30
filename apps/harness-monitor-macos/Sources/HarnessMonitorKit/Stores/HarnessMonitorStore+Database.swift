@@ -10,9 +10,9 @@ public protocol FileViewerActivating {
   func open(itemAt url: URL)
 }
 
-public extension FileViewerActivating {
+extension FileViewerActivating {
   @MainActor
-  func open(itemAt url: URL) {
+  public func open(itemAt url: URL) {
     reveal(itemsAt: [url])
   }
 }

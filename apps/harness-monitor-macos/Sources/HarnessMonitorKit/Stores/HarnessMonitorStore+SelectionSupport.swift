@@ -132,4 +132,24 @@ extension HarnessMonitorStore {
     }
     startSessionStream(using: client, sessionID: sessionID)
   }
+
+  func isCurrentSelectedTimelinePageLoad(
+    _ token: UInt64,
+    key: SelectedTimelinePageLoadKey
+  ) -> Bool {
+    selectedTimelinePageLoadSequence == token
+      && selectedTimelinePageLoadKey == key
+      && selectedSessionID == key.sessionID
+  }
+
+  func finishSelectedTimelinePageLoadIfCurrent(_ token: UInt64, sessionID: String) {
+    guard selectedTimelinePageLoadSequence == token else {
+      return
+    }
+    selectedTimelinePageLoadTask = nil
+    selectedTimelinePageLoadKey = nil
+    if selectedSessionID == sessionID {
+      isTimelineLoading = false
+    }
+  }
 }
