@@ -80,7 +80,7 @@ impl AgentTuiManagerHandle {
         let refreshed = if self.is_tui_active(&snapshot.tui_id)? {
             self.refresh_live_snapshot(snapshot)?
         } else {
-            self.orphaned_inactive_snapshot(snapshot)
+            Self::orphaned_inactive_snapshot(snapshot)
         };
         self.persist_refreshed_snapshot(&previous, &refreshed)?;
         Ok(refreshed)

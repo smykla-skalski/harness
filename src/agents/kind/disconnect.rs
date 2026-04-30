@@ -38,6 +38,8 @@ pub enum DisconnectReason {
     UserCancelled,
     /// Logical ACP session was stopped explicitly.
     SessionStopped,
+    /// Harness session was ended explicitly.
+    SessionEnded,
     /// Daemon shut down.
     DaemonShutdown,
     /// Process was OOM-killed.
@@ -76,12 +78,14 @@ impl DisconnectReason {
             | Self::OomKilled => true,
             Self::UserCancelled
             | Self::SessionStopped
+            | Self::SessionEnded
             | Self::DaemonShutdown
             | Self::Unknown { .. } => false,
         }
     }
 
-    fn kind_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn log_label(&self) -> &'static str {
         match self {
             Self::ProcessExited { .. } => KIND_PROCESS_EXITED,
             Self::StdioClosed => KIND_STDIO_CLOSED,
@@ -91,6 +95,7 @@ impl DisconnectReason {
             Self::WatchdogFired => KIND_WATCHDOG_FIRED,
             Self::UserCancelled => KIND_USER_CANCELLED,
             Self::SessionStopped => KIND_SESSION_STOPPED,
+            Self::SessionEnded => KIND_SESSION_ENDED,
             Self::DaemonShutdown => KIND_DAEMON_SHUTDOWN,
             Self::OomKilled => KIND_OOM_KILLED,
             Self::Unknown { .. } => KIND_UNKNOWN,
@@ -110,6 +115,7 @@ const KIND_PROMPT_TIMEOUT: &str = "prompt_timeout";
 const KIND_WATCHDOG_FIRED: &str = "watchdog_fired";
 const KIND_USER_CANCELLED: &str = "user_cancelled";
 const KIND_SESSION_STOPPED: &str = "session_stopped";
+const KIND_SESSION_ENDED: &str = "session_ended";
 const KIND_DAEMON_SHUTDOWN: &str = "daemon_shutdown";
 const KIND_OOM_KILLED: &str = "oom_killed";
 const KIND_UNKNOWN: &str = "unknown";
@@ -142,7 +148,7 @@ impl Serialize for DisconnectReason {
             }
             other => {
                 let mut state = serializer.serialize_struct("DisconnectReason", 1)?;
-                state.serialize_field("kind", other.kind_str())?;
+                state.serialize_field("kind", other.log_label())?;
                 state.end()
             }
         }
@@ -173,6 +179,7 @@ impl<'de> Deserialize<'de> for DisconnectReason {
             KIND_WATCHDOG_FIRED => Self::WatchdogFired,
             KIND_USER_CANCELLED => Self::UserCancelled,
             KIND_SESSION_STOPPED => Self::SessionStopped,
+            KIND_SESSION_ENDED => Self::SessionEnded,
             KIND_DAEMON_SHUTDOWN => Self::DaemonShutdown,
             KIND_OOM_KILLED => Self::OomKilled,
             KIND_UNKNOWN => Self::Unknown { raw_kind: None },
@@ -201,6 +208,7 @@ mod tests {
             DisconnectReason::WatchdogFired,
             DisconnectReason::UserCancelled,
             DisconnectReason::SessionStopped,
+            DisconnectReason::SessionEnded,
             DisconnectReason::DaemonShutdown,
             DisconnectReason::OomKilled,
             DisconnectReason::Unknown { raw_kind: None },
@@ -248,6 +256,7 @@ mod tests {
         );
         assert!(!DisconnectReason::UserCancelled.is_restartable());
         assert!(!DisconnectReason::SessionStopped.is_restartable());
+        assert!(!DisconnectReason::SessionEnded.is_restartable());
         assert!(!DisconnectReason::DaemonShutdown.is_restartable());
         assert!(DisconnectReason::OomKilled.is_restartable());
         assert!(DisconnectReason::StdioClosed.is_restartable());

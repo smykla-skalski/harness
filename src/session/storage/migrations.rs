@@ -227,7 +227,7 @@ pub(super) fn migrate_v11_to_v12(mut value: Value) -> Result<Value, CliError> {
             if agent_object.contains_key("managed_agent") {
                 continue;
             }
-            if let Some(managed_agent) = migrate_managed_agent_field(agent_object) {
+            if let Some(managed_agent) = migrate_managed_agent_field(agent_object)? {
                 agent_object.insert("managed_agent".to_string(), managed_agent);
             }
         }
@@ -273,18 +273,47 @@ fn migrate_status_field(agent: &mut serde_json::Map<String, Value>) {
     }
 }
 
-fn migrate_managed_agent_field(agent: &serde_json::Map<String, Value>) -> Option<Value> {
-    let capabilities = agent.get("capabilities")?.as_array()?;
-    let tui_id = capabilities
+fn migrate_managed_agent_field(
+    agent: &serde_json::Map<String, Value>,
+) -> Result<Option<Value>, CliError> {
+    let Some(capabilities) = agent.get("capabilities").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    let mut tui_ids = capabilities
         .iter()
         .filter_map(Value::as_str)
-        .find_map(|capability| capability.strip_prefix("agent-tui:"))?
-        .trim();
-    if tui_id.is_empty() {
-        return None;
+        .filter_map(|capability| capability.strip_prefix("agent-tui:"))
+        .map(str::trim)
+        .collect::<Vec<_>>();
+    if tui_ids.is_empty() {
+        return Ok(None);
     }
-    Some(json!({
+    if tui_ids.iter().any(|tui_id| tui_id.is_empty()) {
+        return Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' has malformed managed terminal capability",
+            agent_label(agent)
+        ))
+        .into());
+    }
+    tui_ids.sort_unstable();
+    tui_ids.dedup();
+    if tui_ids.len() > 1 {
+        return Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' has conflicting managed terminal capabilities",
+            agent_label(agent)
+        ))
+        .into());
+    }
+    Ok(Some(json!({
         "kind": "tui",
-        "id": tui_id,
-    }))
+        "id": tui_ids[0],
+    })))
+}
+
+fn agent_label(agent: &serde_json::Map<String, Value>) -> String {
+    agent
+        .get("agent_id")
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>")
+        .to_string()
 }

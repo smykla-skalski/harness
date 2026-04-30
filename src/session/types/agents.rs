@@ -29,11 +29,6 @@ impl ManagedAgentRef {
     pub fn acp(id: impl Into<String>) -> Self {
         Self::new(ManagedAgentKind::Acp, id)
     }
-
-    #[must_use]
-    pub fn codex(id: impl Into<String>) -> Self {
-        Self::new(ManagedAgentKind::Codex, id)
-    }
 }
 
 /// Transport family for a daemon-managed agent reference.
@@ -42,7 +37,6 @@ impl ManagedAgentRef {
 pub enum ManagedAgentKind {
     Tui,
     Acp,
-    Codex,
 }
 
 /// An agent registered in a multi-agent session.

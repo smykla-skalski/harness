@@ -1,3 +1,5 @@
+use crate::agents::kind::DisconnectReason;
+
 use super::{
     AgentStatus, CliError, CliErrorKind, DaemonClient, Path, SessionRole, SessionState,
     SessionTransition, agent_status_label, agents_service, append_leader_transfer_logs,
@@ -440,7 +442,10 @@ pub(crate) fn apply_leave_session(
         .into());
     }
 
-    agent.status = AgentStatus::disconnected_unknown();
+    agent.status = AgentStatus::Disconnected {
+        reason: DisconnectReason::UserCancelled,
+        stderr_tail: None,
+    };
     now.clone_into(&mut agent.updated_at);
     agent.last_activity_at = Some(now.to_string());
     agent.current_task_id = None;

@@ -118,7 +118,11 @@ pub(super) fn test_http_state_with_db() -> DaemonHttpState {
             async_db.clone(),
             false,
         ),
-        acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
+        acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(
+            sender.clone(),
+            db_slot.clone(),
+            async_db.clone(),
+        ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender, db_slot, async_db, false,
         ),
