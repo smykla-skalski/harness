@@ -47,9 +47,6 @@ struct SessionCockpitView: View {
             inspectObserver: focusObserver,
             createTask: openCreateTaskSheet
           )
-          SessionMetricGrid(
-            metrics: detail.session.metrics
-          )
           SessionActionDock(
             detail: detail,
             inspectObserver: focusObserver,

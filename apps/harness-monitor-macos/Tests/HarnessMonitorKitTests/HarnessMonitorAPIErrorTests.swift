@@ -30,4 +30,19 @@ struct HarnessMonitorAPIErrorTests {
     #expect(error.serverMessage == "daemon snapshot warming up")
     #expect(error.serverSemanticCode == nil)
   }
+
+  @Test("Sandbox disabled ACP errors use actionable host bridge copy")
+  func sandboxDisabledAcpErrorsUseActionableHostBridgeCopy() {
+    let error = HarnessMonitorAPIError.server(
+      code: 501,
+      message: "sandbox-disabled - acp.host-bridge"
+    )
+
+    #expect(
+      error.errorDescription
+        == "ACP sessions can't make tool calls because the shared host bridge isn't running. Start the host bridge and try again."
+    )
+    #expect(error.serverMessage == "sandbox-disabled - acp.host-bridge")
+    #expect(error.serverSemanticCode == nil)
+  }
 }
