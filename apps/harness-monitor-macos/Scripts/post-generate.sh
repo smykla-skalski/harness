@@ -8,6 +8,8 @@ BUILD_SERVER_VERSION="1.3.0"
 source "$ROOT/Scripts/lib/swift-tool-env.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/non-indexable-roots.sh
 source "$ROOT/Scripts/lib/non-indexable-roots.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcode-version.sh
+source "$ROOT/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
 
 write_build_server_config() {
@@ -80,17 +82,18 @@ write_workspace_settings \
   "$REPO_ROOT/xcode-derived"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
-LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-2640}"
+DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
+LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-$DEFAULT_LAST_UPGRADE_CHECK}"
 LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$LAST_UPGRADE_CHECK}"
 PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PROJECT_OBJECT_VERSION:-77}"
 PREFERRED_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION:-$PROJECT_OBJECT_VERSION}"
 
 # Tuist 4 / XcodeProj still serializes an Xcode 14-era PBX project
 # (`objectVersion = 55;`, `compatibilityVersion = "Xcode 14.0";`) and omits
-# `LastUpgradeCheck`, `LastSwiftUpdateCheck`, and project-object metadata that
-# current Xcode expects. Normalize the generated pbxproj in one place after
-# every `tuist generate` so Xcode opens cleanly without the "Update to
-# Recommended Settings" banner.
+# `LastUpgradeCheck`, `LastSwiftUpdateCheck`, and project-object metadata.
+# Normalize the generated pbxproj in one place after every `tuist generate`,
+# using active Xcode's DTXcode value so patch releases do not bring back the
+# "Update to Recommended Settings" banner.
 if [ -f "$PBXPROJ" ]; then
   CANONICAL_VERSION="$("$REPO_ROOT/scripts/version.sh" show)"
   HARNESS_MONITOR_PBXPROJ="$PBXPROJ" \
