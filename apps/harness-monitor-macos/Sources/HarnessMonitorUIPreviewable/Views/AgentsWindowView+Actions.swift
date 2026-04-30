@@ -12,6 +12,9 @@ extension AgentsWindowView {
   }
 
   func updateDetailColumnGeometry(_ size: CGSize) {
+    guard viewModel.lastDetailColumnSize != size else {
+      return
+    }
     viewModel.lastDetailColumnSize = size
   }
 
