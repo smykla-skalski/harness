@@ -344,7 +344,18 @@ struct AgentDetailSection: View {
   }
 
   private func openPendingDecisions() {
-    if let decisionID = store.selectOldestDecision(for: agent.agentId) {
+    let directDecisionID = store.supervisorOpenDecisions
+      .filter { $0.agentID == agent.agentId }
+      .sorted {
+        if $0.createdAt != $1.createdAt {
+          return $0.createdAt < $1.createdAt
+        }
+        return $0.id < $1.id
+      }
+      .first?.id
+
+    if let decisionID = directDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
+      store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
     openWindow(id: HarnessMonitorWindowID.decisions)
