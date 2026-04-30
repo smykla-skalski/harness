@@ -88,7 +88,7 @@ struct DecisionRow: View {
         VStack(alignment: .leading, spacing: 2) {
           HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
             Text(decision.summary)
-              .scaledFont(.body)
+              .scaledFont(.callout.weight(isSelected ? .semibold : .regular))
               .lineLimit(2)
               .multilineTextAlignment(.leading)
               .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,14 +115,18 @@ struct DecisionRow: View {
       .padding(.vertical, HarnessMonitorTheme.spacingSM * fontScale)
       .background(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.24) : Color.clear)
+          .fill(isSelected ? HarnessMonitorTheme.accent.opacity(0.30) : Color.clear)
       )
       .overlay(
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .strokeBorder(
-            isSelected ? HarnessMonitorTheme.accent.opacity(0.45) : Color.clear,
-            lineWidth: 1
-          )
+        HStack(spacing: 0) {
+          RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+            .fill(isSelected ? HarnessMonitorTheme.accent : Color.clear)
+            .frame(width: 3)
+          Spacer(minLength: 0)
+        }
+        .clipShape(
+          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        )
       )
       .contentShape(
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)

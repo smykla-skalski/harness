@@ -201,8 +201,12 @@ public struct DecisionsSidebar: View {
         }
       }
       .fixedSize(horizontal: true, vertical: false)
+      .padding(.leading, HarnessMonitorTheme.spacingXS)
+      .padding(.trailing, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, 1)
     }
+    .contentMargins(.horizontal, HarnessMonitorTheme.spacingXS, for: .scrollContent)
+    .scrollClipDisabled()
   }
 
   private var allChip: some View {
@@ -236,6 +240,13 @@ public struct DecisionsSidebar: View {
 
   private func severityChip(_ severity: DecisionSeverity) -> some View {
     let isActive = selectedSeverities.contains(severity)
+    let visualLabel: String
+    switch severity {
+    case .needsUser:
+      visualLabel = "Needs"
+    default:
+      visualLabel = severity.chipLabel
+    }
     return Button {
       var next = selectedSeverities
       if next.contains(severity) {
@@ -245,7 +256,7 @@ public struct DecisionsSidebar: View {
       }
       setSelectedSeverities(next)
     } label: {
-      Text(severity.chipLabel)
+      Text(visualLabel)
         .scaledFont(.caption)
         .fixedSize(horizontal: true, vertical: false)
         .lineLimit(1)
@@ -269,6 +280,7 @@ public struct DecisionsSidebar: View {
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.decisionsSidebarSeverityChip(severity.rawValue)
     )
+    .accessibilityLabel(severity.chipLabel)
     .accessibilityValue(isActive ? "selected" : "not selected")
   }
 
