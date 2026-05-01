@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import SwiftUI
 
 public struct HarnessMonitorActionButton: View {
@@ -11,6 +12,8 @@ public struct HarnessMonitorActionButton: View {
   public let accessibilityIdentifier: String
   public let fillsWidth: Bool
   public let action: Action
+  @Environment(\.isEnabled)
+  private var isEnabled
 
   public init(
     title: String,
@@ -43,7 +46,12 @@ public struct HarnessMonitorActionButton: View {
     .frame(maxWidth: fillsWidth ? .infinity : nil)
     .harnessActionButtonStyle(variant: variant, tint: tint)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .accessibilityIdentifier(accessibilityIdentifier)
+    .harnessMCPButton(
+      accessibilityIdentifier,
+      label: title,
+      enabled: isEnabled,
+      pressAction: action
+    )
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
 }
@@ -72,6 +80,8 @@ public struct HarnessMonitorAsyncActionButton: View {
   @State private var runningTask: Task<Void, Never>?
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
+  @Environment(\.isEnabled)
+  private var isEnabled
 
   public init(
     title: String,
@@ -109,7 +119,7 @@ public struct HarnessMonitorAsyncActionButton: View {
     isLoading ? .secondary : tint
   }
 
-  @ViewBuilder public var body: some View {
+  public var body: some View {
     let control = Button(role: role) {
       if isLoading {
         cancelAction()
@@ -122,7 +132,18 @@ public struct HarnessMonitorAsyncActionButton: View {
     .frame(maxWidth: fillsWidth ? .infinity : nil)
     .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .accessibilityIdentifier(accessibilityIdentifier)
+    .harnessMCPButton(
+      accessibilityIdentifier,
+      label: isLoading ? "Cancel" : title,
+      enabled: isEnabled,
+      pressAction: {
+        if isLoading {
+          cancelAction()
+        } else {
+          performAction()
+        }
+      }
+    )
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
     .onDisappear {
       runningTask?.cancel()

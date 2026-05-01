@@ -9,13 +9,6 @@ extension WorkspaceWindowView {
     let selectedRuntime = viewModel.selectedLaunchSelection.preferredRuntime
     let startSize =
       viewModel.lastMeasuredViewportSize
-      ?? viewModel.lastDetailColumnSize.map {
-        TerminalViewportSizing.estimatedStartSize(
-          detailColumnSize: $0,
-          fontScale: fontScale,
-          fallbackRows: viewModel.rows
-        )
-      }
       ?? AgentTuiSize(rows: viewModel.rows, cols: viewModel.cols)
     syncTerminalResizeControls(to: startSize)
     viewModel.expectedSize = startSize

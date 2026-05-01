@@ -12,7 +12,9 @@ use tokio::sync::{Mutex, MutexGuard};
 use tokio::time::timeout;
 
 use super::path::default_socket_path;
-use super::types::{RegistryOutcome, RegistryRequest, RegistryResponse};
+use super::types::{
+    RegistryAckResult, RegistryOutcome, RegistryRequest, RegistryResponse, RegistrySemanticAction,
+};
 
 /// Default connect and request timeout for the accessibility registry.
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -129,6 +131,37 @@ impl RegistryClient {
             }
         }
         unreachable!("registry client retries at most once")
+    }
+
+    /// Send one semantic action request to the registry host.
+    ///
+    /// # Errors
+    /// Returns `RegistryError` when the request cannot reach the host, times
+    /// out, or the host rejects the action.
+    pub async fn perform_action(
+        &self,
+        identifier: &str,
+        action: RegistrySemanticAction,
+    ) -> Result<(), RegistryError> {
+        let request = RegistryRequest::PerformAction {
+            id: self.next_request_id(),
+            identifier: identifier.to_string(),
+            action,
+        };
+        let ack: RegistryAckResult = self.request(&request).await?;
+        if ack.applied {
+            return Ok(());
+        }
+        Err(RegistryError::Server {
+            code: "not-applied".to_string(),
+            message: ack.message.unwrap_or_else(|| {
+                format!(
+                    "registry did not apply semantic action '{}' to '{}'",
+                    action.as_wire(),
+                    identifier
+                )
+            }),
+        })
     }
 
     async fn ensure_connected<'a>(

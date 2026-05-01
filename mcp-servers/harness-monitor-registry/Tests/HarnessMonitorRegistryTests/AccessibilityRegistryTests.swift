@@ -228,7 +228,7 @@ struct AccessibilityRegistryTests {
       windowID: 100
     )
     await registry.registerElement(local)
-    await registry.upsertClientSnapshot(
+    _ = await registry.upsertClientSnapshot(
       RegistryClientSnapshot(
         clientID: UUID(),
         appVersion: "1.2.3",
@@ -265,6 +265,34 @@ struct AccessibilityRegistryTests {
     #expect(elements.map(\.identifier) == ["session.task.local", "session.task.remote"])
     #expect(await registry.element(identifier: local.identifier) == local)
     #expect(await registry.allWindows().map(\.id) == [200])
+  }
+
+  @Test("client snapshots strip semantic actions before they merge into authoritative queries")
+  func clientSnapshotsStripSemanticActionsBeforeMerging() async {
+    let registry = AccessibilityRegistry()
+
+    _ = await registry.upsertClientSnapshot(
+      RegistryClientSnapshot(
+        clientID: UUID(),
+        appVersion: "1.2.3",
+        bundleIdentifier: "io.test.client",
+        snapshot: RegistrySnapshot(
+          elements: [
+            RegistryElement(
+              identifier: "session.task.remote",
+              label: "Remote task",
+              kind: .row,
+              actions: [.press],
+              frame: RegistryRect(x: 20, y: 30, width: 120, height: 36),
+              windowID: 200
+            )
+          ],
+          windows: []
+        )
+      )
+    )
+
+    #expect(await registry.element(identifier: "session.task.remote")?.actions == [])
   }
 
   @Test("stale clear generations cannot remove a newer remote snapshot")

@@ -152,10 +152,9 @@ where
 {
     match registry_result {
         Ok(result) => resolve_empty_list_elements(result, window_id, kind, fallback).await,
-        Err(registry_error) => fallback_or_combined_error(
-            &registry_error.to_string(),
-            fallback(window_id, kind).await,
-        ),
+        Err(registry_error) => {
+            fallback_or_combined_error(&registry_error.to_string(), fallback(window_id, kind).await)
+        }
     }
 }
 
@@ -220,7 +219,8 @@ where
     if let RegistryError::Server { code, .. } = &registry_error
         && code == "not-found"
     {
-        return fallback_result.map_err(|error| map_not_found_fallback_error(&registry_error, error));
+        return fallback_result
+            .map_err(|error| map_not_found_fallback_error(&registry_error, error));
     }
     fallback_or_combined_error(&registry_error.to_string(), fallback_result)
 }
@@ -261,6 +261,8 @@ where
     let request = get_element_request(client, identifier);
     match client.request::<GetElementResult>(&request).await {
         Ok(result) => Ok(result),
-        Err(registry_error) => resolve_get_element_fallback(identifier, registry_error, fallback).await,
+        Err(registry_error) => {
+            resolve_get_element_fallback(identifier, registry_error, fallback).await
+        }
     }
 }

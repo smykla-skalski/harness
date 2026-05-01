@@ -128,10 +128,7 @@ async fn drag_drop_tool_uses_helper_fallback_when_registry_reports_not_found() {
     let helper = dir.path().join("fake-harness-monitor-input");
     write_fake_harness_input(&helper);
     let helper_value = helper.to_string_lossy().into_owned();
-    let server = spawn_response_sequence(
-        &path,
-        vec![not_found_response(1), not_found_response(2)],
-    );
+    let server = spawn_response_sequence(&path, vec![not_found_response(1), not_found_response(2)]);
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = DragDropTool::new(client);
 
@@ -173,13 +170,13 @@ async fn drag_drop_tool_rejects_duration_over_maximum() {
 }
 
 #[test]
-fn register_all_registers_ten_tools() {
+fn register_all_registers_eleven_tools() {
     let dir = TempDir::new().unwrap();
     let client = Arc::new(RegistryClient::with_socket_path(socket_path(&dir)));
     let mut registry = ToolRegistry::new();
     register_all(&mut registry, &client);
     let metadata = registry.metadata();
-    assert_eq!(metadata.len(), 10);
+    assert_eq!(metadata.len(), 11);
     let names: Vec<&str> = metadata.iter().map(|t| t.name).collect();
     assert_eq!(
         names,
@@ -190,6 +187,7 @@ fn register_all_registers_ten_tools() {
             "move_mouse",
             "click",
             "click_element",
+            "press_element",
             "scroll",
             "drag_drop",
             "type_text",

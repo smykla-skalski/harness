@@ -85,6 +85,12 @@ private struct AccessibilityGetElementOutput: Codable {
   let element: AccessibilityQueryElement
 }
 
+private struct AccessibilityPerformActionOutput: Codable {
+  let identifier: String
+  let action: String
+  let performed: Bool
+}
+
 private struct AccessibilityQueryWindowCandidate {
   let id: Int
   let title: String?
@@ -174,6 +180,89 @@ private struct AccessibilityGetArguments {
   }
 }
 
+private enum AccessibilitySemanticAction: String {
+  case press
+
+  var preferredAXActions: [String] {
+    // Treat "press" as semantic activation rather than one exact AX verb.
+    // SwiftUI/AppKit controls expose a few adjacent action names for menu
+    // buttons, rows, and confirmation controls.
+    switch self {
+    case .press:
+      [kAXPressAction as String, "AXShowMenu", "AXConfirm", "AXOpen", "AXPick"]
+    }
+  }
+}
+
+private struct AccessibilityPerformActionArguments {
+  let bundleIdentifier: String?
+  let windowID: Int?
+  let action: AccessibilitySemanticAction
+  let identifier: String
+
+  init(_ args: [String]) throws {
+    var bundleIdentifier: String?
+    var windowID: Int?
+    var action: AccessibilitySemanticAction = .press
+    var identifier: String?
+    var index = 0
+    while index < args.count {
+      let argument = args[index]
+      switch argument {
+      case "--bundle-id":
+        guard index + 1 < args.count else {
+          throw InputToolError.usage(
+            "perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>"
+          )
+        }
+        bundleIdentifier = args[index + 1]
+        index += 2
+      case "--window-id":
+        guard index + 1 < args.count else {
+          throw InputToolError.usage(
+            "perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>"
+          )
+        }
+        guard let parsed = Int(args[index + 1]) else {
+          throw InputToolError.invalidNumber(args[index + 1])
+        }
+        windowID = parsed
+        index += 2
+      case "--action":
+        guard index + 1 < args.count else {
+          throw InputToolError.usage(
+            "perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>"
+          )
+        }
+        guard let parsed = AccessibilitySemanticAction(rawValue: args[index + 1]) else {
+          throw InputToolError.usage("unknown action: \(args[index + 1])")
+        }
+        action = parsed
+        index += 2
+      default:
+        guard identifier == nil else {
+          throw InputToolError.usage(
+            "perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>"
+          )
+        }
+        identifier = argument
+        index += 1
+      }
+    }
+
+    guard let identifier, !identifier.isEmpty else {
+      throw InputToolError.usage(
+        "perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>"
+      )
+    }
+
+    self.bundleIdentifier = bundleIdentifier
+    self.windowID = windowID
+    self.action = action
+    self.identifier = identifier
+  }
+}
+
 func handleListElements(_ args: [String]) throws {
   let arguments = try AccessibilityListArguments(args)
   try requireTrustedAccessibility()
@@ -193,6 +282,24 @@ func handleGetElement(_ args: [String]) throws {
     throw InputToolError.notFound(arguments.identifier)
   }
   try writeJSON(AccessibilityGetElementOutput(element: element))
+}
+
+func handlePerformAction(_ args: [String]) throws {
+  let arguments = try AccessibilityPerformActionArguments(args)
+  try requireTrustedAccessibility()
+  let element = try resolveAccessibilityElement(
+    bundleIdentifier: arguments.bundleIdentifier,
+    windowID: arguments.windowID,
+    identifier: arguments.identifier
+  )
+  try performAccessibilityAction(arguments.action, on: element, identifier: arguments.identifier)
+  try writeJSON(
+    AccessibilityPerformActionOutput(
+      identifier: arguments.identifier,
+      action: arguments.action.rawValue,
+      performed: true
+    )
+  )
 }
 
 private func accessibilityElements(
@@ -219,6 +326,31 @@ private func accessibilityElements(
   }
 
   return harvested.values.sorted { $0.identifier < $1.identifier }
+}
+
+private func resolveAccessibilityElement(
+  bundleIdentifier: String? = nil,
+  windowID: Int? = nil,
+  identifier: String
+) throws -> AXUIElement {
+  let app = try resolveHarnessMonitorApplication(bundleIdentifier: bundleIdentifier)
+  let windowCandidates = cgWindowCandidates(processID: app.processIdentifier)
+  let windows = accessibilityWindows(for: app)
+
+  for window in windows {
+    let matchedWindowID = matchWindowID(for: window, candidates: windowCandidates)
+    if let windowID, matchedWindowID != windowID {
+      continue
+    }
+    if let element = findAccessibilityElement(
+      identifier: identifier,
+      in: window
+    ) {
+      return element
+    }
+  }
+
+  throw InputToolError.notFound(identifier)
 }
 
 private func resolveHarnessMonitorApplication(
@@ -389,21 +521,44 @@ private func collectElements(
   return harvested.values.sorted { $0.identifier < $1.identifier }
 }
 
+private func findAccessibilityElement(
+  identifier: String,
+  in window: AXUIElement
+) -> AXUIElement? {
+  var queue = [window]
+  var index = 0
+  var visited: Set<OpaquePointer> = []
+
+  while index < queue.count {
+    let node = queue[index]
+    index += 1
+    let pointer = Unmanaged.passUnretained(node).toOpaque()
+    let opaque = OpaquePointer(pointer)
+    guard visited.insert(opaque).inserted else {
+      continue
+    }
+
+    if trackedAccessibilityIdentifier(from: node) == identifier {
+      return node
+    }
+    queue.append(contentsOf: axRelatedElements(node))
+  }
+
+  return nil
+}
+
 private func accessibilityElement(
   from node: AXUIElement,
   windowID: Int?
 ) -> AccessibilityQueryElement? {
-  guard let identifier = normalizedString(axString(node, AccessibilityAttributeName.identifier)) else {
+  guard let identifier = trackedAccessibilityIdentifier(from: node) else {
     return nil
   }
   guard let frame = axFrame(node), frame.isEmpty == false, frame.isInfinite == false else {
     return nil
   }
 
-  let role = axString(node, kAXRoleAttribute) ?? ""
-  if role == kAXWindowRole as String {
-    return nil
-  }
+  let role = axRole(node)
 
   let label =
     normalizedString(axString(node, kAXTitleAttribute))
@@ -466,6 +621,38 @@ private func elementKind(forRole role: String) -> AccessibilityQueryElementKind 
   return .other
 }
 
+private func trackedAccessibilityIdentifier(from node: AXUIElement) -> String? {
+  guard let identifier = normalizedString(axString(node, AccessibilityAttributeName.identifier)) else {
+    return nil
+  }
+  guard axRole(node) != kAXWindowRole as String else {
+    return nil
+  }
+  return identifier
+}
+
+private func performAccessibilityAction(
+  _ action: AccessibilitySemanticAction,
+  on element: AXUIElement,
+  identifier: String
+) throws {
+  for actionName in action.preferredAXActions {
+    let error = AXUIElementPerformAction(element, actionName as CFString)
+    switch error {
+    case .success:
+      return
+    case .actionUnsupported:
+      continue
+    default:
+      throw InputToolError.queryFailed(
+        "perform-action \(identifier) failed for \(actionName): \(error.rawValue)"
+      )
+    }
+  }
+
+  throw InputToolError.actionUnavailable(identifier)
+}
+
 private func writeJSON<T: Encodable>(_ payload: T) throws {
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.sortedKeys]
@@ -486,6 +673,10 @@ private func axAttributeValue(_ element: AXUIElement, _ attribute: String) -> CF
     return nil
   }
   return value
+}
+
+private func axRole(_ element: AXUIElement) -> String {
+  axString(element, kAXRoleAttribute) ?? ""
 }
 
 private func axString(_ element: AXUIElement, _ attribute: String) -> String? {

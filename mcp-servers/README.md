@@ -4,7 +4,7 @@ MCP pieces that let agents drive the Harness Monitor macOS app.
 
 | Path | Language | What it does |
 |------|----------|--------------|
-| `harness mcp serve` (in `../src/mcp/`) | Rust (part of `harness` CLI) | stdio MCP JSON-RPC server with 10 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
+| `harness mcp serve` (in `../src/mcp/`) | Rust (part of `harness` CLI) | stdio MCP JSON-RPC server with 11 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, semantically pressing registered controls, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
 | [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes `.trackWindow(...)` for scene-root auto-harvest, `.trackAccessibility(...)` for explicit per-view registration, and the bundled `harness-monitor-input` helper for input plus AX fallback queries. |
 
 The old Node.js implementation under `harness-monitor/` was replaced by the native Rust server to drop the Node.js runtime dependency. The JSON wire protocol to the Swift host is unchanged.
@@ -97,7 +97,8 @@ If neither `harness-monitor-input` (the bundled Swift helper) nor `cliclick` is 
 | `get_element` | Registry `getElement` by `.accessibilityIdentifier`. On `not-found` or registry transport failure, the server asks `harness-monitor-input get-element` for the live Accessibility tree. |
 | `move_mouse` | Move cursor to global `(x, y)`. No click. |
 | `click` | Left/right click at global `(x, y)`, with optional double-click. Middle-click is not supported. |
-| `click_element` | Resolve identifier to frame, click its center. |
+| `click_element` | Resolve identifier to frame, then click its center in global coordinates. This is a physical click, so whatever app is frontmost at that point receives it. |
+| `press_element` | Resolve identifier, then ask `harness-monitor-input perform-action` to semantically activate the live accessibility element without moving the mouse or requiring Harness Monitor to be frontmost. The helper treats `press` as an activation intent (`AXPress` first, then compatible action names such as menu/show/open confirmations when needed) and retries once without a window filter if a scoped window match has gone stale. |
 | `scroll` | Resolve identifier to frame, then scroll at its center by `deltaX` / `deltaY`. |
 | `drag_drop` | Resolve source/destination identifiers to frames, then drag from one center to the other. |
 | `type_text` | Type Unicode text into the focused window. |

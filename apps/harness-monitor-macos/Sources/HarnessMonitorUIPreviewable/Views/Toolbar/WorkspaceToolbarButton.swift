@@ -16,13 +16,16 @@ public struct WorkspaceToolbarButton: View {
   public var body: some View {
     @Bindable var slice = slice
 
-    Button(action: { openWorkspace(focusesDecisions: slice.count > .zero) }) {
-      Label {
-        Text("Workspace")
-      } icon: {
-        toolbarIcon(count: slice.count, maxSeverity: slice.maxSeverity)
+    Button(
+      action: { openWorkspace(focusesDecisions: slice.count > .zero) },
+      label: {
+        Label {
+          Text("Workspace")
+        } icon: {
+          toolbarIcon(count: slice.count, maxSeverity: slice.maxSeverity)
+        }
       }
-    }
+    )
     .help(helpText(count: slice.count))
     .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceToolbarButton)
     .accessibilityLabel("Workspace")

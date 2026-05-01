@@ -11,6 +11,7 @@ public enum RegistryCapability: String, Sendable, Codable, CaseIterable {
   case clientSnapshots = "client-snapshots"
   case clientSnapshotLeases = "client-snapshot-leases"
   case replacementNotice = "replacement-notice"
+  case semanticActions = "semantic-actions"
 }
 
 public enum RegistryElementKind: String, Sendable, Codable, CaseIterable {
@@ -25,6 +26,10 @@ public enum RegistryElementKind: String, Sendable, Codable, CaseIterable {
   case menuItem
   case image
   case other
+}
+
+public enum RegistrySemanticAction: String, Sendable, Codable, CaseIterable {
+  case press
 }
 
 public struct RegistryRect: Sendable, Codable, Equatable {
@@ -58,6 +63,7 @@ public struct RegistryElement: Sendable, Codable, Equatable {
   public var value: String?
   public var hint: String?
   public var kind: RegistryElementKind
+  public var actions: [RegistrySemanticAction]
   public var frame: RegistryRect
   public var windowID: Int?
   public var enabled: Bool
@@ -70,6 +76,7 @@ public struct RegistryElement: Sendable, Codable, Equatable {
     value: String? = nil,
     hint: String? = nil,
     kind: RegistryElementKind,
+    actions: [RegistrySemanticAction] = [],
     frame: RegistryRect,
     windowID: Int? = nil,
     enabled: Bool = true,
@@ -81,6 +88,7 @@ public struct RegistryElement: Sendable, Codable, Equatable {
     self.value = value
     self.hint = hint
     self.kind = kind
+    self.actions = actions
     self.frame = frame
     self.windowID = windowID
     self.enabled = enabled

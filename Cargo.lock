@@ -2678,7 +2678,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "30.32.3"
+version = "30.33.0"
 dependencies = [
  "agent-client-protocol",
  "assert_cmd",
@@ -2694,6 +2694,7 @@ dependencies = [
  "compose_spec",
  "console-subscriber",
  "core-foundation 0.10.1",
+ "core-foundation-sys",
  "crossterm",
  "fs-err",
  "fs2",
@@ -2753,7 +2754,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "30.32.3"
+version = "30.33.0"
 dependencies = [
  "assert_cmd",
  "harness",

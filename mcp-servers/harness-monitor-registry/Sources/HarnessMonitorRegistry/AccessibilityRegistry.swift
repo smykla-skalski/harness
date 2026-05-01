@@ -213,17 +213,18 @@ public actor AccessibilityRegistry {
 
   public func upsertClientSnapshot(_ clientSnapshot: RegistryClientSnapshot) -> RegistryAckResult {
     pruneExpiredClientSnapshots()
-    if let existing = clientSnapshots[clientSnapshot.clientID],
-      existing.snapshot.generation > clientSnapshot.generation
+    let normalizedSnapshot = normalizedClientSnapshot(clientSnapshot)
+    if let existing = clientSnapshots[normalizedSnapshot.clientID],
+      existing.snapshot.generation > normalizedSnapshot.generation
     {
       return RegistryAckResult(
         applied: true,
-        message: "ignored stale client snapshot generation \(clientSnapshot.generation)"
+        message: "ignored stale client snapshot generation \(normalizedSnapshot.generation)"
       )
     }
 
-    clientSnapshots[clientSnapshot.clientID] = StoredClientSnapshot(
-      snapshot: clientSnapshot,
+    clientSnapshots[normalizedSnapshot.clientID] = StoredClientSnapshot(
+      snapshot: normalizedSnapshot,
       receivedAt: Date()
     )
     return RegistryAckResult(applied: true)
@@ -630,6 +631,27 @@ public actor AccessibilityRegistry {
   private func takeNextRemoteGeneration() -> UInt64 {
     remoteGeneration &+= 1
     return remoteGeneration
+  }
+
+  private func normalizedClientSnapshot(
+    _ clientSnapshot: RegistryClientSnapshot
+  ) -> RegistryClientSnapshot {
+    RegistryClientSnapshot(
+      clientID: clientSnapshot.clientID,
+      generation: clientSnapshot.generation,
+      appVersion: clientSnapshot.appVersion,
+      bundleIdentifier: clientSnapshot.bundleIdentifier,
+      snapshot: RegistrySnapshot(
+        elements: clientSnapshot.snapshot.elements.map(strippingSemanticActions(from:)),
+        windows: clientSnapshot.snapshot.windows
+      )
+    )
+  }
+
+  private func strippingSemanticActions(from element: RegistryElement) -> RegistryElement {
+    var stripped = element
+    stripped.actions = []
+    return stripped
   }
 
   private func localSnapshot() -> RegistrySnapshot {

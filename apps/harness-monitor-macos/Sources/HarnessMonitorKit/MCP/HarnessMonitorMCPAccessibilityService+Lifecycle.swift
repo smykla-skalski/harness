@@ -11,6 +11,7 @@ extension HarnessMonitorMCPAccessibilityService {
       .clientSnapshots,
       .clientSnapshotLeases,
       .replacementNotice,
+      .semanticActions,
     ]
     return { @Sendable in
       PingResult(

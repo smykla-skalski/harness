@@ -57,6 +57,22 @@ public struct RegistrySocketClient: Sendable {
     )
   }
 
+  public func performAction(
+    identifier: String,
+    action: RegistrySemanticAction,
+    toSocketAt socketPath: String
+  ) async throws -> RegistryAckResult {
+    try await send(
+      RegistryRequest(
+        id: 5,
+        op: .performAction,
+        identifier: identifier,
+        action: action
+      ),
+      toSocketAt: socketPath
+    )
+  }
+
   private func send<Result: Decodable & Sendable>(
     _ request: RegistryRequest,
     toSocketAt socketPath: String

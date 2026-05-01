@@ -4,6 +4,12 @@ import Foundation
 ///
 /// Kept transport-agnostic so it can be unit-tested without any sockets.
 public struct RegistryRequestDispatcher: Sendable {
+  public enum SemanticActionDisposition: Sendable, Equatable {
+    case performed
+    case notFound
+    case actionUnavailable
+  }
+
   public struct DispatchResult: Sendable {
     public let response: RegistryResponse
     public let onDelivered: (@Sendable () async -> Void)?
@@ -38,15 +44,18 @@ public struct RegistryRequestDispatcher: Sendable {
 
   public let registry: AccessibilityRegistry
   public let pingInfo: @Sendable () -> PingResult
+  public let semanticActionHandler: (@Sendable (String, RegistrySemanticAction) async -> SemanticActionDisposition)?
   public let replacementHandler: (@Sendable (RegistryReplacementNotice) async -> ReplacementDisposition)?
 
   public init(
     registry: AccessibilityRegistry,
     pingInfo: @escaping @Sendable () -> PingResult,
+    semanticActionHandler: (@Sendable (String, RegistrySemanticAction) async -> SemanticActionDisposition)? = nil,
     replacementHandler: (@Sendable (RegistryReplacementNotice) async -> ReplacementDisposition)? = nil
   ) {
     self.registry = registry
     self.pingInfo = pingInfo
+    self.semanticActionHandler = semanticActionHandler
     self.replacementHandler = replacementHandler
   }
 
@@ -96,6 +105,68 @@ public struct RegistryRequestDispatcher: Sendable {
       return DispatchResult(
         response: .success(id: request.id, result: .getElement(GetElementResult(element: element)))
       )
+
+    case .performAction:
+      guard let identifier = request.identifier, identifier.isEmpty == false else {
+        return DispatchResult(
+          response: .failure(
+            id: request.id,
+            error: RegistryErrorPayload(
+              code: "invalid-argument",
+              message: "performAction requires a non-empty identifier"
+            )
+          )
+        )
+      }
+      guard let action = request.action else {
+        return DispatchResult(
+          response: .failure(
+            id: request.id,
+            error: RegistryErrorPayload(
+              code: "invalid-argument",
+              message: "performAction requires an action payload"
+            )
+          )
+        )
+      }
+      guard let semanticActionHandler else {
+        return DispatchResult(
+          response: .failure(
+            id: request.id,
+            error: RegistryErrorPayload(
+              code: "not-implemented",
+              message: "registry host does not support semantic actions"
+            )
+          )
+        )
+      }
+
+      switch await semanticActionHandler(identifier, action) {
+      case .performed:
+        return DispatchResult(
+          response: .success(id: request.id, result: .ack(RegistryAckResult(applied: true)))
+        )
+      case .notFound:
+        return DispatchResult(
+          response: .failure(
+            id: request.id,
+            error: RegistryErrorPayload(
+              code: "not-found",
+              message: "no element registered with identifier \(identifier)"
+            )
+          )
+        )
+      case .actionUnavailable:
+        return DispatchResult(
+          response: .failure(
+            id: request.id,
+            error: RegistryErrorPayload(
+              code: "action-unavailable",
+              message: "element \(identifier) does not support semantic action \(action.rawValue)"
+            )
+          )
+        )
+      }
 
     case .syncClientSnapshot:
       guard let clientSnapshot = request.clientSnapshot else {

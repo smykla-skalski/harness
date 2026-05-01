@@ -67,6 +67,8 @@ struct WorkspaceWindowCreatePane: View {
 }
 
 extension WorkspaceWindowCreatePane {
+  private static let splitCreateLayoutMinimumWidth: CGFloat = 700
+
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(viewModel.createMode.headerTitle)
@@ -89,22 +91,22 @@ extension WorkspaceWindowCreatePane {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           Picker("Create", selection: $formModel.createMode) {
             ForEach(AgentTuiCreateMode.allCases) { mode in
-            Text(mode.title)
-              .tag(mode)
-              .accessibilityIdentifier(
-                HarnessMonitorAccessibility.segmentedOption(
-                  HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                  option: mode.title
+              Text(mode.title)
+                .tag(mode)
+                .accessibilityIdentifier(
+                  HarnessMonitorAccessibility.segmentedOption(
+                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                    option: mode.title
+                  )
                 )
-              )
-              .harnessMCPButton(
-                HarnessMonitorAccessibility.segmentedOption(
-                  HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                  option: mode.title
-                ),
-                label: mode.title,
-                pressAction: { formModel.createMode = mode }
-              )
+                .harnessMCPButton(
+                  HarnessMonitorAccessibility.segmentedOption(
+                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                    option: mode.title
+                  ),
+                  label: mode.title,
+                  pressAction: { formModel.createMode = mode }
+                )
             }
           }
           .pickerStyle(.segmented)
@@ -116,6 +118,34 @@ extension WorkspaceWindowCreatePane {
 
           AgentsCreateSummaryFactsView(facts: createSummaryFacts)
         }
+      }
+    }
+  }
+
+  @ViewBuilder
+  func createPaneColumns<Leading: View, Trailing: View>(
+    leadingMaxWidth: CGFloat? = nil,
+    @ViewBuilder leading: () -> Leading,
+    @ViewBuilder trailing: () -> Trailing
+  ) -> some View {
+    // Let layout choose the best arrangement without feeding measured width
+    // back into observed state, which can create a geometry/update loop.
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
+        leading()
+          .frame(maxWidth: leadingMaxWidth, alignment: .leading)
+        trailing()
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(
+        minWidth: Self.splitCreateLayoutMinimumWidth,
+        maxWidth: .infinity,
+        alignment: .leading
+      )
+
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+        leading()
+        trailing()
       }
     }
   }

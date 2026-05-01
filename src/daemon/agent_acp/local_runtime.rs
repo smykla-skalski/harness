@@ -33,8 +33,8 @@ use super::pool_key::AcpProcessPoolKey;
 use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task};
 
-mod snapshots;
 mod sandbox_state;
+mod snapshots;
 
 impl AcpAgentManagerHandle {
     #[cfg(test)]
@@ -468,7 +468,6 @@ impl AcpAgentManagerHandle {
         })?;
         db.project_dir_for_session(session_id)
     }
-
 }
 
 #[derive(Clone, Copy)]
