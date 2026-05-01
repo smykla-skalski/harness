@@ -11,7 +11,8 @@ final class WindowRegistrySyncController {
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
   private var trackingOwnerID = UUID()
-  private var pendingActions: [PendingAction] = []
+  private var pendingUnregisters: [PendingAction] = []
+  private var pendingRegistration: PendingAction?
   private var flushTask: Task<Void, Never>?
 
   init(registry: AccessibilityRegistry) {
@@ -46,7 +47,12 @@ final class WindowRegistrySyncController {
   }
 
   private func enqueue(_ action: PendingAction) {
-    pendingActions.append(action)
+    switch action {
+    case .register:
+      pendingRegistration = action
+    case .unregister:
+      pendingUnregisters.append(action)
+    }
     guard flushTask == nil else { return }
     let registry = registry
     flushTask = Task { [weak self] in
@@ -58,13 +64,20 @@ final class WindowRegistrySyncController {
   }
 
   private func takePendingActionOrFinish() -> PendingAction? {
-    guard !pendingActions.isEmpty else {
-      flushTask = nil
+    if pendingUnregisters.isEmpty == false {
+      return pendingUnregisters.removeFirst()
+    }
+    if let pendingRegistration {
+      self.pendingRegistration = nil
+      return pendingRegistration
+    }
+    guard pendingUnregisters.isEmpty, pendingRegistration == nil else {
       return nil
     }
-    return pendingActions.removeFirst()
+    flushTask = nil
+    return nil
   }
-
+ 
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
     case .register(let window, let generation, let ownerID):

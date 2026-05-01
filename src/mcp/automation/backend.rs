@@ -1,14 +1,18 @@
+use std::collections::HashSet;
 use std::env;
+use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use tokio::fs;
 use tokio::process::Command;
+use tokio::time::{Duration, timeout};
 
 /// Environment variable that points at a custom `harness-monitor-input`
 /// binary. When set and the target file exists, it wins over the default
 /// search paths.
 pub const INPUT_OVERRIDE_ENV: &str = "HARNESS_MONITOR_INPUT_BIN";
+const HELPER_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// Selected input backend in preference order.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +38,7 @@ impl Backend {
 /// package > `cliclick` on PATH > None.
 pub async fn detect_backend() -> Backend {
     if let Some(path) = env_override()
-        && file_exists(&path).await
+        && viable_helper_candidate(&path).await.is_some()
     {
         return Backend::HarnessInput(path);
     }
@@ -56,30 +60,25 @@ fn env_override() -> Option<PathBuf> {
 }
 
 pub(crate) async fn default_helper_candidate() -> Option<PathBuf> {
-    for root in helper_search_roots() {
-        if let Some(candidate) = default_helper_candidate_in(&root).await {
-            return Some(candidate);
-        }
-    }
-    None
+    default_helper_candidate_from_roots(&helper_search_roots()).await
 }
 
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "exercised by automation tests to lock helper ranking")
+)]
 pub(crate) async fn default_helper_candidate_in(repo_root: &Path) -> Option<PathBuf> {
-    let mut best: Option<(SystemTime, PathBuf)> = None;
-    for candidate in helper_candidates_from(repo_root) {
-        let Ok(metadata) = fs::metadata(&candidate).await else {
-            continue;
-        };
-        let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-        if best.as_ref().is_none_or(|(best_modified, best_path)| {
-            modified > *best_modified
-                || (modified == *best_modified
-                    && prefers_candidate(&candidate, best_path))
-        }) {
-            best = Some((modified, candidate));
-        }
-    }
-    best.map(|(_, path)| path)
+    best_helper_candidate(helper_candidates_from(repo_root)).await
+}
+
+pub(crate) async fn default_helper_candidate_from_roots(roots: &[PathBuf]) -> Option<PathBuf> {
+    let mut seen = HashSet::new();
+    let candidates: Vec<PathBuf> = roots
+        .iter()
+        .flat_map(|root| helper_candidates_from(root))
+        .filter(|candidate| seen.insert(candidate.clone()))
+        .collect();
+    best_helper_candidate(candidates).await
 }
 
 fn helper_candidates_from(repo_root: &Path) -> Vec<PathBuf> {
@@ -125,6 +124,57 @@ fn prefers_candidate(candidate: &Path, incumbent: &Path) -> bool {
             .any(|component| component.as_os_str() == "debug")
 }
 
+async fn best_helper_candidate<I>(candidates: I) -> Option<PathBuf>
+where
+    I: IntoIterator<Item = PathBuf>,
+{
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for candidate in candidates {
+        let Some((modified, candidate)) = viable_helper_candidate(&candidate).await else {
+            continue;
+        };
+        if best.as_ref().is_none_or(|(best_modified, best_path)| {
+            modified > *best_modified
+                || (modified == *best_modified && prefers_candidate(&candidate, best_path))
+        }) {
+            best = Some((modified, candidate));
+        }
+    }
+    best.map(|(_, path)| path)
+}
+
+async fn viable_helper_candidate(path: &Path) -> Option<(SystemTime, PathBuf)> {
+    let metadata = fs::metadata(path).await.ok()?;
+    if !metadata.is_file() || !is_executable(&metadata) {
+        return None;
+    }
+    if !helper_launches(path).await {
+        return None;
+    }
+    Some((metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH), path.to_path_buf()))
+}
+
+#[cfg(unix)]
+fn is_executable(metadata: &Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable(_metadata: &Metadata) -> bool {
+    true
+}
+
+async fn helper_launches(path: &Path) -> bool {
+    timeout(
+        HELPER_PROBE_TIMEOUT,
+        Command::new(path).arg("--help").output(),
+    )
+    .await
+    .is_ok_and(|output| output.is_ok_and(|output| output.status.success()))
+}
+
 fn helper_search_roots() -> Vec<PathBuf> {
     helper_search_roots_from(env::current_dir().ok(), env::current_exe().ok())
 }
@@ -149,11 +199,6 @@ fn push_unique_ancestors(start: Option<&Path>, roots: &mut Vec<PathBuf>) {
         }
     }
 }
-
-async fn file_exists(path: &Path) -> bool {
-    fs::metadata(path).await.is_ok()
-}
-
 async fn on_path(cmd: &str) -> bool {
     Command::new("/usr/bin/which")
         .arg(cmd)

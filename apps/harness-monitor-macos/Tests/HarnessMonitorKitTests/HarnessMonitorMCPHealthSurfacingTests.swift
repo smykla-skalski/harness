@@ -23,9 +23,10 @@ struct HarnessMonitorMCPHealthSurfacingTests {
       )
     )
 
-    #expect(status.title == "Registry Degraded - Recovering")
-    #expect(status.toolbarLabel == "Registry Recovering")
+    #expect(status.title == "Registry Host Degraded - Recovering")
+    #expect(status.toolbarLabel == "Host Recovering")
     #expect(status.shouldShowChromeBanner)
+    #expect(status.accessibilityLabel == "MCP accessibility registry host status")
     #expect(
       status.failureFeedbackMessage?
         .contains("Recovery continues in the background.") == true
@@ -59,7 +60,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     #expect(store.contentUI.chrome.mcpStatus == degraded)
     #expect(
       store.toast.activeFeedback.first?.message
-        .contains("MCP registry degraded:") == true
+        .contains("MCP registry host degraded:") == true
     )
 
     let snapshot = PreferencesDiagnosticsSnapshot(store: store)
@@ -69,11 +70,12 @@ struct HarnessMonitorMCPHealthSurfacingTests {
       runtimeState: .healthy(socketPath: "/tmp/harness-mcp.sock"),
       recoveryStatus: nil
     )
+    #expect(healthy.detail.contains("This status covers the in-app registry host."))
     store.updateMCPStatus(healthy)
 
     #expect(store.contentUI.toolbar.mcpStatus == healthy)
     #expect(store.contentUI.chrome.mcpStatus == healthy)
-    #expect(store.toast.activeFeedback.first?.message == "MCP recovered and is ready.")
+    #expect(store.toast.activeFeedback.first?.message == "MCP registry host recovered and is ready.")
   }
 
   @Test("Store keeps one degraded failure toast across retry transitions")

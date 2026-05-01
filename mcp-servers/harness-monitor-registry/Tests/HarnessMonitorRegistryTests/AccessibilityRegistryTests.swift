@@ -204,6 +204,56 @@ struct AccessibilityRegistryTests {
     #expect(elements.map(\.identifier) == ["session.task.snapshot"])
   }
 
+  @Test("client snapshots merge into authoritative queries without clobbering local state")
+  func clientSnapshotsMergeIntoAuthoritativeQueries() async {
+    let registry = AccessibilityRegistry()
+    let local = RegistryElement(
+      identifier: "session.task.local",
+      label: "Local task",
+      kind: .row,
+      frame: RegistryRect(x: 10, y: 20, width: 100, height: 32),
+      windowID: 100
+    )
+    await registry.registerElement(local)
+    await registry.upsertClientSnapshot(
+      RegistryClientSnapshot(
+        clientID: UUID(),
+        appVersion: "1.2.3",
+        bundleIdentifier: "io.test.client",
+        snapshot: RegistrySnapshot(
+          elements: [
+            RegistryElement(
+              identifier: "session.task.remote",
+              label: "Remote task",
+              kind: .row,
+              frame: RegistryRect(x: 20, y: 30, width: 120, height: 36),
+              windowID: 200
+            ),
+            RegistryElement(
+              identifier: "session.task.local",
+              label: "Shadowed remote task",
+              kind: .row,
+              frame: RegistryRect(x: 30, y: 40, width: 130, height: 40),
+              windowID: 200
+            ),
+          ],
+          windows: [
+            RegistryWindow(
+              id: 200,
+              title: "Remote window",
+              frame: RegistryRect(x: 0, y: 0, width: 320, height: 240)
+            )
+          ]
+        )
+      )
+    )
+
+    let elements = await registry.allElements()
+    #expect(elements.map(\.identifier) == ["session.task.local", "session.task.remote"])
+    #expect(await registry.element(identifier: local.identifier) == local)
+    #expect(await registry.allWindows().map(\.id) == [200])
+  }
+
   @MainActor
   @Test("stale window updates are ignored after tracking stops")
   func staleWindowUpdatesAreIgnoredAfterTrackingStops() async {
@@ -279,6 +329,40 @@ struct AccessibilityRegistryTests {
 
     let windows = await registry.allWindows()
     #expect(windows.map(\.id) == [second.id])
+  }
+
+  @MainActor
+  @Test("window sync coalesces rapid updates to the latest tracked state")
+  func windowSyncCoalescesRapidUpdatesToLatestState() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowRegistrySyncController(registry: registry)
+    let initial = RegistryWindow(
+      id: 101,
+      title: "Initial",
+      frame: RegistryRect(x: 10, y: 20, width: 300, height: 200)
+    )
+    let latest = RegistryWindow(
+      id: 101,
+      title: "Latest",
+      frame: RegistryRect(x: 30, y: 40, width: 360, height: 260)
+    )
+
+    let generation = controller.beginTracking(windowID: initial.id)
+    controller.sync(initial, generation: generation)
+    controller.sync(
+      RegistryWindow(
+        id: initial.id,
+        title: "Intermediate",
+        frame: RegistryRect(x: 20, y: 30, width: 320, height: 220)
+      ),
+      generation: generation
+    )
+    controller.sync(latest, generation: generation)
+
+    await controller.waitForIdle()
+
+    let windows = await registry.allWindows()
+    #expect(windows == [latest])
   }
 
   @MainActor
