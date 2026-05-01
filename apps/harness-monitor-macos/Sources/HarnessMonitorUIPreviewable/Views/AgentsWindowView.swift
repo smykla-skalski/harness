@@ -176,6 +176,12 @@ public struct AgentsWindowView: View {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
         decisionToolbarItems(decisionScope: decisionScope)
+        ToolbarItem(placement: .automatic) {
+          Button(action: refresh) {
+            Label("Refresh", systemImage: "arrow.clockwise")
+          }
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRefreshButton)
+        }
       }
       .toolbarBaselineOverlay()
       .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
