@@ -85,7 +85,7 @@ fn normalize_json(value: &mut serde_json::Value) {
             }
             // Sort arrays of objects by their string representation for
             // order-independent comparison.
-            arr.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            arr.sort_by_key(std::string::ToString::to_string);
         }
         _ => {}
     }
@@ -107,12 +107,12 @@ fn with_comparison_test_env<T>(
     })
 }
 
-#[ignore]
+#[ignore = "slow integration test that compares file and SQLite-backed daemon reads"]
 #[test]
 fn file_and_db_reads_produce_identical_output() {
     let tmp = tempdir().expect("tempdir");
     with_comparison_test_env(tmp.path(), "comparison-session", || {
-        seed_workspace(tmp.path())
+        seed_workspace(tmp.path());
     });
 
     let db_path = tmp.path().join("harness/daemon/harness.db");

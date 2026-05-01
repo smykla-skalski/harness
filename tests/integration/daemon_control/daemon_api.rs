@@ -18,8 +18,7 @@ pub(super) fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusRepo
         };
         assert!(
             Instant::now() < deadline,
-            "daemon did not become healthy before timeout: {}",
-            retry_reason
+            "daemon did not become healthy before timeout: {retry_reason}"
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -61,8 +60,7 @@ pub(super) fn wait_for_daemon_stopped(home: &Path, xdg: &Path) {
         };
         assert!(
             Instant::now() < deadline,
-            "daemon did not stop before timeout: {}",
-            retry_reason
+            "daemon did not stop before timeout: {retry_reason}"
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -163,6 +161,10 @@ fn session_api_issue(endpoint: &str, token_path: &str) -> Option<String> {
     })
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "retries clone the caller-provided JSON body for each request attempt"
+)]
 pub(super) fn post_json(endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Value) {
     let url = format!(
         "{}/{}",
@@ -192,9 +194,7 @@ pub(super) fn post_json(endpoint: &str, token: &str, path: &str, body: Value) ->
                 return (status, json);
             }
             Err(error) if daemon_request_error_is_retryable(&error) => {
-                if Instant::now() >= deadline {
-                    panic!("daemon post: {error:?}");
-                }
+                assert!(Instant::now() < deadline, "daemon post: {error:?}");
                 thread::sleep(DAEMON_WAIT_INTERVAL);
             }
             Err(error) => panic!("daemon post: {error:?}"),
@@ -287,9 +287,7 @@ pub(super) fn start_session_via_http(
                 if let Some(state) = read_session_status(home, xdg, project_arg, session_id) {
                     return state;
                 }
-                if Instant::now() >= deadline {
-                    panic!("daemon post: {error:?}");
-                }
+                assert!(Instant::now() < deadline, "daemon post: {error:?}");
                 thread::sleep(DAEMON_WAIT_INTERVAL);
             }
             Err(error) => panic!("daemon post: {error:?}"),
@@ -450,10 +448,7 @@ PY
 "#,
     )
     .expect("write mock codex");
-    std::fs::set_permissions(
-        &script,
-        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
-    )
-    .expect("chmod mock codex");
+    std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod mock codex");
     script
 }

@@ -178,25 +178,25 @@ fn monitor_pbxproj_stays_on_current_xcode_format() {
         "patch-tuist-pbxproj.py should patch stale Tuist pbxproj fixtures"
     );
 
-    let patched = fs::read_to_string(&pbxproj_path).expect("patched pbxproj");
+    let patched_pbxproj = fs::read_to_string(&pbxproj_path).expect("patched pbxproj");
     assert!(
-        patched.contains("objectVersion = 77;"),
+        patched_pbxproj.contains("objectVersion = 77;"),
         "patched pbxproj should use the current project object version"
     );
     assert!(
-        patched.contains("preferredProjectObjectVersion = 77;"),
+        patched_pbxproj.contains("preferredProjectObjectVersion = 77;"),
         "patched pbxproj should advertise the current preferred project object version"
     );
     assert!(
-        !patched.contains("compatibilityVersion = \"Xcode 14.0\";"),
+        !patched_pbxproj.contains("compatibilityVersion = \"Xcode 14.0\";"),
         "patched pbxproj should remove the stale Xcode 14 compatibilityVersion"
     );
     assert!(
-        patched.contains("LastSwiftUpdateCheck = 2640;"),
+        patched_pbxproj.contains("LastSwiftUpdateCheck = 2640;"),
         "patched pbxproj should track the current Xcode swift update check"
     );
     assert!(
-        patched.contains("LastUpgradeCheck = 2640;"),
+        patched_pbxproj.contains("LastUpgradeCheck = 2640;"),
         "patched pbxproj should track the current Xcode upgrade check"
     );
 }
