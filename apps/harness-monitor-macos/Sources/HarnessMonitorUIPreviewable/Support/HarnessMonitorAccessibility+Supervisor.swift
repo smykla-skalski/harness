@@ -1,10 +1,9 @@
 import Foundation
 
 extension HarnessMonitorAccessibility {
-  public static let supervisorBadge = "harness.supervisor.badge"
-  public static let supervisorBadgeState = "harness.supervisor.badge.state"
-  public static let supervisorForceTick = "harness.supervisor.force-tick"
-  public static let decisionsWindow = "harness.decisions.window"
+  public static let workspaceToolbarButton = "harness.toolbar.workspace"
+  public static let workspaceToolbarButtonState = "harness.toolbar.workspace.state"
+  public static let workspaceToolbarForceTick = "harness.toolbar.workspace.force-tick"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"
   public static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
@@ -30,6 +29,8 @@ extension HarnessMonitorAccessibility {
     "harness.decisions.bulk-actions.dismiss-visible.input"
   public static let decisionBulkDismissVisibleConfirm =
     "harness.decisions.bulk-actions.dismiss-visible.confirm"
+  public static let decisionBulkDismissVisibleCancel =
+    "harness.decisions.bulk-actions.dismiss-visible.cancel"
   public static let decisionBulkReopenBatch = "harness.decisions.bulk-actions.reopen-batch"
   public static let decisionsObserverPanel = "harness.decisions.observer.panel"
   public static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"

@@ -4,7 +4,7 @@ import SwiftUI
 
 struct GoCommands: Commands {
   let store: HarnessMonitorStore
-  let agentsNavigationBridge: AgentsWindowNavigationBridge
+  let workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
 
@@ -14,8 +14,8 @@ struct GoCommands: Commands {
 
   private var canNavigateBack: Bool {
     switch activeScope {
-    case .agents:
-      agentsNavigationBridge.state.canGoBack
+    case .workspace:
+      workspaceNavigationBridge.state.canGoBack
     case .main:
       displayState.canNavigateBack
     }
@@ -23,8 +23,8 @@ struct GoCommands: Commands {
 
   private var canNavigateForward: Bool {
     switch activeScope {
-    case .agents:
-      agentsNavigationBridge.state.canGoForward
+    case .workspace:
+      workspaceNavigationBridge.state.canGoForward
     case .main:
       displayState.canNavigateForward
     }
@@ -46,8 +46,8 @@ struct GoCommands: Commands {
     let scope = activeScope
     Task {
       switch scope {
-      case .agents:
-        await agentsNavigationBridge.navigateBack()
+      case .workspace:
+        await workspaceNavigationBridge.navigateBack()
       case .main:
         await store.navigateBack()
       }
@@ -58,8 +58,8 @@ struct GoCommands: Commands {
     let scope = activeScope
     Task {
       switch scope {
-      case .agents:
-        await agentsNavigationBridge.navigateForward()
+      case .workspace:
+        await workspaceNavigationBridge.navigateForward()
       case .main:
         await store.navigateForward()
       }

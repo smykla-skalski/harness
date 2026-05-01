@@ -22,7 +22,7 @@ struct HarnessMonitorApp: App {
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
   @State private var showOpenFolder = false
-  @State private var agentsNavigationBridge: AgentsWindowNavigationBridge
+  @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var preferencesSelectedSection: PreferencesSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
@@ -91,7 +91,7 @@ struct HarnessMonitorApp: App {
       pendingDecisionsDockBadgeController.sync(count: count)
     }
     _store = State(initialValue: store)
-    _agentsNavigationBridge = State(initialValue: AgentsWindowNavigationBridge())
+    _workspaceNavigationBridge = State(initialValue: WorkspaceWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
     delegate.bind(store: store)
@@ -100,7 +100,7 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     mainWindowScene
     settingsWindowScene
-    agentsWindowScene
+    workspaceWindowScene
   }
 
   private var allowsWindowRestoration: Bool {
@@ -132,7 +132,7 @@ struct HarnessMonitorApp: App {
       AttachExternalSessionCommand(store: store)
       GoCommands(
         store: store,
-        agentsNavigationBridge: agentsNavigationBridge,
+        workspaceNavigationBridge: workspaceNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         displayState: store.commandsDisplayState
       )
@@ -162,13 +162,13 @@ struct HarnessMonitorApp: App {
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 
-  private var agentsWindowScene: some Scene {
+  private var workspaceWindowScene: some Scene {
     Window("Workspace", id: HarnessMonitorWindowID.workspace) {
-      AgentsWindowRootView(
+      WorkspaceWindowRootView(
         store: store,
         notifications: notificationController,
         acpAttentionState: acpAttentionState,
-        navigationBridge: agentsNavigationBridge,
+        navigationBridge: workspaceNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         themeMode: $themeMode
       )

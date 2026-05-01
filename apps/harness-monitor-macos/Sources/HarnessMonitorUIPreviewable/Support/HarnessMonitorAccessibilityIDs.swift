@@ -138,15 +138,16 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelineNavigation = "harness.session.timeline.navigation"
   public static let sessionTimelineNavigationStatus =
     "harness.session.timeline.navigation.status"
+  public static let sessionTimelineVisibleStatus =
+    "harness.session.timeline.navigation.visible-status"
   public static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
   public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
   public static let connectionCard = "harness.preferences.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
-  public static let agentsActionButton = "harness.session.agents"
-  public static let agentTuiButton = agentsActionButton
+  public static let agentTuiButton = "harness.session.agent-tui"
   public static let agentsSheet = agentTuiSheet, agentsState = agentTuiState
-  public static let agentsCommandRoutingState = agentTuiCommandRoutingState
+  public static let workspaceCommandRoutingState = "harness.window.workspace.command-routing"
   public static let agentsCreateTab = agentTuiCreateTab
   public static let agentsCreateModePicker = agentTuiCreateModePicker
   public static let agentsRuntimePicker = agentTuiRuntimePicker
@@ -177,9 +178,12 @@ public enum HarnessMonitorAccessibility {
   public static let agentsNavigateBackButton = agentTuiNavigateBackButton
   public static let agentsNavigateForwardButton = agentTuiNavigateForwardButton
   public static let agentsPersonaPicker = agentTuiPersonaPicker
-  public static let agentsDecisionDesk = "harness.window.agents.decisions"
-  public static let agentsDecisionFiltersMenu = "harness.window.agents.decisions.filters"
-  public static let agentsDecisionFilterState = "harness.window.agents.decisions.filter-state"
+  public static let workspaceDecisionDesk = "harness.window.workspace.decisions"
+  public static let workspaceDecisionFiltersMenu = "harness.window.workspace.decisions.filters"
+  public static let workspaceDecisionClearFiltersButton =
+    "harness.window.workspace.decisions.clear-filters"
+  public static let workspaceDecisionFilterState =
+    "harness.window.workspace.decisions.filter-state"
   public static let agentTuiSheet = "harness.sheet.agent-tui"
   public static let agentTuiState = "harness.sheet.agent-tui.state"
   public static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"
@@ -187,7 +191,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiCreateModePicker = "harness.sheet.agent-tui.create-mode"
   public static let agentTuiRuntimePicker = "harness.sheet.agent-tui.runtime"
   public static let agentTuiRolePicker = "harness.sheet.agent-tui.role"
-  public static let agentTuiFallbackRolePicker = "harness.window.agents.role-fallback"
+  public static let agentTuiFallbackRolePicker = "harness.window.workspace.role-fallback"
   public static let agentTuiNameField = "harness.sheet.agent-tui.name"
   public static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
   public static let agentTuiProjectDirField = "harness.sheet.agent-tui.project-dir"

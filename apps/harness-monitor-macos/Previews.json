@@ -123,9 +123,9 @@
       "index": 0
     },
     {
-      "id": "DecisionsWindowCrowded",
-      "description": "Decisions window with sidebar, detail, and inspector populated",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsWindowCrowdedPreview.swift",
+      "id": "WorkspaceDecisionDeskCrowded",
+      "description": "Workspace decision desk with sidebar, detail, and inspector populated",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Decisions/WorkspaceDecisionDeskCrowdedPreview.swift",
       "index": 0
     },
     {
