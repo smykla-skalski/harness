@@ -471,6 +471,25 @@ cat
         self.assertEqual(calls, [])
         self.assertEqual(rtk_log, "")
 
+    def test_test_lane_defaults_to_fast_feedback_env(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"',
+            script,
+            "monitor test lane should disable automatic xcodebuild retries by default",
+        )
+        self.assertIn(
+            'TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"',
+            script,
+            "monitor test lane should fail fast on shared xcodebuild lock contention by default",
+        )
+        self.assertEqual(
+            script.count("done < <(test_lane_env)"),
+            3,
+            "build, enumeration, and test actions should all inherit the same fast-feedback env",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

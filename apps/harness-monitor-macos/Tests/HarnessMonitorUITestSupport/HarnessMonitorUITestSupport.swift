@@ -160,15 +160,28 @@ class HarnessMonitorUITestCase: XCTestCase {
   }
 
   override func record(_ issue: XCTIssue) {
-    Self.failureTracker.markFailed(name)
+    let testName = name
+    let artifactsKey = Self.artifactsDirectoryKey
+    Self.failureTracker.markFailed(testName)
     appendDiagnosticsTrace(
       component: "ui-test",
       event: "test.issue.recorded",
-      testName: name,
+      testName: testName,
       details: ["issue": String(describing: issue)],
-      artifactsDirectoryKey: Self.artifactsDirectoryKey
+      artifactsDirectoryKey: artifactsKey
     )
     super.record(issue)
+    appendDiagnosticsTrace(
+      component: "ui-test",
+      event: "test.issue.fail-fast-stop",
+      testName: testName,
+      artifactsDirectoryKey: artifactsKey
+    )
+    MainActor.assumeIsolated {
+      Self.signalRecordingStopIfConfigured()
+      let launchedApp = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+      Self.terminateAndWait(launchedApp)
+    }
   }
 
   override func tearDownWithError() throws {

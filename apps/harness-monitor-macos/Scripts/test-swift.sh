@@ -17,6 +17,17 @@ CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
+TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
+TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+
+test_lane_env() {
+  # Local monitor test runs should fail fast on contention and on the first
+  # observed failure; callers that explicitly want retries or queueing can opt in
+  # by overriding the exported values.
+  printf '%s\0' \
+    "HARNESS_MONITOR_TEST_RETRY_ITERATIONS=${TEST_RETRY_ITERATIONS}" \
+    "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS=${TEST_LOCK_WAIT_TIMEOUT_SECONDS}"
+}
 
 cleanup_script_descendants() {
   local status="${1:-$?}"
@@ -50,8 +61,14 @@ run_stale_preflight() {
 }
 
 run_test_action() {
+  local -a focused_env=()
+  while IFS= read -r -d '' entry; do
+    focused_env+=("$entry")
+  done < <(test_lane_env)
+
   if [[ -n "$XCODE_ONLY_TESTING" ]]; then
     exec env \
+      "${focused_env[@]}" \
       HARNESS_SKIP_STALE_CHECK=1 \
       HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 \
       "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
@@ -63,7 +80,12 @@ run_test_action() {
 run_only_testing_enumeration() {
   local selector="$1"
   local enumeration_path="$2"
-  HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0 \
+  local -a focused_env=()
+  while IFS= read -r -d '' entry; do
+    focused_env+=("$entry")
+  done < <(test_lane_env)
+  env \
+    "${focused_env[@]}" \
     HARNESS_SKIP_STALE_CHECK=1 \
     "$XCODEBUILD_RUNNER" \
     "${BASE_TEST_ARGS[@]}" \
@@ -111,9 +133,16 @@ filter_monitor_test_console_output() {
 
 run_build_for_testing() {
   local build_log_path
+  local -a focused_env=()
+  while IFS= read -r -d '' entry; do
+    focused_env+=("$entry")
+  done < <(test_lane_env)
   build_log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-build-for-testing.XXXXXX.log")"
   set +e
-  HARNESS_SKIP_STALE_CHECK=1 "$BUILD_FOR_TESTING_SCRIPT" >"$build_log_path" 2>&1
+  env \
+    "${focused_env[@]}" \
+    HARNESS_SKIP_STALE_CHECK=1 \
+    "$BUILD_FOR_TESTING_SCRIPT" >"$build_log_path" 2>&1
   local status="$?"
   set -e
   filter_monitor_test_console_output <"$build_log_path"

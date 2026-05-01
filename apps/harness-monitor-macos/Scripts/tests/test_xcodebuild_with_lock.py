@@ -622,7 +622,7 @@ shift
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-showBuildSettings -scheme HarnessMonitor", log)
 
-    def test_test_actions_do_not_require_mapfile(self) -> None:
+    def test_test_actions_do_not_require_mapfile_or_inject_retries_by_default(self) -> None:
         completed, log = self.run_script(
             "-scheme",
             "HarnessMonitorAgentsE2E",
@@ -635,8 +635,22 @@ shift
         self.assertIn("XCODEBUILD=-derivedDataPath", log)
         self.assertIn("-scheme HarnessMonitorAgentsE2E", log)
         self.assertIn("test-without-building", log)
-        self.assertIn("-retry-tests-on-failure -test-iterations 2", log)
+        self.assertNotIn("-retry-tests-on-failure", log)
+        self.assertNotIn("-test-iterations", log)
         self.assertNotIn("mapfile", completed.stderr)
+
+    def test_wrapper_defaults_to_fast_feedback_settings(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            'TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"',
+            script,
+            "xcodebuild wrapper should disable automatic test retries by default",
+        )
+        self.assertIn(
+            'LEASE_LOCK_WAITER_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"',
+            script,
+            "xcodebuild wrapper should fail fast on shared lock contention by default",
+        )
 
     def test_ui_test_actions_do_not_inject_retry_flags(self) -> None:
         completed, log = self.run_script(
