@@ -134,6 +134,18 @@ struct AgentsWindowAcpSessionContextTests {
         ]
     )
     #expect(store.currentFailureFeedbackMessage == nil)
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(view.viewModel.createSessionID == PreviewFixtures.summary.sessionId)
+    #expect(
+      store.selectedSession?.agents.contains(where: { $0.agentId == "copilot" }) == true
+    )
+    #expect(
+      store.selectedSession?.agents.first(where: { $0.agentId == "copilot" })?.role == .worker
+    )
+    #expect(
+      view.viewModel.selection
+        == .agent(sessionID: PreviewFixtures.summary.sessionId, agentID: "copilot")
+    )
   }
 
   @Test("Store ACP start reseats anchored session detail")
