@@ -163,7 +163,7 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     None,
                 )
                 .expect("join leader");
-                let leader_id = active.leader_id.clone().expect("leader id");
+                let leader_id = active.leader_id.expect("leader id");
                 let joined = session_service::join_session(
                     &state.session_id,
                     SessionRole::Worker,

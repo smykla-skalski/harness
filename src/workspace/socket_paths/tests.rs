@@ -24,7 +24,7 @@ fn path_fits_sun_path_limit_with_long_home() {
         .join("Q498EB36N4.io.harnessmonitor")
         .join("sock");
     let path = session_socket(&root, "abc12345", "mcp-registry");
-    let bytes = path.to_string_lossy().as_bytes().len();
+    let bytes = path.to_string_lossy().len();
     assert!(
         bytes < 104,
         "socket path {} is {} bytes",

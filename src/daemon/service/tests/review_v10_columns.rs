@@ -1,6 +1,6 @@
 //! Reviewer-requested coverage for Slice 3: after each real async review
 //! mutation, the denormalized v10 columns on `tasks` must reflect the new
-//! state. Reads the raw SQLite columns directly (not the serialized
+//! state. Reads the raw `SQLite` columns directly (not the serialized
 //! `state.json` blob) to prove the sync and async write paths keep the
 //! mirror in lock-step with the in-memory state.
 

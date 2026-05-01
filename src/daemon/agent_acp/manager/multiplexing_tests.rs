@@ -398,7 +398,7 @@ fn session_managed_agent_id(
     session_id: &str,
     acp_id: &str,
 ) -> Option<String> {
-    session_managed_agent(manager, session_id, acp_id).map(|agent| agent.agent_id.clone())
+    session_managed_agent(manager, session_id, acp_id).map(|agent| agent.agent_id)
 }
 
 fn session_runtime_session_id(
@@ -406,8 +406,7 @@ fn session_runtime_session_id(
     session_id: &str,
     acp_id: &str,
 ) -> Option<String> {
-    session_managed_agent(manager, session_id, acp_id)
-        .and_then(|agent| agent.agent_session_id.clone())
+    session_managed_agent(manager, session_id, acp_id).and_then(|agent| agent.agent_session_id)
 }
 
 fn session_managed_agent(

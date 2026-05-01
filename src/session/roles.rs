@@ -96,7 +96,7 @@ mod tests {
     fn leader_has_all_permissions() {
         let perms = permissions_for(SessionRole::Leader);
         for action in ALL_ACTIONS {
-            assert!(perms.contains(action), "leader should have {action:?}",);
+            assert!(perms.contains(action), "leader should have {action:?}");
         }
     }
 

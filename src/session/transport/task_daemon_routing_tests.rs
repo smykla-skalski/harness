@@ -215,7 +215,7 @@ fn submit_for_review_args_routes_through_daemon_client() {
             suggested_persona: Some("code-reviewer".into()),
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(
@@ -245,7 +245,7 @@ fn claim_review_args_routes_through_daemon_client() {
             actor: "rev-1".into(),
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(
@@ -267,7 +267,7 @@ fn submit_review_args_routes_through_daemon_client() {
             points: Some(r#"[{"point_id":"p1","text":"fix","state":"open"}]"#.into()),
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(
@@ -298,7 +298,7 @@ fn respond_review_args_routes_through_daemon_client() {
             note: Some("reworking".into()),
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(
@@ -320,7 +320,7 @@ fn arbitrate_args_routes_through_daemon_client() {
             summary: "shipping".into(),
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(
@@ -348,7 +348,7 @@ fn improver_apply_args_routes_through_daemon_client() {
             dry_run: true,
             project_dir: None,
         };
-        let exit = args.execute(&AppContext::default()).expect("execute");
+        let exit = args.execute(&AppContext).expect("execute");
         assert_eq!(exit, 0);
     });
     assert_eq!(captured.path, "/v1/sessions/sess-route-imp/improver/apply");

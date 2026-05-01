@@ -121,7 +121,7 @@ fn daemon_service_round_trip_smoke_covers_public_surface() {
             &state.session_id,
             &SignalCancelRequest {
                 actor: leader_id.clone(),
-                agent_id: worker_id.clone(),
+                agent_id: worker_id,
                 signal_id: signal_id.clone(),
             },
             None,

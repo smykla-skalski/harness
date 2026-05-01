@@ -157,7 +157,7 @@ fn write_manifest_serializes_concurrent_writers_before_loading_next_revision() {
             0
         );
 
-        let second_manifest = base.clone();
+        let second_manifest = base;
         let second = thread::spawn(move || write_manifest(&second_manifest));
         let second_before_release = event_rx.recv_timeout(Duration::from_millis(200)).ok();
 

@@ -57,7 +57,7 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
     );
 }
 
-/// Baseline: diagnostics_report returns running=false when no bridge is present.
+/// Baseline: `diagnostics_report` returns running=false when no bridge is present.
 #[test]
 fn diagnostics_report_returns_default_bridge_when_no_bridge_running() {
     let tmp = tempdir().expect("tempdir");

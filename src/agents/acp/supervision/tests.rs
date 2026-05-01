@@ -141,7 +141,7 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
 #[tokio::test]
 async fn watchdog_loop_returns_none_when_session_is_done() {
     let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_secs(60);
+    config.watchdog_timeout = Duration::from_mins(1);
 
     let child = spawn_sleep_child();
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
@@ -185,7 +185,7 @@ fn record_event_resets_watchdog() {
 #[test]
 fn supervision_config_with_prompt_timeout() {
     let config = SupervisionConfig::default().with_prompt_timeout(Some(1200));
-    assert_eq!(config.prompt_timeout, Duration::from_secs(1200));
+    assert_eq!(config.prompt_timeout, Duration::from_mins(20));
 
     let config2 = SupervisionConfig::default().with_prompt_timeout(None);
     assert_eq!(config2.prompt_timeout, DEFAULT_PROMPT_TIMEOUT);

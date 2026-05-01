@@ -68,7 +68,7 @@ fn synthesize_bookmark(path: &std::path::Path, with_security_scope: bool) -> Vec
             },
             std::ptr::null(),
             std::ptr::null(),
-            &mut err,
+            &raw mut err,
         )
     };
     assert!(!data_ref.is_null(), "CFURLCreateBookmarkData returned null");

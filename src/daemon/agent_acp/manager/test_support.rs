@@ -151,12 +151,13 @@ fn fake_acp_agent_script(
     cancel_log: Option<&Path>,
 ) -> String {
     let exit_setup = exit.map_or_else(String::new, |(delay, code)| {
-        format!("threading.Timer({delay}, lambda: os._exit({code})).start()\n",)
+        format!("threading.Timer({delay}, lambda: os._exit({code})).start()\n")
     });
     let prompt_delay = prompt_delay.unwrap_or(0.0);
-    let cancel_log = cancel_log
-        .map(|path| format!("{:?}", path.display().to_string()))
-        .unwrap_or_else(|| "None".to_string());
+    let cancel_log = cancel_log.map_or_else(
+        || "None".to_string(),
+        |path| format!("{:?}", path.display().to_string()),
+    );
     format!(
         r#"#!/usr/bin/env python3
 import json

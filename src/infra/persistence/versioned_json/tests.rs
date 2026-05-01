@@ -188,7 +188,7 @@ fn update_skips_rewrite_when_state_is_unchanged() {
     let before = fs::metadata(&path).unwrap().modified().unwrap();
     thread::sleep(Duration::from_millis(20));
 
-    let updated = repo.update(|current| Ok(current)).unwrap().unwrap();
+    let updated = repo.update(Ok).unwrap().unwrap();
 
     let after = fs::metadata(&path).unwrap().modified().unwrap();
     assert_eq!(updated, state);

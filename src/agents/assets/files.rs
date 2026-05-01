@@ -191,7 +191,7 @@ mod tests {
         let target = PathBuf::from("../some/target");
 
         let mut output = make_output(&tmp);
-        output.symlinks.insert(link.clone(), target);
+        output.symlinks.insert(link, target);
 
         let drift = expected_output_drift(&output);
         assert_eq!(drift.len(), 1);
@@ -206,7 +206,7 @@ mod tests {
 
         let expected_target = PathBuf::from("../correct/target");
         let mut output = make_output(&tmp);
-        output.symlinks.insert(link.clone(), expected_target);
+        output.symlinks.insert(link, expected_target);
 
         let drift = expected_output_drift(&output);
         assert_eq!(drift.len(), 1);
@@ -224,7 +224,7 @@ mod tests {
         symlink(PathBuf::from("../target"), &link).unwrap();
 
         let output = PlannedOutput {
-            managed_root: managed_root.clone(),
+            managed_root,
             files: BTreeMap::new(),
             symlinks: BTreeMap::from([(link, PathBuf::from("../target"))]),
         };
@@ -245,7 +245,7 @@ mod tests {
         symlink(PathBuf::from("../target"), &link).unwrap();
 
         let output = PlannedOutput {
-            managed_root: managed_root.clone(),
+            managed_root,
             files: BTreeMap::new(),
             symlinks: BTreeMap::new(),
         };

@@ -31,7 +31,7 @@ fn input_worker_replays_timed_sequences_in_order() {
     };
 
     let started = Instant::now();
-    let queued_worker = worker.clone();
+    let queued_worker = worker;
     let sender = std::thread::spawn(move || queued_worker.enqueue_sequence(&sequence));
 
     wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("first"));
@@ -91,7 +91,7 @@ fn input_worker_keeps_immediate_input_ordered_after_in_flight_sequence() {
     let sequence_sender = std::thread::spawn(move || queued_worker.enqueue_sequence(&sequence));
     wait_until(WAIT_TIMEOUT, || transcript_text(&process).contains("first"));
 
-    let queued_worker = worker.clone();
+    let queued_worker = worker;
     let sender = std::thread::spawn(move || {
         queued_worker.send_input(&AgentTuiInput::Text {
             text: "third\n".into(),

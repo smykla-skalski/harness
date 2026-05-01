@@ -62,7 +62,7 @@ fn session_timeline_window_known_revision_reloads_when_visible_rows_change_witho
             &state.session_id,
             &TimelineWindowRequest {
                 known_revision: Some(revision),
-                ..request.clone()
+                ..request
             },
             Some(&db),
         )

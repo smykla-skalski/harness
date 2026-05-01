@@ -49,7 +49,7 @@ fn coordination_codes_in_registry() {
     ];
     for code in codes {
         let meta = issue_code_meta(code);
-        assert!(meta.is_some(), "{code:?} should be in the registry",);
+        assert!(meta.is_some(), "{code:?} should be in the registry");
         assert_eq!(
             meta.unwrap().default_category,
             IssueCategory::AgentCoordination,

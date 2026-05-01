@@ -43,7 +43,7 @@ fn join_session_direct_downgrades_leader_role_to_fallback_when_leader_exists() {
             "leader joins downgrade to fallback",
             Some("swarm-default"),
         );
-        let original_leader_id = started.leader_id.clone();
+        let original_leader_id = started.leader_id;
 
         let joined = join_direct_codex(
             &db,

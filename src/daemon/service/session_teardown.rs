@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn build_layout_uses_external_origin_when_set() {
         let origin = PathBuf::from("/tmp/external/demo/abc12345");
-        let state = state_with_external_origin(origin.clone());
+        let state = state_with_external_origin(origin);
         let layout = build_layout(&state);
         assert_eq!(layout.sessions_root, PathBuf::from("/tmp/external"));
         assert_eq!(layout.project_name, "demo");

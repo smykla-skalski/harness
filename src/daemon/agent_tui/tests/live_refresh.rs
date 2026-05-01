@@ -24,7 +24,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
             project_id: "project-tui-live-refresh".into(),
             name: "project".into(),
             project_dir: Some(project_dir.clone()),
-            repository_root: Some(project_dir.clone()),
+            repository_root: Some(project_dir),
             checkout_id: "checkout-tui-live-refresh".into(),
             checkout_name: "Directory".into(),
             context_root,
@@ -82,13 +82,11 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
                     Ok(event) if event.event == "agent_tui_updated" => {
                         if let Ok(event_snapshot) =
                             serde_json::from_value::<AgentTuiSnapshot>(event.payload)
+                            && event_snapshot.tui_id == snapshot.tui_id
+                            && event_snapshot.screen.text.contains("agent-ready")
                         {
-                            if event_snapshot.tui_id == snapshot.tui_id
-                                && event_snapshot.screen.text.contains("agent-ready")
-                            {
-                                updated_snapshot = Some(event_snapshot);
-                                return true;
-                            }
+                            updated_snapshot = Some(event_snapshot);
+                            return true;
                         }
                     }
                     Ok(_) => {}

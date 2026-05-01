@@ -162,7 +162,7 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     None,
                 )
                 .expect("join leader");
-                let leader_id = active.leader_id.clone().expect("leader id");
+                let leader_id = active.leader_id.expect("leader id");
                 let joined = session_service::join_session(
                     &state.session_id,
                     SessionRole::Worker,
@@ -202,7 +202,7 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     method: "session.observe".into(),
                     params: serde_json::json!({
                         "session_id": "ws-sync-observe",
-                        "actor": leader_id.clone()
+                        "actor": leader_id
                     }),
                     trace_context: None,
                 };

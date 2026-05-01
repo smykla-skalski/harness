@@ -74,7 +74,7 @@ fn observe_session_with_db_persists_tasks_without_touching_state_file() {
 
 #[test]
 fn observe_session_with_actor_creates_tasks() {
-    install_test_observe_runtime(Duration::from_secs(60));
+    install_test_observe_runtime(Duration::from_mins(1));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -141,7 +141,7 @@ fn observe_session_with_actor_creates_tasks() {
 
 #[test]
 fn observe_session_restarts_running_loop_when_actor_changes() {
-    install_test_observe_runtime(Duration::from_secs(60));
+    install_test_observe_runtime(Duration::from_mins(1));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -227,7 +227,7 @@ fn observe_session_restarts_running_loop_when_actor_changes() {
 
 #[test]
 fn observe_session_async_creates_tasks_without_sync_db() {
-    install_test_observe_runtime(Duration::from_secs(60));
+    install_test_observe_runtime(Duration::from_mins(1));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

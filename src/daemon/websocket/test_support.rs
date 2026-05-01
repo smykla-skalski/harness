@@ -169,11 +169,11 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
 
     DaemonHttpState {
         token: "token".into(),
-        sender: sender.clone(),
+        sender,
         manifest: sample_manifest(version, started_at),
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
-        db: db.clone(),
+        db,
         async_db: crate::daemon::http::AsyncDaemonDbSlot::from_inner(async_db),
         db_path,
         codex_controller,

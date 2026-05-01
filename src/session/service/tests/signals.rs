@@ -35,7 +35,7 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
             Some("ls-degraded"),
         )
         .expect("start degraded");
-        let degraded_leader = degraded.leader_id.clone().expect("degraded leader");
+        let degraded_leader = degraded.leader_id.expect("degraded leader");
         let degraded_layout =
             storage::layout_from_project_dir(project, "ls-degraded").expect("degraded layout");
         storage::update_state(&degraded_layout, |state| {

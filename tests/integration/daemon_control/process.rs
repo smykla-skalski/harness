@@ -56,9 +56,11 @@ pub(super) fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> Mana
             match child.try_wait().expect("poll bridge start") {
                 Some(_) => {
                     let output = child.wait_with_output().expect("collect bridge output");
-                    if Instant::now() >= deadline {
-                        panic!("bridge start failed: {}", output_text(&output));
-                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "bridge start failed: {}",
+                        output_text(&output)
+                    );
                     thread::sleep(DAEMON_WAIT_INTERVAL);
                     break;
                 }

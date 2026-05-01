@@ -31,7 +31,7 @@ use super::helpers::*;
 /// Fixture case for drift testing.
 struct DriftFixture {
     name: &'static str,
-    /// Path to test (relative to run_dir unless absolute).
+    /// Path to test (relative to `run_dir` unless absolute).
     path: PathBuf,
     /// Whether the policy should allow or deny.
     expected_allow: bool,
@@ -213,8 +213,7 @@ fn test_policy(
     let is_allow = result.is_allow();
     assert_eq!(
         is_allow, expected_allow,
-        "policy drift: fixture '{fixture_name}' expected allow={expected_allow}, got {:?}",
-        result
+        "policy drift: fixture '{fixture_name}' expected allow={expected_allow}, got {result:?}"
     );
 }
 
@@ -367,9 +366,7 @@ fn policy_denies_all_known_denied_binaries() {
         let result = evaluate_write(&path, &ctx, &denied);
         assert!(
             matches!(result, WriteDecision::DenyBinary { .. }),
-            "denied binary '{}' should be rejected: {:?}",
-            binary,
-            result
+            "denied binary '{binary}' should be rejected: {result:?}"
         );
     }
 }
@@ -393,16 +390,10 @@ fn policy_control_file_hints_are_useful() {
         if let WriteDecision::DenyControlFile { hint } = result {
             assert!(
                 hint.contains(expected_hint_fragment),
-                "control file '{}' hint should mention '{}': got '{}'",
-                file,
-                expected_hint_fragment,
-                hint
+                "control file '{file}' hint should mention '{expected_hint_fragment}': got '{hint}'"
             );
         } else {
-            panic!(
-                "control file '{}' should be denied as control file: {:?}",
-                file, result
-            );
+            panic!("control file '{file}' should be denied as control file: {result:?}");
         }
     }
 }

@@ -192,7 +192,7 @@ fn reassignable_drop_starts_on_free_worker() {
             "drop-reassign-free",
             &task.task_id,
             &protocol::TaskDropTarget::Agent {
-                agent_id: busy_worker.clone(),
+                agent_id: busy_worker,
             },
             TaskQueuePolicy::ReassignWhenFree,
             &leader_id,

@@ -106,11 +106,11 @@ fn queue_advance_picks_persona_matching_worker_over_alphabetical_order() {
     // must override the alphabetical default.
     let aaa = agent("aaa", Some("code-reviewer"));
     let zzz = agent("zzz", Some("test-writer"));
-    let mut state = state_with_agents(vec![aaa.clone(), zzz.clone()]);
+    let mut state = state_with_agents(vec![aaa.clone(), zzz]);
     let task = queued_task("task-a", Some("test-writer"));
     let mut reassignable = task.clone();
-    reassignable.assigned_to = Some(aaa.agent_id.clone());
-    state.tasks.insert(task.task_id.clone(), reassignable);
+    reassignable.assigned_to = Some(aaa.agent_id);
+    state.tasks.insert(task.task_id, reassignable);
 
     let _effects =
         apply_advance_queued_tasks(&mut state, "leader-agent-id", "now").expect("advance");

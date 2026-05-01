@@ -56,8 +56,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                     .agents
                     .keys()
                     .find(|id| id.starts_with("codex-"))
-                    .expect("worker id")
-                    .to_string();
+                    .expect("worker id").clone();
 
                 let created = create_task_async(
                     "daemon-async-submit-review",
