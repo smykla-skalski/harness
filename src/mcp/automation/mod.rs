@@ -3,8 +3,7 @@
 //!
 //! Mouse and keyboard events go through the bundled `harness-monitor-input`
 //! Swift helper when available; `cliclick` is accepted as a fallback for
-//! legacy setups; `osascript` covers text input when neither helper is
-//! present. Screenshots use native macOS capture APIs.
+//! legacy setups. Screenshots use native macOS capture APIs.
 
 mod accessibility;
 mod backend;
@@ -29,4 +28,4 @@ pub use input::{
     MouseButton, click_args, drag_drop_args, move_mouse_args, scroll_args, type_text_args,
 };
 pub use input::{click, drag_drop, move_mouse, scroll, type_text};
-pub use screenshot::{ScreenshotOptions, ScreenshotTarget, screenshot};
+pub use screenshot::{ScreenshotOptions, ScreenshotTarget, screenshot, shareable_harness_window_ids};

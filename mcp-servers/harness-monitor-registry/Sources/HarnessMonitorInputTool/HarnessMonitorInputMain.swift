@@ -17,46 +17,55 @@ import Foundation
 //   list-elements [--bundle-id id] [--window-id id] [--kind kind]
 //   get-element [--bundle-id id] <identifier>
 //   perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>
+//   list-shareable-windows        (prints JSON window ids visible to ScreenCaptureKit)
+//   screenshot [--window-id id] [--display-id id] [--include-cursor]
 //
 // Coordinates are in global screen space, origin at the top-left display.
 // Exit codes:
 //   0  success
 //   1  runtime failure
-//   2  accessibility permission denied
+//   2  permission denied (Accessibility or Screen Recording)
 //   4  supported element found, but no matching accessibility action exists
 //   64 usage error
 
-let args = Array(CommandLine.arguments.dropFirst())
-guard let subcommand = args.first else {
-  printUsage()
-  exit(64)
-}
+@main
+enum HarnessMonitorInput {
+  static func main() async {
+    let args = Array(CommandLine.arguments.dropFirst())
+    guard let subcommand = args.first else {
+      printUsage()
+      exit(64)
+    }
 
-do {
-  switch subcommand {
-  case "move": try handleMove(Array(args.dropFirst()))
-  case "click": try handleClick(Array(args.dropFirst()))
-  case "scroll": try handleScroll(Array(args.dropFirst()))
-  case "drag": try handleDrag(Array(args.dropFirst()))
-  case "type": try handleType(Array(args.dropFirst()))
-  case "position": try handlePosition()
-  case "check": try handleCheck()
-  case "list-elements": try handleListElements(Array(args.dropFirst()))
-  case "get-element": try handleGetElement(Array(args.dropFirst()))
-  case "perform-action": try handlePerformAction(Array(args.dropFirst()))
-  case "-h", "--help", "help":
-    printUsage()
-    exit(0)
-  default:
-    printUsage()
-    exit(64)
+    do {
+      switch subcommand {
+      case "move": try handleMove(Array(args.dropFirst()))
+      case "click": try handleClick(Array(args.dropFirst()))
+      case "scroll": try handleScroll(Array(args.dropFirst()))
+      case "drag": try handleDrag(Array(args.dropFirst()))
+      case "type": try handleType(Array(args.dropFirst()))
+      case "position": try handlePosition()
+      case "check": try handleCheck()
+      case "list-elements": try handleListElements(Array(args.dropFirst()))
+      case "get-element": try handleGetElement(Array(args.dropFirst()))
+      case "perform-action": try handlePerformAction(Array(args.dropFirst()))
+      case "list-shareable-windows": try await handleListShareableWindows(Array(args.dropFirst()))
+      case "screenshot": try await handleScreenshot(Array(args.dropFirst()))
+      case "-h", "--help", "help":
+        printUsage()
+        exit(0)
+      default:
+        printUsage()
+        exit(64)
+      }
+    } catch let error as InputToolError {
+      FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+      exit(error.exitCode)
+    } catch {
+      FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
+      exit(1)
+    }
   }
-} catch let error as InputToolError {
-  FileHandle.standardError.write(Data("error: \(error)\n".utf8))
-  exit(error.exitCode)
-} catch {
-  FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
-  exit(1)
 }
 
 enum InputToolError: Error, CustomStringConvertible {
@@ -64,11 +73,13 @@ enum InputToolError: Error, CustomStringConvertible {
   case invalidNumber(String)
   case invalidButton(String)
   case accessibilityDenied
+  case screenCaptureDenied
   case appNotRunning(String)
   case notFound(String)
   case actionUnavailable(String)
   case eventCreationFailed(String)
   case queryFailed(String)
+  case screenshotFailed(String)
 
   var description: String {
     switch self {
@@ -77,6 +88,8 @@ enum InputToolError: Error, CustomStringConvertible {
     case .invalidButton(let raw): return "unknown button: \(raw)"
     case .accessibilityDenied:
       return "Accessibility permission not granted. Open System Settings -> Privacy & Security -> Accessibility and enable the app running this binary (terminal, Claude Code, etc)."
+    case .screenCaptureDenied:
+      return "Screen Recording permission not granted. Open System Settings -> Privacy & Security -> Screen & System Audio Recording and enable the app running this binary (terminal, Claude Code, etc)."
     case .appNotRunning(let bundleIdentifier):
       return "Harness Monitor is not running for bundle id(s): \(bundleIdentifier)"
     case .notFound(let identifier):
@@ -85,6 +98,7 @@ enum InputToolError: Error, CustomStringConvertible {
       return "no supported accessibility action for identifier: \(identifier)"
     case .eventCreationFailed(let what): return "failed to create \(what) event"
     case .queryFailed(let detail): return "query failed: \(detail)"
+    case .screenshotFailed(let detail): return "screenshot failed: \(detail)"
     }
   }
 
@@ -92,10 +106,10 @@ enum InputToolError: Error, CustomStringConvertible {
     switch self {
     case .usage: return 64
     case .invalidNumber, .invalidButton: return 64
-    case .accessibilityDenied: return 2
+    case .accessibilityDenied, .screenCaptureDenied: return 2
     case .notFound: return 3
     case .actionUnavailable: return 4
-    case .appNotRunning, .eventCreationFailed, .queryFailed: return 1
+    case .appNotRunning, .eventCreationFailed, .queryFailed, .screenshotFailed: return 1
     }
   }
 }
@@ -115,6 +129,8 @@ func printUsage() {
       list-elements [--bundle-id id] [--window-id id] [--kind kind]
       get-element [--bundle-id id] <identifier>
       perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>
+      list-shareable-windows
+      screenshot [--window-id id] [--display-id id] [--include-cursor]
 
     All coordinates are global screen coordinates, origin at top-left.
     """

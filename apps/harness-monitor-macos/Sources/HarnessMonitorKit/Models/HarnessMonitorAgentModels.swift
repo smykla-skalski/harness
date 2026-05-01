@@ -186,6 +186,81 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public let persona: AgentPersona?
 
   public var id: String { agentId }
+
+  public init(
+    agentId: String,
+    name: String,
+    runtime: String,
+    role: SessionRole,
+    capabilities: [String],
+    joinedAt: String,
+    updatedAt: String,
+    status: AgentStatus,
+    agentSessionId: String?,
+    lastActivityAt: String?,
+    currentTaskId: String?,
+    runtimeCapabilities: RuntimeCapabilities,
+    persona: AgentPersona?
+  ) {
+    self.agentId = agentId
+    self.name = name
+    self.runtime = runtime
+    self.role = role
+    self.capabilities = capabilities
+    self.joinedAt = joinedAt
+    self.updatedAt = updatedAt
+    self.status = status
+    self.agentSessionId = agentSessionId
+    self.lastActivityAt = lastActivityAt
+    self.currentTaskId = currentTaskId
+    self.runtimeCapabilities = runtimeCapabilities
+    self.persona = persona
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case agentId
+    case name
+    case runtime
+    case role
+    case capabilities
+    case joinedAt
+    case updatedAt
+    case status
+    case agentSessionId
+    case lastActivityAt
+    case currentTaskId
+    case runtimeCapabilities
+    case persona
+  }
+
+  private struct TaggedRuntime: Codable, Equatable, Sendable {
+    let kind: String
+    let id: String
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    agentId = try container.decode(String.self, forKey: .agentId)
+    name = try container.decode(String.self, forKey: .name)
+    if let runtime = try? container.decode(String.self, forKey: .runtime) {
+      self.runtime = runtime
+    } else {
+      self.runtime = try container.decode(TaggedRuntime.self, forKey: .runtime).id
+    }
+    role = try container.decode(SessionRole.self, forKey: .role)
+    capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
+    joinedAt = try container.decode(String.self, forKey: .joinedAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    status = try container.decode(AgentStatus.self, forKey: .status)
+    agentSessionId = try container.decodeIfPresent(String.self, forKey: .agentSessionId)
+    lastActivityAt = try container.decodeIfPresent(String.self, forKey: .lastActivityAt)
+    currentTaskId = try container.decodeIfPresent(String.self, forKey: .currentTaskId)
+    runtimeCapabilities = try container.decode(
+      RuntimeCapabilities.self,
+      forKey: .runtimeCapabilities
+    )
+    persona = try container.decodeIfPresent(AgentPersona.self, forKey: .persona)
+  }
 }
 
 public struct AgentPendingUserPromptOption: Codable, Equatable, Sendable {

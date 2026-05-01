@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "HarnessMonitorPerf",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     products: [
         .executable(name: "harness-monitor-perf", targets: ["harness-monitor-perf"]),
         .library(name: "HarnessMonitorPerfCore", targets: ["HarnessMonitorPerfCore"]),

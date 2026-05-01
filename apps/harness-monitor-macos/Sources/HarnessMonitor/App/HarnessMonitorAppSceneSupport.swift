@@ -10,6 +10,7 @@ struct HarnessMonitorWindowRootView: View {
   let keyWindowObserver: KeyWindowObserver
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
+  let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var preferencesSelectedSection: PreferencesSection
   let perfScenario: HarnessMonitorPerfScenario?
@@ -67,6 +68,7 @@ struct HarnessMonitorWindowRootView: View {
           routingState: windowCommandRouting
         )
       )
+      .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
       .modifier(HarnessMonitorUITestAnimationModifier())
       .acpPermissionAttentionScene(
         store: store,
@@ -220,6 +222,7 @@ struct HarnessMonitorSettingsRootView: View {
   let notifications: HarnessMonitorUserNotificationController
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
+  let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: PreferencesSection
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
@@ -233,6 +236,7 @@ struct HarnessMonitorSettingsRootView: View {
     notifications: HarnessMonitorUserNotificationController,
     acpAttentionState: AcpPermissionAttentionState,
     windowCommandRouting: WindowCommandRoutingState,
+    mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<PreferencesSection>
   ) {
@@ -240,6 +244,7 @@ struct HarnessMonitorSettingsRootView: View {
     self.notifications = notifications
     self.acpAttentionState = acpAttentionState
     self.windowCommandRouting = windowCommandRouting
+    self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
     _themeMode = themeMode
     _selectedSection = selectedSection
   }
@@ -280,6 +285,7 @@ struct HarnessMonitorSettingsRootView: View {
         routingState: windowCommandRouting
       )
     )
+    .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
     .modifier(PinchToZoomTextSizeModifier())
     .modifier(HarnessMonitorUITestAnimationModifier())
   }

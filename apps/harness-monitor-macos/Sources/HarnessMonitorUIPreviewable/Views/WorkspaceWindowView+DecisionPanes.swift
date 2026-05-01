@@ -83,7 +83,7 @@ extension WorkspaceWindowView {
         )
 
         Button {
-          isDecisionInspectorVisible.toggle()
+          toggleDecisionInspector()
         } label: {
           Label(
             isDecisionInspectorVisible ? "Hide Inspector" : "Show Inspector",
@@ -97,7 +97,7 @@ extension WorkspaceWindowView {
         .harnessMCPButton(
           HarnessMonitorAccessibility.decisionInspectorToggle,
           label: isDecisionInspectorVisible ? "Hide decision inspector" : "Show decision inspector",
-          pressAction: { isDecisionInspectorVisible.toggle() }
+          pressAction: toggleDecisionInspector
         )
       }
     }

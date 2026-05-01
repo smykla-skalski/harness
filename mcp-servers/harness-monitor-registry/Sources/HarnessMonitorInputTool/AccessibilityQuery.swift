@@ -3,7 +3,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-private enum AccessibilityQueryDefaults {
+enum AccessibilityQueryDefaults {
   static let preferredBundleIdentifiers = [
     "io.harnessmonitor.app",
     "io.harnessmonitor.app.ui-testing"

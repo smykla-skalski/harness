@@ -25,6 +25,21 @@ pub enum AutomationError {
     )]
     DragBackendMissing,
     #[error(
+        "No text-input backend available. Build the bundled helper with `swift build -c release \
+         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input`, \
+         set `HARNESS_MONITOR_INPUT_BIN` to a built `harness-monitor-input` binary, \
+         or install cliclick (`brew install cliclick`). Either way, grant Accessibility permission \
+         to the process running this MCP server."
+    )]
+    KeyboardBackendMissing,
+    #[error(
+        "No screenshot backend available. Build the bundled helper with `swift build -c release \
+         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         or set `HARNESS_MONITOR_INPUT_BIN` to a built `harness-monitor-input` binary, \
+         and grant Screen Recording permission to the process running this MCP server."
+    )]
+    ScreenshotBackendMissing,
+    #[error(
         "Accessibility permission not granted. Open System Settings -> Privacy & Security -> \
          Accessibility and enable the app running this MCP server."
     )]
@@ -33,12 +48,15 @@ pub enum AutomationError {
     UnsupportedButton,
     #[error("input failed: {detail}")]
     InputFailed { detail: String },
+    #[error(
+        "Screen Recording permission not granted. Open System Settings -> Privacy & Security -> \
+         Screen & System Audio Recording and enable the app running this MCP server."
+    )]
+    ScreenCaptureDenied,
+    #[error("native screenshot capture timed out after {milliseconds}ms")]
+    ScreenshotCaptureTimedOut { milliseconds: u128 },
     #[error("native screenshot capture failed: {detail}")]
     ScreenshotCaptureFailed { detail: String },
-    #[error("native screenshot cursor capture is not implemented")]
-    CursorCaptureUnsupported,
-    #[error("screenshot io: {detail}")]
-    ScreenshotIo { detail: String },
 }
 
 impl AutomationError {

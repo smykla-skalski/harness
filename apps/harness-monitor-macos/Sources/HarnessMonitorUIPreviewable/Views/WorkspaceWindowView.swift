@@ -20,6 +20,7 @@ private enum WorkspaceChromeMetrics {
   static let sidebarMinWidth: CGFloat = 240
   static let sidebarIdealWidth: CGFloat = 280
   static let sidebarMaxWidth: CGFloat = 400
+  static let decisionInspectorWidth: CGFloat = 260
 }
 
 public struct WorkspaceWindowView: View {
@@ -46,6 +47,8 @@ public struct WorkspaceWindowView: View {
   let navigationBridge: WorkspaceWindowNavigationBridge
   @Environment(\.openWindow)
   var openWindow
+  @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
+  @State private var hasCompletedInitialWorkspacePreparation = false
   @State private var stateViewModel: ViewModel
   @State private var decisionsRuntime = WorkspaceDecisionRuntime()
   @State private var decisionFilters = Self.initialDecisionFilters
@@ -62,6 +65,7 @@ public struct WorkspaceWindowView: View {
   @State private var showDismissAllVisibleConfirmation = false
   @State private var reopenBatch: ReopenBatchState?
   @State private var decisionInspectorVisible = false
+  @State private var decisionInspectorPreferredVisibility = false
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
   @Environment(\.fontScale)
@@ -126,13 +130,6 @@ public struct WorkspaceWindowView: View {
 
   var focusedFieldBinding: FocusState<Field?>.Binding { $stateFocusedField }
 
-  var decisionInspectorBinding: Binding<Bool> {
-    Binding(
-      get: { viewModel.selection.isDecisionRoute && decisionInspectorVisible },
-      set: { decisionInspectorVisible = $0 }
-    )
-  }
-
   var decisionItems: [Decision] {
     decisionsRuntime.decisions
   }
@@ -183,8 +180,24 @@ public struct WorkspaceWindowView: View {
   }
 
   var isDecisionInspectorVisible: Bool {
-    get { decisionInspectorVisible }
-    nonmutating set { decisionInspectorVisible = newValue }
+    decisionInspectorVisible
+  }
+
+  func toggleDecisionInspector() {
+    setDecisionInspectorVisible(!decisionInspectorVisible)
+  }
+
+  func restoreDecisionInspectorForDecisionRoute() {
+    decisionInspectorVisible = decisionInspectorPreferredVisibility
+  }
+
+  func hideDecisionInspectorForNonDecisionRoute() {
+    decisionInspectorVisible = false
+  }
+
+  private func setDecisionInspectorVisible(_ isVisible: Bool) {
+    decisionInspectorVisible = isVisible
+    decisionInspectorPreferredVisibility = isVisible
   }
 
   public var body: some View {
@@ -225,6 +238,9 @@ public struct WorkspaceWindowView: View {
         consumePendingWorkspaceSelection()
       }
       .onChange(of: workspaceRefreshState) { _, _ in
+        guard hasCompletedInitialWorkspacePreparation else {
+          return
+        }
         refreshWorkspaceAfterDataChange()
       }
       .onChange(of: store.supervisorDecisionRefreshTick) { _, _ in
@@ -240,6 +256,9 @@ public struct WorkspaceWindowView: View {
         focusPrimaryDecisionAction()
       }
       .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
+        guard hasCompletedInitialWorkspacePreparation else {
+          return
+        }
         handleSelectedTuiChange(selectedTuiID, viewModel: viewModel)
       }
       .onChange(of: decisionFilters) { _, _ in
@@ -249,6 +268,7 @@ public struct WorkspaceWindowView: View {
         handleViewSelectionChange(from: oldValue, to: newValue, viewModel: viewModel)
       }
       .onDisappear {
+        hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
       }
       .acpPermissionPresentation(store: store)
@@ -299,6 +319,7 @@ public struct WorkspaceWindowView: View {
         store: store,
         selection: selection,
         decisionFilters: $decisionFilters,
+        isStartupFocusParticipationEnabled: isStartupFocusParticipationEnabled,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,
         currentSessionTitle: store.selectedSession?.session.title,
@@ -319,20 +340,36 @@ public struct WorkspaceWindowView: View {
       )
       .toolbarBaselineFrame(.sidebar)
     } detail: {
+      detailSplitViewContent(decisionScope: decisionScope)
+    }
+  }
+
+  @ViewBuilder
+  private func detailSplitViewContent(
+    decisionScope: DecisionWorkspaceScope
+  ) -> some View {
+    HStack(spacing: 0) {
       detailColumnContent(decisionScope: decisionScope)
-        .inspector(isPresented: decisionInspectorBinding) {
-          if viewModel.selection.isDecisionRoute {
-            DecisionInspector(
-              decision: decisionScope.selectedDecision,
-              liveTick: decisionLiveTick
-            )
-            .inspectorColumnWidth(min: 200, ideal: 220, max: 280)
-          }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      if viewModel.selection.isDecisionRoute, isDecisionInspectorVisible {
+        Divider()
+        DecisionInspector(
+          decision: decisionScope.selectedDecision,
+          liveTick: decisionLiveTick
+        )
+        .frame(
+          width: WorkspaceChromeMetrics.decisionInspectorWidth,
+          alignment: .topLeading
+        )
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.windowBackground)
+      }
     }
   }
 
   private func prepareWorkspace(viewModel: ViewModel) async {
+    hasCompletedInitialWorkspacePreparation = false
     viewModel.windowNavigation.setHandlers(
       back: { navigateHistoryBack() },
       forward: { navigateHistoryForward() }
@@ -344,9 +381,13 @@ public struct WorkspaceWindowView: View {
     applyManagedSelectionFreshness(refreshOutcome)
     refreshWorkspaceAfterDataChange(afterRefresh: refreshOutcome.didRefreshManagedSelections)
     await reloadDecisions()
-    syncSupervisorDecisionRoute(recordHistory: false)
-    consumePendingWorkspaceSelection()
+    resolveInitialWorkspaceSelection()
     _ = await catalogsLoaded
+    handleSelectedTuiChange(store.selectedAgentTui?.tuiId, viewModel: viewModel)
+    await Task.yield()
+    guard !Task.isCancelled else {
+      return
+    }
   }
 
   private func refreshWorkspaceAfterDataChange(afterRefresh: Bool = false) {
@@ -377,6 +418,13 @@ public struct WorkspaceWindowView: View {
       }
       enforceExpectedSize()
     }
+  }
+
+  private func enableStartupFocusParticipation() {
+    guard !isStartupFocusParticipationEnabled else {
+      return
+    }
+    isStartupFocusParticipationEnabled = true
   }
 
 }

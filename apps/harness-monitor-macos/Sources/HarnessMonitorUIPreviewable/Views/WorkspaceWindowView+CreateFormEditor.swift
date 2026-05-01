@@ -11,42 +11,27 @@ extension WorkspaceWindowCreatePane {
     accessibilityLabel: String? = nil,
     accessibilityHint: String? = nil
   ) -> some View {
-    ZStack(alignment: .topLeading) {
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .fill(Color(nsColor: .controlBackgroundColor))
+    // Keep the create-pane form as a single scroll surface. Nested TextEditor
+    // scroll views made wheel and trackpad scrolling feel jumpy in the outer pane.
+    TextField(placeholder, text: text, axis: .vertical)
+      .scaledFont(.body)
+      .harnessNativeFormControl()
+      .lineLimit(multilineEditorLineLimit(for: minHeight))
+      .frame(minHeight: minHeight, alignment: .topLeading)
+      .focused(focusedFieldBinding, equals: field)
+      .accessibilityFrameMarker(accessibilityIdentifier)
+      .accessibilityLabel(accessibilityLabel ?? placeholder)
+      .accessibilityHint(accessibilityHint ?? "")
+      .harnessMCPTextField(
+        accessibilityIdentifier,
+        label: accessibilityLabel ?? placeholder,
+        value: text.wrappedValue,
+        hint: accessibilityHint ?? ""
+      )
+  }
 
-      if text.wrappedValue.isEmpty {
-        Text(placeholder)
-          .scaledFont(.body)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-          .padding(.vertical, HarnessMonitorTheme.spacingSM)
-          .allowsHitTesting(false)
-      }
-
-      TextEditor(text: text)
-        .scaledFont(.body)
-        .scrollContentBackground(.hidden)
-        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-        .padding(.vertical, HarnessMonitorTheme.spacingXS)
-        .focused(focusedFieldBinding, equals: field)
-        .accessibilityLabel(accessibilityLabel ?? placeholder)
-        .accessibilityHint(accessibilityHint ?? "")
-    }
-    .frame(minHeight: minHeight)
-    .overlay {
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-    }
-    .accessibilityFrameMarker(accessibilityIdentifier)
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel(accessibilityLabel ?? placeholder)
-    .accessibilityHint(accessibilityHint ?? "")
-    .harnessMCPTextField(
-      accessibilityIdentifier,
-      label: accessibilityLabel ?? placeholder,
-      value: text.wrappedValue,
-      hint: accessibilityHint ?? ""
-    )
+  private func multilineEditorLineLimit(for minHeight: CGFloat) -> ClosedRange<Int> {
+    let minimumVisibleLines = max(3, Int((minHeight / 22).rounded(.up)))
+    return minimumVisibleLines...(minimumVisibleLines * 2)
   }
 }

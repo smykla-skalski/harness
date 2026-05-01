@@ -32,17 +32,6 @@ final class WorkspaceDecisionInspectorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(detail, timeout: Self.actionTimeout))
 
     let inspector = element(in: app, identifier: Accessibility.decisionInspector)
-    XCTAssertTrue(
-      waitForElement(inspector, timeout: Self.actionTimeout),
-      "Inspector should be visible by default on first launch (chunk 8 default)"
-    )
-
-    let metadata = element(in: app, identifier: Accessibility.decisionInspectorMetadata)
-    XCTAssertTrue(
-      waitForElement(metadata, timeout: Self.actionTimeout),
-      "Inspector metadata grid should be present when a decision is selected"
-    )
-
     let bulkMenu = element(in: app, identifier: Accessibility.decisionBulkActions)
     XCTAssertTrue(
       waitForElement(bulkMenu, timeout: Self.actionTimeout),
@@ -51,6 +40,10 @@ final class WorkspaceDecisionInspectorUITests: HarnessMonitorUITestCase {
 
     let toggle = button(in: app, identifier: Accessibility.decisionInspectorToggle)
     XCTAssertTrue(waitForElement(toggle, timeout: Self.actionTimeout))
+    XCTAssertFalse(
+      inspector.exists,
+      "Inspector should stay hidden on first manual open until the user asks for it"
+    )
 
     tapButton(in: app, identifier: Accessibility.decisionBulkActions)
     XCTAssertTrue(waitForElement(app.menuItems["Dismiss selected"], timeout: Self.actionTimeout))
@@ -59,14 +52,19 @@ final class WorkspaceDecisionInspectorUITests: HarnessMonitorUITestCase {
 
     app.typeKey("i", modifierFlags: [.command, .option])
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { !inspector.exists },
-      "Inspector should hide after ⌘⌥I"
+      waitUntil(timeout: Self.actionTimeout) { inspector.exists },
+      "Inspector should open after ⌘⌥I"
+    )
+    let metadata = element(in: app, identifier: Accessibility.decisionInspectorMetadata)
+    XCTAssertTrue(
+      waitForElement(metadata, timeout: Self.actionTimeout),
+      "Inspector metadata grid should appear once the inspector is opened"
     )
 
     app.typeKey("i", modifierFlags: [.command, .option])
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { inspector.exists },
-      "Inspector should restore after a second ⌘⌥I"
+      waitUntil(timeout: Self.actionTimeout) { !inspector.exists },
+      "Inspector should hide after a second ⌘⌥I"
     )
   }
 
