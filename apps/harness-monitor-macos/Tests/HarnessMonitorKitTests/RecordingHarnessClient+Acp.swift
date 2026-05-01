@@ -77,75 +77,38 @@ extension RecordingHarnessClient {
       displayName: request.name ?? defaultDisplayName,
       pendingBatches: []
     )
+    recordStartedAcpAgent(
+      sessionID: sessionID,
+      request: request,
+      displayName: request.name ?? defaultDisplayName,
+      snapshot: snapshot
+    )
+    return .acp(snapshot)
+  }
+
+  private func recordStartedAcpAgent(
+    sessionID: String,
+    request: AcpAgentStartRequest,
+    displayName: String,
+    snapshot: AcpAgentSnapshot
+  ) {
     lock.withLock {
-      let assignedRole =
-        if request.role == .leader,
-          let fallbackRole = request.fallbackRole,
-          let existingSession =
-            sessionDetailsByID[sessionID]
-            ?? (detailStorage.session.sessionId == sessionID ? detailStorage : nil),
-          existingSession.session.leaderId != nil,
-          existingSession.session.leaderId != request.agent
-        {
-          fallbackRole
-        } else {
-          request.role
-        }
+      let assignedRole = resolvedRoleForStartedAgent(
+        sessionID: sessionID,
+        request: request
+      )
       let currentDetail = sessionDetailsByID[sessionID] ?? detailStorage
-      let runtimeCapabilities = RuntimeCapabilities(
-        runtime: request.agent,
-        supportsNativeTranscript: true,
-        supportsSignalDelivery: true,
-        supportsContextInjection: true,
-        typicalSignalLatencySeconds: 5,
-        hookPoints: []
+      let registration = startedAgentRegistration(
+        request: request,
+        displayName: displayName,
+        assignedRole: assignedRole,
+        snapshot: snapshot
       )
-      let registration = AgentRegistration(
-        agentId: request.agent,
-        name: request.name ?? defaultDisplayName,
-        runtime: request.agent,
-        role: assignedRole,
-        capabilities: request.capabilities,
-        joinedAt: snapshot.createdAt,
-        updatedAt: snapshot.updatedAt,
-        status: snapshot.status,
-        agentSessionId: nil,
-        lastActivityAt: snapshot.updatedAt,
-        currentTaskId: nil,
-        runtimeCapabilities: runtimeCapabilities,
-        persona: nil
-      )
-      let updatedSummary = SessionSummary(
-        projectId: currentDetail.session.projectId,
-        projectName: currentDetail.session.projectName,
-        projectDir: currentDetail.session.projectDir,
-        contextRoot: currentDetail.session.contextRoot,
-        sessionId: currentDetail.session.sessionId,
-        worktreePath: currentDetail.session.worktreePath,
-        sharedPath: currentDetail.session.sharedPath,
-        originPath: currentDetail.session.originPath,
-        branchRef: currentDetail.session.branchRef,
-        title: currentDetail.session.title,
-        context: currentDetail.session.context,
-        status: currentDetail.session.status,
-        createdAt: currentDetail.session.createdAt,
-        updatedAt: snapshot.updatedAt,
-        lastActivityAt: snapshot.updatedAt,
-        leaderId: assignedRole == .leader ? request.agent : currentDetail.session.leaderId,
-        observeId: currentDetail.session.observeId,
-        pendingLeaderTransfer: currentDetail.session.pendingLeaderTransfer,
-        metrics: SessionMetrics(
-          agentCount: currentDetail.agents.contains(where: { $0.agentId == request.agent })
-            ? currentDetail.session.metrics.agentCount
-            : currentDetail.session.metrics.agentCount + 1,
-          activeAgentCount: currentDetail.agents.contains(where: { $0.agentId == request.agent })
-            ? currentDetail.session.metrics.activeAgentCount
-            : currentDetail.session.metrics.activeAgentCount + 1,
-          openTaskCount: currentDetail.session.metrics.openTaskCount,
-          inProgressTaskCount: currentDetail.session.metrics.inProgressTaskCount,
-          blockedTaskCount: currentDetail.session.metrics.blockedTaskCount,
-          completedTaskCount: currentDetail.session.metrics.completedTaskCount
-        )
+      let updatedSummary = updatedSummaryForStartedAgent(
+        request: request,
+        assignedRole: assignedRole,
+        snapshot: snapshot,
+        currentDetail: currentDetail
       )
       let updatedDetail = SessionDetail(
         session: updatedSummary,
@@ -168,7 +131,95 @@ extension RecordingHarnessClient {
       resolvedAcpSnapshotsByAgentID[snapshot.acpId] = snapshot
       resolvedAcpSnapshotsByAgentID[snapshot.agentId] = snapshot
     }
-    return .acp(snapshot)
+  }
+
+  private func resolvedRoleForStartedAgent(
+    sessionID: String,
+    request: AcpAgentStartRequest
+  ) -> SessionRole {
+    if request.role == .leader,
+      let fallbackRole = request.fallbackRole,
+      let existingSession =
+        sessionDetailsByID[sessionID]
+        ?? (detailStorage.session.sessionId == sessionID ? detailStorage : nil),
+      existingSession.session.leaderId != nil,
+      existingSession.session.leaderId != request.agent
+    {
+      return fallbackRole
+    }
+    return request.role
+  }
+
+  private func startedAgentRegistration(
+    request: AcpAgentStartRequest,
+    displayName: String,
+    assignedRole: SessionRole,
+    snapshot: AcpAgentSnapshot
+  ) -> AgentRegistration {
+    let runtimeCapabilities = RuntimeCapabilities(
+      runtime: request.agent,
+      supportsNativeTranscript: true,
+      supportsSignalDelivery: true,
+      supportsContextInjection: true,
+      typicalSignalLatencySeconds: 5,
+      hookPoints: []
+    )
+    return AgentRegistration(
+      agentId: request.agent,
+      name: displayName,
+      runtime: request.agent,
+      role: assignedRole,
+      capabilities: request.capabilities,
+      joinedAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+      status: snapshot.status,
+      agentSessionId: nil,
+      lastActivityAt: snapshot.updatedAt,
+      currentTaskId: nil,
+      runtimeCapabilities: runtimeCapabilities,
+      persona: nil
+    )
+  }
+
+  private func updatedSummaryForStartedAgent(
+    request: AcpAgentStartRequest,
+    assignedRole: SessionRole,
+    snapshot: AcpAgentSnapshot,
+    currentDetail: SessionDetail
+  ) -> SessionSummary {
+    let alreadyPresent = currentDetail.agents.contains { $0.agentId == request.agent }
+    return SessionSummary(
+      projectId: currentDetail.session.projectId,
+      projectName: currentDetail.session.projectName,
+      projectDir: currentDetail.session.projectDir,
+      contextRoot: currentDetail.session.contextRoot,
+      sessionId: currentDetail.session.sessionId,
+      worktreePath: currentDetail.session.worktreePath,
+      sharedPath: currentDetail.session.sharedPath,
+      originPath: currentDetail.session.originPath,
+      branchRef: currentDetail.session.branchRef,
+      title: currentDetail.session.title,
+      context: currentDetail.session.context,
+      status: currentDetail.session.status,
+      createdAt: currentDetail.session.createdAt,
+      updatedAt: snapshot.updatedAt,
+      lastActivityAt: snapshot.updatedAt,
+      leaderId: assignedRole == .leader ? request.agent : currentDetail.session.leaderId,
+      observeId: currentDetail.session.observeId,
+      pendingLeaderTransfer: currentDetail.session.pendingLeaderTransfer,
+      metrics: SessionMetrics(
+        agentCount: alreadyPresent
+          ? currentDetail.session.metrics.agentCount
+          : currentDetail.session.metrics.agentCount + 1,
+        activeAgentCount: alreadyPresent
+          ? currentDetail.session.metrics.activeAgentCount
+          : currentDetail.session.metrics.activeAgentCount + 1,
+        openTaskCount: currentDetail.session.metrics.openTaskCount,
+        inProgressTaskCount: currentDetail.session.metrics.inProgressTaskCount,
+        blockedTaskCount: currentDetail.session.metrics.blockedTaskCount,
+        completedTaskCount: currentDetail.session.metrics.completedTaskCount
+      )
+    )
   }
 
   private func configuredAcpSnapshots(for sessionID: String?) -> [AcpAgentSnapshot] {
