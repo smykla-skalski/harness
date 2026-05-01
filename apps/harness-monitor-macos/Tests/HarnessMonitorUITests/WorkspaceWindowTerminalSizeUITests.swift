@@ -3,13 +3,13 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class AgentsWindowTerminalSizeUITests:
+final class WorkspaceWindowTerminalSizeUITests:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   func testTerminalSizeRemainsStableAfterStartAndSelection() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Claude", prompt: "viewport size test")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
@@ -53,9 +53,9 @@ final class AgentsWindowTerminalSizeUITests:
     )
   }
 
-  func testTerminalSizeRemainsStableAfterClosingAndReopeningAgentsWindow() throws {
+  func testTerminalSizeRemainsStableAfterClosingAndReopeningWorkspaceWindow() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Claude", prompt: "reopen viewport size test")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(waitForElement(state, timeout: Self.actionTimeout))
@@ -64,8 +64,8 @@ final class AgentsWindowTerminalSizeUITests:
       return
     }
 
-    closeAgentsWindow(in: app)
-    reopenAgentsWindow(in: app)
+    closeWorkspaceWindow(in: app)
+    reopenWorkspaceWindow(in: app)
 
     let sizeStable = waitUntil(timeout: Self.actionTimeout) {
       guard let currentSize = self.agentTuiSize(from: state.label) else {
@@ -79,7 +79,7 @@ final class AgentsWindowTerminalSizeUITests:
     XCTAssertTrue(
       sizeStable,
       """
-      Terminal size should remain stable after closing and reopening the Agents window.
+      Terminal size should remain stable after closing and reopening the Workspace window.
       Initial: \(initialSize.rows)x\(initialSize.cols)
       Final state: \(finalState)
       """

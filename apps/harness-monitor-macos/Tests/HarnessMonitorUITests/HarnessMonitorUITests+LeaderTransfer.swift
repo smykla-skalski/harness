@@ -12,7 +12,7 @@ extension HarnessMonitorUITests {
     tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
-    let detailCard = element(in: app, identifier: Accessibility.agentsTaskCard)
+    let detailCard = element(in: app, identifier: Accessibility.workspaceTaskCard)
 
     XCTAssertTrue(detailCard.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(app.staticTexts["Checkpoint"].exists)

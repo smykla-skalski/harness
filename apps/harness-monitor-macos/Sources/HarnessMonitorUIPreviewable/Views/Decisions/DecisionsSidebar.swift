@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Decisions window sidebar. Search + severity chip filters at the top, ScrollView + LazyVStack
+/// workspace window sidebar. Search + severity chip filters at the top, ScrollView + LazyVStack
 /// body (never List per memory `feedback_sidebar_no_list.md`), one section per session, severity
 /// chip next to each row. Selection writes back through a `Binding<String?>` so the detail
 /// column can render the chosen decision by id.

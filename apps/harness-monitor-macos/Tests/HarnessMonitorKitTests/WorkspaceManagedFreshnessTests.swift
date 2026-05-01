@@ -3,9 +3,9 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Agents window managed freshness gate")
+@Suite("Workspace window managed freshness gate")
 @MainActor
-struct AgentsWindowManagedFreshnessTests {
+struct WorkspaceManagedFreshnessTests {
   @Test("Keeps stale active terminals hidden until the managed refresh succeeds")
   func keepsActiveTerminalHiddenUntilRefreshSucceeds() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -19,7 +19,7 @@ struct AgentsWindowManagedFreshnessTests {
     )
     store.selectedAgentTuis = [makeTuiSnapshot(status: .running)]
 
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
 
     #expect(view.displayState.sortedAgentTuis.isEmpty)
 
@@ -46,7 +46,7 @@ struct AgentsWindowManagedFreshnessTests {
     store.selectedAgentTuis = [initialTui]
     store.selectedAgentTui = initialTui
 
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
     view.viewModel.hasFreshManagedAgentTuis = true
     view.viewModel.selection = .terminal(
       sessionID: initialTui.sessionId,
@@ -82,7 +82,7 @@ struct AgentsWindowManagedFreshnessTests {
     store.selectedAgentTuis = [initialTui]
     store.selectedAgentTui = initialTui
 
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
     view.viewModel.hasFreshManagedAgentTuis = true
     view.refreshDisplayState()
     let initialState = view.workspaceRefreshState

@@ -41,18 +41,18 @@ extension HarnessMonitorAgentsE2ETests {
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.agentsModelPicker,
+      identifier: Accessibility.workspaceModelPicker,
       title: "Model"
     )
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.agentsModelPicker,
+      controlIdentifier: Accessibility.workspaceModelPicker,
       optionTitle: displayName
     )
     if let effortTitle = Self.e2eLowestEffortTitle[runtime] {
       selectSegment(
         in: app,
-        controlIdentifier: Accessibility.agentsEffortPicker,
+        controlIdentifier: Accessibility.workspaceEffortPicker,
         title: effortTitle
       )
     }
@@ -66,7 +66,7 @@ extension HarnessMonitorAgentsE2ETests {
       if let displayName = Self.codexModelDisplayNameByID[customModel] {
         selectMenuOption(
           in: app,
-          controlIdentifier: Accessibility.agentsCodexModelPicker,
+          controlIdentifier: Accessibility.workspaceCodexModelPicker,
           optionTitle: displayName
         )
         if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
@@ -75,7 +75,7 @@ extension HarnessMonitorAgentsE2ETests {
         {
           selectSegment(
             in: app,
-            controlIdentifier: Accessibility.agentsCodexEffortPicker,
+            controlIdentifier: Accessibility.workspaceCodexEffortPicker,
             title: effort.capitalized
           )
         }
@@ -83,12 +83,12 @@ extension HarnessMonitorAgentsE2ETests {
       }
       selectMenuOption(
         in: app,
-        controlIdentifier: Accessibility.agentsCodexModelPicker,
+        controlIdentifier: Accessibility.workspaceCodexModelPicker,
         optionTitle: "Custom..."
       )
       replaceText(
         in: app,
-        identifier: Accessibility.agentsCodexCustomModelField,
+        identifier: Accessibility.workspaceCodexCustomModelField,
         text: customModel
       )
       if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
@@ -97,7 +97,7 @@ extension HarnessMonitorAgentsE2ETests {
       {
         selectSegment(
           in: app,
-          controlIdentifier: Accessibility.agentsCodexEffortPicker,
+          controlIdentifier: Accessibility.workspaceCodexEffortPicker,
           title: effort.capitalized
         )
       }
@@ -107,17 +107,17 @@ extension HarnessMonitorAgentsE2ETests {
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.agentsCodexModelPicker,
+      identifier: Accessibility.workspaceCodexModelPicker,
       title: "Model"
     )
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.agentsCodexModelPicker,
+      controlIdentifier: Accessibility.workspaceCodexModelPicker,
       optionTitle: displayName
     )
     selectSegment(
       in: app,
-      controlIdentifier: Accessibility.agentsCodexEffortPicker,
+      controlIdentifier: Accessibility.workspaceCodexEffortPicker,
       title: Self.e2eLowestEffortTitle["codex"] ?? "Low"
     )
   }
@@ -198,11 +198,11 @@ extension HarnessMonitorAgentsE2ETests {
       )
     }
 
-    let agentsButton = button(in: app, identifier: Accessibility.agentsButton)
+    let workspaceButton = button(in: app, identifier: Accessibility.workspaceToolbarButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.liveStartupTimeout) {
         toolbarState.label.contains("windowTitle=Cockpit")
-          && agentsButton.exists
+          && workspaceButton.exists
       },
       """
       Session cockpit did not load for \(sessionID)
@@ -213,11 +213,11 @@ extension HarnessMonitorAgentsE2ETests {
     )
   }
 
-  func openAgentsWindow(
+  func openWorkspaceWindow(
     in app: XCUIApplication,
     harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
-    tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
+    tapDockButton(in: app, identifier: Accessibility.workspaceToolbarButton, label: "agents")
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
@@ -226,7 +226,7 @@ extension HarnessMonitorAgentsE2ETests {
         launchPane.exists || sessionPane.exists
       },
       """
-      Agents window did not appear.
+      Workspace window did not appear.
       state=\(state.label)
       \(harness.diagnosticsSummary())
       """
@@ -237,7 +237,7 @@ extension HarnessMonitorAgentsE2ETests {
       XCTAssertTrue(
         waitForElement(launchPane, timeout: Self.liveActionTimeout),
         """
-        Agents window never reached the create pane.
+        Workspace window never reached the create pane.
         state=\(state.label)
         \(harness.diagnosticsSummary())
         """
@@ -283,23 +283,95 @@ extension HarnessMonitorAgentsE2ETests {
     title: String
   ) {
     let container = element(in: app, identifier: containerIdentifier)
-    let scrollTarget = container.exists ? container : mainWindow(in: app)
+    let scrollTarget =
+      container.exists ? revealScrollTarget(in: app, container: container) : mainWindow(in: app)
     let deadline = Date.now.addingTimeInterval(Self.liveActionTimeout)
 
     while Date.now < deadline {
-      let candidates = [
-        button(in: app, identifier: identifier),
-        element(in: app, identifier: identifier),
-        element(in: app, identifier: "\(identifier).frame"),
-        button(in: app, title: title),
-      ]
-      if candidates.contains(where: \.exists) {
+      let buttonTarget =
+        container.exists
+        ? descendantButton(in: container, identifier: identifier)
+        : button(in: app, identifier: identifier)
+      if buttonTarget.exists && buttonTarget.isHittable {
+        return
+      }
+
+      let frameMarker =
+        container.exists
+        ? descendantFrameElement(in: container, identifier: "\(identifier).frame")
+        : element(in: app, identifier: "\(identifier).frame")
+      if frameMarker.exists, !frameMarker.frame.isEmpty {
+        let containingWindow = window(in: app, containing: frameMarker)
+        let viewportFrame = scrollTarget.frame.intersection(containingWindow.frame)
+        let visibleFrame = viewportFrame.intersection(frameMarker.frame)
+        let minimumVisibleHeight = min(24, max(frameMarker.frame.height / 2, 1))
+        if !visibleFrame.isNull, !visibleFrame.isEmpty, visibleFrame.height >= minimumVisibleHeight
+        {
+          return
+        }
+      }
+
+      let titleMatch = button(in: app, title: title)
+      if titleMatch.exists && titleMatch.isHittable {
         return
       }
 
       dragUp(in: app, element: scrollTarget, distanceRatio: 0.18)
       RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
+  }
+
+  private func revealScrollTarget(in app: XCUIApplication, container: XCUIElement) -> XCUIElement {
+    guard container.exists, !container.frame.isEmpty else {
+      return mainWindow(in: app)
+    }
+
+    let window = window(in: app, containing: container)
+    let nestedScrollViews = container.descendants(matching: .scrollView)
+
+    if let scrollView = largestVisibleScrollTarget(in: nestedScrollViews, window: window) {
+      return scrollView
+    }
+
+    if container.elementType == .scrollView {
+      return container
+    }
+
+    if let scrollView = largestVisibleScrollTarget(in: window.scrollViews, window: window) {
+      return scrollView
+    }
+
+    return container
+  }
+
+  private func largestVisibleScrollTarget(
+    in query: XCUIElementQuery,
+    window: XCUIElement
+  ) -> XCUIElement? {
+    guard window.exists, !window.frame.isEmpty else {
+      return nil
+    }
+
+    let windowFrame = window.frame
+    let searchCount = min(query.count, 12)
+    var bestArea: CGFloat = 0
+    var bestMatch: XCUIElement?
+
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+
+      let visibleFrame = candidate.frame.intersection(windowFrame)
+      guard !visibleFrame.isNull, !visibleFrame.isEmpty else { continue }
+
+      let area = visibleFrame.width * visibleFrame.height
+      if area > bestArea {
+        bestArea = area
+        bestMatch = candidate
+      }
+    }
+
+    return bestMatch
   }
 
   func selectSegment(

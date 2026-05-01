@@ -1,9 +1,12 @@
+import CoreGraphics
 import XCTest
 
-extension AgentsWindowUITests {
+private typealias Accessibility = HarnessMonitorUITestAccessibility
+
+extension WorkspaceWindowUITests {
   func testCreatePaneSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     XCTAssertTrue(waitForElement(createRow, timeout: Self.actionTimeout))
     let agentWindow = window(in: app, containing: createRow)
@@ -13,31 +16,31 @@ extension AgentsWindowUITests {
     XCTAssertGreaterThan(
       toolbar.buttons.count,
       0,
-      "Agents window should expose toolbar controls in native window chrome"
+      "Workspace window should expose toolbar controls in native window chrome"
     )
     let buttonLeadingInset =
       toolbar.buttons.allElementsBoundByIndex
       .filter { $0.exists && !$0.frame.isEmpty }
       .map { $0.frame.minX - agentWindow.frame.minX }
       .min()
-      ?? .greatestFiniteMagnitude
+      ?? CGFloat.greatestFiniteMagnitude
     let searchLeadingInset =
       agentWindow.searchFields.allElementsBoundByIndex
       .filter { $0.exists && !$0.frame.isEmpty }
       .map { $0.frame.minX - agentWindow.frame.minX }
       .min()
-      ?? .greatestFiniteMagnitude
+      ?? CGFloat.greatestFiniteMagnitude
     let leadingChromeInset = min(buttonLeadingInset, searchLeadingInset)
     let rowTopInset = createRow.frame.minY - agentWindow.frame.minY
     XCTAssertLessThan(
       leadingChromeInset,
-      .greatestFiniteMagnitude,
-      "Agents window should expose a visible leading toolbar control"
+      CGFloat.greatestFiniteMagnitude,
+      "Workspace window should expose a visible leading toolbar control"
     )
     XCTAssertLessThan(
       leadingChromeInset,
       176,
-      "Agents window chrome should stay near the leading window edge"
+      "Workspace window chrome should stay near the leading window edge"
     )
     XCTAssertGreaterThan(
       rowTopInset,
@@ -55,7 +58,7 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     XCTAssertTrue(waitForElement(createRow, timeout: Self.actionTimeout))
@@ -63,8 +66,8 @@ extension AgentsWindowUITests {
     let agentWindow = window(in: app, containing: createRow)
     let toolbar = agentWindow.toolbars.firstMatch
     let nativeSearchField = agentWindow.searchFields.firstMatch
-    let filterButton = button(in: app, identifier: Accessibility.agentsDecisionFiltersMenu)
-    let decisionDesk = element(in: app, identifier: Accessibility.agentsDecisionDesk)
+    let filterButton = button(in: app, identifier: Accessibility.workspaceDecisionFiltersMenu)
+    let decisionDesk = element(in: app, identifier: Accessibility.workspaceDecisionDesk)
     let legacyScopeMenu = element(
       in: app,
       identifier: Accessibility.decisionsSidebarSearchScopeMenu
@@ -111,10 +114,10 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
-    let filterState = element(in: app, identifier: Accessibility.agentsDecisionFilterState)
-    let decisionDesk = element(in: app, identifier: Accessibility.agentsDecisionDesk)
+    let filterState = element(in: app, identifier: Accessibility.workspaceDecisionFilterState)
+    let decisionDesk = element(in: app, identifier: Accessibility.workspaceDecisionDesk)
     XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(decisionDesk, timeout: Self.fastActionTimeout))
     resetAgentsDecisionSeveritiesIfNeeded(in: app)
@@ -170,7 +173,7 @@ extension AgentsWindowUITests {
 
   func testWrapToggleSwitchesViewportMode() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "wrap test")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(
@@ -197,7 +200,7 @@ extension AgentsWindowUITests {
 
   func testCommandReturnSendsAgentInputFromEditor() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "command return send")
     let inputField = editableField(in: app, identifier: Accessibility.agentTuiInputField)
     XCTAssertTrue(waitForElement(inputField, timeout: Self.actionTimeout))
@@ -215,7 +218,7 @@ extension AgentsWindowUITests {
 
   func testRapidKeyStripTapsShowPendingHintBeforeIdleFlush() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "buffer key strip input")
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("arrow-down"))
@@ -240,7 +243,7 @@ extension AgentsWindowUITests {
 
   func testSelectionChangeFlushesPendingKeySequenceImmediately() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "flush pending keys on selection change")
     tapButton(in: app, identifier: Accessibility.agentTuiKeyButton("enter"))
     let pendingHint = element(in: app, identifier: Accessibility.agentTuiKeyQueueHint)
@@ -262,7 +265,7 @@ extension AgentsWindowUITests {
 
   func testDraggingViewportDividerResizesLiveTerminal() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "resize with divider")
     let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
     let controls = element(in: app, identifier: Accessibility.agentTuiControls)
@@ -299,7 +302,7 @@ extension AgentsWindowUITests {
 
   func testStoppedSessionHidesLiveControlsButKeepsTranscriptAction() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "stop after start")
     tapButton(in: app, title: "Stop")
     let state = element(in: app, identifier: Accessibility.agentTuiState)

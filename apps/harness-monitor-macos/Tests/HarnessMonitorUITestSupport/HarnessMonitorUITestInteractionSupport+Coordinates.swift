@@ -37,7 +37,7 @@ extension HarnessMonitorUITestCase {
     visibleFrameMarkerCoordinate(in: app, identifier: identifier) != nil
   }
 
-  private func preferredTapCoordinate(
+  func preferredTapCoordinate(
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {

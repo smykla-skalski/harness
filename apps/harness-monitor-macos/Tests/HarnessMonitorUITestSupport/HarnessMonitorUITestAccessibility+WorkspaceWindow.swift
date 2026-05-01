@@ -1,5 +1,4 @@
 extension HarnessMonitorUITestAccessibility {
-  static let agentsButton = "harness.session.agents"
   static let agentTuiButton = "harness.session.agent-tui"
   static let agentTuiSheet = "harness.sheet.agent-tui"
   static let agentTuiState = "harness.sheet.agent-tui.state"
@@ -34,67 +33,69 @@ extension HarnessMonitorUITestAccessibility {
   static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
   static let decisionsSidebarSearchScopeMenu = "harness.decisions.sidebar.search.scope"
   static let decisionsSidebarFilterToggle = "harness.decisions.sidebar.filter.toggle"
-  static let agentsDecisionDesk = "harness.window.agents.decisions"
-  static let agentsDecisionFiltersMenu = "harness.window.agents.decisions.filters"
-  static let agentsDecisionFilterState = "harness.window.agents.decisions.filter-state"
-  static let agentTuiPersonaPicker = "harness.window.agents.persona"
-  static let agentsModelPicker = "harness.window.agents.model"
-  static let agentsCustomModelField = "harness.window.agents.model.custom"
-  static let agentsEffortPicker = "harness.window.agents.effort"
-  static let agentsCodexModelPicker = "harness.window.agents.codex.model"
-  static let agentsCodexCustomModelField = "harness.window.agents.codex.model.custom"
-  static let agentsCodexEffortPicker = "harness.window.agents.codex.effort"
-  static let agentsCodexPromptField = "harness.window.agents.codex.prompt"
-  static let agentsCodexContextField = "harness.window.agents.codex.context"
-  static let agentsCodexModePicker = "harness.window.agents.codex.mode"
-  static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
-  static let toolCallTimeline = "harness.window.agents.tool-call-timeline"
-  static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
-  static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
-  static let agentsCodexFinalMessage = "harness.window.agents.codex.final"
-  static let agentsCodexLatestSummary = "harness.window.agents.codex.latest"
-  static let agentsCodexErrorMessage = "harness.window.agents.codex.error"
-  static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
-  static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
-  static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
-  static let agentsTaskCard = "harness.agents.task.card"
-  static let agentsTaskNoteField = "harness.agents.task.note-field"
-  static let agentsTaskNoteAddButton = "harness.agents.task.note-add"
-  static let agentsTaskNotesUnavailable = "harness.agents.task.notes-unavailable"
+  static let workspaceDecisionDesk = "harness.window.workspace.decisions"
+  static let workspaceDecisionFiltersMenu = "harness.window.workspace.decisions.filters"
+  static let workspaceDecisionClearFiltersButton =
+    "harness.window.workspace.decisions.clear-filters"
+  static let workspaceDecisionFilterState = "harness.window.workspace.decisions.filter-state"
+  static let workspacePersonaPicker = "harness.window.workspace.persona"
+  static let workspaceModelPicker = "harness.window.workspace.model"
+  static let workspaceCustomModelField = "harness.window.workspace.model.custom"
+  static let workspaceEffortPicker = "harness.window.workspace.effort"
+  static let workspaceCodexModelPicker = "harness.window.workspace.codex.model"
+  static let workspaceCodexCustomModelField = "harness.window.workspace.codex.model.custom"
+  static let workspaceCodexEffortPicker = "harness.window.workspace.codex.effort"
+  static let workspaceCodexPromptField = "harness.window.workspace.codex.prompt"
+  static let workspaceCodexContextField = "harness.window.workspace.codex.context"
+  static let workspaceCodexModePicker = "harness.window.workspace.codex.mode"
+  static let workspaceCodexSubmitButton = "harness.window.workspace.codex.submit"
+  static let workspaceToolCallTimeline = "harness.window.workspace.tool-call-timeline"
+  static let workspaceCodexSteerButton = "harness.window.workspace.codex.steer"
+  static let workspaceCodexInterruptButton = "harness.window.workspace.codex.interrupt"
+  static let workspaceCodexFinalMessage = "harness.window.workspace.codex.final"
+  static let workspaceCodexLatestSummary = "harness.window.workspace.codex.latest"
+  static let workspaceCodexErrorMessage = "harness.window.workspace.codex.error"
+  static let workspaceCodexRecoveryBanner = "harness.window.workspace.codex.recovery-banner"
+  static let workspaceCodexEnableBridgeButton = "harness.window.workspace.codex.enable-bridge"
+  static let workspaceCodexCopyCommandButton = "harness.window.workspace.codex.copy-command"
+  static let workspaceTaskCard = "harness.workspace.task.card"
+  static let workspaceTaskNoteField = "harness.workspace.task.note-field"
+  static let workspaceTaskNoteAddButton = "harness.workspace.task.note-add"
+  static let workspaceTaskNotesUnavailable = "harness.workspace.task.notes-unavailable"
   static let signalDetailSheet = "harness.signal.detail.sheet"
   static let signalDetailCard = "harness.signal.detail.card"
   static let signalDetailDismissButton = "harness.signal.detail.dismiss"
 
-  static func agentTuiPersonaCard(_ identifier: String) -> String {
-    "harness.window.agents.persona.\(identifier)"
+  static func workspacePersonaCard(_ identifier: String) -> String {
+    "harness.window.workspace.persona.\(identifier)"
   }
 
   static func agentCapabilityRow(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier))"
+    "harness.window.workspace.capability.\(slug(identifier))"
   }
 
   static func agentCapabilityInstallButton(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).install"
+    "harness.window.workspace.capability.\(slug(identifier)).install"
   }
 
   static func agentCapabilityProbe(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).probe"
+    "harness.window.workspace.capability.\(slug(identifier)).probe"
   }
 
   static func agentCapabilityTransportButton(_ identifier: String, transportID: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).transport.\(slug(transportID))"
+    "harness.window.workspace.capability.\(slug(identifier)).transport.\(slug(transportID))"
   }
 
   static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
-    "harness.window.agents.codex.approval.\(slug(approvalID)).\(slug(decision))"
+    "harness.window.workspace.codex.approval.\(slug(approvalID)).\(slug(decision))"
   }
 
-  static func agentsTaskTab(_ taskID: String) -> String {
-    "harness.agents.task.tab.\(slug(taskID))"
+  static func workspaceTaskTab(_ taskID: String) -> String {
+    "harness.workspace.task.tab.\(slug(taskID))"
   }
 
-  static func agentsTaskSelection(_ taskID: String) -> String {
-    "harness.agents.task.selection.\(slug(taskID))"
+  static func workspaceTaskSelection(_ taskID: String) -> String {
+    "harness.workspace.task.selection.\(slug(taskID))"
   }
 
   static func agentTuiTab(_ tuiID: String) -> String {
@@ -110,35 +111,35 @@ extension HarnessMonitorUITestAccessibility {
   }
 
   static func agentDetailAwaitingDecisionStrip(_ agentID: String) -> String {
-    "harness.agents.detail.awaiting-decision.\(slug(agentID))"
+    "harness.workspace.detail.awaiting-decision.\(slug(agentID))"
   }
 
   static func agentDetailOpenDecisionsButton(_ agentID: String) -> String {
-    "harness.agents.detail.awaiting-decision.open.\(slug(agentID))"
+    "harness.workspace.detail.awaiting-decision.open.\(slug(agentID))"
   }
 
   static func agentRuntimeStrip(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.strip.\(slug(agentID))"
+    "harness.workspace.detail.runtime.strip.\(slug(agentID))"
   }
 
   static func agentRuntimeWatchdog(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.watchdog.\(slug(agentID))"
+    "harness.workspace.detail.runtime.watchdog.\(slug(agentID))"
   }
 
   static func agentRuntimePendingPermissions(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.pending-permissions.\(slug(agentID))"
+    "harness.workspace.detail.runtime.pending-permissions.\(slug(agentID))"
   }
 
   static func agentRuntimeDeadline(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.deadline.\(slug(agentID))"
+    "harness.workspace.detail.runtime.deadline.\(slug(agentID))"
   }
 
   static func agentRuntimeDisclosure(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.disclosure.\(slug(agentID))"
+    "harness.workspace.detail.runtime.disclosure.\(slug(agentID))"
   }
 
   static func agentRuntimeDisclosureContent(_ agentID: String) -> String {
-    "harness.agents.detail.runtime.disclosure-content.\(slug(agentID))"
+    "harness.workspace.detail.runtime.disclosure-content.\(slug(agentID))"
   }
 
   static func agentTuiKeyButton(_ key: String) -> String {

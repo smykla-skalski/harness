@@ -20,55 +20,58 @@ extension HarnessMonitorAccessibility {
   public static let acpPermissionToastAccessibilityState =
     "harness.acp-permission.toast.accessibility.state"
   public static let toolCallTimelineAccessibilityState =
-    "harness.window.agents.tool-call-timeline.accessibility.state"
+    "harness.window.workspace.tool-call-timeline.accessibility.state"
   public static let agentRuntimeWatchdogAccessibilityState =
-    "harness.agents.detail.runtime.watchdog.accessibility.state"
+    "harness.workspace.detail.runtime.watchdog.accessibility.state"
   public static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
   public static let acpPermissionToastActionButton =
-    "harness.acp-permission.toast.open-decisions"
+    "harness.acp-permission.toast.open-workspace"
   public static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
 
-  public static let agentsCodexModelPicker = "harness.window.agents.codex.model"
-  public static let agentsCodexCustomModelField = "harness.window.agents.codex.model.custom"
-  public static let agentsCodexEffortPicker = "harness.window.agents.codex.effort"
-  public static let agentsCodexPromptField = "harness.window.agents.codex.prompt"
-  public static let agentsCodexContextField = "harness.window.agents.codex.context"
-  public static let agentsCodexModePicker = "harness.window.agents.codex.mode"
-  public static let agentsCodexSubmitButton = "harness.window.agents.codex.submit"
-  public static let agentsCodexSteerButton = "harness.window.agents.codex.steer"
-  public static let agentsCodexInterruptButton = "harness.window.agents.codex.interrupt"
-  public static let agentsCodexFinalMessage = "harness.window.agents.codex.final"
-  public static let agentsCodexLatestSummary = "harness.window.agents.codex.latest"
-  public static let agentsCodexErrorMessage = "harness.window.agents.codex.error"
-  public static let agentsCodexRecoveryBanner = "harness.window.agents.codex.recovery-banner"
-  public static let agentsCodexEnableBridgeButton = "harness.window.agents.codex.enable-bridge"
-  public static let agentsCodexCopyCommandButton = "harness.window.agents.codex.copy-command"
-  public static let agentsAcpRecoveryBanner = "harness.window.agents.acp.recovery-banner"
-  public static let agentsAcpEnableBridgeButton = "harness.window.agents.acp.enable-bridge"
-  public static let agentsAcpCopyCommandButton = "harness.window.agents.acp.copy-command"
+  public static let workspaceCodexModelPicker = "harness.window.workspace.codex.model"
+  public static let workspaceCodexCustomModelField = "harness.window.workspace.codex.model.custom"
+  public static let workspaceCodexEffortPicker = "harness.window.workspace.codex.effort"
+  public static let workspaceCodexPromptField = "harness.window.workspace.codex.prompt"
+  public static let workspaceCodexContextField = "harness.window.workspace.codex.context"
+  public static let workspaceCodexModePicker = "harness.window.workspace.codex.mode"
+  public static let workspaceCodexSubmitButton = "harness.window.workspace.codex.submit"
+  public static let workspaceCodexSteerButton = "harness.window.workspace.codex.steer"
+  public static let workspaceCodexInterruptButton = "harness.window.workspace.codex.interrupt"
+  public static let workspaceCodexFinalMessage = "harness.window.workspace.codex.final"
+  public static let workspaceCodexLatestSummary = "harness.window.workspace.codex.latest"
+  public static let workspaceCodexErrorMessage = "harness.window.workspace.codex.error"
+  public static let workspaceCodexRecoveryBanner =
+    "harness.window.workspace.codex.recovery-banner"
+  public static let workspaceCodexEnableBridgeButton =
+    "harness.window.workspace.codex.enable-bridge"
+  public static let workspaceCodexCopyCommandButton =
+    "harness.window.workspace.codex.copy-command"
+  public static let workspaceAcpRecoveryBanner = "harness.window.workspace.acp.recovery-banner"
+  public static let workspaceAcpEnableBridgeButton = "harness.window.workspace.acp.enable-bridge"
+  public static let workspaceAcpCopyCommandButton = "harness.window.workspace.acp.copy-command"
 
   public static func agentCapabilityRow(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier))"
+    "harness.window.workspace.capability.\(slug(identifier))"
   }
 
   public static func agentCapabilityInstallButton(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).install"
+    "harness.window.workspace.capability.\(slug(identifier)).install"
   }
 
   public static func agentCapabilityProbe(_ identifier: String) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).probe"
+    "harness.window.workspace.capability.\(slug(identifier)).probe"
   }
 
   public static func agentCapabilityTransportButton(
     _ identifier: String,
     transportID: String
   ) -> String {
-    "harness.window.agents.capability.\(slug(identifier)).transport.\(slug(transportID))"
+    "harness.window.workspace.capability.\(slug(identifier)).transport.\(slug(transportID))"
   }
 
-  public static let toolCallTimeline = "harness.window.agents.tool-call-timeline"
+  public static let workspaceToolCallTimeline = "harness.window.workspace.tool-call-timeline"
 
   public static func toolCallTimelineRow(_ identifier: String) -> String {
-    "\(toolCallTimeline).row.\(slug(identifier))"
+    "\(workspaceToolCallTimeline).row.\(slug(identifier))"
   }
 }

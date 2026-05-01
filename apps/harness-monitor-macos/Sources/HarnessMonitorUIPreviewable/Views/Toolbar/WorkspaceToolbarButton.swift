@@ -45,7 +45,9 @@ public struct WorkspaceToolbarButton: View {
     guard count > .zero else {
       return "Open workspace"
     }
-    return "Open workspace and review \(count.formatted()) item\(count == 1 ? "" : "s") needing attention"
+    return
+      "Open workspace and review \(count.formatted()) "
+      + "item\(count == 1 ? "" : "s") needing attention"
   }
 
   @ViewBuilder

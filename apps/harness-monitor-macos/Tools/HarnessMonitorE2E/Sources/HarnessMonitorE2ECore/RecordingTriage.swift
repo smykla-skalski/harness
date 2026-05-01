@@ -859,7 +859,7 @@ extension RecordingTriage {
       ]
     }
     if let taskID = payload["task_refusal_id"], !taskID.isEmpty {
-      let selectionID = SwarmAccessibilityID.agentsTaskSelection(taskID)
+      let selectionID = SwarmAccessibilityID.workspaceTaskSelection(taskID)
       if identifiers.contains(where: { $0.identifier == selectionID }) {
         return [
           ChecklistFinding(

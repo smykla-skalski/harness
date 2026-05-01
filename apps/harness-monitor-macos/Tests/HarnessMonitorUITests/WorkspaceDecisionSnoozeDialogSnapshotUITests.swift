@@ -4,13 +4,13 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class DecisionsSnoozeDialogSnapshotUITests: HarnessMonitorUITestCase {
+final class WorkspaceDecisionSnoozeDialogSnapshotUITests: HarnessMonitorUITestCase {
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let decisionID = "snooze-snapshot-seed"
   private static let snoozeActionID = "snooze-snapshot-action"
 
-  func testCaptureDecisionsWindowWithSnoozeDialogSnapshot() throws {
+  func testCaptureWorkspaceWindowWithSnoozeDialogSnapshot() throws {
     let app = launch(
       mode: "empty",
       additionalEnvironment: [
@@ -19,12 +19,12 @@ final class DecisionsSnoozeDialogSnapshotUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
 
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
-      waitForElement(decisionsWindow, timeout: Self.uiTimeout),
-      "Decisions window should open after tapping supervisor badge"
+      waitForElement(workspaceWindow, timeout: Self.uiTimeout),
+      "Workspace window should open after tapping workspace toolbar button"
     )
 
     tapButton(in: app, identifier: Accessibility.decisionRow(Self.decisionID))
@@ -43,8 +43,8 @@ final class DecisionsSnoozeDialogSnapshotUITests: HarnessMonitorUITestCase {
     )
 
     saveWindowSnapshot(
-      decisionsWindow,
-      named: "decisions-snooze-dialog"
+      workspaceWindow,
+      named: "workspace-decision-snooze-dialog"
     )
   }
 

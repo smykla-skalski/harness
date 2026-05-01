@@ -3,10 +3,10 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSupporting {
-  func testAgentsWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
+final class WorkspaceWindowUITests: HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting {
+  func testWorkspaceWindowDefaultsToCreatePaneWhenNoSessionsExist() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)
@@ -16,14 +16,14 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     XCTAssertTrue(state.label.contains("selection=create"))
   }
 
-  func testAgentsWindowDisablesStartingWhenNoSessionIsSelected() throws {
+  func testWorkspaceWindowDisablesStartingWhenNoSessionIsSelected() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: [
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"
       ]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let startButton = button(in: app, identifier: Accessibility.agentTuiStartButton)
     let banner = element(in: app, identifier: Accessibility.agentTuiSessionActionBanner)
@@ -35,7 +35,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     XCTAssertFalse(startButton.isEnabled, "Start should stay disabled until a session is available")
   }
 
-  func testAgentsWindowSuppressesStaleRunningTerminalUntilRefreshCompletes() throws {
+  func testWorkspaceWindowSuppressesStaleRunningTerminalUntilRefreshCompletes() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-single",
@@ -43,14 +43,14 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
         "HARNESS_MONITOR_PREVIEW_AGENT_TUIS_DELAY_MS": "3000",
       ]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(waitForElement(state, timeout: Self.fastActionTimeout))
     XCTAssertTrue(
       state.label.contains("selection=create"),
       """
-      Agents window should not render stale running terminals before its first refresh finishes.
+      Workspace window should not render stale running terminals before its first refresh finishes.
       state=\(state.label)
       """
     )
@@ -83,7 +83,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
 
   func testStartingAgentTuiCreatesAndSelectsSessionRow() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "Inspect the cockpit session")
     let sessionRow = element(
       in: app,
@@ -110,7 +110,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_CODEX_START": "success"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     tapButton(
       in: app,
@@ -119,20 +119,20 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
         option: "Codex Run"
       )
     )
-    let promptField = editableField(in: app, identifier: Accessibility.agentsCodexPromptField)
+    let promptField = editableField(in: app, identifier: Accessibility.workspaceCodexPromptField)
     XCTAssertTrue(waitForElement(promptField, timeout: Self.actionTimeout))
-    tapElement(in: app, identifier: Accessibility.agentsCodexPromptField)
+    tapElement(in: app, identifier: Accessibility.workspaceCodexPromptField)
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
     promptField.typeText("Start from the explicit click path")
-    let submitButton = button(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+    let submitButton = button(in: app, identifier: Accessibility.workspaceCodexSubmitButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         submitButton.exists && submitButton.isEnabled
       },
       "Start Codex should enable once the prompt field contains non-whitespace text"
     )
-    tapButton(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+    tapButton(in: app, identifier: Accessibility.workspaceCodexSubmitButton)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     XCTAssertTrue(
@@ -146,9 +146,9 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     )
   }
 
-  func testCommandNavigationRoutesBackAndForwardWithinActiveAgentsWindowHistory() throws {
+  func testCommandNavigationRoutesBackAndForwardWithinActiveWorkspaceWindowHistory() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     startAgentTui(in: app, runtimeTitle: "Codex", prompt: "exercise command navigation")
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let createTab = element(in: app, identifier: Accessibility.agentTuiCreateTab)
@@ -177,7 +177,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
           && backButton.isEnabled
           && !forwardButton.isEnabled
       },
-      "Selecting the create tab should move the active Agents window into its create pane"
+      "Selecting the create tab should move the active Workspace window into its create pane"
     )
     invokeMenuItem(in: app, menu: "Go", title: "Back")
     XCTAssertTrue(
@@ -187,7 +187,7 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
           && forwardButton.isEnabled
       },
       """
-      Harness Monitor > Back should navigate back inside the active Agents window history while
+      Harness Monitor > Back should navigate back inside the active Workspace window history while
       preserving the original create pane behind the restored session.
       state=\(state.label)
       routing=\(commandRoutingState.label)
@@ -202,14 +202,14 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
           && backButton.isEnabled
           && !forwardButton.isEnabled
       },
-      "Harness Monitor > Forward should navigate forward inside the active Agents window history"
+      "Harness Monitor > Forward should navigate forward inside the active Workspace window history"
     )
   }
   func testSidebarShowsAllSessionsWithoutOverflow() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "agent-tui-overflow"]
     )
-    reopenAgentsWindow(in: app)
+    reopenWorkspaceWindow(in: app)
     for index in 1...6 {
       let sessionRow = element(
         in: app,

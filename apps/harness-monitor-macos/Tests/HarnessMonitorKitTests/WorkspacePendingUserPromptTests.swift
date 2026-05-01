@@ -4,9 +4,9 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Agents window pending user prompt")
+@Suite("Workspace window pending user prompt")
 @MainActor
-struct AgentsWindowPendingUserPromptTests {
+struct WorkspacePendingUserPromptTests {
   @Test("Resolves pending user prompt for the selected terminal agent")
   func resolvesPendingUserPromptForSelectedTerminalAgent() {
     let prompt = AgentPendingUserPrompt(
@@ -35,7 +35,7 @@ struct AgentsWindowPendingUserPromptTests {
       pendingUserPrompt: prompt
     )
 
-    let resolved = AgentsWindowView.pendingUserPrompt(
+    let resolved = WorkspaceWindowView.pendingUserPrompt(
       for: makeTuiSnapshot(agentID: "agent-alpha"),
       session: PreviewFixtures.sessionDetail(
         session: PreviewFixtures.summary,
@@ -69,7 +69,7 @@ struct AgentsWindowPendingUserPromptTests {
       )
     )
 
-    let resolved = AgentsWindowView.pendingUserPrompt(
+    let resolved = WorkspaceWindowView.pendingUserPrompt(
       for: makeTuiSnapshot(agentID: "agent-alpha"),
       session: PreviewFixtures.sessionDetail(
         session: PreviewFixtures.summary,

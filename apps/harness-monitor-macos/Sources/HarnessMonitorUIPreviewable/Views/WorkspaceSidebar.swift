@@ -92,7 +92,11 @@ struct WorkspaceSidebar: View {
       .padding(.vertical, rowPadding)
       .tag(WorkspaceSelection.create)
       .accessibilityElement(children: .combine)
-      .harnessMCPTab(HarnessMonitorAccessibility.agentTuiCreateTab, label: "Create")
+      .harnessMCPTab(
+        HarnessMonitorAccessibility.agentTuiCreateTab,
+        label: "Create",
+        pressAction: { selection = .create }
+      )
 
       WorkspaceSidebarDecisionSection(
         selection: $selection,
@@ -110,10 +114,13 @@ struct WorkspaceSidebar: View {
           ForEach(externalAgents) { agent in
             externalAgentRow(agent)
               .tag(WorkspaceSelection.agent(sessionID: currentSessionID, agentID: agent.agentId))
-              .harnessMCPTab(
-                HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId),
-                label: agent.name
-              )
+               .harnessMCPTab(
+                 HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId),
+                 label: agent.name,
+                 pressAction: {
+                   selection = .agent(sessionID: currentSessionID, agentID: agent.agentId)
+                 }
+               )
               .accessibilityFrameMarker(
                 "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
               )
@@ -130,10 +137,13 @@ struct WorkspaceSidebar: View {
             )
             .padding(.vertical, rowPadding)
             .tag(WorkspaceSelection.terminal(sessionID: tui.sessionId, terminalID: tui.tuiId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(tui.tuiId),
-              label: sessionTitlesByID[tui.tuiId] ?? "Session"
-            )
+             .harnessMCPTab(
+               HarnessMonitorAccessibility.agentTuiTab(tui.tuiId),
+               label: sessionTitlesByID[tui.tuiId] ?? "Session",
+               pressAction: {
+                 selection = .terminal(sessionID: tui.sessionId, terminalID: tui.tuiId)
+               }
+             )
           }
         }
       }
@@ -147,10 +157,13 @@ struct WorkspaceSidebar: View {
             )
             .padding(.vertical, rowPadding)
             .tag(WorkspaceSelection.terminal(sessionID: tui.sessionId, terminalID: tui.tuiId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(tui.tuiId),
-              label: sessionTitlesByID[tui.tuiId] ?? "Session"
-            )
+             .harnessMCPTab(
+               HarnessMonitorAccessibility.agentTuiTab(tui.tuiId),
+               label: sessionTitlesByID[tui.tuiId] ?? "Session",
+               pressAction: {
+                 selection = .terminal(sessionID: tui.sessionId, terminalID: tui.tuiId)
+               }
+             )
           }
         }
       }
@@ -164,10 +177,13 @@ struct WorkspaceSidebar: View {
             )
             .padding(.vertical, rowPadding)
             .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(run.runId),
-              label: codexTitlesByID[run.runId] ?? "Run"
-            )
+             .harnessMCPTab(
+               HarnessMonitorAccessibility.agentTuiTab(run.runId),
+               label: codexTitlesByID[run.runId] ?? "Run",
+               pressAction: {
+                 selection = .codex(sessionID: run.sessionId, runID: run.runId)
+               }
+             )
           }
         }
       }
@@ -181,10 +197,13 @@ struct WorkspaceSidebar: View {
             )
             .padding(.vertical, rowPadding)
             .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(run.runId),
-              label: codexTitlesByID[run.runId] ?? "Run"
-            )
+             .harnessMCPTab(
+               HarnessMonitorAccessibility.agentTuiTab(run.runId),
+               label: codexTitlesByID[run.runId] ?? "Run",
+               pressAction: {
+                 selection = .codex(sessionID: run.sessionId, runID: run.runId)
+               }
+             )
           }
         }
       }
@@ -207,11 +226,14 @@ struct WorkspaceSidebar: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, rowPadding)
             .tag(WorkspaceSelection.task(sessionID: currentSessionID, taskID: task.taskId))
-            .harnessMCPRow(
-              HarnessMonitorAccessibility.workspaceTaskTab(task.taskId),
-              label: task.title,
-              value: "\(task.severity.title) • \(task.status.title)"
-            )
+             .harnessMCPRow(
+               HarnessMonitorAccessibility.workspaceTaskTab(task.taskId),
+               label: task.title,
+               value: "\(task.severity.title) • \(task.status.title)",
+               pressAction: {
+                 selection = .task(sessionID: currentSessionID, taskID: task.taskId)
+               }
+             )
           }
         }
       }

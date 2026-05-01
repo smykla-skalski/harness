@@ -93,7 +93,7 @@ struct AcpPermissionModal: View {
           openWindow(id: HarnessMonitorWindowID.workspace)
         }
         .keyboardShortcut(.defaultAction)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenDecisions)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenWorkspace)
       }
     }
   }

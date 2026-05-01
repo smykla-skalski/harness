@@ -5,7 +5,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class AttentionInfrastructureUITestsSidebarBadge:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
@@ -22,7 +22,7 @@ final class AttentionInfrastructureUITestsSidebarBadge:
       ]
     )
 
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let badge = element(in: app, identifier: Accessibility.agentPendingDecisionBadge(Self.agentID))
     XCTAssertTrue(
@@ -36,7 +36,7 @@ final class AttentionInfrastructureUITestsSidebarBadge:
 
     let stripState = element(
       in: app,
-      identifier: Accessibility.agentsWindowDetailAwaitingDecisionState
+      identifier: Accessibility.workspaceDetailAwaitingDecisionState
     )
     XCTAssertTrue(
       waitForElement(stripState, timeout: Self.uiTimeout),
@@ -61,8 +61,8 @@ final class AttentionInfrastructureUITestsSidebarBadge:
 
     tapButton(in: app, identifier: Accessibility.agentDetailOpenDecisionsButton(Self.agentID))
 
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
-    XCTAssertTrue(waitForElement(decisionsWindow, timeout: Self.uiTimeout))
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    XCTAssertTrue(waitForElement(workspaceWindow, timeout: Self.uiTimeout))
 
     let decisionRow = button(
       in: app,

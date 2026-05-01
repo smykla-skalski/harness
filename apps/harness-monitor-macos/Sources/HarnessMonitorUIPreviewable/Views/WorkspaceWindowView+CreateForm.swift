@@ -89,14 +89,22 @@ extension WorkspaceWindowCreatePane {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           Picker("Create", selection: $formModel.createMode) {
             ForEach(AgentTuiCreateMode.allCases) { mode in
-              Text(mode.title)
-                .tag(mode)
-                .accessibilityIdentifier(
-                  HarnessMonitorAccessibility.segmentedOption(
-                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                    option: mode.title
-                  )
+            Text(mode.title)
+              .tag(mode)
+              .accessibilityIdentifier(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                  option: mode.title
                 )
+              )
+              .harnessMCPButton(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.agentTuiCreateModePicker,
+                  option: mode.title
+                ),
+                label: mode.title,
+                pressAction: { formModel.createMode = mode }
+              )
             }
           }
           .pickerStyle(.segmented)

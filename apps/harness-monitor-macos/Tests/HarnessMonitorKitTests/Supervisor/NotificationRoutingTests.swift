@@ -6,7 +6,7 @@ import XCTest
 /// Verifies that supervisor notification templates carry a decision id through `userInfo`,
 /// that tapping the default action (or the explicit "Open" action) surfaces the decision id
 /// on `decisionRequestedID`, and that acknowledgement stays on the notification-dismiss path
-/// instead of routing into the Decisions window.
+/// instead of routing into the Workspace window.
 @MainActor
 final class NotificationRoutingTests: XCTestCase {
   func test_supervisorRequest_carriesSeverityInterruptionAndDecisionID() async throws {
@@ -160,7 +160,7 @@ final class NotificationRoutingTests: XCTestCase {
     XCTAssertEqual(controller.decisionRequestTick, 2)
   }
 
-  func test_tapAcknowledgeAction_doesNotOpenDecisionsWindow() async throws {
+  func test_tapAcknowledgeAction_doesNotOpenWorkspaceWindow() async throws {
     let controller = makeController()
     let decisionID = "codex-approval:sess-7:appr-ack"
     let request = try await makeSupervisorRequest(
@@ -174,7 +174,7 @@ final class NotificationRoutingTests: XCTestCase {
 
     controller.handleNotificationResponseForTesting(response)
 
-    // Acknowledge does not open the Decisions window.
+    // Acknowledge does not open the Workspace window.
     XCTAssertNil(controller.decisionRequestedID)
     XCTAssertEqual(controller.decisionRequestTick, 0)
   }

@@ -78,7 +78,7 @@ enum HarnessMonitorNotificationRequestFactory {
 
   /// Builds a `UNNotificationRequest` for a supervisor `Decision` notification. The request
   /// carries the decision id inside `userInfo` so the tap handler can route back into the
-  /// Decisions window via `HarnessMonitorUserNotificationController.decisionRequestedID`.
+  /// workspace window via `HarnessMonitorUserNotificationController.decisionRequestedID`.
   ///
   /// Severity → interruption-level mapping:
   /// - `.info` -> `.passive`

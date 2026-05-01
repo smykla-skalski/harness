@@ -3,12 +3,12 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-extension AgentsWindowUITests {
+extension WorkspaceWindowUITests {
   func testAcpRuntimeStripAndDisclosureAppearForManagedAgent() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let agentRow = element(in: app, identifier: Accessibility.agentTuiExternalTab("worker-codex"))
     XCTAssertTrue(waitForElement(agentRow, timeout: Self.uiTimeout))
@@ -87,7 +87,7 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let leaderRow = element(in: app, identifier: Accessibility.agentTuiExternalTab("leader-claude"))
     XCTAssertTrue(waitForElement(leaderRow, timeout: Self.uiTimeout))

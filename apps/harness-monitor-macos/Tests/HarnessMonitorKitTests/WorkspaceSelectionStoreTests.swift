@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Workspace selection bridge")
 @MainActor
-struct AgentsWindowSelectionStoreTests {
+struct WorkspaceSelectionStoreTests {
   @Test("Fresh store has no pending workspace selection")
   func freshStoreHasNoPendingSelection() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
