@@ -35,13 +35,22 @@ fn seeded_manager_with_sender(sender: broadcast::Sender<StreamEvent>) -> AcpAgen
 
 fn seed_daemon_db() -> DaemonDb {
     let db = DaemonDb::open_in_memory().expect("open db");
+    populate_daemon_db(&db);
+    db
+}
+
+pub(super) fn seed_daemon_db_at(path: &Path) {
+    let db = DaemonDb::open(path).expect("open db");
+    populate_daemon_db(&db);
+}
+
+fn populate_daemon_db(db: &DaemonDb) {
     let project = sample_project();
     db.sync_project(&project).expect("sync project");
     for session_id in ["sess-1", "sess-2", "sess-3", "sess-4"] {
         db.sync_session(&project.project_id, &sample_session_state(session_id))
             .expect("sync session");
     }
-    db
 }
 
 fn sample_project() -> DiscoveredProject {
