@@ -568,6 +568,34 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window element sync harvests accessibility children even when the host view has subviews")
+  func windowElementSyncHarvestsAccessibilityChildrenWhenHostHasSubviews() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = HybridAccessibilityChildrenHostView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["hybrid.child"])
+  }
+
+
+  @MainActor
   @Test("stale tracker teardown does not clear replacement harvested elements for the same window")
   func staleTrackerTeardownDoesNotClearReplacementWindowElements() async {
     let registry = AccessibilityRegistry()
@@ -794,5 +822,37 @@ private final class MixedAccessibilityChildrenHostView: NSView {
 
   override func accessibilityChildren() -> [Any]? {
     [mixedChild, "non-accessibility-member"]
+  }
+}
+
+@MainActor
+private final class HybridAccessibilityChildrenHostView: NSView {
+  private let hybridChild: AccessibilityNavigationChildView
+
+  override init(frame frameRect: NSRect) {
+    hybridChild = AccessibilityNavigationChildView(
+      frame: NSRect(x: 24, y: 24, width: 120, height: 32),
+      identifier: "hybrid.child",
+      label: "Hybrid child"
+    )
+    super.init(frame: frameRect)
+
+    let decorativeButton = NSButton(title: "Decorative", target: nil, action: nil)
+    decorativeButton.frame = NSRect(x: 180, y: 24, width: 120, height: 32)
+    decorativeButton.setAccessibilityIdentifier("hybrid.decorative.button")
+    addSubview(decorativeButton)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    [hybridChild]
   }
 }

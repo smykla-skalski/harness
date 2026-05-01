@@ -138,6 +138,34 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("Timeline navigation identifiers match UI-test mirror")
+  func timelineNavigationIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineNavigation
+        == "harness.session.timeline.navigation"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineNavigationStatus
+        == "harness.session.timeline.navigation.status"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineVisibleStatus
+        == "harness.session.timeline.navigation.visible-status"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineOlderButton
+        == "harness.session.timeline.navigation.older"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineLatestButton
+        == "harness.session.timeline.navigation.latest"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionTimelineNewerButton
+        == "harness.session.timeline.navigation.newer"
+    )
+  }
+
   @Test("ACP bridge banner identifiers match UI-test mirror")
   func acpBridgeBannerIdentifiersMirror() throws {
     #expect(

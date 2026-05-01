@@ -233,7 +233,8 @@ private enum WindowAccessibilityElementSnapshotter {
     var seen: Set<ObjectIdentifier> = []
 
     if let view = node as? NSView {
-      if view.subviews.isEmpty, shouldTraversePublishedAccessibilityChildren(of: view) {
+      let initialCount = children.count
+      if shouldTraversePublishedAccessibilityChildren(of: view) {
         WindowAccessibilityChildNodeCollector.append(
           contentsOf: view.accessibilityChildrenInNavigationOrder(),
           to: &children,
@@ -245,11 +246,13 @@ private enum WindowAccessibilityElementSnapshotter {
           seen: &seen
         )
       }
-      WindowAccessibilityChildNodeCollector.append(
-        contentsOf: view.subviews,
-        to: &children,
-        seen: &seen
-      )
+      if children.count == initialCount {
+        WindowAccessibilityChildNodeCollector.append(
+          contentsOf: view.subviews,
+          to: &children,
+          seen: &seen
+        )
+      }
       return children
     }
 
