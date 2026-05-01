@@ -88,104 +88,23 @@ struct SessionTimelineNavigationTests {
     #expect(advancedBottomEntry.enteredBottomEdge(from: firstBottomEntry))
   }
 
-  @Test("Visibility stats count measured visible rows and preserve fallback during geometry gaps")
-  func visibilityStatsCountMeasuredVisibleRowsAndPreserveFallbackDuringGeometryGaps() {
-    let rowIDs = ["row-1", "row-2", "row-3"]
-    let visible = SessionTimelineVisibilityStats.visibleRowCount(
-      rowIDs: rowIDs,
-      rowFrames: [
-        "row-1": CGRect(x: 0, y: 0, width: 100, height: 80),
-        "row-2": CGRect(x: 0, y: 96, width: 100, height: 132),
-        "row-3": CGRect(x: 0, y: 244, width: 100, height: 64),
-      ],
-      visibleRect: CGRect(x: 0, y: 90, width: 400, height: 160),
-      fallbackVisibleRowCount: 3
-    )
-    let fallback = SessionTimelineVisibilityStats.visibleRowCount(
-      rowIDs: rowIDs,
-      rowFrames: [:],
-      visibleRect: CGRect(x: 0, y: 600, width: 400, height: 160),
-      fallbackVisibleRowCount: 2
-    )
+  @Test("Table row metrics reserve space for rich timeline rows")
+  func tableRowMetricsReserveSpaceForRichTimelineRows() {
+    let rows = makeTimelineRows(count: 13)
+    let plainRow = rows[1]
+    let detailedRow = rows[2]
+    let dayDividerRow = rows[12]
 
-    #expect(visible == 2)
-    #expect(fallback == 2)
+    #expect(SessionTimelineTableMetrics.height(for: plainRow) >= 92)
+    #expect(SessionTimelineTableMetrics.height(for: detailedRow) > 92)
+    #expect(
+      SessionTimelineTableMetrics.height(for: dayDividerRow)
+        > SessionTimelineTableMetrics.height(for: detailedRow)
+    )
   }
 
-  @Test("Virtualized layout renders a bounded top window instead of every loaded row")
-  func virtualizedLayoutRendersBoundedTopWindow() {
-    let rows = makeTimelineRows(count: 32)
-    let layout = SessionTimelineVirtualizedLayout(
-      rows: rows,
-      rowHeights: rowHeights(for: rows, height: 74),
-      scrollMetrics: SessionTimelineScrollMetrics(
-        contentOffsetY: 0,
-        viewportHeight: 470,
-        visibleRect: CGRect(x: 0, y: 0, width: 800, height: 470)
-      ),
-      fallbackViewportHeight: 470,
-      pinnedRowID: nil
-    )
-
-    #expect(layout.totalRowCount == 32)
-    #expect(layout.renderedRowCount < rows.count)
-    #expect(layout.rows.first?.id == rows.first?.id)
-    #expect(layout.topSpacerHeight == 0)
-    #expect(layout.bottomSpacerHeight > 0)
-  }
-
-  @Test("Virtualized layout follows fast fling offsets with leading and trailing spacers")
-  func virtualizedLayoutFollowsFastFlingOffsets() {
-    let rows = makeTimelineRows(count: 40)
-    let heights = Dictionary(
-      uniqueKeysWithValues: rows.enumerated().map { index, row in
-        (row.id, CGFloat(index.isMultiple(of: 3) ? 132 : 74))
-      }
-    )
-    let layout = SessionTimelineVirtualizedLayout(
-      rows: rows,
-      rowHeights: heights,
-      scrollMetrics: SessionTimelineScrollMetrics(
-        contentOffsetY: 1_500,
-        viewportHeight: 420,
-        visibleRect: CGRect(x: 0, y: 1_500, width: 800, height: 420)
-      ),
-      fallbackViewportHeight: 420,
-      pinnedRowID: nil
-    )
-
-    #expect(layout.renderedRowCount < rows.count)
-    #expect(layout.topSpacerHeight > 0)
-    #expect(layout.bottomSpacerHeight > 0)
-    #expect(layout.rows.first?.id != rows.first?.id)
-    #expect(layout.rows.last?.id != rows.last?.id)
-  }
-
-  @Test(
-    "Virtualized layout includes a pending programmatic scroll target without rendering all rows"
-  )
-  func virtualizedLayoutIncludesPendingProgrammaticScrollTarget() {
-    let rows = makeTimelineRows(count: 36)
-    let pinnedRow = rows[28]
-    let layout = SessionTimelineVirtualizedLayout(
-      rows: rows,
-      rowHeights: rowHeights(for: rows, height: 74),
-      scrollMetrics: SessionTimelineScrollMetrics(
-        contentOffsetY: 0,
-        viewportHeight: 420,
-        visibleRect: CGRect(x: 0, y: 0, width: 800, height: 420)
-      ),
-      fallbackViewportHeight: 420,
-      pinnedRowID: pinnedRow.id
-    )
-
-    #expect(layout.renderedRowIDs.contains(pinnedRow.id))
-    #expect(layout.renderedRowCount < rows.count)
-    #expect(layout.topSpacerHeight > 0)
-  }
-
-  @Test("Visibility status reports rendered rows separately from loaded events")
-  func visibilityStatusReportsRenderedRowsSeparatelyFromLoadedEvents() {
+  @Test("Visibility status keeps visible and loaded counts stable")
+  func visibilityStatusKeepsVisibleAndLoadedCountsStable() {
     let stats = SessionTimelineVisibilityStats(
       visibleRowCount: 6,
       renderedRowCount: 15,
@@ -193,7 +112,7 @@ struct SessionTimelineNavigationTests {
       totalEventCount: 80
     )
 
-    #expect(stats.statusText == "Visible rows 6 | Rendered rows 15 | Loaded events 24/80")
+    #expect(stats.statusText == "Visible rows 6 | Loaded events 24/80")
   }
 
   @Test("Timeline content identity changes only across sessions")
@@ -243,12 +162,5 @@ struct SessionTimelineNavigationTests {
         accessibilityLabel: "Event \(index)"
       )
     }
-  }
-
-  private func rowHeights(
-    for rows: [SessionTimelineRow],
-    height: CGFloat
-  ) -> [String: CGFloat] {
-    Dictionary(uniqueKeysWithValues: rows.map { ($0.id, height) })
   }
 }
