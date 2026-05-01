@@ -1,5 +1,6 @@
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Output;
 
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -36,6 +37,11 @@ pub enum AccessibilityQueryError {
     DecodeFailed { detail: String },
 }
 
+/// Resolve elements from the helper backend with optional window/kind filters.
+///
+/// # Errors
+/// Returns `AccessibilityQueryError` when the helper is missing, denied,
+/// times out, or returns invalid/failed output.
 pub async fn list_elements(
     window_id: Option<i64>,
     kind: Option<ElementKind>,
@@ -45,6 +51,11 @@ pub async fn list_elements(
     run_query(&program, &args).await
 }
 
+/// Resolve one element by identifier via the helper backend.
+///
+/// # Errors
+/// Returns `AccessibilityQueryError` when the helper is missing, denied,
+/// times out, or returns invalid/failed output.
 pub async fn get_element(identifier: &str) -> Result<GetElementResult, AccessibilityQueryError> {
     let program = helper_program().await?;
     let args = get_element_args(identifier);
@@ -78,14 +89,14 @@ async fn helper_program() -> Result<PathBuf, AccessibilityQueryError> {
 }
 
 async fn run_query<T: DeserializeOwned>(
-    program: &PathBuf,
+    program: &Path,
     args: &[OsString],
 ) -> Result<T, AccessibilityQueryError> {
     run_query_with_timeout(program, args, ACCESSIBILITY_QUERY_TIMEOUT).await
 }
 
 async fn run_query_with_timeout<T: DeserializeOwned>(
-    program: &PathBuf,
+    program: &Path,
     args: &[OsString],
     deadline: Duration,
 ) -> Result<T, AccessibilityQueryError> {
@@ -108,7 +119,7 @@ async fn run_query_with_timeout<T: DeserializeOwned>(
     })
 }
 
-fn map_query_failure(output: &std::process::Output) -> AccessibilityQueryError {
+fn map_query_failure(output: &Output) -> AccessibilityQueryError {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let detail = stderr.trim();
     match output.status.code() {

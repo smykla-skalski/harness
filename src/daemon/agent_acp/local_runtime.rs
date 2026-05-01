@@ -1,8 +1,6 @@
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Child;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use serde::Serialize;
 use tokio::sync::broadcast;
@@ -36,6 +34,7 @@ use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task};
 
 mod snapshots;
+mod sandbox_state;
 
 impl AcpAgentManagerHandle {
     #[cfg(test)]
@@ -222,61 +221,15 @@ impl AcpAgentManagerHandle {
                 input.descriptor.id
             ))
         })?;
-        let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
-        let supervisor = Arc::new(AcpSessionSupervisor::new(
-            &child,
-            SupervisionConfig::default()
-                .with_prompt_timeout(input.descriptor.prompt_timeout_seconds),
-        ));
-        let prompt_gate = PromptGate::default();
-        let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
-            .map(|_| {
-                prompt_gate
-                    .acquire(PromptOwner::new(input.acp_id, input.session_id))
-                    .map_err(|error| CliErrorKind::workflow_io(error.message()))
-            })
-            .transpose()?;
-        let permissions = PermissionBridgeHandle::spawn(
-            input.acp_id.to_string(),
-            input.session_id.to_string(),
-            self.sender(),
-        );
-        let permission_log_path = input
-            .request
-            .record_permissions
-            .then(|| recording_log_path_for_session(input.session_id));
-        let permission_mode = permission_log_path.clone().map_or_else(
-            || permissions.mode(PERMISSION_RESPONSE_DEADLINE),
-            |log_path| PermissionMode::Recording { log_path },
-        );
-        let display_name = input
-            .request
-            .name
-            .clone()
-            .unwrap_or_else(|| input.descriptor.display_name.clone());
-        let protocol = spawn_protocol_task(
+        let context = self.build_started_process_context(input, &mut child);
+        let protocol = self.attach_protocol_for_started_process(input, &context, &mut child)?;
+        let registration = self.register_started_orchestration_agent(
+            input,
+            input.descriptor.id.as_str(),
+            &context.display_name,
             &mut child,
-            SpawnProtocolInput {
-                request: input.request,
-                acp_id: input.acp_id,
-                session_id: input.session_id,
-                agent_name: display_name.clone(),
-                runtime_name: input.descriptor.id.clone(),
-                project_dir: input.project_dir.to_path_buf(),
-                supervisor: &supervisor,
-                permission_mode,
-                initial_prompt_lease,
-                manager: self.clone(),
-            },
-        )
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "attach ACP protocol for '{}': {error}",
-                input.descriptor.id
-            ))
-        })?;
-        let registration =
-            self.register_started_orchestration_agent(input, input.descriptor.id.as_str(), &display_name, &mut child, &protocol)?;
+            &protocol,
+        )?;
         let event_task = spawn_event_forwarder(self.sender(), protocol.events);
         protocol.start.send(()).map_err(|()| {
             protocol.protocol.abort();
@@ -293,26 +246,111 @@ impl AcpAgentManagerHandle {
             request: input.request,
             agent_id: &registration.agent_id,
             display_name: &registration.display_name,
-            supervisor: &supervisor,
+            supervisor: &context.supervisor,
             project_dir: input.project_dir,
             process_key: input.process_key,
-            permission_log_path,
+            permission_log_path: context.permission_log_path,
         });
         let process = Arc::new(ActiveAcpProcess::new(
             child,
-            Arc::clone(&supervisor),
+            Arc::clone(&context.supervisor),
             protocol.handle,
-            prompt_gate,
-            stderr_tail,
+            context.prompt_gate,
+            context.stderr_tail,
             ActiveAcpTasks {
                 protocol: protocol.protocol,
                 batcher: protocol.batcher,
                 event: event_task,
             },
         ));
-        self.activate_started_session(input, snapshot.clone(), permissions, process, protocol.disconnects, supervisor);
+        self.activate_started_session(
+            input,
+            snapshot.clone(),
+            context.permissions,
+            process,
+            protocol.disconnects,
+            context.supervisor,
+        );
         self.broadcast("acp_agent_started", &snapshot);
         Ok(snapshot)
+    }
+
+    fn build_started_process_context(
+        &self,
+        input: DescriptorStartInput<'_>,
+        child: &mut Child,
+    ) -> StartedProcessContext {
+        let stderr_tail = SharedStderrTail::spawn(child.stderr.take());
+        let supervisor = Arc::new(AcpSessionSupervisor::new(
+            child,
+            SupervisionConfig::default()
+                .with_prompt_timeout(input.descriptor.prompt_timeout_seconds),
+        ));
+        let prompt_gate = PromptGate::default();
+        let permissions = PermissionBridgeHandle::spawn(
+            input.acp_id.to_string(),
+            input.session_id.to_string(),
+            self.sender(),
+        );
+        let permission_log_path = input
+            .request
+            .record_permissions
+            .then(|| recording_log_path_for_session(input.session_id));
+        let display_name = input
+            .request
+            .name
+            .clone()
+            .unwrap_or_else(|| input.descriptor.display_name.clone());
+        StartedProcessContext {
+            permission_log_path,
+            display_name,
+            prompt_gate,
+            supervisor,
+            permissions,
+            stderr_tail,
+        }
+    }
+
+    fn attach_protocol_for_started_process(
+        &self,
+        input: DescriptorStartInput<'_>,
+        context: &StartedProcessContext,
+        child: &mut Child,
+    ) -> Result<SpawnedAcpProtocol, CliError> {
+        let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
+            .map(|_| {
+                context
+                    .prompt_gate
+                    .acquire(PromptOwner::new(input.acp_id, input.session_id))
+                    .map_err(|error| CliErrorKind::workflow_io(error.message()))
+            })
+            .transpose()?;
+        let permission_mode = context.permission_log_path.clone().map_or_else(
+            || context.permissions.mode(PERMISSION_RESPONSE_DEADLINE),
+            |log_path| PermissionMode::Recording { log_path },
+        );
+        spawn_protocol_task(
+            child,
+            SpawnProtocolInput {
+                request: input.request,
+                acp_id: input.acp_id,
+                session_id: input.session_id,
+                agent_name: context.display_name.clone(),
+                runtime_name: input.descriptor.id.clone(),
+                project_dir: input.project_dir.to_path_buf(),
+                supervisor: &context.supervisor,
+                permission_mode,
+                initial_prompt_lease,
+                manager: self.clone(),
+            },
+        )
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "attach ACP protocol for '{}': {error}",
+                input.descriptor.id
+            ))
+            .into()
+        })
     }
 
     fn register_started_orchestration_agent(
@@ -431,81 +469,6 @@ impl AcpAgentManagerHandle {
         db.project_dir_for_session(session_id)
     }
 
-    pub(super) fn sandbox_event_cursor(&self) -> Option<u64> {
-        *self
-            .state
-            .sandbox_event_cursor
-            .lock()
-            .expect("ACP sandbox cursor lock")
-    }
-
-    pub(super) fn set_sandbox_event_cursor(&self, cursor: Option<u64>) {
-        *self
-            .state
-            .sandbox_event_cursor
-            .lock()
-            .expect("ACP sandbox cursor lock") = cursor;
-    }
-
-    pub(super) fn sandbox_event_epoch(&self) -> Option<String> {
-        self.state
-            .sandbox_event_epoch
-            .lock()
-            .expect("ACP sandbox epoch lock")
-            .clone()
-    }
-
-    pub(super) fn set_sandbox_event_epoch(&self, epoch: Option<String>) {
-        *self
-            .state
-            .sandbox_event_epoch
-            .lock()
-            .expect("ACP sandbox epoch lock") = epoch;
-    }
-
-    pub(super) fn sandbox_event_continuity(&self) -> Option<u64> {
-        *self
-            .state
-            .sandbox_event_continuity
-            .lock()
-            .expect("ACP sandbox continuity lock")
-    }
-
-    pub(super) fn set_sandbox_event_continuity(&self, continuity: Option<u64>) {
-        *self
-            .state
-            .sandbox_event_continuity
-            .lock()
-            .expect("ACP sandbox continuity lock") = continuity;
-    }
-
-    pub(super) fn sandbox_known_sessions(&self) -> BTreeSet<String> {
-        self.state
-            .sandbox_known_sessions
-            .lock()
-            .expect("ACP sandbox known sessions lock")
-            .clone()
-    }
-
-    pub(super) fn set_sandbox_known_sessions(&self, sessions: BTreeSet<String>) {
-        *self
-            .state
-            .sandbox_known_sessions
-            .lock()
-            .expect("ACP sandbox known sessions lock") = sessions;
-    }
-
-    pub(super) fn swap_sandbox_event_poller_running(&self) -> bool {
-        self.state
-            .sandbox_event_poller_running
-            .swap(true, Ordering::SeqCst)
-    }
-
-    pub(super) fn clear_sandbox_event_poller_running(&self) {
-        self.state
-            .sandbox_event_poller_running
-            .store(false, Ordering::SeqCst);
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -516,4 +479,13 @@ struct DescriptorStartInput<'a> {
     descriptor: &'a AcpAgentDescriptor,
     project_dir: &'a Path,
     process_key: &'a str,
+}
+
+struct StartedProcessContext {
+    permission_log_path: Option<PathBuf>,
+    display_name: String,
+    prompt_gate: PromptGate,
+    supervisor: Arc<AcpSessionSupervisor>,
+    permissions: PermissionBridgeHandle,
+    stderr_tail: SharedStderrTail,
 }
