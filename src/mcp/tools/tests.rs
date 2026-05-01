@@ -14,7 +14,10 @@ use crate::mcp::tool::{Tool, ToolRegistry};
 use crate::workspace::socket_paths::session_socket;
 
 use super::shared::{resolve_get_element_with, resolve_list_elements_with};
-use super::{ClickElementTool, GetElementTool, ListElementsTool, ListWindowsTool, register_all};
+use super::{
+    ClickElementTool, DragDropTool, GetElementTool, ListElementsTool, ListWindowsTool,
+    ScrollTool, register_all,
+};
 
 fn socket_path(dir: &TempDir) -> PathBuf {
     session_socket(dir.path(), "testid00", "registry")
@@ -63,16 +66,27 @@ fn spawn_response_sequence(
 }
 
 fn sample_element_response(id: u64) -> String {
+    sample_element_response_with(id, "button.send", 100.0, 200.0, 60.0, 40.0)
+}
+
+fn sample_element_response_with(
+    id: u64,
+    identifier: &str,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> String {
     json!({
         "id": id,
         "ok": true,
         "result": {"element": {
-            "identifier": "button.send",
-            "label": "Send",
+            "identifier": identifier,
+            "label": identifier,
             "value": null,
             "hint": null,
             "kind": "button",
-            "frame": {"x": 100.0, "y": 200.0, "width": 60.0, "height": 40.0},
+            "frame": {"x": x, "y": y, "width": width, "height": height},
             "windowID": 7,
             "enabled": true,
             "selected": false,
@@ -398,14 +412,79 @@ async fn click_element_targets_frame_center() {
     assert!(request_line.contains("\"identifier\":\"button.send\""));
 }
 
+#[tokio::test]
+async fn scroll_tool_queries_registry_for_identifier() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let response = sample_element_response_with(
+        1,
+        "harness.session.cockpit.scroll",
+        10.0,
+        20.0,
+        200.0,
+        120.0,
+    );
+    let server = spawn_single_response(&path, response);
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = ScrollTool::new(client);
+    let _ = tool
+        .call(json!({"identifier": "harness.session.cockpit.scroll", "deltaY": 180}))
+        .await;
+    let request_line = server.await.unwrap();
+    assert!(request_line.contains("\"op\":\"getElement\""));
+    assert!(request_line.contains("\"identifier\":\"harness.session.cockpit.scroll\""));
+}
+
+#[tokio::test]
+async fn drag_drop_tool_queries_source_and_destination_identifiers() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let server = spawn_response_sequence(
+        &path,
+        vec![
+            sample_element_response_with(1, "task.source", 10.0, 20.0, 50.0, 40.0),
+            sample_element_response_with(2, "agent.destination", 210.0, 120.0, 60.0, 60.0),
+        ],
+    );
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = DragDropTool::new(client);
+    let _ = tool
+        .call(json!({
+            "sourceIdentifier": "task.source",
+            "destinationIdentifier": "agent.destination",
+        }))
+        .await;
+    let requests = server.await.unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].contains("\"identifier\":\"task.source\""));
+    assert!(requests[1].contains("\"identifier\":\"agent.destination\""));
+}
+
+#[tokio::test]
+async fn drag_drop_tool_rejects_duration_over_maximum() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = DragDropTool::new(client);
+    let err = tool
+        .call(json!({
+            "sourceIdentifier": "task.source",
+            "destinationIdentifier": "agent.destination",
+            "durationMs": 60_001u64,
+        }))
+        .await
+        .expect_err("duration above maximum rejected");
+    assert!(err.message().contains("durationMs must be <="));
+}
+
 #[test]
-fn register_all_registers_eight_tools() {
+fn register_all_registers_ten_tools() {
     let dir = TempDir::new().unwrap();
     let client = Arc::new(RegistryClient::with_socket_path(socket_path(&dir)));
     let mut registry = ToolRegistry::new();
     register_all(&mut registry, client);
     let metadata = registry.metadata();
-    assert_eq!(metadata.len(), 8);
+    assert_eq!(metadata.len(), 10);
     let names: Vec<&str> = metadata.iter().map(|t| t.name).collect();
     assert_eq!(
         names,
@@ -416,6 +495,8 @@ fn register_all_registers_eight_tools() {
             "move_mouse",
             "click",
             "click_element",
+            "scroll",
+            "drag_drop",
             "type_text",
             "screenshot_window",
         ],

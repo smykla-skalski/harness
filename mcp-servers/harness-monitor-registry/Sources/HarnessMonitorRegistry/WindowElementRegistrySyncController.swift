@@ -9,6 +9,7 @@ final class WindowElementRegistrySyncController {
   }
 
   private let registry: AccessibilityRegistry
+  private let ownerID = UUID()
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
   private var pendingAction: PendingAction?
@@ -72,9 +73,13 @@ final class WindowElementRegistrySyncController {
         return
       }
       let elements = WindowAccessibilityElementSnapshotter.elements(in: window)
-      await registry.replaceWindowElements(windowID: window.windowNumber, elements: elements)
+      await registry.replaceTrackedWindowElements(
+        windowID: window.windowNumber,
+        elements: elements,
+        ownerID: ownerID
+      )
     case .clear(let windowID):
-      await registry.unregisterElements(windowID: windowID)
+      await registry.unregisterTrackedWindowElements(windowID: windowID, ownerID: ownerID)
     }
   }
 }

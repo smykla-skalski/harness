@@ -149,6 +149,11 @@ struct SessionTaskSummaryCard: View {
     .onDragSessionUpdated { session in
       updateDragSession(session)
     }
+    .harnessTrackMCPElement(
+      HarnessMonitorAccessibility.sessionTaskCard(task.taskId),
+      kind: .row,
+      label: task.title
+    )
     .contextMenu {
       Button {
         inspectTask(task.taskId)
@@ -163,7 +168,6 @@ struct SessionTaskSummaryCard: View {
       }
     }
     .accessibilityValue(isDragging ? "Dragging" : "")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskCard(task.taskId))
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
     .animation(.easeOut(duration: 0.10), value: isDragging)
     .onDisappear {

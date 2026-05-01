@@ -258,7 +258,11 @@ struct SessionAgentSummaryCard: View {
           Label("Copy Agent ID", systemImage: "doc.on.doc")
         }
       }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId))
+      .harnessTrackMCPElement(
+        HarnessMonitorAccessibility.sessionAgentCard(agent.agentId),
+        kind: .row,
+        label: agent.name
+      )
       .accessibilityFrameMarker(
         "\(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId)).frame"
       )

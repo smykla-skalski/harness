@@ -7,11 +7,13 @@ use crate::mcp::tool::ToolRegistry;
 
 mod click;
 mod click_element;
+mod drag_drop;
 mod get_element;
 mod list_elements;
 mod list_windows;
 mod move_mouse;
 mod screenshot_window;
+mod scroll;
 mod shared;
 mod type_text;
 
@@ -20,10 +22,12 @@ mod tests;
 
 pub use click::ClickTool;
 pub use click_element::ClickElementTool;
+pub use drag_drop::DragDropTool;
 pub use get_element::GetElementTool;
 pub use list_elements::ListElementsTool;
 pub use list_windows::ListWindowsTool;
 pub use move_mouse::MoveMouseTool;
+pub use scroll::ScrollTool;
 pub use screenshot_window::ScreenshotWindowTool;
 pub use type_text::TypeTextTool;
 
@@ -35,7 +39,9 @@ pub fn register_all(registry: &mut ToolRegistry, client: Arc<RegistryClient>) {
     registry.register(Box::new(GetElementTool::new(Arc::clone(&client))));
     registry.register(Box::new(MoveMouseTool));
     registry.register(Box::new(ClickTool));
-    registry.register(Box::new(ClickElementTool::new(client)));
+    registry.register(Box::new(ClickElementTool::new(Arc::clone(&client))));
+    registry.register(Box::new(ScrollTool::new(Arc::clone(&client))));
+    registry.register(Box::new(DragDropTool::new(Arc::clone(&client))));
     registry.register(Box::new(TypeTextTool));
     registry.register(Box::new(ScreenshotWindowTool));
 }

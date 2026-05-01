@@ -7,6 +7,7 @@ struct ContentWindowToolbarModel: Equatable {
   let canStartNewSession: Bool
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
+  let mcpStatus: HarnessMonitorMCPStatusSnapshot
 
   var sleepPreventionTitle: String {
     sleepPreventionEnabled ? "Allow Sleep" : "Prevent Sleep"
@@ -56,6 +57,12 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
           : "Keep the system awake while sessions are active"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
+      MCPStatusLabel(status: model.mcpStatus, variant: .toolbar)
+        .help(model.mcpStatus.detail)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(model.mcpStatus.accessibilityLabel)
+        .accessibilityValue(model.mcpStatus.accessibilityValue)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.mcpToolbarStatus)
       RefreshToolbarButton(isRefreshing: model.isRefreshing) {
         Task { await store.refresh() }
       }

@@ -69,6 +69,11 @@ struct SessionCockpitView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .harnessTrackMCPElement(
+        HarnessMonitorAccessibility.sessionCockpitScrollView,
+        kind: .list,
+        label: "Session cockpit scroll view"
+      )
     }
   }
 

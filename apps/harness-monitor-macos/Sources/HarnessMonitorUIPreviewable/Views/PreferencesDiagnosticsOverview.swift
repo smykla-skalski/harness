@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PreferencesDiagnosticsOverview: View {
   let launchAgent: LaunchAgentStatus?
+  let mcpStatus: HarnessMonitorMCPStatusSnapshot
   let tokenPresent: Bool
   let projectCount: Int
   let worktreeCount: Int
@@ -70,6 +71,27 @@ struct PreferencesDiagnosticsOverview: View {
       }
     }
 
+    Section("MCP") {
+      LabeledContent("Status") {
+        MCPStatusLabel(status: mcpStatus, variant: .detail)
+      }
+      Text(mcpStatus.detail)
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+      if let recoverySummary = mcpStatus.recoverySummary {
+        Text(recoverySummary)
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+      }
+      if let socketPath = mcpStatus.socketPath {
+        LabeledContent("Socket") {
+          Text(socketPath)
+            .scaledFont(.caption.monospaced())
+            .textSelection(.enabled)
+        }
+      }
+    }
+
     if let lastEvent {
       Section("Latest Event") {
         LabeledContent("Level") {
@@ -92,6 +114,7 @@ struct PreferencesDiagnosticsOverview: View {
   Form {
     PreferencesDiagnosticsOverview(
       launchAgent: store.daemonStatus?.launchAgent,
+      mcpStatus: store.mcpStatus,
       tokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
       projectCount: store.daemonStatus?.projectCount ?? 0,
       worktreeCount: store.daemonStatus?.worktreeCount ?? 0,

@@ -9,6 +9,8 @@ import Foundation
 // Subcommands:
 //   move <x> <y>
 //   click <x> <y> [--button left|right] [--double]
+//   scroll <x> <y> <delta-x> <delta-y>
+//   drag <start-x> <start-y> <end-x> <end-y> [--duration-ms <ms>]
 //   type [--delay <ms>] <text>    (text read from stdin if omitted)
 //   position
 //   check                         (report Accessibility permission state)
@@ -32,6 +34,8 @@ do {
   switch subcommand {
   case "move": try handleMove(Array(args.dropFirst()))
   case "click": try handleClick(Array(args.dropFirst()))
+  case "scroll": try handleScroll(Array(args.dropFirst()))
+  case "drag": try handleDrag(Array(args.dropFirst()))
   case "type": try handleType(Array(args.dropFirst()))
   case "position": try handlePosition()
   case "check": try handleCheck()
@@ -96,6 +100,8 @@ func printUsage() {
     Subcommands:
       move <x> <y>
       click <x> <y> [--button left|right] [--double]
+      scroll <x> <y> <delta-x> <delta-y>
+      drag <start-x> <start-y> <end-x> <end-y> [--duration-ms ms]
       type [--delay ms] [text]        (reads stdin if text omitted)
       position                        (prints "x,y")
       check                           (prints "trusted" or "denied"; exit 2 if denied)
@@ -123,11 +129,7 @@ func handleMove(_ args: [String]) throws {
   let x = try parseDouble(args[0])
   let y = try parseDouble(args[1])
   try requireTrustedAccessibility()
-  let point = CGPoint(x: x, y: y)
-  guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left) else {
-    throw InputToolError.eventCreationFailed("mouseMoved")
-  }
-  event.post(tap: .cghidEventTap)
+  try moveMouse(to: CGPoint(x: x, y: y))
 }
 
 enum MouseButton: String {
@@ -182,6 +184,129 @@ func postClick(at point: CGPoint, button: MouseButton, clickState: Int64) throws
   up.setIntegerValueField(.mouseEventClickState, value: clickState)
   down.post(tap: .cghidEventTap)
   up.post(tap: .cghidEventTap)
+}
+
+func handleScroll(_ args: [String]) throws {
+  guard args.count >= 4 else { throw InputToolError.usage("scroll <x> <y> <delta-x> <delta-y>") }
+  let x = try parseDouble(args[0])
+  let y = try parseDouble(args[1])
+  let deltaX = try parseDouble(args[2])
+  let deltaY = try parseDouble(args[3])
+
+  try requireTrustedAccessibility()
+
+  let point = CGPoint(x: x, y: y)
+  try moveMouse(to: point)
+
+  let wheel1 = saturatingInt32(-deltaY.rounded())
+  let wheel2 = saturatingInt32(deltaX.rounded())
+  guard let event = CGEvent(
+    scrollWheelEvent2Source: nil,
+    units: .pixel,
+    wheelCount: 2,
+    wheel1: wheel1,
+    wheel2: wheel2,
+    wheel3: 0
+  ) else {
+    throw InputToolError.eventCreationFailed("scroll")
+  }
+  event.location = point
+  event.post(tap: .cghidEventTap)
+}
+
+func handleDrag(_ args: [String]) throws {
+  guard args.count >= 4 else {
+    throw InputToolError.usage(
+      "drag <start-x> <start-y> <end-x> <end-y> [--duration-ms ms]"
+    )
+  }
+  let startX = try parseDouble(args[0])
+  let startY = try parseDouble(args[1])
+  let endX = try parseDouble(args[2])
+  let endY = try parseDouble(args[3])
+  var durationMillis: UInt64 = 180
+  var index = 4
+  while index < args.count {
+    switch args[index] {
+    case "--duration-ms":
+      guard index + 1 < args.count else {
+        throw InputToolError.usage("--duration-ms requires a value")
+      }
+      guard let value = UInt64(args[index + 1]) else {
+        throw InputToolError.invalidNumber(args[index + 1])
+      }
+      durationMillis = value
+      index += 2
+    default:
+      throw InputToolError.usage("unknown flag: \(args[index])")
+    }
+  }
+
+  try requireTrustedAccessibility()
+
+  let start = CGPoint(x: startX, y: startY)
+  let end = CGPoint(x: endX, y: endY)
+  var releasePoint = start
+  var mouseIsDown = false
+  try moveMouse(to: start)
+  try postMouseEvent(type: .leftMouseDown, point: start, button: .left)
+  mouseIsDown = true
+  defer {
+    if mouseIsDown {
+      try? postMouseEvent(type: .leftMouseUp, point: releasePoint, button: .left)
+    }
+  }
+  let steps = dragStepCount(for: durationMillis)
+  for step in 1...steps {
+    let progress = Double(step) / Double(steps)
+    let point = CGPoint(
+      x: start.x + ((end.x - start.x) * progress),
+      y: start.y + ((end.y - start.y) * progress)
+    )
+    try postMouseEvent(type: .leftMouseDragged, point: point, button: .left)
+    releasePoint = point
+    if durationMillis > 0 {
+      let multiplied = durationMillis.multipliedReportingOverflow(by: 1_000)
+      let microsPerStep = (multiplied.overflow ? UInt64.max : multiplied.partialValue) / UInt64(steps)
+      usleep(useconds_t(min(microsPerStep, UInt64(useconds_t.max))))
+    }
+  }
+  try postMouseEvent(type: .leftMouseUp, point: end, button: .left)
+  mouseIsDown = false
+}
+
+func dragStepCount(for durationMillis: UInt64) -> Int {
+  let baseline = max(UInt64(4), durationMillis / 16)
+  let capped = min(baseline, 4_096)
+  return Int(capped)
+}
+
+func moveMouse(to point: CGPoint) throws {
+  guard let event = CGEvent(
+    mouseEventSource: nil,
+    mouseType: .mouseMoved,
+    mouseCursorPosition: point,
+    mouseButton: .left
+  ) else {
+    throw InputToolError.eventCreationFailed("mouseMoved")
+  }
+  event.post(tap: .cghidEventTap)
+}
+
+func postMouseEvent(type: CGEventType, point: CGPoint, button: CGMouseButton) throws {
+  guard let event = CGEvent(
+    mouseEventSource: nil,
+    mouseType: type,
+    mouseCursorPosition: point,
+    mouseButton: button
+  ) else {
+    throw InputToolError.eventCreationFailed("mouse drag")
+  }
+  event.post(tap: .cghidEventTap)
+}
+
+func saturatingInt32(_ value: Double) -> Int32 {
+  Int32(max(Double(Int32.min), min(Double(Int32.max), value)))
 }
 
 func handleType(_ args: [String]) throws {

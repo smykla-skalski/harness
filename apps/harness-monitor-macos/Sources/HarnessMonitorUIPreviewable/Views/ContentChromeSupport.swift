@@ -8,6 +8,7 @@ struct ContentDetailChrome<Content: View>: View {
   let windowID: String
   let persistenceError: String?
   let sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability
+  let mcpStatus: HarnessMonitorMCPStatusSnapshot
   let arbitrationTasks: [WorkItem]
   @ViewBuilder let content: Content
 
@@ -18,6 +19,7 @@ struct ContentDetailChrome<Content: View>: View {
     windowID: String = HarnessMonitorWindowID.main,
     persistenceError: String?,
     sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot,
     arbitrationTasks: [WorkItem] = [],
     @ViewBuilder content: () -> Content
   ) {
@@ -27,6 +29,7 @@ struct ContentDetailChrome<Content: View>: View {
     self.windowID = windowID
     self.persistenceError = persistenceError
     self.sessionDataAvailability = sessionDataAvailability
+    self.mcpStatus = mcpStatus
     self.arbitrationTasks = arbitrationTasks
     self.content = content()
   }
@@ -42,6 +45,7 @@ struct ContentDetailChrome<Content: View>: View {
   private var showsTopChrome: Bool {
     persistenceError != nil
       || sessionDataAvailability != .live
+      || mcpStatus.shouldShowChromeBanner
       || contentChrome.acpBridgeBanner != nil
       || !arbitrationTasks.isEmpty
   }
@@ -63,6 +67,10 @@ struct ContentDetailChrome<Content: View>: View {
         if isStale {
           SessionDataAvailabilityBanner(availability: sessionDataAvailability)
           chromeDivider(tint: HarnessMonitorTheme.caution)
+        }
+        if mcpStatus.shouldShowChromeBanner {
+          MCPStatusBanner(status: mcpStatus)
+          chromeDivider(tint: MCPStatusViewSupport.tint(for: mcpStatus.tone))
         }
         if contentChrome.acpBridgeBanner != nil {
           ContentAcpBridgeBannerBridge(

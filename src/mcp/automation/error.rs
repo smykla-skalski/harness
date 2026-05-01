@@ -10,6 +10,18 @@ pub enum AutomationError {
     )]
     MouseBackendMissing,
     #[error(
+        "No scroll backend available. Build the bundled helper with `swift build -c release \
+         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         and grant Accessibility permission to the process running this MCP server."
+    )]
+    ScrollBackendMissing,
+    #[error(
+        "No drag/drop backend available. Build the bundled helper with `swift build -c release \
+         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         and grant Accessibility permission to the process running this MCP server."
+    )]
+    DragBackendMissing,
+    #[error(
         "Accessibility permission not granted. Open System Settings -> Privacy & Security -> \
          Accessibility and enable the app running this MCP server."
     )]

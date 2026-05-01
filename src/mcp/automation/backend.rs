@@ -1,5 +1,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use tokio::fs;
 use tokio::process::Command;
@@ -37,10 +38,8 @@ pub async fn detect_backend() -> Backend {
     {
         return Backend::HarnessInput(path);
     }
-    for candidate in default_helper_candidates() {
-        if file_exists(&candidate).await {
-            return Backend::HarnessInput(candidate);
-        }
+    if let Some(candidate) = default_helper_candidate().await {
+        return Backend::HarnessInput(candidate);
     }
     if on_path("cliclick").await {
         return Backend::Cliclick;
@@ -56,17 +55,69 @@ fn env_override() -> Option<PathBuf> {
     Some(PathBuf::from(value))
 }
 
-fn default_helper_candidates() -> Vec<PathBuf> {
+pub(crate) async fn default_helper_candidate() -> Option<PathBuf> {
+    default_helper_candidate_in(&repo_root_guess()).await
+}
+
+pub(crate) async fn default_helper_candidate_in(repo_root: &Path) -> Option<PathBuf> {
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for candidate in helper_candidates_from(repo_root) {
+        let Ok(metadata) = fs::metadata(&candidate).await else {
+            continue;
+        };
+        let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        if best.as_ref().is_none_or(|(best_modified, best_path)| {
+            modified > *best_modified
+                || (modified == *best_modified
+                    && prefers_candidate(&candidate, best_path))
+        }) {
+            best = Some((modified, candidate));
+        }
+    }
+    best.map(|(_, path)| path)
+}
+
+fn helper_candidates_from(repo_root: &Path) -> Vec<PathBuf> {
     // The Node.js server walked up from `dist/automation.js` to the package
     // root, then across to `harness-monitor-registry`. In the Rust CLI we
     // don't have a package-local install path, so we look under the
     // repository sibling `mcp-servers/harness-monitor-registry/.build`.
-    let repo_root = repo_root_guess();
     let registry = repo_root.join("mcp-servers/harness-monitor-registry/.build");
-    vec![
+    let mut candidates = platform_helper_candidates(&registry);
+    candidates.extend([
         registry.join("release/harness-monitor-input"),
         registry.join("debug/harness-monitor-input"),
-    ]
+    ]);
+    candidates
+}
+
+fn platform_helper_candidates(build_root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(build_root) else {
+        return Vec::new();
+    };
+
+    let mut candidates = Vec::new();
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+        let path = entry.path();
+        candidates.extend([
+            path.join("release/harness-monitor-input"),
+            path.join("debug/harness-monitor-input"),
+        ]);
+    }
+    candidates
+}
+
+fn prefers_candidate(candidate: &Path, incumbent: &Path) -> bool {
+    candidate.components().any(|component| component.as_os_str() == "debug")
+        && !incumbent
+            .components()
+            .any(|component| component.as_os_str() == "debug")
 }
 
 fn repo_root_guess() -> PathBuf {
