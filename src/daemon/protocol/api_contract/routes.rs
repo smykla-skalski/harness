@@ -26,6 +26,14 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::CONFIG,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::CONFIG,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::DAEMON_STOP,
         parity: HttpRouteParity::Rpc {

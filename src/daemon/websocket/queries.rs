@@ -11,6 +11,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 
+use super::config::build_config_payload;
 use super::connection::ConnectionState;
 use super::frames::error_response;
 use super::mutations::{dispatch_query, dispatch_query_result};
@@ -41,6 +42,7 @@ async fn dispatch_daemon_read_query(
     match request.method.as_str() {
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
         ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
+        ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
         ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
         ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
@@ -51,6 +53,10 @@ async fn dispatch_daemon_read_query(
         ws_methods::RUNTIMES_PROBE => Some(dispatch_runtimes_probe_query(&request.id)),
         _ => None,
     }
+}
+
+fn dispatch_config_query(request_id: &str) -> WsResponse {
+    dispatch_query_result(request_id, Ok(build_config_payload()))
 }
 
 fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {

@@ -195,6 +195,7 @@ struct SidebarSessionListContent: View {
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
     let presentation = store.sessionSummaryPresentation(for: session)
+    let isSelected = store.selectedSessionID == session.sessionId
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.selectionMarkersEnabled
       && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
@@ -209,6 +210,12 @@ struct SidebarSessionListContent: View {
         sessionAccessibilityLabel(for: session, presentation: presentation)
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionRow(session.sessionId))
+      .harnessMCPRow(
+        HarnessMonitorAccessibility.sessionRow(session.sessionId),
+        label: sessionAccessibilityLabel(for: session, presentation: presentation),
+        value: isSelected ? "selected" : "not selected",
+        pressAction: { store.selectSessionFromList(session.sessionId) }
+      )
       .harnessUITestValue(
         isSelectedForUITest
           ? "selected, interactive=button, selectionChrome=translucent"

@@ -1,6 +1,7 @@
 pub const HEALTH: &str = "/v1/health";
 pub const READY: &str = "/v1/ready";
 pub const DIAGNOSTICS: &str = "/v1/diagnostics";
+pub const CONFIG: &str = "/v1/config";
 pub const DAEMON_STOP: &str = "/v1/daemon/stop";
 pub const BRIDGE_RECONFIGURE: &str = "/v1/bridge/reconfigure";
 pub const DAEMON_LOG_LEVEL: &str = "/v1/daemon/log-level";

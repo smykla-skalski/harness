@@ -15,7 +15,7 @@ use crate::daemon::protocol::{
     SetLogLevelRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::daemon::websocket::ws_upgrade_handler;
+use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
@@ -27,6 +27,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         .route(http_paths::HEALTH, get(get_health))
         .route(http_paths::READY, get(get_ready))
         .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
+        .route(http_paths::CONFIG, get(get_config))
         .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
         .route(
             http_paths::BRIDGE_RECONFIGURE,
@@ -128,6 +129,24 @@ pub(super) async fn get_diagnostics(
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
+}
+
+pub(super) async fn get_config(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
+        "GET",
+        http_paths::CONFIG,
+        &request_id,
+        start,
+        Ok(build_config_payload()),
+    )
 }
 
 pub(super) async fn get_runtimes_probe(
