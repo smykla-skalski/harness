@@ -4,10 +4,15 @@ use std::path::PathBuf;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use tokio::process::Command;
+use tokio::time::{Duration, timeout};
 
 use crate::mcp::registry::{ElementKind, GetElementResult, ListElementsResult};
 
 use super::backend::{Backend, detect_backend};
+
+// Keep helper fallback queries bounded so a wedged AX tree degrades to a fast
+// MCP error instead of hanging the whole request path.
+const ACCESSIBILITY_QUERY_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Error)]
 pub enum AccessibilityQueryError {
@@ -25,6 +30,8 @@ pub enum AccessibilityQueryError {
     NotFound,
     #[error("accessibility query failed: {detail}")]
     QueryFailed { detail: String },
+    #[error("accessibility query timed out after {milliseconds}ms")]
+    TimedOut { milliseconds: u128 },
     #[error("accessibility query decode failed: {detail}")]
     DecodeFailed { detail: String },
 }
@@ -74,13 +81,25 @@ async fn run_query<T: DeserializeOwned>(
     program: &PathBuf,
     args: &[OsString],
 ) -> Result<T, AccessibilityQueryError> {
-    let output = Command::new(program)
-        .args(args)
-        .output()
-        .await
-        .map_err(|error| AccessibilityQueryError::QueryFailed {
-            detail: error.to_string(),
-        })?;
+    run_query_with_timeout(program, args, ACCESSIBILITY_QUERY_TIMEOUT).await
+}
+
+async fn run_query_with_timeout<T: DeserializeOwned>(
+    program: &PathBuf,
+    args: &[OsString],
+    deadline: Duration,
+) -> Result<T, AccessibilityQueryError> {
+    let output = timeout(
+        deadline,
+        Command::new(program).args(args).kill_on_drop(true).output(),
+    )
+    .await
+    .map_err(|_| AccessibilityQueryError::TimedOut {
+        milliseconds: deadline.as_millis(),
+    })?
+    .map_err(|error| AccessibilityQueryError::QueryFailed {
+        detail: error.to_string(),
+    })?;
     if !output.status.success() {
         return Err(map_query_failure(&output));
     }
@@ -106,5 +125,41 @@ fn map_query_failure(output: &std::process::Output) -> AccessibilityQueryError {
                 detail.to_string()
             },
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn write_helper_script(path: &std::path::Path, body: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create helper parent");
+        }
+        fs::write(path, body).expect("write helper script");
+        let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("set helper executable");
+    }
+
+    #[tokio::test]
+    async fn run_query_times_out_hanging_helper() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let helper = temp.path().join("harness-monitor-input");
+        write_helper_script(&helper, "#!/bin/sh\nsleep 60\n");
+
+        let result = run_query_with_timeout::<ListElementsResult>(
+            &helper,
+            &[OsString::from("list-elements")],
+            Duration::from_millis(50),
+        )
+        .await;
+
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "accessibility query timed out after 50ms"
+        );
     }
 }
