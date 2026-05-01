@@ -16,6 +16,25 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     XCTAssertTrue(state.label.contains("selection=create"))
   }
 
+  func testAgentsWindowDisablesStartingWhenNoSessionIsSelected() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"
+      ]
+    )
+    openAgentsWindow(in: app)
+
+    let startButton = button(in: app, identifier: Accessibility.agentTuiStartButton)
+    let banner = element(in: app, identifier: Accessibility.agentTuiSessionActionBanner)
+    let newSessionButton = button(in: app, identifier: Accessibility.agentTuiNewSessionButton)
+
+    XCTAssertTrue(waitForElement(startButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(banner, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(newSessionButton, timeout: Self.actionTimeout))
+    XCTAssertFalse(startButton.isEnabled, "Start should stay disabled until a session is available")
+  }
+
   func testAgentsWindowSuppressesStaleRunningTerminalUntilRefreshCompletes() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: [
@@ -216,14 +235,29 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
       0,
       "Agents window should expose toolbar controls in native window chrome"
     )
-    let leadingToolbarButton = toolbar.buttons.element(boundBy: 0)
-    XCTAssertTrue(leadingToolbarButton.exists)
-    let toolbarLeadingInset = leadingToolbarButton.frame.minX - agentWindow.frame.minX
+    let buttonLeadingInset =
+      toolbar.buttons.allElementsBoundByIndex
+        .filter { $0.exists && !$0.frame.isEmpty }
+        .map { $0.frame.minX - agentWindow.frame.minX }
+        .min()
+      ?? .greatestFiniteMagnitude
+    let searchLeadingInset =
+      agentWindow.searchFields.allElementsBoundByIndex
+        .filter { $0.exists && !$0.frame.isEmpty }
+        .map { $0.frame.minX - agentWindow.frame.minX }
+        .min()
+      ?? .greatestFiniteMagnitude
+    let leadingChromeInset = min(buttonLeadingInset, searchLeadingInset)
     let rowTopInset = createRow.frame.minY - agentWindow.frame.minY
     XCTAssertLessThan(
-      toolbarLeadingInset,
+      leadingChromeInset,
+      .greatestFiniteMagnitude,
+      "Agents window should expose a visible leading toolbar control"
+    )
+    XCTAssertLessThan(
+      leadingChromeInset,
       176,
-      "Agents sidebar toggle should stay near the leading window chrome"
+      "Agents window chrome should stay near the leading window edge"
     )
     XCTAssertGreaterThan(
       rowTopInset,
@@ -236,6 +270,121 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
       "Agents sidebar content should stay visually close to the toolbar"
     )
   }
+
+  func testDecisionDeskUsesNativeSearchFieldAndToolbarFilterMenu() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
+    )
+    openAgentsWindow(in: app)
+
+    let createRow = element(in: app, identifier: Accessibility.agentTuiCreateTab)
+    XCTAssertTrue(waitForElement(createRow, timeout: Self.actionTimeout))
+
+    let agentWindow = window(in: app, containing: createRow)
+    let toolbar = agentWindow.toolbars.firstMatch
+    let nativeSearchField = agentWindow.searchFields.firstMatch
+    let filterButton = button(in: app, identifier: Accessibility.agentsDecisionFiltersMenu)
+    let decisionDesk = element(in: app, identifier: Accessibility.agentsDecisionDesk)
+    let legacyScopeMenu = element(in: app, identifier: Accessibility.decisionsSidebarSearchScopeMenu)
+    let legacyFilterToggle = element(
+      in: app,
+      identifier: Accessibility.decisionsSidebarFilterToggle
+    )
+
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitForElement(nativeSearchField, timeout: Self.fastActionTimeout),
+      "Agents decision search should use SwiftUI searchable instead of a custom in-list text field"
+    )
+    XCTAssertTrue(waitForElement(filterButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(decisionDesk, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      filterButton.isEnabled,
+      "Agents decision filter menu should stay enabled when the preview seeds decisions"
+    )
+    XCTAssertTrue(
+      filterButton.label.contains("Severity"),
+      "Agents decision toolbar control should expose the severity dimension, not a generic filter label"
+    )
+    XCTAssertFalse(
+      legacyScopeMenu.exists,
+      "Agents decision scope menu should come from native search scopes, not a custom sidebar row"
+    )
+    XCTAssertFalse(
+      legacyFilterToggle.exists,
+      "Agents decision severity filters should no longer use the old custom sidebar toggle row"
+    )
+
+    XCTAssertGreaterThanOrEqual(filterButton.frame.minY, toolbar.frame.minY - 4)
+    XCTAssertLessThanOrEqual(filterButton.frame.maxY, toolbar.frame.maxY + 4)
+    XCTAssertLessThanOrEqual(
+      nativeSearchField.frame.maxY,
+      createRow.frame.minY + 2,
+      "Agents decision search should render in native sidebar chrome above the list content"
+    )
+  }
+
+  func testDecisionFilterMenuUpdatesSidebarFilterState() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
+    )
+    openAgentsWindow(in: app)
+
+    let filterState = element(in: app, identifier: Accessibility.agentsDecisionFilterState)
+    let decisionDesk = element(in: app, identifier: Accessibility.agentsDecisionDesk)
+    XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(decisionDesk, timeout: Self.fastActionTimeout))
+    resetAgentsDecisionSeveritiesIfNeeded(in: app)
+    XCTAssertTrue(
+      filterState.label.contains("severities=all"),
+      "Agents decision filters should start with the full severity set visible"
+    )
+
+    openAgentsDecisionFilters(in: app)
+    tapButton(in: app, title: "Critical")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        filterState.label.contains("severities=critical")
+      },
+      """
+      Selecting Critical from the toolbar menu should update the agents decision filter state.
+      state=\(filterState.label)
+      """
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        decisionDesk.label.contains("Severity: Critical")
+      },
+      """
+      Selecting Critical should update the visible Decision Desk summary with the active severity filter.
+      label=\(decisionDesk.label)
+      """
+    )
+
+    openAgentsDecisionFilters(in: app)
+    tapButton(in: app, title: "All severities")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        filterState.label.contains("severities=all")
+      },
+      """
+      Resetting the toolbar menu should restore the unfiltered agents decision state.
+      state=\(filterState.label)
+      """
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        decisionDesk.label.contains("Severity:") == false
+      },
+      """
+      Clearing severity filters should remove the explicit severity summary from the Decision Desk row.
+      label=\(decisionDesk.label)
+      """
+    )
+  }
+
   func testWrapToggleSwitchesViewportMode() throws {
     let app = launchInCockpitPreview()
     openAgentsWindow(in: app)

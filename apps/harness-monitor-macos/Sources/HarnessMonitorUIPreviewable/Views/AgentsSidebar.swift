@@ -19,9 +19,6 @@ struct AgentsSidebar: View {
   let tasks: [WorkItem]
   let refresh: () -> Void
 
-  @State private var decisionQuery = ""
-  @AppStorage("harness.decisions.sidebar.filterExpanded")
-  private var decisionFilterExpanded = true
   @AppStorage("harness.decisions.sidebar.severitiesCSV")
   private var decisionSeveritiesCSV = ""
   @AppStorage("harness.decisions.sidebar.searchScope")
@@ -38,6 +35,32 @@ struct AgentsSidebar: View {
       get: { selection },
       set: { selection = $0 ?? .create }
     )
+  }
+
+  private var decisionSearchText: Binding<String> {
+    Binding(
+      get: { decisionFilters.query },
+      set: { updateDecisionFilters(query: $0) }
+    )
+  }
+
+  private var decisionSearchScope: Binding<DecisionsSidebarSearchScope> {
+    Binding(
+      get: { decisionFilters.scope },
+      set: { updateDecisionFilters(scope: $0) }
+    )
+  }
+
+  private var persistedDecisionSeverities: Set<DecisionSeverity> {
+    Set(
+      decisionSeveritiesCSV
+        .split(separator: ",")
+        .compactMap { DecisionSeverity(rawValue: String($0)) }
+    )
+  }
+
+  private var decisionFiltersMenuEnabled: Bool {
+    decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
   }
 
   private var activeTuis: [AgentTuiSnapshot] {
@@ -79,10 +102,6 @@ struct AgentsSidebar: View {
         currentSessionID: currentSessionID,
         currentSessionTitle: currentSessionTitle,
         fontScale: fontScale,
-        decisionQuery: $decisionQuery,
-        decisionFilterExpanded: $decisionFilterExpanded,
-        decisionSeveritiesCSV: $decisionSeveritiesCSV,
-        decisionSearchScopeRaw: $decisionSearchScopeRaw,
         acpPayload: acpPayload(for:),
         lastMessageAt: lastAcpMessageAt(for:)
       )
@@ -182,13 +201,40 @@ struct AgentsSidebar: View {
       }
     }
     .listStyle(.sidebar)
+    .overlay {
+      AgentsSidebarDecisionFilterStateMarker(
+        filters: decisionFilters,
+        decisionScope: decisionScope
+      )
+    }
+    .searchable(
+      text: decisionSearchText,
+      placement: .sidebar,
+      prompt: Text("Search decisions")
+    )
+    .searchScopes(decisionSearchScope, activation: .onSearchPresentation) {
+      ForEach(DecisionsSidebarSearchScope.allCases) { scope in
+        Text(scope.label).tag(scope)
+      }
+    }
     .toolbar {
+      AgentsSidebarDecisionFilterToolbarItem(
+        selectedSeverities: decisionFilters.severities,
+        isEnabled: decisionFiltersMenuEnabled,
+        setSelectedSeverities: setDecisionSeverities
+      )
       ToolbarItem(placement: .automatic) {
         Button(action: refresh) {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRefreshButton)
       }
+    }
+    .onAppear {
+      restorePersistedDecisionFiltersIfNeeded()
+    }
+    .onChange(of: decisionFilters) { _, newValue in
+      syncPersistedDecisionPreferences(from: newValue)
     }
   }
 
@@ -253,6 +299,55 @@ struct AgentsSidebar: View {
     }
     return store.acpPermissionDecisionPayload(for: decision.id)
       ?? AcpPermissionDecisionPayload.decode(from: decision)
+  }
+
+  private func restorePersistedDecisionFiltersIfNeeded() {
+    let isDefaultState =
+      decisionFilters.query.isEmpty
+      && decisionFilters.severities.isEmpty
+      && decisionFilters.scope == .summary
+    if isDefaultState {
+      updateDecisionFilters(
+        severities: persistedDecisionSeverities,
+        scope: DecisionsSidebarSearchScope(rawValue: decisionSearchScopeRaw) ?? .summary
+      )
+    } else {
+      syncPersistedDecisionPreferences(from: decisionFilters)
+    }
+  }
+
+  private func setDecisionSeverities(_ newValue: Set<DecisionSeverity>) {
+    updateDecisionFilters(severities: newValue)
+  }
+
+  private func updateDecisionFilters(
+    query: String? = nil,
+    severities: Set<DecisionSeverity>? = nil,
+    scope: DecisionsSidebarSearchScope? = nil
+  ) {
+    let next = DecisionsSidebarViewModel.FilterState(
+      query: query ?? decisionFilters.query,
+      severities: severities ?? decisionFilters.severities,
+      scope: scope ?? decisionFilters.scope
+    )
+    guard next != decisionFilters else {
+      syncPersistedDecisionPreferences(from: next)
+      return
+    }
+    decisionFilters = next
+    syncPersistedDecisionPreferences(from: next)
+  }
+
+  private func syncPersistedDecisionPreferences(
+    from filters: DecisionsSidebarViewModel.FilterState
+  ) {
+    let severityCSV = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
+    if decisionSeveritiesCSV != severityCSV {
+      decisionSeveritiesCSV = severityCSV
+    }
+    if decisionSearchScopeRaw != filters.scope.rawValue {
+      decisionSearchScopeRaw = filters.scope.rawValue
+    }
   }
 
 }

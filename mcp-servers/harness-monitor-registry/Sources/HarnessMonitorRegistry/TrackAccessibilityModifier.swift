@@ -1,5 +1,8 @@
 #if canImport(SwiftUI)
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 public extension View {
   /// Register this view with an `AccessibilityRegistry` so the MCP server can discover it.
@@ -8,7 +11,7 @@ public extension View {
   ///   - identifier: Stable identifier exposed over the IPC protocol; must match the view's
   ///     `.accessibilityIdentifier(...)` so on-device UI tests and the MCP server line up.
   ///   - kind: Semantic kind surfaced to the MCP client.
-  ///   - label: Optional human-readable label. Falls back to `identifier` when nil.
+  ///   - label: Optional human-readable label.
   ///   - value: Optional current value (e.g. text-field content).
   ///   - hint: Optional accessibility hint.
   ///   - windowID: Optional `CGWindowID` of the hosting window, when known.
@@ -26,9 +29,9 @@ public extension View {
   ) -> some View {
     modifier(
       TrackAccessibilityModifier(
-        identifier: identifier,
+        elementID: identifier,
         kind: kind,
-        label: label ?? identifier,
+        label: label,
         value: value,
         hint: hint,
         windowID: windowID,
@@ -40,9 +43,9 @@ public extension View {
 }
 
 struct TrackAccessibilityModifier: ViewModifier {
-  let identifier: String
+  let elementID: String
   let kind: RegistryElementKind
-  let label: String
+  let label: String?
   let value: String?
   let hint: String?
   let windowID: Int?
@@ -51,46 +54,282 @@ struct TrackAccessibilityModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .accessibilityIdentifier(identifier)
+      .accessibilityIdentifier(elementID)
       .background(
-        GeometryReader { proxy in
-          Color.clear
-            .preference(
-              key: TrackAccessibilityFramePreferenceKey.self,
-              value: TrackAccessibilityFrame(rect: proxy.frame(in: .global))
-            )
-        }
-      )
-      .onPreferenceChange(TrackAccessibilityFramePreferenceKey.self) { frame in
-        let registry = self.registry
-        let element = RegistryElement(
-          identifier: identifier,
+        TrackAccessibilityProbe(
+          elementID: elementID,
+          kind: kind,
           label: label,
           value: value,
           hint: hint,
-          kind: kind,
-          frame: RegistryRect(frame.rect),
           windowID: windowID,
-          enabled: enabled
+          enabled: enabled,
+          registry: registry
         )
-        Task { await registry.registerElement(element) }
-      }
-      .onDisappear {
-        let identifier = self.identifier
-        let registry = self.registry
-        Task { await registry.unregisterElement(identifier: identifier) }
-      }
+        .allowsHitTesting(false)
+      )
   }
 }
 
-struct TrackAccessibilityFrame: Equatable, Sendable {
-  var rect: CGRect
-}
+#if canImport(AppKit)
+private struct TrackAccessibilityProbe: NSViewRepresentable {
+  let elementID: String
+  let kind: RegistryElementKind
+  let label: String?
+  let value: String?
+  let hint: String?
+  let windowID: Int?
+  let enabled: Bool
+  let registry: AccessibilityRegistry
 
-struct TrackAccessibilityFramePreferenceKey: PreferenceKey {
-  static let defaultValue = TrackAccessibilityFrame(rect: .zero)
-  static func reduce(value: inout TrackAccessibilityFrame, nextValue: () -> TrackAccessibilityFrame) {
-    value = nextValue()
+  func makeNSView(context: Context) -> TrackAccessibilityNSView {
+    let view = TrackAccessibilityNSView()
+    view.configure(
+      elementID: elementID,
+      kind: kind,
+      label: label,
+      value: value,
+      hint: hint,
+      windowID: windowID,
+      enabled: enabled,
+      registry: registry
+    )
+    return view
+  }
+
+  func updateNSView(_ nsView: TrackAccessibilityNSView, context: Context) {
+    nsView.configure(
+      elementID: elementID,
+      kind: kind,
+      label: label,
+      value: value,
+      hint: hint,
+      windowID: windowID,
+      enabled: enabled,
+      registry: registry
+    )
+  }
+
+  static func dismantleNSView(_ nsView: TrackAccessibilityNSView, coordinator: ()) {
+    nsView.unregister()
   }
 }
+
+private final class TrackAccessibilityNSView: NSView {
+  private var trackedElementID = ""
+  private var kind: RegistryElementKind = .other
+  private var label: String?
+  private var value: String?
+  private var hint: String?
+  private var explicitWindowID: Int?
+  private var enabled = true
+  private var registry: AccessibilityRegistry?
+  private var publishTask: Task<Void, Never>?
+  private var observedWindow: NSWindow?
+  private var windowObservers: [NSObjectProtocol] = []
+  private var lastPublishedElement: RegistryElement?
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    alphaValue = 0
+    setAccessibilityHidden(true)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError()
+  }
+
+  deinit {
+    tearDownWindowObservation()
+  }
+
+  func configure(
+    elementID: String,
+    kind: RegistryElementKind,
+    label: String?,
+    value: String?,
+    hint: String?,
+    windowID: Int?,
+    enabled: Bool,
+    registry: AccessibilityRegistry
+  ) {
+    trackedElementID = elementID
+    self.kind = kind
+    self.label = label
+    self.value = value
+    self.hint = hint
+    explicitWindowID = windowID
+    self.enabled = enabled
+    self.registry = registry
+    beginObserving(window: window)
+    publishCurrentElement()
+  }
+
+  func unregister() {
+    publishTask?.cancel()
+    guard let registry, !trackedElementID.isEmpty else {
+      return
+    }
+    let elementID = trackedElementID
+    Task { await registry.unregisterElement(identifier: elementID) }
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    guard window != nil else {
+      tearDownWindowObservation()
+      lastPublishedElement = nil
+      unregister()
+      return
+    }
+    beginObserving(window: window)
+    publishCurrentElement()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    guard superview != nil else {
+      lastPublishedElement = nil
+      unregister()
+      return
+    }
+    publishCurrentElement()
+  }
+
+  override func layout() {
+    super.layout()
+    publishCurrentElement()
+  }
+
+  private func beginObserving(window: NSWindow?) {
+    guard observedWindow !== window else {
+      return
+    }
+    tearDownWindowObservation()
+    observedWindow = window
+    guard let window else {
+      return
+    }
+    let center = NotificationCenter.default
+    windowObservers = [
+      center.addObserver(
+        forName: NSWindow.didMoveNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.publishCurrentElement()
+        }
+      },
+      center.addObserver(
+        forName: NSWindow.didResizeNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.publishCurrentElement()
+        }
+      },
+      center.addObserver(
+        forName: NSWindow.didUpdateNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.publishCurrentElement()
+        }
+      },
+      center.addObserver(
+        forName: NSWindow.didChangeScreenNotification,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated {
+          self?.publishCurrentElement()
+        }
+      },
+    ]
+  }
+
+  private func tearDownWindowObservation() {
+    windowObservers.forEach(NotificationCenter.default.removeObserver)
+    windowObservers.removeAll()
+    observedWindow = nil
+  }
+
+  private func publishCurrentElement() {
+    guard let registry, !trackedElementID.isEmpty else {
+      return
+    }
+    // Use the AppKit accessibility frame so manual registrations line up with
+    // the same screen-space coordinates harvested from NSAccessibility.
+    let frame = accessibilityFrame()
+    guard frame.isNull == false, frame.isInfinite == false, frame.isEmpty == false else {
+      return
+    }
+
+    let element = RegistryElement(
+      identifier: trackedElementID,
+      label: label,
+      value: value,
+      hint: hint,
+      kind: kind,
+      frame: RegistryRect(frame),
+      windowID: explicitWindowID ?? window?.windowNumber,
+      enabled: enabled
+    )
+    guard lastPublishedElement != element else {
+      return
+    }
+    lastPublishedElement = element
+
+    publishTask?.cancel()
+    publishTask = Task { await registry.registerElement(element) }
+  }
+}
+#else
+private struct TrackAccessibilityProbe: View {
+  let elementID: String
+  let kind: RegistryElementKind
+  let label: String?
+  let value: String?
+  let hint: String?
+  let windowID: Int?
+  let enabled: Bool
+  let registry: AccessibilityRegistry
+
+  var body: some View {
+    GeometryReader { proxy in
+      Color.clear
+        .onAppear {
+          publish(frame: proxy.frame(in: .global))
+        }
+        .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+          publish(frame: newFrame)
+        }
+        .onDisappear {
+          let elementID = self.elementID
+          let registry = self.registry
+          Task { await registry.unregisterElement(identifier: elementID) }
+        }
+    }
+  }
+
+  private func publish(frame: CGRect) {
+    let element = RegistryElement(
+      identifier: elementID,
+      label: label,
+      value: value,
+      hint: hint,
+      kind: kind,
+      frame: RegistryRect(frame),
+      windowID: windowID,
+      enabled: enabled
+    )
+    let registry = self.registry
+    Task { await registry.registerElement(element) }
+  }
+}
+#endif
 #endif
