@@ -182,14 +182,11 @@ struct ToolCallTimelineView: View {
       cachedVirtualizedLayout = layout
     }
     let viewportVisibleRowIDs = visibleViewportRowIDs(in: layout)
-    let visibleOverflowToolCallCount = layout.sections
-      .flatMap(\.rows)
-      .reduce(into: 0) { count, row in
-        let isVisibleInViewport = viewportVisibleRowIDs.contains(row.id)
-        if liveAnnouncementRowIDs.contains(row.id), isVisibleInViewport {
-          count += 1
-        }
+    let visibleOverflowToolCallCount = viewportVisibleRowIDs.reduce(into: 0) { count, rowID in
+      if liveAnnouncementRowIDs.contains(rowID) {
+        count += 1
       }
+    }
     if cachedVisibleOverflowToolCallCount != visibleOverflowToolCallCount {
       cachedVisibleOverflowToolCallCount = visibleOverflowToolCallCount
     }
