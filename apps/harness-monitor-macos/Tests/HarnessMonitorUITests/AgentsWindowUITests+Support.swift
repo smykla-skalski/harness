@@ -135,7 +135,7 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     let launchWindow = window(in: app, containing: launchPane)
     let nestedScrollViews = launchPane.descendants(matching: .scrollView)
 
-    if let scrollView = largestScrollTarget(in: nestedScrollViews) {
+    if let scrollView = visibleLargestScrollTarget(in: nestedScrollViews, window: launchWindow) {
       return scrollView
     }
 
@@ -154,10 +154,16 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     ) {
       return scrollView
     }
-    if let largest = largestScrollTarget(in: launchWindow.descendants(matching: .scrollView)) {
+    if let largest = visibleLargestScrollTarget(
+      in: launchWindow.descendants(matching: .scrollView),
+      window: launchWindow
+    ) {
       return largest
     }
-    if let largest = largestScrollTarget(in: app.descendants(matching: .scrollView)) {
+    if let largest = visibleLargestScrollTarget(
+      in: app.descendants(matching: .scrollView),
+      window: launchWindow
+    ) {
       return largest
     }
     return launchPane
@@ -179,6 +185,36 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     return bestMatch
   }
 
+  private func visibleLargestScrollTarget(
+    in query: XCUIElementQuery,
+    window: XCUIElement
+  ) -> XCUIElement? {
+    guard window.exists, !window.frame.isEmpty else {
+      return nil
+    }
+
+    let windowFrame = window.frame
+    let searchCount = min(query.count, 12)
+    var bestArea: CGFloat = 0
+    var bestMatch: XCUIElement?
+
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+
+      let visibleFrame = candidate.frame.intersection(windowFrame)
+      guard !visibleFrame.isNull, !visibleFrame.isEmpty else { continue }
+
+      let area = visibleFrame.width * visibleFrame.height
+      if area > bestArea {
+        bestArea = area
+        bestMatch = candidate
+      }
+    }
+
+    return bestMatch
+  }
+
   private func overlappingDetailScrollTarget(
     in query: XCUIElementQuery,
     window: XCUIElement,
@@ -192,11 +228,20 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     let candidates = query.allElementsBoundByIndex.filter { candidate in
       guard candidate.exists, !candidate.frame.isEmpty else { return false }
       let candidateFrame = candidate.frame
+      let visibleFrame = candidateFrame.intersection(window.frame)
+      let overlapsContainerHorizontally =
+        candidateFrame.minX <= containerFrame.maxX
+        && containerFrame.minX <= candidateFrame.maxX
+      let overlapsContainerVertically =
+        candidateFrame.minY <= containerFrame.maxY
+        && containerFrame.minY <= candidateFrame.maxY
       return
         candidateFrame.minX <= containerMidX
         && containerMidX <= candidateFrame.maxX
-        && !candidateFrame.intersection(containerFrame).isNull
-        && !candidateFrame.intersection(containerFrame).isEmpty
+        && overlapsContainerHorizontally
+        && overlapsContainerVertically
+        && !visibleFrame.isNull
+        && !visibleFrame.isEmpty
     }
 
     let detailCandidates = candidates.filter { candidate in

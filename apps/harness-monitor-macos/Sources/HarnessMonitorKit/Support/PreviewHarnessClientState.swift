@@ -55,6 +55,27 @@ actor PreviewHarnessClientState {
     return fallbackDetail
   }
 
+  func currentMutableSessionDetail(sessionID: String) -> SessionDetail? {
+    if let detail = detailsBySessionID[sessionID] {
+      return detail
+    }
+    if let fallbackDetail, fallbackDetail.session.sessionId == sessionID {
+      return fallbackDetail
+    }
+    return nil
+  }
+
+  func storeMutatedSessionDetail(_ detail: SessionDetail) {
+    let sessionID = detail.session.sessionId
+    detailsBySessionID[sessionID] = detail
+    if coreDetailsBySessionID[sessionID] != nil {
+      coreDetailsBySessionID[sessionID] = detail
+    }
+    if let index = sessionSummaries.firstIndex(where: { $0.sessionId == sessionID }) {
+      sessionSummaries[index] = detail.session
+    }
+  }
+
   func timeline(for sessionID: String) -> [TimelineEntry] {
     timelinesBySessionID[sessionID] ?? fallbackTimeline
   }

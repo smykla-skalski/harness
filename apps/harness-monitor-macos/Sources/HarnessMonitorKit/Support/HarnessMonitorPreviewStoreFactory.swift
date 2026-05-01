@@ -186,7 +186,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     guard hostBridgeOverride?.bridgeStatus.running == false else {
       return
     }
-    store.markHostBridgeIssue(for: "codex", statusCode: 503)
+    store.markHostBridgeIssue(for: "acp", statusCode: 503)
   }
 
   private static func previewStatusReport(

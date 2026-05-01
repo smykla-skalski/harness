@@ -146,19 +146,10 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
 
   private func tapDockButton(in app: XCUIApplication, identifier: String) {
     app.activate()
-    let trigger = button(in: app, identifier: identifier)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        trigger.exists && !trigger.frame.isEmpty
-      }
+      waitForButtonReady(in: app, identifier: identifier, timeout: Self.actionTimeout)
     )
-    if trigger.isHittable {
-      trigger.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: trigger) {
-      coordinate.tap()
-    } else {
-      XCTFail("Cannot resolve coordinate for \(identifier)")
-    }
+    tapButton(in: app, identifier: identifier)
   }
 
   private func makeDecisionSeed() -> String {

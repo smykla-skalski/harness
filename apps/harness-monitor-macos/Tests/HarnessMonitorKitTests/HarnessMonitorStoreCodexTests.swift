@@ -48,9 +48,39 @@ struct HarnessMonitorStoreCodexTests {
       actor: "leader-claude"
     )
 
-    #expect(startedRun?.runId == store.selectedCodexRun?.runId)
+    #expect(startedRun?.runId == "codex-run-1")
     #expect(startedRun?.prompt == "Investigate the failing suite.")
     #expect(startedRun?.mode == .workspaceWrite)
+  }
+
+  @Test("Start Codex run accepts an explicit session when no session is selected")
+  func startCodexRunUsesExplicitSessionAnchor() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.selectedSessionID = nil
+    store.selectedSession = nil
+
+    let startedRun = await store.startCodexRunSnapshot(
+      prompt: "Investigate the failing suite.",
+      mode: .workspaceWrite,
+      actor: "leader-claude",
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+
+    #expect(startedRun?.runId == "codex-run-1")
+    #expect(
+      client.recordedCalls()
+        == [
+          .startCodexRun(
+            sessionID: PreviewFixtures.summary.sessionId,
+            prompt: "Investigate the failing suite.",
+            mode: .workspaceWrite,
+            actor: "leader-claude",
+            resumeThreadID: nil
+          )
+        ]
+    )
+    #expect(store.currentFailureFeedbackMessage == nil)
   }
 
   @Test("Start Codex run keeps the control-plane actor when no session actor is resolved")

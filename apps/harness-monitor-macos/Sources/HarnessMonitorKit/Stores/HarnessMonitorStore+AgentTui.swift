@@ -45,13 +45,54 @@ extension HarnessMonitorStore {
     allowCustomModel: Bool = false,
     argv: [String] = [],
     rows: Int,
-    cols: Int
+    cols: Int,
+    sessionID: String? = nil
   ) async -> Bool {
+    await startAgentTuiSnapshot(
+      runtime: runtime,
+      role: role,
+      name: name,
+      prompt: prompt,
+      projectDir: projectDir,
+      persona: persona,
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel,
+      argv: argv,
+      rows: rows,
+      cols: cols,
+      sessionID: sessionID
+    ) != nil
+  }
+
+  @discardableResult
+  public func startAgentTuiSnapshot(
+    runtime: AgentTuiRuntime,
+    role: SessionRole = .worker,
+    name: String?,
+    prompt: String?,
+    projectDir: String? = nil,
+    persona: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
+    argv: [String] = [],
+    rows: Int,
+    cols: Int,
+    sessionID: String? = nil
+  ) async -> AgentTuiSnapshot? {
     let actionName = "Agents started"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    guard
+      let action = prepareSessionAction(
+        named: actionName,
+        sessionID: sessionID ?? selectedSessionID
+      )
+    else {
+      return nil
+    }
     guard rows > 0, cols > 0 else {
       presentFailureFeedback("Terminal size must be greater than zero.")
-      return false
+      return nil
     }
 
     let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -62,7 +103,7 @@ extension HarnessMonitorStore {
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
 
-    return await mutateAgentTui(
+    return await mutateAgentTuiSnapshot(
       using: action.client,
       actionName: actionName,
       selectUpdatedSnapshot: true

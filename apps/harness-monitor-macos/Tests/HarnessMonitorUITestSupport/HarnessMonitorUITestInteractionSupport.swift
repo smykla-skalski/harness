@@ -176,8 +176,11 @@ extension HarnessMonitorUITestCase {
 
   func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
     let scrollDistance = max(120, element.frame.height * distanceRatio)
-    if let start = centerCoordinate(in: app, for: element) {
-      let end = start.withOffset(CGVector(dx: 0, dy: -scrollDistance))
+    if let (start, end) = clampedWindowDragPath(
+      in: app,
+      for: element,
+      deltaY: -scrollDistance
+    ) {
       start.press(forDuration: 0.01, thenDragTo: end)
       return
     }
@@ -192,8 +195,11 @@ extension HarnessMonitorUITestCase {
 
   func dragDown(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
     let scrollDistance = max(120, element.frame.height * distanceRatio)
-    if let start = centerCoordinate(in: app, for: element) {
-      let end = start.withOffset(CGVector(dx: 0, dy: scrollDistance))
+    if let (start, end) = clampedWindowDragPath(
+      in: app,
+      for: element,
+      deltaY: scrollDistance
+    ) {
       start.press(forDuration: 0.01, thenDragTo: end)
       return
     }
@@ -374,6 +380,13 @@ extension HarnessMonitorUITestCase {
     return true
   }
 
+  func hasVisibleFrameMarker(
+    in app: XCUIApplication,
+    identifier: String
+  ) -> Bool {
+    visibleFrameMarkerCoordinate(in: app, identifier: identifier) != nil
+  }
+
   private func visibleFrameMarkerCoordinate(
     in app: XCUIApplication,
     identifier: String
@@ -446,24 +459,61 @@ extension HarnessMonitorUITestCase {
     )
   }
 
-  func invokeMenuItem(
+  private func clampedWindowDragPath(
     in app: XCUIApplication,
-    menu menuTitle: String,
-    title: String
-  ) {
-    app.activate()
-    let menuBarItem = app.menuBars.menuBarItems[menuTitle].firstMatch
-    XCTAssertTrue(
-      waitForElement(menuBarItem, timeout: Self.actionTimeout),
-      "\(menuTitle) menu should exist in the menu bar"
-    )
-    menuBarItem.click()
+    for element: XCUIElement,
+    deltaY: CGFloat
+  ) -> (start: XCUICoordinate, end: XCUICoordinate)? {
+    guard element.exists || element.waitForExistence(timeout: 0.2) else {
+      return nil
+    }
 
-    let menuItem = app.menuItems[title].firstMatch
-    XCTAssertTrue(
-      waitForElement(menuItem, timeout: Self.actionTimeout),
-      "\(title) menu item should appear after opening the \(menuTitle) menu"
+    let containingWindow = window(in: app, containing: element)
+    guard containingWindow.exists else {
+      return nil
+    }
+
+    let visibleFrame = containingWindow.frame.intersection(element.frame)
+    guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
+      return nil
+    }
+
+    let clampedFrame = visibleFrame.insetBy(
+      dx: min(8, max(visibleFrame.width / 4, 0)),
+      dy: min(12, max(visibleFrame.height / 4, 0))
     )
-    menuItem.click()
+    let targetFrame = clampedFrame.isEmpty ? visibleFrame : clampedFrame
+    let startPoint = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+    let rawEndY = startPoint.y + deltaY
+    let minEndY = targetFrame.minY + 2
+    let maxEndY = targetFrame.maxY - 2
+    let endPoint = CGPoint(
+      x: startPoint.x,
+      y: min(max(rawEndY, minEndY), maxEndY)
+    )
+    guard
+      !startPoint.x.isNaN,
+      !startPoint.y.isNaN,
+      !endPoint.x.isNaN,
+      !endPoint.y.isNaN
+    else {
+      return nil
+    }
+
+    let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
+    let start = origin.withOffset(
+      CGVector(
+        dx: startPoint.x - containingWindow.frame.minX,
+        dy: startPoint.y - containingWindow.frame.minY
+      )
+    )
+    let end = origin.withOffset(
+      CGVector(
+        dx: endPoint.x - containingWindow.frame.minX,
+        dy: endPoint.y - containingWindow.frame.minY
+      )
+    )
+    return (start, end)
   }
+
 }

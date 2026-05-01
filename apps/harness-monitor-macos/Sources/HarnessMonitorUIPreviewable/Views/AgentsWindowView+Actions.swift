@@ -132,7 +132,8 @@ extension AgentsWindowView {
           mode: viewModel.codexMode,
           model: resolved.id,
           effort: viewModel.selectedCodexEffort,
-          allowCustomModel: resolved.allowCustom
+          allowCustomModel: resolved.allowCustom,
+          sessionID: resolvedCreateSessionID
         )
         if let startedRun {
           viewModel.codexStartResult = "run"

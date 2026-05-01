@@ -36,11 +36,6 @@ extension HarnessMonitorStore {
       return .notAttempted
     }
 
-    noteAcpBridgeRetryAttempt(
-      for: "codex",
-      recordedAt: firstFailureRecordedAt
-    )
-
     do {
       let measuredRun = try await measureCodexRunStart(
         using: client,

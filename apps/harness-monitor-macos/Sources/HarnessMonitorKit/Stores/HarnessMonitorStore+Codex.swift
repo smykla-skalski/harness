@@ -46,7 +46,8 @@ extension HarnessMonitorStore {
     resumeThreadId: String? = nil,
     model: String? = nil,
     effort: String? = nil,
-    allowCustomModel: Bool = false
+    allowCustomModel: Bool = false,
+    sessionID: String? = nil
   ) async -> Bool {
     await startCodexRunSnapshot(
       prompt: prompt,
@@ -55,7 +56,8 @@ extension HarnessMonitorStore {
       resumeThreadId: resumeThreadId,
       model: model,
       effort: effort,
-      allowCustomModel: allowCustomModel
+      allowCustomModel: allowCustomModel,
+      sessionID: sessionID
     ) != nil
   }
 
@@ -67,10 +69,18 @@ extension HarnessMonitorStore {
     resumeThreadId: String? = nil,
     model: String? = nil,
     effort: String? = nil,
-    allowCustomModel: Bool = false
+    allowCustomModel: Bool = false,
+    sessionID: String? = nil
   ) async -> CodexRunSnapshot? {
     let actionName = "Start Codex thread"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return nil }
+    guard
+      let action = prepareSessionAction(
+        named: actionName,
+        sessionID: sessionID ?? selectedSessionID
+      )
+    else {
+      return nil
+    }
     let resolvedActor = codexStartActionActor(for: actor)
 
     let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -375,44 +385,6 @@ extension HarnessMonitorStore {
       return "\(clipped)..."
     }
     return clipped
-  }
-
-  private func preferredCodexRun(from runs: [CodexRunSnapshot]) -> CodexRunSnapshot? {
-    if let selectedRunID = selectedCodexRun?.runId {
-      if let selectedRun = runs.first(where: { $0.runId == selectedRunID }) {
-        return selectedRun
-      }
-    }
-    return runs.first { $0.status.isActive } ?? runs.first
-  }
-
-  private func upsertingCodexRun(
-    _ run: CodexRunSnapshot,
-    into runs: [CodexRunSnapshot]
-  ) -> [CodexRunSnapshot] {
-    var updatedRuns = runs.filter { $0.runId != run.runId }
-    updatedRuns.insert(run, at: 0)
-    return updatedRuns
-  }
-
-  func measureCodexRunStart(
-    using client: any HarnessMonitorClientProtocol,
-    sessionID: String,
-    request: CodexRunRequest
-  ) async throws -> MeasuredOperation<CodexRunSnapshot> {
-    try await Self.measureOperation {
-      try await client.startCodexRun(
-        sessionID: sessionID,
-        request: request
-      )
-    }
-  }
-
-  private func codexStartActionActor(for actor: String) -> String {
-    guard actor == "harness-app" else {
-      return actor
-    }
-    return resolvedActionActor() ?? "harness-app"
   }
 
 }
