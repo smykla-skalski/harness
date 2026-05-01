@@ -40,23 +40,39 @@ public actor AccessibilityRegistry {
     let snapshot: RegistryClientSnapshot
   }
 
+  private struct RemoteClearPayload: Equatable {
+    let endpoint: RemoteEndpoint
+    let clearRequest: RegistryClientClearRequest
+  }
+
+  fileprivate struct StoredClientSnapshot {
+    let snapshot: RegistryClientSnapshot
+    let receivedAt: Date
+  }
+
   private var elements: [String: StoredElement] = [:]
   private var windows: [Int: StoredWindow] = [:]
   private var trackedWindowElements: [Int: TrackedWindowElements] = [:]
   // TrackAccessibility publishes asynchronously, so identifier ownership must be
   // claimed separately from element writes to ignore stale register/unregister tasks.
   private var trackedElementOwners: [String: UUID] = [:]
-  private var clientSnapshots: [UUID: RegistryClientSnapshot] = [:]
+  private var clientSnapshots: [UUID: StoredClientSnapshot] = [:]
   // Remote publication is latest-wins: local UI churn only needs the newest full
   // snapshot of this process, not every intermediate mutation on the wire.
   private var remoteEndpoint: RemoteEndpoint?
   private var remoteSnapshotDirty = false
   private var remoteFlushTask: Task<Void, Never>?
+  private var pendingRemoteClear: RemoteClearPayload?
+  private var remoteClearTask: Task<Void, Never>?
+  private var remoteHeartbeatTask: Task<Void, Never>?
+  private var remoteGeneration: UInt64 = 0
 
   private let clientID: UUID
   private let clientAppVersion: String
   private let clientBundleIdentifier: String
   private let remoteWriteRetryDelay: Duration
+  private let remoteSnapshotLeaseDuration: Duration
+  private let remoteHeartbeatInterval: Duration
   private let remoteSocketClient: RegistrySocketClient
 
   public init(
@@ -66,12 +82,16 @@ public actor AccessibilityRegistry {
     ) ?? "0.0.0",
     clientBundleIdentifier: String = Bundle.main.bundleIdentifier ?? "io.harnessmonitor.app",
     remoteWriteRetryDelay: Duration = .milliseconds(100),
+    remoteSnapshotLeaseDuration: Duration = .seconds(2),
+    remoteHeartbeatInterval: Duration = .seconds(1),
     remoteSocketClient: RegistrySocketClient = RegistrySocketClient()
   ) {
     self.clientID = clientID
     self.clientAppVersion = clientAppVersion
     self.clientBundleIdentifier = clientBundleIdentifier
     self.remoteWriteRetryDelay = remoteWriteRetryDelay
+    self.remoteSnapshotLeaseDuration = remoteSnapshotLeaseDuration
+    self.remoteHeartbeatInterval = remoteHeartbeatInterval
     self.remoteSocketClient = remoteSocketClient
   }
 
@@ -191,12 +211,37 @@ public actor AccessibilityRegistry {
     scheduleRemoteSnapshotFlush()
   }
 
-  public func upsertClientSnapshot(_ clientSnapshot: RegistryClientSnapshot) {
-    clientSnapshots[clientSnapshot.clientID] = clientSnapshot
+  public func upsertClientSnapshot(_ clientSnapshot: RegistryClientSnapshot) -> RegistryAckResult {
+    pruneExpiredClientSnapshots()
+    if let existing = clientSnapshots[clientSnapshot.clientID],
+      existing.snapshot.generation > clientSnapshot.generation
+    {
+      return RegistryAckResult(
+        applied: true,
+        message: "ignored stale client snapshot generation \(clientSnapshot.generation)"
+      )
+    }
+
+    clientSnapshots[clientSnapshot.clientID] = StoredClientSnapshot(
+      snapshot: clientSnapshot,
+      receivedAt: Date()
+    )
+    return RegistryAckResult(applied: true)
   }
 
-  public func removeClientSnapshot(clientID: UUID) {
-    clientSnapshots[clientID] = nil
+  public func removeClientSnapshot(_ clearRequest: RegistryClientClearRequest) -> RegistryAckResult {
+    pruneExpiredClientSnapshots()
+    guard let existing = clientSnapshots[clearRequest.clientID] else {
+      return RegistryAckResult(applied: true)
+    }
+    if existing.snapshot.generation > clearRequest.generation {
+      return RegistryAckResult(
+        applied: true,
+        message: "ignored stale client clear generation \(clearRequest.generation)"
+      )
+    }
+    clientSnapshots[clearRequest.clientID] = nil
+    return RegistryAckResult(applied: true)
   }
 
   public func setRemoteSocketPath(_ socketPath: String?) {
@@ -209,31 +254,29 @@ public actor AccessibilityRegistry {
     }
 
     remoteEndpoint = socketPath.map(RemoteEndpoint.init(socketPath:))
+    if let previousEndpoint {
+      scheduleRemoteSnapshotClear(for: previousEndpoint)
+    }
     if socketPath == nil {
       remoteSnapshotDirty = false
       remoteFlushTask?.cancel()
       remoteFlushTask = nil
-      if let previousEndpoint {
-        let clientID = clientID
-        let remoteSocketClient = remoteSocketClient
-        Task.detached(priority: .utility) {
-          _ = try? await remoteSocketClient.clearClientSnapshot(
-            clientID: clientID,
-            toSocketAt: previousEndpoint.socketPath
-          )
-        }
-      }
+      remoteHeartbeatTask?.cancel()
+      remoteHeartbeatTask = nil
       return
     }
 
+    startRemoteHeartbeatIfNeeded()
     scheduleRemoteSnapshotFlush()
   }
 
   public func element(identifier: String) -> RegistryElement? {
+    pruneExpiredClientSnapshots()
     mergedElementsByIdentifier()[identifier]
   }
 
   public func allElements(windowID: Int? = nil, kind: RegistryElementKind? = nil) -> [RegistryElement] {
+    pruneExpiredClientSnapshots()
     mergedElements()
       .filter { element in
         if let windowID, element.windowID != windowID { return false }
@@ -244,11 +287,18 @@ public actor AccessibilityRegistry {
   }
 
   public func allWindows() -> [RegistryWindow] {
+    pruneExpiredClientSnapshots()
     mergedWindows().sorted { $0.id < $1.id }
   }
 
   public func snapshot() -> RegistrySnapshot {
+    pruneExpiredClientSnapshots()
     RegistrySnapshot(elements: mergedElements(), windows: mergedWindows())
+  }
+
+  func storedClientSnapshotCount() -> Int {
+    pruneExpiredClientSnapshots()
+    return clientSnapshots.count
   }
 
   public func reset() {
@@ -381,7 +431,7 @@ public actor AccessibilityRegistry {
 
   private func mergedWindows() -> [RegistryWindow] {
     var merged: [Int: RegistryWindow] = [:]
-    for snapshot in clientSnapshots.values.sorted(by: clientSnapshotSort) {
+    for snapshot in activeClientSnapshots() {
       for window in snapshot.snapshot.windows {
         merged[window.id] = window
       }
@@ -398,7 +448,7 @@ public actor AccessibilityRegistry {
 
   private func mergedElementsByIdentifier() -> [String: RegistryElement] {
     var merged: [String: RegistryElement] = [:]
-    for snapshot in clientSnapshots.values.sorted(by: clientSnapshotSort) {
+    for snapshot in activeClientSnapshots() {
       for element in snapshot.snapshot.elements {
         merged[element.identifier] = element
       }
@@ -424,12 +474,14 @@ public actor AccessibilityRegistry {
       guard let self else {
         return
       }
-      while let payload = await self.takeRemoteFlushPayloadOrFinish() {
+      while Task.isCancelled == false,
+        let payload = await self.takeRemoteFlushPayloadOrFinish()
+      {
         let sendSucceeded =
           (try? await remoteSocketClient.syncClientSnapshot(
             payload.snapshot,
             toSocketAt: payload.endpoint.socketPath
-          ).applied) != nil
+          ).applied) == true
         await self.finishRemoteFlushAttempt(
           socketPath: payload.endpoint.socketPath,
           succeeded: sendSucceeded
@@ -454,6 +506,7 @@ public actor AccessibilityRegistry {
       endpoint: remoteEndpoint,
       snapshot: RegistryClientSnapshot(
         clientID: clientID,
+        generation: takeNextRemoteGeneration(),
         appVersion: clientAppVersion,
         bundleIdentifier: clientBundleIdentifier,
         snapshot: localSnapshot()
@@ -468,6 +521,115 @@ public actor AccessibilityRegistry {
     if succeeded == false {
       remoteSnapshotDirty = true
     }
+  }
+
+  private func scheduleRemoteSnapshotClear(for endpoint: RemoteEndpoint) {
+    pendingRemoteClear = RemoteClearPayload(
+      endpoint: endpoint,
+      clearRequest: RegistryClientClearRequest(
+        clientID: clientID,
+        generation: takeNextRemoteGeneration()
+      )
+    )
+    guard remoteClearTask == nil else {
+      return
+    }
+
+    let retryDelay = remoteWriteRetryDelay
+    let remoteSocketClient = remoteSocketClient
+    remoteClearTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      while Task.isCancelled == false,
+        let payload = await self.takeRemoteClearPayloadOrFinish()
+      {
+        let clearSucceeded =
+          (try? await remoteSocketClient.clearClientSnapshot(
+            payload.clearRequest,
+            toSocketAt: payload.endpoint.socketPath
+          ).applied) == true
+        await self.finishRemoteClearAttempt(payload, succeeded: clearSucceeded)
+        guard clearSucceeded == false else {
+          continue
+        }
+        try? await Task.sleep(for: retryDelay)
+      }
+    }
+  }
+
+  private func takeRemoteClearPayloadOrFinish() -> RemoteClearPayload? {
+    guard let pendingRemoteClear else {
+      remoteClearTask = nil
+      return nil
+    }
+    return pendingRemoteClear
+  }
+
+  private func finishRemoteClearAttempt(_ payload: RemoteClearPayload, succeeded: Bool) {
+    guard pendingRemoteClear == payload else {
+      return
+    }
+    if succeeded {
+      pendingRemoteClear = nil
+    }
+  }
+
+  private func startRemoteHeartbeatIfNeeded() {
+    guard remoteHeartbeatTask == nil else {
+      return
+    }
+
+    let heartbeatInterval = remoteHeartbeatInterval
+    remoteHeartbeatTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      while Task.isCancelled == false {
+        try? await Task.sleep(for: heartbeatInterval)
+        guard Task.isCancelled == false else {
+          return
+        }
+        let shouldContinue = await self.performRemoteHeartbeatTick()
+        if shouldContinue == false {
+          return
+        }
+      }
+    }
+  }
+
+  private func performRemoteHeartbeatTick() -> Bool {
+    guard remoteEndpoint != nil else {
+      remoteHeartbeatTask = nil
+      return false
+    }
+    scheduleRemoteSnapshotFlush()
+    return true
+  }
+
+  private func activeClientSnapshots(referenceDate: Date = Date()) -> [StoredClientSnapshot] {
+    clientSnapshots.values
+      .filter { isClientSnapshotActive($0, referenceDate: referenceDate) }
+      .sorted(by: clientSnapshotSort)
+  }
+
+  private func pruneExpiredClientSnapshots(referenceDate: Date = Date()) {
+    clientSnapshots = clientSnapshots.filter { _, snapshot in
+      isClientSnapshotActive(snapshot, referenceDate: referenceDate)
+    }
+  }
+
+  private func isClientSnapshotActive(
+    _ snapshot: StoredClientSnapshot,
+    referenceDate: Date
+  ) -> Bool {
+    referenceDate.timeIntervalSince(snapshot.receivedAt)
+      < durationTimeInterval(remoteSnapshotLeaseDuration)
+  }
+
+  private func takeNextRemoteGeneration() -> UInt64 {
+    remoteGeneration &+= 1
+    return remoteGeneration
   }
 
   private func localSnapshot() -> RegistrySnapshot {
@@ -489,8 +651,19 @@ public struct RegistrySnapshot: Sendable, Codable, Equatable {
 }
 
 private func clientSnapshotSort(
-  lhs: RegistryClientSnapshot,
-  rhs: RegistryClientSnapshot
+  lhs: AccessibilityRegistry.StoredClientSnapshot,
+  rhs: AccessibilityRegistry.StoredClientSnapshot
 ) -> Bool {
-  lhs.clientID.uuidString < rhs.clientID.uuidString
+  if lhs.receivedAt != rhs.receivedAt {
+    return lhs.receivedAt < rhs.receivedAt
+  }
+  if lhs.snapshot.generation != rhs.snapshot.generation {
+    return lhs.snapshot.generation < rhs.snapshot.generation
+  }
+  return lhs.snapshot.clientID.uuidString < rhs.snapshot.clientID.uuidString
+}
+
+private func durationTimeInterval(_ duration: Duration) -> TimeInterval {
+  let components = duration.components
+  return Double(components.seconds) + (Double(components.attoseconds) / 1_000_000_000_000_000_000)
 }

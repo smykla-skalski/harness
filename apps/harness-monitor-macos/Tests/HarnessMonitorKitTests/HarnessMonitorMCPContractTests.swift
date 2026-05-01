@@ -301,7 +301,7 @@ struct HarnessMonitorMCPContractTests {
           protocolVersion: registryProtocolVersion,
           appVersion: "30.32.0",
           bundleIdentifier: "io.harnessmonitor.app",
-          capabilities: [.clientSnapshots, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
         )
       },
       startupProbeDelay: .milliseconds(20),
@@ -339,6 +339,39 @@ struct HarnessMonitorMCPContractTests {
     #expect(replacementHost.isRunning == true)
     #expect(replacementHost.runtimeState == .healthy(socketPath: socketURL.path))
     #expect(legacyHost.isRunning == false)
+  }
+
+  @Test("enabled reconciliation rejects foreign bundle registry hosts")
+  func enabledReconciliationRejectsForeignBundleRegistryHosts() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
+    let foreignHost = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL },
+      pingInfoProvider: {
+        PingResult(
+          protocolVersion: registryProtocolVersion,
+          appVersion: "30.32.0",
+          bundleIdentifier: "io.foreign.registry",
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+        )
+      }
+    )
+    let localService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
+
+    await foreignHost.setEnabled(true)
+    defer { Task { await localService.setEnabled(false); await foreignHost.setEnabled(false) } }
+    try await waitForSocket(at: socketURL.path, timeout: 2)
+
+    await localService.setEnabled(true)
+
+    #expect(localService.isRunning == false)
+    guard case .degraded(let socketPath, let reason) = localService.runtimeState else {
+      Issue.record("expected degraded runtime state, got \(localService.runtimeState)")
+      return
+    }
+    #expect(socketPath == socketURL.path)
+    #expect(reason.contains("io.foreign.registry"))
   }
 
   @Test("real service degrades when the socket path cannot be resolved")
@@ -392,10 +425,28 @@ struct HarnessMonitorMCPContractTests {
   }
 
   private func sendLine(_ line: String, toSocketAt path: String) throws -> String {
-    let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
-    guard fd >= 0 else { throw MCPContractTestError.clientSocketFailed(errno) }
+    let fd = try connectSocket(to: path)
     defer { Darwin.close(fd) }
 
+    var tv = timeval(tv_sec: 2, tv_usec: 0)
+    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+
+    let payload = Data((line + "\n").utf8)
+    try sendAll(payload, on: fd)
+    let responseData = try readLine(from: fd)
+    guard let response = String(data: responseData, encoding: .utf8) else {
+      throw MCPContractTestError.invalidUTF8Response
+    }
+    return response
+  }
+
+  private func connectSocket(to path: String) throws -> Int32 {
+    let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+    guard fd >= 0 else { throw MCPContractTestError.clientSocketFailed(errno) }
+
+    var noSigPipe: Int32 = 1
+    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
     var addr = sockaddr_un()
     addr.sun_family = sa_family_t(AF_UNIX)
     let pathBytes = Array(path.utf8)
@@ -407,26 +458,72 @@ struct HarnessMonitorMCPContractTests {
         Darwin.connect(fd, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_un>.size))
       }
     }
-    if connectResult != 0 { throw MCPContractTestError.connectFailed(errno) }
-
-    var tv = timeval(tv_sec: 2, tv_usec: 0)
-    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-
-    let payload = Data((line + "\n").utf8)
-    let sent = payload.withUnsafeBytes { buffer in
-      Darwin.send(fd, buffer.baseAddress, buffer.count, 0)
+    if connectResult != 0 {
+      Darwin.close(fd)
+      throw MCPContractTestError.connectFailed(errno)
     }
-    if sent < 0 { throw MCPContractTestError.sendFailed(errno) }
+    return fd
+  }
 
-    var scratch = [UInt8](repeating: 0, count: 64 * 1024)
-    let received = scratch.withUnsafeMutableBufferPointer { buffer in
-      Darwin.recv(fd, buffer.baseAddress, buffer.count, 0)
+  private func sendAll(_ payload: Data, on fd: Int32) throws {
+    try payload.withUnsafeBytes { bytes in
+      guard let baseAddress = bytes.baseAddress else {
+        return
+      }
+      var bytesSent = 0
+      while bytesSent < bytes.count {
+        let sent = Darwin.send(
+          fd,
+          baseAddress.advanced(by: bytesSent),
+          bytes.count - bytesSent,
+          0
+        )
+        if sent > 0 {
+          bytesSent += sent
+          continue
+        }
+        if sent == 0 {
+          throw MCPContractTestError.sendFailed(EPIPE)
+        }
+        if errno == EINTR {
+          continue
+        }
+        throw MCPContractTestError.sendFailed(errno)
+      }
     }
-    if received < 0 { throw MCPContractTestError.recvFailed(errno) }
-    guard let response = String(bytes: scratch.prefix(received), encoding: .utf8) else {
-      throw MCPContractTestError.invalidUTF8Response
+  }
+
+  private func readLine(from fd: Int32) throws -> Data {
+    var lineBuffer = NDJSONLineBuffer()
+    var scratch = [UInt8](repeating: 0, count: 4 * 1024)
+    while true {
+      let received = scratch.withUnsafeMutableBufferPointer { buffer in
+        Darwin.recv(fd, buffer.baseAddress, buffer.count, 0)
+      }
+      if received > 0 {
+        let chunk = Data(scratch.prefix(received))
+        let lines: [Data]
+        do {
+          lines = try lineBuffer.append(chunk, maxBufferedBytes: RegistryWireCodec.maximumFrameBytes)
+        } catch {
+          throw MCPContractTestError.recvFailed(EMSGSIZE)
+        }
+        if let line = lines.first {
+          return line
+        }
+        continue
+      }
+      if received == 0 {
+        if let pending = lineBuffer.drainPendingBytes() {
+          return pending
+        }
+        throw MCPContractTestError.recvFailed(ECONNRESET)
+      }
+      if errno == EINTR {
+        continue
+      }
+      throw MCPContractTestError.recvFailed(errno)
     }
-    return response
   }
 }
 
