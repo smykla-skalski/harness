@@ -25,5 +25,6 @@ const MAX_SEMANTIC_WS_ARRAY_BATCH_BYTES: usize = 128 * 1024;
 const MAX_SEMANTIC_WS_ARRAY_BATCH_ITEMS: usize = 64;
 const WS_CHUNK_DATA_BYTES: usize = 128 * 1024;
 
+pub(crate) use config::build_config_payload;
 pub use connection::ws_upgrade_handler;
 pub use relay::ReplayBuffer;

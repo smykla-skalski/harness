@@ -40,6 +40,20 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
 }
 
 #[test]
+fn config_route_is_swift_exposed_rpc() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::CONFIG)
+        .expect("config route should be registered");
+    assert_eq!(route.method, HttpRouteMethod::Get);
+    assert!(route.swift_client_exposed);
+    match route.parity {
+        HttpRouteParity::Rpc { ws_method } => assert_eq!(ws_method, ws_methods::CONFIG),
+        HttpRouteParity::Exempt { .. } => panic!("config route must use websocket parity"),
+    }
+}
+
+#[test]
 fn mapped_ws_methods_are_unique() {
     let methods = mapped_ws_methods();
     let unique: BTreeSet<_> = methods.iter().copied().collect();

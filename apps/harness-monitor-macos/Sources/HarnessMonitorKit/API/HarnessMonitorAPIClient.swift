@@ -407,6 +407,29 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/voice-sessions/\(voiceSessionID)/finish", body: request)
   }
 
+  public func personas() async throws -> [AgentPersona] {
+    try await configuration().personas
+  }
+
+  public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
+    try await configuration().runtimeModels
+  }
+
+  public func acpAgentDescriptors() async throws -> [AcpAgentDescriptor] {
+    try await configuration().acpAgents
+  }
+
+  public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
+    if let cached = try await configuration().runtimeProbe {
+      return cached
+    }
+    return try await get("/v1/runtimes/probe")
+  }
+
+  public func configuration() async throws -> MonitorConfiguration {
+    try await get("/v1/config")
+  }
+
   public func logLevel() async throws -> LogLevelResponse {
     try await get("/v1/daemon/log-level")
   }

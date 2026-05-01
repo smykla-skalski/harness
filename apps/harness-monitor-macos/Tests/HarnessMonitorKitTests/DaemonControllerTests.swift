@@ -114,8 +114,8 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("auto transport bootstrap does not wait for a slow WebSocket upgrade")
-  func autoTransportBootstrapDoesNotWaitForSlowWebSocketUpgrade() async throws {
+  @Test("auto transport bootstrap upgrades to WebSocket when it becomes ready within the default grace period")
+  func autoTransportBootstrapUpgradesToWebSocketWithinDefaultGracePeriod() async throws {
     let httpClient = RecordingHarnessClient()
     let webSocketClient = RecordingHarnessClient()
     let controller = DaemonController(
@@ -137,8 +137,41 @@ struct DaemonControllerTests {
     let client = try await controller.bootstrap(connection: connection)
 
     let elapsed = start.duration(to: clock.now)
+    #expect(client as AnyObject === webSocketClient as AnyObject)
+    #expect(elapsed >= .milliseconds(300))
+    #expect(elapsed < .seconds(2))
+    #expect(httpClient.readCallCount(.health) == 1)
+    #expect(httpClient.shutdownCallCount() == 1)
+    #expect(webSocketClient.shutdownCallCount() == 0)
+  }
+
+  @Test("auto transport bootstrap falls back after the configured WebSocket grace period")
+  func autoTransportBootstrapFallsBackAfterConfiguredGracePeriod() async throws {
+    let httpClient = RecordingHarnessClient()
+    let webSocketClient = RecordingHarnessClient()
+    let controller = DaemonController(
+      transportPreference: .auto,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      ownership: .managed,
+      autoTransportWebSocketGracePeriod: .milliseconds(150),
+      sessionFactory: { _ in httpClient },
+      webSocketBootstrapper: { _ in
+        try? await Task.sleep(for: .milliseconds(400))
+        return webSocketClient
+      }
+    )
+    let connection = HarnessMonitorConnection(
+      endpoint: try #require(URL(string: "http://127.0.0.1:65535")),
+      token: "test-token"
+    )
+    let clock = ContinuousClock()
+    let start = clock.now
+
+    let client = try await controller.bootstrap(connection: connection)
+
+    let elapsed = start.duration(to: clock.now)
     #expect(client as AnyObject === httpClient as AnyObject)
-    #expect(elapsed < .milliseconds(200))
+    #expect(elapsed < .milliseconds(300))
     #expect(httpClient.readCallCount(.health) == 1)
     #expect(httpClient.shutdownCallCount() == 0)
     #expect(webSocketClient.shutdownCallCount() == 0)

@@ -220,6 +220,7 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
         request.method.as_str(),
         ws_methods::HEALTH
             | ws_methods::DIAGNOSTICS
+            | ws_methods::CONFIG
             | ws_methods::DAEMON_STOP
             | ws_methods::DAEMON_LOG_LEVEL
             | ws_methods::PROJECTS
