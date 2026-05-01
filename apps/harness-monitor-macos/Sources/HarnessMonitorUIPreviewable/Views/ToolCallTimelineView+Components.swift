@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct ToolCallTimelineRowFramePreferenceKey: PreferenceKey {
-  static var defaultValue: [String: CGRect] = [:]
+  static let defaultValue: [String: CGRect] = [:]
 
   static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
     value.merge(nextValue(), uniquingKeysWith: { _, new in new })
@@ -41,7 +41,7 @@ struct ToolCallTimelineSectionView: View {
           capabilityTags: section.capabilityTags
         )
       }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         ForEach(section.rows) { row in
           ToolCallTimelineRowView(row: row)
         }
