@@ -20,7 +20,7 @@ extension WorkspaceWindowCreatePane {
           description: "Choose the provider that should open when this agent starts."
         )
 
-        LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
           ForEach(agentCapabilityOptions) { option in
             AgentsCreateProviderRow(
               option: option,
@@ -32,16 +32,6 @@ extension WorkspaceWindowCreatePane {
           let preferredRuntime = newValue.preferredRuntime
           if formModel.runtime != preferredRuntime {
             formModel.runtime = preferredRuntime
-          }
-        }
-        .onChange(of: agentCapabilityOptions) { _, options in
-          let normalizedSelection = WorkspaceWindowView.normalizedLaunchSelection(
-            options: options,
-            selection: formModel.selectedLaunchSelection,
-            fallbackRuntime: formModel.runtime
-          )
-          if normalizedSelection != formModel.selectedLaunchSelection {
-            formModel.selectedLaunchSelection = normalizedSelection
           }
         }
         .harnessMCPList(
@@ -296,34 +286,18 @@ extension WorkspaceWindowCreatePane {
             + "does not fit your workflow."
         )
 
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
-            terminalSizeStepper(
-              title: "Rows",
-              value: $formModel.rows,
-              range: TerminalViewportSizing.rowRange
-            )
-            terminalSizeStepper(
-              title: "Columns",
-              value: $formModel.cols,
-              range: TerminalViewportSizing.colRange,
-              step: 10
-            )
-          }
-
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-            terminalSizeStepper(
-              title: "Rows",
-              value: $formModel.rows,
-              range: TerminalViewportSizing.rowRange
-            )
-            terminalSizeStepper(
-              title: "Columns",
-              value: $formModel.cols,
-              range: TerminalViewportSizing.colRange,
-              step: 10
-            )
-          }
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          terminalSizeStepper(
+            title: "Rows",
+            value: $formModel.rows,
+            range: TerminalViewportSizing.rowRange
+          )
+          terminalSizeStepper(
+            title: "Columns",
+            value: $formModel.cols,
+            range: TerminalViewportSizing.colRange,
+            step: 10
+          )
         }
       }
     }
