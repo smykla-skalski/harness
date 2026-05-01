@@ -6,6 +6,12 @@ struct ToolCallTimelineView: View {
   let entries: [TimelineEntry]
   let liveAnnouncementRowIDs: Set<String>
   let overflowNotice: HarnessMonitorStore.ToolCallTimelineOverflowNotice?
+  @State private var cachedPresentation = ToolCallTimelinePresentation.empty
+  @State private var cachedVirtualizedLayout = ToolCallTimelineVirtualizedLayout.empty
+  @State private var cachedAnnouncementSnapshot = ToolCallTimelineAnnouncementSnapshot.empty
+  @State private var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
+  @State private var cachedVisibleOverflowToolCallCount = 0
+  @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsKey
@@ -21,34 +27,43 @@ struct ToolCallTimelineView: View {
     self.entries = entries
     self.liveAnnouncementRowIDs = liveAnnouncementRowIDs
     self.overflowNotice = overflowNotice
-  }
-
-  private var presentation: ToolCallTimelinePresentation {
-    Self.materialisePresentation(from: entries)
-  }
-
-  private var announcementSnapshot: ToolCallTimelineAnnouncementSnapshot {
-    ToolCallTimelineAnnouncementSnapshot(
-      rows: presentation.rows,
-      liveRowIDs: liveAnnouncementRowIDs
-    )
-  }
-
-  private var visibleOverflowToolCallCount: Int {
-    presentation.rows.filter { liveAnnouncementRowIDs.contains($0.id) }.count
-  }
-
-  private var overflowAnnouncement: ToolCallTimelineOverflowAnnouncement? {
-    guard let overflowNotice else {
-      return nil
-    }
-    return ToolCallTimelineOverflowAnnouncement(
-      id: overflowNotice.recordedAt,
-      text: Self.overflowNoticeText(
-        rawUpdateCount: overflowNotice.rawUpdateCount,
-        visibleToolCallCount: max(overflowNotice.displayedEventCount, visibleOverflowToolCallCount)
+    let presentation = Self.materialisePresentation(from: entries)
+    _cachedPresentation = State(initialValue: presentation)
+    _cachedVirtualizedLayout = State(
+      initialValue: ToolCallTimelineVirtualizedLayout(
+        presentation: presentation,
+        scrollMetrics: .zero
       )
     )
+    _cachedAnnouncementSnapshot = State(
+      initialValue: ToolCallTimelineAnnouncementSnapshot(
+        rows: presentation.rows,
+        liveRowIDs: liveAnnouncementRowIDs
+      )
+    )
+    let initialVisibleCount = presentation.rows.reduce(into: 0) { count, row in
+      if liveAnnouncementRowIDs.contains(row.id) {
+        count += 1
+      }
+    }
+    _cachedVisibleOverflowToolCallCount = State(initialValue: initialVisibleCount)
+    if let overflowNotice {
+      _cachedOverflowAnnouncement = State(
+        initialValue: ToolCallTimelineOverflowAnnouncement(
+          id: overflowNotice.recordedAt,
+          text: Self.overflowNoticeText(
+            rawUpdateCount: overflowNotice.rawUpdateCount,
+            visibleToolCallCount: initialVisibleCount
+          )
+        )
+      )
+    } else {
+      _cachedOverflowAnnouncement = State(initialValue: nil)
+    }
+  }
+
+  private var overflowToolCallCount: Int {
+    overflowNotice?.displayedEventCount ?? cachedVisibleOverflowToolCallCount
   }
 
   var body: some View {
@@ -62,19 +77,44 @@ struct ToolCallTimelineView: View {
       if let overflowNotice {
         ToolCallTimelineOverflowNoticeView(
           rawUpdateCount: overflowNotice.rawUpdateCount,
-          visibleToolCallCount: max(
-            overflowNotice.displayedEventCount, visibleOverflowToolCallCount)
+          displayedToolCallCount: overflowToolCallCount,
+          visibleToolCallCount: cachedVisibleOverflowToolCallCount
         )
       }
-      if presentation.rows.isEmpty {
+      if cachedPresentation.rows.isEmpty {
         Text("No activity yet.")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
-        LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(presentation.sections) { section in
-            ToolCallTimelineSectionView(section: section)
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+            if cachedVirtualizedLayout.topSpacerHeight > 0 {
+              Color.clear
+                .frame(height: cachedVirtualizedLayout.topSpacerHeight)
+            }
+
+            ForEach(cachedVirtualizedLayout.sections) { section in
+              ToolCallTimelineSectionView(section: section)
+            }
+
+            if cachedVirtualizedLayout.bottomSpacerHeight > 0 {
+              Color.clear
+                .frame(height: cachedVirtualizedLayout.bottomSpacerHeight)
+            }
           }
+          .scrollTargetLayout()
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.visible)
+        .frame(minHeight: 180, idealHeight: 260, maxHeight: 360)
+        .onScrollGeometryChange(
+          for: ToolCallTimelineScrollMetrics.self,
+          of: ToolCallTimelineScrollMetrics.init(geometry:)
+        ) { _, newValue in
+          guard cachedScrollMetrics != newValue else {
+            return
+          }
+          cachedScrollMetrics = newValue
         }
       }
     }
@@ -88,17 +128,84 @@ struct ToolCallTimelineView: View {
         text: Self.accessibilityStateMarkerText
       )
     }
-    .onChange(of: announcementSnapshot) { oldValue, newValue in
+    .onAppear {
+      rebuildCachedPresentation()
+    }
+    .onChange(of: entries) { _, _ in
+      rebuildCachedPresentation()
+    }
+    .onChange(of: liveAnnouncementRowIDs) { _, _ in
+      rebuildCachedPresentation()
+    }
+    .onChange(of: overflowNotice) { _, _ in
+      rebuildCachedPresentation()
+    }
+    .onChange(of: cachedScrollMetrics) { _, _ in
+      rebuildVirtualizedLayout()
+    }
+    .onChange(of: cachedAnnouncementSnapshot) { oldValue, newValue in
       announceToolCallStateChanges(
         from: oldValue,
         to: newValue
       )
     }
-    .onChange(of: overflowAnnouncement) { oldValue, newValue in
+    .onChange(of: cachedOverflowAnnouncement) { oldValue, newValue in
       guard let newValue, newValue != oldValue else {
         return
       }
       AccessibilityNotification.Announcement(newValue.text).post()
+    }
+  }
+
+  private func rebuildCachedPresentation() {
+    let presentation = Self.materialisePresentation(from: entries)
+    if cachedPresentation != presentation {
+      cachedPresentation = presentation
+    }
+    rebuildVirtualizedLayout()
+  }
+
+  private func rebuildVirtualizedLayout() {
+    let layout = ToolCallTimelineVirtualizedLayout(
+      presentation: cachedPresentation,
+      scrollMetrics: cachedScrollMetrics
+    )
+    if cachedVirtualizedLayout != layout {
+      cachedVirtualizedLayout = layout
+    }
+    let visibleOverflowToolCallCount = layout.sections
+      .flatMap(\.rows)
+      .reduce(into: 0) { count, row in
+        if liveAnnouncementRowIDs.contains(row.id) && layout.visibleRowIDs.contains(row.id) {
+          count += 1
+        }
+      }
+    if cachedVisibleOverflowToolCallCount != visibleOverflowToolCallCount {
+      cachedVisibleOverflowToolCallCount = visibleOverflowToolCallCount
+    }
+
+    let snapshot = ToolCallTimelineAnnouncementSnapshot(
+      rows: cachedPresentation.rows,
+      liveRowIDs: liveAnnouncementRowIDs
+    )
+    if cachedAnnouncementSnapshot != snapshot {
+      cachedAnnouncementSnapshot = snapshot
+    }
+
+    let overflowAnnouncement: ToolCallTimelineOverflowAnnouncement? =
+      if let overflowNotice {
+        ToolCallTimelineOverflowAnnouncement(
+          id: overflowNotice.recordedAt,
+          text: Self.overflowNoticeText(
+            rawUpdateCount: overflowNotice.rawUpdateCount,
+            visibleToolCallCount: overflowNotice.displayedEventCount
+          )
+        )
+      } else {
+        nil
+      }
+    if cachedOverflowAnnouncement != overflowAnnouncement {
+      cachedOverflowAnnouncement = overflowAnnouncement
     }
   }
 
@@ -254,6 +361,8 @@ struct ToolCallTimelinePresentation: Equatable {
   var rows: [ToolCallTimelineRow] {
     sections.flatMap(\.rows)
   }
+
+  static let empty = Self(sections: [])
 }
 
 struct ToolCallTimelineAnnouncementSnapshot: Equatable {
@@ -263,4 +372,6 @@ struct ToolCallTimelineAnnouncementSnapshot: Equatable {
   var statusesByRowID: [String: ToolCallTimelineRow.Status] {
     Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.status) })
   }
+
+  static let empty = Self(rows: [], liveRowIDs: [])
 }

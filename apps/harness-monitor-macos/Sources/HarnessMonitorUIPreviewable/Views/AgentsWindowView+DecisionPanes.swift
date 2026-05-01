@@ -2,7 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
-  @ViewBuilder func paneContent(decisionScope: DecisionWorkspaceScope) -> some View {
+  @ViewBuilder
+  func paneContent(decisionScope: DecisionWorkspaceScope) -> some View {
     switch viewModel.selection {
     case .create:
       createPane
@@ -29,7 +30,8 @@ extension AgentsWindowView {
     }
   }
 
-  @ViewBuilder func decisionDeskPane(decisionScope: DecisionWorkspaceScope) -> some View {
+  @ViewBuilder
+  func decisionDeskPane(decisionScope: DecisionWorkspaceScope) -> some View {
     DecisionDetailView(
       selectedTab: decisionDetailTabBinding,
       observer: sessionObserver,
@@ -39,7 +41,8 @@ extension AgentsWindowView {
     )
   }
 
-  @ViewBuilder func decisionDetailPane(decisionScope: DecisionWorkspaceScope) -> some View {
+  @ViewBuilder
+  func decisionDetailPane(decisionScope: DecisionWorkspaceScope) -> some View {
     if let selectedDecision = decisionScope.selectedDecision {
       DecisionDetailView(
         decision: selectedDecision,
@@ -61,7 +64,8 @@ extension AgentsWindowView {
     }
   }
 
-  @ToolbarContentBuilder func decisionToolbarItems(
+  @ToolbarContentBuilder
+  func decisionToolbarItems(
     decisionScope: DecisionWorkspaceScope
   ) -> some ToolbarContent {
     if viewModel.selection.isDecisionRoute {

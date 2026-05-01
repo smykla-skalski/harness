@@ -176,7 +176,8 @@ extension HarnessMonitorStore {
       sessionID: sessionID,
       request: request,
       firstFailureRecordedAt: firstFailureRecordedAt,
-      hostBridge: currentHostBridge
+      hostBridge: currentHostBridge,
+      recordsIncidentRetry: code == 503
     ) {
       return recovery
     }
@@ -188,13 +189,16 @@ extension HarnessMonitorStore {
     guard daemonStatus?.manifest?.sandboxed == true else {
       return .notAttempted
     }
-    guard let recovery = await retryAcpStartIfRunningHostBridge(
-      using: client,
-      sessionID: sessionID,
-      request: request,
-      firstFailureRecordedAt: firstFailureRecordedAt,
-      hostBridge: refreshedHostBridge
-    ) else {
+    guard
+      let recovery = await retryAcpStartIfRunningHostBridge(
+        using: client,
+        sessionID: sessionID,
+        request: request,
+        firstFailureRecordedAt: firstFailureRecordedAt,
+        hostBridge: refreshedHostBridge,
+        recordsIncidentRetry: code == 503
+      )
+    else {
       return .notAttempted
     }
     return recovery
@@ -205,11 +209,13 @@ extension HarnessMonitorStore {
     sessionID: String,
     request: AcpAgentStartRequest,
     firstFailureRecordedAt: Date,
-    hostBridge: HostBridgeManifest
+    hostBridge: HostBridgeManifest,
+    recordsIncidentRetry: Bool
   ) async -> AcpStartRecoveryOutcome? {
     guard hostBridge.running else {
       return nil
     }
+    var effectiveClient: any HarnessMonitorClientProtocol = client
     if hostBridge.capabilities["acp"]?.healthy != true {
       switch await mutateHostBridgeCapability(
         using: client,
@@ -219,7 +225,7 @@ extension HarnessMonitorStore {
         announceFeedback: false
       ) {
       case .success:
-        break
+        effectiveClient = self.client ?? client
       case .requiresForce(let message):
         presentFailureFeedback(message)
         return .failed
@@ -227,10 +233,16 @@ extension HarnessMonitorStore {
         return .failed
       }
     }
+    if recordsIncidentRetry {
+      noteAcpBridgeRetryAttempt(
+        for: "acp",
+        recordedAt: firstFailureRecordedAt
+      )
+    }
 
     do {
       let measuredSnapshot = try await measureAcpAgentStart(
-        using: client,
+        using: effectiveClient,
         sessionID: sessionID,
         request: request
       )

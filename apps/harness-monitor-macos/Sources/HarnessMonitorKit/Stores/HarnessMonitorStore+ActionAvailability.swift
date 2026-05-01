@@ -27,17 +27,21 @@ extension HarnessMonitorStore {
     """
   }
 
-  public var selectedSessionActionUnavailableMessage: String? {
+  public func sessionActionUnavailableMessage(sessionID: String?) -> String? {
     if isSessionReadOnly {
       return readOnlySessionAccessMessage
     }
-    if selectedSessionID == nil {
+    guard let sessionID, !sessionID.isEmpty else {
       return noSelectedSessionActionMessage
     }
-    if client == nil {
+    guard client != nil else {
       return actionChannelUnavailableMessage
     }
     return nil
+  }
+
+  public var selectedSessionActionUnavailableMessage: String? {
+    sessionActionUnavailableMessage(sessionID: selectedSessionID)
   }
 
   public var areSelectedSessionActionsAvailable: Bool {
@@ -103,38 +107,41 @@ extension HarnessMonitorStore {
   func prepareSelectedSessionAction(
     named actionName: String
   ) -> (client: any HarnessMonitorClientProtocol, sessionID: String)? {
-    if isSessionReadOnly {
-      reportUnavailableSelectedSessionAction(actionName, message: readOnlySessionAccessMessage)
-      return nil
+    guard
+      let unavailableMessage = sessionActionUnavailableMessage(sessionID: selectedSessionID)
+    else {
+      guard let client, let sessionID = selectedSessionID else {
+        return nil
+      }
+      return (client, sessionID)
     }
-    guard let sessionID = selectedSessionID else {
-      reportUnavailableSelectedSessionAction(actionName, message: noSelectedSessionActionMessage)
-      return nil
-    }
-    guard let client else {
-      reportUnavailableSelectedSessionAction(actionName, message: actionChannelUnavailableMessage)
-      return nil
-    }
-    return (client, sessionID)
+    reportUnavailableSelectedSessionAction(actionName, message: unavailableMessage)
+    return nil
   }
 
   func prepareSessionAction(
     named actionName: String,
     sessionID: String
   ) -> (client: any HarnessMonitorClientProtocol, sessionID: String)? {
-    if isSessionReadOnly {
-      reportUnavailableSelectedSessionAction(actionName, message: readOnlySessionAccessMessage)
-      return nil
+    guard let unavailableMessage = sessionActionUnavailableMessage(sessionID: sessionID) else {
+      guard let client else {
+        return nil
+      }
+      return (client, sessionID)
     }
-    guard !sessionID.isEmpty else {
+    reportUnavailableSelectedSessionAction(actionName, message: unavailableMessage)
+    return nil
+  }
+
+  func prepareSessionAction(
+    named actionName: String,
+    sessionID: String?
+  ) -> (client: any HarnessMonitorClientProtocol, sessionID: String)? {
+    guard let sessionID else {
       reportUnavailableSelectedSessionAction(actionName, message: noSelectedSessionActionMessage)
       return nil
     }
-    guard let client else {
-      reportUnavailableSelectedSessionAction(actionName, message: actionChannelUnavailableMessage)
-      return nil
-    }
-    return (client, sessionID)
+    return prepareSessionAction(named: actionName, sessionID: sessionID as String)
   }
 
   private var selectedSessionHasRealLeader: Bool {

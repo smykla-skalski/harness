@@ -108,7 +108,8 @@ private func agentsWindowAcpLeaderPreview(
   view.viewModel.name = "Copilot Reviewer"
   view.viewModel.prompt = "Review the latest ACP wiring and call out the next risky change."
   view.viewModel.projectDir = "/tmp/ui-acp"
-  return view
+  return
+    view
     .frame(width: width, height: height)
     .padding()
 }

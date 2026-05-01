@@ -245,7 +245,12 @@ struct HarnessMonitorMCPContractTests {
     let reusedService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
 
     await hostService.setEnabled(true)
-    defer { Task { await reusedService.setEnabled(false); await hostService.setEnabled(false) } }
+    defer {
+      Task {
+        await reusedService.setEnabled(false)
+        await hostService.setEnabled(false)
+      }
+    }
     try await waitForSocket(at: socketURL.path, timeout: 2)
 
     await hostService.registry.registerElement(
@@ -309,7 +314,12 @@ struct HarnessMonitorMCPContractTests {
     )
 
     await legacyHost.setEnabled(true)
-    defer { Task { await legacyHost.setEnabled(false); await replacementHost.setEnabled(false) } }
+    defer {
+      Task {
+        await legacyHost.setEnabled(false)
+        await replacementHost.setEnabled(false)
+      }
+    }
     try await waitForSocket(at: socketURL.path, timeout: 2)
 
     await legacyHost.registry.registerElement(
@@ -360,7 +370,12 @@ struct HarnessMonitorMCPContractTests {
     let localService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
 
     await foreignHost.setEnabled(true)
-    defer { Task { await localService.setEnabled(false); await foreignHost.setEnabled(false) } }
+    defer {
+      Task {
+        await localService.setEnabled(false)
+        await foreignHost.setEnabled(false)
+      }
+    }
     try await waitForSocket(at: socketURL.path, timeout: 2)
 
     await localService.setEnabled(true)
@@ -486,7 +501,13 @@ struct HarnessMonitorMCPContractTests {
     guard fd >= 0 else { throw MCPContractTestError.clientSocketFailed(errno) }
 
     var noSigPipe: Int32 = 1
-    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
+    _ = Darwin.setsockopt(
+      fd,
+      SOL_SOCKET,
+      SO_NOSIGPIPE,
+      &noSigPipe,
+      socklen_t(MemoryLayout<Int32>.size)
+    )
     var addr = sockaddr_un()
     addr.sun_family = sa_family_t(AF_UNIX)
     let pathBytes = Array(path.utf8)
@@ -544,7 +565,10 @@ struct HarnessMonitorMCPContractTests {
         let chunk = Data(scratch.prefix(received))
         let lines: [Data]
         do {
-          lines = try lineBuffer.append(chunk, maxBufferedBytes: RegistryWireCodec.maximumFrameBytes)
+          lines = try lineBuffer.append(
+            chunk,
+            maxBufferedBytes: RegistryWireCodec.maximumFrameBytes
+          )
         } catch {
           throw MCPContractTestError.recvFailed(EMSGSIZE)
         }

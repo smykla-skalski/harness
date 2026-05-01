@@ -41,9 +41,9 @@ public struct ObserverSummaryPanel: View {
         scope?.resultSummary
           ?? "Stay on top of the decisions that need attention and the signals shaping them."
       )
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
+      .scaledFont(.callout)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .fixedSize(horizontal: false, vertical: true)
       if let scope, scope.hasActiveFilters {
         Text(scope.scopeDescription)
           .scaledFont(.caption.weight(.semibold))
@@ -110,10 +110,12 @@ public struct ObserverSummaryEmptyState: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text("Signals will appear here")
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      Text("Open alerts, muted rules, and active work appear here once the session starts reporting them.")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .multilineTextAlignment(.center)
+      Text(
+        "Open alerts, muted rules, and active work appear here once the session starts reporting them."
+      )
+      .scaledFont(.callout)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .multilineTextAlignment(.center)
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .center)

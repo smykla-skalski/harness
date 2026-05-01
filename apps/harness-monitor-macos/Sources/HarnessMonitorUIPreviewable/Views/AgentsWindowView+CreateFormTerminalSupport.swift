@@ -39,7 +39,9 @@ extension AgentsWindowView {
     case .terminalOnly:
       return "Project access isn't available for this provider yet."
     case .unavailable:
-      return option.projectAccessGuidanceText ?? "Project access isn't available for this provider yet."
+      return
+        option.projectAccessGuidanceText
+        ?? "Project access isn't available for this provider yet."
     }
   }
 
@@ -226,13 +228,16 @@ extension AgentsWindowView {
       return customModelID.isEmpty ? "Custom model" : customModelID
     }
 
-    return context.catalogModels.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
+    return
+      context.catalogModels.first { $0.id == selectedModelID }?.displayName
+      ?? selectedModelID
   }
 
   var selectedPersonaStateText: String {
-    guard let selectedPersona = viewModel.selectedPersona,
-      let personaName = viewModel.availablePersonas.first(where: { $0.identifier == selectedPersona })?
-        .name
+    guard
+      let selectedPersona = viewModel.selectedPersona,
+      let personaName =
+        viewModel.availablePersonas.first(where: { $0.identifier == selectedPersona })?.name
     else {
       return "No persona selected."
     }

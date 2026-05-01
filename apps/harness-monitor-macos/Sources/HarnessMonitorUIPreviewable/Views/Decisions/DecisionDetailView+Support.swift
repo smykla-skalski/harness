@@ -36,7 +36,8 @@ func humanizedWorkspaceLabel(_ raw: String) -> String {
     return raw
   }
 
-  let separated = trimmed
+  let separated =
+    trimmed
     .replacingOccurrences(of: ".", with: " ")
     .replacingOccurrences(of: "_", with: " ")
     .replacingOccurrences(of: "-", with: " ")
