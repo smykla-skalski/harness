@@ -305,6 +305,7 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.navigateForwardButton,
       HarnessMonitorUITestAccessibility.refreshButton,
       HarnessMonitorUITestAccessibility.sleepPreventionButton,
+      HarnessMonitorUITestAccessibility.sidebarFiltersCard,
       HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
       HarnessMonitorUITestAccessibility.agentsButton,
     ]
@@ -322,6 +323,22 @@ extension HarnessMonitorUITestCase {
   }
 
   func sidebarFilterControl(in app: XCUIApplication) -> XCUIElement {
+    let identifiedButton = button(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.sidebarFiltersCard
+    )
+    if identifiedButton.exists, !identifiedButton.frame.isEmpty {
+      return identifiedButton
+    }
+
+    let toolbarControl = toolbarButton(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.sidebarFiltersCard
+    )
+    if toolbarControl.exists, !toolbarControl.frame.isEmpty {
+      return toolbarControl
+    }
+
     let identifiedControl = element(
       in: app,
       identifier: HarnessMonitorUITestAccessibility.sidebarStatusPicker
@@ -330,8 +347,25 @@ extension HarnessMonitorUITestCase {
       return identifiedControl
     }
 
-    let titledControl = button(in: app, title: "Status")
-    return titledControl.exists ? titledControl : identifiedControl
+    let titledControl = button(in: app, title: "Filters")
+    if titledControl.exists {
+      return titledControl
+    }
+
+    let fallbackTitledControl = button(in: app, title: "Filter")
+    if fallbackTitledControl.exists {
+      return fallbackTitledControl
+    }
+
+    let filterGroup = element(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.sessionFilterGroup
+    )
+    if filterGroup.exists, !filterGroup.frame.isEmpty {
+      return filterGroup
+    }
+
+    return identifiedControl
   }
 
   func sidebarFilterControlDiagnostics(in app: XCUIApplication) -> String {
@@ -348,7 +382,13 @@ extension HarnessMonitorUITestCase {
     for role in roles {
       let identifierMatches = mainWindow(in: app)
         .descendants(matching: role)
-        .matching(identifier: HarnessMonitorUITestAccessibility.sidebarStatusPicker)
+        .matching(
+          NSPredicate(
+            format: "identifier == %@ OR identifier == %@",
+            HarnessMonitorUITestAccessibility.sidebarFiltersCard,
+            HarnessMonitorUITestAccessibility.sidebarStatusPicker
+          )
+        )
         .allElementsBoundByIndex
       for (index, element) in identifierMatches.enumerated() {
         lines.append(
@@ -359,11 +399,33 @@ extension HarnessMonitorUITestCase {
 
       let titleMatches = mainWindow(in: app)
         .descendants(matching: role)
-        .matching(NSPredicate(format: "label == %@", "Status"))
+        .matching(
+          NSPredicate(
+            format: "label == %@ OR label == %@",
+            "Filters",
+            "Filter"
+          )
+        )
         .allElementsBoundByIndex
       for (index, element) in titleMatches.enumerated() {
         lines.append(
           "title role=\(role.rawValue) index=\(index) exists=\(element.exists) "
+            + "hittable=\(element.isHittable) frame=\(element.frame) identifier=\(element.identifier)"
+        )
+      }
+
+      let statusMatches = mainWindow(in: app)
+        .descendants(matching: role)
+        .matching(
+          NSPredicate(
+            format: "label == %@",
+            "Status"
+          )
+        )
+        .allElementsBoundByIndex
+      for (index, element) in statusMatches.enumerated() {
+        lines.append(
+          "status role=\(role.rawValue) index=\(index) exists=\(element.exists) "
             + "hittable=\(element.isHittable) frame=\(element.frame) identifier=\(element.identifier)"
         )
       }
