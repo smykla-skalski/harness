@@ -99,6 +99,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     var viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
+    private var rowHeightCache: [String: CGFloat] = [:]
     private var rows: [SessionTimelineRow] = []
     private var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
@@ -151,6 +152,12 @@ struct SessionTimelineTableView: NSViewRepresentable {
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
       let rowsChanged = rowSnapshot != nextSnapshot
       if rowsChanged {
+        for i in 0..<tableView.numberOfRows {
+          guard self.rows.indices.contains(i) else { continue }
+          let rowID = self.rows[i].id
+          rowHeightCache[rowID] = tableView.rect(ofRow: i).height
+        }
+
         self.rows = rows
         rowIndexByID = Dictionary(
           uniqueKeysWithValues: rows.enumerated().map { index, row in
@@ -178,6 +185,17 @@ struct SessionTimelineTableView: NSViewRepresentable {
 
     func numberOfRows(in _: NSTableView) -> Int {
       rows.count
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+      guard rows.indices.contains(row) else {
+        return SessionTimelineTableMetrics.estimatedBaseRowHeight
+      }
+      let rowData = rows[row]
+      if let cached = rowHeightCache[rowData.id] {
+        return cached
+      }
+      return SessionTimelineTableMetrics.estimatedHeight(for: rowData)
     }
 
     func tableView(
