@@ -247,22 +247,11 @@ extension HarnessMonitorAgentsE2ETests {
 
   func tapDockButton(in app: XCUIApplication, identifier: String, label: String) {
     app.activate()
-    let trigger = button(in: app, identifier: identifier)
     XCTAssertTrue(
-      waitUntil(timeout: Self.liveActionTimeout) {
-        trigger.exists && !trigger.frame.isEmpty
-      },
+      waitForButtonReady(in: app, identifier: identifier, timeout: Self.liveActionTimeout),
       "\(label) button should be visible"
     )
-    if trigger.isHittable {
-      trigger.tap()
-      return
-    }
-    if let coordinate = centerCoordinate(in: app, for: trigger) {
-      coordinate.tap()
-      return
-    }
-    XCTFail("Cannot resolve coordinate for \(label) button")
+    tapButton(in: app, identifier: identifier)
   }
 
   func replaceText(

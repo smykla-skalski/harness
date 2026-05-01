@@ -283,6 +283,35 @@ struct ToolCallTimelineViewTests {
     )
   }
 
+  @Test("Viewport-visible rows intersect visible rect")
+  func viewportVisibleRowsIntersectVisibleRect() {
+    let visible = ToolCallTimelineView.viewportVisibleRowIDs(
+      renderedRowIDs: ["row-1", "row-2", "row-3"],
+      rowFrames: [
+        "row-1": CGRect(x: 0, y: 10, width: 100, height: 30),
+        "row-2": CGRect(x: 0, y: 120, width: 100, height: 30),
+        "row-3": CGRect(x: 0, y: 260, width: 100, height: 30),
+      ],
+      visibleRect: CGRect(x: 0, y: 100, width: 500, height: 80)
+    )
+
+    #expect(visible == ["row-2"])
+  }
+
+  @Test("Viewport-visible rows ignore missing and non-rendered frame entries")
+  func viewportVisibleRowsIgnoreMissingAndNonRenderedFrames() {
+    let visible = ToolCallTimelineView.viewportVisibleRowIDs(
+      renderedRowIDs: ["row-a", "row-b"],
+      rowFrames: [
+        "row-a": CGRect(x: 0, y: 10, width: 100, height: 30),
+        "row-c": CGRect(x: 0, y: 20, width: 100, height: 30),
+      ],
+      visibleRect: CGRect(x: 0, y: 0, width: 500, height: 50)
+    )
+
+    #expect(visible == ["row-a"])
+  }
+
   private func makeCanonicalEntry(
     entryId: String,
     recordedAt: String,

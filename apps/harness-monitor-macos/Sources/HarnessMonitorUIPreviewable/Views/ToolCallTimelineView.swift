@@ -12,6 +12,7 @@ struct ToolCallTimelineView: View {
   @State private var cachedScrollMetrics = ToolCallTimelineScrollMetrics.zero
   @State private var cachedVisibleOverflowToolCallCount = 0
   @State private var cachedOverflowAnnouncement: ToolCallTimelineOverflowAnnouncement?
+  @State private var cachedRowFrames: [String: CGRect] = [:]
 
   @AppStorage(
     HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsKey
@@ -105,6 +106,7 @@ struct ToolCallTimelineView: View {
           .scrollTargetLayout()
           .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .coordinateSpace(name: ToolCallTimelineScrollMetrics.coordinateSpaceName)
         .scrollIndicators(.visible)
         .frame(minHeight: 180, idealHeight: 260, maxHeight: 360)
         .onScrollGeometryChange(
@@ -115,6 +117,12 @@ struct ToolCallTimelineView: View {
             return
           }
           cachedScrollMetrics = newValue
+        }
+        .onPreferenceChange(ToolCallTimelineRowFramePreferenceKey.self) { newFrames in
+          if cachedRowFrames != newFrames {
+            cachedRowFrames = newFrames
+            rebuildVirtualizedLayout()
+          }
         }
       }
     }
@@ -173,10 +181,11 @@ struct ToolCallTimelineView: View {
     if cachedVirtualizedLayout != layout {
       cachedVirtualizedLayout = layout
     }
+    let viewportVisibleRowIDs = visibleViewportRowIDs(in: layout)
     let visibleOverflowToolCallCount = layout.sections
       .flatMap(\.rows)
       .reduce(into: 0) { count, row in
-        let isVisibleInViewport = layout.viewportVisibleRowIDs.contains(row.id)
+        let isVisibleInViewport = viewportVisibleRowIDs.contains(row.id)
         if liveAnnouncementRowIDs.contains(row.id), isVisibleInViewport {
           count += 1
         }
@@ -208,6 +217,29 @@ struct ToolCallTimelineView: View {
     if cachedOverflowAnnouncement != overflowAnnouncement {
       cachedOverflowAnnouncement = overflowAnnouncement
     }
+  }
+
+  private func visibleViewportRowIDs(in layout: ToolCallTimelineVirtualizedLayout) -> Set<String> {
+    Self.viewportVisibleRowIDs(
+      renderedRowIDs: layout.renderedRowIDs,
+      rowFrames: cachedRowFrames,
+      visibleRect: cachedScrollMetrics.visibleRect
+    )
+  }
+
+  static func viewportVisibleRowIDs(
+    renderedRowIDs: Set<String>,
+    rowFrames: [String: CGRect],
+    visibleRect: CGRect
+  ) -> Set<String> {
+    Set(
+      renderedRowIDs.filter { rowID in
+        guard let frame = rowFrames[rowID] else {
+          return false
+        }
+        return frame.intersects(visibleRect)
+      }
+    )
   }
 
   static func materialiseRows(from entries: [TimelineEntry]) -> [ToolCallTimelineRow] {

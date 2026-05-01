@@ -239,6 +239,34 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     #expect(inspectedAgent.promptDeadlineRemainingMs == 95_000)
   }
 
+  @Test("Preview client start ACP refreshes session detail agents")
+  func previewClientStartAcpRefreshesSessionDetailAgents() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .populated,
+      isLaunchAgentInstalled: true
+    )
+    let sessionID = PreviewFixtures.summary.sessionId
+
+    _ = try await client.startManagedAcpAgent(
+      sessionID: sessionID,
+      request: AcpAgentStartRequest(
+        agent: "copilot",
+        role: .leader,
+        fallbackRole: .observer,
+        capabilities: ["acp"]
+      )
+    )
+
+    let detail = try await client.sessionDetail(id: sessionID, scope: nil)
+    let agent = try #require(detail.agents.first { $0.agentId == "copilot" })
+
+    #expect(agent.name == "GitHub Copilot")
+    #expect(agent.role == .observer)
+    #expect(agent.status == .active)
+    #expect(detail.session.leaderId == PreviewFixtures.summary.leaderId)
+    #expect(detail.session.metrics.agentCount == detail.agents.count)
+  }
+
   @Test("Preview bootstrap refresh keeps ACP managed agents on selected session")
   func previewBootstrapRefreshKeepsAcpManagedAgents() async {
     let previousValue = Foundation.ProcessInfo.processInfo.environment[
@@ -292,7 +320,7 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
 
     #expect(store.daemonStatus?.manifest?.sandboxed == true)
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
-    #expect(store.codexUnavailable == true)
+    #expect(store.acpUnavailable == true)
     #expect(store.acpBridgeHTTPIncident != nil)
     #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
   }

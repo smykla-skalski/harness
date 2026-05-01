@@ -1,6 +1,14 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct ToolCallTimelineRowFramePreferenceKey: PreferenceKey {
+  static var defaultValue: [String: CGRect] = [:]
+
+  static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+    value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+  }
+}
+
 struct ToolCallTimelineSection: Identifiable, Equatable {
   let id: String
   let acpAgentID: String?
@@ -140,6 +148,16 @@ struct ToolCallTimelineRowView: View {
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityValue(row.accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.toolCallTimelineRow(row.id))
+    .background {
+      GeometryReader { proxy in
+        Color.clear.preference(
+          key: ToolCallTimelineRowFramePreferenceKey.self,
+          value: [
+            row.id: proxy.frame(in: .named(ToolCallTimelineScrollMetrics.coordinateSpaceName))
+          ]
+        )
+      }
+    }
   }
 }
 

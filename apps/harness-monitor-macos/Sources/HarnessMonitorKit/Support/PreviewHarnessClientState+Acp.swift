@@ -39,6 +39,7 @@ extension PreviewHarnessClientState {
     var agents = acpAgentsBySessionID[sessionID] ?? []
     agents.insert(snapshot, at: 0)
     acpAgentsBySessionID[sessionID] = agents
+    applyStartedAcpAgent(snapshot, request: request)
     return snapshot
   }
 
@@ -212,5 +213,99 @@ extension PreviewHarnessClientState {
         createdAt: Self.mutationTimestamp
       )
     ]
+  }
+
+  private func applyStartedAcpAgent(
+    _ snapshot: AcpAgentSnapshot,
+    request: AcpAgentStartRequest
+  ) {
+    guard let currentDetail = currentMutableSessionDetail(sessionID: snapshot.sessionId) else {
+      return
+    }
+
+    let assignedRole = startedAcpRole(for: request, currentDetail: currentDetail)
+    let registration = previewAcpRegistration(
+      from: snapshot,
+      request: request,
+      assignedRole: assignedRole
+    )
+    let updatedAgents = currentDetail.agents.filter { $0.agentId != request.agent } + [registration]
+    let updatedSummary = SessionSummary(
+      projectId: currentDetail.session.projectId,
+      projectName: currentDetail.session.projectName,
+      projectDir: currentDetail.session.projectDir,
+      contextRoot: currentDetail.session.contextRoot,
+      sessionId: currentDetail.session.sessionId,
+      worktreePath: currentDetail.session.worktreePath,
+      sharedPath: currentDetail.session.sharedPath,
+      originPath: currentDetail.session.originPath,
+      branchRef: currentDetail.session.branchRef,
+      title: currentDetail.session.title,
+      context: currentDetail.session.context,
+      status: currentDetail.session.status,
+      createdAt: currentDetail.session.createdAt,
+      updatedAt: snapshot.updatedAt,
+      lastActivityAt: snapshot.updatedAt,
+      leaderId: assignedRole == .leader ? request.agent : currentDetail.session.leaderId,
+      observeId: currentDetail.session.observeId,
+      pendingLeaderTransfer: currentDetail.session.pendingLeaderTransfer,
+      externalOrigin: currentDetail.session.externalOrigin,
+      adoptedAt: currentDetail.session.adoptedAt,
+      metrics: SessionMetrics(tasks: currentDetail.tasks, agents: updatedAgents)
+    )
+    let updatedDetail = SessionDetail(
+      session: updatedSummary,
+      agents: updatedAgents,
+      tasks: currentDetail.tasks,
+      signals: currentDetail.signals,
+      observer: currentDetail.observer,
+      agentActivity: currentDetail.agentActivity
+    ).canonicallySorted()
+
+    storeMutatedSessionDetail(updatedDetail)
+  }
+
+  private func startedAcpRole(
+    for request: AcpAgentStartRequest,
+    currentDetail: SessionDetail
+  ) -> SessionRole {
+    if request.role == .leader,
+      let fallbackRole = request.fallbackRole,
+      let leaderID = currentDetail.session.leaderId,
+      leaderID != request.agent
+    {
+      return fallbackRole
+    }
+    return request.role
+  }
+
+  private func previewAcpRegistration(
+    from snapshot: AcpAgentSnapshot,
+    request: AcpAgentStartRequest,
+    assignedRole: SessionRole
+  ) -> AgentRegistration {
+    let runtimeCapabilities = RuntimeCapabilities(
+      runtime: request.agent,
+      supportsNativeTranscript: true,
+      supportsSignalDelivery: true,
+      supportsContextInjection: true,
+      typicalSignalLatencySeconds: 5,
+      hookPoints: []
+    )
+    return AgentRegistration(
+      agentId: request.agent,
+      name: snapshot.displayName,
+      runtime: request.agent,
+      role: assignedRole,
+      capabilities: request.capabilities,
+      joinedAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+      status: snapshot.status,
+      agentSessionId: nil,
+      lastActivityAt: snapshot.updatedAt,
+      currentTaskId: nil,
+      runtimeCapabilities: runtimeCapabilities,
+      persona: nil
+    )
   }
 }

@@ -9,7 +9,7 @@ extension AgentsWindowView {
     }
     let capabilities =
       viewModel.availableAcpAgents.first(where: { $0.id == agentID })?.capabilities ?? []
-    let startSessionID = viewModel.selection.sessionID ?? viewModel.createSessionID
+    let startSessionID = resolvedCreateSessionID
     let started = await store.startAcpAgent(
       agentID: agentID,
       role: viewModel.selectedRole,
