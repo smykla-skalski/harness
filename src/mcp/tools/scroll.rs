@@ -73,6 +73,12 @@ impl Tool for ScrollTool {
             return Err(ToolError::invalid("identifier cannot be empty"));
         }
         let element = self.fetch_element(&parsed.identifier).await?;
+        if !element.element.enabled {
+            return Err(ToolError::invalid(format!(
+                "identifier '{}' resolves to a disabled target",
+                parsed.identifier
+            )));
+        }
         let (cx, cy) = center(&element.element.frame);
         scroll(cx, cy, parsed.delta_x, parsed.delta_y)
             .await

@@ -36,6 +36,7 @@ public enum HarnessMonitorMCPRuntimeState: Equatable, Sendable {
 public protocol HarnessMonitorMCPStartupControlling: AnyObject {
   var runtimeState: HarnessMonitorMCPRuntimeState { get }
   func setEnabled(_ enabled: Bool) async
+  func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState
 }
 
 /// Owns the in-app accessibility registry and its NDJSON Unix-socket
@@ -93,6 +94,22 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     } else {
       await stop()
     }
+  }
+
+  public func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState {
+    guard let socket = runningSocketURL ?? socketPathResolver() else {
+      return .degraded(socketPath: nil, reason: "cannot resolve app-group container")
+    }
+    guard listener != nil else {
+      return .disabled
+    }
+    if await socketAcceptsPing(at: socket.path) {
+      return .healthy(socketPath: socket.path)
+    }
+    return .degraded(
+      socketPath: socket.path,
+      reason: "listener failed the local ping probe"
+    )
   }
 
   private func startIfNeeded() async {

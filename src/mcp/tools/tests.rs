@@ -77,6 +77,18 @@ fn sample_element_response_with(
     width: f64,
     height: f64,
 ) -> String {
+    sample_element_response_with_enabled(id, identifier, x, y, width, height, true)
+}
+
+fn sample_element_response_with_enabled(
+    id: u64,
+    identifier: &str,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    enabled: bool,
+) -> String {
     json!({
         "id": id,
         "ok": true,
@@ -88,7 +100,7 @@ fn sample_element_response_with(
             "kind": "button",
             "frame": {"x": x, "y": y, "width": width, "height": height},
             "windowID": 7,
-            "enabled": true,
+            "enabled": enabled,
             "selected": false,
             "focused": true,
         }}
@@ -436,6 +448,31 @@ async fn scroll_tool_queries_registry_for_identifier() {
 }
 
 #[tokio::test]
+async fn scroll_tool_rejects_disabled_targets() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let response = sample_element_response_with_enabled(
+        1,
+        "harness.session.cockpit.scroll",
+        10.0,
+        20.0,
+        200.0,
+        120.0,
+        false,
+    );
+    let server = spawn_single_response(&path, response);
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = ScrollTool::new(client);
+    let err = tool
+        .call(json!({"identifier": "harness.session.cockpit.scroll", "deltaY": 180}))
+        .await
+        .expect_err("disabled targets should be rejected");
+    let request_line = server.await.unwrap();
+    assert!(request_line.contains("\"identifier\":\"harness.session.cockpit.scroll\""));
+    assert!(err.message().contains("disabled target"));
+}
+
+#[tokio::test]
 async fn drag_drop_tool_queries_source_and_destination_identifiers() {
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
@@ -458,6 +495,39 @@ async fn drag_drop_tool_queries_source_and_destination_identifiers() {
     assert_eq!(requests.len(), 2);
     assert!(requests[0].contains("\"identifier\":\"task.source\""));
     assert!(requests[1].contains("\"identifier\":\"agent.destination\""));
+}
+
+#[tokio::test]
+async fn drag_drop_tool_rejects_disabled_destination() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let server = spawn_response_sequence(
+        &path,
+        vec![
+            sample_element_response_with(1, "task.source", 10.0, 20.0, 50.0, 40.0),
+            sample_element_response_with_enabled(
+                2,
+                "agent.destination",
+                210.0,
+                120.0,
+                60.0,
+                60.0,
+                false,
+            ),
+        ],
+    );
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = DragDropTool::new(client);
+    let err = tool
+        .call(json!({
+            "sourceIdentifier": "task.source",
+            "destinationIdentifier": "agent.destination",
+        }))
+        .await
+        .expect_err("disabled destination should be rejected");
+    let requests = server.await.unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(err.message().contains("disabled target"));
 }
 
 #[tokio::test]

@@ -339,18 +339,24 @@ public final class HarnessMonitorMCPStartupController {
           return
         }
 
-        await self.service.setEnabled(true)
+        let probedState = await self.service.probeRuntimeState()
         guard !Task.isCancelled, self.requestedEnabled else {
           return
         }
+        var shouldContinue = true
         await self.suspendStatusPublication {
-          self.runtimeState = self.service.runtimeState
+          // Health checks only observe. Recovery attempts remain the sole place
+          // that actively restarts the registry host.
+          self.runtimeState = probedState
           guard case .healthy = self.runtimeState else {
             self.healthCheckTask = nil
-            self.completedRetryCount = 0
             await self.scheduleRecoveryIfNeeded()
+            shouldContinue = false
             return
           }
+        }
+        guard shouldContinue else {
+          return
         }
       }
     }
