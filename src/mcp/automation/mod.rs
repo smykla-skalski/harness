@@ -6,6 +6,7 @@
 //! legacy setups; `osascript` covers text input when neither helper is
 //! present. Screenshots always use `/usr/sbin/screencapture`.
 
+mod accessibility;
 mod backend;
 mod error;
 mod input;
@@ -14,6 +15,12 @@ mod screenshot;
 #[cfg(test)]
 mod tests;
 
+pub use accessibility::{
+    AccessibilityQueryError, get_element as get_accessibility_element,
+    get_element_args as accessibility_get_element_args,
+    list_elements as list_accessibility_elements,
+    list_elements_args as accessibility_list_elements_args,
+};
 pub use backend::{Backend, INPUT_OVERRIDE_ENV, detect_backend};
 pub use error::AutomationError;
 pub use input::{MouseButton, click_args, move_mouse_args, type_text_args};

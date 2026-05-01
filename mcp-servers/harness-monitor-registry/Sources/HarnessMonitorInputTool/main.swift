@@ -12,6 +12,8 @@ import Foundation
 //   type [--delay <ms>] <text>    (text read from stdin if omitted)
 //   position
 //   check                         (report Accessibility permission state)
+//   list-elements [--bundle-id id] [--window-id id] [--kind kind]
+//   get-element [--bundle-id id] <identifier>
 //
 // Coordinates are in global screen space, origin at the top-left display.
 // Exit codes:
@@ -33,6 +35,8 @@ do {
   case "type": try handleType(Array(args.dropFirst()))
   case "position": try handlePosition()
   case "check": try handleCheck()
+  case "list-elements": try handleListElements(Array(args.dropFirst()))
+  case "get-element": try handleGetElement(Array(args.dropFirst()))
   case "-h", "--help", "help":
     printUsage()
     exit(0)
@@ -53,7 +57,10 @@ enum InputToolError: Error, CustomStringConvertible {
   case invalidNumber(String)
   case invalidButton(String)
   case accessibilityDenied
+  case appNotRunning(String)
+  case notFound(String)
   case eventCreationFailed(String)
+  case queryFailed(String)
 
   var description: String {
     switch self {
@@ -62,7 +69,12 @@ enum InputToolError: Error, CustomStringConvertible {
     case .invalidButton(let raw): return "unknown button: \(raw)"
     case .accessibilityDenied:
       return "Accessibility permission not granted. Open System Settings -> Privacy & Security -> Accessibility and enable the app running this binary (terminal, Claude Code, etc)."
+    case .appNotRunning(let bundleIdentifier):
+      return "Harness Monitor is not running for bundle id(s): \(bundleIdentifier)"
+    case .notFound(let identifier):
+      return "not found: \(identifier)"
     case .eventCreationFailed(let what): return "failed to create \(what) event"
+    case .queryFailed(let detail): return "query failed: \(detail)"
     }
   }
 
@@ -71,7 +83,8 @@ enum InputToolError: Error, CustomStringConvertible {
     case .usage: return 64
     case .invalidNumber, .invalidButton: return 64
     case .accessibilityDenied: return 2
-    case .eventCreationFailed: return 1
+    case .notFound: return 3
+    case .appNotRunning, .eventCreationFailed, .queryFailed: return 1
     }
   }
 }
@@ -86,6 +99,8 @@ func printUsage() {
       type [--delay ms] [text]        (reads stdin if text omitted)
       position                        (prints "x,y")
       check                           (prints "trusted" or "denied"; exit 2 if denied)
+      list-elements [--bundle-id id] [--window-id id] [--kind kind]
+      get-element [--bundle-id id] <identifier>
 
     All coordinates are global screen coordinates, origin at top-left.
     """

@@ -5,10 +5,10 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::mcp::protocol::ToolResult;
-use crate::mcp::registry::{GetElementResult, RegistryClient, RegistryRequest};
+use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolError};
 
-use super::shared::{decode_params, map_registry_error, ok_text};
+use super::shared::{decode_params, ok_text, resolve_get_element};
 
 #[derive(Debug, Deserialize)]
 struct Params {
@@ -57,16 +57,7 @@ impl Tool for GetElementTool {
         if parsed.identifier.is_empty() {
             return Err(ToolError::invalid("identifier cannot be empty"));
         }
-        let id = self.client.next_request_id();
-        let request = RegistryRequest::GetElement {
-            id,
-            identifier: parsed.identifier,
-        };
-        let result: GetElementResult = self
-            .client
-            .request(&request)
-            .await
-            .map_err(|error| map_registry_error(&error))?;
+        let result = resolve_get_element(&self.client, &parsed.identifier).await?;
         ok_text(&result)
     }
 }
