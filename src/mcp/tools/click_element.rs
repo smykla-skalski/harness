@@ -6,10 +6,10 @@ use serde_json::{Value, json};
 
 use crate::mcp::automation::{AutomationError, MouseButton, click};
 use crate::mcp::protocol::ToolResult;
-use crate::mcp::registry::{GetElementResult, Rect, RegistryClient, RegistryRequest};
+use crate::mcp::registry::{GetElementResult, Rect, RegistryClient};
 use crate::mcp::tool::{Tool, ToolError};
 
-use super::shared::{decode_params, map_registry_error};
+use super::shared::{decode_params, resolve_get_element};
 
 #[derive(Debug, Deserialize)]
 struct Params {
@@ -91,15 +91,7 @@ impl Tool for ClickElementTool {
 
 impl ClickElementTool {
     async fn fetch_element(&self, identifier: &str) -> Result<GetElementResult, ToolError> {
-        let id = self.client.next_request_id();
-        let request = RegistryRequest::GetElement {
-            id,
-            identifier: identifier.to_string(),
-        };
-        self.client
-            .request(&request)
-            .await
-            .map_err(|error| map_registry_error(&error))
+        resolve_get_element(&self.client, identifier).await
     }
 }
 

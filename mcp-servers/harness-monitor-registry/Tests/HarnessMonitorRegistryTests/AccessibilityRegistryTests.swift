@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 @testable import HarnessMonitorRegistry
 
@@ -67,6 +68,45 @@ struct AccessibilityRegistryTests {
     #expect(fetched == nil)
   }
 
+  @Test("replacing window elements clears stale entries for that window only")
+  func replaceWindowElementsClearsStaleEntries() async {
+    let registry = AccessibilityRegistry()
+    await registry.registerElement(
+      RegistryElement(
+        identifier: "main.keep",
+        kind: .button,
+        frame: RegistryRect(x: 0, y: 0, width: 1, height: 1),
+        windowID: 100
+      )
+    )
+    await registry.registerElement(
+      RegistryElement(
+        identifier: "prefs.keep",
+        kind: .button,
+        frame: RegistryRect(x: 0, y: 0, width: 1, height: 1),
+        windowID: 200
+      )
+    )
+
+    await registry.replaceWindowElements(
+      windowID: 100,
+      elements: [
+        RegistryElement(
+          identifier: "main.next",
+          kind: .textField,
+          frame: RegistryRect(x: 10, y: 20, width: 100, height: 24)
+        )
+      ]
+    )
+
+    let mainElements = await registry.allElements(windowID: 100)
+    #expect(mainElements.map(\.identifier) == ["main.next"])
+    #expect(mainElements.first?.windowID == 100)
+
+    let prefsElements = await registry.allElements(windowID: 200)
+    #expect(prefsElements.map(\.identifier) == ["prefs.keep"])
+  }
+
   @MainActor
   @Test("stale window updates are ignored after tracking stops")
   func staleWindowUpdatesAreIgnoredAfterTrackingStops() async {
@@ -87,5 +127,52 @@ struct AccessibilityRegistryTests {
 
     let windows = await registry.allWindows()
     #expect(windows.isEmpty)
+  }
+
+  @MainActor
+  @Test("window element sync harvests and replaces tracked controls")
+  func windowElementSyncHarvestsTrackedControls() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(registry: registry)
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("session.controls.start")
+    let field = NSTextField(string: "")
+    field.placeholderString = "Search"
+    field.frame = NSRect(x: 40, y: 96, width: 180, height: 24)
+    field.setAccessibilityIdentifier("sidebar.search")
+    root.addSubview(button)
+    root.addSubview(field)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let initialElements = await registry.allElements(windowID: window.windowNumber)
+    #expect(initialElements.map(\.identifier) == ["session.controls.start", "sidebar.search"])
+    #expect(initialElements.first(where: { $0.identifier == "session.controls.start" })?.kind == .button)
+    #expect(initialElements.first(where: { $0.identifier == "sidebar.search" })?.kind == .textField)
+
+    field.removeFromSuperview()
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let refreshedElements = await registry.allElements(windowID: window.windowNumber)
+    #expect(refreshedElements.map(\.identifier) == ["session.controls.start"])
+
+    controller.stopTracking()
+    await controller.waitForIdle()
+    let clearedElements = await registry.allElements(windowID: window.windowNumber)
+    #expect(clearedElements.isEmpty)
   }
 }

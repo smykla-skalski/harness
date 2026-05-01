@@ -8,6 +8,8 @@ use crate::mcp::tool::{Tool, ToolError};
 
 use super::shared::decode_params;
 
+const MAX_INLINE_SCREENSHOT_BASE64_BYTES: usize = 1_000_000;
+
 #[derive(Debug, Deserialize)]
 struct Params {
     #[serde(rename = "windowID", default)]
@@ -28,8 +30,8 @@ impl Tool for ScreenshotWindowTool {
 
     fn description(&self) -> &'static str {
         "Capture a PNG screenshot. If windowID is provided, capture that \
-         window; otherwise the display. Returns a base64-encoded image \
-         content block."
+         window; otherwise the display. Returns an inline image block when \
+         the encoded payload stays within the safe size limit."
     }
 
     fn input_schema(&self) -> Value {
@@ -52,12 +54,67 @@ impl Tool for ScreenshotWindowTool {
             include_cursor: parsed.include_cursor,
         };
         match screenshot(&options).await {
-            Ok(bytes) => Ok(ToolResult::image(bytes, "image/png")),
+            Ok(bytes) => Ok(screenshot_tool_result(bytes)),
             Err(error) => Err(map_automation_error(&error)),
         }
     }
 }
 
+fn screenshot_tool_result(bytes: Vec<u8>) -> ToolResult {
+    let byte_len = bytes.len();
+    let encoded_len = base64_encoded_len(byte_len);
+    if encoded_len <= MAX_INLINE_SCREENSHOT_BASE64_BYTES {
+        return ToolResult::image(bytes, "image/png");
+    }
+    ToolResult::text(format!(
+        "Captured PNG screenshot but omitted the inline image because the \
+         base64 payload would be {encoded_len} bytes, exceeding the \
+         {MAX_INLINE_SCREENSHOT_BASE64_BYTES}-byte safety limit."
+    ))
+}
+
+const fn base64_encoded_len(byte_len: usize) -> usize {
+    byte_len.div_ceil(3) * 4
+}
+
 fn map_automation_error(error: &AutomationError) -> ToolError {
     ToolError::internal(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::mcp::protocol::ContentBlock;
+
+    use super::{MAX_INLINE_SCREENSHOT_BASE64_BYTES, base64_encoded_len, screenshot_tool_result};
+
+    #[test]
+    fn screenshot_tool_result_keeps_small_pngs_inline() {
+        let raw_len = (MAX_INLINE_SCREENSHOT_BASE64_BYTES / 4) * 3;
+        let result = screenshot_tool_result(vec![0_u8; raw_len]);
+        assert!(!result.is_error);
+        assert_eq!(result.content.len(), 1);
+        match &result.content[0] {
+            ContentBlock::Image { mime_type, data } => {
+                assert_eq!(mime_type, "image/png");
+                assert_eq!(data.len(), MAX_INLINE_SCREENSHOT_BASE64_BYTES);
+            }
+            other => panic!("expected image block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn screenshot_tool_result_falls_back_to_text_for_large_pngs() {
+        let raw_len = ((MAX_INLINE_SCREENSHOT_BASE64_BYTES / 4) * 3) + 1;
+        let result = screenshot_tool_result(vec![0_u8; raw_len]);
+        assert!(!result.is_error);
+        assert_eq!(result.content.len(), 1);
+        match &result.content[0] {
+            ContentBlock::Text { text } => {
+                let encoded_len = base64_encoded_len(raw_len);
+                assert!(text.contains("omitted the inline image"));
+                assert!(text.contains(&encoded_len.to_string()));
+            }
+            other => panic!("expected text block, got {other:?}"),
+        }
+    }
 }

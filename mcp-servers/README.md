@@ -4,8 +4,8 @@ MCP pieces that let agents drive the Harness Monitor macOS app.
 
 | Path | Language | What it does |
 |------|----------|--------------|
-| `harness mcp serve` (in `../src/mcp/`) | Rust (part of `harness` CLI) | stdio MCP JSON-RPC server with 8 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, and capturing screenshots. |
-| [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes a `.trackAccessibility()` SwiftUI view modifier. |
+| `harness mcp serve` (in `../src/mcp/`) | Rust (part of `harness` CLI) | stdio MCP JSON-RPC server with 8 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
+| [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes `.trackWindow(...)` for scene-root auto-harvest, `.trackAccessibility(...)` for explicit per-view registration, and the bundled `harness-monitor-input` helper for input plus AX fallback queries. |
 
 The old Node.js implementation under `harness-monitor/` was replaced by the native Rust server to drop the Node.js runtime dependency. The JSON wire protocol to the Swift host is unchanged.
 
@@ -21,6 +21,7 @@ Claude Code / MCP client
 |  - tools/list                  |
 |  - tools/call                  |
 |  - NDJSON over Unix socket ----+-----+
+|  - harness-monitor-input       |     |
 |  - cliclick / osascript        |     |
 |  - /usr/sbin/screencapture     |     |
 +--------------------------------+     |
@@ -82,7 +83,7 @@ HARNESS_MONITOR_INPUT_BIN=/path/to/harness-monitor-input harness mcp serve
 
 The server requires:
 
-- Accessibility permission for the process that runs `harness` (for `cliclick` / `harness-monitor-input` / `osascript` to synthesize CGEvents)
+- Accessibility permission for the process that runs `harness` (for `harness-monitor-input` / `cliclick` / `osascript` to synthesize CGEvents and query the AX tree)
 - Screen Recording permission for window-scoped screenshots
 
 If neither `harness-monitor-input` (the bundled Swift helper) nor `cliclick` is on the machine, text input still works through `osascript`; mouse input does not.
@@ -92,13 +93,13 @@ If neither `harness-monitor-input` (the bundled Swift helper) nor `cliclick` is 
 | Tool | Behavior |
 |------|----------|
 | `list_windows` | Registry `listWindows`: window id, title, role, frame, key/main flags. |
-| `list_elements` | Registry `listElements` with optional `windowID` and `kind` filters. |
-| `get_element` | Registry `getElement` by `.accessibilityIdentifier`. |
+| `list_elements` | Registry `listElements` with optional `windowID` and `kind` filters. If the registry returns an empty success, the server asks `harness-monitor-input list-elements` for the live macOS Accessibility tree and keeps the empty success if the helper cannot add data. Fresh window-scoped queries without a `kind` filter also do a short bounded registry retry before returning that final empty success. |
+| `get_element` | Registry `getElement` by `.accessibilityIdentifier`. On `not-found` or registry transport failure, the server asks `harness-monitor-input get-element` for the live Accessibility tree. |
 | `move_mouse` | Move cursor to global `(x, y)`. No click. |
 | `click` | Left/right click at global `(x, y)`, with optional double-click. Middle-click is not supported. |
 | `click_element` | Resolve identifier to frame, click its center. |
 | `type_text` | Type Unicode text into the focused window. |
-| `screenshot_window` | Capture a window by `windowID` or a display by `displayID`; returns base64 PNG. |
+| `screenshot_window` | Capture a window by `windowID` or a display by `displayID`; returns an inline PNG when it fits the safe payload limit, otherwise a text summary. |
 
 Coordinates are in global screen space, origin at top-left (matching `CGEvent`).
 
@@ -128,7 +129,7 @@ The Swift host is implemented as a sibling SPM package so the app's `project.yml
 
 4. Bind the listener at app startup, gated by the Preferences toggle (see that module's README).
 
-5. Tag SwiftUI views with `.trackAccessibility(...)`.
+5. Attach `.trackWindow(...)` at each tracked scene root so the app publishes window metadata and auto-harvested controls. Use `.trackAccessibility(...)` only for explicit per-view registration when a view needs precise manual metadata.
 
 ## See also
 

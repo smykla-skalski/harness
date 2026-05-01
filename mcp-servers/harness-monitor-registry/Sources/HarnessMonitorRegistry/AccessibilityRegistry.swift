@@ -7,14 +7,26 @@ import Foundation
 public actor AccessibilityRegistry {
   private var elements: [String: RegistryElement] = [:]
   private var windows: [Int: RegistryWindow] = [:]
+  private var windowElementIdentifiers: [Int: Set<String>] = [:]
 
   public init() {}
 
   public func registerElement(_ element: RegistryElement) {
+    if let previousWindowID = elements[element.identifier]?.windowID {
+      removeTrackedElementIdentifier(element.identifier, from: previousWindowID)
+    }
     elements[element.identifier] = element
+    if let windowID = element.windowID {
+      var identifiers = windowElementIdentifiers[windowID] ?? []
+      identifiers.insert(element.identifier)
+      windowElementIdentifiers[windowID] = identifiers
+    }
   }
 
   public func unregisterElement(identifier: String) {
+    if let windowID = elements[identifier]?.windowID {
+      removeTrackedElementIdentifier(identifier, from: windowID)
+    }
     elements[identifier] = nil
   }
 
@@ -24,6 +36,26 @@ public actor AccessibilityRegistry {
 
   public func unregisterWindow(id: Int) {
     windows[id] = nil
+  }
+
+  public func replaceWindowElements(windowID: Int, elements replacement: [RegistryElement]) {
+    unregisterElements(windowID: windowID)
+    for element in replacement {
+      var normalized = element
+      normalized.windowID = windowID
+      registerElement(normalized)
+    }
+  }
+
+  public func unregisterElements(windowID: Int) {
+    guard let identifiers = windowElementIdentifiers.removeValue(forKey: windowID) else {
+      return
+    }
+    for identifier in identifiers {
+      if elements[identifier]?.windowID == windowID {
+        elements[identifier] = nil
+      }
+    }
   }
 
   public func element(identifier: String) -> RegistryElement? {
@@ -54,6 +86,19 @@ public actor AccessibilityRegistry {
   public func reset() {
     elements.removeAll()
     windows.removeAll()
+    windowElementIdentifiers.removeAll()
+  }
+
+  private func removeTrackedElementIdentifier(_ identifier: String, from windowID: Int) {
+    guard var identifiers = windowElementIdentifiers[windowID] else {
+      return
+    }
+    identifiers.remove(identifier)
+    if identifiers.isEmpty {
+      windowElementIdentifiers[windowID] = nil
+    } else {
+      windowElementIdentifiers[windowID] = identifiers
+    }
   }
 }
 

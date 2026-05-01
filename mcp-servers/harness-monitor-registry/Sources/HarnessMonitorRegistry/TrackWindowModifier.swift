@@ -4,8 +4,13 @@ import SwiftUI
 
 public extension View {
   /// Register the hosting NSWindow with an `AccessibilityRegistry` so the MCP
-  /// server can discover it via `list_windows`. Tracks frame, key/main state,
-  /// and title automatically; re-registers on move, resize, and focus changes.
+  /// server can discover it via `list_windows`. Also harvests the window's live
+  /// AppKit view tree into `RegistryElement` values so `list_elements`,
+  /// `get_element`, and `click_element` can target controls without requiring
+  /// manual per-view registration in production scenes.
+  ///
+  /// Tracks frame, key/main state, and title automatically; re-registers on
+  /// window and content updates.
   func trackWindow(registry: AccessibilityRegistry) -> some View {
     modifier(TrackWindowModifier(registry: registry))
   }
@@ -34,10 +39,12 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 
 final class WindowTrackingNSView: NSView {
   private let syncController: WindowRegistrySyncController
+  private let elementSyncController: WindowElementRegistrySyncController
   private var observations: [NSObjectProtocol] = []
 
   init(registry: AccessibilityRegistry) {
     syncController = WindowRegistrySyncController(registry: registry)
+    elementSyncController = WindowElementRegistrySyncController(registry: registry)
     super.init(frame: .zero)
   }
 
@@ -52,8 +59,9 @@ final class WindowTrackingNSView: NSView {
   }
 
   private func startTracking(_ window: NSWindow) {
-    let generation = syncController.beginTracking(windowID: window.windowNumber)
-    sync(window, generation: generation)
+    let windowGeneration = syncController.beginTracking(windowID: window.windowNumber)
+    let elementGeneration = elementSyncController.beginTracking(windowID: window.windowNumber)
+    sync(window, windowGeneration: windowGeneration, elementGeneration: elementGeneration)
     let names: [NSNotification.Name] = [
       NSWindow.didMoveNotification,
       NSWindow.didResizeNotification,
@@ -61,6 +69,7 @@ final class WindowTrackingNSView: NSView {
       NSWindow.didResignKeyNotification,
       NSWindow.didBecomeMainNotification,
       NSWindow.didResignMainNotification,
+      NSWindow.didUpdateNotification,
     ]
     for name in names {
       let obs = NotificationCenter.default.addObserver(
@@ -70,7 +79,11 @@ final class WindowTrackingNSView: NSView {
       ) { [weak self, weak window] _ in
         MainActor.assumeIsolated {
           guard let self, let window else { return }
-          self.sync(window, generation: generation)
+          self.sync(
+            window,
+            windowGeneration: windowGeneration,
+            elementGeneration: elementGeneration
+          )
         }
       }
       observations.append(obs)
@@ -81,9 +94,14 @@ final class WindowTrackingNSView: NSView {
     observations.forEach { NotificationCenter.default.removeObserver($0) }
     observations.removeAll()
     syncController.stopTracking()
+    elementSyncController.stopTracking()
   }
 
-  private func sync(_ window: NSWindow, generation: UInt64) {
+  private func sync(
+    _ window: NSWindow,
+    windowGeneration: UInt64,
+    elementGeneration: UInt64
+  ) {
     let entry = RegistryWindow(
       id: window.windowNumber,
       title: window.title,
@@ -91,7 +109,8 @@ final class WindowTrackingNSView: NSView {
       isKey: window.isKeyWindow,
       isMain: window.isMainWindow
     )
-    syncController.sync(entry, generation: generation)
+    syncController.sync(entry, generation: windowGeneration)
+    elementSyncController.sync(window: window, generation: elementGeneration)
   }
 }
 #endif
