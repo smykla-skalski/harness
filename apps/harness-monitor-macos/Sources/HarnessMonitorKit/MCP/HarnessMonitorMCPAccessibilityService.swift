@@ -444,7 +444,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     return false
   }
 
-  private func handleReplacementNotice(
+  func handleReplacementNotice(
     _ notice: RegistryReplacementNotice
   ) async -> RegistryRequestDispatcher.ReplacementDisposition {
     let expectedSocketPath = activeSocketURL?.path ?? socketPathResolver()?.path

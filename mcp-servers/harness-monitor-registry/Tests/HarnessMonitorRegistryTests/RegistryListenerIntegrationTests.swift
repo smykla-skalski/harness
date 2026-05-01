@@ -216,6 +216,72 @@ struct RegistryListenerIntegrationTests {
     }
   }
 
+  @Test("replacementNotice seals later pipelined requests on the same connection")
+  func replacementNoticeSealsLaterPipelinedRequestsOnTheSameConnection() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let delivery = ReplacementNoticeDelivery()
+      let notice = RegistryReplacementNotice(
+        socketPath: socketPath,
+        protocolVersion: 1,
+        appVersion: "1.2.4",
+        bundleIdentifier: "io.test.replacement",
+        message: "replacement incoming"
+      )
+      let dispatcher = RegistryRequestDispatcher(
+        registry: registry,
+        pingInfo: {
+          PingResult(
+            protocolVersion: 1,
+            appVersion: "test",
+            bundleIdentifier: "io.test",
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          )
+        },
+        replacementHandler: { _ in
+          RegistryRequestDispatcher.ReplacementDisposition(
+            ack: RegistryAckResult(applied: true, message: "yielding after the response flushes"),
+            onDelivered: { await delivery.record(notice) },
+            closeConnectionAfterDelivery: true
+          )
+        }
+      )
+      let listener = RegistryListener(dispatcher: dispatcher)
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      let fd = try connectSocket(to: socketPath)
+      defer { Darwin.close(fd) }
+      setSocketTimeout(fd, seconds: 1)
+
+      var payload = try encodeRequestLine(
+        RegistryRequest(id: 1, op: .replacementNotice, replacementNotice: notice)
+      )
+      payload.append(try encodeRequestLine(RegistryRequest(id: 2, op: .ping)))
+      try sendAll(payload, on: fd)
+
+      let ack = try #require(String(data: try readLine(from: fd), encoding: .utf8))
+      #expect(ack.contains("\"applied\":true"))
+      try await waitForReplacementNotice(delivery, expected: notice, timeout: 2)
+
+      do {
+        let unexpectedResponse = String(
+          data: try readLine(from: fd),
+          encoding: .utf8
+        ) ?? "<invalid utf8>"
+        Issue.record("expected replacement barrier to drop later pipelined requests, got \(unexpectedResponse)")
+      } catch let error as IntegrationTestError {
+        switch error {
+        case .recvFailed(let code) where code == ECONNRESET || code == EAGAIN || code == EWOULDBLOCK:
+          break
+        default:
+          throw error
+        }
+      }
+    }
+  }
+
   @Test("a slow reader does not stall unrelated clients")
   func slowReaderDoesNotStallUnrelatedClients() async throws {
     try await withTempSocket { socketPath in
@@ -298,6 +364,12 @@ struct RegistryListenerIntegrationTests {
     return String(data: responseData, encoding: .utf8) ?? ""
   }
 
+  private func encodeRequestLine(_ request: RegistryRequest) throws -> Data {
+    var payload = try JSONEncoder().encode(request)
+    payload.append(0x0A)
+    return payload
+  }
+
   private func connectSocket(to path: String) throws -> Int32 {
     let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { throw IntegrationTestError.clientSocketFailed(errno) }
@@ -320,6 +392,12 @@ struct RegistryListenerIntegrationTests {
       throw IntegrationTestError.connectFailed(errno)
     }
     return fd
+  }
+
+  private func setSocketTimeout(_ fd: Int32, seconds: Int) {
+    var tv = timeval(tv_sec: seconds, tv_usec: 0)
+    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+    _ = Darwin.setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
   }
 
   private func sendAll(_ payload: Data, on fd: Int32) throws {

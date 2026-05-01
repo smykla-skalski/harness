@@ -301,7 +301,7 @@ public actor RegistryListener {
         return true
       }
     } catch {
-      await logAndCloseConnection(id: connectionID, fd: fd, reason: error.localizedDescription)
+      logAndCloseConnection(id: connectionID, fd: fd, reason: error.localizedDescription)
     }
     return false
   }
