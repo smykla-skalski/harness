@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import plistlib
 import shutil
 import stat
 import subprocess
@@ -12,7 +13,10 @@ from pathlib import Path
 APP_ROOT = Path(__file__).resolve().parents[2]
 GENERATE_SOURCE = APP_ROOT / "Scripts" / "generate.sh"
 POST_GENERATE_SOURCE = APP_ROOT / "Scripts" / "post-generate.sh"
+PREPARE_APP_ENTITLEMENTS_SOURCE = APP_ROOT / "Scripts" / "prepare-app-entitlements.sh"
 SWIFT_TOOL_ENV_SOURCE = APP_ROOT / "Scripts" / "lib" / "swift-tool-env.sh"
+NON_INDEXABLE_ROOTS_SOURCE = APP_ROOT / "Scripts" / "lib" / "non-indexable-roots.sh"
+XCODE_VERSION_SOURCE = APP_ROOT / "Scripts" / "lib" / "xcode-version.sh"
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -86,6 +90,194 @@ class GenerateScriptTests(unittest.TestCase):
             captured_env = captured_env_path.read_text()
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_FORMAT=", captured_env)
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_VERSION=", captured_env)
+
+    def test_runs_post_generate_even_when_tuist_regeneration_is_not_needed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            repo_root = temp_root / "repo"
+            app_root = repo_root / "apps" / "harness-monitor-macos"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            marker_path = temp_root / "post-generate.marker"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            (app_root / "Tuist.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            write_executable(
+                fake_post_generate,
+                "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
+            )
+            fake_patcher.write_text("# test\n")
+
+            outputs = (
+                app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
+                app_root
+                / "HarnessMonitor.xcodeproj"
+                / "project.xcworkspace"
+                / "xcshareddata"
+                / "WorkspaceSettings.xcsettings",
+                app_root / "HarnessMonitor.xcworkspace" / "contents.xcworkspacedata",
+                app_root
+                / "HarnessMonitor.xcworkspace"
+                / "xcshareddata"
+                / "WorkspaceSettings.xcsettings",
+                app_root / "buildServer.json",
+                repo_root / "buildServer.json",
+            )
+            for output in outputs:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text("generated\n")
+
+            stale_timestamp = 1_000_000_000
+            fresh_timestamp = stale_timestamp + 100
+            for input_path in (
+                app_root / "Project.swift",
+                app_root / "Tuist.swift",
+                fake_post_generate,
+                fake_patcher,
+                tuist_root / "Package.swift",
+            ):
+                os.utime(input_path, (stale_timestamp, stale_timestamp))
+            for output in outputs:
+                os.utime(output, (fresh_timestamp, fresh_timestamp))
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": "/usr/bin:/bin",
+                    "POST_GENERATE_MARKER": str(marker_path),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(marker_path.exists(), "post-generate should still run")
+
+    def test_post_generate_writes_internal_workspace_settings_and_seeded_entitlements(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            repo_root = temp_root / "repo"
+            app_root = repo_root / "apps" / "harness-monitor-macos"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            generated_post_generate = scripts_root / "post-generate.sh"
+            generated_prepare_entitlements = scripts_root / "prepare-app-entitlements.sh"
+
+            lib_root.mkdir(parents=True)
+            shutil.copy(POST_GENERATE_SOURCE, generated_post_generate)
+            generated_post_generate.chmod(
+                generated_post_generate.stat().st_mode | stat.S_IXUSR
+            )
+            shutil.copy(PREPARE_APP_ENTITLEMENTS_SOURCE, generated_prepare_entitlements)
+            generated_prepare_entitlements.chmod(
+                generated_prepare_entitlements.stat().st_mode | stat.S_IXUSR
+            )
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, lib_root / "swift-tool-env.sh")
+            shutil.copy(NON_INDEXABLE_ROOTS_SOURCE, lib_root / "non-indexable-roots.sh")
+            shutil.copy(XCODE_VERSION_SOURCE, lib_root / "xcode-version.sh")
+
+            monitor_entitlements = {
+                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
+                "monitor": True,
+            }
+            ui_test_host_entitlements = {
+                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
+                "ui-test-host": True,
+            }
+            (app_root / "HarnessMonitor.entitlements").write_bytes(
+                plistlib.dumps(monitor_entitlements)
+            )
+            (app_root / "HarnessMonitorUITestHost.entitlements").write_bytes(
+                plistlib.dumps(ui_test_host_entitlements)
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
+                    "HARNESS_MONITOR_SKIP_VERSION_SYNC": "1",
+                    "HARNESS_MONITOR_XCODE_DTXCODE": "2640",
+                    "REPO_ROOT": str(repo_root),
+                    "TMPDIR": str(temp_root),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(generated_post_generate)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+            settings_paths = (
+                app_root
+                / "HarnessMonitor.xcworkspace"
+                / "xcshareddata"
+                / "WorkspaceSettings.xcsettings",
+                app_root
+                / "HarnessMonitor.xcodeproj"
+                / "project.xcworkspace"
+                / "xcshareddata"
+                / "WorkspaceSettings.xcsettings",
+            )
+            for settings_path in settings_paths:
+                with self.subTest(settings_path=settings_path):
+                    self.assertTrue(settings_path.exists())
+                    self.assertIn(
+                        str(repo_root / "xcode-derived"),
+                        settings_path.read_text(),
+                    )
+
+            generated_entitlements_dir = (
+                repo_root
+                / "xcode-derived"
+                / "Build"
+                / "Intermediates.noindex"
+                / "HarnessMonitor.build"
+                / "GeneratedAppEntitlements"
+            )
+            self.assertEqual(
+                plistlib.loads(
+                    (
+                        generated_entitlements_dir
+                        / "HarnessMonitor.codesign.entitlements"
+                    ).read_bytes()
+                ),
+                monitor_entitlements,
+            )
+            self.assertEqual(
+                plistlib.loads(
+                    (
+                        generated_entitlements_dir
+                        / "HarnessMonitorUITestHost.codesign.entitlements"
+                    ).read_bytes()
+                ),
+                ui_test_host_entitlements,
+            )
+            self.assertTrue(
+                (repo_root / "xcode-derived" / ".metadata_never_index").exists()
+            )
 
     def test_removes_legacy_spotlight_project_links_before_generation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

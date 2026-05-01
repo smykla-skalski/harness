@@ -13,12 +13,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 source "$SCRIPT_DIR/lib/swift-tool-env.sh"
 sanitize_xcode_only_swift_environment
 
-TUIST_BIN="${TUIST_BIN:-$(type -P tuist || true)}"
-if [ -z "$TUIST_BIN" ]; then
-  echo "tuist is required on PATH (pinned via mise)" >&2
-  exit 1
-fi
-
 generation_inputs=(
   "$ROOT/Project.swift"
   "$ROOT/Scripts/post-generate.sh"
@@ -40,6 +34,7 @@ done < <(
 
 generation_outputs=(
   "$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
+  "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings"
   "$ROOT/HarnessMonitor.xcworkspace/contents.xcworkspacedata"
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings"
   "$ROOT/buildServer.json"
@@ -123,10 +118,17 @@ should_generate() {
 }
 
 if should_generate; then
+  TUIST_BIN="${TUIST_BIN:-$(type -P tuist || true)}"
+  if [ -z "$TUIST_BIN" ]; then
+    echo "tuist is required on PATH (pinned via mise)" >&2
+    exit 1
+  fi
+
   if [ ! -d "$ROOT/Tuist/.build" ]; then
     run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" install --path "$ROOT"
   fi
 
   run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" generate --no-open --path "$ROOT"
-  "$SCRIPT_DIR/post-generate.sh"
 fi
+
+"$SCRIPT_DIR/post-generate.sh"
