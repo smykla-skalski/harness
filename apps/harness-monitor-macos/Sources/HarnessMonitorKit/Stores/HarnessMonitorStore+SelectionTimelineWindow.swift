@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private static let selectedTimelineRetainedEntryLimit = 120
+  private static let selectedTimelineRetainedEntryLimit = 300
 
   public func loadSelectedTimelineWindow(request: TimelineWindowRequest) async {
     guard let sessionID = selectedSessionID, let selectedSession, connectionState == .online,
