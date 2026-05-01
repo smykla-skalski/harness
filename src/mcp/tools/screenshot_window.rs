@@ -350,34 +350,37 @@ mod tests {
 
     #[test]
     fn screenshot_registry_windows_collect_registry_window_ids() {
-        let windows = screenshot_registry_windows(vec![
-            RegistryWindow {
-                id: 41,
-                title: "One".to_string(),
-                role: None,
-                frame: crate::mcp::registry::Rect {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 100.0,
-                    height: 100.0,
+        let windows = screenshot_registry_windows(
+            vec![
+                RegistryWindow {
+                    id: 41,
+                    title: "One".to_string(),
+                    role: None,
+                    frame: crate::mcp::registry::Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 100.0,
+                        height: 100.0,
+                    },
+                    is_key: false,
+                    is_main: false,
                 },
-                is_key: false,
-                is_main: false,
-            },
-            RegistryWindow {
-                id: 42,
-                title: "Two".to_string(),
-                role: None,
-                frame: crate::mcp::registry::Rect {
-                    x: 20.0,
-                    y: 20.0,
-                    width: 80.0,
-                    height: 80.0,
+                RegistryWindow {
+                    id: 42,
+                    title: "Two".to_string(),
+                    role: None,
+                    frame: crate::mcp::registry::Rect {
+                        x: 20.0,
+                        y: 20.0,
+                        width: 80.0,
+                        height: 80.0,
+                    },
+                    is_key: true,
+                    is_main: true,
                 },
-                is_key: true,
-                is_main: true,
-            },
-        ], None)
+            ],
+            None,
+        )
         .expect("windows");
         assert_eq!(
             windows,
@@ -485,6 +488,10 @@ mod tests {
             vec![99],
         )
         .expect_err("empty intersection");
-        assert!(error.message().contains("No live shareable Harness Monitor windows"));
+        assert!(
+            error
+                .message()
+                .contains("No live shareable Harness Monitor windows")
+        );
     }
 }

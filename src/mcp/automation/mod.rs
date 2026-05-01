@@ -28,4 +28,6 @@ pub use input::{
     MouseButton, click_args, drag_drop_args, move_mouse_args, scroll_args, type_text_args,
 };
 pub use input::{click, drag_drop, move_mouse, scroll, type_text};
-pub use screenshot::{ScreenshotOptions, ScreenshotTarget, screenshot, shareable_harness_window_ids};
+pub use screenshot::{
+    ScreenshotOptions, ScreenshotTarget, screenshot, shareable_harness_window_ids,
+};

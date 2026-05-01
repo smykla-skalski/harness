@@ -1,10 +1,10 @@
 use std::{ffi::OsString, process::Output, str, time::Duration};
 
-use tokio::process::Command;
-use tokio::time::timeout;
 use super::backend::{Backend, detect_backend};
 use super::error::AutomationError;
 use serde::Deserialize;
+use tokio::process::Command;
+use tokio::time::timeout;
 
 const SCREENSHOT_CAPTURE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -66,11 +66,8 @@ pub async fn screenshot(options: &ScreenshotOptions) -> Result<Vec<u8>, Automati
 /// permission is missing, or the helper returns malformed output.
 pub async fn shareable_harness_window_ids() -> Result<Vec<u32>, AutomationError> {
     let helper_path = harness_input_path().await?;
-    let output = run_json_helper_command(
-        &helper_path,
-        &[OsString::from("list-shareable-windows")],
-    )
-    .await?;
+    let output =
+        run_json_helper_command(&helper_path, &[OsString::from("list-shareable-windows")]).await?;
     parse_shareable_window_ids(&output)
 }
 
@@ -165,10 +162,11 @@ async fn harness_input_path() -> Result<OsString, AutomationError> {
 }
 
 fn parse_shareable_window_ids(output: &[u8]) -> Result<Vec<u32>, AutomationError> {
-    let parsed: ShareableWindowList =
-        serde_json::from_slice(output).map_err(|error| AutomationError::ScreenshotCaptureFailed {
+    let parsed: ShareableWindowList = serde_json::from_slice(output).map_err(|error| {
+        AutomationError::ScreenshotCaptureFailed {
             detail: format!("invalid helper JSON: {error}"),
-        })?;
+        }
+    })?;
     Ok(parsed.window_ids)
 }
 
