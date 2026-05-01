@@ -10,7 +10,7 @@ use super::active::{ActiveAcpProcess, ActiveAcpSession, process_incident_from_sn
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
@@ -187,6 +187,10 @@ impl AcpAgentManagerHandle {
                 quarantined_process_keys: Mutex::new(BTreeSet::new()),
             }),
         }
+    }
+
+    fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+        ensure_shared_db(&self.state.db)
     }
 
     /// Start an ACP agent session using a built-in descriptor.
