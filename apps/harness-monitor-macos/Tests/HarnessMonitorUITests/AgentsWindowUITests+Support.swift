@@ -78,26 +78,148 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     )
   }
 
+  func revealAgentsLaunchAction(in app: XCUIApplication, identifier: String) {
+    let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    XCTAssertTrue(waitForElement(launchPane, timeout: Self.actionTimeout))
+    var launchAction = button(in: app, identifier: identifier)
+    XCTAssertTrue(waitForElement(launchAction, timeout: Self.actionTimeout))
+
+    let scrollTarget = agentsLaunchScrollTarget(in: app, launchPane: launchPane)
+    for _ in 0..<8 {
+      launchAction = button(in: app, identifier: identifier)
+      if launchActionIsVisible(
+        in: app,
+        scrollTarget: scrollTarget,
+        launchAction: launchAction,
+        identifier: identifier
+      ) {
+        return
+      }
+
+      dragUp(in: app, element: scrollTarget, distanceRatio: 0.18)
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    }
+
+    XCTFail("Failed to reveal launch action \(identifier)")
+  }
+
+  private func launchActionIsVisible(
+    in app: XCUIApplication,
+    scrollTarget: XCUIElement,
+    launchAction: XCUIElement,
+    identifier: String
+  ) -> Bool {
+    if launchAction.exists && launchAction.isHittable {
+      return true
+    }
+
+    let frameMarker = element(in: app, identifier: "\(identifier).frame")
+    guard frameMarker.exists, !frameMarker.frame.isEmpty else {
+      return false
+    }
+
+    let windowFrame = mainWindow(in: app).frame
+    let visibleFrame = scrollTarget.frame.intersection(windowFrame)
+    guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
+      return false
+    }
+
+    let minimumVisibleHeight = min(24, max(frameMarker.frame.height / 2, 1))
+    return visibleFrame.height >= minimumVisibleHeight
+  }
+
+  private func agentsLaunchScrollTarget(
+    in app: XCUIApplication,
+    launchPane: XCUIElement
+  ) -> XCUIElement {
+    let launchWindow = window(in: app, containing: launchPane)
+    let nestedScrollViews = launchPane.descendants(matching: .scrollView)
+
+    if let scrollView = largestScrollTarget(in: nestedScrollViews) {
+      return scrollView
+    }
+
+    if let scrollView = overlappingDetailScrollTarget(
+      in: launchWindow.descendants(matching: .scrollView),
+      window: launchWindow,
+      container: launchPane
+    ) {
+      return scrollView
+    }
+
+    if let scrollView = overlappingDetailScrollTarget(
+      in: app.descendants(matching: .scrollView),
+      window: launchWindow,
+      container: launchPane
+    ) {
+      return scrollView
+    }
+    if let largest = largestScrollTarget(in: launchWindow.descendants(matching: .scrollView)) {
+      return largest
+    }
+    if let largest = largestScrollTarget(in: app.descendants(matching: .scrollView)) {
+      return largest
+    }
+    return launchPane
+  }
+
+  private func largestScrollTarget(in query: XCUIElementQuery) -> XCUIElement? {
+    let searchCount = min(query.count, 12)
+    var bestArea: CGFloat = 0
+    var bestMatch: XCUIElement?
+    for index in 0..<searchCount {
+      let candidate = query.element(boundBy: index)
+      guard candidate.exists, !candidate.frame.isEmpty else { continue }
+      let area = candidate.frame.width * candidate.frame.height
+      if area > bestArea {
+        bestArea = area
+        bestMatch = candidate
+      }
+    }
+    return bestMatch
+  }
+
+  private func overlappingDetailScrollTarget(
+    in query: XCUIElementQuery,
+    window: XCUIElement,
+    container: XCUIElement
+  ) -> XCUIElement? {
+    guard container.exists, !container.frame.isEmpty else { return nil }
+
+    let containerFrame = container.frame
+    let containerMidX = containerFrame.midX
+    let windowMidX = window.frame.midX
+    let candidates = query.allElementsBoundByIndex.filter { candidate in
+      guard candidate.exists, !candidate.frame.isEmpty else { return false }
+      let candidateFrame = candidate.frame
+      return
+        candidateFrame.minX <= containerMidX
+        && containerMidX <= candidateFrame.maxX
+        && !candidateFrame.intersection(containerFrame).isNull
+        && !candidateFrame.intersection(containerFrame).isEmpty
+    }
+
+    let detailCandidates = candidates.filter { candidate in
+      candidate.frame.midX > windowMidX
+    }
+
+    let preferredCandidates = detailCandidates.isEmpty ? candidates : detailCandidates
+    return preferredCandidates.max { left, right in
+      left.frame.width * left.frame.height < right.frame.width * right.frame.height
+    }
+  }
+
   func tapDockButton(
     in app: XCUIApplication,
     identifier: String,
     label: String
   ) {
     app.activate()
-    let trigger = button(in: app, identifier: identifier)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        trigger.exists && !trigger.frame.isEmpty
-      },
+      waitForButtonReady(in: app, identifier: identifier, timeout: Self.actionTimeout),
       "\(label) dock button should be visible in cockpit preview"
     )
-    if trigger.isHittable {
-      trigger.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: trigger) {
-      coordinate.tap()
-    } else {
-      XCTFail("Cannot resolve coordinate for \(label) dock button")
-    }
+    tapButton(in: app, identifier: identifier)
   }
 
   func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
@@ -148,7 +270,8 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
         filterState.label.contains("severities=all")
       },
       """
-      Resetting the agents decision severity menu should restore the full severity set before the test continues.
+      Resetting the agents decision severity menu should restore the full severity set \
+      before the test continues.
       state=\(filterState.label)
       """
     )

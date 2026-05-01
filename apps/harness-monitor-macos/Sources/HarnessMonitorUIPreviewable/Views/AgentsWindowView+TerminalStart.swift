@@ -33,21 +33,23 @@ extension AgentsWindowView {
       catalogDefault: catalog?.default ?? ""
     )
     let effort = viewModel.selectedTerminalEffortByRuntime[selectedRuntime]
-    let success = await store.startAgentTui(
-      runtime: selectedRuntime,
-      role: viewModel.selectedRole,
-      name: viewModel.name,
-      prompt: viewModel.prompt,
-      projectDir: trimmedProjectDir,
-      persona: viewModel.selectedPersona,
-      model: resolved.id,
-      effort: effort,
-      allowCustomModel: resolved.allowCustom,
-      argv: parsedArgvOverride,
-      rows: startSize.rows,
-      cols: startSize.cols
-    )
-    guard success, let startedTui = store.selectedAgentTui else {
+    guard
+      let startedTui = await store.startAgentTuiSnapshot(
+        runtime: selectedRuntime,
+        role: viewModel.selectedRole,
+        name: viewModel.name,
+        prompt: viewModel.prompt,
+        projectDir: trimmedProjectDir,
+        persona: viewModel.selectedPersona,
+        model: resolved.id,
+        effort: effort,
+        allowCustomModel: resolved.allowCustom,
+        argv: parsedArgvOverride,
+        rows: startSize.rows,
+        cols: startSize.cols,
+        sessionID: resolvedCreateSessionID
+      )
+    else {
       return
     }
     resetTerminalCreateForm(startedTui: startedTui)

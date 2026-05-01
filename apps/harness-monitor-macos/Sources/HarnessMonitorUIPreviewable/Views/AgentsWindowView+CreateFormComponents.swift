@@ -171,7 +171,9 @@ struct AgentsCreateProviderRow: View {
     case .terminalOnly:
       return "Project access isn't available for this provider yet."
     case .unavailable:
-      return option.projectAccessGuidanceText ?? "Project access isn't available for this provider yet."
+      return
+        option.projectAccessGuidanceText
+        ?? "Project access isn't available for this provider yet."
     }
   }
 

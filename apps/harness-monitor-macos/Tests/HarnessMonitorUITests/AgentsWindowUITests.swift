@@ -237,15 +237,15 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     )
     let buttonLeadingInset =
       toolbar.buttons.allElementsBoundByIndex
-        .filter { $0.exists && !$0.frame.isEmpty }
-        .map { $0.frame.minX - agentWindow.frame.minX }
-        .min()
+      .filter { $0.exists && !$0.frame.isEmpty }
+      .map { $0.frame.minX - agentWindow.frame.minX }
+      .min()
       ?? .greatestFiniteMagnitude
     let searchLeadingInset =
       agentWindow.searchFields.allElementsBoundByIndex
-        .filter { $0.exists && !$0.frame.isEmpty }
-        .map { $0.frame.minX - agentWindow.frame.minX }
-        .min()
+      .filter { $0.exists && !$0.frame.isEmpty }
+      .map { $0.frame.minX - agentWindow.frame.minX }
+      .min()
       ?? .greatestFiniteMagnitude
     let leadingChromeInset = min(buttonLeadingInset, searchLeadingInset)
     let rowTopInset = createRow.frame.minY - agentWindow.frame.minY
@@ -285,7 +285,10 @@ final class AgentsWindowUITests: HarnessMonitorUITestCase, AgentsWindowUITestSup
     let nativeSearchField = agentWindow.searchFields.firstMatch
     let filterButton = button(in: app, identifier: Accessibility.agentsDecisionFiltersMenu)
     let decisionDesk = element(in: app, identifier: Accessibility.agentsDecisionDesk)
-    let legacyScopeMenu = element(in: app, identifier: Accessibility.decisionsSidebarSearchScopeMenu)
+    let legacyScopeMenu = element(
+      in: app,
+      identifier: Accessibility.decisionsSidebarSearchScopeMenu
+    )
     let legacyFilterToggle = element(
       in: app,
       identifier: Accessibility.decisionsSidebarFilterToggle

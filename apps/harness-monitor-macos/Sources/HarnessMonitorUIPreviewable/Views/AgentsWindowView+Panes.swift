@@ -13,7 +13,8 @@ extension AgentsWindowView {
     }
   }
 
-  @ViewBuilder func detailColumnContent(decisionScope: DecisionWorkspaceScope) -> some View {
+  @ViewBuilder
+  func detailColumnContent(decisionScope: DecisionWorkspaceScope) -> some View {
     if usesLiveViewportSplitLayout, let selectedSessionTui {
       sessionPane(selectedSessionTui)
         .padding(HarnessMonitorTheme.spacingLG)

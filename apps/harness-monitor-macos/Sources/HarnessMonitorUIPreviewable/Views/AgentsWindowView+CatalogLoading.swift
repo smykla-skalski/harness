@@ -20,7 +20,9 @@ extension AgentsWindowView {
   }
 
   var canStartTerminal: Bool {
-    guard !viewModel.isSubmitting else { return false }
+    guard !viewModel.isSubmitting, createPaneSessionActionUnavailableNote == nil else {
+      return false
+    }
     switch viewModel.selectedLaunchSelection {
     case .tui:
       return viewModel.rows > 0 && viewModel.cols > 0

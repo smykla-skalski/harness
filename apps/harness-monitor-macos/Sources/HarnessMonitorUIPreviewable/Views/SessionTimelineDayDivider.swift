@@ -10,6 +10,7 @@ struct SessionTimelineRow: Identifiable, Equatable {
 
   var id: String { node.id }
 
+  @MainActor
   static func rows(
     for nodes: [SessionTimelineNode],
     configuration: HarnessMonitorDateTimeConfiguration
@@ -37,11 +38,14 @@ struct SessionTimelineRow: Identifiable, Equatable {
 private final class SessionTimelineRowFormatter {
   private let calendar: Calendar
   private let now: Date
-  private let timeFormatter: DateFormatter
-  private let sameYearTimestampFormatter: DateFormatter
-  private let crossYearTimestampFormatter: DateFormatter
-  private let sameYearDayFormatter: DateFormatter
-  private let crossYearDayFormatter: DateFormatter
+
+  @MainActor private static let timeFormatter = makeFormatter(dateFormat: "HH:mm:ss")
+  @MainActor private static let sameYearTimestampFormatter =
+    makeFormatter(dateFormat: "d MMM HH:mm:ss")
+  @MainActor private static let crossYearTimestampFormatter =
+    makeFormatter(dateFormat: "d MMM yyyy HH:mm:ss")
+  @MainActor private static let sameYearDayFormatter = makeFormatter(dateFormat: "d MMM")
+  @MainActor private static let crossYearDayFormatter = makeFormatter(dateFormat: "d MMM yyyy")
 
   init(configuration: HarnessMonitorDateTimeConfiguration, now: Date = .now) {
     let timeZone = configuration.effectiveTimeZone
@@ -49,55 +53,43 @@ private final class SessionTimelineRowFormatter {
     calendar.timeZone = timeZone
     self.calendar = calendar
     self.now = now
-    timeFormatter = Self.makeFormatter(
-      dateFormat: "HH:mm:ss",
-      calendar: calendar,
-      timeZone: timeZone
-    )
-    sameYearTimestampFormatter = Self.makeFormatter(
-      dateFormat: "d MMM HH:mm:ss",
-      calendar: calendar,
-      timeZone: timeZone
-    )
-    crossYearTimestampFormatter = Self.makeFormatter(
-      dateFormat: "d MMM yyyy HH:mm:ss",
-      calendar: calendar,
-      timeZone: timeZone
-    )
-    sameYearDayFormatter = Self.makeFormatter(
-      dateFormat: "d MMM",
-      calendar: calendar,
-      timeZone: timeZone
-    )
-    crossYearDayFormatter = Self.makeFormatter(
-      dateFormat: "d MMM yyyy",
-      calendar: calendar,
-      timeZone: timeZone
-    )
   }
 
   func timelineDayStart(for date: Date) -> Date {
     calendar.startOfDay(for: date)
   }
 
+  @MainActor
   func dayDividerLabel(for date: Date) -> String {
-    dayFormatter(for: date).string(from: date)
+    let formatter = dayFormatter(for: date)
+    formatter.timeZone = calendar.timeZone
+    formatter.calendar = calendar
+    return formatter.string(from: date)
   }
 
+  @MainActor
   func timeLabel(for node: SessionTimelineNode) -> String {
     guard isParsedTimestamp(node) else {
       return node.rawTimestamp ?? "n/a"
     }
-    return timeFormatter.string(from: node.timestamp)
+    let formatter = Self.timeFormatter
+    formatter.timeZone = calendar.timeZone
+    formatter.calendar = calendar
+    return formatter.string(from: node.timestamp)
   }
 
+  @MainActor
   func timestampLabel(for node: SessionTimelineNode) -> String {
     guard isParsedTimestamp(node) else {
       return node.rawTimestamp ?? "n/a"
     }
-    return timestampFormatter(for: node.timestamp).string(from: node.timestamp)
+    let formatter = timestampFormatter(for: node.timestamp)
+    formatter.timeZone = calendar.timeZone
+    formatter.calendar = calendar
+    return formatter.string(from: node.timestamp)
   }
 
+  @MainActor
   func accessibilityLabel(for node: SessionTimelineNode) -> String {
     var parts = [
       node.kind.label,
@@ -122,27 +114,26 @@ private final class SessionTimelineRowFormatter {
     node.rawTimestamp == nil || node.timestamp != .distantPast
   }
 
+  @MainActor
   private func timestampFormatter(for date: Date) -> DateFormatter {
     calendar.isDate(date, equalTo: now, toGranularity: .year)
-      ? sameYearTimestampFormatter
-      : crossYearTimestampFormatter
+      ? Self.sameYearTimestampFormatter
+      : Self.crossYearTimestampFormatter
   }
 
+  @MainActor
   private func dayFormatter(for date: Date) -> DateFormatter {
     calendar.isDate(date, equalTo: now, toGranularity: .year)
-      ? sameYearDayFormatter
-      : crossYearDayFormatter
+      ? Self.sameYearDayFormatter
+      : Self.crossYearDayFormatter
   }
 
+  @MainActor
   private static func makeFormatter(
-    dateFormat: String,
-    calendar: Calendar,
-    timeZone: TimeZone
+    dateFormat: String
   ) -> DateFormatter {
     let formatter = DateFormatter()
     formatter.locale = .autoupdatingCurrent
-    formatter.calendar = calendar
-    formatter.timeZone = timeZone
     formatter.dateFormat = dateFormat
     return formatter
   }

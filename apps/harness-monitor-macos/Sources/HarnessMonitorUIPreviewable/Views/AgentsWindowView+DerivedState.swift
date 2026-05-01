@@ -2,6 +2,18 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
+  var resolvedCreateSessionID: String? {
+    viewModel.selection.sessionID ?? viewModel.createSessionID ?? store.selectedSessionID
+  }
+
+  var createPaneSessionActionUnavailableNote: String? {
+    store.sessionActionUnavailableMessage(sessionID: resolvedCreateSessionID)
+  }
+
+  var createPaneSessionActionTitle: String {
+    resolvedCreateSessionID == nil ? "Select a session first" : "Session actions unavailable"
+  }
+
   var decisionWorkspaceScope: DecisionWorkspaceScope {
     DecisionWorkspaceScope(
       decisions: decisionItems,
@@ -65,7 +77,9 @@ extension AgentsWindowView {
   }
 
   var canStartCodex: Bool {
-    !viewModel.isSubmitting && !trimmedCodexPrompt.isEmpty
+    createPaneSessionActionUnavailableNote == nil
+      && !viewModel.isSubmitting
+      && !trimmedCodexPrompt.isEmpty
   }
 
   var canSend: Bool {

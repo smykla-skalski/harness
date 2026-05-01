@@ -420,7 +420,9 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
         )
       }
       guard await waitForSocketYield(at: socket.path, previousHost: remoteHost) else {
-        return .denied("existing registry host acknowledged replacement but never yielded the socket")
+        return .denied(
+          "existing registry host acknowledged replacement but never yielded the socket"
+        )
       }
       return .approved
     } catch {
@@ -432,11 +434,10 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
 
   private func waitForSocketYield(at path: String, previousHost: PingResult) async -> Bool {
     for _ in 0..<startupProbeCount {
-      if let pingInfo = await pingSocket(at: path) {
-        if sameHost(lhs: pingInfo, rhs: previousHost) == false {
-          return true
-        }
-      } else {
+      guard let pingInfo = await pingSocket(at: path) else {
+        return true
+      }
+      if sameHost(lhs: pingInfo, rhs: previousHost) == false {
         return true
       }
       try? await Task.sleep(for: startupProbeDelay)
@@ -488,7 +489,9 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     _ notice: RegistryReplacementNotice,
     generation: UInt64
   ) async {
-    guard acknowledgedReplacement == AcknowledgedReplacement(notice: notice, generation: generation) else {
+    guard
+      acknowledgedReplacement == AcknowledgedReplacement(notice: notice, generation: generation)
+    else {
       return
     }
 
@@ -610,7 +613,8 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       return "existing registry host is incompatible with this app"
     }
 
-    let missingList = missingCapabilities
+    let missingList =
+      missingCapabilities
       .map(\.rawValue)
       .sorted()
       .joined(separator: ", ")

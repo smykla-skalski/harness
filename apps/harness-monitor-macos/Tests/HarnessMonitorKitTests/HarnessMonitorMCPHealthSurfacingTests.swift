@@ -75,7 +75,10 @@ struct HarnessMonitorMCPHealthSurfacingTests {
 
     #expect(store.contentUI.toolbar.mcpStatus == healthy)
     #expect(store.contentUI.chrome.mcpStatus == healthy)
-    #expect(store.toast.activeFeedback.first?.message == "MCP registry host recovered and is ready.")
+    #expect(
+      store.toast.activeFeedback.first?.message
+        == "MCP registry host recovered and is ready."
+    )
   }
 
   @Test("Store keeps one degraded failure toast across retry transitions")

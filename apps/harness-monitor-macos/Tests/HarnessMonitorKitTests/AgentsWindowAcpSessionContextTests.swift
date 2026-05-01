@@ -91,6 +91,51 @@ struct AgentsWindowAcpSessionContextTests {
     )
   }
 
+  @Test("ACP start from create falls back to the selected session when no cached anchor exists")
+  func acpStartFromCreateUsesSelectedSessionFallback() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let view = AgentsWindowView(store: store)
+    store.toast.dismissAll()
+    store.selectedSessionID = PreviewFixtures.summary.sessionId
+    view.viewModel.selection = .create
+    view.viewModel.createSessionID = nil
+    view.viewModel.selectedLaunchSelection = .acp("copilot")
+    view.viewModel.availableAcpAgents = [
+      AcpAgentDescriptor(
+        id: "copilot",
+        displayName: "GitHub Copilot",
+        capabilities: ["fs.read", "terminal.spawn"],
+        launchCommand: "copilot",
+        launchArgs: ["agent", "acp"],
+        envPassthrough: [],
+        doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
+      )
+    ]
+
+    let didHandleAcp = await view.startAcpAgentIfSelected()
+
+    #expect(didHandleAcp)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAcpAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: "copilot",
+            role: .worker,
+            fallbackRole: nil,
+            capabilities: ["fs.read", "terminal.spawn"],
+            name: nil,
+            prompt: nil,
+            projectDir: nil,
+            persona: nil,
+            recordPermissions: false
+          )
+        ]
+    )
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
+
   @Test("Store ACP start reseats anchored session detail")
   func storeAcpStartReseatsAnchoredSessionDetail() async {
     let client = RecordingHarnessClient()
@@ -221,6 +266,105 @@ struct AgentsWindowAcpSessionContextTests {
           ),
         ]
     )
+    #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
+
+  @Test(
+    "Store ACP start retries with the restarted managed daemon client after legacy 404 recovery"
+  )
+  func storeAcpStartUsesRestartedClientAfterLegacy404Recovery() async {
+    let staleClient = RecordingHarnessClient()
+    staleClient.configureAcpStartErrors([
+      HarnessMonitorAPIError.server(code: 501, message: "sandbox-disabled - acp.host-bridge")
+    ])
+    staleClient.configureHostBridgeReconfigureError(
+      HarnessMonitorAPIError.server(code: 404, message: "Not Found")
+    )
+
+    let recoveredClient = RecordingHarnessClient()
+    recoveredClient.configureHostBridgeStatusReport(
+      BridgeStatusReport(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        pid: 4321,
+        startedAt: "2026-04-11T10:00:00Z",
+        uptimeSeconds: 15,
+        capabilities: [
+          "acp": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "unix",
+            endpoint: "/tmp/bridge.sock"
+          )
+        ]
+      )
+    )
+
+    let daemon = HostBridgeRecoveryDaemonController(
+      initialClient: staleClient,
+      restartedClient: recoveredClient
+    )
+    let store = HarnessMonitorStore(daemonController: daemon, daemonOwnership: .managed)
+    await store.bootstrap()
+    store.toast.dismissAll()
+    store.selectedSessionID = nil
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [:]
+      )
+    )
+
+    let started = await store.startAcpAgent(
+      agentID: "copilot",
+      role: .worker,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: "Copilot Reviewer",
+      prompt: "Review the latest ACP wiring.",
+      projectDir: "/tmp/ui-acp",
+      persona: "reviewer",
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+
+    #expect(started?.agentId == "copilot")
+    #expect(
+      staleClient.recordedCalls()
+        == [
+          .startAcpAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: "copilot",
+            role: .worker,
+            fallbackRole: nil,
+            capabilities: ["fs.read", "terminal.spawn"],
+            name: "Copilot Reviewer",
+            prompt: "Review the latest ACP wiring.",
+            projectDir: "/tmp/ui-acp",
+            persona: "reviewer",
+            recordPermissions: false
+          ),
+          .reconfigureHostBridge(enable: ["acp"], disable: [], force: false),
+        ]
+    )
+    #expect(
+      recoveredClient.recordedCalls()
+        == [
+          .reconfigureHostBridge(enable: ["acp"], disable: [], force: false),
+          .startAcpAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: "copilot",
+            role: .worker,
+            fallbackRole: nil,
+            capabilities: ["fs.read", "terminal.spawn"],
+            name: "Copilot Reviewer",
+            prompt: "Review the latest ACP wiring.",
+            projectDir: "/tmp/ui-acp",
+            persona: "reviewer",
+            recordPermissions: false
+          ),
+        ]
+    )
+    #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
     #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
     #expect(store.currentFailureFeedbackMessage == nil)
   }
