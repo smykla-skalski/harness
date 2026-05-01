@@ -23,6 +23,8 @@ pub use accessibility::{
 };
 pub use backend::{Backend, INPUT_OVERRIDE_ENV, detect_backend};
 pub use error::AutomationError;
-pub use input::{MouseButton, click_args, move_mouse_args, type_text_args};
-pub use input::{click, move_mouse, type_text};
+pub use input::{
+    MouseButton, click_args, drag_drop_args, move_mouse_args, scroll_args, type_text_args,
+};
+pub use input::{click, drag_drop, move_mouse, scroll, type_text};
 pub use screenshot::{ScreenshotOptions, screencapture_args, screenshot};

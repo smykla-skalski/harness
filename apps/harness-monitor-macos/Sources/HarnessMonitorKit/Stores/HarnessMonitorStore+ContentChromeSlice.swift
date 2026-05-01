@@ -8,6 +8,10 @@ extension HarnessMonitorStore {
     public var sessionDataAvailability: SessionDataAvailability = .live
     public var sessionStatus: SessionStatus?
     public var acpBridgeBanner: AcpBridgeBannerState?
+    public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .disabled,
+      recoveryStatus: nil
+    )
 
     public init() {}
 
@@ -23,6 +27,9 @@ extension HarnessMonitorStore {
       }
       if acpBridgeBanner != state.acpBridgeBanner {
         acpBridgeBanner = state.acpBridgeBanner
+      }
+      if mcpStatus != state.mcpStatus {
+        mcpStatus = state.mcpStatus
       }
     }
   }

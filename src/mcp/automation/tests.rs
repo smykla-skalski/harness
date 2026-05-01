@@ -1,10 +1,15 @@
 use std::ffi::OsString;
+use std::fs;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use crate::mcp::registry::ElementKind;
 
 use super::accessibility::{get_element_args, list_elements_args};
-use super::backend::{Backend, INPUT_OVERRIDE_ENV, detect_backend};
+use super::backend::{
+    Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_in, detect_backend,
+};
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
 use super::screenshot::{ScreenshotOptions, screencapture_args};
 
@@ -168,4 +173,20 @@ async fn detect_backend_honours_env_override_when_file_exists() {
     )
     .await;
     assert_eq!(backend, Backend::HarnessInput(expected_path));
+}
+
+#[tokio::test]
+async fn default_helper_candidate_prefers_newest_platform_build() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let build_root = temp.path().join("mcp-servers/harness-monitor-registry/.build");
+    let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
+    let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
+    fs::create_dir_all(release.parent().expect("release dir")).expect("create release dir");
+    fs::write(&release, "release").expect("write release helper");
+    thread::sleep(Duration::from_millis(20));
+    fs::create_dir_all(debug.parent().expect("debug dir")).expect("create debug dir");
+    fs::write(&debug, "debug").expect("write debug helper");
+
+    let candidate = default_helper_candidate_in(temp.path()).await;
+    assert_eq!(candidate, Some(debug));
 }

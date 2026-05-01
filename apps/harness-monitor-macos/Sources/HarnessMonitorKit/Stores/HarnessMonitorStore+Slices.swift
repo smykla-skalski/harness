@@ -306,6 +306,10 @@ extension HarnessMonitorStore {
     public var sessionDataAvailability: SessionDataAvailability = .live
     public var sessionStatus: SessionStatus?
     public var acpBridgeBanner: AcpBridgeBannerState?
+    public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .disabled,
+      recoveryStatus: nil
+    )
   }
 
   public struct ContentSessionState: Equatable {
@@ -374,6 +378,10 @@ extension HarnessMonitorStore {
     public var canNavigateForward = false
     public var isRefreshing = false
     public var sleepPreventionEnabled = false
+    public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .disabled,
+      recoveryStatus: nil
+    )
 
     public init() {}
   }

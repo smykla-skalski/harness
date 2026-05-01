@@ -6,13 +6,16 @@ import SwiftUI
 /// A single master toggle controls whether Harness Monitor exposes its
 /// accessibility registry over a Unix-domain socket in the app-group
 /// container. The toggle is persisted in `@AppStorage` and defaults to
-/// off so the app introduces no socket surface unless the user opts in.
+/// **on** so MCP stays available from first launch unless the user disables it.
 public struct PreferencesMCPSection: View {
+  public let store: HarnessMonitorStore
   @AppStorage(HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
   private var registryHostEnabled = HarnessMonitorMCPPreferencesDefaults
     .registryHostEnabledDefault
 
-  public init() {}
+  public init(store: HarnessMonitorStore) {
+    self.store = store
+  }
 
   private var forceEnabled: Bool {
     HarnessMonitorMCPPreferencesDefaults.forceEnableFromEnvironment
@@ -31,6 +34,15 @@ public struct PreferencesMCPSection: View {
             .scaledFont(.caption)
             .foregroundStyle(.orange)
         }
+        statusRow
+        Text(store.mcpStatus.detail)
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+        if let recoverySummary = store.mcpStatus.recoverySummary {
+          Text(recoverySummary)
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+        }
         socketPathRow
       } header: {
         Text("Accessibility Registry")
@@ -41,6 +53,7 @@ public struct PreferencesMCPSection: View {
       }
     }
     .preferencesDetailFormStyle()
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMCPSection)
   }
 
   private var forceEnabledMessage: String {
@@ -68,12 +81,19 @@ public struct PreferencesMCPSection: View {
     return string
   }
 
+  private var statusRow: some View {
+    LabeledContent("Status") {
+      MCPStatusLabel(status: store.mcpStatus, variant: .detail)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMCPStatus)
+  }
+
   @ViewBuilder private var socketPathRow: some View {
-    if let socket = HarnessMonitorMCPSocketPath.resolved() {
+    if let socketPath = store.mcpStatus.socketPath ?? HarnessMonitorMCPSocketPath.resolved()?.path {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         Text("Socket path:")
           .fixedSize(horizontal: true, vertical: false)
-        Text(socket.path)
+        Text(socketPath)
           .monospaced()
           .lineLimit(1)
           .truncationMode(.middle)
@@ -83,7 +103,7 @@ public struct PreferencesMCPSection: View {
       .scaledFont(.caption)
       .foregroundStyle(.secondary)
       .accessibilityElement(children: .combine)
-      .accessibilityLabel(Text("Socket path: \(socket.path)"))
+      .accessibilityLabel(Text("Socket path: \(socketPath)"))
     } else {
       Text("Socket path: unavailable (app-group container not resolved)")
         .scaledFont(.caption)
@@ -93,6 +113,6 @@ public struct PreferencesMCPSection: View {
 }
 
 #Preview("Preferences MCP") {
-  PreferencesMCPSection()
+  PreferencesMCPSection(store: HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded))
     .frame(width: 520, height: 260)
 }

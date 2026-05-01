@@ -83,6 +83,66 @@ pub fn click_args(
     }
 }
 
+/// Build the `(program, args)` pair to scroll at `(x, y)` by the given deltas.
+#[must_use]
+pub fn scroll_args(
+    backend: &Backend,
+    x: f64,
+    y: f64,
+    delta_x: f64,
+    delta_y: f64,
+) -> Option<(OsString, Vec<OsString>)> {
+    let px = round_to_string(x);
+    let py = round_to_string(y);
+    let dx = round_to_string(delta_x);
+    let dy = round_to_string(delta_y);
+    match backend {
+        Backend::HarnessInput(path) => Some((
+            os_string_from_path(path),
+            vec![
+                OsString::from("scroll"),
+                OsString::from(px),
+                OsString::from(py),
+                OsString::from(dx),
+                OsString::from(dy),
+            ],
+        )),
+        Backend::Cliclick | Backend::None => None,
+    }
+}
+
+/// Build the `(program, args)` pair to drag from `(start_x, start_y)` to
+/// `(end_x, end_y)`.
+#[must_use]
+pub fn drag_drop_args(
+    backend: &Backend,
+    start_x: f64,
+    start_y: f64,
+    end_x: f64,
+    end_y: f64,
+    duration_ms: u64,
+) -> Option<(OsString, Vec<OsString>)> {
+    let sx = round_to_string(start_x);
+    let sy = round_to_string(start_y);
+    let ex = round_to_string(end_x);
+    let ey = round_to_string(end_y);
+    match backend {
+        Backend::HarnessInput(path) => Some((
+            os_string_from_path(path),
+            vec![
+                OsString::from("drag"),
+                OsString::from(&sx),
+                OsString::from(&sy),
+                OsString::from(&ex),
+                OsString::from(&ey),
+                OsString::from("--duration-ms"),
+                OsString::from(duration_ms.to_string()),
+            ],
+        )),
+        Backend::Cliclick | Backend::None => None,
+    }
+}
+
 fn cliclick_click_args(
     px: &str,
     py: &str,
@@ -154,6 +214,40 @@ pub async fn click(
     let backend = detect_backend().await;
     let Some((program, args)) = click_args(&backend, x, y, button, double_click) else {
         return Err(AutomationError::MouseBackendMissing);
+    };
+    run_command(&program, &args).await
+}
+
+/// Scroll at `(x, y)` by the provided deltas via the bundled helper.
+///
+/// # Errors
+/// Returns `AutomationError` when the helper is unavailable or the command
+/// fails.
+pub async fn scroll(x: f64, y: f64, delta_x: f64, delta_y: f64) -> Result<(), AutomationError> {
+    let backend = detect_backend().await;
+    let Some((program, args)) = scroll_args(&backend, x, y, delta_x, delta_y) else {
+        return Err(AutomationError::ScrollBackendMissing);
+    };
+    run_command(&program, &args).await
+}
+
+/// Drag from `(start_x, start_y)` to `(end_x, end_y)` via the bundled helper.
+///
+/// # Errors
+/// Returns `AutomationError` when the helper is unavailable or the command
+/// fails.
+pub async fn drag_drop(
+    start_x: f64,
+    start_y: f64,
+    end_x: f64,
+    end_y: f64,
+    duration_ms: u64,
+) -> Result<(), AutomationError> {
+    let backend = detect_backend().await;
+    let Some((program, args)) =
+        drag_drop_args(&backend, start_x, start_y, end_x, end_y, duration_ms)
+    else {
+        return Err(AutomationError::DragBackendMissing);
     };
     run_command(&program, &args).await
 }

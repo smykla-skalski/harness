@@ -75,6 +75,7 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesMCPSection = "harness.preferences.mcp"
   public static let preferencesMCPRegistryHostToggle =
     "harness.preferences.mcp.registry-host"
+  public static let preferencesMCPStatus = "harness.preferences.mcp.status"
   public static let preferencesVoiceSection = "harness.preferences.voice"
   public static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
   public static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
@@ -108,6 +109,8 @@ public enum HarnessMonitorAccessibility {
   public static let refreshButton = "harness.toolbar.refresh"
   public static let daemonPreferencesButton = "harness.toolbar.preferences"
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
+  public static let mcpToolbarStatus = "harness.toolbar.mcp.status"
+  public static let mcpBanner = "harness.content.mcp.banner"
   public static let sessionHeaderCard = "harness.session.header"
   public static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"
   public static let sessionTaskListHeader = "harness.session.tasks.header"
@@ -174,6 +177,9 @@ public enum HarnessMonitorAccessibility {
   public static let agentsNavigateBackButton = agentTuiNavigateBackButton
   public static let agentsNavigateForwardButton = agentTuiNavigateForwardButton
   public static let agentsPersonaPicker = agentTuiPersonaPicker
+  public static let agentsDecisionDesk = "harness.window.agents.decisions"
+  public static let agentsDecisionFiltersMenu = "harness.window.agents.decisions.filters"
+  public static let agentsDecisionFilterState = "harness.window.agents.decisions.filter-state"
   public static let agentTuiSheet = "harness.sheet.agent-tui"
   public static let agentTuiState = "harness.sheet.agent-tui.state"
   public static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"
@@ -200,8 +206,10 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
   public static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
   public static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
+  public static let agentTuiSessionActionBanner = "harness.sheet.agent-tui.session-action-banner"
   public static let agentTuiPendingUserPrompt = "harness.sheet.agent-tui.pending-user-prompt"
   public static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
+  public static let agentTuiNewSessionButton = "harness.sheet.agent-tui.new-session"
   public static let agentTuiCopyCommandButton = "harness.sheet.agent-tui.copy-command"
   public static let agentTuiBackToCreateButton = "harness.sheet.agent-tui.back-to-create"
   public static let agentTuiWrapToggle = "harness.sheet.agent-tui.wrap-toggle"
@@ -327,6 +335,7 @@ public enum HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID))"
   }
 
+  public static let sessionCockpitScrollView = "harness.session.cockpit.scroll"
   public static let sessionTaskListState = "harness.session.tasks.state"
   public static let sessionAgentListState = "harness.session.agents.state"
 

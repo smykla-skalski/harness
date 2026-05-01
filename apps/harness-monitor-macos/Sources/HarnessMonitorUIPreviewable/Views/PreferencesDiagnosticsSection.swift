@@ -9,6 +9,7 @@ public struct PreferencesDiagnosticsSnapshot {
   }
 
   public let launchAgent: LaunchAgentStatus?
+  public let mcpStatus: HarnessMonitorMCPStatusSnapshot
   public let tokenPresent: Bool
   public let projectCount: Int
   public let worktreeCount: Int
@@ -27,6 +28,7 @@ public struct PreferencesDiagnosticsSnapshot {
     let launchAgent = store.daemonStatus?.launchAgent
 
     self.launchAgent = launchAgent
+    mcpStatus = store.mcpStatus
     tokenPresent = workspaceDiagnostics?.authTokenPresent ?? false
     projectCount = store.daemonStatus?.projectCount ?? store.projects.count
     worktreeCount =
@@ -84,6 +86,7 @@ public struct PreferencesDiagnosticsSection: View {
     Form {
       PreferencesDiagnosticsOverview(
         launchAgent: snapshot.launchAgent,
+        mcpStatus: snapshot.mcpStatus,
         tokenPresent: snapshot.tokenPresent,
         projectCount: snapshot.projectCount,
         worktreeCount: snapshot.worktreeCount,

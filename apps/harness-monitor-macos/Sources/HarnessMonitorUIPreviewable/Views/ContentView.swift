@@ -142,7 +142,8 @@ public struct ContentView<CornerContent: View>: View {
       canNavigateForward: store.contentUI.toolbar.canNavigateForward,
       canStartNewSession: store.connectionState == .online,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
+      mcpStatus: store.contentUI.toolbar.mcpStatus
     )
   }
 
