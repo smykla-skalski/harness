@@ -85,5 +85,34 @@ extension WorkspaceWindowView {
     if viewModel.runtimeProbeResults != runtimeProbeResults {
       viewModel.runtimeProbeResults = runtimeProbeResults
     }
+    normalizePreferredLaunchSelection(
+      acpAgents: acpAgents,
+      runtimeProbeResults: runtimeProbeResults
+    )
+  }
+
+  @MainActor
+  private func normalizePreferredLaunchSelection(
+    acpAgents: [AcpAgentDescriptor],
+    runtimeProbeResults: AcpRuntimeProbeResponse?
+  ) {
+    let options = Self.agentCapabilityOptions(
+      acpAgents: acpAgents,
+      runtimeProbeResults: runtimeProbeResults,
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+    )
+    let normalizedSelection = Self.normalizedLaunchSelection(
+      options: options,
+      selection: viewModel.selectedLaunchSelection,
+      fallbackRuntime: viewModel.runtime
+    )
+    if viewModel.selectedLaunchSelection != normalizedSelection {
+      viewModel.selectedLaunchSelection = normalizedSelection
+    }
+    let preferredRuntime = normalizedSelection.preferredRuntime
+    if viewModel.runtime != preferredRuntime {
+      viewModel.runtime = preferredRuntime
+    }
   }
 }
