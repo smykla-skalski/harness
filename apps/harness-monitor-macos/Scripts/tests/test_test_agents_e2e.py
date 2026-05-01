@@ -41,9 +41,22 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
     def test_expensive_e2e_lane_disables_xcodebuild_retries(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
         self.assertIn(
-            'HARNESS_MONITOR_TEST_RETRY_ITERATIONS=0',
+            'TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"',
             script,
             "agents e2e must disable xcodebuild retry iterations so expensive UI runs do not relaunch automatically",
+        )
+
+    def test_expensive_e2e_lane_bounds_xcodebuild_lock_waits(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            'LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"',
+            script,
+            "agents e2e should fail fast on shared xcodebuild lock contention by default",
+        )
+        self.assertIn(
+            'XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS="$LOCK_WAIT_TIMEOUT_SECONDS"',
+            script,
+            "agents e2e build and test actions should both use the bounded lock wait",
         )
 
     def test_defaults_to_e2e_specific_derived_data_root(self) -> None:
