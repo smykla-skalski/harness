@@ -95,7 +95,7 @@ public struct DecisionWorkspaceScope: Equatable {
         .filter { filters.severities.contains($0) }
         .map(\.chipLabel)
         .joined(separator: ", ")
-      segments.append(severities)
+      segments.append("Severity: \(severities)")
     }
     return segments.isEmpty ? "All open decisions" : segments.joined(separator: " · ")
   }

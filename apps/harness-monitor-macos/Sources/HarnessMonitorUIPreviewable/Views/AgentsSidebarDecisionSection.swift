@@ -8,10 +8,6 @@ struct AgentsSidebarDecisionSection: View {
   let currentSessionID: String?
   let currentSessionTitle: String?
   let fontScale: CGFloat
-  @Binding var decisionQuery: String
-  @Binding var decisionFilterExpanded: Bool
-  @Binding var decisionSeveritiesCSV: String
-  @Binding var decisionSearchScopeRaw: String
   let acpPayload: (Decision) -> AcpPermissionDecisionPayload?
   let lastMessageAt: (Decision) -> Date?
 
@@ -19,35 +15,24 @@ struct AgentsSidebarDecisionSection: View {
     HarnessMonitorTheme.spacingXS * fontScale
   }
 
-  private var selectedSeverities: Set<DecisionSeverity> {
-    Set(
-      decisionSeveritiesCSV
-        .split(separator: ",")
-        .compactMap { DecisionSeverity(rawValue: String($0)) }
-    )
-  }
-
-  private var decisionSearchScope: DecisionsSidebarSearchScope {
-    DecisionsSidebarSearchScope(rawValue: decisionSearchScopeRaw) ?? .summary
-  }
-
   private var activeSearchSummary: String {
     scope.scopeDescription
   }
 
-  private var selectedSeverityCount: Int {
-    selectedSeverities.count
+  private var decisionDeskAccessibilityValue: String {
+    if scope.hasActiveFilters {
+      return "\(scope.resultSummary). \(activeSearchSummary)"
+    }
+    return scope.resultSummary
+  }
+
+  private var decisionDeskAccessibilityLabel: String {
+    "Decision Desk. \(decisionDeskAccessibilityValue)"
   }
 
   var body: some View {
     Section("Decisions") {
       decisionDeskRow
-      decisionSearchRow
-        .listRowSeparator(.hidden)
-      if decisionFilterExpanded {
-        decisionSeverityRow
-          .listRowSeparator(.hidden)
-      }
       if scope.groups.isEmpty {
         decisionEmptyState
           .listRowSeparator(.hidden)
@@ -77,22 +62,6 @@ struct AgentsSidebarDecisionSection: View {
         }
       }
     }
-    .onAppear {
-      applyExternalDecisionFilters()
-      publishDecisionFilters()
-    }
-    .onChange(of: decisionQuery) { _, _ in
-      publishDecisionFilters()
-    }
-    .onChange(of: decisionSeveritiesCSV) { _, _ in
-      publishDecisionFilters()
-    }
-    .onChange(of: decisionSearchScopeRaw) { _, _ in
-      publishDecisionFilters()
-    }
-    .onChange(of: decisionFilters) { _, newValue in
-      applyExternalDecisionFilters(newValue)
-    }
   }
 
   private var decisionDeskRow: some View {
@@ -105,6 +74,12 @@ struct AgentsSidebarDecisionSection: View {
         Text(scope.resultSummary)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        if scope.hasActiveFilters {
+          Text(activeSearchSummary)
+            .scaledFont(.caption2.weight(.medium))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
       Text(scope.countLabel)
@@ -114,121 +89,9 @@ struct AgentsSidebarDecisionSection: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, rowPadding)
     .tag(WorkspaceSelection.decisions(sessionID: currentSessionID))
-  }
-
-  private var decisionSearchRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        TextField(decisionSearchScope.label, text: $decisionQuery)
-          .textFieldStyle(.roundedBorder)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
-        decisionSearchScopeMenu
-        decisionFilterToggle
-      }
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          TextField(decisionSearchScope.label, text: $decisionQuery)
-            .textFieldStyle(.roundedBorder)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearch)
-          decisionFilterToggle
-        }
-
-        decisionSearchScopeMenu
-      }
-    }
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-  }
-
-  private var decisionFilterToggle: some View {
-    let systemName =
-      decisionFilterExpanded
-      ? "line.3.horizontal.decrease.circle.fill"
-      : "line.3.horizontal.decrease.circle"
-    return Button {
-      decisionFilterExpanded.toggle()
-    } label: {
-      Label(
-        selectedSeverityCount > 0 ? "Filters \(selectedSeverityCount)" : "Filters",
-        systemImage: systemName
-      )
-      .labelStyle(.titleAndIcon)
-      .foregroundStyle(
-        decisionFilterExpanded ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk
-      )
-    }
-    .buttonStyle(.borderless)
-    .accessibilityLabel(decisionFilterExpanded ? "Hide filters" : "Show filters")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarFilterToggle)
-  }
-
-  private var decisionSearchScopeMenu: some View {
-    Menu {
-      Picker("Search scope", selection: $decisionSearchScopeRaw) {
-        ForEach(DecisionsSidebarSearchScope.allCases) { scope in
-          Label(scope.label, systemImage: scope.systemImage)
-            .tag(scope.rawValue)
-        }
-      }
-    } label: {
-      Label(decisionSearchScope.label, systemImage: decisionSearchScope.systemImage)
-        .labelStyle(.titleAndIcon)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .menuStyle(.borderlessButton)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityLabel("Search scope — \(decisionSearchScope.label)")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarSearchScopeMenu)
-  }
-
-  private var decisionSeverityRow: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        decisionAllChip
-        ForEach(DecisionSeverity.sidebarOrdering, id: \.self) { severity in
-          decisionSeverityChip(severity)
-        }
-      }
-      .padding(.vertical, 1)
-    }
-    .contentMargins(.horizontal, HarnessMonitorTheme.spacingXS, for: .scrollContent)
-    .scrollClipDisabled()
-  }
-
-  private var decisionAllChip: some View {
-    let isActive = selectedSeverities.isEmpty
-    return Button {
-      setSelectedSeverities([])
-    } label: {
-      Text("All")
-        .scaledFont(.caption.weight(.semibold))
-    }
-    .harnessFilterChipButtonStyle(isSelected: isActive)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionsSidebarAllChip)
-    .accessibilityValue(isActive ? "selected" : "not selected")
-  }
-
-  private func decisionSeverityChip(_ severity: DecisionSeverity) -> some View {
-    let isActive = selectedSeverities.contains(severity)
-    return Button {
-      var next = selectedSeverities
-      if next.contains(severity) {
-        next.remove(severity)
-      } else {
-        next.insert(severity)
-      }
-      setSelectedSeverities(next)
-    } label: {
-      Text(severity.chipLabel)
-        .scaledFont(.caption.weight(.semibold))
-        .lineLimit(1)
-    }
-    .harnessFilterChipButtonStyle(isSelected: isActive)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.decisionsSidebarSeverityChip(severity.rawValue)
-    )
-    .accessibilityLabel(severity.chipLabel)
-    .accessibilityValue(isActive ? "selected" : "not selected")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(decisionDeskAccessibilityLabel)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsDecisionDesk)
   }
 
   private var decisionEmptyState: some View {
@@ -272,37 +135,12 @@ struct AgentsSidebarDecisionSection: View {
     .padding(.top, HarnessMonitorTheme.spacingSM)
   }
 
-  private func setSelectedSeverities(_ newValue: Set<DecisionSeverity>) {
-    decisionSeveritiesCSV = newValue.map(\.rawValue).sorted().joined(separator: ",")
-  }
-
   private func clearFilters() {
-    decisionQuery = ""
-    decisionSeveritiesCSV = ""
-    decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
-  }
-
-  private func publishDecisionFilters() {
     decisionFilters = DecisionsSidebarViewModel.FilterState(
-      query: decisionQuery,
-      severities: selectedSeverities,
-      scope: decisionSearchScope
+      query: "",
+      severities: [],
+      scope: .summary
     )
-  }
-
-  private func applyExternalDecisionFilters(
-    _ incoming: DecisionsSidebarViewModel.FilterState? = nil
-  ) {
-    let source = incoming ?? decisionFilters
-    if decisionQuery != source.query {
-      decisionQuery = source.query
-    }
-    if selectedSeverities != source.severities {
-      setSelectedSeverities(source.severities)
-    }
-    if decisionSearchScopeRaw != source.scope.rawValue {
-      decisionSearchScopeRaw = source.scope.rawValue
-    }
   }
 
   private func sessionHeading(for sessionID: String?) -> String {

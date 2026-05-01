@@ -107,6 +107,53 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     }
   }
 
+  func openAgentsDecisionFilters(in app: XCUIApplication) {
+    let filterButton = button(in: app, identifier: Accessibility.agentsDecisionFiltersMenu)
+    XCTAssertTrue(
+      waitForElement(filterButton, timeout: Self.fastActionTimeout),
+      "Agents window decision filter menu should exist before opening it"
+    )
+
+    app.activate()
+    if let coordinate = centerCoordinate(in: app, for: filterButton) {
+      coordinate.click()
+    } else if filterButton.isHittable {
+      filterButton.click()
+    } else {
+      XCTFail("Failed to resolve the actual agents decision filter control")
+      return
+    }
+
+    XCTAssertTrue(
+      waitForElement(element(in: app, title: "Critical"), timeout: Self.fastActionTimeout),
+      "Agents decision filter menu should present the severity filter commands"
+    )
+  }
+
+  func resetAgentsDecisionSeveritiesIfNeeded(in app: XCUIApplication) {
+    let filterState = element(in: app, identifier: Accessibility.agentsDecisionFilterState)
+    XCTAssertTrue(
+      waitForElement(filterState, timeout: Self.fastActionTimeout),
+      "Agents window decision filter state should exist before resetting severities"
+    )
+    guard !filterState.label.contains("severities=all") else {
+      return
+    }
+
+    openAgentsDecisionFilters(in: app)
+    tapButton(in: app, title: "All severities")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        filterState.label.contains("severities=all")
+      },
+      """
+      Resetting the agents decision severity menu should restore the full severity set before the test continues.
+      state=\(filterState.label)
+      """
+    )
+  }
+
   func agentTuiActionExists(
     in app: XCUIApplication,
     title: String,

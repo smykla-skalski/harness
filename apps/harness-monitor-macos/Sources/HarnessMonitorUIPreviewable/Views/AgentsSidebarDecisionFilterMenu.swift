@@ -10,6 +10,7 @@ struct AgentsSidebarDecisionFilterToolbarItem: ToolbarContent {
     ToolbarItem(placement: .automatic) {
       AgentsSidebarDecisionFilterMenu(
         selectedSeverities: selectedSeverities,
+        isEnabled: isEnabled,
         setSelectedSeverities: setSelectedSeverities
       )
       .disabled(!isEnabled)
@@ -19,14 +20,11 @@ struct AgentsSidebarDecisionFilterToolbarItem: ToolbarContent {
 
 private struct AgentsSidebarDecisionFilterMenu: View {
   let selectedSeverities: Set<DecisionSeverity>
+  let isEnabled: Bool
   let setSelectedSeverities: (Set<DecisionSeverity>) -> Void
 
   private var hasActiveFilters: Bool {
     !selectedSeverities.isEmpty
-  }
-
-  private var selectedSeverityCount: Int {
-    selectedSeverities.count
   }
 
   private var selectedSeverityLabels: String {
@@ -34,6 +32,22 @@ private struct AgentsSidebarDecisionFilterMenu: View {
       .filter { selectedSeverities.contains($0) }
       .map(\.chipLabel)
       .joined(separator: ", ")
+  }
+
+  private var accessibilityValue: String {
+    guard isEnabled else {
+      return "Unavailable until the workspace has active decisions"
+    }
+    if hasActiveFilters {
+      return "Filtered to \(selectedSeverityLabels)"
+    }
+    return "All severities"
+  }
+
+  private var helpText: String {
+    isEnabled
+      ? "Filter decisions by severity"
+      : "Severity filters become available when the workspace has active decisions"
   }
 
   var body: some View {
@@ -62,15 +76,14 @@ private struct AgentsSidebarDecisionFilterMenu: View {
       }
     } label: {
       Label(
-        selectedSeverityCount > 0 ? "Filters \(selectedSeverityCount)" : "Filters",
+        "Severity",
         systemImage: hasActiveFilters
           ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
       )
     }
-    .help("Filter decisions by severity")
-    .menuIndicator(.hidden)
-    .accessibilityLabel("Decision filters")
-    .accessibilityValue(hasActiveFilters ? selectedSeverityLabels : "All severities")
+    .help(helpText)
+    .accessibilityLabel("Severity")
+    .accessibilityValue(accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentsDecisionFiltersMenu)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsDecisionFiltersMenu).frame")
   }
