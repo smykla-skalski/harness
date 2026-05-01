@@ -28,6 +28,13 @@ public struct PreferencesMCPSection: View {
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.preferencesMCPRegistryHostToggle
           )
+          .accessibilityHint(
+            Text(
+              forceEnabled
+                ? forceEnabledMessage
+                : "Turns the MCP accessibility registry host on or off."
+            )
+          )
           .disabled(forceEnabled)
         if forceEnabled {
           Text(forceEnabledMessage)

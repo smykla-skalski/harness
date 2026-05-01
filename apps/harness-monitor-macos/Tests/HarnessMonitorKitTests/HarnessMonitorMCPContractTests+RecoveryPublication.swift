@@ -102,10 +102,10 @@ extension HarnessMonitorMCPContractTests {
     let service = RecoveryStubMCPService(
       nextEnabledRuntimeStates: [
         .healthy(socketPath: "/tmp/mcp.sock"),
-        degradedState,
         .healthy(socketPath: "/tmp/mcp.sock"),
       ]
     )
+    service.nextProbeRuntimeStates = [degradedState]
     let controller = HarnessMonitorMCPStartupController(
       service: service,
       defaults: defaults.defaults,

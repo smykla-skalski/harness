@@ -90,6 +90,18 @@ impl Tool for DragDropTool {
 
         let source = self.fetch_element(&parsed.source_identifier).await?;
         let destination = self.fetch_element(&parsed.destination_identifier).await?;
+        if !source.element.enabled {
+            return Err(ToolError::invalid(format!(
+                "sourceIdentifier '{}' resolves to a disabled target",
+                parsed.source_identifier
+            )));
+        }
+        if !destination.element.enabled {
+            return Err(ToolError::invalid(format!(
+                "destinationIdentifier '{}' resolves to a disabled target",
+                parsed.destination_identifier
+            )));
+        }
         let (start_x, start_y) = center(&source.element.frame);
         let (end_x, end_y) = center(&destination.element.frame);
         drag_drop(start_x, start_y, end_x, end_y, parsed.duration_ms)

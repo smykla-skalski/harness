@@ -116,6 +116,7 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
 }
 
 private final class TrackAccessibilityNSView: NSView {
+  private let registrationOwnerID = UUID()
   private var trackedElementID = ""
   private var kind: RegistryElementKind = .other
   private var label: String?
@@ -124,6 +125,7 @@ private final class TrackAccessibilityNSView: NSView {
   private var explicitWindowID: Int?
   private var enabled = true
   private var registry: AccessibilityRegistry?
+  private var claimTask: Task<Void, Never>?
   private var publishTask: Task<Void, Never>?
   private var observedWindow: NSWindow?
   private var windowObservers: [NSObjectProtocol] = []
@@ -141,7 +143,9 @@ private final class TrackAccessibilityNSView: NSView {
   }
 
   deinit {
-    tearDownWindowObservation()
+    MainActor.assumeIsolated {
+      tearDownWindowObservation()
+    }
   }
 
   func configure(
@@ -154,6 +158,19 @@ private final class TrackAccessibilityNSView: NSView {
     enabled: Bool,
     registry: AccessibilityRegistry
   ) {
+    if trackedElementID != elementID, let currentRegistry = self.registry, !trackedElementID.isEmpty {
+      let previousElementID = trackedElementID
+      let previousClaimTask = claimTask
+      let ownerID = registrationOwnerID
+      Task {
+        await previousClaimTask?.value
+        await currentRegistry.unregisterTrackedElement(
+          identifier: previousElementID,
+          ownerID: ownerID
+        )
+      }
+      lastPublishedElement = nil
+    }
     trackedElementID = elementID
     self.kind = kind
     self.label = label
@@ -162,17 +179,25 @@ private final class TrackAccessibilityNSView: NSView {
     explicitWindowID = windowID
     self.enabled = enabled
     self.registry = registry
+    claimTrackedElement()
     beginObserving(window: window)
     publishCurrentElement()
   }
 
   func unregister() {
     publishTask?.cancel()
+    publishTask = nil
+    let claimTask = self.claimTask
+    self.claimTask = nil
     guard let registry, !trackedElementID.isEmpty else {
       return
     }
     let elementID = trackedElementID
-    Task { await registry.unregisterElement(identifier: elementID) }
+    let ownerID = registrationOwnerID
+    Task {
+      await claimTask?.value
+      await registry.unregisterTrackedElement(identifier: elementID, ownerID: ownerID)
+    }
   }
 
   override func viewDidMoveToWindow() {
@@ -258,6 +283,21 @@ private final class TrackAccessibilityNSView: NSView {
     observedWindow = nil
   }
 
+  private func claimTrackedElement() {
+    claimTask?.cancel()
+    guard let registry, !trackedElementID.isEmpty else {
+      return
+    }
+    let elementID = trackedElementID
+    let ownerID = registrationOwnerID
+    claimTask = Task {
+      guard !Task.isCancelled else {
+        return
+      }
+      await registry.claimTrackedElement(identifier: elementID, ownerID: ownerID)
+    }
+  }
+
   private func publishCurrentElement() {
     guard let registry, !trackedElementID.isEmpty else {
       return
@@ -266,6 +306,21 @@ private final class TrackAccessibilityNSView: NSView {
     // the same screen-space coordinates harvested from NSAccessibility.
     let frame = accessibilityFrame()
     guard frame.isNull == false, frame.isInfinite == false, frame.isEmpty == false else {
+      guard lastPublishedElement != nil else {
+        return
+      }
+      lastPublishedElement = nil
+      publishTask?.cancel()
+      let claimTask = self.claimTask
+      let elementID = trackedElementID
+      let ownerID = registrationOwnerID
+      publishTask = Task {
+        await claimTask?.value
+        guard !Task.isCancelled else {
+          return
+        }
+        await registry.clearTrackedElement(identifier: elementID, ownerID: ownerID)
+      }
       return
     }
 
@@ -285,7 +340,15 @@ private final class TrackAccessibilityNSView: NSView {
     lastPublishedElement = element
 
     publishTask?.cancel()
-    publishTask = Task { await registry.registerElement(element) }
+    let claimTask = self.claimTask
+    let ownerID = registrationOwnerID
+    publishTask = Task {
+      await claimTask?.value
+      guard !Task.isCancelled else {
+        return
+      }
+      await registry.registerTrackedElement(element, ownerID: ownerID)
+    }
   }
 }
 #else

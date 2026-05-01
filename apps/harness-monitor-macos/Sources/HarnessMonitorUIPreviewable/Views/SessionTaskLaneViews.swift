@@ -152,7 +152,8 @@ struct SessionTaskSummaryCard: View {
     .harnessTrackMCPElement(
       HarnessMonitorAccessibility.sessionTaskCard(task.taskId),
       kind: .row,
-      label: task.title
+      label: task.title,
+      value: isDragging ? "Dragging" : nil
     )
     .contextMenu {
       Button {

@@ -4,15 +4,15 @@ import AppKit
 @MainActor
 final class WindowElementRegistrySyncController {
   private enum PendingAction {
-    case replace(window: NSWindow, generation: UInt64)
-    case clear(Int)
+    case replace(window: NSWindow, generation: UInt64, ownerID: UUID)
+    case clear(Int, ownerID: UUID)
   }
 
   private let registry: AccessibilityRegistry
-  private let ownerID = UUID()
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
-  private var pendingAction: PendingAction?
+  private var trackingOwnerID = UUID()
+  private var pendingActions: [PendingAction] = []
   private var flushTask: Task<Void, Never>?
 
   init(registry: AccessibilityRegistry) {
@@ -22,6 +22,7 @@ final class WindowElementRegistrySyncController {
   func beginTracking(windowID: Int) -> UInt64 {
     trackingGeneration &+= 1
     trackedWindowID = windowID
+    trackingOwnerID = UUID()
     return trackingGeneration
   }
 
@@ -29,14 +30,16 @@ final class WindowElementRegistrySyncController {
     guard generation == trackingGeneration, trackedWindowID == window.windowNumber else {
       return
     }
-    enqueue(.replace(window: window, generation: generation))
+    enqueue(.replace(window: window, generation: generation, ownerID: trackingOwnerID))
   }
 
   func stopTracking() {
     guard let windowID = trackedWindowID else { return }
+    let ownerID = trackingOwnerID
     trackingGeneration &+= 1
     trackedWindowID = nil
-    enqueue(.clear(windowID))
+    trackingOwnerID = UUID()
+    enqueue(.clear(windowID, ownerID: ownerID))
   }
 
   func waitForIdle() async {
@@ -46,7 +49,7 @@ final class WindowElementRegistrySyncController {
   }
 
   private func enqueue(_ action: PendingAction) {
-    pendingAction = action
+    pendingActions.append(action)
     guard flushTask == nil else { return }
     let registry = registry
     flushTask = Task { @MainActor [weak self] in
@@ -58,18 +61,21 @@ final class WindowElementRegistrySyncController {
   }
 
   private func takePendingActionOrFinish() -> PendingAction? {
-    guard let action = pendingAction else {
+    guard !pendingActions.isEmpty else {
       flushTask = nil
       return nil
     }
-    pendingAction = nil
-    return action
+    return pendingActions.removeFirst()
   }
 
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
-    case .replace(let window, let generation):
-      guard generation == trackingGeneration, trackedWindowID == window.windowNumber else {
+    case .replace(let window, let generation, let ownerID):
+      guard
+        generation == trackingGeneration,
+        trackedWindowID == window.windowNumber,
+        trackingOwnerID == ownerID
+      else {
         return
       }
       let elements = WindowAccessibilityElementSnapshotter.elements(in: window)
@@ -78,7 +84,7 @@ final class WindowElementRegistrySyncController {
         elements: elements,
         ownerID: ownerID
       )
-    case .clear(let windowID):
+    case .clear(let windowID, let ownerID):
       await registry.unregisterTrackedWindowElements(windowID: windowID, ownerID: ownerID)
     }
   }
@@ -86,6 +92,20 @@ final class WindowElementRegistrySyncController {
 
 @MainActor
 private enum WindowAccessibilityElementSnapshotter {
+  private static let relatedAccessibilitySelectors: [Selector] = [
+    NSSelectorFromString("accessibilityChildren"),
+    NSSelectorFromString("accessibilityChildrenInNavigationOrder"),
+    NSSelectorFromString("accessibilityContents"),
+    NSSelectorFromString("accessibilityVisibleChildren"),
+    NSSelectorFromString("accessibilitySelectedChildren"),
+    NSSelectorFromString("accessibilityRows"),
+    NSSelectorFromString("accessibilityTabs"),
+    NSSelectorFromString("accessibilityDisclosedRows"),
+    NSSelectorFromString("accessibilityTitleUIElement"),
+    NSSelectorFromString("accessibilityToolbarButton"),
+    NSSelectorFromString("accessibilityProxy"),
+  ]
+
   static func elements(in window: NSWindow) -> [RegistryElement] {
     var queue: [any NSAccessibilityProtocol] = [window]
     if let contentView = window.contentView {
@@ -121,10 +141,15 @@ private enum WindowAccessibilityElementSnapshotter {
     var children: [any NSAccessibilityProtocol] = []
 
     if let accessibilityChildren = node.accessibilityChildren() {
-      for child in accessibilityChildren {
-        if let child = child as? any NSAccessibilityProtocol {
-          children.append(child)
+      appendChildNodes(from: accessibilityChildren, to: &children)
+    }
+
+    if let object = node as? NSObject {
+      for selector in relatedAccessibilitySelectors where object.responds(to: selector) {
+        guard let value = object.perform(selector)?.takeUnretainedValue() else {
+          continue
         }
+        appendChildNodes(from: value, to: &children)
       }
     }
 
@@ -135,6 +160,27 @@ private enum WindowAccessibilityElementSnapshotter {
     }
 
     return children
+  }
+
+  private static func appendChildNodes(
+    from value: Any,
+    to children: inout [any NSAccessibilityProtocol]
+  ) {
+    if let child = value as? any NSAccessibilityProtocol {
+      children.append(child)
+      return
+    }
+    if let childArray = value as? [Any] {
+      for child in childArray {
+        appendChildNodes(from: child, to: &children)
+      }
+      return
+    }
+    if let childSet = value as? NSSet {
+      for child in childSet {
+        appendChildNodes(from: child, to: &children)
+      }
+    }
   }
 
   private static func registryElement(

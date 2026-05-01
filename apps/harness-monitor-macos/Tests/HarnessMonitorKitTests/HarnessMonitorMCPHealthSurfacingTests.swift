@@ -23,12 +23,16 @@ struct HarnessMonitorMCPHealthSurfacingTests {
       )
     )
 
-    #expect(status.title == "Degraded - Recovering")
-    #expect(status.toolbarLabel == "MCP Recovering")
+    #expect(status.title == "Registry Degraded - Recovering")
+    #expect(status.toolbarLabel == "Registry Recovering")
     #expect(status.shouldShowChromeBanner)
     #expect(
       status.failureFeedbackMessage?
         .contains("Recovery continues in the background.") == true
+    )
+    #expect(
+      status.failureFeedbackMessage?
+        .contains("You can keep working while the registry retries in the background.") == true
     )
   }
 
@@ -55,7 +59,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     #expect(store.contentUI.chrome.mcpStatus == degraded)
     #expect(
       store.toast.activeFeedback.first?.message
-        .contains("MCP degraded:") == true
+        .contains("MCP registry degraded:") == true
     )
 
     let snapshot = PreferencesDiagnosticsSnapshot(store: store)

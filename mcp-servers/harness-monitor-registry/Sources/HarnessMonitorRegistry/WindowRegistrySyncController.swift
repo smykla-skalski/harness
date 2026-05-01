@@ -3,15 +3,15 @@ import Foundation
 @MainActor
 final class WindowRegistrySyncController {
   private enum PendingAction {
-    case register(RegistryWindow)
-    case unregister(Int)
+    case register(RegistryWindow, generation: UInt64, ownerID: UUID)
+    case unregister(Int, ownerID: UUID)
   }
 
   private let registry: AccessibilityRegistry
-  private let ownerID = UUID()
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
-  private var pendingAction: PendingAction?
+  private var trackingOwnerID = UUID()
+  private var pendingActions: [PendingAction] = []
   private var flushTask: Task<Void, Never>?
 
   init(registry: AccessibilityRegistry) {
@@ -21,19 +21,22 @@ final class WindowRegistrySyncController {
   func beginTracking(windowID: Int) -> UInt64 {
     trackingGeneration &+= 1
     trackedWindowID = windowID
+    trackingOwnerID = UUID()
     return trackingGeneration
   }
 
   func sync(_ entry: RegistryWindow, generation: UInt64) {
     guard generation == trackingGeneration, trackedWindowID == entry.id else { return }
-    enqueue(.register(entry))
+    enqueue(.register(entry, generation: generation, ownerID: trackingOwnerID))
   }
 
   func stopTracking() {
     guard let windowID = trackedWindowID else { return }
+    let ownerID = trackingOwnerID
     trackingGeneration &+= 1
     trackedWindowID = nil
-    enqueue(.unregister(windowID))
+    trackingOwnerID = UUID()
+    enqueue(.unregister(windowID, ownerID: ownerID))
   }
 
   func waitForIdle() async {
@@ -43,7 +46,7 @@ final class WindowRegistrySyncController {
   }
 
   private func enqueue(_ action: PendingAction) {
-    pendingAction = action
+    pendingActions.append(action)
     guard flushTask == nil else { return }
     let registry = registry
     flushTask = Task { [weak self] in
@@ -55,19 +58,25 @@ final class WindowRegistrySyncController {
   }
 
   private func takePendingActionOrFinish() -> PendingAction? {
-    guard let action = pendingAction else {
+    guard !pendingActions.isEmpty else {
       flushTask = nil
       return nil
     }
-    pendingAction = nil
-    return action
+    return pendingActions.removeFirst()
   }
 
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
-    case .register(let window):
+    case .register(let window, let generation, let ownerID):
+      guard
+        generation == trackingGeneration,
+        trackedWindowID == window.id,
+        trackingOwnerID == ownerID
+      else {
+        return
+      }
       await registry.registerTrackedWindow(window, ownerID: ownerID)
-    case .unregister(let windowID):
+    case .unregister(let windowID, let ownerID):
       await registry.unregisterTrackedWindow(id: windowID, ownerID: ownerID)
     }
   }

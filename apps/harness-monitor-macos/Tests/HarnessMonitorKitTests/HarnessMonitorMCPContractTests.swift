@@ -316,6 +316,10 @@ private final class StubMCPService: HarnessMonitorMCPStartupControlling {
     recordedEnabledStates.append(enabled)
     runtimeState = enabled ? nextEnabledRuntimeState : .disabled
   }
+
+  func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState {
+    runtimeState
+  }
 }
 
 @MainActor
@@ -346,6 +350,10 @@ private final class BlockingMCPService: HarnessMonitorMCPStartupControlling {
     }
     recordedEnabledStates.append(true)
     runtimeState = terminalState
+  }
+
+  func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState {
+    runtimeState
   }
 
   func waitForEnableAttempt() async {

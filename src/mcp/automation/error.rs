@@ -4,7 +4,8 @@ use thiserror::Error;
 pub enum AutomationError {
     #[error(
         "No mouse backend available. Build the bundled helper with `swift build -c release \
-         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input`, \
+         set `HARNESS_MONITOR_INPUT_BIN` to a built `harness-monitor-input` binary, \
          or install cliclick (`brew install cliclick`). Either way, grant Accessibility permission \
          to the process running this MCP server."
     )]
@@ -12,12 +13,14 @@ pub enum AutomationError {
     #[error(
         "No scroll backend available. Build the bundled helper with `swift build -c release \
          --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         or set `HARNESS_MONITOR_INPUT_BIN` to a built `harness-monitor-input` binary, \
          and grant Accessibility permission to the process running this MCP server."
     )]
     ScrollBackendMissing,
     #[error(
         "No drag/drop backend available. Build the bundled helper with `swift build -c release \
          --package-path mcp-servers/harness-monitor-registry --product harness-monitor-input` \
+         or set `HARNESS_MONITOR_INPUT_BIN` to a built `harness-monitor-input` binary, \
          and grant Accessibility permission to the process running this MCP server."
     )]
     DragBackendMissing,
