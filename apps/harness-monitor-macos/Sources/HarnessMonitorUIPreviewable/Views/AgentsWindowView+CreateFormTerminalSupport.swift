@@ -1,7 +1,25 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentsWindowView {
+extension AgentsWindowCreatePane {
+  var selectedAgentLaunchTitle: String {
+    switch viewModel.selectedLaunchSelection {
+    case .tui(let runtime):
+      runtime.title
+    case .acp(let id):
+      viewModel.availableAcpAgents.first { $0.id == id }?.displayName ?? "Agent"
+    }
+  }
+
+  var agentCapabilityOptions: [AgentCapabilityOption] {
+    AgentsWindowView.agentCapabilityOptions(
+      acpAgents: viewModel.availableAcpAgents,
+      runtimeProbeResults: viewModel.runtimeProbeResults,
+      sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+    )
+  }
+
   var showsAcpFallbackRoleMenu: Bool {
     viewModel.selectedLaunchSelection.isAcp && viewModel.selectedRole == .leader
   }
@@ -245,6 +263,25 @@ extension AgentsWindowView {
     return "Using \(personaName)."
   }
 
+  var canStartTerminal: Bool {
+    guard !viewModel.isSubmitting, createPaneSessionActionUnavailableNote == nil else {
+      return false
+    }
+    switch viewModel.selectedLaunchSelection {
+    case .tui:
+      return viewModel.rows > 0 && viewModel.cols > 0
+    case .acp(let id):
+      guard
+        let option = agentCapabilityOptions.first(where: { option in
+          option.transportChoices.contains { $0.id == .acp(id) }
+        })
+      else {
+        return false
+      }
+      return option.isEnabled(option.transportChoice(for: .acp(id)))
+    }
+  }
+
   @ViewBuilder
   func terminalEffortField(context: TerminalConfigurationContext) -> some View {
     if !context.effortValues.isEmpty {
@@ -310,14 +347,19 @@ extension AgentsWindowView {
     )
     let effortValues =
       catalog
-      .map { Self.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue) }
-      ?? Self.allEffortLevels
+      .map {
+        AgentsWindowView.effortValues(
+          catalog: $0,
+          selectedModelId: modelBinding.wrappedValue
+        )
+      }
+      ?? AgentsWindowView.allEffortLevels
     let effortBinding = Binding<String>(
       get: {
         guard let current = formModel.selectedTerminalEffortByRuntime[selectedRuntime],
           effortValues.contains(current)
         else {
-          return Self.defaultEffortLevel(from: effortValues)
+          return AgentsWindowView.defaultEffortLevel(from: effortValues)
         }
         return current
       },

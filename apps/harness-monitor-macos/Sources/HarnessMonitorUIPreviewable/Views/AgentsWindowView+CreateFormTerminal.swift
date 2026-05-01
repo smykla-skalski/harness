@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension AgentsWindowView {
+extension AgentsWindowCreatePane {
   @ViewBuilder var terminalCreateContent: some View {
     if usesSplitCreateLayout {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
@@ -39,7 +39,7 @@ extension AgentsWindowView {
           formModel.runtime = newValue.preferredRuntime
         }
         .onChange(of: agentCapabilityOptions, initial: true) { _, options in
-          let normalizedSelection = Self.normalizedLaunchSelection(
+          let normalizedSelection = AgentsWindowView.normalizedLaunchSelection(
             options: options,
             selection: formModel.selectedLaunchSelection,
             fallbackRuntime: formModel.runtime
@@ -310,7 +310,7 @@ extension AgentsWindowView {
           accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
           fillsWidth: false
         ) {
-          startTui()
+          startAction()
         }
         .keyboardShortcut(.defaultAction)
         .disabled(!canStartTerminal)
