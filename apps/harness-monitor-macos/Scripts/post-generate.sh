@@ -63,6 +63,12 @@ write_workspace_settings() {
 EOF
 }
 
+seed_generated_app_entitlements() {
+  local project_temp_dir="$1"
+
+  PROJECT_TEMP_DIR="$project_temp_dir" /bin/bash "$ROOT/Scripts/prepare-app-entitlements.sh"
+}
+
 write_build_server_config \
   "$ROOT/buildServer.json" \
   "./Scripts/run-xcode-build-server.sh" \
@@ -80,6 +86,13 @@ ensure_monitor_build_artifact_roots_non_indexable "$REPO_ROOT"
 write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$REPO_ROOT/xcode-derived"
+
+write_workspace_settings \
+  "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
+  "$REPO_ROOT/xcode-derived"
+
+seed_generated_app_entitlements \
+  "$REPO_ROOT/xcode-derived/Build/Intermediates.noindex/HarnessMonitor.build"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
