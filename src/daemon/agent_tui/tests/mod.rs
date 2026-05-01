@@ -36,7 +36,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
             project_id: "project-tui-manager".into(),
             name: "project".into(),
             project_dir: Some(project_dir.clone()),
-            repository_root: Some(project_dir.clone()),
+            repository_root: Some(project_dir),
             checkout_id: "checkout-tui-manager".into(),
             checkout_name: "Directory".into(),
             context_root: context_root.clone(),

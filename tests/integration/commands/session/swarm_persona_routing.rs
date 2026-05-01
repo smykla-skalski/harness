@@ -32,7 +32,7 @@ fn persona_matching_worker_picks_up_reassignable_task_over_bare_agent() {
             None,
         )
         .unwrap();
-        let leader_id = leader_state.leader_id.clone().unwrap();
+        let leader_id = leader_state.leader_id.unwrap();
 
         // Alphabetically-first agent (bare, no persona).
         let bare = temp_env::with_var("CODEX_SESSION_ID", Some("bare-worker"), || {
@@ -127,7 +127,7 @@ fn persona_matching_worker_picks_up_reassignable_task_over_bare_agent() {
         let layout =
             harness::session::storage::layout_from_project_dir(&project, "persona-rt").unwrap();
         let state_before = service::session_status("persona-rt", &project).unwrap();
-        let mut patched = state_before.clone();
+        let mut patched = state_before;
         patched
             .tasks
             .get_mut(&persona_task.task_id)

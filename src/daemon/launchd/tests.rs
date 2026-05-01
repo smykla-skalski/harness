@@ -65,11 +65,11 @@ fn launch_agent_install_and_remove_round_trip() {
                     return Ok(CommandOutput {
                         exit_code: 0,
                         stdout: format!(
-                            r#"{service} = {{
+                            r"{service} = {{
     state = running
     pid = 4242
     last exit code = 0
-}}"#,
+}}",
                             service = launchd_service_target()
                         ),
                         stderr: String::new(),
@@ -270,11 +270,11 @@ fn restart_launch_agent_requires_installed_plist() {
 #[test]
 fn parse_launchctl_print_extracts_runtime_fields() {
     let parsed = parse_launchctl_print(
-        r#"gui/501/io.harness.daemon = {
+        r"gui/501/io.harness.daemon = {
     state = waiting
     pid = 98321
     last exit code = 78
-}"#,
+}",
     );
     assert_eq!(
         parsed,
@@ -338,11 +338,11 @@ fn launch_agent_status_coalesces_legacy_runtime_into_current_contract() {
                 Ok(CommandOutput {
                     exit_code: 0,
                     stdout: format!(
-                        r#"{service} = {{
+                        r"{service} = {{
     state = running
     pid = 4242
     last exit code = 0
-}}"#,
+}}",
                         service = launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL)
                     ),
                     stderr: String::new(),

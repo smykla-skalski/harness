@@ -1,6 +1,6 @@
 //! Parse tests for the multi-agent review-workflow task subcommands:
 //! `submit-for-review`, `claim-review`, `submit-review`, `respond-review`,
-//! and `arbitrate`. These cover the `ReviewVerdict` enum's snake_case /
+//! and `arbitrate`. These cover the `ReviewVerdict` enum's `snake_case` /
 //! kebab-case alias surface and the CSV splitter on
 //! `respond-review --agreed/--disputed`.
 

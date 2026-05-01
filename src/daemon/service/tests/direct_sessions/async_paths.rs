@@ -43,7 +43,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let detail = remove_agent_async(
                     "daemon-async-remove",
@@ -113,7 +113,7 @@ fn end_session_async_direct_marks_inactive() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let detail = end_session_async(
                     "daemon-async-end",

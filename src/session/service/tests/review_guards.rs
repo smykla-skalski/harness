@@ -75,7 +75,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
             "arbitration-block-guards",
             &task.task_id,
             &protocol::TaskDropTarget::Agent {
-                agent_id: worker_id.clone(),
+                agent_id: worker_id,
             },
             TaskQueuePolicy::Locked,
             &leader_id,

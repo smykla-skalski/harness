@@ -150,7 +150,7 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
             .expect("alpha detail");
             let beta_detail = session_detail_from_resolved_with_db(
                 &ResolvedSession {
-                    project: project.clone(),
+                    project,
                     state: beta_state,
                 },
                 &db,

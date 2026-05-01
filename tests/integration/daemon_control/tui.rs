@@ -325,7 +325,7 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
         session.session_id.as_str(),
         "codex",
     );
-    let leader_id = joined.leader_id.clone().expect("leader id after join");
+    let leader_id = joined.leader_id.expect("leader id after join");
 
     let leave_output = run_harness(
         &home,
@@ -447,11 +447,8 @@ exec cat
 "#,
     )
     .expect("write mock codex");
-    std::fs::set_permissions(
-        &script,
-        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
-    )
-    .expect("chmod mock codex");
+    std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod mock codex");
 }
 
 fn wait_for_tui_prompt(home: &Path, xdg: &Path, tui_id: &str) -> AgentTuiSnapshot {

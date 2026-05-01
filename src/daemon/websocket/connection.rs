@@ -435,7 +435,7 @@ mod tests {
         });
         let inbound_task = tokio::spawn(async {});
         let writer_task = tokio::spawn(async {
-            tokio::time::sleep(Duration::from_secs(60)).await;
+            tokio::time::sleep(Duration::from_mins(1)).await;
         });
 
         await_connection_tasks(relay_task, inbound_task, writer_task).await;

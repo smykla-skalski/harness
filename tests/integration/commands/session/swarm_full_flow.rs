@@ -2,7 +2,7 @@
 //!
 //! This intentionally shells out to the repo-native mise lane because the
 //! scenario spans the Rust CLI, external daemon, and the macOS Monitor
-//! XCUITest host. Fast integration tests cover the individual state-machine
+//! `XCUITest` host. Fast integration tests cover the individual state-machine
 //! pieces; this wrapper is for explicit slow/e2e runs only.
 
 use std::process::Command;

@@ -65,12 +65,11 @@ pub fn wait_for_daemon_ready(home: &Path, xdg: &Path) {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
         let output = run_harness(home, xdg, &["daemon", "status"]);
-        if output.status.success() {
-            if let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-                if status.get("manifest").is_some_and(|v| !v.is_null()) {
-                    return;
-                }
-            }
+        if output.status.success()
+            && let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            && status.get("manifest").is_some_and(|v| !v.is_null())
+        {
+            return;
         }
         assert!(
             Instant::now() < deadline,
@@ -84,19 +83,17 @@ pub fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, St
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
         let output = run_harness(home, xdg, &["daemon", "status"]);
-        if output.status.success() {
-            if let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-                if let (Some(endpoint), Some(token_path)) = (
-                    status["manifest"]["endpoint"].as_str(),
-                    status["manifest"]["token_path"].as_str(),
-                ) {
-                    if let Ok(token) = std::fs::read_to_string(token_path) {
-                        let token = token.trim().to_string();
-                        if !token.is_empty() {
-                            return (endpoint.to_string(), token);
-                        }
-                    }
-                }
+        if output.status.success()
+            && let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            && let (Some(endpoint), Some(token_path)) = (
+                status["manifest"]["endpoint"].as_str(),
+                status["manifest"]["token_path"].as_str(),
+            )
+            && let Ok(token) = std::fs::read_to_string(token_path)
+        {
+            let token = token.trim().to_string();
+            if !token.is_empty() {
+                return (endpoint.to_string(), token);
             }
         }
         assert!(

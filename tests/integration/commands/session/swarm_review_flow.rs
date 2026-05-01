@@ -373,9 +373,7 @@ fn drop_task_rejects_review_state_task() {
         let err = service::drop_task(
             "drop-no-bypass",
             &task_id,
-            &harness::daemon::protocol::TaskDropTarget::Agent {
-                agent_id: fresh_id.clone(),
-            },
+            &harness::daemon::protocol::TaskDropTarget::Agent { agent_id: fresh_id },
             harness::session::types::TaskQueuePolicy::Locked,
             &leader_id,
             &project,

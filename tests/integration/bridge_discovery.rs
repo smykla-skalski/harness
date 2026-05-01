@@ -207,11 +207,8 @@ PY
 "#,
     )
     .expect("write mock codex");
-    std::fs::set_permissions(
-        &script,
-        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
-    )
-    .expect("chmod mock codex");
+    std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod mock codex");
     script
 }
 

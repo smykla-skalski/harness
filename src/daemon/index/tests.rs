@@ -89,7 +89,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             )
             .expect("join leader")
         });
-        let leader_id = active.leader_id.clone().expect("leader id");
+        let leader_id = active.leader_id.expect("leader id");
 
         temp_env::with_vars(
             [

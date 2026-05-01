@@ -87,7 +87,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
             title: "renamed title".into(),
             project_dir: Some(project.to_string_lossy().into_owned()),
         }
-        .execute(&AppContext::default())
+        .execute(&AppContext)
         .expect("session title should route through daemon");
 
         assert_eq!(exit, 0);
@@ -231,7 +231,7 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
             actor: Some("observer-1".into()),
             project_dir: Some(project.to_string_lossy().into_owned()),
         }
-        .execute(&AppContext::default())
+        .execute(&AppContext)
         .expect("session observe should route through daemon");
 
         assert_eq!(exit, 0);

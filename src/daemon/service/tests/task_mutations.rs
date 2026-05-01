@@ -141,7 +141,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let created = create_task_async(
                     "daemon-async-task",
@@ -243,7 +243,7 @@ fn async_mutations_sync_file_backed_state() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let created = create_task_async(
                     "daemon-async-file-state",
@@ -424,7 +424,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let changed = change_role_async(
                     "daemon-async-role",

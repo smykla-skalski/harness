@@ -39,10 +39,7 @@ fn leader_request_with_fallback_stays_non_leader_until_transfer() {
                 )
                 .expect("join leader")
             });
-        let leader_id = joined_leader
-            .leader_id
-            .clone()
-            .expect("leader id after join");
+        let leader_id = joined_leader.leader_id.expect("leader id after join");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("swarm-fallback-worker"), || {
             let cli = Cli::try_parse_from([
@@ -124,10 +121,7 @@ fn observer_creates_open_tasks_and_leader_assigns_worker() {
                 )
                 .expect("join leader")
             });
-        let leader_id = joined_leader
-            .leader_id
-            .clone()
-            .expect("leader id after join");
+        let leader_id = joined_leader.leader_id.expect("leader id after join");
 
         let observer = temp_env::with_var("CODEX_SESSION_ID", Some("swarm-observer"), || {
             service::join_session(

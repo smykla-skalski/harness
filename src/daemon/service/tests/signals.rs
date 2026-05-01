@@ -156,7 +156,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
             send_signal(
                 "daemon-active-signal",
                 &SignalSendRequest {
-                    actor: joined.leader_id.clone().expect("leader id"),
+                    actor: joined.leader_id.expect("leader id"),
                     agent_id: worker_id.clone(),
                     command: "inject_context".into(),
                     message: "deliver immediately".into(),
@@ -277,7 +277,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
             send_signal(
                 "daemon-timed-signal",
                 &SignalSendRequest {
-                    actor: joined.leader_id.clone().expect("leader id"),
+                    actor: joined.leader_id.expect("leader id"),
                     agent_id: worker_id.clone(),
                     command: "inject_context".into(),
                     message: "stay pending".into(),
@@ -361,7 +361,7 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
             "daemon-cancel",
             &super::super::protocol::SignalCancelRequest {
                 actor: leader_id,
-                agent_id: worker_id.clone(),
+                agent_id: worker_id,
                 signal_id: signal_id.clone(),
             },
             None,

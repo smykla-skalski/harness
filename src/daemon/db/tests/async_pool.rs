@@ -220,18 +220,18 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
                     json!({
                         "schema_version": 6,
                         "state_version": 1,
-                        "session_id": state.session_id.clone(),
-                        "title": state.title.clone(),
-                        "context": state.context.clone(),
+                        "session_id": state.session_id,
+                        "title": state.title,
+                        "context": state.context,
                         "status": "active",
-                        "created_at": state.created_at.clone(),
-                        "updated_at": state.updated_at.clone(),
+                        "created_at": state.created_at,
+                        "updated_at": state.updated_at,
                         "agents": {},
                         "tasks": {},
                         "leader_id": null,
                         "archived_at": null,
-                        "last_activity_at": state.last_activity_at.clone(),
-                        "observe_id": state.observe_id.clone(),
+                        "last_activity_at": state.last_activity_at,
+                        "observe_id": state.observe_id,
                         "pending_leader_transfer": null,
                         "metrics": {
                             "agent_count": 0,
@@ -244,7 +244,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
                         }
                     })
                     .to_string(),
-                    state.session_id.clone(),
+                    state.session_id,
                 ],
             )
             .expect("corrupt v8 row");

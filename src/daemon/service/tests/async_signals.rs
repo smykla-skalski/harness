@@ -84,7 +84,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let detail = send_signal_async(
                     "daemon-async-signal-send",
@@ -157,7 +157,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
 
                     let signal_id = seed_pending_signal(
                         &async_db,
@@ -241,7 +241,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                     .keys()
                     .find(|agent_id| agent_id.starts_with("codex-"))
                     .expect("worker id")
-                    .to_string();
+                    .clone();
 
                 let signal_id = seed_pending_signal(
                     &async_db,
@@ -331,7 +331,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
 
                     let created = create_task_async(
                         "daemon-async-signal-expired",

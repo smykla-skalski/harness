@@ -198,7 +198,7 @@ pub(super) async fn join_async_worker(
         .keys()
         .find(|agent_id| agent_id.starts_with("codex-"))
         .expect("worker id")
-        .to_string()
+        .clone()
 }
 
 pub(super) async fn leader_id_for_session(state: &DaemonHttpState, session_id: &str) -> String {

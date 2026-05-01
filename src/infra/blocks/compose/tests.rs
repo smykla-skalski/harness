@@ -260,7 +260,7 @@ fn fake_compose_orchestrator_tracks_project_state() {
         .up(
             Path::new("/tmp/compose.yml"),
             "mesh",
-            Duration::from_secs(60),
+            Duration::from_mins(1),
         )
         .expect("expected fake up to succeed");
     assert!(
@@ -307,7 +307,7 @@ fn bollard_compose_orchestrator_up_and_down_use_container_runtime() {
         .expect("expected compose file write");
 
     let up = orchestrator
-        .up(&compose_path, "mesh", Duration::from_secs(60))
+        .up(&compose_path, "mesh", Duration::from_mins(1))
         .expect("expected compose up to succeed");
     assert_eq!(up.returncode, 0);
     assert!(
@@ -359,7 +359,7 @@ mod contracts {
         project_name: &str,
     ) {
         let up_result = orchestrator
-            .up(compose_file, project_name, Duration::from_secs(60))
+            .up(compose_file, project_name, Duration::from_mins(1))
             .expect("compose up should succeed");
         assert_eq!(up_result.returncode, 0);
         let down_result = orchestrator

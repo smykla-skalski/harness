@@ -69,7 +69,7 @@ fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
     write_signal_file(&signal_dir, &signal).unwrap();
 
     let ack = SignalAck {
-        signal_id: signal.signal_id.clone(),
+        signal_id: signal.signal_id,
         acknowledged_at: "2026-03-28T12:00:03Z".into(),
         result: AckResult::Accepted,
         agent: "codex".into(),

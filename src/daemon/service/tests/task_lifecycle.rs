@@ -47,7 +47,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
 
                     let first = create_task_async(
                         "daemon-async-task-lifecycle",

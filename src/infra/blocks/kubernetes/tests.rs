@@ -23,7 +23,7 @@ fn write_dead_kubeconfig() -> (tempfile::TempDir, std::path::PathBuf) {
     let kubeconfig = temp_dir.path().join("dead-kubeconfig.yaml");
     fs::write(
         &kubeconfig,
-        r#"apiVersion: v1
+        r"apiVersion: v1
 kind: Config
 clusters:
   - name: dead
@@ -41,7 +41,7 @@ users:
   - name: dead
     user:
       token: dead-token
-"#,
+",
     )
     .expect("expected kubeconfig write to succeed");
     (temp_dir, kubeconfig)

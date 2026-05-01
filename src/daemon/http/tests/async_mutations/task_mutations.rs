@@ -202,7 +202,7 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
 
                     let response = post_task_assign(
                         axum::extract::Path(("http-async-task-assign".to_owned(), task_id)),

@@ -1,7 +1,7 @@
 //! CLI → service → state integration coverage for the review workflow
 //! subcommands added in Slice 4 (T21-T23). Drives each command through
 //! `Cli::try_parse_from` and `run_command` so the clap parser (incl.
-//! snake_case + kebab-case alias surface) and the `Execute` dispatch are
+//! `snake_case` + kebab-case alias surface) and the `Execute` dispatch are
 //! both exercised against real session state. Improver permission +
 //! project-dir isolation tests live in [`super::improver_cli`].
 

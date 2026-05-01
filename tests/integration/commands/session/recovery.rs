@@ -15,7 +15,7 @@ fn recover_leader_builds_managed_tui_request_from_policy_preset() {
             "recover-1",
             "swarm-default",
         );
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         service::leave_session("recover-1", &leader_id, &project).expect("leave");
 
