@@ -21,13 +21,4 @@ enum AgentTuiCreateMode: String, CaseIterable, Identifiable {
       "New Codex run"
     }
   }
-
-  var sidebarTitle: String {
-    switch self {
-    case .terminal:
-      "New Agent"
-    case .codex:
-      "New Codex Run"
-    }
-  }
 }

@@ -4,7 +4,6 @@ import SwiftUI
 struct AgentsSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
-  let createMode: AgentTuiCreateMode
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
@@ -84,7 +83,7 @@ struct AgentsSidebar: View {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Image(systemName: "plus.rectangle")
           .accessibilityHidden(true)
-        Text(createMode.sidebarTitle)
+        Text("Create")
           .scaledFont(.body)
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)

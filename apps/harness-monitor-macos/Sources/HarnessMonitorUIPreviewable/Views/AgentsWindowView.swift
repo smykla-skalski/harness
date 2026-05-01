@@ -47,7 +47,10 @@ public struct AgentsWindowView: View {
   @State private var stateViewModel: ViewModel
   @State private var decisionsRuntime = DecisionsWindowRuntime()
   @State private var decisionFilters = Self.initialDecisionFilters
-  @State private var decisionWorkspaceScopeState = DecisionWorkspaceScope(
+  // Cache the expensive visible decision snapshot by decisions + filters only.
+  // Selection stays live in `decisionWorkspaceScope` so selection hops never
+  // rebuild the filtered/grouped sidebar data.
+  @State private var decisionWorkspaceSnapshotState = DecisionWorkspaceScope(
     decisions: [],
     filters: Self.initialDecisionFilters
   )
@@ -83,24 +86,23 @@ public struct AgentsWindowView: View {
         createSessionID: store.selectedSessionID
       )
     )
-    _decisionWorkspaceScopeState = State(
+    _decisionWorkspaceSnapshotState = State(
       initialValue: DecisionWorkspaceScope(
         decisions: [],
-        filters: Self.initialDecisionFilters,
-        selectedDecisionID: initialSelection.decisionID
+        filters: Self.initialDecisionFilters
       )
     )
   }
 
-  var cachedDecisionWorkspaceScope: DecisionWorkspaceScope {
-    decisionWorkspaceScopeState
+  var cachedDecisionWorkspaceSnapshot: DecisionWorkspaceScope {
+    decisionWorkspaceSnapshotState
   }
 
-  func replaceDecisionWorkspaceScope(_ nextScope: DecisionWorkspaceScope) {
-    guard decisionWorkspaceScopeState != nextScope else {
+  func replaceDecisionWorkspaceSnapshot(_ nextSnapshot: DecisionWorkspaceScope) {
+    guard decisionWorkspaceSnapshotState != nextSnapshot else {
       return
     }
-    decisionWorkspaceScopeState = nextScope
+    decisionWorkspaceSnapshotState = nextSnapshot
   }
 
   let commonKeys: [AgentTuiKey] = [
@@ -235,7 +237,7 @@ public struct AgentsWindowView: View {
         handleSelectedTuiChange(selectedTuiID, viewModel: viewModel)
       }
       .onChange(of: decisionFilters) { _, _ in
-        refreshDecisionWorkspaceScope()
+        refreshDecisionWorkspaceSnapshot()
       }
       .onChange(of: viewModel.selection) { oldValue, newValue in
         handleViewSelectionChange(from: oldValue, to: newValue, viewModel: viewModel)
@@ -276,7 +278,6 @@ public struct AgentsWindowView: View {
       AgentsSidebar(
         store: store,
         selection: selection,
-        createMode: viewModel.createMode,
         decisionFilters: $decisionFilters,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,
