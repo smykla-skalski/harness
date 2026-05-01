@@ -107,16 +107,28 @@ impl RegistryClient {
         request: &RegistryRequest,
     ) -> Result<T, RegistryError> {
         let mut guard = self.connection.lock().await;
-        let connection = self.ensure_connected(&mut guard).await?;
-        match self.exchange(connection, request).await {
-            Ok(response) => decode_outcome(response, request.id()),
-            Err(error @ (RegistryError::Closed { .. } | RegistryError::Timeout { .. })) => {
-                // Drop the broken connection so the next call reconnects.
-                *guard = None;
-                Err(error)
+        // This client only serves read-only registry lookups, so we can drop a
+        // stale cached connection and replay the same request once after the
+        // app-side listener restarts.
+        for attempt in 0..=1 {
+            let outcome = {
+                let connection = self.ensure_connected(&mut guard).await?;
+                self.exchange(connection, request).await
+            };
+
+            match outcome {
+                Ok(response) => return decode_outcome(response, request.id()),
+                Err(error @ (RegistryError::Closed { .. } | RegistryError::Timeout { .. })) => {
+                    *guard = None;
+                    if attempt == 0 {
+                        continue;
+                    }
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
             }
-            Err(error) => Err(error),
         }
+        unreachable!("registry client retries at most once")
     }
 
     async fn ensure_connected<'a>(

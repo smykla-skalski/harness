@@ -200,6 +200,47 @@ async fn reconnects_after_server_closes_connection() {
     received.await.unwrap();
 }
 
+#[tokio::test]
+async fn retries_same_request_after_stale_connection_breaks() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+
+    let first_received = spawn_fake_server(path.clone(), |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
+    })
+    .await;
+
+    let client = RegistryClient::with_socket_path(path.clone())
+        .with_timeouts(Duration::from_millis(500), Duration::from_millis(500));
+
+    let id = client.next_request_id();
+    let result: ListWindowsResult = client
+        .request(&RegistryRequest::ListWindows { id })
+        .await
+        .expect("initial request succeeds");
+    assert!(result.windows.is_empty());
+    first_received.await.unwrap();
+
+    let _ = std::fs::remove_file(&path);
+
+    let second_received = spawn_fake_server(path, |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
+    })
+    .await;
+
+    let id = client.next_request_id();
+    let result: ListWindowsResult = client
+        .request(&RegistryRequest::ListWindows { id })
+        .await
+        .expect("same request retries after stale connection");
+    assert!(result.windows.is_empty());
+    second_received.await.unwrap();
+}
+
 #[test]
 fn default_socket_path_respects_override_env() {
     temp_env::with_var(SOCKET_OVERRIDE_ENV, Some("/tmp/custom.sock"), || {
