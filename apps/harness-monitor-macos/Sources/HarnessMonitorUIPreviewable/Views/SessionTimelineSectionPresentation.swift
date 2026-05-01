@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SessionTimelineSectionPresentation {
   private static let maximumVisibleRows = 6
-  private static let rowHeightEstimate: CGFloat = 74
+  static let rowHeightEstimate: CGFloat = 74
   private static let minimumViewportHeight: CGFloat = 260
   private static let maximumViewportHeight: CGFloat = 470
 
@@ -91,6 +91,14 @@ struct SessionTimelineSectionPresentation {
 
   var showsEmptyState: Bool {
     !navigation.isLoading && navigation.totalCount == 0 && rows.isEmpty
+  }
+
+  var rowIDs: [String] {
+    rows.map(\.id)
+  }
+
+  var fallbackVisibleRowCount: Int {
+    min(max(rows.count + placeholderCount, 0), Self.maximumVisibleRows)
   }
 
   func canScrollOlder(from targetID: String?) -> Bool {
