@@ -14,7 +14,9 @@ struct SessionCockpitTimelineSection: View {
   private var dateTimeConfiguration
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var scrollTargetID: String?
+  @State private var visibleAnchorID: String?
+  @State private var scrollCommand: SessionTimelineScrollCommand?
+  @State private var scrollCommandGeneration = 0
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var cachedVisibilityStats = SessionTimelineVisibilityStats.empty
@@ -98,25 +100,27 @@ struct SessionCockpitTimelineSection: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .onAppear {
-      reconcileScrollTarget(with: presentation.scrollNodeIDs)
+      reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
       requestLatestWindowIfNeeded(presentation)
     }
     .onChange(of: sessionID) { _, _ in
-      scrollTargetID = nil
+      visibleAnchorID = nil
+      scrollCommand = nil
       requestLatestWindow()
     }
     .onChange(of: presentation.scrollNodeIDs) { _, ids in
-      reconcileScrollTarget(with: ids)
+      reconcileTimelineAnchor(with: ids)
     }
   }
 
   private func timelineSurface(for presentation: SessionTimelineSectionPresentation) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       if presentation.navigation.showsNavigation {
+        let anchorID = navigationAnchorID
         SessionTimelineNavigationControls(
           navigation: presentation.navigation,
-          canScrollOlder: presentation.canScrollOlder(from: scrollTargetID),
-          canScrollNewer: presentation.canScrollNewer(from: scrollTargetID),
+          canScrollOlder: presentation.canScrollOlder(from: anchorID),
+          canScrollNewer: presentation.canScrollNewer(from: anchorID),
           visibilityStats: cachedVisibilityStats,
           performAction: { action in
             performNavigationAction(action, presentation: presentation)
@@ -150,9 +154,10 @@ struct SessionCockpitTimelineSection: View {
       } else {
         SessionTimelineTableView(
           rows: presentation.rows,
-          scrollTargetID: scrollTargetID,
+          scrollCommand: scrollCommand,
           actionHandler: actionHandler,
           viewportStatsChanged: { viewportStats in
+            updateVisibleAnchor(viewportStats.anchorRowID)
             rebuildVisibilityStats(viewportStats: viewportStats)
           },
           scrollBoundaryChanged: { oldValue, newValue in
@@ -166,6 +171,10 @@ struct SessionCockpitTimelineSection: View {
       }
     }
     .frame(height: presentation.viewportHeight)
+  }
+
+  private var navigationAnchorID: String? {
+    visibleAnchorID ?? scrollCommand?.targetID
   }
 
   private func timelinePlaceholderContent(
@@ -247,7 +256,8 @@ struct SessionCockpitTimelineSection: View {
       case .older:
         await loadOlderWindowBeforeSteppingIfNeeded(presentation)
         await scroll(
-          to: presentation.nextOlderNodeID(from: scrollTargetID) ?? presentation.scrollNodeIDs.last
+          to: presentation.nextOlderNodeID(from: navigationAnchorID)
+            ?? presentation.scrollNodeIDs.last
         )
       case .latest:
         if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
@@ -255,11 +265,12 @@ struct SessionCockpitTimelineSection: View {
         }
         await scroll(to: presentation.scrollNodeIDs.first)
       case .newer:
-        if presentation.nextNewerNodeID(from: scrollTargetID) == nil {
+        if presentation.nextNewerNodeID(from: navigationAnchorID) == nil {
           await loadWindowIfAvailable(for: .newer, presentation: presentation)
         }
         await scroll(
-          to: presentation.nextNewerNodeID(from: scrollTargetID) ?? presentation.scrollNodeIDs.first
+          to: presentation.nextNewerNodeID(from: navigationAnchorID)
+            ?? presentation.scrollNodeIDs.first
         )
       }
     }
@@ -268,7 +279,7 @@ struct SessionCockpitTimelineSection: View {
   private func loadOlderWindowBeforeSteppingIfNeeded(
     _ presentation: SessionTimelineSectionPresentation
   ) async {
-    guard presentation.shouldLoadOlderBeforeStepping(from: scrollTargetID) else {
+    guard presentation.shouldLoadOlderBeforeStepping(from: navigationAnchorID) else {
       return
     }
     await loadWindowIfAvailable(for: .older, presentation: presentation)
@@ -289,24 +300,45 @@ struct SessionCockpitTimelineSection: View {
       return
     }
     await MainActor.run {
-      withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) {
-        scrollTargetID = targetID
-      }
+      visibleAnchorID = targetID
+      issueScrollCommand(targetID)
     }
   }
 
-  private func reconcileScrollTarget(with ids: [String]) {
+  private func reconcileTimelineAnchor(with ids: [String]) {
     guard !ids.isEmpty else {
-      scrollTargetID = nil
+      visibleAnchorID = nil
+      scrollCommand = nil
       return
     }
-    guard let scrollTargetID else {
-      self.scrollTargetID = ids.first
+    guard let anchorID = navigationAnchorID else {
+      visibleAnchorID = ids.first
+      issueScrollCommand(ids.first)
       return
     }
-    if !ids.contains(scrollTargetID) {
-      self.scrollTargetID = ids.first
+    if !ids.contains(anchorID) {
+      visibleAnchorID = ids.first
+      issueScrollCommand(ids.first)
     }
+  }
+
+  private func updateVisibleAnchor(_ anchorID: String?) {
+    guard let anchorID, visibleAnchorID != anchorID else {
+      return
+    }
+    visibleAnchorID = anchorID
+  }
+
+  private func issueScrollCommand(_ targetID: String?) {
+    guard let targetID else {
+      scrollCommand = nil
+      return
+    }
+    scrollCommandGeneration += 1
+    scrollCommand = SessionTimelineScrollCommand(
+      targetID: targetID,
+      generation: scrollCommandGeneration
+    )
   }
 
   private func handleScrollBoundaryChange(

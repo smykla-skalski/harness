@@ -5,21 +5,34 @@ import SwiftUI
 struct SessionTimelineTableViewportStats: Equatable, Sendable {
   let visibleRowCount: Int
   let renderedRowCount: Int
+  let anchorRowID: String?
 
   static func initial(
     estimatedVisibleRows: Int,
     totalRows: Int
   ) -> Self {
     let count = min(max(estimatedVisibleRows, 0), max(totalRows, 0))
-    return Self(visibleRowCount: count, renderedRowCount: count)
+    return Self(
+      visibleRowCount: count,
+      renderedRowCount: count,
+      anchorRowID: nil
+    )
   }
 }
 
+struct SessionTimelineScrollCommand: Equatable, Sendable {
+  let targetID: String
+  let generation: Int
+}
+
+// NSTableView owns the hot scroll path here: row reuse, visible ranges, and content
+// offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
 enum SessionTimelineTableMetrics {
   static let baseRowHeight: CGFloat = 92
   private static let dayDividerHeight: CGFloat = 30
   private static let detailHeight: CGFloat = 20
-  private static let actionHeight: CGFloat = 42
+  private static let singleLineActionHeight: CGFloat = 42
+  private static let wrappedActionHeight: CGFloat = 78
 
   static func height(for row: SessionTimelineRow) -> CGFloat {
     var height = baseRowHeight
@@ -30,15 +43,19 @@ enum SessionTimelineTableMetrics {
       height += detailHeight
     }
     if !row.node.actions.isEmpty {
-      height += actionHeight
+      height += actionHeight(for: row.node.actions.count)
     }
     return height
+  }
+
+  private static func actionHeight(for actionCount: Int) -> CGFloat {
+    actionCount > 2 ? wrappedActionHeight : singleLineActionHeight
   }
 }
 
 struct SessionTimelineTableView: NSViewRepresentable {
   let rows: [SessionTimelineRow]
-  let scrollTargetID: String?
+  let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
   let viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
   let scrollBoundaryChanged: (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState)
@@ -92,7 +109,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     context.coordinator.update(
       rows: rows,
       actionHandler: actionHandler,
-      scrollTargetID: scrollTargetID,
+      scrollCommand: scrollCommand,
       scrollView: scrollView
     )
   }
@@ -110,10 +127,13 @@ struct SessionTimelineTableView: NSViewRepresentable {
       (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState) -> Void
 
     private var rows: [SessionTimelineRow] = []
+    private var rowIndexByID: [String: Int] = [:]
+    private var rowSnapshot = SessionTimelineTableSnapshot.empty
     private var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
     private weak var tableView: NSTableView?
     private weak var scrollView: NSScrollView?
-    private var lastScrollTargetID: String?
+    private var lastScrollCommand: SessionTimelineScrollCommand?
+    private var pendingScrollCommand: SessionTimelineScrollCommand?
     private var lastViewportStats: SessionTimelineTableViewportStats?
     private var lastBoundaryState = SessionTimelineScrollBoundaryState(
       visibleMinY: .greatestFiniteMagnitude,
@@ -154,22 +174,35 @@ struct SessionTimelineTableView: NSViewRepresentable {
     func update(
       rows: [SessionTimelineRow],
       actionHandler: any DecisionActionHandler,
-      scrollTargetID: String?,
+      scrollCommand: SessionTimelineScrollCommand?,
       scrollView: NSScrollView
     ) {
       guard let tableView else {
         return
       }
       self.actionHandler = actionHandler
-      let rowsChanged = self.rows != rows
+      let previousAnchor = currentVisibleAnchor()
+      let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
+      let rowsChanged = rowSnapshot != nextSnapshot
       if rowsChanged {
         self.rows = rows
+        rowIndexByID = Dictionary(
+          uniqueKeysWithValues: rows.enumerated().map { index, row in
+            (row.id, index)
+          }
+        )
+        rowSnapshot = nextSnapshot
         tableView.reloadData()
+        tableView.layoutSubtreeIfNeeded()
       }
       resizeColumn(in: scrollView)
-      if rowsChanged || scrollTargetID != lastScrollTargetID {
-        scrollToTarget(scrollTargetID)
-        lastScrollTargetID = scrollTargetID
+
+      if scrollCommand != lastScrollCommand {
+        pendingScrollCommand = scrollCommand
+        lastScrollCommand = scrollCommand
+      }
+      if !performPendingScrollCommand() && rowsChanged {
+        restore(anchor: previousAnchor)
       }
       publishViewportState()
     }
@@ -204,6 +237,10 @@ struct SessionTimelineTableView: NSViewRepresentable {
       return SessionTimelineTableMetrics.height(for: rows[row])
     }
 
+    func tableView(_: NSTableView, rowViewForRow _: Int) -> NSTableRowView? {
+      SessionTimelineTableRowView()
+    }
+
     func tableView(_: NSTableView, shouldSelectRow _: Int) -> Bool {
       false
     }
@@ -222,19 +259,75 @@ struct SessionTimelineTableView: NSViewRepresentable {
       }
     }
 
-    private func scrollToTarget(_ rowID: String?) {
-      guard let rowID,
+    private func performPendingScrollCommand() -> Bool {
+      guard let command = pendingScrollCommand else {
+        return false
+      }
+      if scrollToTarget(command.targetID) {
+        pendingScrollCommand = nil
+        return true
+      }
+      return false
+    }
+
+    @discardableResult
+    private func scrollToTarget(_ rowID: String) -> Bool {
+      guard
         let tableView,
         let scrollView,
-        let index = rows.firstIndex(where: { $0.id == rowID })
+        let index = rowIndexByID[rowID]
       else {
-        return
+        return false
       }
       tableView.layoutSubtreeIfNeeded()
       let rowRect = tableView.rect(ofRow: index)
-      let y = max(0, min(rowRect.minY, max(0, tableView.bounds.height - scrollView.contentSize.height)))
+      let y = clampedScrollY(rowRect.minY, scrollView: scrollView)
       scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
       scrollView.reflectScrolledClipView(scrollView.contentView)
+      return true
+    }
+
+    private func restore(anchor: SessionTimelineTableAnchor?) {
+      guard let anchor,
+        let tableView,
+        let scrollView,
+        let index = rowIndexByID[anchor.rowID]
+      else {
+        return
+      }
+      let rowRect = tableView.rect(ofRow: index)
+      let y = clampedScrollY(rowRect.minY + anchor.offsetY, scrollView: scrollView)
+      scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+      scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    private func clampedScrollY(_ y: CGFloat, scrollView: NSScrollView) -> CGFloat {
+      guard let tableView else {
+        return 0
+      }
+      let maxY = max(0, tableView.bounds.height - scrollView.contentSize.height)
+      return max(0, min(y, maxY))
+    }
+
+    private func currentVisibleAnchor() -> SessionTimelineTableAnchor? {
+      guard let tableView, let scrollView else {
+        return nil
+      }
+      let visibleRect = scrollView.contentView.bounds
+      guard visibleRect.height > 0, visibleRect.width > 0 else {
+        return nil
+      }
+      let visibleRows = tableView.rows(in: visibleRect)
+      guard visibleRows.location != NSNotFound,
+        rows.indices.contains(visibleRows.location)
+      else {
+        return nil
+      }
+      let rowRect = tableView.rect(ofRow: visibleRows.location)
+      return SessionTimelineTableAnchor(
+        rowID: rows[visibleRows.location].id,
+        offsetY: visibleRect.minY - rowRect.minY
+      )
     }
 
     private func publishViewportState() {
@@ -242,11 +335,15 @@ struct SessionTimelineTableView: NSViewRepresentable {
         return
       }
       let visibleRect = scrollView.contentView.bounds
+      guard visibleRect.height > 0, visibleRect.width > 0 else {
+        return
+      }
       let visibleRows = tableView.rows(in: visibleRect)
       let visibleRowCount = max(0, visibleRows.length)
       let stats = SessionTimelineTableViewportStats(
         visibleRowCount: visibleRowCount,
-        renderedRowCount: visibleRowCount
+        renderedRowCount: visibleRowCount,
+        anchorRowID: anchorRowID(for: visibleRows)
       )
       if lastViewportStats != stats {
         lastViewportStats = stats
@@ -258,13 +355,89 @@ struct SessionTimelineTableView: NSViewRepresentable {
         visibleMaxY: visibleRect.maxY,
         contentHeight: tableView.bounds.height
       )
-      if boundaryState != lastBoundaryState {
+      if boundaryState.enteredTopEdge(from: lastBoundaryState)
+        || boundaryState.enteredBottomEdge(from: lastBoundaryState)
+      {
         let oldValue = lastBoundaryState
         lastBoundaryState = boundaryState
         scrollBoundaryChanged(oldValue, boundaryState)
+      } else if boundaryState != lastBoundaryState {
+        lastBoundaryState = boundaryState
       }
     }
+
+    private func anchorRowID(for visibleRows: NSRange) -> String? {
+      guard visibleRows.location != NSNotFound,
+        rows.indices.contains(visibleRows.location)
+      else {
+        return nil
+      }
+      return rows[visibleRows.location].id
+    }
   }
+}
+
+private struct SessionTimelineTableAnchor {
+  let rowID: String
+  let offsetY: CGFloat
+}
+
+private struct SessionTimelineTableSnapshot: Equatable {
+  let rows: [SessionTimelineTableRowSnapshot]
+
+  static let empty = Self(rowSnapshots: [])
+
+  init(rows: [SessionTimelineRow]) {
+    self.rows = rows.map(SessionTimelineTableRowSnapshot.init)
+  }
+
+  private init(rowSnapshots: [SessionTimelineTableRowSnapshot]) {
+    rows = rowSnapshots
+  }
+}
+
+private struct SessionTimelineTableRowSnapshot: Equatable {
+  let id: String
+  let height: CGFloat
+  let dayDividerLabel: String?
+  let timestampLabel: String
+  let accessibilityLabel: String
+  let kindLabel: String
+  let sourceLabel: String
+  let title: String
+  let detail: String?
+  let toneLabel: String?
+  let decisionID: String?
+  let decisionSeverityLabel: String?
+  let actionIDs: [String]
+  let actionKinds: [String]
+  let actionTitles: [String]
+  let actionPayloads: [String]
+  let primaryActionIDs: [String]
+
+  init(row: SessionTimelineRow) {
+    id = row.id
+    height = SessionTimelineTableMetrics.height(for: row)
+    dayDividerLabel = row.dayDividerLabel
+    timestampLabel = row.timestampLabel
+    accessibilityLabel = row.accessibilityLabel
+    kindLabel = row.node.kind.label
+    sourceLabel = row.node.sourceLabel
+    title = row.node.title
+    detail = row.node.detail
+    toneLabel = row.node.eventTone?.label
+    decisionID = row.node.decision?.id
+    decisionSeverityLabel = row.node.decision?.severityLabel
+    actionIDs = row.node.actions.map(\.id)
+    actionKinds = row.node.actions.map { String(describing: $0.kind) }
+    actionTitles = row.node.actions.map(\.title)
+    actionPayloads = row.node.actions.map(\.payloadJSON)
+    primaryActionIDs = row.node.actions.filter(\.isPrimary).map(\.id)
+  }
+}
+
+private final class SessionTimelineTableRowView: NSTableRowView {
+  override func drawSelection(in _: NSRect) {}
 }
 
 private final class SessionTimelineTableCellView: NSTableCellView {
