@@ -31,7 +31,7 @@ public struct ContentView<CornerContent: View>: View {
   private var workspaceToolbarAccessibilityValue: String {
     let slice = store.supervisorToolbarSlice
     let severity = slice.maxSeverity?.rawValue ?? "none"
-    let badge = slice.count > 0 ? "visible" : "hidden"
+    let badge = slice.count > .zero ? "visible" : "hidden"
     return
       """
       count=\(slice.count) severity=\(severity) \
