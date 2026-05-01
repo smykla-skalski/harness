@@ -246,7 +246,6 @@ fn screenshot_args_require_harness_input_backend() {
     assert!(screenshot_args(&Backend::None, &ScreenshotOptions::default()).is_none());
 }
 
-
 #[tokio::test]
 async fn detect_backend_honours_env_override_when_file_exists() {
     let temp = tempfile::tempdir().expect("tempdir");
