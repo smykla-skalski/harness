@@ -1,6 +1,6 @@
 //! Parse tests for the non-review `session task` subcommands: create, assign,
 //! list, and update. The update variant covers the status-enum alias surface
-//! (snake_case plus legacy kebab-case) and the new `awaiting_review` slot.
+//! (`snake_case` plus legacy kebab-case) and the new `awaiting_review` slot.
 //!
 //! The review-workflow task subcommands (submit-for-review, claim-review,
 //! submit-review, respond-review, arbitrate) live in

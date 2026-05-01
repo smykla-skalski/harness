@@ -45,7 +45,7 @@ fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
             Some("swarm-default"),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("fallback-candidate"), || {
             join_session_with_fallback(
@@ -148,7 +148,7 @@ fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_se
             Some("swarm-default"),
         )
         .expect("start active session");
-        let degraded_leader = degraded.leader_id.clone().expect("leader");
+        let degraded_leader = degraded.leader_id.expect("leader");
         let layout = storage::layout_from_project_dir(project, "recover-degraded").expect("layout");
         storage::update_state(&layout, |state| {
             state.status = SessionStatus::LeaderlessDegraded;

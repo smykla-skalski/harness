@@ -53,7 +53,7 @@ async fn join_http_worker(
         .keys()
         .find(|agent_id| agent_id.starts_with("codex-"))
         .expect("worker id")
-        .to_string()
+        .clone()
 }
 
 async fn create_http_task(

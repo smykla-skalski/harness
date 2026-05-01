@@ -31,5 +31,5 @@ pub(crate) fn telemetry_test_guard() -> MutexGuard<'static, ()> {
     GUARD
         .get_or_init(|| Mutex::new(()))
         .lock()
-        .unwrap_or_else(|error| error.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }

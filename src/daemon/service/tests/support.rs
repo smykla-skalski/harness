@@ -12,7 +12,7 @@ pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
 }
 
 pub(super) fn install_test_observe_async_db(async_db: Arc<crate::daemon::db::AsyncDaemonDb>) {
-    install_test_observe_runtime(Duration::from_secs(60));
+    install_test_observe_runtime(Duration::from_mins(1));
     let runtime = OBSERVE_RUNTIME.get().expect("observe runtime");
     let _ = runtime.async_db.set(async_db);
 }
@@ -240,11 +240,11 @@ exit 1
         IdleSignalScriptBehavior::IgnoreWake => "sleep 2\nexit 0\n".to_string(),
     };
     let script = format!(
-        r#"#!/bin/sh
+        r"#!/bin/sh
 while IFS= read -r _line; do
   {wake_behavior}
 done
-"#
+"
     );
     fs::write(&script_path, script).expect("write idle signal script");
     let mut permissions = fs::metadata(&script_path)
@@ -294,7 +294,7 @@ pub(super) async fn setup_async_db_with_session(
 }
 
 /// Build an in-memory DB with a project and session loaded only into
-/// SQLite (no files for that session). The session only exists in the DB.
+/// `SQLite` (no files for that session). The session only exists in the DB.
 pub(super) fn setup_db_only_session(
     project: &Path,
 ) -> (

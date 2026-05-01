@@ -69,11 +69,7 @@ impl LegacyBridgeServer {
                 let envelope: BridgeEnvelope =
                     serde_json::from_str(&line).expect("parse bridge envelope");
                 let request = envelope.request.clone();
-                let response = if envelope.token != thread_token {
-                    BridgeResponse::error(&CliError::from(CliErrorKind::workflow_io(
-                        "bridge token mismatch",
-                    )))
-                } else {
+                let response = if envelope.token == thread_token {
                     match request {
                         BridgeRequest::Status => {
                             BridgeResponse::ok_payload(&report).expect("status response")
@@ -83,6 +79,10 @@ impl LegacyBridgeServer {
                             "unsupported legacy test request",
                         ))),
                     }
+                } else {
+                    BridgeResponse::error(&CliError::from(CliErrorKind::workflow_io(
+                        "bridge token mismatch",
+                    )))
                 };
                 let payload = serde_json::to_string(&response).expect("serialize response");
                 stream

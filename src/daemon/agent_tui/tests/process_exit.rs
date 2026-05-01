@@ -136,7 +136,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
             project_id: "project-tui-child-exit".into(),
             name: "project".into(),
             project_dir: Some(project_dir.clone()),
-            repository_root: Some(project_dir.clone()),
+            repository_root: Some(project_dir),
             checkout_id: "checkout-tui-child-exit".into(),
             checkout_name: "Directory".into(),
             context_root,
@@ -223,8 +223,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
         wait_until(WAIT_TIMEOUT, || {
             manager
                 .load_snapshot(&snapshot.tui_id)
-                .map(|persisted| persisted.status == AgentTuiStatus::Exited)
-                .unwrap_or(false)
+                .is_ok_and(|persisted| persisted.status == AgentTuiStatus::Exited)
         });
 
         let persisted = manager

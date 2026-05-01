@@ -158,7 +158,11 @@ fn load_state_migrates_v8_state_to_v9_passthrough() {
     let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
     assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
     // Fields with Option::is_none skipped during serialize
-    assert!(persisted.get("external_origin").is_none_or(|v| v.is_null()));
+    assert!(
+        persisted
+            .get("external_origin")
+            .is_none_or(serde_json::Value::is_null)
+    );
 }
 
 #[test]

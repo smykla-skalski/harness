@@ -5,7 +5,7 @@ fn sync_liveness_transitions_stale_agent_to_disconnected() {
     with_temp_project(|project| {
         let state = start_active_session("test", "", project, Some("claude"), Some("sync-1"))
             .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess"), || {
             join_session(
@@ -251,7 +251,7 @@ fn sync_liveness_returns_dead_agent_task_to_open() {
     with_temp_project(|project| {
         let state = start_active_session("test", "", project, Some("claude"), Some("sync-3"))
             .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-sess-3"), || {
             join_session(
@@ -391,7 +391,7 @@ fn leave_session_marks_agent_disconnected() {
     with_temp_project(|project| {
         let state = start_active_session("test", "", project, Some("claude"), Some("leave-1"))
             .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("worker-leave"), || {
             join_session(
@@ -453,7 +453,7 @@ fn leave_session_promotes_highest_priority_successor() {
             Some("swarm-default"),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("improver-leave"), || {
             join_session(
@@ -494,7 +494,7 @@ fn leave_session_marks_session_leaderless_degraded_without_successor() {
             Some("swarm-default"),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         leave_session("leave-degraded", &leader_id, project).expect("leader leave");
 

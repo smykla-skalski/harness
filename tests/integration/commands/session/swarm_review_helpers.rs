@@ -109,7 +109,7 @@ pub(super) fn join_reviewer(
         .clone()
 }
 
-/// Drive a task all the way through submit_for_review and two reviewer
+/// Drive a task all the way through `submit_for_review` and two reviewer
 /// claims (gemini + claude). Returns `(worker_id, task_id, gemini_id,
 /// claude_id)`.
 pub(super) fn setup_two_reviewers_on_claimed_task(

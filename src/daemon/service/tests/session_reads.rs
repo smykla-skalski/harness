@@ -227,7 +227,7 @@ fn resolve_runtime_session_agent_async_returns_match_for_live_worker() {
             "daemon async runtime session resolve",
             "daemon-async-runtime-session-resolve",
         );
-        let orchestration_session_id = fixture.state.session_id.clone();
+        let orchestration_session_id = fixture.state.session_id;
         let status = session_service::session_status(&orchestration_session_id, project)
             .expect("session status");
         let worker = status

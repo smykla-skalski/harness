@@ -59,7 +59,7 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
                     let response = post_role_change(
                         axum::extract::Path(("http-async-role".to_owned(), worker_id.clone())),
                         auth_headers(),
@@ -137,7 +137,7 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                         .keys()
                         .find(|agent_id| agent_id.starts_with("codex-"))
                         .expect("worker id")
-                        .to_string();
+                        .clone();
                     let leader_id = resolved.state.leader_id.clone().expect("leader id");
 
                     let response = post_transfer_leader(

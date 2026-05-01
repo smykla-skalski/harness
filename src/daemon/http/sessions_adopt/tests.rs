@@ -234,7 +234,7 @@ fn returns_422_on_layout_violation() {
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
             assert_eq!(body["error"].as_str(), Some("layout-violation"));
             assert!(
-                body["reason"].as_str().map_or(false, |r| !r.is_empty()),
+                body["reason"].as_str().is_some_and(|r| !r.is_empty()),
                 "reason must be non-empty"
             );
         });
@@ -274,7 +274,7 @@ fn synthesize_bookmark(path: &Path) -> Vec<u8> {
             kCFURLBookmarkCreationWithSecurityScope,
             std::ptr::null(),
             std::ptr::null(),
-            &mut err,
+            &raw mut err,
         )
     };
     assert!(!data_ref.is_null(), "CFURLCreateBookmarkData returned null");

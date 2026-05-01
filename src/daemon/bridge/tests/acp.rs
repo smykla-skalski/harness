@@ -59,7 +59,7 @@ fn acp_event_buffer_initial_sync_does_not_require_resync_after_quiet_restart() {
 #[test]
 fn acp_event_buffer_flags_truncation_when_history_evicted_before_first_poll() {
     let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
-    for idx in 0..(BridgeAcpEventBuffer::MAX_EVENTS as u64 + 1) {
+    for idx in 0..=(BridgeAcpEventBuffer::MAX_EVENTS as u64) {
         buffer.push(stream_event("acp_agent_started", &format!("sess-{idx}")));
     }
 

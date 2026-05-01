@@ -1,5 +1,69 @@
 use crate::session::types::WorkItem;
 
+/// Precomputed bindings for a single row in the `tasks` table. Shared by
+/// the sync (rusqlite) and async (sqlx) task mirror writers so v10 columns
+/// stay in lock-step and the two paths cannot diverge silently.
+pub(super) struct TaskRowBindings {
+    pub severity: String,
+    pub status: String,
+    pub source: String,
+    pub notes_json: String,
+    pub checkpoint_summary_json: Option<String>,
+    pub review_claim_json: Option<String>,
+    pub consensus_json: Option<String>,
+    pub arbitration_json: Option<String>,
+    pub awaiting_queued_at: Option<String>,
+    pub awaiting_submitter: Option<String>,
+    pub awaiting_required_consensus: i64,
+    pub review_round: i64,
+}
+
+impl TaskRowBindings {
+    pub(super) fn from_task(task: &WorkItem) -> Self {
+        let notes_json = serde_json::to_string(&task.notes).unwrap_or_default();
+        let checkpoint_summary_json = task
+            .checkpoint_summary
+            .as_ref()
+            .and_then(|summary| serde_json::to_string(summary).ok());
+        let review_claim_json = task
+            .review_claim
+            .as_ref()
+            .and_then(|claim| serde_json::to_string(claim).ok());
+        let consensus_json = task
+            .consensus
+            .as_ref()
+            .and_then(|consensus| serde_json::to_string(consensus).ok());
+        let arbitration_json = task
+            .arbitration
+            .as_ref()
+            .and_then(|outcome| serde_json::to_string(outcome).ok());
+        let awaiting_queued_at = task.awaiting_review.as_ref().map(|a| a.queued_at.clone());
+        let awaiting_submitter = task
+            .awaiting_review
+            .as_ref()
+            .map(|a| a.submitter_agent_id.clone());
+        let awaiting_required_consensus = task
+            .awaiting_review
+            .as_ref()
+            .map_or(2_i64, |a| i64::from(a.required_consensus));
+
+        Self {
+            severity: format!("{:?}", task.severity).to_lowercase(),
+            status: format!("{:?}", task.status).to_lowercase(),
+            source: format!("{:?}", task.source).to_lowercase(),
+            notes_json,
+            checkpoint_summary_json,
+            review_claim_json,
+            consensus_json,
+            arbitration_json,
+            awaiting_queued_at,
+            awaiting_submitter,
+            awaiting_required_consensus,
+            review_round: i64::from(task.review_round),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::TaskRowBindings;
@@ -95,69 +159,5 @@ mod tests {
         let row = TaskRowBindings::from_task(&task);
         let consensus_json = row.consensus_json.expect("consensus serialized");
         assert!(consensus_json.contains("\"verdict\":\"approve\""));
-    }
-}
-
-/// Precomputed bindings for a single row in the `tasks` table. Shared by
-/// the sync (rusqlite) and async (sqlx) task mirror writers so v10 columns
-/// stay in lock-step and the two paths cannot diverge silently.
-pub(super) struct TaskRowBindings {
-    pub severity: String,
-    pub status: String,
-    pub source: String,
-    pub notes_json: String,
-    pub checkpoint_summary_json: Option<String>,
-    pub review_claim_json: Option<String>,
-    pub consensus_json: Option<String>,
-    pub arbitration_json: Option<String>,
-    pub awaiting_queued_at: Option<String>,
-    pub awaiting_submitter: Option<String>,
-    pub awaiting_required_consensus: i64,
-    pub review_round: i64,
-}
-
-impl TaskRowBindings {
-    pub(super) fn from_task(task: &WorkItem) -> Self {
-        let notes_json = serde_json::to_string(&task.notes).unwrap_or_default();
-        let checkpoint_summary_json = task
-            .checkpoint_summary
-            .as_ref()
-            .and_then(|summary| serde_json::to_string(summary).ok());
-        let review_claim_json = task
-            .review_claim
-            .as_ref()
-            .and_then(|claim| serde_json::to_string(claim).ok());
-        let consensus_json = task
-            .consensus
-            .as_ref()
-            .and_then(|consensus| serde_json::to_string(consensus).ok());
-        let arbitration_json = task
-            .arbitration
-            .as_ref()
-            .and_then(|outcome| serde_json::to_string(outcome).ok());
-        let awaiting_queued_at = task.awaiting_review.as_ref().map(|a| a.queued_at.clone());
-        let awaiting_submitter = task
-            .awaiting_review
-            .as_ref()
-            .map(|a| a.submitter_agent_id.clone());
-        let awaiting_required_consensus = task
-            .awaiting_review
-            .as_ref()
-            .map_or(2_i64, |a| i64::from(a.required_consensus));
-
-        Self {
-            severity: format!("{:?}", task.severity).to_lowercase(),
-            status: format!("{:?}", task.status).to_lowercase(),
-            source: format!("{:?}", task.source).to_lowercase(),
-            notes_json,
-            checkpoint_summary_json,
-            review_claim_json,
-            consensus_json,
-            arbitration_json,
-            awaiting_queued_at,
-            awaiting_submitter,
-            awaiting_required_consensus,
-            review_round: i64::from(task.review_round),
-        }
     }
 }

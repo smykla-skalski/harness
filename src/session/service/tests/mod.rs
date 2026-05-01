@@ -31,7 +31,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             Some(session_id),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader id");
+        let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("smoke-worker"))], || {
             join_session(
                 session_id,
@@ -107,7 +107,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
                 signal_id: start_signal.signal.signal_id.clone(),
                 acknowledged_at: utc_now(),
                 result: AckResult::Accepted,
-                agent: worker_session_id.clone(),
+                agent: worker_session_id,
                 session_id: session_id.to_string(),
                 details: None,
             },

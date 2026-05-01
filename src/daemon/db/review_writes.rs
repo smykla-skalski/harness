@@ -102,7 +102,7 @@ impl AsyncDaemonDb {
     }
 
     /// Number of `task_reviews` rows for `(session_id, task_id)`. Used by tests
-    /// to assert that a live `submit_review_async` mutation mirrored into SQLite
+    /// to assert that a live `submit_review_async` mutation mirrored into `SQLite`
     /// without requiring a rebuild or resync.
     ///
     /// # Errors
@@ -160,7 +160,7 @@ impl AsyncDaemonDb {
 
 /// Raw read-back of the v10 denormalized `tasks` columns. Test-only helper
 /// used by Slice 3 persistence tests to assert review mutations update each
-/// column in place on the async SQLite path.
+/// column in place on the async `SQLite` path.
 #[cfg(test)]
 #[derive(Debug, sqlx::FromRow)]
 pub(crate) struct TaskV10Columns {

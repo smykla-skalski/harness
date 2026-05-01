@@ -135,7 +135,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
             Some("swarm-default"),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
 
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("improver"), || {
             join_session(
@@ -154,7 +154,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
             .keys()
             .find(|id| id.starts_with("codex-"))
             .expect("improver id")
-            .to_string();
+            .clone();
         let task = create_task(
             "assign-rules",
             "task",
@@ -189,7 +189,7 @@ fn leader_cannot_assign_task_to_observer() {
             Some("swarm-default"),
         )
         .expect("start");
-        let leader_id = state.leader_id.clone().expect("leader");
+        let leader_id = state.leader_id.expect("leader");
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("observer"), || {
             join_session(
                 "observer-assignee",
@@ -207,7 +207,7 @@ fn leader_cannot_assign_task_to_observer() {
             .keys()
             .find(|id| id.starts_with("codex-"))
             .expect("observer id")
-            .to_string();
+            .clone();
         let task = create_task(
             "observer-assignee",
             "task",

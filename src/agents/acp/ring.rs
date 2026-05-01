@@ -270,7 +270,7 @@ mod tests {
         let config = RingConfig {
             max_updates: 3,
             max_bytes: 1_000_000,
-            max_duration: Duration::from_secs(60),
+            max_duration: Duration::from_mins(1),
         };
         let mut ring = SessionRing::new(config);
 
@@ -284,7 +284,7 @@ mod tests {
         let config = RingConfig {
             max_updates: 1000,
             max_bytes: 100,
-            max_duration: Duration::from_secs(60),
+            max_duration: Duration::from_mins(1),
         };
         let mut ring = SessionRing::new(config);
 

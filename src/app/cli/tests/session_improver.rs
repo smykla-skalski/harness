@@ -1,4 +1,4 @@
-//! Parse tests for `session improver apply`. Covers target-enum snake_case
+//! Parse tests for `session improver apply`. Covers target-enum `snake_case`
 //! spelling and the default `--dry-run=false` path.
 
 use super::*;

@@ -288,8 +288,7 @@ fn submit_for_review_file_path_emits_spawn_reviewer_to_leader_runtime_session() 
             .join("pending");
         assert!(
             std::fs::read_dir(&orchestration_signal_dir)
-                .map(|mut iter| iter.next().is_none())
-                .unwrap_or(true),
+                .map_or(true, |mut iter| iter.next().is_none()),
             "spawn_reviewer must not target orchestration session id {}",
             orchestration_signal_dir.display()
         );

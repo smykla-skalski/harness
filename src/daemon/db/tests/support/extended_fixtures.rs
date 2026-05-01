@@ -144,7 +144,7 @@ pub(crate) fn performance_session_state(
             title: format!("Performance task {session_id}"),
             context: Some(format!("Regression guard {project_index}-{session_index}")),
             severity: TaskSeverity::Medium,
-            status: if token % 5 == 0 {
+            status: if token.is_multiple_of(5) {
                 TaskStatus::Done
             } else {
                 TaskStatus::Open
@@ -175,7 +175,7 @@ pub(crate) fn performance_session_state(
     SessionState {
         schema_version: 3,
         state_version: 1,
-        session_id: session_id.clone(),
+        session_id,
         project_name: String::new(),
         worktree_path: PathBuf::new(),
         shared_path: PathBuf::new(),
@@ -183,7 +183,7 @@ pub(crate) fn performance_session_state(
         branch_ref: String::new(),
         title: format!("perf {project_index}-{session_index}"),
         context: format!("performance lane {project_index}-{session_index}"),
-        status: if token % 6 == 0 {
+        status: if token.is_multiple_of(6) {
             SessionStatus::Ended
         } else {
             SessionStatus::Active
@@ -254,9 +254,7 @@ pub(crate) fn median_runtime_budget_ms(
 
     assert!(
         median <= budget,
-        "{label} median runtime {:?} exceeded {:?}",
-        median,
-        budget
+        "{label} median runtime {median:?} exceeded {budget:?}"
     );
 }
 

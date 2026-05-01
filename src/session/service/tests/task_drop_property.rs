@@ -3,7 +3,7 @@
 //! Variables: previous-assignee identity (none / different agent / same as target),
 //! and target-worker busy state (free / locked on this same task / locked on a
 //! different task). Post-condition is either `Started` (signal produced, target
-//! locked on this task, queued_at None) or `Queued` (task queued, queued_at set,
+//! locked on this task, `queued_at` None) or `Queued` (task queued, `queued_at` set,
 //! target still locked on its prior task).
 
 use super::*;
@@ -34,7 +34,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
         let leader_state =
             start_active_session("test", "", project, Some("claude"), Some(session_id))
                 .expect("start");
-        let leader_id = leader_state.leader_id.clone().expect("leader id");
+        let leader_id = leader_state.leader_id.expect("leader id");
 
         let target_join = temp_env::with_vars([("CODEX_SESSION_ID", Some("prop-target"))], || {
             join_session(

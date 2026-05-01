@@ -212,7 +212,7 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
                     assert_eq!(
                         body["state"]["agents"]
                             .as_object()
-                            .map(|agents| agents.len()),
+                            .map(serde_json::Map::len),
                         Some(2)
                     );
 

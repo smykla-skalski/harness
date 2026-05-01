@@ -69,7 +69,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             None,
         )
         .expect("join leader");
-        let leader_id = state.leader_id.clone().expect("leader id");
+        let leader_id = state.leader_id.expect("leader id");
         service::leave_session("bridge-recovery", &leader_id, &project).expect("leave leader");
         service::build_recovery_tui_request("bridge-recovery", "swarm-default", "codex", &project)
             .expect("build request")
@@ -155,11 +155,8 @@ exec cat
 "#,
     )
     .expect("write mock codex");
-    std::fs::set_permissions(
-        &script,
-        std::fs::Permissions::from(std::os::unix::fs::PermissionsExt::from_mode(0o755)),
-    )
-    .expect("chmod mock codex");
+    std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod mock codex");
 }
 
 fn wait_for_bridge_prompt(manager: &AgentTuiManagerHandle, tui_id: &str) -> AgentTuiSnapshot {
