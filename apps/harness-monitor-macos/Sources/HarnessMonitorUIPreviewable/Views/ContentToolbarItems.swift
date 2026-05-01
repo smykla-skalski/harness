@@ -70,35 +70,7 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
-      AgentsToolbarButton()
+      WorkspaceToolbarButton(store: store, slice: store.supervisorToolbarSlice)
     }
-    ToolbarSpacer(.fixed, placement: .primaryAction)
-    ToolbarItem(placement: .primaryAction) {
-      SupervisorToolbarItem(store: store, slice: store.supervisorToolbarSlice)
-    }
-  }
-}
-
-private struct AgentsToolbarButton: View {
-  @Environment(\.openWindow)
-  private var openWindow
-
-  var body: some View {
-    Button {
-      openWindow(id: HarnessMonitorWindowID.workspace)
-    } label: {
-      Label {
-        Text("Workspace")
-      } icon: {
-        HarnessMonitorUIAssets.image(named: "ToolbarAgentsBot")
-          .renderingMode(.template)
-          .resizable()
-          .scaledToFit()
-          .frame(width: 18, height: 18)
-          .accessibilityHidden(true)
-      }
-    }
-    .help("Open workspace")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsActionButton)
   }
 }

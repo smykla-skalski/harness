@@ -117,7 +117,7 @@ struct AgentDetailSection: View {
             "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
         )
         .accessibilityTestProbe(
-          HarnessMonitorAccessibility.agentsWindowDetailAwaitingDecisionState,
+          HarnessMonitorAccessibility.workspaceDetailAwaitingDecisionState,
           label:
             "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
           value: agent.agentId
@@ -199,7 +199,7 @@ struct AgentDetailSection: View {
         }
       }
       .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailPersona)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
       InspectorSection(title: "Assigned Tasks") {
         if assignedTasks.isEmpty {
           Text("No assigned tasks")
@@ -220,7 +220,7 @@ struct AgentDetailSection: View {
         }
       }
       .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailAssignedTasks)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
       InspectorSection(title: "Recent Activity") {
         if agentTimelineEntries.isEmpty {
           Text("No recent activity")
@@ -246,7 +246,7 @@ struct AgentDetailSection: View {
         }
       }
       .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailTimeline)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailTimeline)
       InspectorSection(title: "Role Actions") {
         if isLeader {
           Text("Transfer leadership before changing the leader's role.")
@@ -259,7 +259,7 @@ struct AgentDetailSection: View {
             }
           }
           .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailRolePicker)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailRolePicker)
           HarnessInlineActionButton(
             title: "Change Role",
             actionID: .changeRole(sessionID: sessionID, agentID: agent.agentId),
@@ -267,7 +267,7 @@ struct AgentDetailSection: View {
             variant: .prominent,
             tint: nil,
             isExternallyDisabled: !roleActionsAvailable,
-            accessibilityIdentifier: HarnessMonitorAccessibility.agentsWindowDetailRoleChange,
+            accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleChange,
             action: {
               Task { await changeRole() }
             }
@@ -280,7 +280,7 @@ struct AgentDetailSection: View {
           variant: .bordered,
           tint: .red,
           isExternallyDisabled: isLeader || !roleActionsAvailable,
-          accessibilityIdentifier: HarnessMonitorAccessibility.agentsWindowDetailRoleRemove,
+          accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleRemove,
           help: isLeader ? "The session leader cannot be removed" : "",
           action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
         )
@@ -296,16 +296,16 @@ struct AgentDetailSection: View {
           .fixedSize(horizontal: false, vertical: true)
         TextField("Update Type", text: $signalCommand)
           .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalCommand)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalCommand)
           .submitLabel(.send)
         TextField("Message", text: $signalMessage, axis: .vertical)
           .harnessNativeFormControl()
           .lineLimit(3, reservesSpace: true)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalMessage)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalMessage)
           .submitLabel(.send)
         TextField("Optional Context", text: $signalActionHint)
           .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsWindowDetailSignalAction)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalAction)
           .submitLabel(.send)
         HarnessInlineActionButton(
           title: "Send Update",
@@ -319,7 +319,7 @@ struct AgentDetailSection: View {
           isExternallyDisabled:
             signalCommand.isEmpty || signalMessage.isEmpty
             || store.isSessionReadOnly,
-          accessibilityIdentifier: HarnessMonitorAccessibility.agentsWindowDetailSignalSend,
+          accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailSignalSend,
           action: {
             Task {
               await store.sendSignal(
@@ -337,11 +337,11 @@ struct AgentDetailSection: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(
-      HarnessMonitorAccessibility.agentsWindowDetailCard,
+      HarnessMonitorAccessibility.workspaceDetailCard,
       label: agent.name,
       value: agent.agentId
     )
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsWindowDetailCard).frame")
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
   }
 
   @ViewBuilder
