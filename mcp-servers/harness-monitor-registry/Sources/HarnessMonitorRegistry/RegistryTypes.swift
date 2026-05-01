@@ -2,12 +2,14 @@ import CoreGraphics
 import Foundation
 
 public let registryProtocolVersion: Int = 1
+public let registryMaximumFrameBytes: Int = 1 << 20
 /// Keep short - Unix domain sockets have a 104-byte path limit on macOS.
 public let registrySocketFilename: String = "mcp.sock"
 public let registryAppGroupIdentifier: String = "Q498EB36N4.io.harnessmonitor"
 
 public enum RegistryCapability: String, Sendable, Codable, CaseIterable {
   case clientSnapshots = "client-snapshots"
+  case clientSnapshotLeases = "client-snapshot-leases"
   case replacementNotice = "replacement-notice"
 }
 
@@ -114,20 +116,50 @@ public struct RegistryWindow: Sendable, Codable, Equatable {
 
 public struct RegistryClientSnapshot: Sendable, Codable, Equatable {
   public var clientID: UUID
+  public var generation: UInt64
   public var appVersion: String
   public var bundleIdentifier: String
   public var snapshot: RegistrySnapshot
 
   public init(
     clientID: UUID,
+    generation: UInt64 = 0,
     appVersion: String,
     bundleIdentifier: String,
     snapshot: RegistrySnapshot
   ) {
     self.clientID = clientID
+    self.generation = generation
     self.appVersion = appVersion
     self.bundleIdentifier = bundleIdentifier
     self.snapshot = snapshot
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    clientID = try container.decode(UUID.self, forKey: .clientID)
+    generation = try container.decodeIfPresent(UInt64.self, forKey: .generation) ?? 0
+    appVersion = try container.decode(String.self, forKey: .appVersion)
+    bundleIdentifier = try container.decode(String.self, forKey: .bundleIdentifier)
+    snapshot = try container.decode(RegistrySnapshot.self, forKey: .snapshot)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case clientID
+    case generation
+    case appVersion
+    case bundleIdentifier
+    case snapshot
+  }
+}
+
+public struct RegistryClientClearRequest: Sendable, Codable, Equatable {
+  public var clientID: UUID
+  public var generation: UInt64
+
+  public init(clientID: UUID, generation: UInt64) {
+    self.clientID = clientID
+    self.generation = generation
   }
 }
 

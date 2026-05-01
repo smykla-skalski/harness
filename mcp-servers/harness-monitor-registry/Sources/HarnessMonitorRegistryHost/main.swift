@@ -99,13 +99,13 @@ func bootstrap() async {
   let bundleID = Bundle.main.bundleIdentifier ?? "io.harnessmonitor.test-host"
 
   let dispatcher = RegistryRequestDispatcher(registry: registry) {
-    PingResult(
-      protocolVersion: registryProtocolVersion,
-      appVersion: appVersion,
-      bundleIdentifier: bundleID,
-      capabilities: [.clientSnapshots, .replacementNotice]
-    )
-  }
+      PingResult(
+        protocolVersion: registryProtocolVersion,
+        appVersion: appVersion,
+        bundleIdentifier: bundleID,
+        capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+      )
+    }
   let listener = RegistryListener(dispatcher: dispatcher)
   hostListener = listener
 
