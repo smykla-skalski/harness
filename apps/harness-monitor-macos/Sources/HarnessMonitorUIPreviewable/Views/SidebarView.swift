@@ -58,6 +58,17 @@ struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
   }
 }
 
+struct SidebarToolbarFilterToolbarItem: ToolbarContent {
+  let store: HarnessMonitorStore
+  let controls: HarnessMonitorStore.SessionControlsSlice
+
+  var body: some ToolbarContent {
+    ToolbarItem(placement: .automatic) {
+      SidebarFilterMenu(store: store, controls: controls)
+    }
+  }
+}
+
 struct SidebarFilterStateMarker: View {
   let controls: HarnessMonitorStore.SessionControlsSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice

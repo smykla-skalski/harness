@@ -83,10 +83,11 @@ struct SidebarFilterMenu: View {
           systemImage: hasActiveFilters
             ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
       }
-      .harnessGlassButtonStyle()
+      .help("Filter sessions")
       .menuIndicator(.hidden)
       .accessibilityLabel("Filters")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarFiltersCardFrame)
     }
   }
 }
