@@ -15,7 +15,13 @@ extension AgentsWindowView {
   }
 
   var decisionWorkspaceScope: DecisionWorkspaceScope {
-    cachedDecisionWorkspaceScope
+    let snapshot = cachedDecisionWorkspaceSnapshot
+    return DecisionWorkspaceScope(
+      decisions: snapshot.decisions,
+      filters: snapshot.filters,
+      visibleSnapshot: snapshot.visibleSnapshot,
+      selectedDecisionID: viewModel.selection.decisionID
+    )
   }
 
   var selectedSessionTui: AgentTuiSnapshot? {

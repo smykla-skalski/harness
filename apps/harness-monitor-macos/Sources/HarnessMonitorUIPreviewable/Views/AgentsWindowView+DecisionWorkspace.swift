@@ -20,8 +20,6 @@ extension AgentsWindowView {
     to newValue: WorkspaceSelection,
     viewModel: ViewModel
   ) {
-    refreshDecisionWorkspaceScope()
-
     if oldValue != newValue {
       cancelPendingViewportResize()
       Task {
@@ -80,7 +78,7 @@ extension AgentsWindowView {
 
   func reloadDecisions() async {
     await currentDecisionsRuntime.reload(from: store)
-    refreshDecisionWorkspaceScope()
+    refreshDecisionWorkspaceSnapshot()
     if viewModel.selection.isDecisionRoute,
       let decisionID = viewModel.selection.decisionID,
       !decisionItems.contains(where: { $0.id == decisionID })
@@ -89,17 +87,15 @@ extension AgentsWindowView {
         .decisions(sessionID: viewModel.selection.sessionID ?? store.selectedSessionID),
         recordHistory: false
       )
-      refreshDecisionWorkspaceScope()
     }
   }
 
-  func refreshDecisionWorkspaceScope() {
-    let nextScope = DecisionWorkspaceScope(
+  func refreshDecisionWorkspaceSnapshot() {
+    let nextSnapshot = DecisionWorkspaceScope(
       decisions: decisionItems,
-      filters: currentDecisionFilters,
-      selectedDecisionID: viewModel.selection.decisionID
+      filters: currentDecisionFilters
     )
-    replaceDecisionWorkspaceScope(nextScope)
+    replaceDecisionWorkspaceSnapshot(nextSnapshot)
   }
 
   func syncSupervisorDecisionRoute(recordHistory: Bool) {

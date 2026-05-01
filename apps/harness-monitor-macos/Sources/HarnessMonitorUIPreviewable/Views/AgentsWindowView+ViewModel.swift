@@ -332,6 +332,10 @@ extension AgentsWindowView {
     var createSessionID: String?
     var wrapLines = false
     var selectedPersona: String?
+    var selectedPersonaID: String {
+      get { selectedPersona ?? "" }
+      set { selectedPersona = newValue.isEmpty ? nil : newValue }
+    }
     var availablePersonas: [AgentPersona] = []
     var availableRuntimeModels: [RuntimeModelCatalog] = []
     var availableAcpAgents: [AcpAgentDescriptor] = []

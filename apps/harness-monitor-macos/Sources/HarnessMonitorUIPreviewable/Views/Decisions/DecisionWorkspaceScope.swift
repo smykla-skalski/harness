@@ -10,15 +10,29 @@ public struct DecisionWorkspaceScope: Equatable {
   public init(
     decisions: [Decision],
     filters: DecisionsSidebarViewModel.FilterState,
+    visibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot,
     selectedDecisionID: String? = nil
   ) {
     self.decisions = decisions
     self.filters = filters
-    self.visibleSnapshot = DecisionsSidebarViewModel.visibleSnapshot(
-      decisions: decisions,
-      filters: filters
-    )
+    self.visibleSnapshot = visibleSnapshot
     self.selectedDecisionID = selectedDecisionID
+  }
+
+  public init(
+    decisions: [Decision],
+    filters: DecisionsSidebarViewModel.FilterState,
+    selectedDecisionID: String? = nil
+  ) {
+    self.init(
+      decisions: decisions,
+      filters: filters,
+      visibleSnapshot: DecisionsSidebarViewModel.visibleSnapshot(
+        decisions: decisions,
+        filters: filters
+      ),
+      selectedDecisionID: selectedDecisionID
+    )
   }
 
   var groups: [DecisionsSidebarViewModel.SessionGroup] {
