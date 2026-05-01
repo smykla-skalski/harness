@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SessionTimelineScrollBoundaryState: Equatable {
-  private static let triggerDistance: CGFloat = 96
+  static let triggerDistance: CGFloat = 220
   private static let bucketSize: CGFloat = 24
 
   private let topBucket: Int?
