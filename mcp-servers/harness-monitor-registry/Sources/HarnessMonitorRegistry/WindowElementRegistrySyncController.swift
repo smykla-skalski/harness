@@ -9,15 +9,25 @@ final class WindowElementRegistrySyncController {
   }
 
   private let registry: AccessibilityRegistry
+  private let minimumReplacementInterval: Duration
+  private let onReplacementApplied: @MainActor () -> Void
+  private let clock = ContinuousClock()
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
   private var trackingOwnerID = UUID()
   private var pendingClears: [PendingAction] = []
   private var pendingReplacement: PendingAction?
   private var flushTask: Task<Void, Never>?
+  private var lastReplacementAppliedAt: ContinuousClock.Instant?
 
-  init(registry: AccessibilityRegistry) {
+  init(
+    registry: AccessibilityRegistry,
+    minimumReplacementInterval: Duration = .milliseconds(120),
+    onReplacementApplied: @escaping @MainActor () -> Void = {}
+  ) {
     self.registry = registry
+    self.minimumReplacementInterval = minimumReplacementInterval
+    self.onReplacementApplied = onReplacementApplied
   }
 
   func beginTracking(windowID: Int) -> UInt64 {
@@ -84,6 +94,13 @@ final class WindowElementRegistrySyncController {
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
     case .replace(let window, let generation, let ownerID):
+      if let delay = replacementDelay() {
+        do {
+          try await Task.sleep(for: delay)
+        } catch {
+          return
+        }
+      }
       guard
         generation == trackingGeneration,
         trackedWindowID == window.windowNumber,
@@ -91,7 +108,9 @@ final class WindowElementRegistrySyncController {
       else {
         return
       }
+      lastReplacementAppliedAt = clock.now
       let elements = WindowAccessibilityElementSnapshotter.elements(in: window)
+      onReplacementApplied()
       await registry.replaceTrackedWindowElements(
         windowID: window.windowNumber,
         elements: elements,
@@ -101,34 +120,72 @@ final class WindowElementRegistrySyncController {
       await registry.unregisterTrackedWindowElements(windowID: windowID, ownerID: ownerID)
     }
   }
+
+  private func replacementDelay() -> Duration? {
+    guard minimumReplacementInterval > .zero, let lastReplacementAppliedAt else {
+      return nil
+    }
+    let nextAllowed = lastReplacementAppliedAt + minimumReplacementInterval
+    let now = clock.now
+    guard now < nextAllowed else {
+      return nil
+    }
+    return now.duration(to: nextAllowed)
+  }
+}
+
+@MainActor
+enum WindowAccessibilityChildNodeCollector {
+  static func collect<S: Sequence>(from values: S) -> [any NSAccessibilityProtocol] {
+    var children: [any NSAccessibilityProtocol] = []
+    var seen: Set<ObjectIdentifier> = []
+    append(contentsOf: values, to: &children, seen: &seen)
+    return children
+  }
+
+  static func append<S: Sequence>(
+    contentsOf values: S?,
+    to children: inout [any NSAccessibilityProtocol],
+    seen: inout Set<ObjectIdentifier>
+  ) {
+    guard let values else { return }
+    for value in values {
+      append(value, to: &children, seen: &seen)
+    }
+  }
+
+  static func append<T>(
+    _ value: T,
+    to children: inout [any NSAccessibilityProtocol],
+    seen: inout Set<ObjectIdentifier>
+  ) {
+    guard let child = value as? any NSAccessibilityProtocol else {
+      return
+    }
+    let identifier = ObjectIdentifier(child as AnyObject)
+    guard seen.insert(identifier).inserted else {
+      return
+    }
+    children.append(child)
+  }
 }
 
 @MainActor
 private enum WindowAccessibilityElementSnapshotter {
-  private static let relatedAccessibilitySelectors: [Selector] = [
-    NSSelectorFromString("accessibilityChildren"),
-    NSSelectorFromString("accessibilityChildrenInNavigationOrder"),
-    NSSelectorFromString("accessibilityContents"),
-    NSSelectorFromString("accessibilityVisibleChildren"),
-    NSSelectorFromString("accessibilitySelectedChildren"),
-    NSSelectorFromString("accessibilityRows"),
-    NSSelectorFromString("accessibilityTabs"),
-    NSSelectorFromString("accessibilityDisclosedRows"),
-    NSSelectorFromString("accessibilityTitleUIElement"),
-    NSSelectorFromString("accessibilityToolbarButton"),
-    NSSelectorFromString("accessibilityProxy"),
-  ]
+  private static let maximumVisitedNodes = 700
 
   static func elements(in window: NSWindow) -> [RegistryElement] {
-    var queue: [any NSAccessibilityProtocol] = [window]
+    var queue: [any NSAccessibilityProtocol] = []
     if let contentView = window.contentView {
       queue.append(contentView)
+    } else {
+      queue.append(window)
     }
     var index = 0
     var visited: Set<ObjectIdentifier> = []
     var harvested: [String: RegistryElement] = [:]
 
-    while index < queue.count {
+    while index < queue.count, visited.count < maximumVisitedNodes {
       let node = queue[index]
       index += 1
 
@@ -152,48 +209,46 @@ private enum WindowAccessibilityElementSnapshotter {
     of node: any NSAccessibilityProtocol
   ) -> [any NSAccessibilityProtocol] {
     var children: [any NSAccessibilityProtocol] = []
-
-    if let accessibilityChildren = node.accessibilityChildren() {
-      appendChildNodes(from: accessibilityChildren, to: &children)
-    }
-
-    if let object = node as? NSObject {
-      for selector in relatedAccessibilitySelectors where object.responds(to: selector) {
-        guard let value = object.perform(selector)?.takeUnretainedValue() else {
-          continue
-        }
-        appendChildNodes(from: value, to: &children)
-      }
-    }
+    var seen: Set<ObjectIdentifier> = []
 
     if let view = node as? NSView {
-      children.append(contentsOf: view.subviews)
-    } else if let window = node as? NSWindow, let contentView = window.contentView {
-      children.append(contentView)
+      if view.subviews.isEmpty {
+        WindowAccessibilityChildNodeCollector.append(
+          contentsOf: view.accessibilityChildrenInNavigationOrder(),
+          to: &children,
+          seen: &seen
+        )
+        WindowAccessibilityChildNodeCollector.append(
+          contentsOf: view.accessibilityChildren(),
+          to: &children,
+          seen: &seen
+        )
+      }
+      WindowAccessibilityChildNodeCollector.append(
+        contentsOf: view.subviews,
+        to: &children,
+        seen: &seen
+      )
+      return children
     }
+
+    if let window = node as? NSWindow, let contentView = window.contentView {
+      children.append(contentView)
+      return children
+    }
+
+    WindowAccessibilityChildNodeCollector.append(
+      contentsOf: node.accessibilityChildrenInNavigationOrder(),
+      to: &children,
+      seen: &seen
+    )
+    WindowAccessibilityChildNodeCollector.append(
+      contentsOf: node.accessibilityChildren(),
+      to: &children,
+      seen: &seen
+    )
 
     return children
-  }
-
-  private static func appendChildNodes(
-    from value: Any,
-    to children: inout [any NSAccessibilityProtocol]
-  ) {
-    if let child = value as? any NSAccessibilityProtocol {
-      children.append(child)
-      return
-    }
-    if let childArray = value as? [Any] {
-      for child in childArray {
-        appendChildNodes(from: child, to: &children)
-      }
-      return
-    }
-    if let childSet = value as? NSSet {
-      for child in childSet {
-        appendChildNodes(from: child, to: &children)
-      }
-    }
   }
 
   private static func registryElement(

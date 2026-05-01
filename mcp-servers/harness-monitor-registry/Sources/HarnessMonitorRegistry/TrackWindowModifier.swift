@@ -38,9 +38,13 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
 }
 
 final class WindowTrackingNSView: NSView {
+  private static let didUpdateElementRefreshInterval: Duration = .milliseconds(900)
+
   private let syncController: WindowRegistrySyncController
   private let elementSyncController: WindowElementRegistrySyncController
+  private let clock = ContinuousClock()
   private var observations: [NSObjectProtocol] = []
+  private var lastDidUpdateElementRefreshAt: ContinuousClock.Instant?
 
   init(registry: AccessibilityRegistry) {
     syncController = WindowRegistrySyncController(registry: registry)
@@ -61,7 +65,12 @@ final class WindowTrackingNSView: NSView {
   private func startTracking(_ window: NSWindow) {
     let windowGeneration = syncController.beginTracking(windowID: window.windowNumber)
     let elementGeneration = elementSyncController.beginTracking(windowID: window.windowNumber)
-    sync(window, windowGeneration: windowGeneration, elementGeneration: elementGeneration)
+    sync(
+      window,
+      windowGeneration: windowGeneration,
+      elementGeneration: elementGeneration,
+      includeElements: true
+    )
     let names: [NSNotification.Name] = [
       NSWindow.didMoveNotification,
       NSWindow.didResizeNotification,
@@ -76,13 +85,16 @@ final class WindowTrackingNSView: NSView {
         forName: name,
         object: window,
         queue: .main
-      ) { [weak self, weak window] _ in
+      ) { [weak self, weak window] notification in
+        let isDidUpdate = notification.name == NSWindow.didUpdateNotification
         MainActor.assumeIsolated {
           guard let self, let window else { return }
+          let includeElements = !isDidUpdate || self.shouldRefreshElementsOnDidUpdate()
           self.sync(
             window,
             windowGeneration: windowGeneration,
-            elementGeneration: elementGeneration
+            elementGeneration: elementGeneration,
+            includeElements: includeElements
           )
         }
       }
@@ -100,7 +112,8 @@ final class WindowTrackingNSView: NSView {
   private func sync(
     _ window: NSWindow,
     windowGeneration: UInt64,
-    elementGeneration: UInt64
+    elementGeneration: UInt64,
+    includeElements: Bool
   ) {
     let entry = RegistryWindow(
       id: window.windowNumber,
@@ -110,7 +123,19 @@ final class WindowTrackingNSView: NSView {
       isMain: window.isMainWindow
     )
     syncController.sync(entry, generation: windowGeneration)
+    guard includeElements else {
+      return
+    }
+    lastDidUpdateElementRefreshAt = clock.now
     elementSyncController.sync(window: window, generation: elementGeneration)
+  }
+
+  private func shouldRefreshElementsOnDidUpdate() -> Bool {
+    guard let lastDidUpdateElementRefreshAt else {
+      return true
+    }
+    let now = clock.now
+    return lastDidUpdateElementRefreshAt + Self.didUpdateElementRefreshInterval <= now
   }
 }
 #endif
