@@ -28,14 +28,14 @@ public struct ContentView<CornerContent: View>: View {
     ].joined(separator: ", ")
   }
 
-  private var supervisorBadgeAccessibilityValue: String {
+  private var workspaceToolbarAccessibilityValue: String {
     let slice = store.supervisorToolbarSlice
     let severity = slice.maxSeverity?.rawValue ?? "none"
-    let symbol = supervisorBadgeSymbol(for: slice.count)
+    let badge = slice.count > 0 ? "visible" : "hidden"
     return
       """
       count=\(slice.count) severity=\(severity) \
-      tint=\(supervisorBadgeTint(for: slice.maxSeverity)) symbol=\(symbol)
+      tint=\(workspaceToolbarTint(for: slice.maxSeverity)) badge=\(badge)
       """
   }
 
@@ -159,25 +159,21 @@ public struct ContentView<CornerContent: View>: View {
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       appChromeAccessibilityValue: appChromeAccessibilityValue,
-      supervisorBadgeAccessibilityValue: supervisorBadgeAccessibilityValue,
+      workspaceToolbarAccessibilityValue: workspaceToolbarAccessibilityValue,
       toolbarBackgroundMarker: contentToolbarBackgroundMarker,
       auditBuildAccessibilityValue: auditBuildAccessibilityValue
     )
   }
 
-  private func supervisorBadgeTint(for severity: DecisionSeverity?) -> String {
+  private func workspaceToolbarTint(for severity: DecisionSeverity?) -> String {
     switch severity {
     case .none, .info:
-      return "secondary"
+      return "primary"
     case .warn, .needsUser:
       return "orange"
     case .critical:
       return "red"
     }
-  }
-
-  private func supervisorBadgeSymbol(for count: Int) -> String {
-    count > 0 ? "bell.badge.fill" : "bell.badge"
   }
 
   @ViewBuilder private var contentBackground: some View {

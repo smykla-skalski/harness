@@ -213,7 +213,7 @@ struct ContentAccessibilityOverlayBridge: View {
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   let appChromeAccessibilityValue: String
-  let supervisorBadgeAccessibilityValue: String
+  let workspaceToolbarAccessibilityValue: String
   let toolbarBackgroundMarker: String
   let auditBuildAccessibilityValue: String?
 
@@ -226,8 +226,8 @@ struct ContentAccessibilityOverlayBridge: View {
             text: appChromeAccessibilityValue
           )
           AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.supervisorBadgeState,
-            text: supervisorBadgeAccessibilityValue
+            identifier: HarnessMonitorAccessibility.workspaceToolbarButtonState,
+            text: workspaceToolbarAccessibilityValue
           )
           ContentToolbarChromeAccessibilityMarker(
             contentSession: contentSession,

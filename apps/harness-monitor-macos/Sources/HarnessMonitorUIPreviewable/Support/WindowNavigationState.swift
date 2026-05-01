@@ -59,9 +59,7 @@ public struct WindowNavigationState {
 
 public enum WindowNavigationScope: Hashable {
   case main
-  case agents
-
-  public static var agentTui: Self { .agents }
+  case workspace
 }
 
 @MainActor
@@ -99,7 +97,7 @@ public final class WindowCommandRoutingState {
 
 @MainActor
 @Observable
-public final class AgentsWindowNavigationBridge {
+public final class WorkspaceWindowNavigationBridge {
   public var state = WindowNavigationState()
 
   public init() {}

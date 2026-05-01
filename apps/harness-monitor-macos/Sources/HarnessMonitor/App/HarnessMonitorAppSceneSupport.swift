@@ -74,7 +74,7 @@ struct HarnessMonitorWindowRootView: View {
         attentionState: acpAttentionState,
         windowID: HarnessMonitorWindowID.main
       )
-      .modifier(SupervisorUITestForceTickModifier(store: store))
+      .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
       .task(id: shouldShowBootstrapPlaceholder) {
         await bootstrapDeferredContentIfNeeded()
       }
