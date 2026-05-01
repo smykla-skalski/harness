@@ -17,6 +17,8 @@ struct SessionCockpitTimelineSection: View {
   @State private var visibleAnchorID: String?
   @State private var scrollCommand: SessionTimelineScrollCommand?
   @State private var scrollCommandGeneration = 0
+  @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
+  @State private var pendingNavigationGeneration = 0
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var cachedVisibilityStats = SessionTimelineVisibilityStats.empty
@@ -106,10 +108,12 @@ struct SessionCockpitTimelineSection: View {
     .onChange(of: sessionID) { _, _ in
       visibleAnchorID = nil
       scrollCommand = nil
+      pendingNavigationAfterLoad = nil
       requestLatestWindow()
     }
     .onChange(of: presentation.scrollNodeIDs) { _, ids in
       reconcileTimelineAnchor(with: ids)
+      completePendingNavigationIfNeeded(presentation)
     }
   }
 
@@ -173,10 +177,6 @@ struct SessionCockpitTimelineSection: View {
     .frame(height: presentation.viewportHeight)
   }
 
-  private var navigationAnchorID: String? {
-    visibleAnchorID ?? scrollCommand?.targetID
-  }
-
   private func timelinePlaceholderContent(
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
@@ -211,18 +211,20 @@ struct SessionCockpitTimelineSection: View {
       cachedVisibilityStats = stats
     }
   }
+}
+
+extension SessionCockpitTimelineSection {
+  private var navigationAnchorID: String? {
+    visibleAnchorID ?? scrollCommand?.targetID
+  }
 
   private func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    guard !presentation.hasLatestWindow else {
-      return
-    }
+    guard !presentation.hasLatestWindow else { return }
     requestLatestWindow()
   }
 
   private func requestLatestWindow() {
-    Task {
-      await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
-    }
+    Task { await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit)) }
   }
 
   private func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -237,14 +239,10 @@ struct SessionCockpitTimelineSection: View {
     for action: SessionTimelineWindowAction,
     presentation: SessionTimelineSectionPresentation
   ) {
-    guard !isTimelineLoading,
-      let request = presentation.navigation.request(for: action)
-    else {
+    guard !isTimelineLoading, let request = presentation.navigation.request(for: action) else {
       return
     }
-    Task {
-      await loadWindow(request)
-    }
+    Task { await loadWindow(request) }
   }
 
   private func performNavigationAction(
@@ -254,55 +252,104 @@ struct SessionCockpitTimelineSection: View {
     Task {
       switch action {
       case .older:
-        await loadOlderWindowBeforeSteppingIfNeeded(presentation)
-        await scroll(
-          to: presentation.nextOlderNodeID(from: navigationAnchorID)
-            ?? presentation.scrollNodeIDs.last
-        )
+        if await loadWindowBeforeNavigationIfNeeded(.older, presentation: presentation) {
+          return
+        }
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .older, presentation: presentation))
       case .latest:
         if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
-          await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit))
+          let request = TimelineWindowRequest.latest(
+            limit: SessionTimelineWindowNavigation.defaultLimit
+          )
+          markPendingNavigation(.latest, request: request)
+          await loadWindow(request)
+          return
         }
-        await scroll(to: presentation.scrollNodeIDs.first)
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .latest, presentation: presentation))
       case .newer:
-        if presentation.nextNewerNodeID(from: navigationAnchorID) == nil {
-          await loadWindowIfAvailable(for: .newer, presentation: presentation)
+        if await loadWindowBeforeNavigationIfNeeded(.newer, presentation: presentation) {
+          return
         }
-        await scroll(
-          to: presentation.nextNewerNodeID(from: navigationAnchorID)
-            ?? presentation.scrollNodeIDs.first
-        )
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .newer, presentation: presentation))
       }
     }
   }
 
-  private func loadOlderWindowBeforeSteppingIfNeeded(
-    _ presentation: SessionTimelineSectionPresentation
-  ) async {
-    guard presentation.shouldLoadOlderBeforeStepping(from: navigationAnchorID) else {
-      return
+  private func loadWindowBeforeNavigationIfNeeded(
+    _ action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) async -> Bool {
+    let shouldLoad =
+      switch action {
+      case .older:
+        presentation.shouldLoadOlderBeforeStepping(from: navigationAnchorID)
+      case .latest:
+        false
+      case .newer:
+        presentation.nextNewerNodeID(from: navigationAnchorID) == nil
+          && presentation.navigation.hasNewer
+      }
+    guard shouldLoad, let request = presentation.navigation.request(for: action) else {
+      return false
     }
-    await loadWindowIfAvailable(for: .older, presentation: presentation)
+    markPendingNavigation(action, request: request)
+    await loadWindow(request)
+    return true
   }
 
-  private func loadWindowIfAvailable(
-    for action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) async {
-    guard let request = presentation.navigation.request(for: action) else {
+  @MainActor
+  private func markPendingNavigation(
+    _ action: SessionTimelineWindowAction,
+    request: TimelineWindowRequest
+  ) {
+    pendingNavigationGeneration += 1
+    pendingNavigationAfterLoad = SessionTimelinePendingNavigation(
+      action: action,
+      request: request,
+      sessionID: sessionID,
+      generation: pendingNavigationGeneration
+    )
+  }
+
+  @MainActor
+  private func cancelPendingNavigation() {
+    pendingNavigationAfterLoad = nil
+  }
+
+  @MainActor
+  private func completePendingNavigationIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation
+  ) {
+    guard let pending = pendingNavigationAfterLoad,
+      pending.isSatisfied(sessionID: sessionID, navigation: presentation.navigation),
+      !presentation.scrollNodeIDs.isEmpty
+    else {
       return
     }
-    await loadWindow(request)
+    pendingNavigationAfterLoad = nil
+    issueScroll(to: nextTarget(for: pending.action, presentation: presentation))
+  }
+
+  private func nextTarget(
+    for action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) -> String? {
+    switch action {
+    case .older:
+      presentation.nextOlderNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.last
+    case .latest:
+      presentation.scrollNodeIDs.first
+    case .newer:
+      presentation.nextNewerNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.first
+    }
   }
 
   private func scroll(to targetID: String?) async {
-    guard let targetID else {
-      return
-    }
-    await MainActor.run {
-      visibleAnchorID = targetID
-      issueScrollCommand(targetID)
-    }
+    guard let targetID else { return }
+    await MainActor.run { issueScroll(to: targetID) }
   }
 
   private func reconcileTimelineAnchor(with ids: [String]) {
@@ -323,10 +370,14 @@ struct SessionCockpitTimelineSection: View {
   }
 
   private func updateVisibleAnchor(_ anchorID: String?) {
-    guard let anchorID, visibleAnchorID != anchorID else {
-      return
-    }
+    guard let anchorID, visibleAnchorID != anchorID else { return }
     visibleAnchorID = anchorID
+  }
+
+  @MainActor
+  private func issueScroll(to targetID: String?) {
+    visibleAnchorID = targetID
+    issueScrollCommand(targetID)
   }
 
   private func issueScrollCommand(_ targetID: String?) {

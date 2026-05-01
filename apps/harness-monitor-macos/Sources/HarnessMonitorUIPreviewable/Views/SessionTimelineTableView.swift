@@ -25,41 +25,15 @@ struct SessionTimelineScrollCommand: Equatable, Sendable {
   let generation: Int
 }
 
-// NSTableView owns the hot scroll path here: row reuse, visible ranges, and content
-// offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
-enum SessionTimelineTableMetrics {
-  static let baseRowHeight: CGFloat = 92
-  private static let dayDividerHeight: CGFloat = 30
-  private static let detailHeight: CGFloat = 20
-  private static let singleLineActionHeight: CGFloat = 42
-  private static let wrappedActionHeight: CGFloat = 78
-
-  static func height(for row: SessionTimelineRow) -> CGFloat {
-    var height = baseRowHeight
-    if row.dayDividerLabel != nil {
-      height += dayDividerHeight
-    }
-    if row.node.detail != nil {
-      height += detailHeight
-    }
-    if !row.node.actions.isEmpty {
-      height += actionHeight(for: row.node.actions.count)
-    }
-    return height
-  }
-
-  private static func actionHeight(for actionCount: Int) -> CGFloat {
-    actionCount > 2 ? wrappedActionHeight : singleLineActionHeight
-  }
-}
+typealias SessionTimelineScrollBoundaryHandler =
+  (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState) -> Void
 
 struct SessionTimelineTableView: NSViewRepresentable {
   let rows: [SessionTimelineRow]
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
   let viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
-  let scrollBoundaryChanged: (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState)
-    -> Void
+  let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -81,7 +55,8 @@ struct SessionTimelineTableView: NSViewRepresentable {
     tableView.usesAlternatingRowBackgroundColors = false
     tableView.gridStyleMask = []
     tableView.intercellSpacing = NSSize(width: 0, height: HarnessMonitorTheme.itemSpacing)
-    tableView.rowHeight = SessionTimelineTableMetrics.baseRowHeight
+    tableView.rowHeight = SessionTimelineTableMetrics.estimatedBaseRowHeight
+    tableView.usesAutomaticRowHeights = true
     tableView.selectionHighlightStyle = .none
     tableView.allowsEmptySelection = true
     tableView.allowsColumnSelection = false
@@ -115,7 +90,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
   }
 
   static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
-    coordinator.stopObserving()
     (scrollView.documentView as? NSTableView)?.delegate = nil
     (scrollView.documentView as? NSTableView)?.dataSource = nil
   }
@@ -123,8 +97,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   @MainActor
   final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     var viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
-    var scrollBoundaryChanged:
-      (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState) -> Void
+    var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
     private var rows: [SessionTimelineRow] = []
     private var rowIndexByID: [String: Int] = [:]
@@ -143,10 +116,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
 
     init(
       viewportStatsChanged: @escaping (SessionTimelineTableViewportStats) -> Void,
-      scrollBoundaryChanged: @escaping (
-        SessionTimelineScrollBoundaryState,
-        SessionTimelineScrollBoundaryState
-      ) -> Void
+      scrollBoundaryChanged: @escaping SessionTimelineScrollBoundaryHandler
     ) {
       self.viewportStatsChanged = viewportStatsChanged
       self.scrollBoundaryChanged = scrollBoundaryChanged
@@ -165,10 +135,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
         name: NSView.boundsDidChangeNotification,
         object: scrollView.contentView
       )
-    }
-
-    func stopObserving() {
-      NotificationCenter.default.removeObserver(self)
     }
 
     func update(
@@ -194,8 +160,12 @@ struct SessionTimelineTableView: NSViewRepresentable {
         rowSnapshot = nextSnapshot
         tableView.reloadData()
         tableView.layoutSubtreeIfNeeded()
+      } else {
+        refreshVisibleRows()
       }
-      resizeColumn(in: scrollView)
+      if resizeColumn(in: scrollView) {
+        invalidateVisibleRowHeights()
+      }
 
       if scrollCommand != lastScrollCommand {
         pendingScrollCommand = scrollCommand
@@ -204,7 +174,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
       if !performPendingScrollCommand() && rowsChanged {
         restore(anchor: previousAnchor)
       }
-      publishViewportState()
     }
 
     func numberOfRows(in _: NSTableView) -> Int {
@@ -230,13 +199,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
       return cell
     }
 
-    func tableView(_: NSTableView, heightOfRow row: Int) -> CGFloat {
-      guard rows.indices.contains(row) else {
-        return SessionTimelineTableMetrics.baseRowHeight
-      }
-      return SessionTimelineTableMetrics.height(for: rows[row])
-    }
-
     func tableView(_: NSTableView, rowViewForRow _: Int) -> NSTableRowView? {
       SessionTimelineTableRowView()
     }
@@ -245,18 +207,21 @@ struct SessionTimelineTableView: NSViewRepresentable {
       false
     }
 
-    @objc private func contentBoundsDidChange(_: Notification) {
+    @objc
+    private func contentBoundsDidChange(_: Notification) {
       publishViewportState()
     }
 
-    private func resizeColumn(in scrollView: NSScrollView) {
+    private func resizeColumn(in scrollView: NSScrollView) -> Bool {
       guard let tableView, let column = tableView.tableColumns.first else {
-        return
+        return false
       }
       let width = max(1, scrollView.contentView.bounds.width)
       if column.width != width {
         column.width = width
+        return true
       }
+      return false
     }
 
     private func performPendingScrollCommand() -> Bool {
@@ -296,7 +261,12 @@ struct SessionTimelineTableView: NSViewRepresentable {
         return
       }
       let rowRect = tableView.rect(ofRow: index)
-      let y = clampedScrollY(rowRect.minY + anchor.offsetY, scrollView: scrollView)
+      let y = SessionTimelineTableMetrics.restoredScrollY(
+        rowMinY: rowRect.minY,
+        anchorOffsetY: anchor.offsetY,
+        contentHeight: tableView.bounds.height,
+        viewportHeight: scrollView.contentSize.height
+      )
       scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
       scrollView.reflectScrolledClipView(scrollView.contentView)
     }
@@ -305,8 +275,49 @@ struct SessionTimelineTableView: NSViewRepresentable {
       guard let tableView else {
         return 0
       }
-      let maxY = max(0, tableView.bounds.height - scrollView.contentSize.height)
-      return max(0, min(y, maxY))
+      return SessionTimelineTableMetrics.clampedScrollY(
+        y,
+        contentHeight: tableView.bounds.height,
+        viewportHeight: scrollView.contentSize.height
+      )
+    }
+
+    private func refreshVisibleRows() {
+      guard
+        let tableView,
+        let scrollView,
+        let columnIndex = tableView.tableColumns.indices.first
+      else {
+        return
+      }
+      let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+        return
+      }
+      let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
+      for row in rowRange where rows.indices.contains(row) {
+        let view = tableView.view(
+          atColumn: columnIndex,
+          row: row,
+          makeIfNecessary: false
+        )
+        (view as? SessionTimelineTableCellView)?.update(
+          row: rows[row],
+          actionHandler: actionHandler
+        )
+      }
+    }
+
+    private func invalidateVisibleRowHeights() {
+      guard let tableView, let scrollView else {
+        return
+      }
+      let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+        return
+      }
+      let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rowRange))
     }
 
     private func currentVisibleAnchor() -> SessionTimelineTableAnchor? {
@@ -380,121 +391,4 @@ struct SessionTimelineTableView: NSViewRepresentable {
 private struct SessionTimelineTableAnchor {
   let rowID: String
   let offsetY: CGFloat
-}
-
-private struct SessionTimelineTableSnapshot: Equatable {
-  let rows: [SessionTimelineTableRowSnapshot]
-
-  static let empty = Self(rowSnapshots: [])
-
-  init(rows: [SessionTimelineRow]) {
-    self.rows = rows.map(SessionTimelineTableRowSnapshot.init)
-  }
-
-  private init(rowSnapshots: [SessionTimelineTableRowSnapshot]) {
-    rows = rowSnapshots
-  }
-}
-
-private struct SessionTimelineTableRowSnapshot: Equatable {
-  let id: String
-  let height: CGFloat
-  let dayDividerLabel: String?
-  let timestampLabel: String
-  let accessibilityLabel: String
-  let kindLabel: String
-  let sourceLabel: String
-  let title: String
-  let detail: String?
-  let toneLabel: String?
-  let decisionID: String?
-  let decisionSeverityLabel: String?
-  let actionIDs: [String]
-  let actionKinds: [String]
-  let actionTitles: [String]
-  let actionPayloads: [String]
-  let primaryActionIDs: [String]
-
-  init(row: SessionTimelineRow) {
-    id = row.id
-    height = SessionTimelineTableMetrics.height(for: row)
-    dayDividerLabel = row.dayDividerLabel
-    timestampLabel = row.timestampLabel
-    accessibilityLabel = row.accessibilityLabel
-    kindLabel = row.node.kind.label
-    sourceLabel = row.node.sourceLabel
-    title = row.node.title
-    detail = row.node.detail
-    toneLabel = row.node.eventTone?.label
-    decisionID = row.node.decision?.id
-    decisionSeverityLabel = row.node.decision?.severityLabel
-    actionIDs = row.node.actions.map(\.id)
-    actionKinds = row.node.actions.map { String(describing: $0.kind) }
-    actionTitles = row.node.actions.map(\.title)
-    actionPayloads = row.node.actions.map(\.payloadJSON)
-    primaryActionIDs = row.node.actions.filter(\.isPrimary).map(\.id)
-  }
-}
-
-private final class SessionTimelineTableRowView: NSTableRowView {
-  override func drawSelection(in _: NSRect) {}
-}
-
-private final class SessionTimelineTableCellView: NSTableCellView {
-  static let columnIdentifier = NSUserInterfaceItemIdentifier("session-timeline-column")
-  static let cellIdentifier = NSUserInterfaceItemIdentifier("session-timeline-cell")
-
-  private let hostingView = NSHostingView(rootView: SessionTimelineHostedRow.empty)
-
-  init() {
-    super.init(frame: .zero)
-    identifier = Self.cellIdentifier
-    wantsLayer = true
-    layer?.backgroundColor = NSColor.clear.cgColor
-    hostingView.translatesAutoresizingMaskIntoConstraints = false
-    addSubview(hostingView)
-    NSLayoutConstraint.activate([
-      hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
-      hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
-      hostingView.topAnchor.constraint(equalTo: topAnchor),
-      hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ])
-  }
-
-  @available(*, unavailable)
-  required init?(coder _: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  func update(row: SessionTimelineRow, actionHandler: any DecisionActionHandler) {
-    hostingView.rootView = SessionTimelineHostedRow(row: row, actionHandler: actionHandler)
-  }
-}
-
-private struct SessionTimelineHostedRow: View {
-  let row: SessionTimelineRow?
-  let actionHandler: any DecisionActionHandler
-
-  static var empty: Self {
-    Self(row: nil, actionHandler: NullDecisionActionHandler())
-  }
-
-  var body: some View {
-    if let row {
-      ZStack(alignment: .topLeading) {
-        Rectangle()
-          .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
-          .frame(width: 2)
-          .padding(.top, HarnessMonitorTheme.spacingSM)
-          .offset(x: SessionTimelineLayout.railLineOffset - 1)
-          .accessibilityHidden(true)
-
-        SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
-          .padding(.trailing, HarnessMonitorTheme.spacingXS)
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    } else {
-      Color.clear
-    }
-  }
 }

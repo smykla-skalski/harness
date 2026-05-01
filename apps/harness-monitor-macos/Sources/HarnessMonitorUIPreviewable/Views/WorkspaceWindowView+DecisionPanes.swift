@@ -71,72 +71,7 @@ extension WorkspaceWindowView {
     if viewModel.selection.isDecisionRoute {
       ToolbarItemGroup(placement: .primaryAction) {
         Menu {
-          Button("Dismiss selected") {
-            Task { await dismissSelectedDecision() }
-          }
-          .disabled(decisionScope.selectedDecision == nil)
-          .harnessMCPMenuItem(
-            HarnessMonitorAccessibility.decisionBulkDismissSelected,
-            label: "Dismiss selected decision",
-            enabled: decisionScope.selectedDecision != nil,
-            pressAction: { Task { await dismissSelectedDecision() } }
-          )
-
-          Button("Dismiss all visible") {
-            beginDismissAllVisible()
-          }
-          .disabled(decisionScope.visibleDecisionIDs.isEmpty)
-          .harnessMCPMenuItem(
-            HarnessMonitorAccessibility.decisionBulkDismissVisible,
-            label: "Dismiss all visible decisions",
-            enabled: !decisionScope.visibleDecisionIDs.isEmpty,
-            pressAction: beginDismissAllVisible
-          )
-
-          if let reopenBatch = currentReopenBatch {
-            Button("Reopen dismissed batch") {
-              Task { await reopenDismissedBatch(reopenBatch) }
-            }
-            .harnessMCPMenuItem(
-              HarnessMonitorAccessibility.decisionBulkReopenBatch,
-              label: "Reopen dismissed batch",
-              pressAction: { Task { await reopenDismissedBatch(reopenBatch) } }
-            )
-          }
-
-          Button(
-            decisionScope.hasActiveFilters
-              ? "Snooze filtered critical for 1h"
-              : "Snooze visible critical for 1h"
-          ) {
-            Task { await snoozeAllCritical() }
-          }
-          .disabled(decisionScope.visibleCriticalDecisionIDs.isEmpty)
-          .harnessMCPMenuItem(
-            HarnessMonitorAccessibility.decisionBulkSnoozeCritical,
-            label: decisionScope.hasActiveFilters
-              ? "Snooze filtered critical for 1 hour"
-              : "Snooze visible critical for 1 hour",
-            enabled: !decisionScope.visibleCriticalDecisionIDs.isEmpty,
-            pressAction: { Task { await snoozeAllCritical() } }
-          )
-
-          Button(
-            decisionScope.hasActiveFilters
-              ? "Dismiss filtered info"
-              : "Dismiss visible info"
-          ) {
-            Task { await dismissAllInfo() }
-          }
-          .disabled(decisionScope.visibleInfoDecisionIDs.isEmpty)
-          .harnessMCPMenuItem(
-            HarnessMonitorAccessibility.decisionBulkDismissInfo,
-            label: decisionScope.hasActiveFilters
-              ? "Dismiss filtered info decisions"
-              : "Dismiss visible info decisions",
-            enabled: !decisionScope.visibleInfoDecisionIDs.isEmpty,
-            pressAction: { Task { await dismissAllInfo() } }
-          )
+          decisionBulkActionItems(decisionScope: decisionScope)
         } label: {
           Label("Bulk actions", systemImage: "ellipsis.circle")
         }
@@ -166,5 +101,77 @@ extension WorkspaceWindowView {
         )
       }
     }
+  }
+
+  @ViewBuilder
+  private func decisionBulkActionItems(
+    decisionScope: DecisionWorkspaceScope
+  ) -> some View {
+    Button("Dismiss selected") {
+      Task { await dismissSelectedDecision() }
+    }
+    .disabled(decisionScope.selectedDecision == nil)
+    .harnessMCPMenuItem(
+      HarnessMonitorAccessibility.decisionBulkDismissSelected,
+      label: "Dismiss selected decision",
+      enabled: decisionScope.selectedDecision != nil,
+      pressAction: { Task { await dismissSelectedDecision() } }
+    )
+
+    Button("Dismiss all visible") {
+      beginDismissAllVisible()
+    }
+    .disabled(decisionScope.visibleDecisionIDs.isEmpty)
+    .harnessMCPMenuItem(
+      HarnessMonitorAccessibility.decisionBulkDismissVisible,
+      label: "Dismiss all visible decisions",
+      enabled: !decisionScope.visibleDecisionIDs.isEmpty,
+      pressAction: beginDismissAllVisible
+    )
+
+    if let reopenBatch = currentReopenBatch {
+      Button("Reopen dismissed batch") {
+        Task { await reopenDismissedBatch(reopenBatch) }
+      }
+      .harnessMCPMenuItem(
+        HarnessMonitorAccessibility.decisionBulkReopenBatch,
+        label: "Reopen dismissed batch",
+        pressAction: { Task { await reopenDismissedBatch(reopenBatch) } }
+      )
+    }
+
+    Button(
+      decisionScope.hasActiveFilters
+        ? "Snooze filtered critical for 1h"
+        : "Snooze visible critical for 1h"
+    ) {
+      Task { await snoozeAllCritical() }
+    }
+    .disabled(decisionScope.visibleCriticalDecisionIDs.isEmpty)
+    .harnessMCPMenuItem(
+      HarnessMonitorAccessibility.decisionBulkSnoozeCritical,
+      label: decisionScope.hasActiveFilters
+        ? "Snooze filtered critical for 1 hour"
+        : "Snooze visible critical for 1 hour",
+      enabled: !decisionScope.visibleCriticalDecisionIDs.isEmpty,
+      pressAction: { Task { await snoozeAllCritical() } }
+    )
+
+    Button(
+      decisionScope.hasActiveFilters
+        ? "Dismiss filtered info"
+        : "Dismiss visible info"
+    ) {
+      Task { await dismissAllInfo() }
+    }
+    .disabled(decisionScope.visibleInfoDecisionIDs.isEmpty)
+    .harnessMCPMenuItem(
+      HarnessMonitorAccessibility.decisionBulkDismissInfo,
+      label: decisionScope.hasActiveFilters
+        ? "Dismiss filtered info decisions"
+        : "Dismiss visible info decisions",
+      enabled: !decisionScope.visibleInfoDecisionIDs.isEmpty,
+      pressAction: { Task { await dismissAllInfo() } }
+    )
   }
 }
