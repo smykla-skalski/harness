@@ -23,7 +23,6 @@ public protocol DaemonControlling: Sendable {
 
 public struct DaemonController: DaemonControlling {
   private static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
-  private static let autoTransportWebSocketGracePeriodDefault: Duration = .milliseconds(150)
 
   private enum AutoTransportBootstrapOutcome: Sendable {
     case upgraded(any HarnessMonitorClientProtocol)
@@ -52,7 +51,7 @@ public struct DaemonController: DaemonControlling {
     launchAgentManager: any DaemonLaunchAgentManaging =
       ServiceManagementDaemonLaunchAgentManager(),
     ownership: DaemonOwnership = .managed,
-    autoTransportWebSocketGracePeriod: Duration = .milliseconds(150),
+    autoTransportWebSocketGracePeriod: Duration = .seconds(2),
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
         HarnessMonitorAPIClient(connection: $0)

@@ -230,6 +230,29 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("Workspace create pane keeps MCP-tracked provider controls eagerly mounted")
+  func workspaceCreatePaneKeepsMCPTrackedProviderControlsEagerlyMounted() throws {
+    let createForm = try sourceFile(named: "WorkspaceWindowView+CreateForm.swift")
+    let terminalCreateForm = try sourceFile(named: "WorkspaceWindowView+CreateFormTerminal.swift")
+
+    #expect(createForm.contains("Keep MCP-tracked controls instantiated even while this pane scrolls."))
+    #expect(
+      !createForm.contains("LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL)")
+    )
+    #expect(
+      !terminalCreateForm.contains("LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing)")
+    )
+  }
+
+  @Test("Sidebar session rows stay MCP-selectable")
+  func sidebarSessionRowsStayMCPSelectable() throws {
+    let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
+
+    #expect(sidebarSections.contains("HarnessMonitorAccessibility.sessionRow(session.sessionId)"))
+    #expect(sidebarSections.contains("store.selectSessionFromList(session.sessionId)"))
+    #expect(sidebarSections.contains(".harnessMCPRow("))
+  }
+
   @Test("Agents runtime identifiers match UI-test mirror")
   func agentsRuntimeIdentifiersMirror() {
     #expect(

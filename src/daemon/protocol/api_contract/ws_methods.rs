@@ -1,6 +1,7 @@
 pub const PING: &str = "ping";
 pub const HEALTH: &str = "health";
 pub const DIAGNOSTICS: &str = "diagnostics";
+pub const CONFIG: &str = "config.get";
 pub const DAEMON_STOP: &str = "daemon.stop";
 pub const BRIDGE_RECONFIGURE: &str = "bridge.reconfigure";
 pub const DAEMON_LOG_LEVEL: &str = "daemon.log_level";
