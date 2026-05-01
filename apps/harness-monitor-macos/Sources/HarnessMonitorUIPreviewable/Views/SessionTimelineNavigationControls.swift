@@ -8,7 +8,7 @@ enum SessionTimelineWindowAction: Equatable, Sendable {
 }
 
 struct SessionTimelineWindowNavigation: Equatable, Sendable {
-  static let defaultLimit = 10
+  static let defaultLimit = 24
 
   let limit: Int
   let totalCount: Int
@@ -91,6 +91,7 @@ struct SessionTimelineNavigationControls: View {
   let navigation: SessionTimelineWindowNavigation
   let canScrollOlder: Bool
   let canScrollNewer: Bool
+  let visibilityStats: SessionTimelineVisibilityStats
   let performAction: (SessionTimelineWindowAction) -> Void
 
   var body: some View {
@@ -106,6 +107,7 @@ struct SessionTimelineNavigationControls: View {
   private var horizontalControls: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       statusLabel
+      visibleStatusLabel
       Spacer(minLength: 0)
       buttons
     }
@@ -114,6 +116,7 @@ struct SessionTimelineNavigationControls: View {
   private var verticalControls: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       statusLabel
+      visibleStatusLabel
       buttons
     }
   }
@@ -123,6 +126,13 @@ struct SessionTimelineNavigationControls: View {
       .scaledFont(.caption.monospaced())
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
+  }
+
+  private var visibleStatusLabel: some View {
+    Text(visibilityStats.statusText)
+      .scaledFont(.caption2.monospaced())
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
   }
 
   private var buttons: some View {
