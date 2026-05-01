@@ -2,19 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension WorkspaceWindowCreatePane {
-  @ViewBuilder var terminalCreateContent: some View {
-    if usesSplitCreateLayout {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
-        terminalProviderCard
-          .frame(maxWidth: 280, alignment: .leading)
-        terminalConfigurationColumn
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-    } else {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        terminalProviderCard
-        terminalConfigurationColumn
-      }
+  var terminalCreateContent: some View {
+    createPaneColumns(leadingMaxWidth: 280) {
+      terminalProviderCard
+    } trailing: {
+      terminalConfigurationColumn
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 

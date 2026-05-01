@@ -153,7 +153,8 @@ struct SessionTaskSummaryCard: View {
       HarnessMonitorAccessibility.sessionTaskCard(task.taskId),
       kind: .row,
       label: task.title,
-      value: isDragging ? "Dragging" : nil
+      value: isDragging ? "Dragging" : nil,
+      pressAction: { inspectTask(task.taskId) }
     )
     .contextMenu {
       Button {

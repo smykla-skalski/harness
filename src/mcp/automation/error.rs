@@ -33,8 +33,10 @@ pub enum AutomationError {
     UnsupportedButton,
     #[error("input failed: {detail}")]
     InputFailed { detail: String },
-    #[error("screencapture failed: {detail}")]
-    ScreencaptureFailed { detail: String },
+    #[error("native screenshot capture failed: {detail}")]
+    ScreenshotCaptureFailed { detail: String },
+    #[error("native screenshot cursor capture is not implemented")]
+    CursorCaptureUnsupported,
     #[error("screenshot io: {detail}")]
     ScreenshotIo { detail: String },
 }

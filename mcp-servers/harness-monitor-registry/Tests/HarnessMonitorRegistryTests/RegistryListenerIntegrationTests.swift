@@ -14,7 +14,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -25,6 +25,7 @@ struct RegistryListenerIntegrationTests {
       #expect(response.contains("\"ok\":true"))
       #expect(response.contains("\"appVersion\":\"test\""))
       #expect(response.contains("\"client-snapshots\""))
+      #expect(response.contains("\"semantic-actions\""))
     }
   }
 
@@ -46,7 +47,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -68,7 +69,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -90,7 +91,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -135,7 +136,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -193,7 +194,7 @@ struct RegistryListenerIntegrationTests {
             protocolVersion: 1,
             appVersion: "test",
             bundleIdentifier: "io.test",
-            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
           )
         },
         replacementHandler: { _ in
@@ -235,7 +236,7 @@ struct RegistryListenerIntegrationTests {
             protocolVersion: 1,
             appVersion: "test",
             bundleIdentifier: "io.test",
-            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
           )
         },
         replacementHandler: { _ in
@@ -300,7 +301,7 @@ struct RegistryListenerIntegrationTests {
           protocolVersion: 1,
           appVersion: "test",
           bundleIdentifier: "io.test",
-          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
         )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
@@ -327,6 +328,43 @@ struct RegistryListenerIntegrationTests {
 
       #expect(response.contains("\"ok\":true"))
       #expect(elapsed < 0.5)
+    }
+  }
+
+  @Test("performAction round-trips a semantic action acknowledgement")
+  func performActionRoundTrip() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let probe = SemanticActionProbe()
+      let dispatcher = RegistryRequestDispatcher(
+        registry: registry,
+        pingInfo: {
+          PingResult(
+            protocolVersion: 1,
+            appVersion: "test",
+            bundleIdentifier: "io.test",
+            capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+          )
+        },
+        semanticActionHandler: { identifier, action in
+          await probe.record(identifier: identifier, action: action)
+          return .performed
+        }
+      )
+      let listener = RegistryListener(dispatcher: dispatcher)
+      let socketClient = RegistrySocketClient()
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      let ack = try await socketClient.performAction(
+        identifier: "workspace.refresh",
+        action: .press,
+        toSocketAt: socketPath
+      )
+
+      #expect(ack.applied == true)
+      #expect(await probe.invocations() == [SemanticActionProbe.Invocation(identifier: "workspace.refresh", action: .press)])
     }
   }
 
@@ -476,6 +514,23 @@ struct RegistryListenerIntegrationTests {
       try await Task.sleep(nanoseconds: 20_000_000)
     }
     #expect(await delivery.matches(expected))
+  }
+}
+
+private actor SemanticActionProbe {
+  struct Invocation: Equatable {
+    let identifier: String
+    let action: RegistrySemanticAction
+  }
+
+  private var recordedInvocations: [Invocation] = []
+
+  func record(identifier: String, action: RegistrySemanticAction) {
+    recordedInvocations.append(Invocation(identifier: identifier, action: action))
+  }
+
+  func invocations() -> [Invocation] {
+    recordedInvocations
   }
 }
 

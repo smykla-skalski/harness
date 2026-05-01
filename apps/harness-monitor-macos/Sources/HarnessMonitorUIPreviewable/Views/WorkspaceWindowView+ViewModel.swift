@@ -362,13 +362,12 @@ extension WorkspaceWindowView {
     var navigationForwardStack: [WorkspaceSelection] = []
     var suppressHistoryRecording = false
     var windowNavigation = WindowNavigationState()
-    var lastDetailColumnSize: CGSize?
-    var lastMeasuredViewportPoints: CGSize?
-    var lastMeasuredViewportTerminalSize: AgentTuiSize?
-    var pendingViewportResizeTarget: AgentTuiSize?
-    var lastMeasuredViewportSize: AgentTuiSize?
-    var viewportResizeTask: Task<Void, Never>?
-    var expectedSize: AgentTuiSize?
+    @ObservationIgnored var lastMeasuredViewportPoints: CGSize?
+    @ObservationIgnored var lastMeasuredViewportTerminalSize: AgentTuiSize?
+    @ObservationIgnored var pendingViewportResizeTarget: AgentTuiSize?
+    @ObservationIgnored var lastMeasuredViewportSize: AgentTuiSize?
+    @ObservationIgnored var viewportResizeTask: Task<Void, Never>?
+    @ObservationIgnored var expectedSize: AgentTuiSize?
     var keySequenceBuffer = KeySequenceBuffer()
     var hasFreshManagedAgentTuis = false
     var hasFreshManagedCodexRuns = false

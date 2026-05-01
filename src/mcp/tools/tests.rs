@@ -5,33 +5,35 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use serde_json::{Value, json};
+use serde_json::json;
 use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
+use tokio::task::JoinHandle;
 
 use crate::mcp::automation::{AccessibilityQueryError, INPUT_OVERRIDE_ENV};
+use crate::mcp::protocol::ContentBlock;
 use crate::mcp::registry::RegistryClient;
-use crate::mcp::registry::{ElementKind, GetElementResult, ListElementsResult};
-use crate::mcp::tool::{Tool, ToolRegistry};
+use crate::mcp::registry::{
+    ElementKind, GetElementResult, ListElementsResult, Rect, RegistryElement,
+};
+use crate::mcp::tool::Tool;
 use crate::workspace::socket_paths::session_socket;
 
 use super::shared::{resolve_get_element_with, resolve_list_elements_with};
 use super::{
     ClickElementTool, DragDropTool, GetElementTool, ListElementsTool, ListWindowsTool,
-    ScrollTool, register_all,
+    PressElementTool, ScrollTool, register_all,
 };
 
 mod interaction_tests;
+mod registry_tool_tests;
 
 fn socket_path(dir: &TempDir) -> PathBuf {
     session_socket(dir.path(), "testid00", "registry")
 }
 
-fn spawn_single_response(
-    path: &std::path::Path,
-    response: String,
-) -> tokio::task::JoinHandle<String> {
+fn spawn_single_response(path: &Path, response: String) -> JoinHandle<String> {
     let listener = UnixListener::bind(path).expect("bind");
     tokio::spawn(async move {
         let (stream, _) = listener.accept().await.expect("accept");
@@ -47,10 +49,7 @@ fn spawn_single_response(
     })
 }
 
-fn spawn_response_sequence(
-    path: &std::path::Path,
-    responses: Vec<String>,
-) -> tokio::task::JoinHandle<Vec<String>> {
+fn spawn_response_sequence(path: &Path, responses: Vec<String>) -> JoinHandle<Vec<String>> {
     let listener = UnixListener::bind(path).expect("bind");
     tokio::spawn(async move {
         let (stream, _) = listener.accept().await.expect("accept");
@@ -113,6 +112,27 @@ fn sample_element_response_with_enabled(
     .to_string()
 }
 
+fn actionable_element_response(id: u64, identifier: &str) -> String {
+    json!({
+        "id": id,
+        "ok": true,
+        "result": {"element": {
+            "identifier": identifier,
+            "label": identifier,
+            "value": null,
+            "hint": null,
+            "kind": "button",
+            "frame": {"x": 100.0, "y": 200.0, "width": 60.0, "height": 40.0},
+            "windowID": 7,
+            "enabled": true,
+            "selected": false,
+            "focused": true,
+            "actions": ["press"],
+        }}
+    })
+    .to_string()
+}
+
 fn empty_elements_response(id: u64) -> String {
     json!({
         "id": id,
@@ -151,18 +171,14 @@ fn not_found_response(id: u64) -> String {
     .to_string()
 }
 
-fn fallback_element(
-    identifier: &str,
-    window_id: i64,
-    kind: ElementKind,
-) -> crate::mcp::registry::RegistryElement {
-    crate::mcp::registry::RegistryElement {
+fn fallback_element(identifier: &str, window_id: i64, kind: ElementKind) -> RegistryElement {
+    RegistryElement {
         identifier: identifier.to_string(),
         label: Some("Fallback".to_string()),
         value: None,
         hint: None,
         kind,
-        frame: crate::mcp::registry::Rect {
+        frame: Rect {
             x: 10.0,
             y: 20.0,
             width: 30.0,
@@ -172,7 +188,15 @@ fn fallback_element(
         enabled: true,
         selected: false,
         focused: false,
+        actions: vec![],
     }
+}
+
+fn write_helper_script(path: &Path, body: &str) {
+    fs::write(path, body).expect("write helper");
+    let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("set helper executable");
 }
 
 fn write_fake_harness_input(path: &Path) {
@@ -206,7 +230,7 @@ case "$1" in
     printf '{"element":{"identifier":"%s","label":"%s","value":null,"hint":null,"kind":"button","frame":{"x":%s,"y":%s,"width":%s,"height":%s},"windowID":7,"enabled":true,"selected":false,"focused":true}}\n' \
       "$identifier" "$identifier" "$x" "$y" "$width" "$height"
     ;;
-  scroll|drag)
+  scroll|drag|perform-action)
     exit 0
     ;;
   *)
@@ -214,285 +238,46 @@ case "$1" in
     ;;
 esac
 "#;
-    fs::write(path, script).expect("write fake helper");
-    let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("set helper executable");
+    write_helper_script(path, script);
 }
 
-#[tokio::test]
-async fn list_windows_tool_returns_json_text_result() {
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let response = json!({
-        "id": 1,
-        "ok": true,
-        "result": {"windows": [{
-            "id": 1234,
-            "title": "Harness Monitor",
-            "role": "AXWindow",
-            "frame": {"x": 0.0, "y": 0.0, "width": 800.0, "height": 600.0},
-            "isKey": true,
-            "isMain": true,
-        }]},
-    })
-    .to_string();
-    let server = spawn_single_response(&path, response);
-    let client = Arc::new(RegistryClient::with_socket_path(path));
-    let tool = ListWindowsTool::new(client);
-    let result = tool.call(json!({})).await.expect("ok");
-    let request_line = server.await.unwrap();
-    assert!(!result.is_error);
-    assert_eq!(result.content.len(), 1);
-    assert!(request_line.contains("\"op\":\"listWindows\""));
-}
-
-#[tokio::test]
-async fn list_elements_tool_forwards_filters_to_registry() {
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let response = json!({
-        "id": 1,
-        "ok": true,
-        "result": {"elements": [{
-            "identifier": "button.send",
-            "label": "Send",
-            "value": null,
-            "hint": null,
-            "kind": "button",
-            "frame": {"x": 100.0, "y": 200.0, "width": 60.0, "height": 40.0},
-            "windowID": 42,
-            "enabled": true,
-            "selected": false,
-            "focused": false,
-        }]},
-    })
-    .to_string();
-    let server = spawn_single_response(&path, response);
-    let client = Arc::new(RegistryClient::with_socket_path(path));
-    let tool = ListElementsTool::new(client);
-    tool.call(json!({"windowID": 42, "kind": "button"}))
-        .await
-        .expect("ok");
-    let request_line = server.await.unwrap();
-    assert!(request_line.contains("\"windowID\":42"));
-    assert!(
-        request_line.contains("\"kind\":\"button\""),
-        "missing kind, got {request_line}",
+fn write_press_action_helper(path: &Path, log_path: &Path) {
+    let script = format!(
+        r#"#!/bin/sh
+case "$1" in
+  --help|check)
+    exit 0
+    ;;
+  perform-action)
+    printf '%s\n' "$*" >> "{log_path}"
+    exit 0
+    ;;
+  *)
+    exit 64
+    ;;
+esac
+"#,
+        log_path = log_path.to_string_lossy()
     );
+    write_helper_script(path, &script);
 }
 
-#[tokio::test]
-async fn resolve_list_elements_uses_helper_when_registry_is_empty() {
-    async fn helper(
-        window_id: Option<i64>,
-        kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        assert_eq!(window_id, Some(42));
-        assert_eq!(kind, Some(ElementKind::Button));
-        Ok(ListElementsResult {
-            elements: vec![fallback_element("button.fallback", 42, ElementKind::Button)],
-        })
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_single_response(&path, empty_elements_response(1));
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_list_elements_with(&client, Some(42), Some(ElementKind::Button), helper)
-        .await
-        .expect("fallback succeeds");
-    let request_line = server.await.unwrap();
-
-    assert!(request_line.contains("\"op\":\"listElements\""));
-    assert_eq!(result.elements.len(), 1);
-    assert_eq!(result.elements[0].identifier, "button.fallback");
-    assert_eq!(result.elements[0].window_id, Some(42));
-}
-
-#[tokio::test]
-async fn resolve_list_elements_preserves_empty_success_when_helper_fails() {
-    async fn helper(
-        _window_id: Option<i64>,
-        _kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        Err(AccessibilityQueryError::AccessibilityDenied)
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_single_response(&path, empty_elements_response(1));
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_list_elements_with(&client, Some(42), Some(ElementKind::Button), helper)
-        .await
-        .expect("empty success is preserved");
-    let request_line = server.await.unwrap();
-
-    assert!(request_line.contains("\"op\":\"listElements\""));
-    assert!(result.elements.is_empty());
-}
-
-#[tokio::test]
-async fn resolve_list_elements_retries_window_scoped_empty_results_until_registry_populates() {
-    let helper_calls = AtomicUsize::new(0);
-
-    async fn helper(
-        helper_calls: &AtomicUsize,
-        _window_id: Option<i64>,
-        _kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        helper_calls.fetch_add(1, Ordering::Relaxed);
-        Ok(ListElementsResult { elements: vec![] })
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_response_sequence(
-        &path,
-        vec![
-            empty_elements_response(1),
-            empty_elements_response(2),
-            elements_response(3, "button.ready", 42),
-        ],
+fn write_press_action_failure_helper(path: &Path, exit_code: i32, stderr: &str) {
+    let script = format!(
+        r#"#!/bin/sh
+case "$1" in
+  --help|check)
+    exit 0
+    ;;
+  perform-action)
+    printf '%s\n' "{stderr}" >&2
+    exit {exit_code}
+    ;;
+  *)
+    exit 64
+    ;;
+esac
+"#
     );
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_list_elements_with(&client, Some(42), None, |window_id, kind| {
-        helper(&helper_calls, window_id, kind)
-    })
-    .await
-    .expect("registry eventually populates");
-    let request_lines = server.await.unwrap();
-
-    assert_eq!(request_lines.len(), 3);
-    assert_eq!(helper_calls.load(Ordering::Relaxed), 1);
-    assert_eq!(result.elements.len(), 1);
-    assert_eq!(result.elements[0].identifier, "button.ready");
-    assert_eq!(result.elements[0].window_id, Some(42));
-}
-
-#[tokio::test]
-async fn resolve_list_elements_does_not_retry_unscoped_empty_results() {
-    async fn helper(
-        _window_id: Option<i64>,
-        _kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        Ok(ListElementsResult { elements: vec![] })
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_single_response(&path, empty_elements_response(1));
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_list_elements_with(&client, None, None, helper)
-        .await
-        .expect("empty unscoped result succeeds");
-    let request_line = server.await.unwrap();
-
-    assert!(request_line.contains("\"op\":\"listElements\""));
-    assert!(result.elements.is_empty());
-}
-
-#[tokio::test]
-async fn resolve_list_elements_does_not_retry_kind_filtered_empty_results() {
-    async fn helper(
-        _window_id: Option<i64>,
-        _kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        Ok(ListElementsResult { elements: vec![] })
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_single_response(&path, empty_elements_response(1));
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_list_elements_with(&client, Some(42), Some(ElementKind::Button), helper)
-        .await
-        .expect("empty kind-filtered result succeeds");
-    let request_line = server.await.unwrap();
-
-    assert!(request_line.contains("\"op\":\"listElements\""));
-    assert!(request_line.contains("\"kind\":\"button\""));
-    assert!(result.elements.is_empty());
-}
-
-#[tokio::test]
-async fn get_element_rejects_empty_identifier() {
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let client = Arc::new(RegistryClient::with_socket_path(path));
-    let tool = GetElementTool::new(client);
-    let err = tool
-        .call(json!({"identifier": ""}))
-        .await
-        .expect_err("empty identifier rejected");
-    assert!(err.message().contains("identifier cannot be empty"));
-}
-
-#[tokio::test]
-async fn resolve_get_element_uses_helper_when_registry_reports_not_found() {
-    async fn helper(identifier: String) -> Result<GetElementResult, AccessibilityQueryError> {
-        assert_eq!(identifier, "button.fallback");
-        Ok(GetElementResult {
-            element: fallback_element("button.fallback", 7, ElementKind::Button),
-        })
-    }
-
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let server = spawn_single_response(&path, not_found_response(1));
-    let client = RegistryClient::with_socket_path(path);
-    let result = resolve_get_element_with(&client, "button.fallback", helper)
-        .await
-        .expect("helper recovers not-found");
-    let request_line = server.await.unwrap();
-
-    assert!(request_line.contains("\"op\":\"getElement\""));
-    assert_eq!(result.element.identifier, "button.fallback");
-    assert_eq!(result.element.window_id, Some(7));
-}
-
-#[tokio::test]
-async fn click_element_targets_frame_center() {
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    // Use a bogus harness-input path so click() definitely fails (no
-    // backend) after the element lookup completes. We assert the request
-    // line made it to the socket, proving the element resolution ran.
-    let response = sample_element_response(1);
-    let server = spawn_single_response(&path, response);
-    let client = Arc::new(RegistryClient::with_socket_path(path));
-    let tool = ClickElementTool::new(client);
-    // On this host we may or may not have a click backend; we only assert
-    // that the registry was consulted. The subsequent click can succeed
-    // (on a host with cliclick) or fail (hosts without).
-    let _ = tool.call(json!({"identifier": "button.send"})).await;
-    let request_line = server.await.unwrap();
-    assert!(
-        request_line.contains("\"op\":\"getElement\""),
-        "missing op, got {request_line}",
-    );
-    assert!(request_line.contains("\"identifier\":\"button.send\""));
-}
-
-#[tokio::test]
-async fn scroll_tool_queries_registry_for_identifier() {
-    let dir = TempDir::new().unwrap();
-    let path = socket_path(&dir);
-    let response = sample_element_response_with(
-        1,
-        "harness.session.cockpit.scroll",
-        10.0,
-        20.0,
-        200.0,
-        120.0,
-    );
-    let server = spawn_single_response(&path, response);
-    let client = Arc::new(RegistryClient::with_socket_path(path));
-    let tool = ScrollTool::new(client);
-    let _ = tool
-        .call(json!({"identifier": "harness.session.cockpit.scroll", "deltaY": 180}))
-        .await;
-    let request_line = server.await.unwrap();
-    assert!(request_line.contains("\"op\":\"getElement\""));
-    assert!(request_line.contains("\"identifier\":\"harness.session.cockpit.scroll\""));
+    write_helper_script(path, &script);
 }

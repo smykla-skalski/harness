@@ -263,7 +263,7 @@ private final class BlockingMCPService: HarnessMonitorMCPStartupControlling {
   }
 }
 
-private enum MCPContractTestError: Error, CustomStringConvertible {
+enum MCPContractTestError: Error, CustomStringConvertible {
   case socketNeverAppeared(String)
   case clientSocketFailed(Int32)
   case connectFailed(Int32)

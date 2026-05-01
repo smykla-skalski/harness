@@ -5,6 +5,7 @@ public enum RegistryRequestOp: String, Sendable, Codable {
   case listWindows
   case listElements
   case getElement
+  case performAction
   case syncClientSnapshot
   case clearClientSnapshot
   case replacementNotice
@@ -14,6 +15,7 @@ public struct RegistryRequest: Sendable, Codable {
   public var id: Int
   public var op: RegistryRequestOp
   public var identifier: String?
+  public var action: RegistrySemanticAction?
   public var windowID: Int?
   public var kind: RegistryElementKind?
   public var clientID: UUID?
@@ -25,6 +27,7 @@ public struct RegistryRequest: Sendable, Codable {
     id: Int,
     op: RegistryRequestOp,
     identifier: String? = nil,
+    action: RegistrySemanticAction? = nil,
     windowID: Int? = nil,
     kind: RegistryElementKind? = nil,
     clientID: UUID? = nil,
@@ -35,6 +38,7 @@ public struct RegistryRequest: Sendable, Codable {
     self.id = id
     self.op = op
     self.identifier = identifier
+    self.action = action
     self.windowID = windowID
     self.kind = kind
     self.clientID = clientID

@@ -192,7 +192,7 @@ struct NewSessionSheetView: View {
   }
 
   var agentCapabilityOptions: [AgentCapabilityOption] {
-    AgentsWindowView.agentCapabilityOptions(
+    WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: availableAcpAgents,
       runtimeProbeResults: runtimeProbeResults,
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
@@ -361,7 +361,7 @@ struct NewSessionSheetView: View {
   }
 
   private func normalizePreferredSelection() {
-    selectedLaunchSelection = AgentsWindowView.normalizedLaunchSelection(
+    selectedLaunchSelection = WorkspaceWindowView.normalizedLaunchSelection(
       options: agentCapabilityOptions,
       selection: selectedLaunchSelection,
       fallbackRuntime: selectedLaunchSelection.preferredRuntime

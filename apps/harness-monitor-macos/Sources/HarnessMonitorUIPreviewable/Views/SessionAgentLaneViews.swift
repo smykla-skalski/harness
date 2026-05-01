@@ -261,7 +261,8 @@ struct SessionAgentSummaryCard: View {
       .harnessTrackMCPElement(
         HarnessMonitorAccessibility.sessionAgentCard(agent.agentId),
         kind: .row,
-        label: agent.name
+        label: agent.name,
+        pressAction: { openAgent(agent.agentId) }
       )
       .accessibilityFrameMarker(
         "\(HarnessMonitorAccessibility.sessionAgentCard(agent.agentId)).frame"

@@ -12,6 +12,7 @@ mod get_element;
 mod list_elements;
 mod list_windows;
 mod move_mouse;
+mod press_element;
 mod screenshot_window;
 mod scroll;
 mod shared;
@@ -27,8 +28,9 @@ pub use get_element::GetElementTool;
 pub use list_elements::ListElementsTool;
 pub use list_windows::ListWindowsTool;
 pub use move_mouse::MoveMouseTool;
-pub use scroll::ScrollTool;
+pub use press_element::PressElementTool;
 pub use screenshot_window::ScreenshotWindowTool;
+pub use scroll::ScrollTool;
 pub use type_text::TypeTextTool;
 
 /// Register every automation tool against `registry`, sharing a single
@@ -40,6 +42,7 @@ pub fn register_all(registry: &mut ToolRegistry, client: &Arc<RegistryClient>) {
     registry.register(Box::new(MoveMouseTool));
     registry.register(Box::new(ClickTool));
     registry.register(Box::new(ClickElementTool::new(Arc::clone(client))));
+    registry.register(Box::new(PressElementTool::new(Arc::clone(client))));
     registry.register(Box::new(ScrollTool::new(Arc::clone(client))));
     registry.register(Box::new(DragDropTool::new(Arc::clone(client))));
     registry.register(Box::new(TypeTextTool));

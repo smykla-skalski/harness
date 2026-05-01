@@ -16,12 +16,14 @@ import Foundation
 //   check                         (report Accessibility permission state)
 //   list-elements [--bundle-id id] [--window-id id] [--kind kind]
 //   get-element [--bundle-id id] <identifier>
+//   perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>
 //
 // Coordinates are in global screen space, origin at the top-left display.
 // Exit codes:
 //   0  success
 //   1  runtime failure
 //   2  accessibility permission denied
+//   4  supported element found, but no matching accessibility action exists
 //   64 usage error
 
 let args = Array(CommandLine.arguments.dropFirst())
@@ -41,6 +43,7 @@ do {
   case "check": try handleCheck()
   case "list-elements": try handleListElements(Array(args.dropFirst()))
   case "get-element": try handleGetElement(Array(args.dropFirst()))
+  case "perform-action": try handlePerformAction(Array(args.dropFirst()))
   case "-h", "--help", "help":
     printUsage()
     exit(0)
@@ -63,6 +66,7 @@ enum InputToolError: Error, CustomStringConvertible {
   case accessibilityDenied
   case appNotRunning(String)
   case notFound(String)
+  case actionUnavailable(String)
   case eventCreationFailed(String)
   case queryFailed(String)
 
@@ -77,6 +81,8 @@ enum InputToolError: Error, CustomStringConvertible {
       return "Harness Monitor is not running for bundle id(s): \(bundleIdentifier)"
     case .notFound(let identifier):
       return "not found: \(identifier)"
+    case .actionUnavailable(let identifier):
+      return "no supported accessibility action for identifier: \(identifier)"
     case .eventCreationFailed(let what): return "failed to create \(what) event"
     case .queryFailed(let detail): return "query failed: \(detail)"
     }
@@ -88,6 +94,7 @@ enum InputToolError: Error, CustomStringConvertible {
     case .invalidNumber, .invalidButton: return 64
     case .accessibilityDenied: return 2
     case .notFound: return 3
+    case .actionUnavailable: return 4
     case .appNotRunning, .eventCreationFailed, .queryFailed: return 1
     }
   }
@@ -107,6 +114,7 @@ func printUsage() {
       check                           (prints "trusted" or "denied"; exit 2 if denied)
       list-elements [--bundle-id id] [--window-id id] [--kind kind]
       get-element [--bundle-id id] <identifier>
+      perform-action [--bundle-id id] [--window-id id] [--action press] <identifier>
 
     All coordinates are global screen coordinates, origin at top-left.
     """

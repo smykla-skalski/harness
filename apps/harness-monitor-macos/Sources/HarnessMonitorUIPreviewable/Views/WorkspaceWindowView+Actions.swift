@@ -11,13 +11,6 @@ extension WorkspaceWindowView {
     )
   }
 
-  func updateDetailColumnGeometry(_ size: CGSize) {
-    guard viewModel.lastDetailColumnSize != size else {
-      return
-    }
-    viewModel.lastDetailColumnSize = size
-  }
-
   func syncTerminalResizeControls(to size: AgentTuiSize) {
     if viewModel.rows != size.rows {
       viewModel.rows = size.rows

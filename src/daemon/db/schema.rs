@@ -33,6 +33,9 @@ impl DaemonDb {
     }
 
     /// Open an in-memory database for testing.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
     #[cfg(test)]
     pub fn open_in_memory() -> Result<Self, CliError> {
         let conn = Connection::open_in_memory()
@@ -90,7 +93,9 @@ impl DaemonDb {
 
     fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
         let version_number = version.parse::<u8>().map_err(|error| {
-            db_error(format!("invalid daemon database schema version '{version}': {error}"))
+            db_error(format!(
+                "invalid daemon database schema version '{version}': {error}"
+            ))
         })?;
         if version_number > 11 {
             return Err(db_error(format!(
