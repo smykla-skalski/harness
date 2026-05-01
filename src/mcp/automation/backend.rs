@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::env;
+use std::fs::read_dir;
 use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -96,7 +97,7 @@ fn helper_candidates_from(repo_root: &Path) -> Vec<PathBuf> {
 }
 
 fn platform_helper_candidates(build_root: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(build_root) else {
+    let Ok(entries) = read_dir(build_root) else {
         return Vec::new();
     };
 
@@ -176,16 +177,18 @@ async fn helper_launches(path: &Path) -> bool {
 }
 
 fn helper_search_roots() -> Vec<PathBuf> {
-    helper_search_roots_from(env::current_dir().ok(), env::current_exe().ok())
+    let current_dir = env::current_dir().ok();
+    let current_exe = env::current_exe().ok();
+    helper_search_roots_from(current_dir.as_deref(), current_exe.as_deref())
 }
 
 pub(crate) fn helper_search_roots_from(
-    current_dir: Option<PathBuf>,
-    current_exe: Option<PathBuf>,
+    current_dir: Option<&Path>,
+    current_exe: Option<&Path>,
 ) -> Vec<PathBuf> {
     let mut roots = Vec::new();
-    push_unique_ancestors(current_exe.as_deref().and_then(Path::parent), &mut roots);
-    push_unique_ancestors(current_dir.as_deref(), &mut roots);
+    push_unique_ancestors(current_exe.and_then(Path::parent), &mut roots);
+    push_unique_ancestors(current_dir, &mut roots);
     roots
 }
 

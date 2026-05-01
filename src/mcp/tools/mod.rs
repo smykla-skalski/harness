@@ -33,15 +33,15 @@ pub use type_text::TypeTextTool;
 
 /// Register every automation tool against `registry`, sharing a single
 /// `RegistryClient` for the registry-backed tools.
-pub fn register_all(registry: &mut ToolRegistry, client: Arc<RegistryClient>) {
-    registry.register(Box::new(ListWindowsTool::new(Arc::clone(&client))));
-    registry.register(Box::new(ListElementsTool::new(Arc::clone(&client))));
-    registry.register(Box::new(GetElementTool::new(Arc::clone(&client))));
+pub fn register_all(registry: &mut ToolRegistry, client: &Arc<RegistryClient>) {
+    registry.register(Box::new(ListWindowsTool::new(Arc::clone(client))));
+    registry.register(Box::new(ListElementsTool::new(Arc::clone(client))));
+    registry.register(Box::new(GetElementTool::new(Arc::clone(client))));
     registry.register(Box::new(MoveMouseTool));
     registry.register(Box::new(ClickTool));
-    registry.register(Box::new(ClickElementTool::new(Arc::clone(&client))));
-    registry.register(Box::new(ScrollTool::new(Arc::clone(&client))));
-    registry.register(Box::new(DragDropTool::new(Arc::clone(&client))));
+    registry.register(Box::new(ClickElementTool::new(Arc::clone(client))));
+    registry.register(Box::new(ScrollTool::new(Arc::clone(client))));
+    registry.register(Box::new(DragDropTool::new(Arc::clone(client))));
     registry.register(Box::new(TypeTextTool));
     registry.register(Box::new(ScreenshotWindowTool));
 }

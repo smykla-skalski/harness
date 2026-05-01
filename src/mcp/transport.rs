@@ -69,7 +69,7 @@ fn serve_macos(args: &McpServeArgs) -> Result<i32, CliError> {
         None => RegistryClient::new(),
     };
     let mut tools = ToolRegistry::new();
-    register_all(&mut tools, Arc::new(client));
+    register_all(&mut tools, &Arc::new(client));
     let dispatcher = Dispatcher::new(tools);
 
     let runtime = Builder::new_current_thread()
