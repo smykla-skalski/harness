@@ -54,7 +54,7 @@ public struct PreferencesView: View {
         case .codex:
           PreferencesHostBridgeSection(store: store)
         case .mcp:
-          PreferencesMCPSection()
+          PreferencesMCPSection(store: store)
         case .authorizedFolders:
           AuthorizedFoldersSection(store: store)
         case .supervisor:

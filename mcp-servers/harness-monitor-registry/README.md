@@ -11,7 +11,7 @@ Swift package that exposes Harness Monitor's accessibility elements to the Rust 
 - `RegistryWireCodec` - JSON codec for the envelope format the Node server expects.
 - `.trackAccessibility(...)` - SwiftUI view modifier that captures a view's frame via `GeometryReader` + `CoordinateSpace.global` and registers it with a registry. Frame updates flow through a `PreferenceKey`, so moves during layout are picked up automatically.
 - `.trackWindow(...)` - SwiftUI scene-level modifier that registers the hosting `NSWindow` and automatically harvests the live AppKit view tree into `RegistryElement`s for that window.
-- `harness-monitor-input` executable - CGEvent-backed helper that replaces the external `cliclick` dependency for input and also exposes live AX query subcommands used by the Rust MCP server. Subcommands: `move`, `click`, `type`, `position`, `check`, `list-elements`, `get-element`.
+- `harness-monitor-input` executable - CGEvent-backed helper that replaces the external `cliclick` dependency for input and also exposes live AX query subcommands used by the Rust MCP server. Subcommands: `move`, `click`, `scroll`, `drag`, `type`, `position`, `check`, `list-elements`, `get-element`.
 - `harness-monitor-registry-host` executable - manual-test harness that seeds the registry with fixture windows and elements and runs the listener at a given socket path.
 
 ## Why a separate package

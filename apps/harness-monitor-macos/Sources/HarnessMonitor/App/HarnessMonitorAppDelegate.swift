@@ -66,6 +66,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   func bind(store: HarnessMonitorStore) {
     self.store = store
+    // The startup controller owns MCP runtime/recovery truth. The store only mirrors
+    // snapshots so toolbar, banner, preferences, and feedback stay passive observers.
+    mcpStartupController.statusDidChange = { [weak store] status in
+      store?.updateMCPStatus(status)
+    }
+    store.updateMCPStatus(mcpStartupController.statusSnapshot)
   }
 
   private func disableAnimationsForUITesting() {

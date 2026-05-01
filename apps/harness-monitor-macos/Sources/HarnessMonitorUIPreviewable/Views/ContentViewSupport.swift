@@ -77,7 +77,8 @@ public struct ContentDetailColumn: View {
       canNavigateForward: false,
       canStartNewSession: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
+      mcpStatus: store.contentUI.toolbar.mcpStatus
     )
   }
 
@@ -97,6 +98,7 @@ public struct ContentDetailColumn: View {
           windowID: HarnessMonitorWindowID.main,
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
+          mcpStatus: contentChrome.mcpStatus,
           arbitrationTasks: contentSessionDetail.arbitrationBannerTasks
         ) {
           sessionContent

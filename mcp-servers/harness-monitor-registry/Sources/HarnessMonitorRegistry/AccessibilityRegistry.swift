@@ -5,41 +5,68 @@ import Foundation
 /// Views register themselves via `.trackAccessibility(...)` and the actor publishes the
 /// results over the IPC socket.
 public actor AccessibilityRegistry {
-  private var elements: [String: RegistryElement] = [:]
-  private var windows: [Int: RegistryWindow] = [:]
-  private var windowElementIdentifiers: [Int: Set<String>] = [:]
+  private struct StoredWindow {
+    let window: RegistryWindow
+    let ownership: WindowOwnership
+  }
+
+  private enum WindowOwnership: Equatable {
+    case manual
+    case tracked(UUID)
+  }
+
+  private struct StoredElement {
+    let element: RegistryElement
+    let ownership: ElementOwnership
+  }
+
+  private enum ElementOwnership: Equatable {
+    case manual
+    case trackedWindowSnapshot(windowID: Int, ownerID: UUID)
+  }
+
+  private var elements: [String: StoredElement] = [:]
+  private var windows: [Int: StoredWindow] = [:]
+  private var trackedWindowElements: [Int: TrackedWindowElements] = [:]
+
+  private struct TrackedWindowElements {
+    let ownerID: UUID
+    var identifiers: Set<String>
+  }
 
   public init() {}
 
   public func registerElement(_ element: RegistryElement) {
-    if let previousWindowID = elements[element.identifier]?.windowID {
-      removeTrackedElementIdentifier(element.identifier, from: previousWindowID)
-    }
-    elements[element.identifier] = element
-    if let windowID = element.windowID {
-      var identifiers = windowElementIdentifiers[windowID] ?? []
-      identifiers.insert(element.identifier)
-      windowElementIdentifiers[windowID] = identifiers
-    }
+    removeTrackedSnapshotReference(for: element.identifier)
+    elements[element.identifier] = StoredElement(element: element, ownership: .manual)
   }
 
   public func unregisterElement(identifier: String) {
-    if let windowID = elements[identifier]?.windowID {
-      removeTrackedElementIdentifier(identifier, from: windowID)
-    }
+    removeTrackedSnapshotReference(for: identifier)
     elements[identifier] = nil
   }
 
   public func registerWindow(_ window: RegistryWindow) {
-    windows[window.id] = window
+    windows[window.id] = StoredWindow(window: window, ownership: .manual)
   }
 
   public func unregisterWindow(id: Int) {
     windows[id] = nil
   }
 
+  public func registerTrackedWindow(_ window: RegistryWindow, ownerID: UUID) {
+    windows[window.id] = StoredWindow(window: window, ownership: .tracked(ownerID))
+  }
+
+  public func unregisterTrackedWindow(id: Int, ownerID: UUID) {
+    guard windows[id]?.ownership == .tracked(ownerID) else {
+      return
+    }
+    windows[id] = nil
+  }
+
   public func replaceWindowElements(windowID: Int, elements replacement: [RegistryElement]) {
-    unregisterElements(windowID: windowID)
+    clearAllWindowElements(windowID: windowID)
     for element in replacement {
       var normalized = element
       normalized.windowID = windowID
@@ -48,22 +75,48 @@ public actor AccessibilityRegistry {
   }
 
   public func unregisterElements(windowID: Int) {
-    guard let identifiers = windowElementIdentifiers.removeValue(forKey: windowID) else {
+    clearAllWindowElements(windowID: windowID)
+  }
+
+  public func replaceTrackedWindowElements(
+    windowID: Int,
+    elements replacement: [RegistryElement],
+    ownerID: UUID
+  ) {
+    clearTrackedWindowElements(windowID: windowID)
+
+    var identifiers: Set<String> = []
+    for element in replacement {
+      var normalized = element
+      normalized.windowID = windowID
+      removeTrackedSnapshotReference(for: normalized.identifier)
+      elements[normalized.identifier] = StoredElement(
+        element: normalized,
+        ownership: .trackedWindowSnapshot(windowID: windowID, ownerID: ownerID)
+      )
+      identifiers.insert(normalized.identifier)
+    }
+
+    trackedWindowElements[windowID] = TrackedWindowElements(
+      ownerID: ownerID,
+      identifiers: identifiers
+    )
+  }
+
+  public func unregisterTrackedWindowElements(windowID: Int, ownerID: UUID) {
+    guard trackedWindowElements[windowID]?.ownerID == ownerID else {
       return
     }
-    for identifier in identifiers {
-      if elements[identifier]?.windowID == windowID {
-        elements[identifier] = nil
-      }
-    }
+    clearTrackedWindowElements(windowID: windowID)
   }
 
   public func element(identifier: String) -> RegistryElement? {
-    elements[identifier]
+    elements[identifier]?.element
   }
 
   public func allElements(windowID: Int? = nil, kind: RegistryElementKind? = nil) -> [RegistryElement] {
     elements.values
+      .map(\.element)
       .filter { element in
         if let windowID, element.windowID != windowID { return false }
         if let kind, element.kind != kind { return false }
@@ -73,31 +126,71 @@ public actor AccessibilityRegistry {
   }
 
   public func allWindows() -> [RegistryWindow] {
-    windows.values.sorted { $0.id < $1.id }
+    windows.values
+      .map(\.window)
+      .sorted { $0.id < $1.id }
   }
 
   public func snapshot() -> RegistrySnapshot {
     RegistrySnapshot(
-      elements: elements.values.sorted { $0.identifier < $1.identifier },
-      windows: windows.values.sorted { $0.id < $1.id }
+      elements: elements.values.map(\.element).sorted { $0.identifier < $1.identifier },
+      windows: windows.values.map(\.window).sorted { $0.id < $1.id }
     )
   }
 
   public func reset() {
     elements.removeAll()
     windows.removeAll()
-    windowElementIdentifiers.removeAll()
+    trackedWindowElements.removeAll()
   }
 
-  private func removeTrackedElementIdentifier(_ identifier: String, from windowID: Int) {
-    guard var identifiers = windowElementIdentifiers[windowID] else {
+  private func clearTrackedWindowElements(windowID: Int) {
+    guard let tracked = trackedWindowElements.removeValue(forKey: windowID) else {
       return
     }
-    identifiers.remove(identifier)
-    if identifiers.isEmpty {
-      windowElementIdentifiers[windowID] = nil
+    for identifier in tracked.identifiers {
+      guard
+        case .trackedWindowSnapshot(let storedWindowID, let storedOwnerID) = elements[identifier]?
+          .ownership,
+        storedWindowID == windowID,
+        storedOwnerID == tracked.ownerID
+      else {
+        continue
+      }
+
+        elements[identifier] = nil
+    }
+  }
+
+  private func clearAllWindowElements(windowID: Int) {
+    let identifiersToRemove = elements.compactMap { identifier, stored in
+      stored.element.windowID == windowID ? identifier : nil
+    }
+
+    for identifier in identifiersToRemove {
+      removeTrackedSnapshotReference(for: identifier)
+      elements[identifier] = nil
+    }
+
+    trackedWindowElements[windowID] = nil
+  }
+
+  private func removeTrackedSnapshotReference(for identifier: String) {
+    guard
+      case .trackedWindowSnapshot(let windowID, let ownerID) = elements[identifier]?.ownership,
+      var tracked = trackedWindowElements[windowID]
+    else {
+      return
+    }
+
+    tracked.identifiers.subtract([identifier])
+    if tracked.identifiers.isEmpty {
+      trackedWindowElements[windowID] = nil
     } else {
-      windowElementIdentifiers[windowID] = identifiers
+      trackedWindowElements[windowID] = TrackedWindowElements(
+        ownerID: ownerID,
+        identifiers: tracked.identifiers
+      )
     }
   }
 }

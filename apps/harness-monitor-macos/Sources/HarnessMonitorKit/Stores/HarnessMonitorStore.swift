@@ -51,6 +51,16 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentChrome])
     }
   }
+  public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
+    runtimeState: .disabled,
+    recoveryStatus: nil
+  ) {
+    didSet {
+      guard oldValue != mcpStatus else { return }
+      scheduleUISync([.contentToolbar, .contentChrome])
+    }
+  }
+  @ObservationIgnored var mcpFeedbackState = MCPStatusFeedbackState()
   @ObservationIgnored var forcedHostBridgeCapabilities: Set<String> = []
   public var selectedCodexRuns: [CodexRunSnapshot] = [] {
     didSet {

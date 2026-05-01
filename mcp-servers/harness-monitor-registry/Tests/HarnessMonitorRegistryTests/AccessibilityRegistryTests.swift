@@ -130,6 +130,32 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("stale tracker teardown does not unregister a replacement tracker for the same window")
+  func staleTrackerTeardownDoesNotUnregisterReplacementWindowTracker() async {
+    let registry = AccessibilityRegistry()
+    let staleController = WindowRegistrySyncController(registry: registry)
+    let replacementController = WindowRegistrySyncController(registry: registry)
+    let entry = RegistryWindow(
+      id: 101,
+      title: "Tracked",
+      frame: RegistryRect(x: 40, y: 50, width: 320, height: 240)
+    )
+
+    let staleGeneration = staleController.beginTracking(windowID: entry.id)
+    staleController.sync(entry, generation: staleGeneration)
+
+    let replacementGeneration = replacementController.beginTracking(windowID: entry.id)
+    replacementController.sync(entry, generation: replacementGeneration)
+    staleController.stopTracking()
+
+    await staleController.waitForIdle()
+    await replacementController.waitForIdle()
+
+    let windows = await registry.allWindows()
+    #expect(windows.map(\.id) == [entry.id])
+  }
+
+  @MainActor
   @Test("window element sync harvests and replaces tracked controls")
   func windowElementSyncHarvestsTrackedControls() async {
     let registry = AccessibilityRegistry()
@@ -174,5 +200,40 @@ struct AccessibilityRegistryTests {
     await controller.waitForIdle()
     let clearedElements = await registry.allElements(windowID: window.windowNumber)
     #expect(clearedElements.isEmpty)
+  }
+
+  @MainActor
+  @Test("stale tracker teardown does not clear replacement harvested elements for the same window")
+  func staleTrackerTeardownDoesNotClearReplacementWindowElements() async {
+    let registry = AccessibilityRegistry()
+    let staleController = WindowElementRegistrySyncController(registry: registry)
+    let replacementController = WindowElementRegistrySyncController(registry: registry)
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("session.controls.start")
+    root.addSubview(button)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let staleGeneration = staleController.beginTracking(windowID: window.windowNumber)
+    staleController.sync(window: window, generation: staleGeneration)
+
+    let replacementGeneration = replacementController.beginTracking(windowID: window.windowNumber)
+    replacementController.sync(window: window, generation: replacementGeneration)
+    staleController.stopTracking()
+
+    await staleController.waitForIdle()
+    await replacementController.waitForIdle()
+
+    let elements = await registry.allElements(windowID: window.windowNumber)
+    #expect(elements.map(\.identifier) == ["session.controls.start"])
   }
 }

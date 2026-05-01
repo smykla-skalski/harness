@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -109,6 +111,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.tasks.state"
     )
     #expect(
+      HarnessMonitorAccessibility.sessionCockpitScrollView
+        == "harness.session.cockpit.scroll"
+    )
+    #expect(
       HarnessMonitorAccessibility.sessionAgentListState
         == "harness.session.agents.state"
     )
@@ -155,6 +161,26 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     let contentView = try sourceFile(named: "ContentView.swift")
     #expect(contentChrome.contains("ContentAcpBridgeBannerBridge("))
     #expect(!contentView.contains("ContentAcpBridgeBannerBridge("))
+  }
+
+  @Test("MCP reliability identifiers match UI-test mirror")
+  func mcpReliabilityIdentifiersMirror() throws {
+    #expect(HarnessMonitorAccessibility.preferencesMCPSection == "harness.preferences.mcp")
+    #expect(
+      HarnessMonitorAccessibility.preferencesMCPRegistryHostToggle
+        == "harness.preferences.mcp.registry-host"
+    )
+    #expect(HarnessMonitorAccessibility.preferencesMCPStatus == "harness.preferences.mcp.status")
+    #expect(HarnessMonitorAccessibility.mcpToolbarStatus == "harness.toolbar.mcp.status")
+    #expect(HarnessMonitorAccessibility.mcpBanner == "harness.content.mcp.banner")
+
+    let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
+    let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
+    let preferencesMCP = try sourceFile(named: "PreferencesMCPSection.swift")
+
+    #expect(contentToolbar.contains("mcpToolbarStatus"))
+    #expect(contentChrome.contains("MCPStatusBanner(status: mcpStatus)"))
+    #expect(preferencesMCP.contains("preferencesMCPStatus"))
   }
 
   @Test("New session capability identifiers match UI-test mirror")
@@ -228,12 +254,16 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   func reviewAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let cockpitView = try sourceFile(named: "SessionCockpitView.swift")
     let taskLaneView = try sourceFile(named: "SessionTaskLaneViews.swift")
+    let agentLaneView = try sourceFile(named: "SessionAgentLaneViews.swift")
     let taskActionsSheet = try sourceFile(named: "Actions/TaskActionsSheet.swift")
     let toastView = try sourceFile(named: "HarnessMonitorFeedbackToastView.swift")
 
     #expect(cockpitView.contains("SessionCockpitHeuristicIssuesSection"))
+    #expect(cockpitView.contains("sessionCockpitScrollView"))
     #expect(taskLaneView.contains("sessionTaskListState"))
     #expect(taskActionsSheet.contains("ReviewStatePanel(task: task)"))
+    #expect(taskLaneView.contains("harnessTrackMCPElement"))
+    #expect(agentLaneView.contains("harnessTrackMCPElement"))
     #expect(toastView.contains("feedback.accessibilityIdentifier"))
   }
 
@@ -242,6 +272,56 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     let taskActionsSheet = try sourceFile(named: "Actions/TaskActionsSheet.swift")
 
     #expect(taskActionsSheet.contains("contentUI.sessionDetail.presentedSessionDetail"))
+  }
+
+  @MainActor
+  @Test("Harness MCP tracked elements register in the shared runtime registry")
+  func harnessTrackedElementsRegisterInRuntimeRegistry() async {
+    let registry = HarnessMonitorMCPAccessibilityService.shared.registry
+    let identifier = "harness.test.runtime-registration"
+
+    await registry.unregisterElement(identifier: identifier)
+
+    let host = NSHostingView(
+      rootView: Text("Pointer Target")
+        .harnessTrackMCPElement(identifier, kind: .row, label: "Pointer Target")
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 320, height: 120),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier) != nil
+      }
+    )
+
+    let element = await registry.element(identifier: identifier)
+    #expect(element?.label == "Pointer Target")
+    #expect((element?.frame.width ?? 0) > 0)
+    #expect((element?.frame.height ?? 0) > 0)
+
+    window.contentView = nil
+    host.removeFromSuperview()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier) == nil
+      }
+    )
   }
 
   private func sourceFile(named name: String) throws -> String {
@@ -259,5 +339,22 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       )
       .appendingPathComponent(name)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func waitUntil(
+    timeout: Duration = .seconds(1),
+    interval: Duration = .milliseconds(10),
+    _ predicate: @escaping @Sendable () async -> Bool
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now + timeout
+    while clock.now < deadline {
+      if await predicate() {
+        return true
+      }
+      await Task.yield()
+      try? await Task.sleep(for: interval)
+    }
+    return await predicate()
   }
 }

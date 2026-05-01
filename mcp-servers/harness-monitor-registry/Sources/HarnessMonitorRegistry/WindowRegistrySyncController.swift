@@ -8,6 +8,7 @@ final class WindowRegistrySyncController {
   }
 
   private let registry: AccessibilityRegistry
+  private let ownerID = UUID()
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
   private var pendingAction: PendingAction?
@@ -48,7 +49,7 @@ final class WindowRegistrySyncController {
     flushTask = Task { [weak self] in
       guard let self else { return }
       while let action = await MainActor.run(body: { self.takePendingActionOrFinish() }) {
-        await Self.apply(action, to: registry)
+        await self.apply(action, to: registry)
       }
     }
   }
@@ -62,12 +63,12 @@ final class WindowRegistrySyncController {
     return action
   }
 
-  private static func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
+  private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
     case .register(let window):
-      await registry.registerWindow(window)
+      await registry.registerTrackedWindow(window, ownerID: ownerID)
     case .unregister(let windowID):
-      await registry.unregisterWindow(id: windowID)
+      await registry.unregisterTrackedWindow(id: windowID, ownerID: ownerID)
     }
   }
 }

@@ -17,6 +17,14 @@ private enum AccessibilityAttributeName {
   static let windowNumber = "AXWindowNumber"
 }
 
+private enum AccessibilityTraversalDefaults {
+  static let excludedAttributes: Set<String> = [
+    kAXParentAttribute as String,
+    kAXWindowAttribute as String,
+    "AXTopLevelUIElement",
+  ]
+}
+
 private struct AccessibilityQueryRect: Codable {
   let x: Double
   let y: Double
@@ -293,6 +301,9 @@ private func matchWindowID(
   for window: AXUIElement,
   candidates: [AccessibilityQueryWindowCandidate]
 ) -> Int? {
+  if let directWindowNumber = axInt(window, AccessibilityAttributeName.windowNumber) {
+    return directWindowNumber
+  }
   guard !candidates.isEmpty else {
     return nil
   }
@@ -359,7 +370,7 @@ private func collectElements(
     if let element = accessibilityElement(from: node, windowID: windowID) {
       harvested[element.identifier] = element
     }
-    queue.append(contentsOf: axElementArray(node, kAXChildrenAttribute))
+    queue.append(contentsOf: axRelatedElements(node))
   }
 
   return harvested.values.sorted { $0.identifier < $1.identifier }
@@ -472,6 +483,10 @@ private func axBool(_ element: AXUIElement, _ attribute: String) -> Bool? {
   (axAttributeValue(element, attribute) as? NSNumber)?.boolValue
 }
 
+private func axInt(_ element: AXUIElement, _ attribute: String) -> Int? {
+  (axAttributeValue(element, attribute) as? NSNumber)?.intValue
+}
+
 private func axElement(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
   guard let value = axAttributeValue(element, attribute) else {
     return nil
@@ -481,6 +496,43 @@ private func axElement(_ element: AXUIElement, _ attribute: String) -> AXUIEleme
 
 private func axElementArray(_ element: AXUIElement, _ attribute: String) -> [AXUIElement] {
   (axAttributeValue(element, attribute) as? [AXUIElement]) ?? []
+}
+
+private func axRelatedElements(_ element: AXUIElement) -> [AXUIElement] {
+  var attributeNames: CFArray?
+  guard AXUIElementCopyAttributeNames(element, &attributeNames) == .success,
+    let names = attributeNames as? [String]
+  else {
+    return []
+  }
+
+  var related: [AXUIElement] = []
+  var seen: Set<OpaquePointer> = []
+  for attribute in names.sorted() {
+    guard !AccessibilityTraversalDefaults.excludedAttributes.contains(attribute) else {
+      continue
+    }
+    if let relatedElement = axElement(element, attribute) {
+      appendRelatedElement(relatedElement, to: &related, seen: &seen)
+    }
+    for relatedElement in axElementArray(element, attribute) {
+      appendRelatedElement(relatedElement, to: &related, seen: &seen)
+    }
+  }
+  return related
+}
+
+private func appendRelatedElement(
+  _ element: AXUIElement,
+  to related: inout [AXUIElement],
+  seen: inout Set<OpaquePointer>
+) {
+  let pointer = Unmanaged.passUnretained(element).toOpaque()
+  let opaque = OpaquePointer(pointer)
+  guard seen.insert(opaque).inserted else {
+    return
+  }
+  related.append(element)
 }
 
 private func axFrame(_ element: AXUIElement) -> CGRect? {

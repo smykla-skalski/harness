@@ -16,6 +16,8 @@ enum HarnessMonitorUITestAccessibility {
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let refreshButton = "harness.toolbar.refresh"
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
+  static let mcpToolbarStatus = "harness.toolbar.mcp.status"
+  static let mcpBanner = "harness.content.mcp.banner"
   static let supervisorBadge = "harness.supervisor.badge"
   static let supervisorBadgeState = "harness.supervisor.badge.state"
   static let supervisorForceTick = "harness.supervisor.force-tick"
@@ -141,6 +143,9 @@ enum HarnessMonitorUITestAccessibility {
   static let preferencesConnectionSection = "harness.preferences.section.connection"
   static let preferencesDatabaseSection = "harness.preferences.section.database"
   static let preferencesDiagnosticsSection = "harness.preferences.section.diagnostics"
+  static let preferencesMCPSection = "harness.preferences.mcp"
+  static let preferencesMCPRegistryHostToggle = "harness.preferences.mcp.registry-host"
+  static let preferencesMCPStatus = "harness.preferences.mcp.status"
   static let preferencesVoiceRoot = "harness.preferences.voice"
   static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
   static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
@@ -222,6 +227,11 @@ enum HarnessMonitorUITestAccessibility {
   static let sessionTimelinePaginationPrevious = "harness.session.timeline.pagination.previous"
   static let sessionTimelinePaginationNext = "harness.session.timeline.pagination.next"
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
+  static let sessionTimelineNavigation = "harness.session.timeline.navigation"
+  static let sessionTimelineNavigationStatus = "harness.session.timeline.navigation.status"
+  static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
+  static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
+  static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
   static let sendSignalSheet = "harness.sheet.send-signal"
   static let sendSignalSheetCommandField = "harness.sheet.send-signal.command"
   static let sendSignalSheetMessageField = "harness.sheet.send-signal.message"
@@ -258,6 +268,14 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.timeline.pagination.page.\(pageNumber)"
   }
 
+  static func sessionTimelineNode(_ key: String) -> String {
+    "harness.session.timeline.node.\(slug(key))"
+  }
+
+  static func sessionTimelineActionButton(decisionID: String, actionID: String) -> String {
+    "harness.session.timeline.action.\(slug(decisionID)).\(slug(actionID))"
+  }
+
   static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }
@@ -292,6 +310,7 @@ enum HarnessMonitorUITestAccessibility {
 
   static let leaderAgentTuiMarker = "harness.session.agent.leader-claude.tui-marker"
   static let workerAgentTuiMarker = "harness.session.agent.worker-codex.tui-marker"
+  static let sessionCockpitScrollView = "harness.session.cockpit.scroll"
   static let sessionAgentListState = "harness.session.agents.state"
 
   static func sessionAgentTuiMarker(_ agentID: String) -> String {
