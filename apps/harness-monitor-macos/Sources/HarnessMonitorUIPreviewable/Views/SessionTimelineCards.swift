@@ -4,20 +4,12 @@ import SwiftUI
 struct SessionTimelineCards: View {
   let rows: [SessionTimelineRow]
   let placeholderCount: Int
-  let topSpacerHeight: CGFloat
-  let bottomSpacerHeight: CGFloat
   let shimmerPhase: CGFloat
   let showsShimmer: Bool
   let actionHandler: any DecisionActionHandler
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      if topSpacerHeight > 0 {
-        Color.clear
-          .frame(height: topSpacerHeight)
-          .accessibilityHidden(true)
-      }
-
       ForEach(rows) { row in
         SessionTimelineNodeCluster(
           row: row,
@@ -32,12 +24,6 @@ struct SessionTimelineCards: View {
           showsShimmer: showsShimmer
         )
       }
-
-      if bottomSpacerHeight > 0 {
-        Color.clear
-          .frame(height: bottomSpacerHeight)
-          .accessibilityHidden(true)
-      }
     }
     .scrollTargetLayout()
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -49,7 +35,7 @@ struct SessionTimelineCards: View {
   }
 }
 
-private struct SessionTimelineNodeCluster: View {
+struct SessionTimelineNodeCluster: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
 
@@ -64,16 +50,6 @@ private struct SessionTimelineNodeCluster: View {
       )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background {
-      GeometryReader { proxy in
-        Color.clear.preference(
-          key: SessionTimelineRowFramePreferenceKey.self,
-          value: [
-            row.id: proxy.frame(in: .named(SessionTimelineScrollMetrics.coordinateSpaceName))
-          ]
-        )
-      }
-    }
   }
 }
 

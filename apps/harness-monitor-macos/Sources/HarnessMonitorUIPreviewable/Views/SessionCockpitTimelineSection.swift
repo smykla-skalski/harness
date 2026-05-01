@@ -15,13 +15,8 @@ struct SessionCockpitTimelineSection: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var scrollTargetID: String?
-  @State private var pendingScrollTargetID: String?
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
-  @State private var cachedVirtualizedLayout = SessionTimelineVirtualizedLayout.empty
-  @State private var cachedScrollMetrics = SessionTimelineScrollMetrics.zero
-  @State private var cachedRowFrames: [String: CGRect] = [:]
-  @State private var cachedRowHeights: [String: CGFloat] = [:]
   @State private var cachedVisibilityStats = SessionTimelineVisibilityStats.empty
 
   private var contentIdentity: SessionTimelineContentIdentity {
@@ -38,10 +33,6 @@ struct SessionCockpitTimelineSection: View {
     }
     .onChange(of: input) { _, newInput in
       rebuildPresentationIfNeeded(for: newInput)
-    }
-    .onChange(of: cachedScrollMetrics) { _, _ in
-      clearSettledPendingScrollTargetIfNeeded()
-      rebuildVirtualizedLayout()
     }
   }
 
@@ -85,8 +76,12 @@ struct SessionCockpitTimelineSection: View {
       dateTimeConfiguration: dateTimeConfiguration
     )
     cachedPresentationInput = input
-    reconcileTimelineCaches(with: cachedPresentation.rowIDs)
-    rebuildVirtualizedLayout()
+    rebuildVisibilityStats(
+      viewportStats: SessionTimelineTableViewportStats.initial(
+        estimatedVisibleRows: cachedPresentation.fallbackVisibleRowCount,
+        totalRows: cachedPresentation.rows.count
+      )
+    )
   }
 
   private func content(for presentation: SessionTimelineSectionPresentation) -> some View {
@@ -108,7 +103,6 @@ struct SessionCockpitTimelineSection: View {
     }
     .onChange(of: sessionID) { _, _ in
       scrollTargetID = nil
-      pendingScrollTargetID = nil
       requestLatestWindow()
     }
     .onChange(of: presentation.scrollNodeIDs) { _, ids in
@@ -150,13 +144,38 @@ struct SessionCockpitTimelineSection: View {
   private func timelineScrollContent(
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
+    Group {
+      if presentation.rows.isEmpty {
+        timelinePlaceholderContent(for: presentation)
+      } else {
+        SessionTimelineTableView(
+          rows: presentation.rows,
+          scrollTargetID: scrollTargetID,
+          actionHandler: actionHandler,
+          viewportStatsChanged: { viewportStats in
+            rebuildVisibilityStats(viewportStats: viewportStats)
+          },
+          scrollBoundaryChanged: { oldValue, newValue in
+            handleScrollBoundaryChange(
+              from: oldValue,
+              to: newValue,
+              presentation: presentation
+            )
+          }
+        )
+      }
+    }
+    .frame(height: presentation.viewportHeight)
+  }
+
+  private func timelinePlaceholderContent(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         SessionTimelineCards(
-          rows: cachedVirtualizedLayout.rows,
+          rows: [],
           placeholderCount: presentation.placeholderCount,
-          topSpacerHeight: cachedVirtualizedLayout.topSpacerHeight,
-          bottomSpacerHeight: cachedVirtualizedLayout.bottomSpacerHeight,
           shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
           showsShimmer: presentation.shouldAnimatePlaceholders,
           actionHandler: actionHandler
@@ -165,121 +184,23 @@ struct SessionCockpitTimelineSection: View {
       .id(contentIdentity)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .coordinateSpace(name: SessionTimelineScrollMetrics.coordinateSpaceName)
-    .frame(height: presentation.viewportHeight)
     .scrollIndicators(.visible)
     .scrollBounceBehavior(.always, axes: .vertical)
     .scrollClipDisabled(false)
-    .scrollPosition(id: $scrollTargetID, anchor: .top)
-    .onScrollGeometryChange(
-      for: SessionTimelineScrollMetrics.self,
-      of: SessionTimelineScrollMetrics.init(geometry:)
-    ) { _, newValue in
-      guard cachedScrollMetrics != newValue else {
-        return
-      }
-      cachedScrollMetrics = newValue
-    }
-    .onPreferenceChange(SessionTimelineRowFramePreferenceKey.self) { newFrames in
-      let rowHeightsDidChange = mergeMeasuredRowHeights(from: newFrames)
-      if cachedRowFrames != newFrames || rowHeightsDidChange {
-        cachedRowFrames = newFrames
-        let pendingTargetDidSettle = clearSettledPendingScrollTargetIfNeeded()
-        if rowHeightsDidChange || pendingTargetDidSettle {
-          rebuildVirtualizedLayout()
-        } else {
-          rebuildVisibilityStats()
-        }
-      }
-    }
-    .onScrollGeometryChange(
-      for: SessionTimelineScrollBoundaryState.self,
-      of: SessionTimelineScrollBoundaryState.init(geometry:)
-    ) { oldValue, newValue in
-      handleScrollBoundaryChange(
-        from: oldValue,
-        to: newValue,
-        presentation: presentation
-      )
-    }
   }
 
-  private func reconcileTimelineCaches(with rowIDs: [String]) {
-    let rowIDSet = Set(rowIDs)
-    let rowHeights = cachedRowHeights.filter { rowIDSet.contains($0.key) }
-    if rowHeights != cachedRowHeights {
-      cachedRowHeights = rowHeights
-    }
-    let rowFrames = cachedRowFrames.filter { rowIDSet.contains($0.key) }
-    if rowFrames != cachedRowFrames {
-      cachedRowFrames = rowFrames
-    }
-    if let pendingScrollTargetID, !rowIDSet.contains(pendingScrollTargetID) {
-      self.pendingScrollTargetID = nil
-    }
-  }
-
-  private func mergeMeasuredRowHeights(from rowFrames: [String: CGRect]) -> Bool {
-    var rowHeights = cachedRowHeights
-    var didChange = false
-
-    for (rowID, frame) in rowFrames {
-      let height = frame.height
-      guard height.isFinite, height > 0 else {
-        continue
-      }
-      if rowHeights[rowID] != height {
-        rowHeights[rowID] = height
-        didChange = true
-      }
-    }
-
-    if didChange {
-      cachedRowHeights = rowHeights
-    }
-    return didChange
-  }
-
-  private func rebuildVirtualizedLayout() {
-    let layout = SessionTimelineVirtualizedLayout(
-      rows: cachedPresentation.rows,
-      rowHeights: cachedRowHeights,
-      scrollMetrics: cachedScrollMetrics,
-      fallbackViewportHeight: cachedPresentation.viewportHeight,
-      pinnedRowID: pendingScrollTargetID
-    )
-    if cachedVirtualizedLayout != layout {
-      cachedVirtualizedLayout = layout
-    }
-    rebuildVisibilityStats()
-  }
-
-  private func rebuildVisibilityStats() {
+  private func rebuildVisibilityStats(
+    viewportStats: SessionTimelineTableViewportStats
+  ) {
     let stats = SessionTimelineVisibilityStats(
-      rowIDs: cachedPresentation.rowIDs,
-      rowFrames: cachedRowFrames,
-      scrollMetrics: cachedScrollMetrics,
-      fallbackVisibleRowCount: cachedVirtualizedLayout.estimatedVisibleRowCount,
-      renderedRowCount: cachedVirtualizedLayout.renderedRowCount,
+      visibleRowCount: viewportStats.visibleRowCount,
+      renderedRowCount: viewportStats.renderedRowCount,
       loadedEventCount: cachedPresentation.navigation.loadedCount,
       totalEventCount: cachedPresentation.navigation.totalCount
     )
     if cachedVisibilityStats != stats {
       cachedVisibilityStats = stats
     }
-  }
-
-  @discardableResult
-  private func clearSettledPendingScrollTargetIfNeeded() -> Bool {
-    guard let pendingScrollTargetID,
-      let targetFrame = cachedRowFrames[pendingScrollTargetID],
-      !cachedScrollMetrics.visibleRect.isEmpty,
-      targetFrame.intersects(cachedScrollMetrics.visibleRect)
-    else {
-      return false
-    }
-    self.pendingScrollTargetID = nil
-    return true
   }
 
   private func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -368,8 +289,6 @@ struct SessionCockpitTimelineSection: View {
       return
     }
     await MainActor.run {
-      pendingScrollTargetID = targetID
-      rebuildVirtualizedLayout()
       withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) {
         scrollTargetID = targetID
       }
@@ -379,7 +298,6 @@ struct SessionCockpitTimelineSection: View {
   private func reconcileScrollTarget(with ids: [String]) {
     guard !ids.isEmpty else {
       scrollTargetID = nil
-      pendingScrollTargetID = nil
       return
     }
     guard let scrollTargetID else {
@@ -388,9 +306,6 @@ struct SessionCockpitTimelineSection: View {
     }
     if !ids.contains(scrollTargetID) {
       self.scrollTargetID = ids.first
-    }
-    if let pendingScrollTargetID, !ids.contains(pendingScrollTargetID) {
-      self.pendingScrollTargetID = nil
     }
   }
 
