@@ -1,4 +1,8 @@
 use std::collections::HashSet;
+use std::env;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -14,10 +18,10 @@ use crate::mcp::tool::{Tool, ToolError};
 
 use super::shared::{decode_params, map_registry_error};
 
-const MAX_INLINE_SCREENSHOT_BASE64_BYTES: usize = 1_000_000;
-
 #[derive(Debug, Deserialize)]
 struct Params {
+    #[serde(rename = "outputPath")]
+    output_path: String,
     #[serde(rename = "windowID", default)]
     window_id: Option<u32>,
     #[serde(rename = "displayID", default)]
@@ -38,6 +42,7 @@ struct ScreenshotRegistryWindow {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CapturedScreenshot {
+    window_id: Option<u32>,
     label: Option<String>,
     bytes: Vec<u8>,
 }
@@ -59,18 +64,20 @@ impl Tool for ScreenshotWindowTool {
         "Capture PNG screenshots for the current Harness Monitor app run. If \
          windowID is provided, capture that Harness Monitor window; otherwise \
          capture only the live registry windows for the current app run, \
-         optionally filtered to displayID. Returns one inline image block per \
-         PNG when the encoded payload stays within the safe size limit."
+         optionally filtered to displayID. Saves PNGs to outputPath and \
+         returns saved file paths."
     }
 
     fn input_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
+                "outputPath": {"type": "string"},
                 "windowID": {"type": "integer"},
                 "displayID": {"type": "integer"},
                 "includeCursor": {"type": "boolean"},
             },
+            "required": ["outputPath"],
             "additionalProperties": false,
         })
     }
@@ -79,7 +86,13 @@ impl Tool for ScreenshotWindowTool {
         let parsed: Params = decode_params(params)?;
         let windows = self.capture_windows(parsed.window_id).await?;
         if parsed.display_id.is_none() {
-            return self.capture_registry_windows(windows, parsed.include_cursor).await;
+            return self
+                .capture_registry_windows(
+                    windows,
+                    parsed.include_cursor,
+                    Path::new(&parsed.output_path),
+                )
+                .await;
         }
         let options = ScreenshotOptions {
             window_id: None,
@@ -88,10 +101,14 @@ impl Tool for ScreenshotWindowTool {
             include_cursor: parsed.include_cursor,
         };
         match screenshot(&options).await {
-            Ok(bytes) => Ok(screenshot_tool_result(vec![CapturedScreenshot {
-                label: None,
-                bytes,
-            }])),
+            Ok(bytes) => screenshot_tool_result(
+                vec![CapturedScreenshot {
+                    window_id: None,
+                    label: None,
+                    bytes,
+                }],
+                Path::new(&parsed.output_path),
+            ),
             Err(error) => Err(map_automation_error(&error)),
         }
     }
@@ -116,6 +133,7 @@ impl ScreenshotWindowTool {
         &self,
         windows: Vec<ScreenshotRegistryWindow>,
         include_cursor: bool,
+        output_path: &Path,
     ) -> Result<ToolResult, ToolError> {
         let multiple = windows.len() > 1;
         let mut captures = Vec::with_capacity(windows.len());
@@ -130,11 +148,12 @@ impl ScreenshotWindowTool {
                 .await
                 .map_err(|error| map_automation_error(&error))?;
             captures.push(CapturedScreenshot {
+                window_id: Some(window.id),
                 label: multiple.then(|| screenshot_label(&window)),
                 bytes,
             });
         }
-        Ok(screenshot_tool_result(captures))
+        screenshot_tool_result(captures, output_path)
     }
 
     async fn request_registry_windows(
@@ -203,28 +222,64 @@ fn shareable_registry_windows(
     Ok(windows)
 }
 
-fn screenshot_tool_result(captures: Vec<CapturedScreenshot>) -> ToolResult {
+fn screenshot_tool_result(
+    captures: Vec<CapturedScreenshot>,
+    output_path: &Path,
+) -> Result<ToolResult, ToolError> {
+    let output_dir = resolve_output_dir(output_path)?;
+    let save_targets = capture_targets(&output_dir, &captures);
+    let mut saved_paths = Vec::with_capacity(save_targets.len());
+    for (capture, target_path) in captures.into_iter().zip(save_targets) {
+        fs::write(&target_path, &capture.bytes).map_err(|error| io_write_error(&error))?;
+        let full = target_path
+            .canonicalize()
+            .map_err(|error| io_write_error(&error))?
+            .display()
+            .to_string();
+        saved_paths.push((capture.label, full));
+    }
     let mut content = Vec::new();
-    for capture in captures {
-        if let Some(label) = capture.label {
+    for (label, full_path) in saved_paths {
+        if let Some(label) = label {
             content.push(ContentBlock::text(label));
         }
-        let byte_len = capture.bytes.len();
-        let encoded_len = base64_encoded_len(byte_len);
-        if encoded_len <= MAX_INLINE_SCREENSHOT_BASE64_BYTES {
-            content.push(ContentBlock::image(capture.bytes, "image/png"));
-            continue;
-        }
-        content.push(ContentBlock::text(format!(
-            "Captured PNG screenshot but omitted the inline image because the \
-             base64 payload would be {encoded_len} bytes, exceeding the \
-             {MAX_INLINE_SCREENSHOT_BASE64_BYTES}-byte safety limit."
-        )));
+        content.push(ContentBlock::text(full_path));
     }
-    ToolResult {
+    Ok(ToolResult {
         content,
         is_error: false,
+    })
+}
+
+fn resolve_output_dir(output_path: &Path) -> Result<PathBuf, ToolError> {
+    let absolute = if output_path.is_absolute() {
+        output_path.to_path_buf()
+    } else {
+        env::current_dir()
+            .map_err(|error| io_write_error(&error))?
+            .join(output_path)
+    };
+    fs::create_dir_all(&absolute).map_err(|error| io_write_error(&error))?;
+    Ok(absolute)
+}
+
+fn capture_targets(output_dir: &Path, captures: &[CapturedScreenshot]) -> Vec<PathBuf> {
+    captures
+        .iter()
+        .enumerate()
+        .map(|(index, capture)| output_dir.join(default_screenshot_name(capture, index)))
+        .collect()
+}
+
+fn io_write_error(error: &io::Error) -> ToolError {
+    ToolError::internal(format!("failed to save screenshot: {error}"))
+}
+
+fn default_screenshot_name(capture: &CapturedScreenshot, index: usize) -> String {
+    if let Some(window_id) = capture.window_id {
+        return format!("screenshot-window-{window_id}.png");
     }
+    format!("screenshot-{index}.png")
 }
 
 fn screenshot_label(window: &ScreenshotRegistryWindow) -> String {
@@ -234,92 +289,63 @@ fn screenshot_label(window: &ScreenshotRegistryWindow) -> String {
     format!("Window {} ({})", window.id, window.title)
 }
 
-const fn base64_encoded_len(byte_len: usize) -> usize {
-    byte_len.div_ceil(3) * 4
-}
-
 fn map_automation_error(error: &AutomationError) -> ToolError {
     ToolError::internal(error.to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::mcp::protocol::ContentBlock;
-
     use crate::mcp::registry::RegistryWindow;
+    use tempfile::TempDir;
 
     use super::{
-        CapturedScreenshot, MAX_INLINE_SCREENSHOT_BASE64_BYTES, ScreenshotRegistryWindow,
-        base64_encoded_len, screenshot_registry_windows, screenshot_tool_result,
-        shareable_registry_windows,
+        CapturedScreenshot, ScreenshotRegistryWindow, default_screenshot_name,
+        screenshot_registry_windows, screenshot_tool_result, shareable_registry_windows,
     };
 
     #[test]
-    fn screenshot_tool_result_keeps_small_pngs_inline() {
-        let raw_len = (MAX_INLINE_SCREENSHOT_BASE64_BYTES / 4) * 3;
-        let result = screenshot_tool_result(vec![CapturedScreenshot {
-            label: None,
-            bytes: vec![0_u8; raw_len],
-        }]);
+    fn screenshot_tool_result_saves_pngs_to_output_directory() {
+        let tmp = TempDir::new().expect("tempdir");
+        let output_dir = tmp.path().join("shots");
+        let result = screenshot_tool_result(
+            vec![CapturedScreenshot {
+                window_id: Some(41),
+                label: None,
+                bytes: vec![1_u8, 2_u8, 3_u8],
+            }],
+            &output_dir,
+        )
+        .expect("result");
         assert!(!result.is_error);
         assert_eq!(result.content.len(), 1);
-        match &result.content[0] {
-            ContentBlock::Image { mime_type, data } => {
-                assert_eq!(mime_type, "image/png");
-                assert_eq!(data.len(), MAX_INLINE_SCREENSHOT_BASE64_BYTES);
-            }
-            other => panic!("expected image block, got {other:?}"),
-        }
+        let saved = std::fs::read(output_dir.join("screenshot-window-41.png")).expect("saved");
+        assert_eq!(saved, vec![1_u8, 2_u8, 3_u8]);
     }
 
     #[test]
-    fn screenshot_tool_result_falls_back_to_text_for_large_pngs() {
-        let raw_len = ((MAX_INLINE_SCREENSHOT_BASE64_BYTES / 4) * 3) + 1;
-        let result = screenshot_tool_result(vec![CapturedScreenshot {
-            label: None,
-            bytes: vec![0_u8; raw_len],
-        }]);
-        assert!(!result.is_error);
-        assert_eq!(result.content.len(), 1);
-        match &result.content[0] {
-            ContentBlock::Text { text } => {
-                let encoded_len = base64_encoded_len(raw_len);
-                assert!(text.contains("omitted the inline image"));
-                assert!(text.contains(&encoded_len.to_string()));
-            }
-            other => panic!("expected text block, got {other:?}"),
-        }
+    fn default_screenshot_name_uses_window_id() {
+        let named = default_screenshot_name(
+            &CapturedScreenshot {
+                window_id: Some(41),
+                label: None,
+                bytes: vec![],
+            },
+            0,
+        );
+        assert_eq!(named, "screenshot-window-41.png");
     }
 
     #[test]
-    fn screenshot_tool_result_labels_multiple_pngs() {
-        let raw_len = 12;
-        let result = screenshot_tool_result(vec![
-            CapturedScreenshot {
-                label: Some("Window 41 (Dashboard)".to_string()),
-                bytes: vec![0_u8; raw_len],
+    fn default_screenshot_name_uses_index_when_window_missing() {
+        let named = default_screenshot_name(
+            &CapturedScreenshot {
+                window_id: None,
+                label: None,
+                bytes: vec![],
             },
-            CapturedScreenshot {
-                label: Some("Window 42 (Workspace)".to_string()),
-                bytes: vec![1_u8; raw_len],
-            },
-        ]);
-        assert!(!result.is_error);
-        assert_eq!(result.content.len(), 4);
-        assert_eq!(
-            result.content[0],
-            ContentBlock::Text {
-                text: "Window 41 (Dashboard)".to_string()
-            }
+            7,
         );
-        assert!(matches!(result.content[1], ContentBlock::Image { .. }));
-        assert_eq!(
-            result.content[2],
-            ContentBlock::Text {
-                text: "Window 42 (Workspace)".to_string()
-            }
-        );
-        assert!(matches!(result.content[3], ContentBlock::Image { .. }));
+        assert_eq!(named, "screenshot-7.png");
     }
 
     #[test]
