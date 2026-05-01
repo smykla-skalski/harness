@@ -358,7 +358,7 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     let service = HarnessMonitorMCPAccessibilityService.shared
     let registry = service.registry
     let identifier = "harness.test.semantic-press"
-    let probe = SemanticPressProbe()
+    let probe = AccessibilityRegistrySemanticPressProbe()
 
     await registry.unregisterElement(identifier: identifier)
 
@@ -396,48 +396,5 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     let result = await service.performSemanticAction(identifier: identifier, action: .press)
     #expect(result == .performed)
     #expect(probe.pressCount == 1)
-  }
-
-  private func sourceFile(named name: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let fileURL =
-      repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views"
-      )
-      .appendingPathComponent(name)
-    return try String(contentsOf: fileURL, encoding: .utf8)
-  }
-
-  private func waitUntil(
-    timeout: Duration = .seconds(1),
-    interval: Duration = .milliseconds(10),
-    _ predicate: @escaping @Sendable () async -> Bool
-  ) async -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now + timeout
-    while clock.now < deadline {
-      if await predicate() {
-        return true
-      }
-      await Task.yield()
-      try? await Task.sleep(for: interval)
-    }
-    return await predicate()
-  }
-}
-
-@MainActor
-private final class SemanticPressProbe {
-  private(set) var pressCount = 0
-
-  func recordPress() {
-    pressCount += 1
   }
 }

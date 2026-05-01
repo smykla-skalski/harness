@@ -11,7 +11,7 @@ struct RegistryRequestDispatcherTests {
         protocolVersion: 1,
         appVersion: "1.2.3",
         bundleIdentifier: "io.harnessmonitor.app",
-        capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+        capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
       )
     }
     return (registry, dispatcher)
@@ -26,7 +26,9 @@ struct RegistryRequestDispatcherTests {
       return
     }
     #expect(info.appVersion == "1.2.3")
-    #expect(info.capabilities == [.clientSnapshots, .clientSnapshotLeases, .replacementNotice])
+    #expect(
+      info.capabilities == [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+    )
   }
 
   @Test("getElement returns not-found for unknown identifier")
@@ -173,6 +175,69 @@ struct RegistryRequestDispatcherTests {
     }
     #expect(await probe.deliveryCount() == 1)
   }
+
+  @Test("performAction delegates to the semantic action handler")
+  func performActionDelegatesToTheSemanticActionHandler() async {
+    let registry = AccessibilityRegistry()
+    let probe = SemanticActionProbe()
+    let dispatcher = RegistryRequestDispatcher(
+      registry: registry,
+      pingInfo: {
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "1.2.3",
+          bundleIdentifier: "io.harnessmonitor.app",
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+        )
+      },
+      semanticActionHandler: { identifier, action in
+        await probe.record(identifier: identifier, action: action)
+        return .performed
+      }
+    )
+
+    let response = await dispatcher.dispatch(
+      RegistryRequest(id: 13, op: .performAction, identifier: "session.task.open", action: .press)
+    ).response
+
+    guard case .success(let id, .ack(let ack)) = response else {
+      Issue.record("expected performAction ack")
+      return
+    }
+    #expect(id == 13)
+    #expect(ack == RegistryAckResult(applied: true))
+    #expect(await probe.invocations() == [SemanticActionProbe.Invocation(identifier: "session.task.open", action: .press)])
+  }
+
+  @Test("performAction surfaces action-unavailable when no live handler exists")
+  func performActionSurfacesActionUnavailable() async {
+    let registry = AccessibilityRegistry()
+    let dispatcher = RegistryRequestDispatcher(
+      registry: registry,
+      pingInfo: {
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "1.2.3",
+          bundleIdentifier: "io.harnessmonitor.app",
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice, .semanticActions]
+        )
+      },
+      semanticActionHandler: { _, _ in
+        .actionUnavailable
+      }
+    )
+
+    let response = await dispatcher.dispatch(
+      RegistryRequest(id: 14, op: .performAction, identifier: "session.task.open", action: .press)
+    ).response
+
+    guard case .failure(let id, let error) = response else {
+      Issue.record("expected performAction failure")
+      return
+    }
+    #expect(id == 14)
+    #expect(error.code == "action-unavailable")
+  }
 }
 
 private actor ReplacementDeliveryProbe {
@@ -184,5 +249,22 @@ private actor ReplacementDeliveryProbe {
 
   func deliveryCount() -> Int {
     deliveries
+  }
+}
+
+private actor SemanticActionProbe {
+  struct Invocation: Equatable {
+    let identifier: String
+    let action: RegistrySemanticAction
+  }
+
+  private var recordedInvocations: [Invocation] = []
+
+  func record(identifier: String, action: RegistrySemanticAction) {
+    recordedInvocations.append(Invocation(identifier: identifier, action: action))
+  }
+
+  func invocations() -> [Invocation] {
+    recordedInvocations
   }
 }

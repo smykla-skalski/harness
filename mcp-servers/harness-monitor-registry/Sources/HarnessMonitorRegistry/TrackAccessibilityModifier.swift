@@ -1,8 +1,48 @@
 #if canImport(SwiftUI)
+import Foundation
 import SwiftUI
 #if canImport(AppKit)
 import AppKit
 #endif
+
+public struct RegistryTrackedSemanticActions: Sendable {
+  public typealias PressHandler = @MainActor @Sendable () -> Void
+
+  public static let none = Self()
+
+  public var press: PressHandler?
+
+  public init(press: PressHandler? = nil) {
+    self.press = press
+  }
+
+  public var supportedActions: [RegistrySemanticAction] {
+    press == nil ? [] : [.press]
+  }
+
+  var isEmpty: Bool {
+    press == nil
+  }
+
+  func handler(for action: RegistrySemanticAction) -> PressHandler? {
+    switch action {
+    case .press:
+      press
+    }
+  }
+}
+
+@MainActor
+public protocol RegistrySemanticActionSink: AnyObject {
+  func claimTrackedSemanticActions(identifier: String, ownerID: UUID)
+  func registerTrackedSemanticActions(
+    identifier: String,
+    semanticActions: RegistryTrackedSemanticActions,
+    ownerID: UUID
+  )
+  func clearTrackedSemanticActions(identifier: String, ownerID: UUID)
+  func unregisterTrackedSemanticActions(identifier: String, ownerID: UUID)
+}
 
 public extension View {
   /// Register this view with an `AccessibilityRegistry` so the MCP server can discover it.
@@ -16,6 +56,8 @@ public extension View {
   ///   - hint: Optional accessibility hint.
   ///   - windowID: Optional `CGWindowID` of the hosting window, when known.
   ///   - enabled: Whether the element currently accepts interaction.
+  ///   - semanticActions: In-app semantic actions the registry host can execute directly.
+  ///   - semanticActionSink: Main-actor sink that owns the live action handlers.
   ///   - registry: Registry instance to target.
   func trackAccessibility(
     _ identifier: String,
@@ -25,6 +67,8 @@ public extension View {
     hint: String? = nil,
     windowID: Int? = nil,
     enabled: Bool = true,
+    semanticActions: RegistryTrackedSemanticActions = .none,
+    semanticActionSink: (any RegistrySemanticActionSink)? = nil,
     registry: AccessibilityRegistry
   ) -> some View {
     modifier(
@@ -36,6 +80,8 @@ public extension View {
         hint: hint,
         windowID: windowID,
         enabled: enabled,
+        semanticActions: semanticActions,
+        semanticActionSink: semanticActionSink,
         registry: registry
       )
     )
@@ -50,6 +96,8 @@ struct TrackAccessibilityModifier: ViewModifier {
   let hint: String?
   let windowID: Int?
   let enabled: Bool
+  let semanticActions: RegistryTrackedSemanticActions
+  let semanticActionSink: (any RegistrySemanticActionSink)?
   let registry: AccessibilityRegistry
 
   func body(content: Content) -> some View {
@@ -64,6 +112,8 @@ struct TrackAccessibilityModifier: ViewModifier {
           hint: hint,
           windowID: windowID,
           enabled: enabled,
+          semanticActions: semanticActions,
+          semanticActionSink: semanticActionSink,
           registry: registry
         )
         .allowsHitTesting(false)
@@ -80,6 +130,8 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
   let hint: String?
   let windowID: Int?
   let enabled: Bool
+  let semanticActions: RegistryTrackedSemanticActions
+  let semanticActionSink: (any RegistrySemanticActionSink)?
   let registry: AccessibilityRegistry
 
   func makeNSView(context: Context) -> TrackAccessibilityNSView {
@@ -92,6 +144,8 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
       hint: hint,
       windowID: windowID,
       enabled: enabled,
+      semanticActions: semanticActions,
+      semanticActionSink: semanticActionSink,
       registry: registry
     )
     return view
@@ -106,6 +160,8 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
       hint: hint,
       windowID: windowID,
       enabled: enabled,
+      semanticActions: semanticActions,
+      semanticActionSink: semanticActionSink,
       registry: registry
     )
   }
@@ -124,6 +180,8 @@ private final class TrackAccessibilityNSView: NSView {
   private var hint: String?
   private var explicitWindowID: Int?
   private var enabled = true
+  private var semanticActions = RegistryTrackedSemanticActions.none
+  private var semanticActionSink: (any RegistrySemanticActionSink)?
   private var registry: AccessibilityRegistry?
   private var claimTask: Task<Void, Never>?
   private var publishTask: Task<Void, Never>?
@@ -156,15 +214,22 @@ private final class TrackAccessibilityNSView: NSView {
     hint: String?,
     windowID: Int?,
     enabled: Bool,
+    semanticActions: RegistryTrackedSemanticActions,
+    semanticActionSink: (any RegistrySemanticActionSink)?,
     registry: AccessibilityRegistry
   ) {
     if trackedElementID != elementID, let currentRegistry = self.registry, !trackedElementID.isEmpty {
       let previousElementID = trackedElementID
       let previousClaimTask = claimTask
       let ownerID = registrationOwnerID
-      Task {
+      let previousSemanticActionSink = self.semanticActionSink
+      Task { @MainActor in
         await previousClaimTask?.value
         await currentRegistry.unregisterTrackedElement(
+          identifier: previousElementID,
+          ownerID: ownerID
+        )
+        previousSemanticActionSink?.unregisterTrackedSemanticActions(
           identifier: previousElementID,
           ownerID: ownerID
         )
@@ -178,6 +243,8 @@ private final class TrackAccessibilityNSView: NSView {
     self.hint = hint
     explicitWindowID = windowID
     self.enabled = enabled
+    self.semanticActions = semanticActions
+    self.semanticActionSink = semanticActionSink
     self.registry = registry
     claimTrackedElement()
     beginObserving(window: window)
@@ -194,9 +261,14 @@ private final class TrackAccessibilityNSView: NSView {
     }
     let elementID = trackedElementID
     let ownerID = registrationOwnerID
-    Task {
+    let semanticActionSink = self.semanticActionSink
+    Task { @MainActor in
       await claimTask?.value
       await registry.unregisterTrackedElement(identifier: elementID, ownerID: ownerID)
+      semanticActionSink?.unregisterTrackedSemanticActions(
+        identifier: elementID,
+        ownerID: ownerID
+      )
     }
   }
 
@@ -290,11 +362,16 @@ private final class TrackAccessibilityNSView: NSView {
     }
     let elementID = trackedElementID
     let ownerID = registrationOwnerID
-    claimTask = Task {
+    let semanticActionSink = self.semanticActionSink
+    claimTask = Task { @MainActor in
       guard !Task.isCancelled else {
         return
       }
       await registry.claimTrackedElement(identifier: elementID, ownerID: ownerID)
+      semanticActionSink?.claimTrackedSemanticActions(
+        identifier: elementID,
+        ownerID: ownerID
+      )
     }
   }
 
@@ -314,12 +391,17 @@ private final class TrackAccessibilityNSView: NSView {
       let claimTask = self.claimTask
       let elementID = trackedElementID
       let ownerID = registrationOwnerID
-      publishTask = Task {
+      let semanticActionSink = self.semanticActionSink
+      publishTask = Task { @MainActor in
         await claimTask?.value
         guard !Task.isCancelled else {
           return
         }
         await registry.clearTrackedElement(identifier: elementID, ownerID: ownerID)
+        semanticActionSink?.clearTrackedSemanticActions(
+          identifier: elementID,
+          ownerID: ownerID
+        )
       }
       return
     }
@@ -330,6 +412,7 @@ private final class TrackAccessibilityNSView: NSView {
       value: value,
       hint: hint,
       kind: kind,
+      actions: semanticActions.supportedActions,
       frame: RegistryRect(frame),
       windowID: explicitWindowID ?? window?.windowNumber,
       enabled: enabled
@@ -342,12 +425,19 @@ private final class TrackAccessibilityNSView: NSView {
     publishTask?.cancel()
     let claimTask = self.claimTask
     let ownerID = registrationOwnerID
-    publishTask = Task {
+    let semanticActionSink = self.semanticActionSink
+    let semanticActions = self.semanticActions
+    publishTask = Task { @MainActor in
       await claimTask?.value
       guard !Task.isCancelled else {
         return
       }
       await registry.registerTrackedElement(element, ownerID: ownerID)
+      semanticActionSink?.registerTrackedSemanticActions(
+        identifier: element.identifier,
+        semanticActions: semanticActions,
+        ownerID: ownerID
+      )
     }
   }
 }
@@ -374,7 +464,9 @@ private struct TrackAccessibilityProbe: View {
         .onDisappear {
           let elementID = self.elementID
           let registry = self.registry
-          Task { await registry.unregisterElement(identifier: elementID) }
+          Task { @MainActor in
+            await registry.unregisterElement(identifier: elementID)
+          }
         }
     }
   }
@@ -391,7 +483,9 @@ private struct TrackAccessibilityProbe: View {
       enabled: enabled
     )
     let registry = self.registry
-    Task { await registry.registerElement(element) }
+    Task { @MainActor in
+      await registry.registerElement(element)
+    }
   }
 }
 #endif

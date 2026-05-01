@@ -2,52 +2,22 @@ import Foundation
 import HarnessMonitorRegistry
 import OSLog
 
-public enum HarnessMonitorMCPRuntimeState: Equatable, Sendable {
-  case disabled
-  case starting(socketPath: String?)
-  case healthy(socketPath: String)
-  case degraded(socketPath: String?, reason: String)
-
-  public var socketPath: String? {
-    switch self {
-    case .disabled:
-      nil
-    case .starting(let socketPath):
-      socketPath
-    case .healthy(let socketPath):
-      socketPath
-    case .degraded(let socketPath, _):
-      socketPath
-    }
-  }
-
-  public var reason: String? {
-    switch self {
-    case .degraded(_, let reason):
-      reason
-    case .disabled, .starting, .healthy:
-      nil
-    }
-  }
-}
-
-@MainActor
-public protocol HarnessMonitorMCPStartupControlling: AnyObject {
-  var runtimeState: HarnessMonitorMCPRuntimeState { get }
-  func setEnabled(_ enabled: Bool) async
-  func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState
-}
-
-/// Owns the in-app accessibility registry and its NDJSON Unix-socket
-/// listener. The listener stays off until `setEnabled(true)` is called so
-/// the app introduces no socket surface by default.
+/// Owns the in-app accessibility registry and its NDJSON Unix-socket listener.
+/// The listener stays off until `setEnabled(true)` is called so the app
+/// introduces no socket surface by default.
 ///
-/// The service is intentionally a simple reference type instead of a
-/// SwiftUI observable: a startup controller owns its lifecycle, and it does
-/// not drive any UI.
+/// The service is intentionally a simple reference type instead of a SwiftUI
+/// observable: a startup controller owns its lifecycle, and it does not drive any UI.
 @MainActor
-public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStartupControlling {
+public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStartupControlling,
+  RegistrySemanticActionSink
+{
   public static let shared = HarnessMonitorMCPAccessibilityService()
+
+  struct TrackedSemanticActionRegistration {
+    let ownerID: UUID
+    let semanticActions: RegistryTrackedSemanticActions
+  }
 
   public let registry: AccessibilityRegistry
   let logger: Logger
@@ -67,7 +37,9 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   var acknowledgedReplacement: AcknowledgedReplacement?
   var replacementRecoveryTask: Task<Void, Never>?
   var replacementGeneration: UInt64 = 0
-  public private(set) var runtimeState: HarnessMonitorMCPRuntimeState = .disabled
+  public internal(set) var runtimeState: HarnessMonitorMCPRuntimeState = .disabled
+  var trackedSemanticActionOwners: [String: UUID] = [:]
+  var trackedSemanticActions: [String: TrackedSemanticActionRegistration] = [:]
   enum ReplacementDecision {
     case approved
     case denied(String)
@@ -83,6 +55,12 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   lazy var dispatcher = RegistryRequestDispatcher(
     registry: self.registry,
     pingInfo: self.pingInfoProvider,
+    semanticActionHandler: { [weak self] identifier, action in
+      guard let self else {
+        return .actionUnavailable
+      }
+      return await self.performSemanticAction(identifier: identifier, action: action)
+    },
     replacementHandler: { [weak self] notice in
       guard let self else {
         return RegistryRequestDispatcher.ReplacementDisposition(
@@ -365,5 +343,78 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       socketPath: socket.path,
       reason: "listener never passed the local ping probe"
     )
+  }
+
+  public func claimTrackedSemanticActions(identifier: String, ownerID: UUID) {
+    trackedSemanticActionOwners[identifier] = ownerID
+    if trackedSemanticActions[identifier]?.ownerID != ownerID {
+      trackedSemanticActions[identifier] = nil
+    }
+  }
+
+  public func registerTrackedSemanticActions(
+    identifier: String,
+    semanticActions actions: RegistryTrackedSemanticActions,
+    ownerID: UUID
+  ) {
+    guard trackedSemanticActionOwners[identifier] == ownerID else {
+      return
+    }
+    guard actions.supportedActions.isEmpty == false else {
+      trackedSemanticActions[identifier] = nil
+      return
+    }
+    trackedSemanticActions[identifier] = TrackedSemanticActionRegistration(
+      ownerID: ownerID,
+      semanticActions: actions
+    )
+  }
+
+  public func clearTrackedSemanticActions(identifier: String, ownerID: UUID) {
+    guard trackedSemanticActionOwners[identifier] == ownerID else {
+      return
+    }
+    if trackedSemanticActions[identifier]?.ownerID == ownerID {
+      trackedSemanticActions[identifier] = nil
+    }
+  }
+
+  public func unregisterTrackedSemanticActions(identifier: String, ownerID: UUID) {
+    guard trackedSemanticActionOwners[identifier] == ownerID else {
+      return
+    }
+    trackedSemanticActionOwners[identifier] = nil
+    if trackedSemanticActions[identifier]?.ownerID == ownerID {
+      trackedSemanticActions[identifier] = nil
+    }
+  }
+
+  func performSemanticAction(
+    identifier: String,
+    action: RegistrySemanticAction
+  ) async -> RegistryRequestDispatcher.SemanticActionDisposition {
+    guard let element = await registry.element(identifier: identifier) else {
+      return .notFound
+    }
+    guard element.enabled else {
+      return .actionUnavailable
+    }
+    guard
+      let registration = trackedSemanticActions[identifier]
+    else {
+      return .actionUnavailable
+    }
+
+    let handler =
+      switch action {
+      case .press:
+        registration.semanticActions.press
+      }
+    guard let handler else {
+      return .actionUnavailable
+    }
+
+    handler()
+    return .performed
   }
 }

@@ -83,7 +83,6 @@ extension WorkspaceWindowView {
         "status=\(status)",
         "wrap=\(viewModel.wrapLines)",
         sizeLabel,
-        "detailPts=\(formatPoints(viewModel.lastDetailColumnSize))",
         "viewportPts=\(formatPoints(viewModel.lastMeasuredViewportPoints))",
         "measured=\(formatSize(viewModel.lastMeasuredViewportTerminalSize))",
         "stabilized=\(formatSize(viewModel.lastMeasuredViewportSize))",

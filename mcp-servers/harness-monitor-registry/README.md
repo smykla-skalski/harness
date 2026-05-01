@@ -11,7 +11,7 @@ Swift package that exposes Harness Monitor's accessibility elements to the Rust 
 - `RegistryWireCodec` - JSON codec for the envelope format the Node server expects.
 - `.trackAccessibility(...)` - SwiftUI view modifier that captures a view's frame via `GeometryReader` + `CoordinateSpace.global` and registers it with a registry. Frame updates flow through a `PreferenceKey`, so moves during layout are picked up automatically.
 - `.trackWindow(...)` - SwiftUI scene-level modifier that registers the hosting `NSWindow` and automatically harvests the live AppKit view tree into `RegistryElement`s for that window.
-- `harness-monitor-input` executable - CGEvent-backed helper that replaces the external `cliclick` dependency for input and also exposes live AX query subcommands used by the Rust MCP server. Subcommands: `move`, `click`, `scroll`, `drag`, `type`, `position`, `check`, `list-elements`, `get-element`.
+- `harness-monitor-input` executable - CGEvent-backed helper that replaces the external `cliclick` dependency for input and also exposes live AX query and semantic-action subcommands used by the Rust MCP server. Subcommands: `move`, `click`, `scroll`, `drag`, `type`, `position`, `check`, `list-elements`, `get-element`, `perform-action`.
 - `harness-monitor-registry-host` executable - manual-test harness that seeds the registry with fixture windows and elements and runs the listener at a given socket path.
 
 ## Why a separate package
@@ -87,7 +87,11 @@ tree. Existing `.accessibilityIdentifier(...)` values become discoverable over
 MCP without additional per-view registration churn. The Rust MCP server still
 prefers this in-app registry path first; the helper's `list-elements` and
 `get-element` subcommands are a fallback for live AX queries when registry data
-is empty or missing an element.
+is empty or missing an element, and `perform-action` gives the server a
+background-safe semantic activation path for controls that expose AX actions.
+For `press`, the helper tries `AXPress` first, then closely related action names
+used by menu buttons, rows, and confirmation controls, and retries once without
+a scoped window filter when a previously matched window has been recreated.
 
 ## Launching the listener
 

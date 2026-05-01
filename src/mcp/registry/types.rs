@@ -50,6 +50,21 @@ impl ElementKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RegistrySemanticAction {
+    Press,
+}
+
+impl RegistrySemanticAction {
+    #[must_use]
+    pub const fn as_wire(self) -> &'static str {
+        match self {
+            Self::Press => "press",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RegistryElement {
     pub identifier: String,
@@ -63,6 +78,15 @@ pub struct RegistryElement {
     pub enabled: bool,
     pub selected: bool,
     pub focused: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<RegistrySemanticAction>,
+}
+
+impl RegistryElement {
+    #[must_use]
+    pub fn supports_action(&self, action: RegistrySemanticAction) -> bool {
+        self.actions.contains(&action)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -97,6 +121,11 @@ pub enum RegistryRequest {
         id: u64,
         identifier: String,
     },
+    PerformAction {
+        id: u64,
+        identifier: String,
+        action: RegistrySemanticAction,
+    },
 }
 
 impl RegistryRequest {
@@ -106,7 +135,8 @@ impl RegistryRequest {
             Self::Ping { id }
             | Self::ListWindows { id }
             | Self::ListElements { id, .. }
-            | Self::GetElement { id, .. } => *id,
+            | Self::GetElement { id, .. }
+            | Self::PerformAction { id, .. } => *id,
         }
     }
 }
@@ -178,4 +208,11 @@ pub struct ListElementsResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetElementResult {
     pub element: RegistryElement,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryAckResult {
+    pub applied: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }

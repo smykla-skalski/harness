@@ -1,7 +1,7 @@
 use super::{
-    INSERT_LOG_ENTRY_SQL, NEXT_LOG_SEQUENCE_SQL, UPSERT_TIMELINE_ENTRY_SQL,
-    UPSERT_TIMELINE_STATE_SQL, SessionLogEntry, daemon_timeline, db_error,
-    i64_from_u64, query, query_scalar, stored_timeline_entry, u64_from_i64, utc_now,
+    INSERT_LOG_ENTRY_SQL, NEXT_LOG_SEQUENCE_SQL, SessionLogEntry, UPSERT_TIMELINE_ENTRY_SQL,
+    UPSERT_TIMELINE_STATE_SQL, daemon_timeline, db_error, i64_from_u64, query, query_scalar,
+    stored_timeline_entry, u64_from_i64, utc_now,
 };
 use super::{Sqlite, Transaction};
 use crate::daemon::db::StoredTimelineEntry;

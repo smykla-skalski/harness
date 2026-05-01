@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::env;
-use std::fs::read_dir;
 use std::fs::Metadata;
+use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -66,7 +66,10 @@ pub(crate) async fn default_helper_candidate() -> Option<PathBuf> {
 
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "exercised by automation tests to lock helper ranking")
+    expect(
+        dead_code,
+        reason = "exercised by automation tests to lock helper ranking"
+    )
 )]
 pub(crate) async fn default_helper_candidate_in(repo_root: &Path) -> Option<PathBuf> {
     best_helper_candidate(helper_candidates_from(repo_root)).await
@@ -119,7 +122,9 @@ fn platform_helper_candidates(build_root: &Path) -> Vec<PathBuf> {
 }
 
 fn prefers_candidate(candidate: &Path, incumbent: &Path) -> bool {
-    candidate.components().any(|component| component.as_os_str() == "debug")
+    candidate
+        .components()
+        .any(|component| component.as_os_str() == "debug")
         && !incumbent
             .components()
             .any(|component| component.as_os_str() == "debug")
@@ -152,7 +157,10 @@ async fn viable_helper_candidate(path: &Path) -> Option<(SystemTime, PathBuf)> {
     if !helper_launches(path).await {
         return None;
     }
-    Some((metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH), path.to_path_buf()))
+    Some((
+        metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+        path.to_path_buf(),
+    ))
 }
 
 #[cfg(unix)]

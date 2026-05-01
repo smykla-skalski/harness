@@ -127,8 +127,12 @@ struct DecisionRow: View {
     )
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabelText(deadlineStatus: deadlineStatus))
-    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
-    .accessibilityValue(accessibilityValueText(deadlineStatus: deadlineStatus))
+    .harnessMCPRow(
+      HarnessMonitorAccessibility.decisionRow(decision.id),
+      label: accessibilityLabelText(deadlineStatus: deadlineStatus),
+      value: accessibilityValueText(deadlineStatus: deadlineStatus),
+      pressAction: select
+    )
   }
 
   private func accessibilityLabelText(

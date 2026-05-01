@@ -19,37 +19,17 @@ extension WorkspaceWindowView {
       sessionPane(selectedSessionTui)
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onGeometryChange(for: CGSize.self) { proxy in
-          proxy.size
-        } action: { detailSize in
-          updateDetailColumnGeometry(detailSize)
-        }
         .overlay { workspaceStateMarkerOverlay() }
     } else if case .create = viewModel.selection {
       createPane
-        .onGeometryChange(for: CGSize.self) { proxy in
-          proxy.size
-        } action: { detailSize in
-          updateDetailColumnGeometry(detailSize)
-        }
         .overlay { workspaceStateMarkerOverlay() }
     } else if viewModel.selection.isDecisionRoute {
       paneContent(decisionScope: decisionScope)
-        .onGeometryChange(for: CGSize.self) { proxy in
-          proxy.size
-        } action: { detailSize in
-          updateDetailColumnGeometry(detailSize)
-        }
         .overlay { workspaceStateMarkerOverlay() }
     } else {
       ScrollView {
         paneContent(decisionScope: decisionScope)
           .padding(HarnessMonitorTheme.spacingLG)
-      }
-      .onGeometryChange(for: CGSize.self) { proxy in
-        proxy.size
-      } action: { detailSize in
-        updateDetailColumnGeometry(detailSize)
       }
       .overlay { workspaceStateMarkerOverlay() }
     }

@@ -15,9 +15,9 @@ use self::sql::{
 };
 use super::{
     AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
-    SessionState, TaskCheckpoint, WorkItem, daemon_timeline, db_error,
-    extract_transition_kind, i64_from_u64, normalize_change_scope, session_status_db_label,
-    stored_timeline_entry, u64_from_i64, utc_now,
+    SessionState, TaskCheckpoint, WorkItem, daemon_timeline, db_error, extract_transition_kind,
+    i64_from_u64, normalize_change_scope, session_status_db_label, stored_timeline_entry,
+    u64_from_i64, utc_now,
 };
 use crate::errors::CliErrorKind;
 use crate::session::service::{agent_status_db_label, canonicalize_active_session_without_leader};

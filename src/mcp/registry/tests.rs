@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -6,22 +7,23 @@ use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::sync::oneshot;
+use tokio::time::sleep;
 
 use super::client::{RegistryClient, RegistryError};
 use super::path::{DEFAULT_APP_GROUP, SOCKET_FILENAME, SOCKET_OVERRIDE_ENV, default_socket_path};
-use super::types::{ListWindowsResult, RegistryRequest};
+use super::types::{ListWindowsResult, RegistryRequest, RegistrySemanticAction};
 use crate::workspace::socket_paths::session_socket;
 
 fn socket_path(dir: &TempDir) -> PathBuf {
     session_socket(dir.path(), "testid00", "registry")
 }
 
-async fn spawn_fake_server<F>(path: PathBuf, responder: F) -> oneshot::Receiver<String>
+fn spawn_fake_server<F>(path: PathBuf, responder: F) -> oneshot::Receiver<String>
 where
     F: Fn(&str) -> String + Send + 'static,
 {
     let (tx, rx) = oneshot::channel();
-    let listener = UnixListener::bind(&path).expect("bind test socket");
+    let listener = UnixListener::bind(path).expect("bind test socket");
     tokio::spawn(async move {
         let (stream, _) = listener.accept().await.expect("accept");
         let (read, mut write) = stream.into_split();
@@ -54,8 +56,7 @@ async fn request_returns_typed_ok_result() {
             "result": {"windows": []},
         })
         .to_string()
-    })
-    .await;
+    });
 
     let client = RegistryClient::with_socket_path(path);
     let id = client.next_request_id();
@@ -81,8 +82,7 @@ async fn request_surfaces_server_error() {
             "error": {"code": "not-found", "message": "no element"},
         })
         .to_string()
-    })
-    .await;
+    });
 
     let client = RegistryClient::with_socket_path(path);
     let id = client.next_request_id();
@@ -123,7 +123,7 @@ async fn request_times_out_when_server_is_silent() {
     tokio::spawn(async move {
         let _conn = listener.accept().await.expect("accept");
         // Hold the connection open without responding.
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(2)).await;
     });
 
     let client = RegistryClient::with_socket_path(path)
@@ -147,8 +147,7 @@ async fn request_detects_id_mismatch_as_protocol_error() {
             "result": {"windows": []},
         })
         .to_string()
-    })
-    .await;
+    });
 
     let client = RegistryClient::with_socket_path(path);
     let id = client.next_request_id();
@@ -178,18 +177,23 @@ async fn reconnects_after_server_closes_connection() {
         .request::<ListWindowsResult>(&RegistryRequest::ListWindows { id })
         .await
         .expect_err("closed");
-    assert!(matches!(err, RegistryError::Closed { .. }));
+    assert!(
+        matches!(
+            err,
+            RegistryError::Closed { .. } | RegistryError::Unavailable { .. }
+        ),
+        "expected closed or unavailable after retry, got {err:?}"
+    );
 
     // Remove the socket file so the second listener can bind the same path.
-    let _ = std::fs::remove_file(&path);
+    let _ = fs::remove_file(&path);
 
     // Second server at the same path: responds normally.
     let received = spawn_fake_server(path, |line| {
         let parsed: Value = serde_json::from_str(line).unwrap();
         let id = parsed.get("id").and_then(Value::as_u64).unwrap();
         json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
-    })
-    .await;
+    });
 
     let id = client.next_request_id();
     let result: ListWindowsResult = client
@@ -209,8 +213,7 @@ async fn retries_same_request_after_stale_connection_breaks() {
         let parsed: Value = serde_json::from_str(line).unwrap();
         let id = parsed.get("id").and_then(Value::as_u64).unwrap();
         json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
-    })
-    .await;
+    });
 
     let client = RegistryClient::with_socket_path(path.clone())
         .with_timeouts(Duration::from_millis(500), Duration::from_millis(500));
@@ -223,14 +226,13 @@ async fn retries_same_request_after_stale_connection_breaks() {
     assert!(result.windows.is_empty());
     first_received.await.unwrap();
 
-    let _ = std::fs::remove_file(&path);
+    let _ = fs::remove_file(&path);
 
     let second_received = spawn_fake_server(path, |line| {
         let parsed: Value = serde_json::from_str(line).unwrap();
         let id = parsed.get("id").and_then(Value::as_u64).unwrap();
         json!({"id": id, "ok": true, "result": {"windows": []}}).to_string()
-    })
-    .await;
+    });
 
     let id = client.next_request_id();
     let result: ListWindowsResult = client
@@ -239,6 +241,33 @@ async fn retries_same_request_after_stale_connection_breaks() {
         .expect("same request retries after stale connection");
     assert!(result.windows.is_empty());
     second_received.await.unwrap();
+}
+
+#[tokio::test]
+async fn perform_action_sends_semantic_action_request() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let received = spawn_fake_server(path.clone(), |line| {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        let id = parsed.get("id").and_then(Value::as_u64).unwrap();
+        json!({
+            "id": id,
+            "ok": true,
+            "result": {"applied": true},
+        })
+        .to_string()
+    });
+
+    let client = RegistryClient::with_socket_path(path);
+    client
+        .perform_action("button.send", RegistrySemanticAction::Press)
+        .await
+        .expect("perform action succeeds");
+
+    let line = received.await.unwrap();
+    assert!(line.contains("\"op\":\"performAction\""));
+    assert!(line.contains("\"identifier\":\"button.send\""));
+    assert!(line.contains("\"action\":\"press\""));
 }
 
 #[test]

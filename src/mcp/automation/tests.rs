@@ -1,22 +1,19 @@
-use std::ffi::OsString;
-use std::fs;
 use std::path::PathBuf;
-use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
 use std::os::unix::fs::PermissionsExt;
 
+use crate::mcp::automation::AccessibilityAction;
 use crate::mcp::registry::ElementKind;
 
-use super::accessibility::{get_element_args, list_elements_args};
+use super::accessibility::{get_element_args, list_elements_args, perform_action_args};
 use super::backend::{
     Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_from_roots, default_helper_candidate_in,
-    detect_backend,
-    helper_search_roots_from,
+    detect_backend, helper_search_roots_from,
 };
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
-use super::screenshot::{ScreenshotOptions, screencapture_args};
+use super::screenshot::{ScreenshotOptions, ScreenshotTarget};
 
 fn as_strings(args: &[OsString]) -> Vec<String> {
     args.iter()
@@ -129,60 +126,57 @@ fn accessibility_get_element_args_preserve_identifier() {
 }
 
 #[test]
-fn screencapture_args_default_is_silent_png_no_target() {
-    let path = PathBuf::from("/tmp/out.png");
-    let args = screencapture_args(&ScreenshotOptions::default(), &path);
-    assert_eq!(as_strings(&args), vec!["-x", "-t", "png", "/tmp/out.png"],);
-}
-
-#[test]
-fn screencapture_args_window_id_uses_l_flag() {
-    let path = PathBuf::from("/tmp/out.png");
-    let args = screencapture_args(
-        &ScreenshotOptions {
-            window_id: Some(42),
-            display_id: None,
-            include_cursor: true,
-        },
-        &path,
+fn accessibility_perform_action_args_include_window_and_action() {
+    let args = perform_action_args(
+        "harness.sidebar.new-session",
+        Some(42),
+        AccessibilityAction::Press,
     );
     assert_eq!(
         as_strings(&args),
-        vec!["-x", "-t", "png", "-l", "42", "-C", "/tmp/out.png"],
+        vec![
+            "perform-action",
+            "--window-id",
+            "42",
+            "--action",
+            "press",
+            "harness.sidebar.new-session",
+        ],
     );
 }
 
 #[test]
-fn screencapture_args_display_id_uses_d_flag_when_window_absent() {
-    let path = PathBuf::from("/tmp/out.png");
-    let args = screencapture_args(
-        &ScreenshotOptions {
+fn screenshot_target_defaults_to_main_display() {
+    assert_eq!(
+        ScreenshotOptions::default().target(),
+        ScreenshotTarget::MainDisplay
+    );
+}
+
+#[test]
+fn screenshot_target_uses_window_when_present() {
+    assert_eq!(
+        ScreenshotOptions {
+            window_id: Some(42),
+            display_id: Some(3),
+            include_cursor: false,
+        }
+        .target(),
+        ScreenshotTarget::Window(42)
+    );
+}
+
+#[test]
+fn screenshot_target_uses_display_when_window_absent() {
+    assert_eq!(
+        ScreenshotOptions {
             window_id: None,
             display_id: Some(3),
             include_cursor: false,
-        },
-        &path,
+        }
+        .target(),
+        ScreenshotTarget::Display(3)
     );
-    assert_eq!(
-        as_strings(&args),
-        vec!["-x", "-t", "png", "-D", "3", "/tmp/out.png"],
-    );
-}
-
-#[test]
-fn screencapture_args_window_wins_over_display() {
-    let path = PathBuf::from("/tmp/out.png");
-    let args = screencapture_args(
-        &ScreenshotOptions {
-            window_id: Some(1),
-            display_id: Some(2),
-            include_cursor: false,
-        },
-        &path,
-    );
-    let strings = as_strings(&args);
-    assert!(strings.iter().any(|s| s == "-l"));
-    assert!(!strings.iter().any(|s| s == "-D"));
 }
 
 #[tokio::test]
@@ -202,7 +196,9 @@ async fn detect_backend_honours_env_override_when_file_exists() {
 #[tokio::test]
 async fn default_helper_candidate_prefers_newest_platform_build() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let build_root = temp.path().join("mcp-servers/harness-monitor-registry/.build");
+    let build_root = temp
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build");
     let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
     let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
     write_helper_script(&release, valid_helper_script());
@@ -216,7 +212,9 @@ async fn default_helper_candidate_prefers_newest_platform_build() {
 #[tokio::test]
 async fn default_helper_candidate_skips_newer_non_viable_platform_build() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let build_root = temp.path().join("mcp-servers/harness-monitor-registry/.build");
+    let build_root = temp
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build");
     let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
     let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
     write_helper_script(&release, valid_helper_script());
@@ -253,13 +251,20 @@ async fn default_helper_candidate_prefers_newest_viable_candidate_across_search_
 fn helper_search_roots_include_executable_and_current_dir_ancestors_once() {
     let current_dir = PathBuf::from("/tmp/harness/worktrees/main/apps/harness-monitor-macos");
     let current_exe = PathBuf::from("/tmp/harness/target/debug/harness");
+    let repo_root = Path::new("/tmp/harness");
 
     let roots = helper_search_roots_from(Some(&current_dir), Some(&current_exe));
 
-    assert_eq!(roots.first(), Some(&PathBuf::from("/tmp/harness/target/debug")));
-    assert!(roots.contains(&PathBuf::from("/tmp/harness")));
     assert_eq!(
-        roots.iter().filter(|root| **root == PathBuf::from("/tmp/harness")).count(),
+        roots.first(),
+        Some(&PathBuf::from("/tmp/harness/target/debug"))
+    );
+    assert!(roots.iter().any(|root| root.as_path() == repo_root));
+    assert_eq!(
+        roots
+            .iter()
+            .filter(|root| root.as_path() == repo_root)
+            .count(),
         1
     );
 }
