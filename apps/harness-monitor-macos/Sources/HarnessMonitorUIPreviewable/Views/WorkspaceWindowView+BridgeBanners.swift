@@ -2,28 +2,6 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension WorkspaceWindowView {
-  func createPaneSessionActionBanner(message: String) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Label(createPaneSessionActionTitle, systemImage: "info.circle")
-        .scaledFont(.headline)
-        .foregroundStyle(HarnessMonitorTheme.caution)
-      Text(message)
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if resolvedCreateSessionID == nil {
-        Button("New Session") {
-          store.presentedSheet = .newSession
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNewSessionButton)
-      }
-    }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionActionBanner)
-  }
-
   var agentTuiUnavailableBanner: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(agentTuiBridgeTitle, systemImage: "exclamationmark.triangle")

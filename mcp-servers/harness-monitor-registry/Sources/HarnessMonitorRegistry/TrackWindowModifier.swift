@@ -78,6 +78,10 @@ final class WindowTrackingNSView: NSView {
       NSWindow.didResignKeyNotification,
       NSWindow.didBecomeMainNotification,
       NSWindow.didResignMainNotification,
+      NSWindow.didChangeOcclusionStateNotification,
+      NSWindow.didMiniaturizeNotification,
+      NSWindow.didDeminiaturizeNotification,
+      NSWindow.didChangeScreenNotification,
       NSWindow.didUpdateNotification,
     ]
     for name in names {

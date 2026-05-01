@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
@@ -13,7 +15,7 @@ use super::backend::{
     detect_backend, helper_search_roots_from,
 };
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
-use super::screenshot::{ScreenshotOptions, ScreenshotTarget};
+use super::screenshot::{ScreenshotOptions, ScreenshotTarget, screenshot_args};
 
 fn as_strings(args: &[OsString]) -> Vec<String> {
     args.iter()
@@ -98,13 +100,8 @@ fn type_text_cliclick_embeds_text_in_t_argument() {
 }
 
 #[test]
-fn type_text_none_falls_back_to_osascript_keystroke() {
-    let (program, args) = type_text_args(&Backend::None, "a\"b").unwrap();
-    assert_eq!(program, OsString::from("/usr/bin/osascript"));
-    assert_eq!(args.len(), 2);
-    assert_eq!(args[0], OsString::from("-e"));
-    let script = args[1].to_string_lossy();
-    assert!(script.contains("keystroke \"a\\\"b\""), "got {script}");
+fn type_text_none_has_no_backend() {
+    assert!(type_text_args(&Backend::None, "a\"b").is_none());
 }
 
 #[test]
@@ -158,6 +155,7 @@ fn screenshot_target_uses_window_when_present() {
     assert_eq!(
         ScreenshotOptions {
             window_id: Some(42),
+            window_ids: vec![],
             display_id: Some(3),
             include_cursor: false,
         }
@@ -171,6 +169,7 @@ fn screenshot_target_uses_display_when_window_absent() {
     assert_eq!(
         ScreenshotOptions {
             window_id: None,
+            window_ids: vec![],
             display_id: Some(3),
             include_cursor: false,
         }
@@ -178,6 +177,75 @@ fn screenshot_target_uses_display_when_window_absent() {
         ScreenshotTarget::Display(3)
     );
 }
+
+#[test]
+fn screenshot_args_prefer_window_and_pass_cursor_flag() {
+    let backend = Backend::HarnessInput(PathBuf::from("/tmp/helper"));
+    let (_, args) = screenshot_args(
+        &backend,
+        &ScreenshotOptions {
+            window_id: Some(42),
+            window_ids: vec![],
+            display_id: Some(3),
+            include_cursor: true,
+        },
+    )
+    .expect("helper backend available");
+    assert_eq!(
+        as_strings(&args),
+        vec!["screenshot", "--window-id", "42", "--include-cursor"],
+    );
+}
+
+#[test]
+fn screenshot_args_use_display_when_window_absent() {
+    let backend = Backend::HarnessInput(PathBuf::from("/tmp/helper"));
+    let (_, args) = screenshot_args(
+        &backend,
+        &ScreenshotOptions {
+            window_id: None,
+            window_ids: vec![],
+            display_id: Some(3),
+            include_cursor: false,
+        },
+    )
+    .expect("helper backend available");
+    assert_eq!(as_strings(&args), vec!["screenshot", "--display-id", "3"]);
+}
+
+#[test]
+fn screenshot_args_repeat_explicit_window_ids_and_keep_display_filter() {
+    let backend = Backend::HarnessInput(PathBuf::from("/tmp/helper"));
+    let (_, args) = screenshot_args(
+        &backend,
+        &ScreenshotOptions {
+            window_id: None,
+            window_ids: vec![42, 43],
+            display_id: Some(7),
+            include_cursor: false,
+        },
+    )
+    .expect("helper backend available");
+    assert_eq!(
+        as_strings(&args),
+        vec![
+            "screenshot",
+            "--window-id",
+            "42",
+            "--window-id",
+            "43",
+            "--display-id",
+            "7",
+        ],
+    );
+}
+
+#[test]
+fn screenshot_args_require_harness_input_backend() {
+    assert!(screenshot_args(&Backend::Cliclick, &ScreenshotOptions::default()).is_none());
+    assert!(screenshot_args(&Backend::None, &ScreenshotOptions::default()).is_none());
+}
+
 
 #[tokio::test]
 async fn detect_backend_honours_env_override_when_file_exists() {

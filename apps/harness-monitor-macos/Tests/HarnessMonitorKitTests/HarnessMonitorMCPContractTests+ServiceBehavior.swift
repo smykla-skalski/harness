@@ -105,6 +105,38 @@ extension HarnessMonitorMCPContractTests {
     #expect(probe.pressCount == 1)
   }
 
+  @Test("persistent semantic elements register live menu item actions")
+  func persistentSemanticElementsRegisterLiveMenuItemActions() async {
+    let service = HarnessMonitorMCPAccessibilityService()
+    let identifier = "harness.test.window-menu.workspace"
+    let probe = MCPContractSemanticPressProbe()
+    let semanticActions = RegistryTrackedSemanticActions(press: { probe.recordPress() })
+    let element = RegistryElement(
+      identifier: identifier,
+      label: "Workspace",
+      hint: "Open the Workspace window.",
+      kind: .menuItem,
+      frame: RegistryRect(x: 0, y: 0, width: 0, height: 0)
+    )
+
+    await service.registerPersistentSemanticElement(
+      element,
+      semanticActions: semanticActions
+    )
+
+    let stored = await service.registry.element(identifier: identifier)
+    #expect(stored?.kind == .menuItem)
+    #expect(stored?.actions == [.press])
+
+    let result = await service.performSemanticAction(identifier: identifier, action: .press)
+    #expect(result == .performed)
+    #expect(probe.pressCount == 1)
+
+    await service.unregisterPersistentSemanticElement(identifier: identifier)
+    let removed = await service.registry.element(identifier: identifier)
+    #expect(removed == nil)
+  }
+
   @Test("enabled reconciliation reuses a compatible registry socket and forwards local snapshots")
   func enabledReconciliationReusesCompatibleRegistrySocket() async throws {
     let root = try temporaryDirectory()

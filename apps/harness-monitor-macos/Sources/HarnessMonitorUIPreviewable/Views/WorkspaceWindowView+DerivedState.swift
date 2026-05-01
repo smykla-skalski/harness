@@ -10,10 +10,6 @@ extension WorkspaceWindowView {
     store.sessionActionUnavailableMessage(sessionID: resolvedCreateSessionID)
   }
 
-  var createPaneSessionActionTitle: String {
-    resolvedCreateSessionID == nil ? "Select a session first" : "Session actions unavailable"
-  }
-
   var decisionWorkspaceScope: DecisionWorkspaceScope {
     let snapshot = cachedDecisionWorkspaceSnapshot
     return DecisionWorkspaceScope(

@@ -38,6 +38,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   var replacementRecoveryTask: Task<Void, Never>?
   var replacementGeneration: UInt64 = 0
   public internal(set) var runtimeState: HarnessMonitorMCPRuntimeState = .disabled
+  var persistentSemanticElementOwners: [String: UUID] = [:]
   var trackedSemanticActionOwners: [String: UUID] = [:]
   var trackedSemanticActions: [String: TrackedSemanticActionRegistration] = [:]
   enum ReplacementDecision {
@@ -352,6 +353,32 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     }
   }
 
+  public func registerPersistentSemanticElement(
+    _ element: RegistryElement,
+    semanticActions actions: RegistryTrackedSemanticActions = .none
+  ) async {
+    var element = element
+    let ownerID = persistentSemanticElementOwners[element.identifier] ?? UUID()
+    persistentSemanticElementOwners[element.identifier] = ownerID
+    element.actions = actions.supportedActions
+    await registry.claimTrackedElement(identifier: element.identifier, ownerID: ownerID)
+    await registry.registerTrackedElement(element, ownerID: ownerID)
+    claimTrackedSemanticActions(identifier: element.identifier, ownerID: ownerID)
+    registerTrackedSemanticActions(
+      identifier: element.identifier,
+      semanticActions: actions,
+      ownerID: ownerID
+    )
+  }
+
+  public func unregisterPersistentSemanticElement(identifier: String) async {
+    guard let ownerID = persistentSemanticElementOwners.removeValue(forKey: identifier) else {
+      return
+    }
+    await registry.unregisterTrackedElement(identifier: identifier, ownerID: ownerID)
+    unregisterTrackedSemanticActions(identifier: identifier, ownerID: ownerID)
+  }
+
   public func registerTrackedSemanticActions(
     identifier: String,
     semanticActions actions: RegistryTrackedSemanticActions,
@@ -389,7 +416,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     }
   }
 
-  func performSemanticAction(
+  public func performSemanticAction(
     identifier: String,
     action: RegistrySemanticAction
   ) async -> RegistryRequestDispatcher.SemanticActionDisposition {

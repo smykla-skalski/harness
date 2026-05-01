@@ -72,10 +72,9 @@ elif command -v cliclick >/dev/null 2>&1; then
   warn "Swift helper missing, falling back to cliclick" \
     "Run: mise run mcp:build:input-helper (preferred)"
 else
-  warn "No mouse backend available (no Swift helper, no cliclick)" \
+  warn "No input backend available (no Swift helper, no cliclick)" \
     "Run: mise run mcp:build:input-helper" \
-    "or:  brew install cliclick" \
-    "Text input still works via osascript."
+    "or:  brew install cliclick"
 fi
 
 # 3. Monitor.app build

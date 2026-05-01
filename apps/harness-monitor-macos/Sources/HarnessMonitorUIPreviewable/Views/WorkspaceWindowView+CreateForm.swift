@@ -9,23 +9,18 @@ extension WorkspaceWindowView {
       displayState: displayState,
       focusedFieldBinding: focusedFieldBinding,
       startAction: { startTui() },
-      renderSessionActionBanner: { message in
-        AnyView(createPaneSessionActionBanner(message: message))
-      },
-      renderAcpUnavailableBanner: {
-        AnyView(acpUnavailableBanner)
-      },
-      renderAgentTuiUnavailableBanner: {
-        AnyView(agentTuiUnavailableBanner)
-      },
-      renderCodexUnavailableBanner: {
-        AnyView(codexUnavailableBanner)
-      }
+      acpUnavailableBanner: acpUnavailableBanner,
+      agentTuiUnavailableBanner: agentTuiUnavailableBanner,
+      codexUnavailableBanner: codexUnavailableBanner
     )
   }
 }
 
-struct WorkspaceWindowCreatePane: View {
+struct WorkspaceWindowCreatePane<
+  AcpUnavailableBanner: View,
+  AgentTuiUnavailableBanner: View,
+  CodexUnavailableBanner: View
+>: View {
   typealias ViewModel = WorkspaceWindowView.ViewModel
   typealias DisplayState = WorkspaceWindowView.AgentTuiDisplayState
   typealias Field = WorkspaceWindowView.Field
@@ -35,10 +30,9 @@ struct WorkspaceWindowCreatePane: View {
   let displayState: DisplayState
   let focusedFieldBinding: FocusState<Field?>.Binding
   let startAction: () -> Void
-  let renderSessionActionBanner: (String) -> AnyView
-  let renderAcpUnavailableBanner: () -> AnyView
-  let renderAgentTuiUnavailableBanner: () -> AnyView
-  let renderCodexUnavailableBanner: () -> AnyView
+  let acpUnavailableBanner: AcpUnavailableBanner
+  let agentTuiUnavailableBanner: AgentTuiUnavailableBanner
+  let codexUnavailableBanner: CodexUnavailableBanner
 
   var body: some View {
     ScrollView {
@@ -67,8 +61,6 @@ struct WorkspaceWindowCreatePane: View {
 }
 
 extension WorkspaceWindowCreatePane {
-  private static let splitCreateLayoutMinimumWidth: CGFloat = 700
-
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(viewModel.createMode.headerTitle)
@@ -128,25 +120,10 @@ extension WorkspaceWindowCreatePane {
     @ViewBuilder leading: () -> Leading,
     @ViewBuilder trailing: () -> Trailing
   ) -> some View {
-    // Let layout choose the best arrangement without feeding measured width
-    // back into observed state, which can create a geometry/update loop.
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
-        leading()
-          .frame(maxWidth: leadingMaxWidth, alignment: .leading)
-        trailing()
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .frame(
-        minWidth: Self.splitCreateLayoutMinimumWidth,
-        maxWidth: .infinity,
-        alignment: .leading
-      )
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        leading()
-        trailing()
-      }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+      leading()
+        .frame(maxWidth: leadingMaxWidth, alignment: .leading)
+      trailing()
     }
   }
 
@@ -179,19 +156,45 @@ extension WorkspaceWindowCreatePane {
 
   @ViewBuilder private var createPaneBanners: some View {
     if let message = createPaneSessionActionUnavailableNote {
-      renderSessionActionBanner(message)
+      sessionActionUnavailableBanner(message: message)
     }
     if viewModel.createMode == .terminal {
       if viewModel.selectedLaunchSelection.isAcp {
         if displayState.acpUnavailable {
-          renderAcpUnavailableBanner()
+          acpUnavailableBanner
         }
       } else if displayState.agentTuiUnavailable {
-        renderAgentTuiUnavailableBanner()
+        agentTuiUnavailableBanner
       }
     }
     if viewModel.createMode == .codex && displayState.codexUnavailable {
-      renderCodexUnavailableBanner()
+      codexUnavailableBanner
     }
+  }
+
+  private var createPaneSessionActionTitle: String {
+    resolvedCreateSessionID == nil ? "Select a session first" : "Session actions unavailable"
+  }
+
+  private func sessionActionUnavailableBanner(message: String) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label(createPaneSessionActionTitle, systemImage: "info.circle")
+        .scaledFont(.headline)
+        .foregroundStyle(HarnessMonitorTheme.caution)
+      Text(message)
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if resolvedCreateSessionID == nil {
+        Button("New Session") {
+          store.presentedSheet = .newSession
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNewSessionButton)
+      }
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionActionBanner)
   }
 }

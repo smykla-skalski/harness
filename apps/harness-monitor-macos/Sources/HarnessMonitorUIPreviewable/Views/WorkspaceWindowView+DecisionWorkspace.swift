@@ -64,14 +64,23 @@ extension WorkspaceWindowView {
       }
     }
 
+    if !oldValue.isDecisionRoute, newValue.isDecisionRoute {
+      restoreDecisionInspectorForDecisionRoute()
+    }
+
     switch newValue {
     case .decision(_, let decisionID):
       handleDecisionSelectionChange(from: oldValue, decisionID: decisionID)
     case .terminal(_, let terminalID):
+      hideDecisionInspectorForNonDecisionRoute()
       handleTerminalSelectionChange(from: oldValue, terminalID: terminalID)
     case .codex(_, let runID):
+      hideDecisionInspectorForNonDecisionRoute()
       handleCodexSelectionChange(from: oldValue, runID: runID)
-    case .create, .decisions, .agent, .task:
+    case .create, .agent, .task:
+      hideDecisionInspectorForNonDecisionRoute()
+      store.supervisorSelectedDecisionID = nil
+    case .decisions:
       store.supervisorSelectedDecisionID = nil
     }
   }

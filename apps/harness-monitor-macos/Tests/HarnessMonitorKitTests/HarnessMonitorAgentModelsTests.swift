@@ -85,6 +85,43 @@ struct HarnessMonitorAgentModelsTests {
     #expect(snapshot.acp?.stderrTail == "boom")
   }
 
+  @Test("AgentRegistration decodes tagged ACP runtime shape")
+  func agentRegistrationDecodesTaggedAcpRuntime() throws {
+    let data = Data(
+      #"""
+      {
+        "agent_id": "copilot-worker",
+        "name": "GitHub Copilot",
+        "runtime": {
+          "kind": "acp",
+          "id": "copilot"
+        },
+        "role": "worker",
+        "capabilities": [],
+        "joined_at": "2026-05-01T17:00:00Z",
+        "updated_at": "2026-05-01T17:00:01Z",
+        "status": "active",
+        "agent_session_id": "acp-session-1",
+        "runtime_capabilities": {
+          "runtime": "copilot",
+          "supports_native_transcript": true,
+          "supports_signal_delivery": true,
+          "supports_context_injection": true,
+          "typical_signal_latency_seconds": 5,
+          "hook_points": []
+        }
+      }
+      """#.utf8
+    )
+
+    let registration = try decoder.decode(AgentRegistration.self, from: data)
+
+    #expect(registration.agentId == "copilot-worker")
+    #expect(registration.runtime == "copilot")
+    #expect(registration.agentSessionId == "acp-session-1")
+    #expect(registration.status == .active)
+  }
+
   @Test("Transport-closed disconnect is restartable")
   func transportClosedDisconnectIsRestartable() {
     let reason = AgentDisconnectReason(kind: "transport_closed", code: nil, signal: nil)

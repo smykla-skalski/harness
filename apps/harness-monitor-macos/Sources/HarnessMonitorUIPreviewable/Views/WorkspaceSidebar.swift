@@ -5,6 +5,7 @@ struct WorkspaceSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
+  let isStartupFocusParticipationEnabled: Bool
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
   let currentSessionTitle: String?
@@ -22,6 +23,7 @@ struct WorkspaceSidebar: View {
   private var decisionSeveritiesCSV = ""
   @AppStorage("harness.workspace.sidebar.searchScope")
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
+  @State private var hasHydratedPersistedDecisionFilters = false
   @Environment(\.fontScale)
   private var fontScale
 
@@ -78,7 +80,47 @@ struct WorkspaceSidebar: View {
     codexRuns.filter { !$0.status.isActive }
   }
 
+  private var showsDecisionSearchChrome: Bool {
+    selection.isDecisionRoute
+  }
+
   var body: some View {
+    searchableSidebarList
+      .toolbar {
+        WorkspaceSidebarDecisionFilterToolbarItem(
+          selectedSeverities: decisionFilters.severities,
+          isEnabled: decisionFiltersMenuEnabled,
+          setSelectedSeverities: setDecisionSeverities
+        )
+      }
+      .task {
+        await hydratePersistedDecisionFiltersIfNeeded()
+      }
+      .onChange(of: decisionFilters) { _, newValue in
+        syncPersistedDecisionPreferences(from: newValue)
+      }
+  }
+
+  @ViewBuilder
+  private var searchableSidebarList: some View {
+    if isStartupFocusParticipationEnabled, showsDecisionSearchChrome {
+      sidebarList
+        .searchable(
+          text: decisionSearchText,
+          placement: .sidebar,
+          prompt: Text("Search decisions")
+        )
+        .searchScopes(decisionSearchScope, activation: .onSearchPresentation) {
+          ForEach(DecisionsSidebarSearchScope.allCases) { scope in
+            Text(scope.label).tag(scope)
+          }
+        }
+    } else {
+      sidebarList
+    }
+  }
+
+  private var sidebarList: some View {
     List(selection: selectionBinding) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Image(systemName: "plus.rectangle")
@@ -248,29 +290,6 @@ struct WorkspaceSidebar: View {
         decisionScope: decisionScope
       )
     }
-    .searchable(
-      text: decisionSearchText,
-      placement: .sidebar,
-      prompt: Text("Search decisions")
-    )
-    .searchScopes(decisionSearchScope, activation: .onSearchPresentation) {
-      ForEach(DecisionsSidebarSearchScope.allCases) { scope in
-        Text(scope.label).tag(scope)
-      }
-    }
-    .toolbar {
-      WorkspaceSidebarDecisionFilterToolbarItem(
-        selectedSeverities: decisionFilters.severities,
-        isEnabled: decisionFiltersMenuEnabled,
-        setSelectedSeverities: setDecisionSeverities
-      )
-    }
-    .onAppear {
-      restorePersistedDecisionFiltersIfNeeded()
-    }
-    .onChange(of: decisionFilters) { _, newValue in
-      syncPersistedDecisionPreferences(from: newValue)
-    }
   }
 
   @ViewBuilder
@@ -383,6 +402,19 @@ struct WorkspaceSidebar: View {
     if decisionSearchScopeRaw != filters.scope.rawValue {
       decisionSearchScopeRaw = filters.scope.rawValue
     }
+  }
+
+  @MainActor
+  private func hydratePersistedDecisionFiltersIfNeeded() async {
+    guard !hasHydratedPersistedDecisionFilters else {
+      return
+    }
+    await Task.yield()
+    guard !Task.isCancelled, !hasHydratedPersistedDecisionFilters else {
+      return
+    }
+    hasHydratedPersistedDecisionFilters = true
+    restorePersistedDecisionFiltersIfNeeded()
   }
 
 }

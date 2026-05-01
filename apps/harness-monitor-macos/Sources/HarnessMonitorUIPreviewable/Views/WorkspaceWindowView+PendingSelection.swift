@@ -2,10 +2,16 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension WorkspaceWindowView {
-  func consumePendingWorkspaceSelection() {
+  @discardableResult
+  func consumePendingWorkspaceSelection() -> Bool {
     guard let pending = store.consumePendingWorkspaceSelection() else {
-      return
+      return false
     }
     applyProgrammaticSelection(pending, recordHistory: true)
+    return true
+  }
+
+  func resolveInitialWorkspaceSelection() {
+    _ = consumePendingWorkspaceSelection()
   }
 }
