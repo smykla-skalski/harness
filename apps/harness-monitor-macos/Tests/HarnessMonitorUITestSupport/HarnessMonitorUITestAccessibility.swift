@@ -42,6 +42,8 @@ enum HarnessMonitorUITestAccessibility {
     "harness.decisions.bulk-actions.dismiss-visible.input"
   static let decisionBulkDismissVisibleConfirm =
     "harness.decisions.bulk-actions.dismiss-visible.confirm"
+  static let decisionBulkDismissVisibleCancel =
+    "harness.decisions.bulk-actions.dismiss-visible.cancel"
   static let decisionBulkReopenBatch = "harness.decisions.bulk-actions.reopen-batch"
   static let decisionsObserverPanel = "harness.decisions.observer.panel"
   static let decisionsObserverEmptyState = "harness.decisions.observer.empty-state"
@@ -229,6 +231,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sessionTimelinePaginationStatus = "harness.session.timeline.pagination.status"
   static let sessionTimelineNavigation = "harness.session.timeline.navigation"
   static let sessionTimelineNavigationStatus = "harness.session.timeline.navigation.status"
+  static let sessionTimelineVisibleStatus = "harness.session.timeline.navigation.visible-status"
   static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
   static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
