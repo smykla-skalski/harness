@@ -24,6 +24,17 @@ struct NDJSONLineBufferTests {
     let lines = buffer.append(Data("\n\n{\"x\":1}\n\n".utf8))
     #expect(lines.map { String(data: $0, encoding: .utf8) } == ["{\"x\":1}"])
   }
+
+  @Test("rejects oversized buffered frames")
+  func rejectsOversizedBufferedFrames() throws {
+    var buffer = NDJSONLineBuffer()
+    #expect(throws: RegistryWireCodecError.self) {
+      try buffer.append(
+        Data(String(repeating: "x", count: registryMaximumFrameBytes + 1).utf8),
+        maxBufferedBytes: registryMaximumFrameBytes
+      )
+    }
+  }
 }
 
 @Suite("RegistryWireCodec")

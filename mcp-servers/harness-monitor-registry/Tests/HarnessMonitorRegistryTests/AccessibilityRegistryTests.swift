@@ -254,6 +254,91 @@ struct AccessibilityRegistryTests {
     #expect(await registry.allWindows().map(\.id) == [200])
   }
 
+  @Test("stale clear generations cannot remove a newer remote snapshot")
+  func staleClearGenerationsCannotRemoveNewerRemoteSnapshot() async {
+    let clientID = UUID()
+    let registry = AccessibilityRegistry()
+    let firstSnapshot = RegistryClientSnapshot(
+      clientID: clientID,
+      generation: 1,
+      appVersion: "1.2.3",
+      bundleIdentifier: "io.test.client",
+      snapshot: RegistrySnapshot(
+        elements: [
+          RegistryElement(
+            identifier: "session.task.remote",
+            label: "First remote task",
+            kind: .row,
+            frame: RegistryRect(x: 20, y: 30, width: 120, height: 36),
+            windowID: 200
+          )
+        ],
+        windows: []
+      )
+    )
+    let secondSnapshot = RegistryClientSnapshot(
+      clientID: clientID,
+      generation: 2,
+      appVersion: "1.2.3",
+      bundleIdentifier: "io.test.client",
+      snapshot: RegistrySnapshot(
+        elements: [
+          RegistryElement(
+            identifier: "session.task.remote",
+            label: "Second remote task",
+            kind: .row,
+            frame: RegistryRect(x: 30, y: 40, width: 130, height: 40),
+            windowID: 200
+          )
+        ],
+        windows: []
+      )
+    )
+
+    _ = await registry.upsertClientSnapshot(firstSnapshot)
+    _ = await registry.upsertClientSnapshot(secondSnapshot)
+    let ack = await registry.removeClientSnapshot(
+      RegistryClientClearRequest(clientID: clientID, generation: 1)
+    )
+
+    #expect(ack.applied == true)
+    #expect(await registry.element(identifier: "session.task.remote")?.label == "Second remote task")
+  }
+
+  @Test("expired client snapshots age out of authoritative queries")
+  func expiredClientSnapshotsAgeOutOfAuthoritativeQueries() async throws {
+    let registry = AccessibilityRegistry(
+      remoteSnapshotLeaseDuration: .milliseconds(50),
+      remoteHeartbeatInterval: .milliseconds(25)
+    )
+    _ = await registry.upsertClientSnapshot(
+      RegistryClientSnapshot(
+        clientID: UUID(),
+        generation: 1,
+        appVersion: "1.2.3",
+        bundleIdentifier: "io.test.client",
+        snapshot: RegistrySnapshot(
+          elements: [
+            RegistryElement(
+              identifier: "session.task.remote.expiring",
+              label: "Expiring remote task",
+              kind: .row,
+              frame: RegistryRect(x: 20, y: 30, width: 120, height: 36),
+              windowID: 200
+            )
+          ],
+          windows: []
+        )
+      )
+    )
+
+    #expect(await registry.element(identifier: "session.task.remote.expiring") != nil)
+    #expect(await registry.storedClientSnapshotCount() == 1)
+    try await Task.sleep(for: .milliseconds(80))
+    #expect(await registry.element(identifier: "session.task.remote.expiring") == nil)
+    #expect(await registry.storedClientSnapshotCount() == 0)
+  }
+
   @MainActor
   @Test("stale window updates are ignored after tracking stops")
   func staleWindowUpdatesAreIgnoredAfterTrackingStops() async {

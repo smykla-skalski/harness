@@ -30,14 +30,14 @@ public struct RegistrySocketClient: Sendable {
   }
 
   public func clearClientSnapshot(
-    clientID: UUID,
+    _ clearRequest: RegistryClientClearRequest,
     toSocketAt socketPath: String
   ) async throws -> RegistryAckResult {
     try await send(
       RegistryRequest(
         id: 3,
         op: .clearClientSnapshot,
-        clientID: clientID
+        clientClear: clearRequest
       ),
       toSocketAt: socketPath
     )
@@ -126,22 +126,76 @@ public struct RegistrySocketClient: Sendable {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     var payload = try encoder.encode(request)
     payload.append(0x0A)
-    let sent = payload.withUnsafeBytes { buffer in
-      Darwin.send(fd, buffer.baseAddress, buffer.count, 0)
-    }
-    guard sent >= 0 else {
-      throw RegistrySocketClientError.sendFailed(errno: errno)
-    }
+    try sendAll(payload, on: fd)
+    let responseData = try receiveResponseLine(from: fd)
+    return try decodeResponseData(responseData)
+  }
 
-    var scratch = [UInt8](repeating: 0, count: 64 * 1024)
-    let received = scratch.withUnsafeMutableBufferPointer { buffer in
-      Darwin.recv(fd, buffer.baseAddress, buffer.count, 0)
+  private func sendAll(_ payload: Data, on fd: Int32) throws {
+    try payload.withUnsafeBytes { bytes in
+      guard let baseAddress = bytes.baseAddress else {
+        return
+      }
+      var bytesSent = 0
+      while bytesSent < bytes.count {
+        let sent = Darwin.send(
+          fd,
+          baseAddress.advanced(by: bytesSent),
+          bytes.count - bytesSent,
+          0
+        )
+        if sent > 0 {
+          bytesSent += sent
+          continue
+        }
+        if sent == 0 {
+          throw RegistrySocketClientError.sendFailed(errno: EPIPE)
+        }
+        if errno == EINTR {
+          continue
+        }
+        throw RegistrySocketClientError.sendFailed(errno: errno)
+      }
     }
-    guard received > 0 else {
+  }
+
+  private func receiveResponseLine(from fd: Int32) throws -> Data {
+    var lineBuffer = NDJSONLineBuffer()
+    var scratch = [UInt8](repeating: 0, count: 4 * 1024)
+    while true {
+      let received = scratch.withUnsafeMutableBufferPointer { buffer in
+        Darwin.recv(fd, buffer.baseAddress, buffer.count, 0)
+      }
+      if received > 0 {
+        let chunk = Data(scratch.prefix(received))
+        let lines: [Data]
+        do {
+          lines = try lineBuffer.append(chunk, maxBufferedBytes: RegistryWireCodec.maximumFrameBytes)
+        } catch let error as RegistryWireCodecError {
+          switch error {
+          case .frameTooLarge(let maxBytes):
+            throw RegistrySocketClientError.frameTooLarge(maxBytes)
+          }
+        }
+        if let line = lines.first {
+          return line
+        }
+        continue
+      }
+      if received == 0 {
+        if let pendingLine = lineBuffer.drainPendingBytes() {
+          return pendingLine
+        }
+        throw RegistrySocketClientError.recvFailed(errno: ECONNRESET)
+      }
+      if errno == EINTR {
+        continue
+      }
       throw RegistrySocketClientError.recvFailed(errno: errno)
     }
+  }
 
-    let responseData = Data(scratch.prefix(received))
+  private func decodeResponseData<Result: Decodable>(_ responseData: Data) throws -> Result {
     let decoder = JSONDecoder()
     if let success = try? decoder.decode(SuccessEnvelope<Result>.self, from: responseData),
       success.ok
@@ -176,12 +230,13 @@ private struct FailureEnvelope: Decodable {
   let error: RegistryErrorPayload
 }
 
-public enum RegistrySocketClientError: Error, CustomStringConvertible {
+public enum RegistrySocketClientError: Error, CustomStringConvertible, LocalizedError {
   case socketFailed(errno: Int32)
   case pathTooLong(String)
   case connectFailed(errno: Int32)
   case sendFailed(errno: Int32)
   case recvFailed(errno: Int32)
+  case frameTooLarge(Int)
   case remoteFailure(RegistryErrorPayload)
   case invalidResponse(Data)
 
@@ -197,10 +252,16 @@ public enum RegistrySocketClientError: Error, CustomStringConvertible {
       "send() failed: \(String(cString: strerror(code)))"
     case .recvFailed(let code):
       "recv() failed: \(String(cString: strerror(code)))"
+    case .frameTooLarge(let maxBytes):
+      "registry frame exceeded the \(maxBytes)-byte limit"
     case .remoteFailure(let error):
       "remote registry failure: \(error.code) \(error.message)"
     case .invalidResponse(let data):
       "received invalid registry response: \(String(decoding: data, as: UTF8.self))"
     }
+  }
+
+  public var errorDescription: String? {
+    description
   }
 }

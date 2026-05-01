@@ -17,6 +17,7 @@ public struct RegistryRequest: Sendable, Codable {
   public var windowID: Int?
   public var kind: RegistryElementKind?
   public var clientID: UUID?
+  public var clientClear: RegistryClientClearRequest?
   public var clientSnapshot: RegistryClientSnapshot?
   public var replacementNotice: RegistryReplacementNotice?
 
@@ -27,6 +28,7 @@ public struct RegistryRequest: Sendable, Codable {
     windowID: Int? = nil,
     kind: RegistryElementKind? = nil,
     clientID: UUID? = nil,
+    clientClear: RegistryClientClearRequest? = nil,
     clientSnapshot: RegistryClientSnapshot? = nil,
     replacementNotice: RegistryReplacementNotice? = nil
   ) {
@@ -36,6 +38,7 @@ public struct RegistryRequest: Sendable, Codable {
     self.windowID = windowID
     self.kind = kind
     self.clientID = clientID
+    self.clientClear = clientClear
     self.clientSnapshot = clientSnapshot
     self.replacementNotice = replacementNotice
   }
@@ -125,6 +128,8 @@ public struct RegistryAckResult: Sendable, Codable, Equatable {
 }
 
 public enum RegistryWireCodec {
+  public static let maximumFrameBytes = registryMaximumFrameBytes
+
   public static func encodeResponse(_ response: RegistryResponse) throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -177,5 +182,61 @@ public enum RegistryWireCodec {
     let id: Int
     let ok: Bool
     let error: RegistryErrorPayload
+  }
+}
+
+public enum RegistryWireCodecError: Error, CustomStringConvertible, LocalizedError {
+  case frameTooLarge(maxBytes: Int)
+
+  public var description: String {
+    switch self {
+    case .frameTooLarge(let maxBytes):
+      "registry frame exceeded the \(maxBytes)-byte limit"
+    }
+  }
+
+  public var errorDescription: String? {
+    description
+  }
+}
+
+/// Splits a sliding byte buffer into complete NDJSON lines.
+///
+/// Kept public so the registry host, socket client, and tests share one
+/// framing implementation.
+public struct NDJSONLineBuffer {
+  private var buffer: Data = Data()
+
+  public init() {}
+
+  public mutating func append(_ data: Data) -> [Data] {
+    (try? append(data, maxBufferedBytes: registryMaximumFrameBytes)) ?? []
+  }
+
+  public mutating func append(_ data: Data, maxBufferedBytes: Int) throws -> [Data] {
+    buffer.append(data)
+    if buffer.count > maxBufferedBytes {
+      throw RegistryWireCodecError.frameTooLarge(maxBytes: maxBufferedBytes)
+    }
+    var lines: [Data] = []
+    while let newlineIndex = buffer.firstIndex(of: 0x0A) {
+      let range = buffer.startIndex..<newlineIndex
+      let line = buffer.subdata(in: range)
+      buffer.removeSubrange(buffer.startIndex...newlineIndex)
+      if line.isEmpty == false {
+        lines.append(line)
+      }
+    }
+    return lines
+  }
+
+  public var pendingByteCount: Int { buffer.count }
+
+  public mutating func drainPendingBytes() -> Data? {
+    guard buffer.isEmpty == false else {
+      return nil
+    }
+    defer { buffer.removeAll(keepingCapacity: false) }
+    return buffer
   }
 }
