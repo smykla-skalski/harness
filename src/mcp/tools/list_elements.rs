@@ -5,10 +5,10 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::mcp::protocol::ToolResult;
-use crate::mcp::registry::{ElementKind, ListElementsResult, RegistryClient, RegistryRequest};
+use crate::mcp::registry::{ElementKind, RegistryClient};
 use crate::mcp::tool::{Tool, ToolError};
 
-use super::shared::{decode_params, map_registry_error, ok_text};
+use super::shared::{decode_params, ok_text, resolve_list_elements};
 
 #[derive(Debug, Deserialize)]
 struct Params {
@@ -63,17 +63,7 @@ impl Tool for ListElementsTool {
 
     async fn call(&self, params: Value) -> Result<ToolResult, ToolError> {
         let parsed: Params = decode_params(params)?;
-        let id = self.client.next_request_id();
-        let request = RegistryRequest::ListElements {
-            id,
-            window_id: parsed.window_id,
-            kind: parsed.kind,
-        };
-        let result: ListElementsResult = self
-            .client
-            .request(&request)
-            .await
-            .map_err(|error| map_registry_error(&error))?;
+        let result = resolve_list_elements(&self.client, parsed.window_id, parsed.kind).await?;
         ok_text(&result)
     }
 }

@@ -1,6 +1,9 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use crate::mcp::registry::ElementKind;
+
+use super::accessibility::{get_element_args, list_elements_args};
 use super::backend::{Backend, INPUT_OVERRIDE_ENV, detect_backend};
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
 use super::screenshot::{ScreenshotOptions, screencapture_args};
@@ -77,6 +80,24 @@ fn type_text_none_falls_back_to_osascript_keystroke() {
     assert_eq!(args[0], OsString::from("-e"));
     let script = args[1].to_string_lossy();
     assert!(script.contains("keystroke \"a\\\"b\""), "got {script}");
+}
+
+#[test]
+fn accessibility_list_elements_args_include_optional_filters() {
+    let args = list_elements_args(Some(42), Some(ElementKind::Button));
+    assert_eq!(
+        as_strings(&args),
+        vec!["list-elements", "--window-id", "42", "--kind", "button"],
+    );
+}
+
+#[test]
+fn accessibility_get_element_args_preserve_identifier() {
+    let args = get_element_args("harness.sidebar.new-session");
+    assert_eq!(
+        as_strings(&args),
+        vec!["get-element", "harness.sidebar.new-session"],
+    );
 }
 
 #[test]

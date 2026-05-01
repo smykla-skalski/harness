@@ -1,6 +1,6 @@
 # HarnessMonitorRegistry
 
-Swift package that exposes Harness Monitor's accessibility elements to the `harness-monitor-mcp` Node server over a Unix domain socket.
+Swift package that exposes Harness Monitor's accessibility elements to the Rust `harness mcp serve` server over a Unix domain socket.
 
 ## What's inside
 
@@ -10,7 +10,8 @@ Swift package that exposes Harness Monitor's accessibility elements to the `harn
 - `NDJSONLineBuffer` - byte-oriented framing for the wire.
 - `RegistryWireCodec` - JSON codec for the envelope format the Node server expects.
 - `.trackAccessibility(...)` - SwiftUI view modifier that captures a view's frame via `GeometryReader` + `CoordinateSpace.global` and registers it with a registry. Frame updates flow through a `PreferenceKey`, so moves during layout are picked up automatically.
-- `harness-monitor-input` executable - CGEvent-backed input-synthesis CLI that replaces the external `cliclick` dependency. Subcommands: `move`, `click`, `type`, `position`, `check`.
+- `.trackWindow(...)` - SwiftUI scene-level modifier that registers the hosting `NSWindow` and automatically harvests the live AppKit view tree into `RegistryElement`s for that window.
+- `harness-monitor-input` executable - CGEvent-backed helper that replaces the external `cliclick` dependency for input and also exposes live AX query subcommands used by the Rust MCP server. Subcommands: `move`, `click`, `type`, `position`, `check`, `list-elements`, `get-element`.
 - `harness-monitor-registry-host` executable - manual-test harness that seeds the registry with fixture windows and elements and runs the listener at a given socket path.
 
 ## Why a separate package
@@ -67,6 +68,26 @@ struct SessionControls: View {
 ```
 
 The identifier you pass also becomes the view's `.accessibilityIdentifier`, so on-device XCUITest queries and the MCP server look at the same value.
+
+## Scene-level auto-harvest
+
+Production Harness Monitor scenes typically attach the registry at the window
+root instead of adding `.trackAccessibility(...)` to every control:
+
+```swift
+Window("Workspace", id: HarnessMonitorWindowID.workspace) {
+  AgentsWindowRootView(store: store, ...)
+}
+.trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+```
+
+`trackWindow(...)` keeps `list_windows` accurate and periodically replaces the
+registered element set for the tracked window by harvesting the live AppKit view
+tree. Existing `.accessibilityIdentifier(...)` values become discoverable over
+MCP without additional per-view registration churn. The Rust MCP server still
+prefers this in-app registry path first; the helper's `list-elements` and
+`get-element` subcommands are a fallback for live AX queries when registry data
+is empty or missing an element.
 
 ## Launching the listener
 
