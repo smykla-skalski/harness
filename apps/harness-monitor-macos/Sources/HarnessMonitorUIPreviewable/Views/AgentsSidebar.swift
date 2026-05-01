@@ -223,12 +223,6 @@ struct AgentsSidebar: View {
         isEnabled: decisionFiltersMenuEnabled,
         setSelectedSeverities: setDecisionSeverities
       )
-      ToolbarItem(placement: .automatic) {
-        Button(action: refresh) {
-          Label("Refresh", systemImage: "arrow.clockwise")
-        }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRefreshButton)
-      }
     }
     .onAppear {
       restorePersistedDecisionFiltersIfNeeded()
