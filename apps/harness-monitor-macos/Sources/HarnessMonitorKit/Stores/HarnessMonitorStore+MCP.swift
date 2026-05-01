@@ -56,7 +56,7 @@ extension HarnessMonitorStore {
       presentFailureFeedback(failureMessage)
     case .healthy:
       if mcpFeedbackState.shouldPresentRecoverySuccess {
-        presentSuccessFeedback("MCP recovered and is ready.")
+        presentSuccessFeedback("MCP registry host recovered and is ready.")
       }
       mcpFeedbackState.reset()
     case .disabled:

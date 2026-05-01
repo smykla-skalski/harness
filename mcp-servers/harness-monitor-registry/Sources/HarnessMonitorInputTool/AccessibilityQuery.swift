@@ -271,7 +271,7 @@ private func accessibilityWindows(for app: NSRunningApplication) -> [AXUIElement
 }
 
 private func cgWindowCandidates(processID: pid_t) -> [AccessibilityQueryWindowCandidate] {
-  let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+  let options: CGWindowListOption = [.excludeDesktopElements]
   let windowInfo =
     CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] ?? []
 
@@ -335,7 +335,7 @@ private func windowMatchScore(
   candidate: AccessibilityQueryWindowCandidate
 ) -> Int {
   var score = 0
-  if title != candidate.title {
+  if let title, let candidateTitle = candidate.title, title != candidateTitle {
     score += 1_000
   }
   if let frame {

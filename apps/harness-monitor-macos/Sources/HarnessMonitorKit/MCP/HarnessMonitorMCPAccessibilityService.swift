@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 import HarnessMonitorRegistry
 import OSLog
@@ -51,34 +50,48 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   public static let shared = HarnessMonitorMCPAccessibilityService()
 
   public let registry: AccessibilityRegistry
-  private let dispatcher: RegistryRequestDispatcher
   private let logger: Logger
   private let socketPathResolver: @Sendable () -> URL?
+  private let pingInfoProvider: @Sendable () -> PingResult
   private let startupAttempts: Int
   private let startupProbeDelay: Duration
   private let startupProbeCount: Int
+  private let socketClient: RegistrySocketClient
   private var listener: RegistryListener?
   private var runningSocketURL: URL?
+  private var remoteSocketURL: URL?
+  private var pendingReplacementNotice: RegistryReplacementNotice?
   public private(set) var runtimeState: HarnessMonitorMCPRuntimeState = .disabled
+  private lazy var dispatcher = RegistryRequestDispatcher(
+    registry: self.registry,
+    pingInfo: self.pingInfoProvider,
+    replacementHandler: { [weak self] notice in
+      guard let self else {
+        return RegistryAckResult(applied: false, message: "registry service released")
+      }
+      return await self.handleReplacementNotice(notice)
+    }
+  )
 
   public init(
     registry: AccessibilityRegistry = AccessibilityRegistry(),
     logger: Logger = Logger(subsystem: "io.harnessmonitor", category: "mcp-registry"),
     socketPathResolver: @escaping @Sendable () -> URL? = { HarnessMonitorMCPSocketPath.resolved() },
+    pingInfoProvider: (@Sendable () -> PingResult)? = nil,
     startupAttempts: Int = 3,
     startupProbeDelay: Duration = .milliseconds(50),
-    startupProbeCount: Int = 20
+    startupProbeCount: Int = 20,
+    socketClient: RegistrySocketClient = RegistrySocketClient()
   ) {
+    let pingInfoProvider = pingInfoProvider ?? Self.makePingInfoProvider()
     self.registry = registry
-    self.dispatcher = RegistryRequestDispatcher(
-      registry: registry,
-      pingInfo: Self.makePingInfoProvider()
-    )
     self.logger = logger
     self.socketPathResolver = socketPathResolver
+    self.pingInfoProvider = pingInfoProvider
     self.startupAttempts = max(1, startupAttempts)
     self.startupProbeDelay = startupProbeDelay
     self.startupProbeCount = max(1, startupProbeCount)
+    self.socketClient = socketClient
   }
 
   /// Whether the listener is currently bound to its socket.
@@ -97,23 +110,52 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   }
 
   public func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState {
-    guard let socket = runningSocketURL ?? socketPathResolver() else {
+    guard let socket = activeSocketURL ?? socketPathResolver() else {
       return .degraded(socketPath: nil, reason: "cannot resolve app-group container")
     }
-    guard listener != nil else {
+    guard listener != nil || remoteSocketURL != nil else {
       return .disabled
     }
-    if await socketAcceptsPing(at: socket.path) {
+    guard let pingInfo = await pingSocket(at: socket.path) else {
+      let reason =
+        if pendingReplacementNotice != nil {
+          "waiting for the replacement registry host to appear"
+        } else if remoteSocketURL != nil {
+          "connected registry host failed the local ping probe"
+        } else {
+          "listener failed the local ping probe"
+        }
+      return .degraded(socketPath: socket.path, reason: reason)
+    }
+    if listener != nil, sameHost(lhs: pingInfo, rhs: localPingInfo) {
       return .healthy(socketPath: socket.path)
     }
-    return .degraded(
-      socketPath: socket.path,
-      reason: "listener failed the local ping probe"
-    )
+    guard isCompatible(remoteHost: pingInfo, localHost: localPingInfo) else {
+      return .degraded(
+        socketPath: socket.path,
+        reason: incompatibilityReason(remoteHost: pingInfo, localHost: localPingInfo)
+      )
+    }
+    return .healthy(socketPath: socket.path)
+  }
+
+  private var activeSocketURL: URL? {
+    if listener != nil {
+      return runningSocketURL
+    }
+    return remoteSocketURL
+  }
+
+  private var localPingInfo: PingResult {
+    pingInfoProvider()
+  }
+
+  private var requiredRemoteCapabilities: Set<RegistryCapability> {
+    [.clientSnapshots]
   }
 
   private func startIfNeeded() async {
-    guard let socket = socketPathResolver() else {
+    guard let socket = remoteSocketURL ?? socketPathResolver() else {
       runtimeState = .degraded(
         socketPath: nil,
         reason: "cannot resolve app-group container"
@@ -124,18 +166,61 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       return
     }
 
-    if listener != nil, await socketAcceptsPing(at: socket.path) {
+    if listener != nil, let pingInfo = await pingSocket(at: socket.path) {
+      if sameHost(lhs: pingInfo, rhs: localPingInfo) {
+        await registry.setRemoteSocketPath(nil)
+        remoteSocketURL = nil
+        pendingReplacementNotice = nil
+        runtimeState = .healthy(socketPath: socket.path)
+        return
+      }
+    }
+
+    if remoteSocketURL != nil,
+      let pingInfo = await pingSocket(at: socket.path),
+      isCompatible(remoteHost: pingInfo, localHost: localPingInfo)
+    {
       runtimeState = .healthy(socketPath: socket.path)
       return
     }
 
+    if pendingReplacementNotice != nil {
+      runtimeState = .starting(socketPath: socket.path)
+      if await waitForCompatibleRemoteHost(at: socket.path) {
+        await attachToRemoteHost(at: socket)
+        return
+      }
+      pendingReplacementNotice = nil
+    }
+
+    if let remoteHost = await pingSocket(at: socket.path) {
+      if isCompatible(remoteHost: remoteHost, localHost: localPingInfo) {
+        await attachToRemoteHost(at: socket)
+        return
+      }
+      guard shouldReplace(remoteHost: remoteHost, localHost: localPingInfo) else {
+        let reason = incompatibilityReason(remoteHost: remoteHost, localHost: localPingInfo)
+        runtimeState = .degraded(socketPath: socket.path, reason: reason)
+        logger.error(
+          """
+          MCP start refused to replace existing socket at \(socket.path, privacy: .public): \
+          \(reason, privacy: .public)
+          """
+        )
+        return
+      }
+      await requestReplacement(of: remoteHost, at: socket)
+    }
+
+    await registry.setRemoteSocketPath(nil)
+    remoteSocketURL = nil
     await stopListener()
     runtimeState = .starting(socketPath: socket.path)
 
     for attempt in 1...startupAttempts {
       let nextListener = RegistryListener(dispatcher: dispatcher, logger: logger)
       do {
-        try await nextListener.start(at: socket.path)
+        try await nextListener.start(at: socket.path, replaceExistingSocketFile: true)
       } catch {
         let description = error.localizedDescription
         logger.error(
@@ -152,8 +237,9 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       listener = nextListener
       runningSocketURL = socket
 
-      if await waitForHealthySocket(at: socket.path) {
+      if await waitForMatchingHost(at: socket.path, expectedHost: localPingInfo) {
         runtimeState = .healthy(socketPath: socket.path)
+        pendingReplacementNotice = nil
         logger.trace(
           "harness-monitor MCP: registry host started at \(socket.path, privacy: .public)"
         )
@@ -176,8 +262,18 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
   }
 
   private func stop() async {
+    let hadOwnedListener = listener != nil
+    let reusedRemoteSocket = remoteSocketURL
+    pendingReplacementNotice = nil
     await stopListener()
-    if let socketURL = socketPathResolver() {
+    remoteSocketURL = nil
+    await registry.setRemoteSocketPath(nil)
+
+    if hadOwnedListener == false,
+      reusedRemoteSocket == nil,
+      let socketURL = socketPathResolver(),
+      await pingSocket(at: socketURL.path) == nil
+    {
       cleanupSocketFileIfPresent(at: socketURL)
     }
     runtimeState = .disabled
@@ -203,18 +299,25 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     let version =
       (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0.0.0"
     let bundleId = bundle.bundleIdentifier ?? "io.harnessmonitor.app"
+    let capabilities: [RegistryCapability] = [
+      .clientSnapshots,
+      .replacementNotice,
+    ]
     return { @Sendable in
       PingResult(
-        protocolVersion: 1,
+        protocolVersion: registryProtocolVersion,
         appVersion: version,
-        bundleIdentifier: bundleId
+        bundleIdentifier: bundleId,
+        capabilities: capabilities
       )
     }
   }
 
-  private func waitForHealthySocket(at path: String) async -> Bool {
+  private func waitForCompatibleRemoteHost(at path: String) async -> Bool {
     for _ in 0..<startupProbeCount {
-      if await socketAcceptsPing(at: path) {
+      if let pingInfo = await pingSocket(at: path),
+        isCompatible(remoteHost: pingInfo, localHost: localPingInfo)
+      {
         return true
       }
       try? await Task.sleep(for: startupProbeDelay)
@@ -222,10 +325,197 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     return false
   }
 
-  private func socketAcceptsPing(at path: String) async -> Bool {
-    await Task.detached(priority: .utility) {
-      pingSocket(at: path)
-    }.value
+  private func waitForMatchingHost(at path: String, expectedHost: PingResult) async -> Bool {
+    for _ in 0..<startupProbeCount {
+      if let pingInfo = await pingSocket(at: path), sameHost(lhs: pingInfo, rhs: expectedHost) {
+        return true
+      }
+      try? await Task.sleep(for: startupProbeDelay)
+    }
+    return false
+  }
+
+  private func pingSocket(at path: String) async -> PingResult? {
+    try? await socketClient.ping(at: path)
+  }
+
+  private func attachToRemoteHost(at socket: URL) async {
+    await stopListener()
+    await registry.setRemoteSocketPath(socket.path)
+    remoteSocketURL = socket
+    pendingReplacementNotice = nil
+    runtimeState = .healthy(socketPath: socket.path)
+    logger.trace(
+      "harness-monitor MCP: reusing compatible registry host at \(socket.path, privacy: .public)"
+    )
+  }
+
+  private func requestReplacement(of remoteHost: PingResult, at socket: URL) async {
+    guard remoteHost.capabilities.contains(.replacementNotice) else {
+      logger.info(
+        """
+        harness-monitor MCP: replacing legacy socket at \(socket.path, privacy: .public) \
+        without a handoff notice because the running host does not support it
+        """
+      )
+      return
+    }
+
+    let notice = RegistryReplacementNotice(
+      socketPath: socket.path,
+      protocolVersion: localPingInfo.protocolVersion,
+      appVersion: localPingInfo.appVersion,
+      bundleIdentifier: localPingInfo.bundleIdentifier,
+      message:
+        "A newer Harness Monitor MCP registry host is taking ownership of this socket. "
+        + "Stop listening and reregister your windows and elements against the replacement host."
+    )
+
+    do {
+      let ack = try await socketClient.sendReplacementNotice(notice, toSocketAt: socket.path)
+      if ack.applied == false {
+        logger.info(
+          """
+          harness-monitor MCP: existing socket at \(socket.path, privacy: .public) \
+          ignored the replacement notice: \(ack.message ?? "no reason provided", privacy: .public)
+          """
+        )
+        return
+      }
+      _ = await waitForSocketYield(at: socket.path, previousHost: remoteHost)
+    } catch {
+      logger.error(
+        """
+        harness-monitor MCP: failed to notify the existing socket at \
+        \(socket.path, privacy: .public) about replacement: \
+        \(error.localizedDescription, privacy: .public)
+        """
+      )
+    }
+  }
+
+  private func waitForSocketYield(at path: String, previousHost: PingResult) async -> Bool {
+    for _ in 0..<startupProbeCount {
+      if let pingInfo = await pingSocket(at: path) {
+        if sameHost(lhs: pingInfo, rhs: previousHost) == false {
+          return true
+        }
+      } else {
+        return true
+      }
+      try? await Task.sleep(for: startupProbeDelay)
+    }
+    return false
+  }
+
+  private func handleReplacementNotice(
+    _ notice: RegistryReplacementNotice
+  ) async -> RegistryAckResult {
+    guard shouldYield(to: notice, localHost: localPingInfo) else {
+      return RegistryAckResult(
+        applied: false,
+        message: "replacement host is not newer than the current registry host"
+      )
+    }
+
+    pendingReplacementNotice = notice
+    await stopListener()
+    remoteSocketURL = URL(fileURLWithPath: notice.socketPath)
+    await registry.setRemoteSocketPath(notice.socketPath)
+    runtimeState = .starting(socketPath: notice.socketPath)
+    logger.info(
+      """
+      harness-monitor MCP: yielding socket ownership to replacement host at \
+      \(notice.socketPath, privacy: .public)
+      """
+    )
+    return RegistryAckResult(
+      applied: true,
+      message: "listener yielded and will reregister against the replacement host"
+    )
+  }
+
+  private func isCompatible(remoteHost: PingResult, localHost: PingResult) -> Bool {
+    guard remoteHost.protocolVersion == localHost.protocolVersion else {
+      return false
+    }
+    return Set(remoteHost.capabilities).isSuperset(of: requiredRemoteCapabilities)
+  }
+
+  private func shouldReplace(remoteHost: PingResult, localHost: PingResult) -> Bool {
+    guard isCompatible(remoteHost: remoteHost, localHost: localHost) == false else {
+      return false
+    }
+    if remoteHost.protocolVersion < localHost.protocolVersion {
+      return true
+    }
+    if remoteHost.protocolVersion > localHost.protocolVersion {
+      return false
+    }
+    return compareVersions(remoteHost.appVersion, localHost.appVersion) != .orderedDescending
+  }
+
+  private func shouldYield(
+    to replacementNotice: RegistryReplacementNotice,
+    localHost: PingResult
+  ) -> Bool {
+    if replacementNotice.protocolVersion > localHost.protocolVersion {
+      return true
+    }
+    if replacementNotice.protocolVersion < localHost.protocolVersion {
+      return false
+    }
+    return compareVersions(replacementNotice.appVersion, localHost.appVersion) != .orderedAscending
+  }
+
+  private func incompatibilityReason(remoteHost: PingResult, localHost: PingResult) -> String {
+    if remoteHost.protocolVersion > localHost.protocolVersion {
+      return
+        "existing registry host uses protocol \(remoteHost.protocolVersion), newer than local "
+        + "protocol \(localHost.protocolVersion)"
+    }
+    if remoteHost.protocolVersion < localHost.protocolVersion {
+      return
+        "existing registry host uses protocol \(remoteHost.protocolVersion), older than local "
+        + "protocol \(localHost.protocolVersion)"
+    }
+
+    let missingCapabilities = requiredRemoteCapabilities.subtracting(remoteHost.capabilities)
+    guard missingCapabilities.isEmpty == false else {
+      return "existing registry host is incompatible with this app"
+    }
+
+    let missingList = missingCapabilities
+      .map(\.rawValue)
+      .sorted()
+      .joined(separator: ", ")
+    return "existing registry host is missing required capabilities: \(missingList)"
+  }
+
+  private func sameHost(lhs: PingResult, rhs: PingResult) -> Bool {
+    lhs.protocolVersion == rhs.protocolVersion
+      && lhs.appVersion == rhs.appVersion
+      && lhs.bundleIdentifier == rhs.bundleIdentifier
+      && Set(lhs.capabilities) == Set(rhs.capabilities)
+  }
+
+  private func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
+    let lhsParts = lhs.split(separator: ".").compactMap { Int($0) }
+    let rhsParts = rhs.split(separator: ".").compactMap { Int($0) }
+    let maxCount = max(lhsParts.count, rhsParts.count)
+
+    for index in 0..<maxCount {
+      let lhsValue = index < lhsParts.count ? lhsParts[index] : 0
+      let rhsValue = index < rhsParts.count ? rhsParts[index] : 0
+      if lhsValue < rhsValue {
+        return .orderedAscending
+      }
+      if lhsValue > rhsValue {
+        return .orderedDescending
+      }
+    }
+
+    return .orderedSame
   }
 
   private func cleanupSocketFileIfPresent(at socketURL: URL) {
@@ -243,68 +533,4 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
       )
     }
   }
-}
-
-private func pingSocket(at path: String) -> Bool {
-  let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
-  guard fd >= 0 else {
-    return false
-  }
-  defer { Darwin.close(fd) }
-
-  var addr = sockaddr_un()
-  addr.sun_family = sa_family_t(AF_UNIX)
-  let pathBytes = Array(path.utf8)
-  let maxPathLength = MemoryLayout.size(ofValue: addr.sun_path)
-  guard pathBytes.count < maxPathLength else {
-    return false
-  }
-  withUnsafeMutableBytes(of: &addr.sun_path) { pointer in
-    pointer.baseAddress?.copyMemory(from: pathBytes, byteCount: pathBytes.count)
-  }
-  let connectResult = withUnsafePointer(to: &addr) { addrPointer -> Int32 in
-    addrPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPointer in
-      Darwin.connect(fd, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_un>.size))
-    }
-  }
-  guard connectResult == 0 else {
-    return false
-  }
-
-  var timeout = timeval(tv_sec: 1, tv_usec: 0)
-  _ = Darwin.setsockopt(
-    fd,
-    SOL_SOCKET,
-    SO_RCVTIMEO,
-    &timeout,
-    socklen_t(MemoryLayout<timeval>.size)
-  )
-  _ = Darwin.setsockopt(
-    fd,
-    SOL_SOCKET,
-    SO_SNDTIMEO,
-    &timeout,
-    socklen_t(MemoryLayout<timeval>.size)
-  )
-
-  let payload = Data("{\"id\":1,\"op\":\"ping\"}\n".utf8)
-  let sent = payload.withUnsafeBytes { buffer in
-    Darwin.send(fd, buffer.baseAddress, buffer.count, 0)
-  }
-  guard sent >= 0 else {
-    return false
-  }
-
-  var scratch = [UInt8](repeating: 0, count: 8 * 1024)
-  let received = scratch.withUnsafeMutableBufferPointer { buffer in
-    Darwin.recv(fd, buffer.baseAddress, buffer.count, 0)
-  }
-  guard received > 0 else {
-    return false
-  }
-
-  guard let response = String(bytes: scratch.prefix(received), encoding: .utf8) else {
-    return false
-  }
-  return response.contains("\"ok\":true")
 }

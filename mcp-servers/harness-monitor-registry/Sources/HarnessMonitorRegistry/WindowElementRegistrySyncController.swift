@@ -12,7 +12,8 @@ final class WindowElementRegistrySyncController {
   private var trackedWindowID: Int?
   private var trackingGeneration: UInt64 = 0
   private var trackingOwnerID = UUID()
-  private var pendingActions: [PendingAction] = []
+  private var pendingClears: [PendingAction] = []
+  private var pendingReplacement: PendingAction?
   private var flushTask: Task<Void, Never>?
 
   init(registry: AccessibilityRegistry) {
@@ -49,7 +50,12 @@ final class WindowElementRegistrySyncController {
   }
 
   private func enqueue(_ action: PendingAction) {
-    pendingActions.append(action)
+    switch action {
+    case .replace:
+      pendingReplacement = action
+    case .clear:
+      pendingClears.append(action)
+    }
     guard flushTask == nil else { return }
     let registry = registry
     flushTask = Task { @MainActor [weak self] in
@@ -61,11 +67,18 @@ final class WindowElementRegistrySyncController {
   }
 
   private func takePendingActionOrFinish() -> PendingAction? {
-    guard !pendingActions.isEmpty else {
-      flushTask = nil
+    if pendingClears.isEmpty == false {
+      return pendingClears.removeFirst()
+    }
+    if let pendingReplacement {
+      self.pendingReplacement = nil
+      return pendingReplacement
+    }
+    guard pendingClears.isEmpty, pendingReplacement == nil else {
       return nil
     }
-    return pendingActions.removeFirst()
+    flushTask = nil
+    return nil
   }
 
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {

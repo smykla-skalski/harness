@@ -5,6 +5,9 @@ public enum RegistryRequestOp: String, Sendable, Codable {
   case listWindows
   case listElements
   case getElement
+  case syncClientSnapshot
+  case clearClientSnapshot
+  case replacementNotice
 }
 
 public struct RegistryRequest: Sendable, Codable {
@@ -13,19 +16,28 @@ public struct RegistryRequest: Sendable, Codable {
   public var identifier: String?
   public var windowID: Int?
   public var kind: RegistryElementKind?
+  public var clientID: UUID?
+  public var clientSnapshot: RegistryClientSnapshot?
+  public var replacementNotice: RegistryReplacementNotice?
 
   public init(
     id: Int,
     op: RegistryRequestOp,
     identifier: String? = nil,
     windowID: Int? = nil,
-    kind: RegistryElementKind? = nil
+    kind: RegistryElementKind? = nil,
+    clientID: UUID? = nil,
+    clientSnapshot: RegistryClientSnapshot? = nil,
+    replacementNotice: RegistryReplacementNotice? = nil
   ) {
     self.id = id
     self.op = op
     self.identifier = identifier
     self.windowID = windowID
     self.kind = kind
+    self.clientID = clientID
+    self.clientSnapshot = clientSnapshot
+    self.replacementNotice = replacementNotice
   }
 }
 
@@ -49,17 +61,41 @@ public enum RegistryResult: Sendable, Codable, Equatable {
   case listWindows(ListWindowsResult)
   case listElements(ListElementsResult)
   case getElement(GetElementResult)
+  case ack(RegistryAckResult)
 }
 
 public struct PingResult: Sendable, Codable, Equatable {
   public var protocolVersion: Int
   public var appVersion: String
   public var bundleIdentifier: String
+  public var capabilities: [RegistryCapability]
 
-  public init(protocolVersion: Int, appVersion: String, bundleIdentifier: String) {
+  public init(
+    protocolVersion: Int,
+    appVersion: String,
+    bundleIdentifier: String,
+    capabilities: [RegistryCapability] = []
+  ) {
     self.protocolVersion = protocolVersion
     self.appVersion = appVersion
     self.bundleIdentifier = bundleIdentifier
+    self.capabilities = capabilities
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    protocolVersion = try container.decode(Int.self, forKey: .protocolVersion)
+    appVersion = try container.decode(String.self, forKey: .appVersion)
+    bundleIdentifier = try container.decode(String.self, forKey: .bundleIdentifier)
+    capabilities =
+      try container.decodeIfPresent([RegistryCapability].self, forKey: .capabilities) ?? []
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case protocolVersion
+    case appVersion
+    case bundleIdentifier
+    case capabilities
   }
 }
 
@@ -76,6 +112,16 @@ public struct ListElementsResult: Sendable, Codable, Equatable {
 public struct GetElementResult: Sendable, Codable, Equatable {
   public var element: RegistryElement
   public init(element: RegistryElement) { self.element = element }
+}
+
+public struct RegistryAckResult: Sendable, Codable, Equatable {
+  public var applied: Bool
+  public var message: String?
+
+  public init(applied: Bool, message: String? = nil) {
+    self.applied = applied
+    self.message = message
+  }
 }
 
 public enum RegistryWireCodec {
@@ -114,6 +160,8 @@ public enum RegistryWireCodec {
       case .listElements(let payload):
         try container.encode(payload, forKey: .result)
       case .getElement(let payload):
+        try container.encode(payload, forKey: .result)
+      case .ack(let payload):
         try container.encode(payload, forKey: .result)
       }
     }

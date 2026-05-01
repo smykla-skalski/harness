@@ -26,79 +26,93 @@ public actor AccessibilityRegistry {
     case trackedWindowSnapshot(windowID: Int, ownerID: UUID)
   }
 
+  private struct TrackedWindowElements {
+    let ownerID: UUID
+    var identifiers: Set<String>
+  }
+
+  private struct RemoteEndpoint: Equatable {
+    let socketPath: String
+  }
+
+  private struct RemoteFlushPayload {
+    let endpoint: RemoteEndpoint
+    let snapshot: RegistryClientSnapshot
+  }
+
   private var elements: [String: StoredElement] = [:]
   private var windows: [Int: StoredWindow] = [:]
   private var trackedWindowElements: [Int: TrackedWindowElements] = [:]
   // TrackAccessibility publishes asynchronously, so identifier ownership must be
   // claimed separately from element writes to ignore stale register/unregister tasks.
   private var trackedElementOwners: [String: UUID] = [:]
+  private var clientSnapshots: [UUID: RegistryClientSnapshot] = [:]
+  // Remote publication is latest-wins: local UI churn only needs the newest full
+  // snapshot of this process, not every intermediate mutation on the wire.
+  private var remoteEndpoint: RemoteEndpoint?
+  private var remoteSnapshotDirty = false
+  private var remoteFlushTask: Task<Void, Never>?
 
-  private struct TrackedWindowElements {
-    let ownerID: UUID
-    var identifiers: Set<String>
+  private let clientID: UUID
+  private let clientAppVersion: String
+  private let clientBundleIdentifier: String
+  private let remoteWriteRetryDelay: Duration
+  private let remoteSocketClient: RegistrySocketClient
+
+  public init(
+    clientID: UUID = UUID(),
+    clientAppVersion: String = (
+      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    ) ?? "0.0.0",
+    clientBundleIdentifier: String = Bundle.main.bundleIdentifier ?? "io.harnessmonitor.app",
+    remoteWriteRetryDelay: Duration = .milliseconds(100),
+    remoteSocketClient: RegistrySocketClient = RegistrySocketClient()
+  ) {
+    self.clientID = clientID
+    self.clientAppVersion = clientAppVersion
+    self.clientBundleIdentifier = clientBundleIdentifier
+    self.remoteWriteRetryDelay = remoteWriteRetryDelay
+    self.remoteSocketClient = remoteSocketClient
   }
 
-  public init() {}
-
   public func registerElement(_ element: RegistryElement) {
-    removeTrackedSnapshotReference(for: element.identifier)
-    trackedElementOwners[element.identifier] = nil
-    elements[element.identifier] = StoredElement(element: element, ownership: .manual)
+    applyRegisterElement(element)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterElement(identifier: String) {
-    removeTrackedSnapshotReference(for: identifier)
-    trackedElementOwners[identifier] = nil
-    elements[identifier] = nil
+    applyUnregisterElement(identifier: identifier)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func claimTrackedElement(identifier: String, ownerID: UUID) {
-    trackedElementOwners[identifier] = ownerID
-    guard case .trackedWindowSnapshot = elements[identifier]?.ownership else {
-      return
-    }
-    removeTrackedSnapshotReference(for: identifier)
-    elements[identifier] = nil
+    applyClaimTrackedElement(identifier: identifier, ownerID: ownerID)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func registerTrackedElement(_ element: RegistryElement, ownerID: UUID) {
-    guard trackedElementOwners[element.identifier] == ownerID else {
-      return
-    }
-    removeTrackedSnapshotReference(for: element.identifier)
-    elements[element.identifier] = StoredElement(
-      element: element,
-      ownership: .trackedElement(ownerID: ownerID)
-    )
+    applyRegisterTrackedElement(element, ownerID: ownerID)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func clearTrackedElement(identifier: String, ownerID: UUID) {
-    guard trackedElementOwners[identifier] == ownerID else {
-      return
-    }
-    guard
-      case .trackedElement(let storedOwnerID) = elements[identifier]?.ownership,
-      storedOwnerID == ownerID
-    else {
-      return
-    }
-    elements[identifier] = nil
+    applyClearTrackedElement(identifier: identifier, ownerID: ownerID)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterTrackedElement(identifier: String, ownerID: UUID) {
-    guard trackedElementOwners[identifier] == ownerID else {
-      return
-    }
-    trackedElementOwners[identifier] = nil
-    clearTrackedElementStorage(identifier: identifier, ownerID: ownerID)
+    applyUnregisterTrackedElement(identifier: identifier, ownerID: ownerID)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func registerWindow(_ window: RegistryWindow) {
     windows[window.id] = StoredWindow(window: window, ownership: .manual)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterWindow(id: Int) {
     windows[id] = nil
+    scheduleRemoteSnapshotFlush()
   }
 
   public func registerTrackedWindow(_ window: RegistryWindow, ownerID: UUID) {
@@ -106,6 +120,7 @@ public actor AccessibilityRegistry {
       return
     }
     windows[window.id] = StoredWindow(window: window, ownership: .tracked(ownerID))
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterTrackedWindow(id: Int, ownerID: UUID) {
@@ -113,6 +128,7 @@ public actor AccessibilityRegistry {
       return
     }
     windows[id] = nil
+    scheduleRemoteSnapshotFlush()
   }
 
   public func replaceWindowElements(windowID: Int, elements replacement: [RegistryElement]) {
@@ -120,12 +136,14 @@ public actor AccessibilityRegistry {
     for element in replacement {
       var normalized = element
       normalized.windowID = windowID
-      registerElement(normalized)
+      applyRegisterElement(normalized)
     }
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterElements(windowID: Int) {
     clearAllWindowElements(windowID: windowID)
+    scheduleRemoteSnapshotFlush()
   }
 
   public func replaceTrackedWindowElements(
@@ -162,6 +180,7 @@ public actor AccessibilityRegistry {
         identifiers: identifiers
       )
     }
+    scheduleRemoteSnapshotFlush()
   }
 
   public func unregisterTrackedWindowElements(windowID: Int, ownerID: UUID) {
@@ -169,15 +188,53 @@ public actor AccessibilityRegistry {
       return
     }
     clearTrackedWindowElements(windowID: windowID)
+    scheduleRemoteSnapshotFlush()
+  }
+
+  public func upsertClientSnapshot(_ clientSnapshot: RegistryClientSnapshot) {
+    clientSnapshots[clientSnapshot.clientID] = clientSnapshot
+  }
+
+  public func removeClientSnapshot(clientID: UUID) {
+    clientSnapshots[clientID] = nil
+  }
+
+  public func setRemoteSocketPath(_ socketPath: String?) {
+    let previousEndpoint = remoteEndpoint
+    guard previousEndpoint?.socketPath != socketPath else {
+      if socketPath != nil {
+        scheduleRemoteSnapshotFlush()
+      }
+      return
+    }
+
+    remoteEndpoint = socketPath.map(RemoteEndpoint.init(socketPath:))
+    if socketPath == nil {
+      remoteSnapshotDirty = false
+      remoteFlushTask?.cancel()
+      remoteFlushTask = nil
+      if let previousEndpoint {
+        let clientID = clientID
+        let remoteSocketClient = remoteSocketClient
+        Task.detached(priority: .utility) {
+          _ = try? await remoteSocketClient.clearClientSnapshot(
+            clientID: clientID,
+            toSocketAt: previousEndpoint.socketPath
+          )
+        }
+      }
+      return
+    }
+
+    scheduleRemoteSnapshotFlush()
   }
 
   public func element(identifier: String) -> RegistryElement? {
-    elements[identifier]?.element
+    mergedElementsByIdentifier()[identifier]
   }
 
   public func allElements(windowID: Int? = nil, kind: RegistryElementKind? = nil) -> [RegistryElement] {
-    elements.values
-      .map(\.element)
+    mergedElements()
       .filter { element in
         if let windowID, element.windowID != windowID { return false }
         if let kind, element.kind != kind { return false }
@@ -187,16 +244,11 @@ public actor AccessibilityRegistry {
   }
 
   public func allWindows() -> [RegistryWindow] {
-    windows.values
-      .map(\.window)
-      .sorted { $0.id < $1.id }
+    mergedWindows().sorted { $0.id < $1.id }
   }
 
   public func snapshot() -> RegistrySnapshot {
-    RegistrySnapshot(
-      elements: elements.values.map(\.element).sorted { $0.identifier < $1.identifier },
-      windows: windows.values.map(\.window).sorted { $0.id < $1.id }
-    )
+    RegistrySnapshot(elements: mergedElements(), windows: mergedWindows())
   }
 
   public func reset() {
@@ -204,6 +256,55 @@ public actor AccessibilityRegistry {
     windows.removeAll()
     trackedWindowElements.removeAll()
     trackedElementOwners.removeAll()
+    clientSnapshots.removeAll()
+    scheduleRemoteSnapshotFlush()
+  }
+
+  private func applyRegisterElement(_ element: RegistryElement) {
+    removeTrackedSnapshotReference(for: element.identifier)
+    trackedElementOwners[element.identifier] = nil
+    elements[element.identifier] = StoredElement(element: element, ownership: .manual)
+  }
+
+  private func applyUnregisterElement(identifier: String) {
+    removeTrackedSnapshotReference(for: identifier)
+    trackedElementOwners[identifier] = nil
+    elements[identifier] = nil
+  }
+
+  private func applyClaimTrackedElement(identifier: String, ownerID: UUID) {
+    trackedElementOwners[identifier] = ownerID
+    guard case .trackedWindowSnapshot = elements[identifier]?.ownership else {
+      return
+    }
+    removeTrackedSnapshotReference(for: identifier)
+    elements[identifier] = nil
+  }
+
+  private func applyRegisterTrackedElement(_ element: RegistryElement, ownerID: UUID) {
+    guard trackedElementOwners[element.identifier] == ownerID else {
+      return
+    }
+    removeTrackedSnapshotReference(for: element.identifier)
+    elements[element.identifier] = StoredElement(
+      element: element,
+      ownership: .trackedElement(ownerID: ownerID)
+    )
+  }
+
+  private func applyClearTrackedElement(identifier: String, ownerID: UUID) {
+    guard trackedElementOwners[identifier] == ownerID else {
+      return
+    }
+    clearTrackedElementStorage(identifier: identifier, ownerID: ownerID)
+  }
+
+  private func applyUnregisterTrackedElement(identifier: String, ownerID: UUID) {
+    guard trackedElementOwners[identifier] == ownerID else {
+      return
+    }
+    trackedElementOwners[identifier] = nil
+    clearTrackedElementStorage(identifier: identifier, ownerID: ownerID)
   }
 
   private func clearTrackedWindowElements(windowID: Int) {
@@ -220,7 +321,7 @@ public actor AccessibilityRegistry {
         continue
       }
 
-        elements[identifier] = nil
+      elements[identifier] = nil
     }
   }
 
@@ -277,9 +378,107 @@ public actor AccessibilityRegistry {
       )
     }
   }
+
+  private func mergedWindows() -> [RegistryWindow] {
+    var merged: [Int: RegistryWindow] = [:]
+    for snapshot in clientSnapshots.values.sorted(by: clientSnapshotSort) {
+      for window in snapshot.snapshot.windows {
+        merged[window.id] = window
+      }
+    }
+    for stored in windows.values {
+      merged[stored.window.id] = stored.window
+    }
+    return Array(merged.values)
+  }
+
+  private func mergedElements() -> [RegistryElement] {
+    Array(mergedElementsByIdentifier().values)
+  }
+
+  private func mergedElementsByIdentifier() -> [String: RegistryElement] {
+    var merged: [String: RegistryElement] = [:]
+    for snapshot in clientSnapshots.values.sorted(by: clientSnapshotSort) {
+      for element in snapshot.snapshot.elements {
+        merged[element.identifier] = element
+      }
+    }
+    for stored in elements.values {
+      merged[stored.element.identifier] = stored.element
+    }
+    return merged
+  }
+
+  private func scheduleRemoteSnapshotFlush() {
+    guard remoteEndpoint != nil else {
+      return
+    }
+    remoteSnapshotDirty = true
+    guard remoteFlushTask == nil else {
+      return
+    }
+
+    let retryDelay = remoteWriteRetryDelay
+    let remoteSocketClient = remoteSocketClient
+    remoteFlushTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      while let payload = await self.takeRemoteFlushPayloadOrFinish() {
+        let sendSucceeded =
+          (try? await remoteSocketClient.syncClientSnapshot(
+            payload.snapshot,
+            toSocketAt: payload.endpoint.socketPath
+          ).applied) != nil
+        await self.finishRemoteFlushAttempt(
+          socketPath: payload.endpoint.socketPath,
+          succeeded: sendSucceeded
+        )
+        guard sendSucceeded == false else {
+          continue
+        }
+        try? await Task.sleep(for: retryDelay)
+      }
+    }
+  }
+
+  private func takeRemoteFlushPayloadOrFinish() -> RemoteFlushPayload? {
+    guard remoteSnapshotDirty, let remoteEndpoint else {
+      remoteSnapshotDirty = false
+      remoteFlushTask = nil
+      return nil
+    }
+
+    remoteSnapshotDirty = false
+    return RemoteFlushPayload(
+      endpoint: remoteEndpoint,
+      snapshot: RegistryClientSnapshot(
+        clientID: clientID,
+        appVersion: clientAppVersion,
+        bundleIdentifier: clientBundleIdentifier,
+        snapshot: localSnapshot()
+      )
+    )
+  }
+
+  private func finishRemoteFlushAttempt(socketPath: String, succeeded: Bool) {
+    guard remoteEndpoint?.socketPath == socketPath else {
+      return
+    }
+    if succeeded == false {
+      remoteSnapshotDirty = true
+    }
+  }
+
+  private func localSnapshot() -> RegistrySnapshot {
+    RegistrySnapshot(
+      elements: elements.values.map(\.element).sorted { $0.identifier < $1.identifier },
+      windows: windows.values.map(\.window).sorted { $0.id < $1.id }
+    )
+  }
 }
 
-public struct RegistrySnapshot: Sendable, Equatable {
+public struct RegistrySnapshot: Sendable, Codable, Equatable {
   public let elements: [RegistryElement]
   public let windows: [RegistryWindow]
 
@@ -287,4 +486,11 @@ public struct RegistrySnapshot: Sendable, Equatable {
     self.elements = elements
     self.windows = windows
   }
+}
+
+private func clientSnapshotSort(
+  lhs: RegistryClientSnapshot,
+  rhs: RegistryClientSnapshot
+) -> Bool {
+  lhs.clientID.uuidString < rhs.clientID.uuidString
 }

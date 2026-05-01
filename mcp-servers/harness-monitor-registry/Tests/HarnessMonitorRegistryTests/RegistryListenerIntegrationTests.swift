@@ -10,7 +10,12 @@ struct RegistryListenerIntegrationTests {
     try await withTempSocket { socketPath in
       let registry = AccessibilityRegistry()
       let dispatcher = RegistryRequestDispatcher(registry: registry) {
-        PingResult(protocolVersion: 1, appVersion: "test", bundleIdentifier: "io.test")
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "test",
+          bundleIdentifier: "io.test",
+          capabilities: [.clientSnapshots, .replacementNotice]
+        )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
       try await listener.start(at: socketPath)
@@ -19,6 +24,7 @@ struct RegistryListenerIntegrationTests {
       let response = try sendLine("{\"id\":1,\"op\":\"ping\"}", toSocketAt: socketPath)
       #expect(response.contains("\"ok\":true"))
       #expect(response.contains("\"appVersion\":\"test\""))
+      #expect(response.contains("\"client-snapshots\""))
     }
   }
 
@@ -36,7 +42,12 @@ struct RegistryListenerIntegrationTests {
         )
       )
       let dispatcher = RegistryRequestDispatcher(registry: registry) {
-        PingResult(protocolVersion: 1, appVersion: "test", bundleIdentifier: "io.test")
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "test",
+          bundleIdentifier: "io.test",
+          capabilities: [.clientSnapshots, .replacementNotice]
+        )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
       try await listener.start(at: socketPath)
@@ -53,7 +64,12 @@ struct RegistryListenerIntegrationTests {
     try await withTempSocket { socketPath in
       let registry = AccessibilityRegistry()
       let dispatcher = RegistryRequestDispatcher(registry: registry) {
-        PingResult(protocolVersion: 1, appVersion: "test", bundleIdentifier: "io.test")
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "test",
+          bundleIdentifier: "io.test",
+          capabilities: [.clientSnapshots, .replacementNotice]
+        )
       }
       let listener = RegistryListener(dispatcher: dispatcher)
       try await listener.start(at: socketPath)
@@ -62,6 +78,50 @@ struct RegistryListenerIntegrationTests {
       await listener.stop()
 
       #expect(FileManager.default.fileExists(atPath: socketPath) == false)
+    }
+  }
+
+  @Test("syncClientSnapshot round-trips remote client elements")
+  func syncClientSnapshotRoundTrip() async throws {
+    try await withTempSocket { socketPath in
+      let registry = AccessibilityRegistry()
+      let dispatcher = RegistryRequestDispatcher(registry: registry) {
+        PingResult(
+          protocolVersion: 1,
+          appVersion: "test",
+          bundleIdentifier: "io.test",
+          capabilities: [.clientSnapshots, .replacementNotice]
+        )
+      }
+      let listener = RegistryListener(dispatcher: dispatcher)
+      let socketClient = RegistrySocketClient()
+      try await listener.start(at: socketPath)
+      defer { Task { await listener.stop() } }
+      try await waitForSocket(at: socketPath, timeout: 2)
+
+      _ = try await socketClient.syncClientSnapshot(
+        RegistryClientSnapshot(
+          clientID: UUID(),
+          appVersion: "test-client",
+          bundleIdentifier: "io.test.client",
+          snapshot: RegistrySnapshot(
+            elements: [
+              RegistryElement(
+                identifier: "client.refresh",
+                kind: .button,
+                frame: RegistryRect(x: 10, y: 20, width: 24, height: 24),
+                windowID: 42
+              )
+            ],
+            windows: []
+          )
+        ),
+        toSocketAt: socketPath
+      )
+
+      let response = try sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: socketPath)
+      #expect(response.contains("\"identifier\":\"client.refresh\""))
+      #expect(response.contains("\"ok\":true"))
     }
   }
 

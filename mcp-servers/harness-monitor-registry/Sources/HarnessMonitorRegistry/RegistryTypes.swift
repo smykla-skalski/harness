@@ -6,6 +6,11 @@ public let registryProtocolVersion: Int = 1
 public let registrySocketFilename: String = "mcp.sock"
 public let registryAppGroupIdentifier: String = "Q498EB36N4.io.harnessmonitor"
 
+public enum RegistryCapability: String, Sendable, Codable, CaseIterable {
+  case clientSnapshots = "client-snapshots"
+  case replacementNotice = "replacement-notice"
+}
+
 public enum RegistryElementKind: String, Sendable, Codable, CaseIterable {
   case button
   case toggle
@@ -104,5 +109,46 @@ public struct RegistryWindow: Sendable, Codable, Equatable {
     self.frame = frame
     self.isKey = isKey
     self.isMain = isMain
+  }
+}
+
+public struct RegistryClientSnapshot: Sendable, Codable, Equatable {
+  public var clientID: UUID
+  public var appVersion: String
+  public var bundleIdentifier: String
+  public var snapshot: RegistrySnapshot
+
+  public init(
+    clientID: UUID,
+    appVersion: String,
+    bundleIdentifier: String,
+    snapshot: RegistrySnapshot
+  ) {
+    self.clientID = clientID
+    self.appVersion = appVersion
+    self.bundleIdentifier = bundleIdentifier
+    self.snapshot = snapshot
+  }
+}
+
+public struct RegistryReplacementNotice: Sendable, Codable, Equatable {
+  public var socketPath: String
+  public var protocolVersion: Int
+  public var appVersion: String
+  public var bundleIdentifier: String
+  public var message: String
+
+  public init(
+    socketPath: String,
+    protocolVersion: Int,
+    appVersion: String,
+    bundleIdentifier: String,
+    message: String
+  ) {
+    self.socketPath = socketPath
+    self.protocolVersion = protocolVersion
+    self.appVersion = appVersion
+    self.bundleIdentifier = bundleIdentifier
+    self.message = message
   }
 }

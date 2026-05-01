@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
 import Testing
 
@@ -235,6 +236,111 @@ struct HarnessMonitorMCPContractTests {
     #expect(service.runtimeState == .healthy(socketPath: socketURL.path))
   }
 
+  @Test("enabled reconciliation reuses a compatible registry socket and forwards local snapshots")
+  func enabledReconciliationReusesCompatibleRegistrySocket() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
+    let hostService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
+    let reusedService = HarnessMonitorMCPAccessibilityService(socketPathResolver: { socketURL })
+
+    await hostService.setEnabled(true)
+    defer { Task { await reusedService.setEnabled(false); await hostService.setEnabled(false) } }
+    try await waitForSocket(at: socketURL.path, timeout: 2)
+
+    await hostService.registry.registerElement(
+      RegistryElement(
+        identifier: "host.refresh",
+        kind: .button,
+        frame: RegistryRect(x: 10, y: 20, width: 24, height: 24),
+        windowID: 10
+      )
+    )
+
+    await reusedService.setEnabled(true)
+    await reusedService.registry.registerElement(
+      RegistryElement(
+        identifier: "client.refresh",
+        kind: .button,
+        frame: RegistryRect(x: 40, y: 60, width: 24, height: 24),
+        windowID: 20
+      )
+    )
+
+    try await waitForSocketResponse(at: socketURL.path, timeout: 2) { response in
+      response.contains("\"identifier\":\"host.refresh\"")
+        && response.contains("\"identifier\":\"client.refresh\"")
+    }
+
+    #expect(reusedService.isRunning == false)
+    #expect(reusedService.runtimeState == .healthy(socketPath: socketURL.path))
+  }
+
+  @Test("enabled reconciliation replaces an incompatible socket and old host reregisters")
+  func enabledReconciliationReplacesIncompatibleSocketAndReregisters() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
+    let legacyHost = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL },
+      pingInfoProvider: {
+        PingResult(
+          protocolVersion: registryProtocolVersion,
+          appVersion: "30.31.0",
+          bundleIdentifier: "io.harnessmonitor.app",
+          capabilities: [.replacementNotice]
+        )
+      },
+      startupProbeDelay: .milliseconds(20),
+      startupProbeCount: 50
+    )
+    let replacementHost = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL },
+      pingInfoProvider: {
+        PingResult(
+          protocolVersion: registryProtocolVersion,
+          appVersion: "30.32.0",
+          bundleIdentifier: "io.harnessmonitor.app",
+          capabilities: [.clientSnapshots, .replacementNotice]
+        )
+      },
+      startupProbeDelay: .milliseconds(20),
+      startupProbeCount: 50
+    )
+
+    await legacyHost.setEnabled(true)
+    defer { Task { await legacyHost.setEnabled(false); await replacementHost.setEnabled(false) } }
+    try await waitForSocket(at: socketURL.path, timeout: 2)
+
+    await legacyHost.registry.registerElement(
+      RegistryElement(
+        identifier: "legacy.refresh",
+        kind: .button,
+        frame: RegistryRect(x: 10, y: 20, width: 24, height: 24),
+        windowID: 10
+      )
+    )
+
+    await replacementHost.setEnabled(true)
+    await replacementHost.registry.registerElement(
+      RegistryElement(
+        identifier: "replacement.refresh",
+        kind: .button,
+        frame: RegistryRect(x: 40, y: 60, width: 24, height: 24),
+        windowID: 20
+      )
+    )
+
+    try await waitForSocketResponse(at: socketURL.path, timeout: 2) { response in
+      response.contains("\"identifier\":\"legacy.refresh\"")
+        && response.contains("\"identifier\":\"replacement.refresh\"")
+    }
+
+    #expect(replacementHost.isRunning == true)
+    #expect(replacementHost.runtimeState == .healthy(socketPath: socketURL.path))
+    #expect(legacyHost.isRunning == false)
+  }
+
   @Test("real service degrades when the socket path cannot be resolved")
   func realServiceDegradesWhenSocketPathCannotBeResolved() async {
     let service = HarnessMonitorMCPAccessibilityService(socketPathResolver: { nil })
@@ -265,6 +371,24 @@ struct HarnessMonitorMCPContractTests {
       }
       try await Task.sleep(nanoseconds: 20_000_000)
     }
+  }
+
+  private func waitForSocketResponse(
+    at path: String,
+    timeout: TimeInterval,
+    predicate: (String) -> Bool
+  ) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+      if let response = try? sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: path),
+        predicate(response)
+      {
+        return
+      }
+      try await Task.sleep(nanoseconds: 20_000_000)
+    }
+    let response = try sendLine("{\"id\":5,\"op\":\"listElements\"}", toSocketAt: path)
+    #expect(predicate(response))
   }
 
   private func sendLine(_ line: String, toSocketAt path: String) throws -> String {
