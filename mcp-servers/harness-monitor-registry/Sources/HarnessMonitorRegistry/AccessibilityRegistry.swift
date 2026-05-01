@@ -272,12 +272,12 @@ public actor AccessibilityRegistry {
 
   public func element(identifier: String) -> RegistryElement? {
     pruneExpiredClientSnapshots()
-    mergedElementsByIdentifier()[identifier]
+    return mergedElementsByIdentifier()[identifier]
   }
 
   public func allElements(windowID: Int? = nil, kind: RegistryElementKind? = nil) -> [RegistryElement] {
     pruneExpiredClientSnapshots()
-    mergedElements()
+    return mergedElements()
       .filter { element in
         if let windowID, element.windowID != windowID { return false }
         if let kind, element.kind != kind { return false }
@@ -288,12 +288,12 @@ public actor AccessibilityRegistry {
 
   public func allWindows() -> [RegistryWindow] {
     pruneExpiredClientSnapshots()
-    mergedWindows().sorted { $0.id < $1.id }
+    return mergedWindows().sorted { $0.id < $1.id }
   }
 
   public func snapshot() -> RegistrySnapshot {
     pruneExpiredClientSnapshots()
-    RegistrySnapshot(elements: mergedElements(), windows: mergedWindows())
+    return RegistrySnapshot(elements: mergedElements(), windows: mergedWindows())
   }
 
   func storedClientSnapshotCount() -> Int {
@@ -431,8 +431,8 @@ public actor AccessibilityRegistry {
 
   private func mergedWindows() -> [RegistryWindow] {
     var merged: [Int: RegistryWindow] = [:]
-    for snapshot in activeClientSnapshots() {
-      for window in snapshot.snapshot.windows {
+    for stored in activeClientSnapshots() {
+      for window in stored.snapshot.snapshot.windows {
         merged[window.id] = window
       }
     }
@@ -448,8 +448,8 @@ public actor AccessibilityRegistry {
 
   private func mergedElementsByIdentifier() -> [String: RegistryElement] {
     var merged: [String: RegistryElement] = [:]
-    for snapshot in activeClientSnapshots() {
-      for element in snapshot.snapshot.elements {
+    for stored in activeClientSnapshots() {
+      for element in stored.snapshot.snapshot.elements {
         merged[element.identifier] = element
       }
     }
