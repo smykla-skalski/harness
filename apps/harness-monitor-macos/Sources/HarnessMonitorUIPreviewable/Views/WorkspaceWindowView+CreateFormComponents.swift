@@ -57,18 +57,9 @@ struct AgentsCreateSummaryFactsView: View {
   let facts: [AgentsCreateSummaryFact]
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingLG) {
-        ForEach(facts) { fact in
-          summaryFact(fact)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-      }
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        ForEach(facts) { fact in
-          summaryFact(fact)
-        }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      ForEach(facts) { fact in
+        summaryFact(fact)
       }
     }
   }

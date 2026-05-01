@@ -36,6 +36,7 @@ struct WorkspaceWindowCreatePane<
 
   var body: some View {
     ScrollView {
+      // Keep MCP-tracked controls instantiated even while this pane scrolls.
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createPaneHeader
         createModeCard
