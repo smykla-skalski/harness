@@ -1,7 +1,7 @@
 import XCTest
 
 extension HarnessMonitorUITestCase {
-  func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
+  func openNativeMenuControl(in app: XCUIApplication, controlIdentifier: String) {
     let control = popUpButton(in: app, identifier: controlIdentifier)
     XCTAssertTrue(
       control.exists || control.waitForExistence(timeout: Self.fastActionTimeout)
@@ -10,20 +10,29 @@ extension HarnessMonitorUITestCase {
     app.activate()
     if control.isHittable {
       control.tap()
-    } else if !control.frame.isEmpty,
+      return
+    }
+
+    if !control.frame.isEmpty,
       let coordinate = centerCoordinate(in: app, for: control)
     {
       coordinate.tap()
-    } else {
-      let frameMarker = frameElement(in: app, identifier: "\(controlIdentifier).frame")
-      guard frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
-        let coordinate = centerCoordinate(in: app, for: frameMarker)
-      else {
-        XCTFail("Failed to open pop-up button \(controlIdentifier)")
-        return
-      }
-      coordinate.tap()
+      return
     }
+
+    let frameMarker = frameElement(in: app, identifier: "\(controlIdentifier).frame")
+    guard frameMarker.waitForExistence(timeout: Self.fastActionTimeout),
+      let coordinate = centerCoordinate(in: app, for: frameMarker)
+    else {
+      XCTFail("Failed to open native menu control \(controlIdentifier)")
+      return
+    }
+
+    coordinate.tap()
+  }
+
+  func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
+    openNativeMenuControl(in: app, controlIdentifier: controlIdentifier)
 
     let menuItem = presentedMenuOption(in: app, title: optionTitle)
     XCTAssertTrue(

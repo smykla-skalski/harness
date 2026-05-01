@@ -66,31 +66,21 @@ struct SidebarSearchHost: View {
 
   var body: some View {
     ViewBodySignposter.trace(Self.self, "SidebarView", attributes: profilingAttributes) {
-      ZStack {
-        SidebarSessionListColumn(
-          store: store,
-          controls: controls,
-          projection: projection,
-          searchResults: searchResults,
-          sidebarUI: sidebarUI,
-          dateTimeConfiguration: dateTimeConfiguration,
-          fontScale: fontScale,
-          collapsedCheckoutKeys: collapsedCheckoutKeys,
-          setCheckoutCollapsed: setCheckoutCollapsed
-        )
-        .listStyle(.sidebar)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .safeAreaInset(edge: .top) {
-          HStack {
-            SidebarFilterMenu(store: store, controls: controls)
-            Spacer()
-          }
-          .padding(.horizontal)
-          .padding(.bottom, HarnessMonitorTheme.spacingSM)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-          SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
-        }
+      SidebarSessionListColumn(
+        store: store,
+        controls: controls,
+        projection: projection,
+        searchResults: searchResults,
+        sidebarUI: sidebarUI,
+        dateTimeConfiguration: dateTimeConfiguration,
+        fontScale: fontScale,
+        collapsedCheckoutKeys: collapsedCheckoutKeys,
+        setCheckoutCollapsed: setCheckoutCollapsed
+      )
+      .listStyle(.sidebar)
+      .scrollEdgeEffectStyle(.soft, for: .top)
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        SidebarFooterMetricsBridge(sidebarUI: sidebarUI)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
@@ -109,6 +99,9 @@ struct SidebarSearchHost: View {
         placement: .sidebar,
         prompt: Text("Search sessions, projects, leaders")
       )
+      .toolbar {
+        SidebarToolbarFilterToolbarItem(store: store, controls: controls)
+      }
       .focusedSceneValue(
         \.harnessSidebarSearchFocusAction,
         HarnessSidebarSearchFocus(

@@ -10,16 +10,22 @@ extension HarnessMonitorSidebarLayoutUITests {
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
     let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let statusPicker = element(in: app, identifier: Accessibility.sidebarStatusPicker)
-    let focusPicker = element(in: app, identifier: Accessibility.sidebarFocusPicker)
-    let sortPicker = element(in: app, identifier: Accessibility.sidebarSortPicker)
+    let filterButton = sidebarFilterControl(in: app)
     let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
 
     XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(statusPicker, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(focusPicker, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(sortPicker, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(filterButton, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
+
+    openSidebarFilters(in: app)
+    XCTAssertTrue(waitForElement(element(in: app, title: "Ended"), timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitForElement(element(in: app, title: "Open Work"), timeout: Self.fastActionTimeout)
+    )
+    XCTAssertTrue(
+      waitForElement(element(in: app, title: "Recent Activity"), timeout: Self.fastActionTimeout)
+    )
+
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) {
         !filterState.label.isEmpty && filterState.label.contains("sort=")
@@ -27,87 +33,71 @@ extension HarnessMonitorSidebarLayoutUITests {
     )
   }
 
-  func testDashboardLandingDefersSidebarFilterControlsUntilSearchBegins() throws {
+  func testDashboardLandingPlacesSidebarFiltersInToolbarChrome() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
     )
-    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
-    let searchState = element(in: app, identifier: Accessibility.sidebarSearchState)
-    let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let filterButton = sidebarFilterControl(in: app)
+    let toolbar = mainWindow(in: app).toolbars.firstMatch
+    let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
 
-    XCTAssertTrue(waitForElement(searchField, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(searchState, timeout: Self.fastActionTimeout))
-    XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.fastActionTimeout))
-    XCTAssertFalse(
-      sidebarFilterControl(in: app).exists,
-      "Dashboard landing should not pay filter chrome cost until sidebar search is engaged"
-    )
-
-    tapElement(in: app, identifier: Accessibility.sidebarSearchField)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) {
-        let filterMenu = self.sidebarFilterControl(in: app)
-        return searchState.label.contains("visible=true")
-          && filterMenu.exists
-          && !filterMenu.frame.isEmpty
-      },
-      """
-      Focusing the native sidebar search field should reveal the sidebar filter controls.
-      searchState=\(searchState.label)
-      searchFieldFrame=\(searchField.frame)
-      sidebarShellFrame=\(sidebarShell.frame)
-      filterDiagnostics=\(sidebarFilterControlDiagnostics(in: app))
-      """
+    XCTAssertTrue(waitForElement(filterButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sessionList, timeout: Self.fastActionTimeout))
+    XCTAssertGreaterThanOrEqual(filterButton.frame.minY, toolbar.frame.minY - 4)
+    XCTAssertLessThanOrEqual(filterButton.frame.maxY, toolbar.frame.maxY + 4)
+    XCTAssertLessThanOrEqual(
+      filterButton.frame.maxY,
+      sessionList.frame.minY + 2,
+      "Sidebar filters should live in toolbar chrome above the scrollable sidebar content"
     )
   }
 
-  func testSidebarUsesNativeSearchFieldWithFilterMenuBelowIt() throws {
+  func testSidebarUsesNativeSearchFieldWithToolbarFilterMenu() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
+    let window = mainWindow(in: app)
     let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let nativeSearchField = mainWindow(in: app).searchFields.firstMatch
-    let statusPicker = element(in: app, identifier: Accessibility.sidebarStatusPicker)
+    let filterButton = sidebarFilterControl(in: app)
+    let toolbar = window.toolbars.firstMatch
 
     XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.fastActionTimeout))
     XCTAssertTrue(
       waitForElement(nativeSearchField, timeout: Self.fastActionTimeout),
       "Sidebar search should use SwiftUI searchable instead of a custom text field"
     )
-    XCTAssertTrue(waitForElement(statusPicker, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(filterButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(toolbar, timeout: Self.fastActionTimeout))
 
     XCTAssertGreaterThanOrEqual(nativeSearchField.frame.minX, sidebarShell.frame.minX - 8)
     XCTAssertLessThanOrEqual(nativeSearchField.frame.maxX, sidebarShell.frame.maxX + 8)
     XCTAssertGreaterThanOrEqual(
-      statusPicker.frame.minY,
-      nativeSearchField.frame.maxY - 2,
-      "Sidebar filters should live below the native search field inside the sidebar"
+      filterButton.frame.minY,
+      toolbar.frame.minY - 4,
+      "Sidebar filters should render inside native toolbar chrome"
     )
-    XCTAssertLessThanOrEqual(statusPicker.frame.maxY, sidebarShell.frame.maxY + 8)
+    XCTAssertLessThanOrEqual(filterButton.frame.maxY, toolbar.frame.maxY + 4)
   }
 
-  func testSidebarFilterControlsLiveInsideScrollableSidebarContent() throws {
+  func testSidebarFilterControlsLiveOutsideScrollableSidebarContent() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
     let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
-    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let filtersCard = sidebarFilterControl(in: app)
 
     XCTAssertTrue(waitForElement(sessionList, timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(filtersCard, timeout: Self.fastActionTimeout))
 
-    XCTAssertGreaterThanOrEqual(
-      filtersCard.frame.minY,
-      sessionList.frame.minY - 2,
-      "Sidebar filters should be rendered inside the scrollable sidebar content"
-    )
     XCTAssertLessThanOrEqual(
       filtersCard.frame.maxY,
-      sessionList.frame.maxY + 2,
-      "Sidebar filters should stay inside the sidebar list bounds"
+      sessionList.frame.minY + 2,
+      "Sidebar filters should stay in toolbar chrome, not the sidebar list bounds"
     )
   }
 
@@ -165,19 +155,19 @@ extension HarnessMonitorSidebarLayoutUITests {
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
-    let statusPicker = element(in: app, identifier: Accessibility.sidebarStatusPicker)
     let filterState = element(in: app, identifier: Accessibility.sidebarFilterState)
     let emptyState = frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame)
 
-    XCTAssertTrue(waitForElement(statusPicker, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(waitForElement(sidebarFilterControl(in: app), timeout: Self.fastActionTimeout))
     XCTAssertTrue(waitForElement(filterState, timeout: Self.fastActionTimeout))
 
-    tapElement(in: app, identifier: Accessibility.sidebarStatusPicker)
+    openSidebarFilters(in: app)
     tapButton(in: app, title: "Ended")
     XCTAssertTrue(waitForElement(emptyState, timeout: Self.fastActionTimeout))
     XCTAssertTrue(filterState.label.contains("status=ended"))
 
-    tapButton(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+    openSidebarFilters(in: app)
+    tapButton(in: app, title: "Clear Filters")
 
     let didResetFilterState = waitUntil(timeout: Self.fastActionTimeout) {
       filterState.label.contains("status=all")
@@ -210,5 +200,34 @@ extension HarnessMonitorSidebarLayoutUITests {
     )
     XCTAssertTrue(filterState.label.contains("status=all"))
     XCTAssertTrue(filterState.label.contains("sort=recentActivity"))
+  }
+
+  private func openSidebarFilters(in app: XCUIApplication) {
+    let filterButton = sidebarFilterControl(in: app)
+    XCTAssertTrue(
+      waitForElement(filterButton, timeout: Self.fastActionTimeout),
+      "Sidebar filter button should exist before opening the menu"
+    )
+    app.activate()
+    if let coordinate = centerCoordinate(in: app, for: filterButton) {
+      coordinate.click()
+    } else if filterButton.isHittable {
+      filterButton.click()
+    } else {
+      XCTFail("Failed to resolve the actual sidebar filter button")
+      return
+    }
+
+    let statusOption = element(in: app, title: "Ended")
+    guard waitForElement(statusOption, timeout: Self.fastActionTimeout) else {
+      attachWindowScreenshot(in: app, named: "sidebar-filter-open-failure")
+      attachAppHierarchy(in: app, named: "sidebar-filter-open-failure-hierarchy")
+      let diagnostics = sidebarFilterControlDiagnostics(in: app)
+        .replacingOccurrences(of: "\n", with: " | ")
+      XCTFail(
+        "Expected sidebar filter menu options after opening the toolbar filter control. diagnostics=\(diagnostics)"
+      )
+      return
+    }
   }
 }
