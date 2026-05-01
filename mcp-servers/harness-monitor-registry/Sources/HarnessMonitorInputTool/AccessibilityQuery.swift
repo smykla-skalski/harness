@@ -18,10 +18,21 @@ private enum AccessibilityAttributeName {
 }
 
 private enum AccessibilityTraversalDefaults {
-  static let excludedAttributes: Set<String> = [
-    kAXParentAttribute as String,
-    kAXWindowAttribute as String,
-    "AXTopLevelUIElement",
+  // Intentionally keep this list narrow: generic AX attribute discovery can
+  // wedge on real SwiftUI trees, while these relationships cover the controls
+  // Harness Monitor exposes through MCP today.
+  static let relatedAttributes: [String] = [
+    kAXChildrenAttribute as String,
+    "AXChildrenInNavigationOrder",
+    "AXContents",
+    "AXVisibleChildren",
+    "AXSelectedChildren",
+    "AXRows",
+    "AXTabs",
+    "AXDisclosedRows",
+    kAXTitleUIElementAttribute as String,
+    "AXToolbarButton",
+    "AXProxy",
   ]
 }
 
@@ -356,11 +367,13 @@ private func collectElements(
   windowID: Int?
 ) -> [AccessibilityQueryElement] {
   var queue = [window]
+  var index = 0
   var visited: Set<OpaquePointer> = []
   var harvested: [String: AccessibilityQueryElement] = [:]
 
-  while !queue.isEmpty {
-    let node = queue.removeFirst()
+  while index < queue.count {
+    let node = queue[index]
+    index += 1
     let pointer = Unmanaged.passUnretained(node).toOpaque()
     let opaque = OpaquePointer(pointer)
     guard visited.insert(opaque).inserted else {
@@ -499,19 +512,9 @@ private func axElementArray(_ element: AXUIElement, _ attribute: String) -> [AXU
 }
 
 private func axRelatedElements(_ element: AXUIElement) -> [AXUIElement] {
-  var attributeNames: CFArray?
-  guard AXUIElementCopyAttributeNames(element, &attributeNames) == .success,
-    let names = attributeNames as? [String]
-  else {
-    return []
-  }
-
   var related: [AXUIElement] = []
   var seen: Set<OpaquePointer> = []
-  for attribute in names.sorted() {
-    guard !AccessibilityTraversalDefaults.excludedAttributes.contains(attribute) else {
-      continue
-    }
+  for attribute in AccessibilityTraversalDefaults.relatedAttributes {
     if let relatedElement = axElement(element, attribute) {
       appendRelatedElement(relatedElement, to: &related, seen: &seen)
     }
