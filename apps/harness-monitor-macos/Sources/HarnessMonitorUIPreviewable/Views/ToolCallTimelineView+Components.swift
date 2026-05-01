@@ -51,12 +51,14 @@ struct ToolCallTimelineSectionHeader: View {
       Text(title)
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
       if !capabilityTags.isEmpty {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
           ForEach(capabilityTags, id: \.self) { tag in
             Text(tag)
               .scaledFont(.caption2.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.accent)
+              .lineLimit(1)
               .harnessPillPadding()
               .harnessContentPill(tint: HarnessMonitorTheme.accent.opacity(0.2))
           }
@@ -77,6 +79,7 @@ struct ToolCallTimelineSectionHeader: View {
 
 struct ToolCallTimelineOverflowNoticeView: View {
   let rawUpdateCount: Int
+  let displayedToolCallCount: Int
   let visibleToolCallCount: Int
 
   var body: some View {
@@ -87,11 +90,14 @@ struct ToolCallTimelineOverflowNoticeView: View {
       Text(
         ToolCallTimelineView.overflowNoticeText(
           rawUpdateCount: rawUpdateCount,
-          visibleToolCallCount: visibleToolCallCount
+          visibleToolCallCount: displayedToolCallCount
         )
       )
       .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text("Visible now: \(visibleToolCallCount)")
+        .scaledFont(.caption2)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .padding(HarnessMonitorTheme.spacingSM)
     .background(

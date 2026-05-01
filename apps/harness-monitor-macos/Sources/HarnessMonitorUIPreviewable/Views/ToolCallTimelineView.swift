@@ -176,7 +176,8 @@ struct ToolCallTimelineView: View {
     let visibleOverflowToolCallCount = layout.sections
       .flatMap(\.rows)
       .reduce(into: 0) { count, row in
-        if liveAnnouncementRowIDs.contains(row.id) && layout.visibleRowIDs.contains(row.id) {
+        let isVisibleInViewport = layout.viewportVisibleRowIDs.contains(row.id)
+        if liveAnnouncementRowIDs.contains(row.id), isVisibleInViewport {
           count += 1
         }
       }
