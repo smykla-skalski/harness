@@ -41,14 +41,23 @@ extension AgentsWindowUITests {
 
     let agentRow = element(in: app, identifier: Accessibility.agentTuiExternalTab("copilot"))
     let state = element(in: app, identifier: Accessibility.agentTuiState)
+    let resolved = waitUntil(timeout: Self.uiTimeout) {
+      let stateLabel = state.label
+      let startFinished =
+        stateLabel.contains("startTui=1:done")
+        || stateLabel.contains("startTui=1:failed")
+        || stateLabel.contains("toast=failure:")
+      return stateLabel.contains("selection=agent:copilot") || startFinished
+    }
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
-        agentRow.exists && state.label.contains("selection=agent:copilot")
-      },
+      resolved,
+      "Starting GitHub Copilot from the create pane timed out before resolving; state=\(state.label)"
+    )
+    XCTAssertTrue(
+      agentRow.exists && state.label.contains("selection=agent:copilot"),
       """
       Starting GitHub Copilot from the create pane should use the selected session as \
-      the fallback anchor instead of no-oping.
-      state=\(state.label)
+      the fallback anchor instead of no-oping; state=\(state.label)
       """
     )
   }

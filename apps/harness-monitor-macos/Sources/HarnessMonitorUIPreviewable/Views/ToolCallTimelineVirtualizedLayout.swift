@@ -1,20 +1,25 @@
 import SwiftUI
 
 struct ToolCallTimelineScrollMetrics: Equatable {
+  static let coordinateSpaceName = "tool-call-timeline-scroll-space"
+
   var contentOffsetY: CGFloat
   var viewportHeight: CGFloat
+  var visibleRect: CGRect
 
-  static let zero = Self(contentOffsetY: 0, viewportHeight: 0)
+  static let zero = Self(contentOffsetY: 0, viewportHeight: 0, visibleRect: .zero)
 
-  init(contentOffsetY: CGFloat = 0, viewportHeight: CGFloat = 0) {
+  init(contentOffsetY: CGFloat = 0, viewportHeight: CGFloat = 0, visibleRect: CGRect = .zero) {
     self.contentOffsetY = contentOffsetY
     self.viewportHeight = viewportHeight
+    self.visibleRect = visibleRect
   }
 
   init(geometry: ScrollGeometry) {
     self.init(
       contentOffsetY: geometry.contentOffset.y,
-      viewportHeight: geometry.visibleRect.height
+      viewportHeight: geometry.visibleRect.height,
+      visibleRect: geometry.visibleRect
     )
   }
 }
@@ -30,7 +35,6 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
   let topSpacerHeight: CGFloat
   let bottomSpacerHeight: CGFloat
   let renderedRowIDs: Set<String>
-  let viewportVisibleRowIDs: Set<String>
 
   var renderedRowCount: Int {
     sections.reduce(0) { $0 + $1.rows.count }
@@ -40,22 +44,19 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
     sections: [],
     topSpacerHeight: 0,
     bottomSpacerHeight: 0,
-    renderedRowIDs: [],
-    viewportVisibleRowIDs: []
+    renderedRowIDs: []
   )
 
   init(
     sections: [ToolCallTimelineSection],
     topSpacerHeight: CGFloat,
     bottomSpacerHeight: CGFloat,
-    renderedRowIDs: Set<String>,
-    viewportVisibleRowIDs: Set<String>
+    renderedRowIDs: Set<String>
   ) {
     self.sections = sections
     self.topSpacerHeight = topSpacerHeight
     self.bottomSpacerHeight = bottomSpacerHeight
     self.renderedRowIDs = renderedRowIDs
-    self.viewportVisibleRowIDs = viewportVisibleRowIDs
   }
 
   init(presentation: ToolCallTimelinePresentation, scrollMetrics: ToolCallTimelineScrollMetrics) {
@@ -77,10 +78,6 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
     let renderedSpans = spans.filter { span in
       span.endY >= windowTop && span.startY <= windowBottom
     }
-    let viewportVisibleSpans = spans.filter { span in
-      span.endY >= viewportTop && span.startY <= viewportBottom
-    }
-
     guard let first = renderedSpans.first, let last = renderedSpans.last else {
       // Keep at least one section rendered so stale geometry never blanks the timeline.
       let fallbackSection = presentation.sections.first
@@ -89,8 +86,7 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
         sections: fallbackSection.map { [$0] } ?? [],
         topSpacerHeight: 0,
         bottomSpacerHeight: 0,
-        renderedRowIDs: fallbackRenderedIDs,
-        viewportVisibleRowIDs: []
+        renderedRowIDs: fallbackRenderedIDs
       )
       return
     }
@@ -100,14 +96,12 @@ struct ToolCallTimelineVirtualizedLayout: Equatable {
     let topSpacerHeight = max(0, first.startY)
     let bottomSpacerHeight = max(0, totalHeight - last.endY)
     let renderedRowIDs = Set(renderedSections.flatMap(\.rows).map(\.id))
-    let viewportVisibleRowIDs = Set(viewportVisibleSpans.flatMap(\.section.rows).map(\.id))
 
     self.init(
       sections: renderedSections,
       topSpacerHeight: topSpacerHeight,
       bottomSpacerHeight: bottomSpacerHeight,
-      renderedRowIDs: renderedRowIDs,
-      viewportVisibleRowIDs: viewportVisibleRowIDs
+      renderedRowIDs: renderedRowIDs
     )
   }
 

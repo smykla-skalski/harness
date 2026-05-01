@@ -8,6 +8,22 @@ extension HarnessMonitorStore {
     mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot,
     staleTuiID: String? = nil
   ) async -> Bool {
+    await mutateAgentTuiSnapshot(
+      using: client,
+      actionName: actionName,
+      selectUpdatedSnapshot: selectUpdatedSnapshot,
+      mutation: mutation,
+      staleTuiID: staleTuiID
+    ) != nil
+  }
+
+  func mutateAgentTuiSnapshot(
+    using client: any HarnessMonitorClientProtocol,
+    actionName: String? = nil,
+    selectUpdatedSnapshot: Bool = false,
+    mutation: @escaping @Sendable () async throws -> AgentTuiSnapshot,
+    staleTuiID: String? = nil
+  ) async -> AgentTuiSnapshot? {
     do {
       let measuredTui = try await Self.measureOperation {
         try await mutation()
@@ -22,13 +38,14 @@ extension HarnessMonitorStore {
       if let actionName {
         presentSuccessFeedback(actionName)
       }
-      return true
+      return measuredTui.value
     } catch {
-      return applyAgentTuiError(
+      _ = applyAgentTuiError(
         error,
         selectedSessionID: selectedSessionID,
         staleTuiID: staleTuiID
       )
+      return nil
     }
   }
 

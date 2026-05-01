@@ -14,6 +14,38 @@ struct SessionTimelineSectionPresentation {
   let viewportHeight: CGFloat
   let scrollNodeIDs: [String]
 
+  private init(
+    navigation: SessionTimelineWindowNavigation,
+    rows: [SessionTimelineRow],
+    placeholderCount: Int,
+    shouldAnimatePlaceholders: Bool,
+    viewportHeight: CGFloat,
+    scrollNodeIDs: [String]
+  ) {
+    self.navigation = navigation
+    self.rows = rows
+    self.placeholderCount = placeholderCount
+    self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
+    self.viewportHeight = viewportHeight
+    self.scrollNodeIDs = scrollNodeIDs
+  }
+
+  static var empty: Self {
+    Self(
+      navigation: SessionTimelineWindowNavigation(
+        timeline: [],
+        timelineWindow: nil,
+        isLoading: false
+      ),
+      rows: [],
+      placeholderCount: 0,
+      shouldAnimatePlaceholders: false,
+      viewportHeight: minimumViewportHeight,
+      scrollNodeIDs: []
+    )
+  }
+
+  @MainActor
   init(
     sessionID: String,
     timeline: [TimelineEntry],
@@ -38,20 +70,23 @@ struct SessionTimelineSectionPresentation {
     let loadedCount = nodes.count + placeholderCount
     let visibleRows = min(max(loadedCount, 1), Self.maximumVisibleRows)
 
-    self.navigation = navigation
-    rows = SessionTimelineRow.rows(for: nodes, configuration: dateTimeConfiguration)
-    self.placeholderCount = placeholderCount
-    shouldAnimatePlaceholders = SessionTimelinePlaceholderShimmer.shouldAnimate(
+    let rows = SessionTimelineRow.rows(for: nodes, configuration: dateTimeConfiguration)
+    let shouldAnimatePlaceholders = SessionTimelinePlaceholderShimmer.shouldAnimate(
       reduceMotion: reduceMotion,
       placeholderCount: placeholderCount
     )
-    viewportHeight = min(
+    let viewportHeight = min(
       max(
         (CGFloat(visibleRows) * Self.rowHeightEstimate) + HarnessMonitorTheme.spacingLG,
         Self.minimumViewportHeight),
       Self.maximumViewportHeight
     )
-    scrollNodeIDs = nodes.map(\.id)
+    self.navigation = navigation
+    self.rows = rows
+    self.placeholderCount = placeholderCount
+    self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
+    self.viewportHeight = viewportHeight
+    self.scrollNodeIDs = nodes.map(\.id)
   }
 
   var showsEmptyState: Bool {

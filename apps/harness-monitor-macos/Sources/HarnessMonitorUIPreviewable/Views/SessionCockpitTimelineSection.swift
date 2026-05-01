@@ -37,21 +37,57 @@ struct SessionCockpitTimelineSection: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var scrollTargetID: String?
+  @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
+  @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
 
   private var contentIdentity: SessionTimelineContentIdentity {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
   var body: some View {
-    let presentation = makePresentation()
+    let input = presentationInput
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
-      content(for: presentation)
+      content(for: cachedPresentation)
+    }
+    .onAppear {
+      rebuildPresentationIfNeeded(for: input, force: true)
+    }
+    .onChange(of: input) { _, newInput in
+      rebuildPresentationIfNeeded(for: newInput)
     }
   }
 
+  private var presentationInput: SessionTimelinePresentationInput {
+    SessionTimelinePresentationInput(
+      sessionID: sessionID,
+      timelineCount: timeline.count,
+      firstTimelineEntryID: timeline.first?.entryId,
+      firstTimelineRecordedAt: timeline.first?.recordedAt,
+      lastTimelineEntryID: timeline.last?.entryId,
+      lastTimelineRecordedAt: timeline.last?.recordedAt,
+      timelineWindowRevision: timelineWindow?.revision,
+      timelineWindowStart: timelineWindow?.windowStart,
+      timelineWindowEnd: timelineWindow?.windowEnd,
+      timelineWindowHasOlder: timelineWindow?.hasOlder ?? false,
+      timelineWindowHasNewer: timelineWindow?.hasNewer ?? false,
+      decisionCount: decisions.count,
+      firstDecisionID: decisions.first?.id,
+      lastDecisionID: decisions.last?.id,
+      isTimelineLoading: isTimelineLoading,
+      reduceMotion: reduceMotion,
+      dateTimeConfiguration: dateTimeConfiguration
+    )
+  }
+
   @MainActor
-  private func makePresentation() -> SessionTimelineSectionPresentation {
-    SessionTimelineSectionPresentation(
+  private func rebuildPresentationIfNeeded(
+    for input: SessionTimelinePresentationInput,
+    force: Bool = false
+  ) {
+    guard force || cachedPresentationInput != input else {
+      return
+    }
+    cachedPresentation = SessionTimelineSectionPresentation(
       sessionID: sessionID,
       timeline: timeline,
       timelineWindow: timelineWindow,
@@ -60,6 +96,7 @@ struct SessionCockpitTimelineSection: View {
       reduceMotion: reduceMotion,
       dateTimeConfiguration: dateTimeConfiguration
     )
+    cachedPresentationInput = input
   }
 
   private func content(for presentation: SessionTimelineSectionPresentation) -> some View {
@@ -273,6 +310,48 @@ struct SessionCockpitTimelineSection: View {
 
 struct SessionTimelineContentIdentity: Hashable, Sendable {
   let sessionID: String
+}
+
+private struct SessionTimelinePresentationInput: Equatable {
+  let sessionID: String
+  let timelineCount: Int
+  let firstTimelineEntryID: String?
+  let firstTimelineRecordedAt: String?
+  let lastTimelineEntryID: String?
+  let lastTimelineRecordedAt: String?
+  let timelineWindowRevision: Int64?
+  let timelineWindowStart: Int?
+  let timelineWindowEnd: Int?
+  let timelineWindowHasOlder: Bool
+  let timelineWindowHasNewer: Bool
+  let decisionCount: Int
+  let firstDecisionID: String?
+  let lastDecisionID: String?
+  let isTimelineLoading: Bool
+  let reduceMotion: Bool
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+
+  static var empty: Self {
+    Self(
+      sessionID: "",
+      timelineCount: 0,
+      firstTimelineEntryID: nil,
+      firstTimelineRecordedAt: nil,
+      lastTimelineEntryID: nil,
+      lastTimelineRecordedAt: nil,
+      timelineWindowRevision: nil,
+      timelineWindowStart: nil,
+      timelineWindowEnd: nil,
+      timelineWindowHasOlder: false,
+      timelineWindowHasNewer: false,
+      decisionCount: 0,
+      firstDecisionID: nil,
+      lastDecisionID: nil,
+      isTimelineLoading: false,
+      reduceMotion: false,
+      dateTimeConfiguration: .default
+    )
+  }
 }
 
 #Preview("Timeline Cursor") {
