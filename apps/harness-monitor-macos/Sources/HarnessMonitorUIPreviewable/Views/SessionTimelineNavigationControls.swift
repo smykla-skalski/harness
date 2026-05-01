@@ -7,6 +7,28 @@ enum SessionTimelineWindowAction: Equatable, Sendable {
   case newer
 }
 
+struct SessionTimelinePendingNavigation: Equatable, Sendable {
+  let action: SessionTimelineWindowAction
+  let request: TimelineWindowRequest
+  let sessionID: String
+  let generation: Int
+
+  func isSatisfied(
+    sessionID currentSessionID: String,
+    navigation: SessionTimelineWindowNavigation
+  ) -> Bool {
+    guard sessionID == currentSessionID else {
+      return false
+    }
+    switch action {
+    case .older, .newer:
+      return navigation.request(for: action) != request
+    case .latest:
+      return !navigation.hasNewer
+    }
+  }
+}
+
 struct SessionTimelineWindowNavigation: Equatable, Sendable {
   static let defaultLimit = 24
 

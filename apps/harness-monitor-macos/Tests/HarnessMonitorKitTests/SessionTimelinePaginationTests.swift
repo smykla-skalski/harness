@@ -95,12 +95,146 @@ struct SessionTimelineNavigationTests {
     let detailedRow = rows[2]
     let dayDividerRow = rows[12]
 
-    #expect(SessionTimelineTableMetrics.height(for: plainRow) >= 92)
-    #expect(SessionTimelineTableMetrics.height(for: detailedRow) > 92)
+    #expect(SessionTimelineTableMetrics.estimatedHeight(for: plainRow) >= 92)
+    #expect(SessionTimelineTableMetrics.estimatedHeight(for: detailedRow) > 92)
     #expect(
-      SessionTimelineTableMetrics.height(for: dayDividerRow)
-        > SessionTimelineTableMetrics.height(for: detailedRow)
+      SessionTimelineTableMetrics.estimatedHeight(for: dayDividerRow)
+        > SessionTimelineTableMetrics.estimatedHeight(for: detailedRow)
     )
+  }
+
+  @Test("Table scroll restoration preserves anchor offset after rows insert above")
+  func tableScrollRestorationPreservesAnchorOffsetAfterRowsInsertAbove() {
+    let restoredY = SessionTimelineTableMetrics.restoredScrollY(
+      rowMinY: 640,
+      anchorOffsetY: 32,
+      contentHeight: 2_400,
+      viewportHeight: 470
+    )
+    let clampedY = SessionTimelineTableMetrics.restoredScrollY(
+      rowMinY: 2_380,
+      anchorOffsetY: 80,
+      contentHeight: 2_400,
+      viewportHeight: 470
+    )
+
+    #expect(restoredY == 672)
+    #expect(clampedY == 1_930)
+  }
+
+  @Test("Table scroll restoration preserves anchor offset after rows are removed above")
+  func tableScrollRestorationPreservesAnchorOffsetAfterRowsRemovedAbove() {
+    let restoredY = SessionTimelineTableMetrics.restoredScrollY(
+      rowMinY: 280,
+      anchorOffsetY: 32,
+      contentHeight: 1_700,
+      viewportHeight: 470
+    )
+    let clampedTopY = SessionTimelineTableMetrics.restoredScrollY(
+      rowMinY: -42,
+      anchorOffsetY: 24,
+      contentHeight: 1_700,
+      viewportHeight: 470
+    )
+
+    #expect(restoredY == 312)
+    #expect(clampedTopY == 0)
+  }
+
+  @Test("Pending navigation waits for matching loaded window and latest intent wins")
+  func pendingNavigationWaitsForMatchingLoadedWindowAndLatestIntentWins() {
+    let entries = makeTimelineEntries(count: 6, startingAt: 6)
+    let initialNavigation = SessionTimelineWindowNavigation(
+      timeline: entries,
+      timelineWindow: makeWindow(
+        entries: entries,
+        windowStart: 6,
+        windowEnd: 12,
+        hasOlder: true,
+        hasNewer: true
+      ),
+      isLoading: false
+    )
+    let olderRequest = initialNavigation.request(for: .older)!
+    let newerRequest = initialNavigation.request(for: .newer)!
+    let olderPending = SessionTimelinePendingNavigation(
+      action: .older,
+      request: olderRequest,
+      sessionID: "sess-pagination",
+      generation: 1
+    )
+    let newerPending = SessionTimelinePendingNavigation(
+      action: .newer,
+      request: newerRequest,
+      sessionID: "sess-pagination",
+      generation: 2
+    )
+
+    #expect(!olderPending.isSatisfied(sessionID: "other-session", navigation: initialNavigation))
+    #expect(!olderPending.isSatisfied(sessionID: "sess-pagination", navigation: initialNavigation))
+    #expect(!newerPending.isSatisfied(sessionID: "sess-pagination", navigation: initialNavigation))
+
+    let olderLoadedEntries = makeTimelineEntries(count: 6, startingAt: 12)
+    let olderLoadedNavigation = SessionTimelineWindowNavigation(
+      timeline: olderLoadedEntries,
+      timelineWindow: makeWindow(
+        entries: olderLoadedEntries,
+        windowStart: 12,
+        windowEnd: 18,
+        hasOlder: true,
+        hasNewer: true
+      ),
+      isLoading: false
+    )
+    #expect(
+      olderPending.isSatisfied(
+        sessionID: "sess-pagination",
+        navigation: olderLoadedNavigation
+      )
+    )
+    #expect(
+      !newerPending.isSatisfied(
+        sessionID: "sess-pagination",
+        navigation: olderLoadedNavigation
+      )
+    )
+  }
+
+  @Test("Pending latest navigation waits until latest window is loaded")
+  func pendingLatestNavigationWaitsUntilLatestWindowIsLoaded() {
+    let olderEntries = makeTimelineEntries(count: 6, startingAt: 6)
+    let pending = SessionTimelinePendingNavigation(
+      action: .latest,
+      request: .latest(limit: SessionTimelineWindowNavigation.defaultLimit),
+      sessionID: "sess-pagination",
+      generation: 1
+    )
+    let olderNavigation = SessionTimelineWindowNavigation(
+      timeline: olderEntries,
+      timelineWindow: makeWindow(
+        entries: olderEntries,
+        windowStart: 6,
+        windowEnd: 12,
+        hasOlder: true,
+        hasNewer: true
+      ),
+      isLoading: false
+    )
+    let latestEntries = makeTimelineEntries(count: 6)
+    let latestNavigation = SessionTimelineWindowNavigation(
+      timeline: latestEntries,
+      timelineWindow: makeWindow(
+        entries: latestEntries,
+        windowStart: 0,
+        windowEnd: 6,
+        hasOlder: true,
+        hasNewer: false
+      ),
+      isLoading: false
+    )
+
+    #expect(!pending.isSatisfied(sessionID: "sess-pagination", navigation: olderNavigation))
+    #expect(pending.isSatisfied(sessionID: "sess-pagination", navigation: latestNavigation))
   }
 
   @Test("Visibility status keeps visible and loaded counts stable")
@@ -162,5 +296,30 @@ struct SessionTimelineNavigationTests {
         accessibilityLabel: "Event \(index)"
       )
     }
+  }
+
+  private func makeWindow(
+    entries: [TimelineEntry],
+    windowStart: Int,
+    windowEnd: Int,
+    hasOlder: Bool,
+    hasNewer: Bool
+  ) -> TimelineWindowResponse {
+    TimelineWindowResponse(
+      revision: Int64(windowStart + windowEnd),
+      totalCount: 32,
+      windowStart: windowStart,
+      windowEnd: windowEnd,
+      hasOlder: hasOlder,
+      hasNewer: hasNewer,
+      oldestCursor: entries.last.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      newestCursor: entries.first.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      entries: nil,
+      unchanged: false
+    )
   }
 }
