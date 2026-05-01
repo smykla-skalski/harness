@@ -232,7 +232,7 @@ public struct WorkspaceWindowView: View {
       .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
       .containerBackground(.windowBackground, for: .window)
       .task {
-        await prepareWorkspace(viewModel: viewModel)
+        await prepareWorkspace()
       }
       .onChange(of: store.pendingWorkspaceSelection) { _, _ in
         consumePendingWorkspaceSelection()
@@ -368,26 +368,21 @@ public struct WorkspaceWindowView: View {
     }
   }
 
-  private func prepareWorkspace(viewModel: ViewModel) async {
+  private func prepareWorkspace() async {
     hasCompletedInitialWorkspacePreparation = false
     viewModel.windowNavigation.setHandlers(
       back: { navigateHistoryBack() },
       forward: { navigateHistoryForward() }
     )
-    navigationBridge.update(viewModel.windowNavigation)
     await Task.yield()
-    async let catalogsLoaded = loadAgentPickerCatalogs()
-    let refreshOutcome = await refreshManagedSelections()
-    applyManagedSelectionFreshness(refreshOutcome)
-    refreshWorkspaceAfterDataChange(afterRefresh: refreshOutcome.didRefreshManagedSelections)
-    await reloadDecisions()
+    await loadAgentPickerCatalogs()
     resolveInitialWorkspaceSelection()
-    _ = await catalogsLoaded
-    handleSelectedTuiChange(store.selectedAgentTui?.tuiId, viewModel: viewModel)
     await Task.yield()
     guard !Task.isCancelled else {
       return
     }
+    hasCompletedInitialWorkspacePreparation = true
+    enableStartupFocusParticipation()
   }
 
   private func refreshWorkspaceAfterDataChange(afterRefresh: Bool = false) {
