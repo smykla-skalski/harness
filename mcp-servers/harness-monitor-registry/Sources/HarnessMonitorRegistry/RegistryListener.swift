@@ -27,9 +27,9 @@ public actor RegistryListener {
     self.queue = DispatchQueue(label: "io.harnessmonitor.mcp-registry.listener", qos: .utility)
   }
 
-  public func start(at path: String) throws {
+  public func start(at path: String, replaceExistingSocketFile: Bool = true) throws {
     guard running == false else { return }
-    try ensureSocketPathAvailable(path)
+    try ensureSocketPathAvailable(path, replaceExistingSocketFile: replaceExistingSocketFile)
 
     let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else {
@@ -245,14 +245,14 @@ public enum RegistryListenerError: Error, CustomStringConvertible {
   }
 }
 
-private func ensureSocketPathAvailable(_ path: String) throws {
+private func ensureSocketPathAvailable(_ path: String, replaceExistingSocketFile: Bool) throws {
   let fileManager = FileManager.default
   let directory = (path as NSString).deletingLastPathComponent
   var isDirectory: ObjCBool = false
   if fileManager.fileExists(atPath: directory, isDirectory: &isDirectory) == false {
     try fileManager.createDirectory(atPath: directory, withIntermediateDirectories: true)
   }
-  if fileManager.fileExists(atPath: path) {
+  if replaceExistingSocketFile, fileManager.fileExists(atPath: path) {
     try fileManager.removeItem(atPath: path)
   }
 }

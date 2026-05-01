@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HarnessMonitorRegistry
 
@@ -6,7 +7,12 @@ struct RegistryRequestDispatcherTests {
   private func makeDispatcher() -> (AccessibilityRegistry, RegistryRequestDispatcher) {
     let registry = AccessibilityRegistry()
     let dispatcher = RegistryRequestDispatcher(registry: registry) {
-      PingResult(protocolVersion: 1, appVersion: "1.2.3", bundleIdentifier: "io.harnessmonitor.app")
+      PingResult(
+        protocolVersion: 1,
+        appVersion: "1.2.3",
+        bundleIdentifier: "io.harnessmonitor.app",
+        capabilities: [.clientSnapshots, .replacementNotice]
+      )
     }
     return (registry, dispatcher)
   }
@@ -20,6 +26,7 @@ struct RegistryRequestDispatcherTests {
       return
     }
     #expect(info.appVersion == "1.2.3")
+    #expect(info.capabilities == [.clientSnapshots, .replacementNotice])
   }
 
   @Test("getElement returns not-found for unknown identifier")
@@ -77,5 +84,77 @@ struct RegistryRequestDispatcherTests {
       return
     }
     #expect(payload.elements.map(\.identifier) == ["btn"])
+  }
+
+  @Test("syncClientSnapshot publishes remote client snapshots")
+  func syncClientSnapshotPublishesRemoteClientSnapshots() async {
+    let (registry, dispatcher) = makeDispatcher()
+    let clientID = UUID()
+    let response = await dispatcher.dispatch(
+      RegistryRequest(
+        id: 11,
+        op: .syncClientSnapshot,
+        clientSnapshot: RegistryClientSnapshot(
+          clientID: clientID,
+          appVersion: "1.2.3",
+          bundleIdentifier: "io.test.client",
+          snapshot: RegistrySnapshot(
+            elements: [
+              RegistryElement(
+                identifier: "client.refresh",
+                kind: .button,
+                frame: RegistryRect(x: 10, y: 20, width: 24, height: 24),
+                windowID: 7
+              )
+            ],
+            windows: [
+              RegistryWindow(
+                id: 7,
+                title: "Client Window",
+                frame: RegistryRect(x: 0, y: 0, width: 100, height: 80)
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    guard case .success(_, .ack(let ack)) = response else {
+      Issue.record("expected syncClientSnapshot ack")
+      return
+    }
+    #expect(ack.applied == true)
+    #expect(await registry.element(identifier: "client.refresh")?.windowID == 7)
+  }
+
+  @Test("replacementNotice delegates to the handler")
+  func replacementNoticeDelegatesToTheHandler() async {
+    let registry = AccessibilityRegistry()
+    let notice = RegistryReplacementNotice(
+      socketPath: "/tmp/mcp.sock",
+      protocolVersion: 1,
+      appVersion: "1.2.4",
+      bundleIdentifier: "io.harnessmonitor.app",
+      message: "replacement incoming"
+    )
+    let dispatcher = RegistryRequestDispatcher(
+      registry: registry,
+      pingInfo: {
+        PingResult(protocolVersion: 1, appVersion: "1.2.3", bundleIdentifier: "io.harnessmonitor.app")
+      },
+      replacementHandler: { receivedNotice in
+        RegistryAckResult(applied: receivedNotice == notice)
+      }
+    )
+
+    let response = await dispatcher.dispatch(
+      RegistryRequest(id: 12, op: .replacementNotice, replacementNotice: notice)
+    )
+
+    guard case .success(_, .ack(let ack)) = response else {
+      Issue.record("expected replacementNotice ack")
+      return
+    }
+    #expect(ack == RegistryAckResult(applied: true))
   }
 }

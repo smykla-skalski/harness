@@ -43,6 +43,9 @@ struct MCPStatusLabel: View {
       .scaledFont(font)
       .foregroundStyle(tint)
       .lineLimit(1)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(status.accessibilityLabel)
+      .accessibilityValue(status.accessibilityValue)
   }
 
   private var font: Font {

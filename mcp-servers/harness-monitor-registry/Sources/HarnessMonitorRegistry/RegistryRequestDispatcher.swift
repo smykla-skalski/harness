@@ -6,10 +6,16 @@ import Foundation
 public struct RegistryRequestDispatcher: Sendable {
   public let registry: AccessibilityRegistry
   public let pingInfo: @Sendable () -> PingResult
+  public let replacementHandler: (@Sendable (RegistryReplacementNotice) async -> RegistryAckResult)?
 
-  public init(registry: AccessibilityRegistry, pingInfo: @escaping @Sendable () -> PingResult) {
+  public init(
+    registry: AccessibilityRegistry,
+    pingInfo: @escaping @Sendable () -> PingResult,
+    replacementHandler: (@Sendable (RegistryReplacementNotice) async -> RegistryAckResult)? = nil
+  ) {
     self.registry = registry
     self.pingInfo = pingInfo
+    self.replacementHandler = replacementHandler
   }
 
   public func dispatch(_ request: RegistryRequest) async -> RegistryResponse {
@@ -48,6 +54,53 @@ public struct RegistryRequestDispatcher: Sendable {
         )
       }
       return .success(id: request.id, result: .getElement(GetElementResult(element: element)))
+
+    case .syncClientSnapshot:
+      guard let clientSnapshot = request.clientSnapshot else {
+        return .failure(
+          id: request.id,
+          error: RegistryErrorPayload(
+            code: "invalid-argument",
+            message: "syncClientSnapshot requires a clientSnapshot payload"
+          )
+        )
+      }
+      await registry.upsertClientSnapshot(clientSnapshot)
+      return .success(id: request.id, result: .ack(RegistryAckResult(applied: true)))
+
+    case .clearClientSnapshot:
+      guard let clientID = request.clientID else {
+        return .failure(
+          id: request.id,
+          error: RegistryErrorPayload(
+            code: "invalid-argument",
+            message: "clearClientSnapshot requires a clientID payload"
+          )
+        )
+      }
+      await registry.removeClientSnapshot(clientID: clientID)
+      return .success(id: request.id, result: .ack(RegistryAckResult(applied: true)))
+
+    case .replacementNotice:
+      guard let replacementNotice = request.replacementNotice else {
+        return .failure(
+          id: request.id,
+          error: RegistryErrorPayload(
+            code: "invalid-argument",
+            message: "replacementNotice requires a replacementNotice payload"
+          )
+        )
+      }
+      let ack =
+        if let replacementHandler {
+          await replacementHandler(replacementNotice)
+        } else {
+          RegistryAckResult(
+            applied: false,
+            message: "registry host does not support replacement notices"
+          )
+        }
+      return .success(id: request.id, result: .ack(ack))
     }
   }
 }

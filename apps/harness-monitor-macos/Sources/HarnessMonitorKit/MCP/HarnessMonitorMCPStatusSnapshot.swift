@@ -56,47 +56,51 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   public var title: String {
     switch runtimeState {
     case .disabled:
-      "Registry Disabled"
+      "Registry Host Disabled"
     case .starting:
-      "Registry Starting"
+      "Registry Host Starting"
     case .healthy:
-      "Registry Ready"
+      "Registry Host Ready"
     case .degraded:
-      isRecovering ? "Registry Degraded - Recovering" : "Registry Degraded"
+      isRecovering ? "Registry Host Degraded - Recovering" : "Registry Host Degraded"
     }
   }
 
   public var toolbarLabel: String {
     switch runtimeState {
     case .disabled:
-      "Registry Off"
+      "Host Off"
     case .starting:
-      "Registry Starting"
+      "Host Starting"
     case .healthy:
-      "Registry Ready"
+      "Host Ready"
     case .degraded:
-      isRecovering ? "Registry Recovering" : "Registry Degraded"
+      isRecovering ? "Host Recovering" : "Host Degraded"
     }
   }
 
   public var detail: String {
     switch runtimeState {
     case .disabled:
-      return "The in-app MCP accessibility registry is disabled."
+      return "The in-app MCP accessibility registry host is disabled."
     case .starting(let socketPath):
       if let socketPath {
-        return "Starting the in-app MCP accessibility registry at \(socketPath)."
+        return
+          "Starting the in-app MCP accessibility registry host at \(socketPath). "
+          + hostScopeClarification
       }
-      return "Starting the in-app MCP accessibility registry."
+      return "Starting the in-app MCP accessibility registry host. \(hostScopeClarification)"
     case .healthy(let socketPath):
-      return "The in-app MCP accessibility registry is ready at \(socketPath)."
+      return
+        "The in-app MCP accessibility registry host is responding at \(socketPath). "
+        + hostScopeClarification
     case .degraded(_, let reason):
       let summary = recoverySummary
       let guidance = recoveryGuidance
       if let summary {
-        return "The MCP registry is unavailable: \(reason). \(summary) \(guidance)"
+        return "The MCP registry host is unavailable: \(reason). \(summary) \(guidance)"
       }
-      return "The MCP registry is unavailable: \(reason). \(guidance)"
+      return "The MCP registry host is unavailable: \(reason). \(guidance)"
     }
   }
 
@@ -130,7 +134,7 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   }
 
   public var accessibilityLabel: String {
-    "MCP accessibility registry status"
+    "MCP accessibility registry host status"
   }
 
   public var accessibilityValue: String {
@@ -142,9 +146,9 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return nil
     }
     if let recoverySummary {
-      return "MCP registry degraded: \(reason). \(recoverySummary) \(recoveryGuidance)"
+      return "MCP registry host degraded: \(reason). \(recoverySummary) \(recoveryGuidance)"
     }
-    return "MCP registry degraded: \(reason). \(recoveryGuidance)"
+    return "MCP registry host degraded: \(reason). \(recoveryGuidance)"
   }
 
   private var isRecovering: Bool {
@@ -159,6 +163,10 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return "You can keep working while the registry retries in the background."
     }
     return "Correct the problem, then open Preferences > MCP to re-enable the registry host."
+  }
+
+  private var hostScopeClarification: String {
+    "This status covers the in-app registry host. MCP clients still validate helper-backed accessibility actions when requests need them."
   }
 
   private func formattedDelay(_ delay: Duration) -> String {

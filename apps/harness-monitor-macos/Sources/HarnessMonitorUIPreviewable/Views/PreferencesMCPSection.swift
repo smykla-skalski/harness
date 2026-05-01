@@ -81,8 +81,11 @@ public struct PreferencesMCPSection: View {
     string.append(code)
     string.append(
       AttributedString(
-        " MCP server can enumerate windows and elements, click UI, and type "
-          + "text. Clients still need Accessibility permission in System Settings."
+        " MCP server can read app-published windows and registry-backed "
+          + "controls. MCP clients still resolve some live accessibility "
+          + "queries and input actions through the bundled helper, and the "
+          + "client process still needs Accessibility permission in System "
+          + "Settings."
       )
     )
     return string
@@ -92,6 +95,7 @@ public struct PreferencesMCPSection: View {
     LabeledContent("Status") {
       MCPStatusLabel(status: store.mcpStatus, variant: .detail)
     }
+    .help(store.mcpStatus.detail)
     .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMCPStatus)
   }
 

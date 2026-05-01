@@ -102,7 +102,8 @@ func bootstrap() async {
     PingResult(
       protocolVersion: registryProtocolVersion,
       appVersion: appVersion,
-      bundleIdentifier: bundleID
+      bundleIdentifier: bundleID,
+      capabilities: [.clientSnapshots, .replacementNotice]
     )
   }
   let listener = RegistryListener(dispatcher: dispatcher)

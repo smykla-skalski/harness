@@ -1,3 +1,6 @@
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -7,7 +10,7 @@ use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 
-use crate::mcp::automation::AccessibilityQueryError;
+use crate::mcp::automation::{AccessibilityQueryError, INPUT_OVERRIDE_ENV};
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::registry::{ElementKind, GetElementResult, ListElementsResult};
 use crate::mcp::tool::{Tool, ToolRegistry};
@@ -168,6 +171,51 @@ fn fallback_element(
         selected: false,
         focused: false,
     }
+}
+
+fn write_fake_harness_input(path: &Path) {
+    let script = r#"#!/bin/sh
+case "$1" in
+  --help|check)
+    exit 0
+    ;;
+  get-element)
+    identifier="$2"
+    case "$identifier" in
+      "task.source")
+        x=10
+        y=20
+        width=50
+        height=40
+        ;;
+      "agent.destination")
+        x=210
+        y=120
+        width=60
+        height=60
+        ;;
+      *)
+        x=10
+        y=20
+        width=30
+        height=40
+        ;;
+    esac
+    printf '{"element":{"identifier":"%s","label":"%s","value":null,"hint":null,"kind":"button","frame":{"x":%s,"y":%s,"width":%s,"height":%s},"windowID":7,"enabled":true,"selected":false,"focused":true}}\n' \
+      "$identifier" "$identifier" "$x" "$y" "$width" "$height"
+    ;;
+  scroll|drag)
+    exit 0
+    ;;
+  *)
+    exit 64
+    ;;
+esac
+"#;
+    fs::write(path, script).expect("write fake helper");
+    let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("set helper executable");
 }
 
 #[tokio::test]
@@ -473,6 +521,35 @@ async fn scroll_tool_rejects_disabled_targets() {
 }
 
 #[tokio::test]
+async fn scroll_tool_uses_helper_fallback_when_registry_reports_not_found() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let helper = dir.path().join("fake-harness-monitor-input");
+    write_fake_harness_input(&helper);
+    let helper_value = helper.to_string_lossy().into_owned();
+    let server = spawn_single_response(&path, not_found_response(1));
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = ScrollTool::new(client);
+
+    let result = temp_env::async_with_vars(
+        [(INPUT_OVERRIDE_ENV, Some(helper_value.as_str()))],
+        async move {
+            tool.call(json!({
+                "identifier": "harness.session.cockpit.scroll",
+                "deltaY": 180,
+            }))
+            .await
+        },
+    )
+    .await
+    .expect("helper fallback should let scroll succeed");
+
+    let request_line = server.await.unwrap();
+    assert!(request_line.contains("\"identifier\":\"harness.session.cockpit.scroll\""));
+    assert!(!result.is_error);
+}
+
+#[tokio::test]
 async fn drag_drop_tool_queries_source_and_destination_identifiers() {
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
@@ -528,6 +605,40 @@ async fn drag_drop_tool_rejects_disabled_destination() {
     let requests = server.await.unwrap();
     assert_eq!(requests.len(), 2);
     assert!(err.message().contains("disabled target"));
+}
+
+#[tokio::test]
+async fn drag_drop_tool_uses_helper_fallback_when_registry_reports_not_found() {
+    let dir = TempDir::new().unwrap();
+    let path = socket_path(&dir);
+    let helper = dir.path().join("fake-harness-monitor-input");
+    write_fake_harness_input(&helper);
+    let helper_value = helper.to_string_lossy().into_owned();
+    let server = spawn_response_sequence(
+        &path,
+        vec![not_found_response(1), not_found_response(2)],
+    );
+    let client = Arc::new(RegistryClient::with_socket_path(path));
+    let tool = DragDropTool::new(client);
+
+    let result = temp_env::async_with_vars(
+        [(INPUT_OVERRIDE_ENV, Some(helper_value.as_str()))],
+        async move {
+            tool.call(json!({
+                "sourceIdentifier": "task.source",
+                "destinationIdentifier": "agent.destination",
+            }))
+            .await
+        },
+    )
+    .await
+    .expect("helper fallback should let drag succeed");
+
+    let requests = server.await.unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].contains("\"identifier\":\"task.source\""));
+    assert!(requests[1].contains("\"identifier\":\"agent.destination\""));
+    assert!(!result.is_error);
 }
 
 #[tokio::test]

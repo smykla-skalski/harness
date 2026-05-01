@@ -1,14 +1,18 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
+
+use std::os::unix::fs::PermissionsExt;
 
 use crate::mcp::registry::ElementKind;
 
 use super::accessibility::{get_element_args, list_elements_args};
 use super::backend::{
-    Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_in, detect_backend,
+    Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_from_roots, default_helper_candidate_in,
+    detect_backend,
     helper_search_roots_from,
 };
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
@@ -18,6 +22,24 @@ fn as_strings(args: &[OsString]) -> Vec<String> {
     args.iter()
         .map(|arg| arg.to_string_lossy().into_owned())
         .collect()
+}
+
+fn write_helper_script(path: &Path, body: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create helper parent");
+    }
+    fs::write(path, body).expect("write helper script");
+    let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("set helper executable");
+}
+
+fn valid_helper_script() -> &'static str {
+    "#!/bin/sh\nexit 0\n"
+}
+
+fn failing_helper_script() -> &'static str {
+    "#!/bin/sh\nexit 1\n"
 }
 
 #[test]
@@ -165,9 +187,10 @@ fn screencapture_args_window_wins_over_display() {
 
 #[tokio::test]
 async fn detect_backend_honours_env_override_when_file_exists() {
-    let temp = tempfile::NamedTempFile::new().expect("tempfile");
-    let path_value = temp.path().to_string_lossy().into_owned();
-    let expected_path = temp.path().to_path_buf();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let expected_path = temp.path().join("harness-monitor-input");
+    write_helper_script(&expected_path, valid_helper_script());
+    let path_value = expected_path.to_string_lossy().into_owned();
     let backend = temp_env::async_with_vars(
         [(INPUT_OVERRIDE_ENV, Some(path_value.as_str()))],
         async move { detect_backend().await },
@@ -182,14 +205,48 @@ async fn default_helper_candidate_prefers_newest_platform_build() {
     let build_root = temp.path().join("mcp-servers/harness-monitor-registry/.build");
     let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
     let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
-    fs::create_dir_all(release.parent().expect("release dir")).expect("create release dir");
-    fs::write(&release, "release").expect("write release helper");
+    write_helper_script(&release, valid_helper_script());
     thread::sleep(Duration::from_millis(20));
-    fs::create_dir_all(debug.parent().expect("debug dir")).expect("create debug dir");
-    fs::write(&debug, "debug").expect("write debug helper");
+    write_helper_script(&debug, valid_helper_script());
 
     let candidate = default_helper_candidate_in(temp.path()).await;
     assert_eq!(candidate, Some(debug));
+}
+
+#[tokio::test]
+async fn default_helper_candidate_skips_newer_non_viable_platform_build() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let build_root = temp.path().join("mcp-servers/harness-monitor-registry/.build");
+    let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
+    let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
+    write_helper_script(&release, valid_helper_script());
+    thread::sleep(Duration::from_millis(20));
+    write_helper_script(&debug, failing_helper_script());
+
+    let candidate = default_helper_candidate_in(temp.path()).await;
+    assert_eq!(candidate, Some(release));
+}
+
+#[tokio::test]
+async fn default_helper_candidate_prefers_newest_viable_candidate_across_search_roots() {
+    let first_root = tempfile::tempdir().expect("first root");
+    let second_root = tempfile::tempdir().expect("second root");
+    let older = first_root
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build/arm64-apple-macosx/release/harness-monitor-input");
+    let newer = second_root
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build/arm64-apple-macosx/debug/harness-monitor-input");
+    write_helper_script(&older, valid_helper_script());
+    thread::sleep(Duration::from_millis(20));
+    write_helper_script(&newer, valid_helper_script());
+
+    let candidate = default_helper_candidate_from_roots(&[
+        first_root.path().to_path_buf(),
+        second_root.path().to_path_buf(),
+    ])
+    .await;
+    assert_eq!(candidate, Some(newer));
 }
 
 #[test]
