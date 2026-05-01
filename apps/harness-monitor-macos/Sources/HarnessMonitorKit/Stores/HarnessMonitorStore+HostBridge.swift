@@ -131,7 +131,7 @@ extension HarnessMonitorStore {
       return
     }
     hostBridgeCapabilityIssues.removeValue(forKey: capability)
-    if capability == "codex" {
+    if capability == "acp" {
       acpBridgeHTTPIncident = nil
     }
   }
@@ -186,7 +186,10 @@ extension HarnessMonitorStore {
     switch hostBridgeCapabilityState(for: "acp") {
     case .ready:
       return
-        "ACP project access should be available, but the last request still failed. Retry or restart the shared host bridge."
+        """
+        ACP project access should be available, but the last request still failed. \
+        Retry or restart the shared host bridge.
+        """
     case .excluded:
       return "ACP project access is excluded from the shared host bridge. Enable ACP and try again."
     case .unavailable:
@@ -202,7 +205,7 @@ extension HarnessMonitorStore {
     guard let manifest = daemonStatus?.manifest, manifest.sandboxed else {
       return false
     }
-    return hostBridgeCapabilityState(for: "codex") == .unavailable
+    return hostBridgeCapabilityState(for: "acp") == .unavailable
   }
 
   func reconcileAcpBridgeIncidentVisibility() {
@@ -220,7 +223,7 @@ extension HarnessMonitorStore {
     for capability: String,
     recordedAt: Date = .now
   ) {
-    guard capability == "codex", daemonStatus?.manifest?.sandboxed == true else {
+    guard capability == "acp", daemonStatus?.manifest?.sandboxed == true else {
       return
     }
     if let incident = acpBridgeHTTPIncident {
@@ -238,7 +241,7 @@ extension HarnessMonitorStore {
     statusCode: Int,
     recordedAt: Date = .now
   ) {
-    guard capability == "codex", statusCode == 503, daemonStatus?.manifest?.sandboxed == true else {
+    guard capability == "acp", statusCode == 503, daemonStatus?.manifest?.sandboxed == true else {
       return
     }
     guard acpBridgeHTTPIncident == nil else { return }

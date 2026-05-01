@@ -166,7 +166,10 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   }
 
   private var hostScopeClarification: String {
-    "This status covers the in-app registry host. MCP clients still validate helper-backed accessibility actions when requests need them."
+    """
+    This status covers the in-app registry host. MCP clients still validate helper-backed \
+    accessibility actions when requests need them.
+    """
   }
 
   private func formattedDelay(_ delay: Duration) -> String {

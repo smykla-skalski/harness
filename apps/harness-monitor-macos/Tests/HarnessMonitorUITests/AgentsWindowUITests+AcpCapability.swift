@@ -4,6 +4,55 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 extension AgentsWindowUITests {
+  func testAcpStartUsesSelectedSessionFallbackWhenCreatePaneHasNoCachedSession() throws {
+    let app = launchInCockpitPreview()
+    openAgentsWindow(in: app)
+
+    let copilotRow = element(in: app, identifier: Accessibility.agentCapabilityRow("copilot"))
+    XCTAssertTrue(waitForElement(copilotRow, timeout: Self.actionTimeout))
+    tapButton(in: app, title: "Copilot")
+
+    let acpChoice = element(
+      in: app,
+      identifier: Accessibility.agentCapabilityTransportButton(
+        "copilot",
+        transportID: "managed:copilot"
+      )
+    )
+    XCTAssertTrue(
+      waitForElement(acpChoice, timeout: Self.actionTimeout),
+      "ACP transport should be visible before the start action is triggered"
+    )
+    tapElement(
+      in: app,
+      identifier: Accessibility.agentCapabilityTransportButton(
+        "copilot",
+        transportID: "managed:copilot"
+      )
+    )
+
+    revealAgentsLaunchAction(in: app, identifier: Accessibility.agentTuiStartButton)
+    let startButton = button(in: app, identifier: Accessibility.agentTuiStartButton)
+    XCTAssertTrue(
+      startButton.isEnabled,
+      "Start should stay enabled when the cockpit already has a selected session"
+    )
+    tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
+
+    let agentRow = element(in: app, identifier: Accessibility.agentTuiExternalTab("copilot"))
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        agentRow.exists && state.label.contains("selection=agent:copilot")
+      },
+      """
+      Starting GitHub Copilot from the create pane should use the selected session as \
+      the fallback anchor instead of no-oping.
+      state=\(state.label)
+      """
+    )
+  }
+
   func testAcpCapabilityPicker() throws {
     let app = launchInCockpitPreview()
     openAgentsWindow(in: app)

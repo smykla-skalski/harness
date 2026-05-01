@@ -322,7 +322,8 @@ extension AgentsWindowView {
     var message = "Launches as \(viewModel.selectedRole.title)."
 
     if showsAcpFallbackRoleMenu {
-      message += " If a leader is already active, it joins as \(viewModel.selectedAcpFallbackRole.title)."
+      message +=
+        " If a leader is already active, it joins as \(viewModel.selectedAcpFallbackRole.title)."
     }
 
     return message

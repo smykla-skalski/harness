@@ -79,9 +79,9 @@ struct DecisionRelatedAgentContextSection: View {
           InspectorFactGrid(facts: facts)
           if let agentID = nonEmpty(decision.agentID), matchingAgent == nil {
             Text("Open the matching workspace to see \(humanizedWorkspaceLabel(agentID)) live.")
-            .scaledFont(.footnote)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
+              .scaledFont(.footnote)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .fixedSize(horizontal: false, vertical: true)
           }
           if let agentID = nonEmpty(decision.agentID) {
             Button("Open agent") {

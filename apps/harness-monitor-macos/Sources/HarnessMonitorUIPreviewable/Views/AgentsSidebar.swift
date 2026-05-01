@@ -89,11 +89,11 @@ struct AgentsSidebar: View {
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
       }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, rowPadding)
-        .tag(WorkspaceSelection.create)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.vertical, rowPadding)
+      .tag(WorkspaceSelection.create)
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiCreateTab)
 
       AgentsSidebarDecisionSection(
         selection: $selection,

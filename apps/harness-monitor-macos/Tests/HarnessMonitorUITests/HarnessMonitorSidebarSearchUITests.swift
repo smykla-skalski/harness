@@ -225,7 +225,10 @@ extension HarnessMonitorSidebarLayoutUITests {
       let diagnostics = sidebarFilterControlDiagnostics(in: app)
         .replacingOccurrences(of: "\n", with: " | ")
       XCTFail(
-        "Expected sidebar filter menu options after opening the toolbar filter control. diagnostics=\(diagnostics)"
+        """
+        Expected sidebar filter menu options after opening the toolbar filter control. \
+        diagnostics=\(diagnostics)
+        """
       )
       return
     }

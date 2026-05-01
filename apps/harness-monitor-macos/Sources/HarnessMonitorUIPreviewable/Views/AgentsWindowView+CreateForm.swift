@@ -140,6 +140,9 @@ extension AgentsWindowView {
   }
 
   @ViewBuilder var createPaneBanners: some View {
+    if let message = createPaneSessionActionUnavailableNote {
+      createPaneSessionActionBanner(message: message)
+    }
     if viewModel.createMode == .terminal {
       if viewModel.selectedLaunchSelection.isAcp {
         if displayState.acpUnavailable {

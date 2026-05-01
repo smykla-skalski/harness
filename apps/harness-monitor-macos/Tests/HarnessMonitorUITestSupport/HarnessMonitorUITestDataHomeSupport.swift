@@ -15,11 +15,13 @@ extension HarnessMonitorUITestCase {
         storageDirectoryName(for: purpose),
         isDirectory: true
       )
-    let previousArtifactsDirectory = ProcessInfo.processInfo.environment[Self.artifactsDirectoryKey]?
+    let previousArtifactsDirectory =
+      ProcessInfo.processInfo.environment[Self.artifactsDirectoryKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
     let shouldSeedArtifactsDirectory =
       previousArtifactsDirectory == nil || previousArtifactsDirectory?.isEmpty == true
-    let seededArtifactsDirectory = root
+    let seededArtifactsDirectory =
+      root
       .appendingPathComponent("ui-test-artifacts", isDirectory: true)
 
     recordDiagnosticsTrace(
