@@ -5,7 +5,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class AttentionInfrastructureUITestsAcpBridgeBanner:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   func testBridgeBannerRendersActionsAndFrontHallRuntimeRemainsVisible() throws {
     let app = launchInCockpitPreview(
@@ -28,7 +28,7 @@ final class AttentionInfrastructureUITestsAcpBridgeBanner:
     XCTAssertTrue(waitForElement(runDoctor, timeout: Self.actionTimeout))
     tapButton(in: app, identifier: Accessibility.contentAcpBridgeRunDoctorButton)
 
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     let agentRow = element(in: app, identifier: Accessibility.agentTuiExternalTab("worker-codex"))
     XCTAssertTrue(waitForElement(agentRow, timeout: Self.uiTimeout))
     tapViaCoordinate(in: app, element: agentRow)

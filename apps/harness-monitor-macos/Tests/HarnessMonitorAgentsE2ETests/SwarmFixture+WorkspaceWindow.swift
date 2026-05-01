@@ -4,9 +4,9 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 extension SwarmFixture {
-  func openAgentsWindow() {
+  func openWorkspaceWindow() {
     dismissTaskActionsSheetIfPresent()
-    let identifier = Accessibility.agentsButton
+    let identifier = Accessibility.workspaceToolbarButton
     trace("open-agents.begin", app: app, details: ["identifier": identifier])
     testCase.tapElement(in: app, identifier: identifier)
     let opened = testCase.waitUntil(timeout: 10) {
@@ -21,24 +21,24 @@ extension SwarmFixture {
     }
     XCTAssertTrue(
       opened,
-      "Expected Agents window to appear\n\(diagnosticsSummary())"
+      "Expected Workspace window to appear\n\(diagnosticsSummary())"
     )
   }
 
-  func closeAgentsWindow() {
-    let agentsWindow = testCase.element(in: app, identifier: Accessibility.agentsWindow)
+  func closeWorkspaceWindow() {
+    let workspaceWindow = testCase.element(in: app, identifier: Accessibility.workspaceWindow)
     let agentsState = testCase.element(in: app, identifier: Accessibility.agentTuiState)
     let launchPane = testCase.element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let sessionPane = testCase.element(in: app, identifier: Accessibility.agentTuiSessionPane)
     guard
-      agentsWindow.exists || agentsState.exists || launchPane.exists || sessionPane.exists
+      workspaceWindow.exists || agentsState.exists || launchPane.exists || sessionPane.exists
     else {
       return
     }
     trace("close-agents.begin", app: app)
     app.typeKey("w", modifierFlags: .command)
     let closed = testCase.waitUntil(timeout: 10) {
-      !agentsWindow.exists && !agentsState.exists && !launchPane.exists && !sessionPane.exists
+      !workspaceWindow.exists && !agentsState.exists && !launchPane.exists && !sessionPane.exists
     }
     if closed {
       trace("close-agents.success", app: app)
@@ -47,13 +47,13 @@ extension SwarmFixture {
     }
     XCTAssertTrue(
       closed,
-      "Expected Agents window to close\n\(diagnosticsSummary())"
+      "Expected Workspace window to close\n\(diagnosticsSummary())"
     )
   }
 
   func selectAgentsTask(_ taskID: String) {
-    let tabID = Accessibility.agentsTaskTab(taskID)
-    let selectionID = Accessibility.agentsTaskSelection(taskID)
+    let tabID = Accessibility.workspaceTaskTab(taskID)
+    let selectionID = Accessibility.workspaceTaskSelection(taskID)
     let taskTab = testCase.element(in: app, identifier: tabID)
     let sidebar = agentsSidebarScrollView()
     trace(
@@ -110,7 +110,7 @@ extension SwarmFixture {
       taskVisible,
       """
       Expected Agents task tab \(taskID) to become visible inside the Agents sidebar.
-      agentsWindowState=\(currentAgentsWindowStateLabel())
+      workspaceWindowState=\(currentWorkspaceWindowStateLabel())
       \(diagnosticsSummary())
       """
     )
@@ -118,20 +118,20 @@ extension SwarmFixture {
 
   private func assertAgentsTaskSelected(_ taskID: String) {
     let selected = testCase.waitUntil(timeout: 5) {
-      self.currentAgentsWindowStateLabel().contains("selection=task:\(taskID)")
+      self.currentWorkspaceWindowStateLabel().contains("selection=task:\(taskID)")
     }
     XCTAssertTrue(
       selected,
       """
       Expected Agents task tab \(taskID) to become selected after tap.
-      agentsWindowState=\(currentAgentsWindowStateLabel())
+      workspaceWindowState=\(currentWorkspaceWindowStateLabel())
       \(diagnosticsSummary())
       """
     )
   }
 
-  private func currentAgentsWindowStateLabel() -> String {
-    let identifiers = [Accessibility.agentTuiState, Accessibility.agentsWindow]
+  private func currentWorkspaceWindowStateLabel() -> String {
+    let identifiers = [Accessibility.agentTuiState, Accessibility.workspaceWindow]
     for identifier in identifiers {
       let matches = app.descendants(matching: .any).matching(identifier: identifier)
       let searchCount = min(matches.count, 8)
@@ -150,8 +150,8 @@ extension SwarmFixture {
     let createRow = testCase.element(in: app, identifier: Accessibility.agentTuiCreateTab)
     let launchPane = testCase.element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let anchor = createRow.exists ? createRow : launchPane
-    let agentsWindow = testCase.window(in: app, containing: anchor)
-    return agentsWindow.scrollViews.element(boundBy: 0)
+    let workspaceWindow = testCase.window(in: app, containing: anchor)
+    return workspaceWindow.scrollViews.element(boundBy: 0)
   }
 
   private func elementIsVisible(_ element: XCUIElement, in container: XCUIElement) -> Bool {

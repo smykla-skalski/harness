@@ -6,7 +6,7 @@ extension HarnessMonitorUITestAccessibility {
 
   static let acpPermissionModal = "harness.acp-permission.modal"
   static let acpPermissionModalSelectionSummary = "harness.acp-permission.selection-summary"
-  static let acpPermissionModalOpenDecisions = "harness.acp-permission.open-decisions"
+  static let acpPermissionModalOpenWorkspace = "harness.acp-permission.open-workspace"
   static let acpPermissionModalClose = "harness.acp-permission.close"
 
   static func decisionDeadline(_ id: String) -> String {

@@ -2,12 +2,12 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-/// Covers chunk 8/9 affordances on the Decisions window: the inspector column with the
+/// Covers chunk 8/9 affordances on the workspace decision desk: the inspector column with the
 /// metadata grid, the ⌘⌥I toggle button, and the bulk-actions menu items. Single-launch per
 /// `feedback_narrow_ui_test_runs.md`; uses `.firstMatch` lookups and never resolves elements
 /// through Section identifiers.
 @MainActor
-final class DecisionsInspectorUITests: HarnessMonitorUITestCase {
+final class WorkspaceDecisionInspectorUITests: HarnessMonitorUITestCase {
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let infoDecisionID = "ui-inspector-info"
@@ -22,7 +22,7 @@ final class DecisionsInspectorUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
 
     let row = button(in: app, identifier: Accessibility.decisionRow(Self.criticalDecisionID))
     XCTAssertTrue(waitForElement(row, timeout: Self.uiTimeout))

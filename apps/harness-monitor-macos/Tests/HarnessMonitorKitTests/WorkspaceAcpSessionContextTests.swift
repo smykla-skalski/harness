@@ -3,9 +3,9 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Agents window ACP session context")
+@Suite("Workspace window ACP session context")
 @MainActor
-struct AgentsWindowAcpSessionContextTests {
+struct WorkspaceAcpSessionContextTests {
   @Test("Create selection retains last session context and reseats selected session when missing")
   func createSelectionRestoresMissingSelectedSession() async {
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
@@ -17,7 +17,7 @@ struct AgentsWindowAcpSessionContextTests {
     let sessionID = PreviewFixtures.summary.sessionId
     store.selectedSessionID = nil
 
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
     await view.handleSelectionChange(
       from: .decisions(sessionID: sessionID),
       to: .create
@@ -31,7 +31,7 @@ struct AgentsWindowAcpSessionContextTests {
   func acpStartFromCreateUsesAnchoredSession() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
     store.toast.dismissAll()
     store.selectedSessionID = nil
     view.viewModel.selection = .create
@@ -95,7 +95,7 @@ struct AgentsWindowAcpSessionContextTests {
   func acpStartFromCreateUsesSelectedSessionFallback() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
-    let view = AgentsWindowView(store: store)
+    let view = WorkspaceWindowView(store: store)
     store.toast.dismissAll()
     store.selectedSessionID = PreviewFixtures.summary.sessionId
     view.viewModel.selection = .create

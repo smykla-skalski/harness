@@ -3,20 +3,20 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-extension AgentsWindowUITests {
+extension WorkspaceWindowUITests {
   func testAcpStartUsesSelectedSessionFallbackWhenCreatePaneHasNoCachedSession() throws {
     throw XCTSkip(
       """
       Multi-window create-pane scrolling is still flaky in XCUITest and blocks local iterations. \
       Deterministic fallback coverage lives in \
-      HarnessMonitorKitTests/AgentsWindowAcpSessionContextTests.
+      HarnessMonitorKitTests/WorkspaceAcpSessionContextTests.
       """
     )
   }
 
   func testAcpCapabilityPicker() throws {
     let app = launchInCockpitPreview()
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let copilotRow = element(in: app, identifier: Accessibility.agentCapabilityRow("copilot"))
     XCTAssertTrue(
@@ -64,13 +64,13 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_MISSING_BINARIES": "copilot"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     let copilotRow = element(in: app, identifier: Accessibility.agentCapabilityRow("copilot"))
     XCTAssertTrue(waitForElement(copilotRow, timeout: Self.actionTimeout))
     XCTAssertTrue(copilotRow.label.localizedCaseInsensitiveContains("install required"))
 
-    let modelPicker = element(in: app, identifier: Accessibility.agentsModelPicker)
+    let modelPicker = element(in: app, identifier: Accessibility.workspaceModelPicker)
     XCTAssertTrue(
       waitForElement(modelPicker, timeout: Self.actionTimeout),
       "Missing ACP binary should fall back to the TUI-backed form state"
@@ -130,17 +130,17 @@ extension AgentsWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        self.element(in: app, identifier: Accessibility.decisionsWindow).exists
+        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
           && self.element(
             in: app,
             identifier: Accessibility.decisionRow("acp-permission:preview-acp-permission-1")
           ).exists
       },
-      "ACP permission prompts should route directly into the Decisions window"
+      "ACP permission prompts should route directly into the Workspace window"
     )
 
     XCTAssertFalse(
@@ -156,13 +156,13 @@ extension AgentsWindowUITests {
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
       ]
     )
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
-        self.element(in: app, identifier: Accessibility.decisionsWindow).exists
+        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
       },
-      "Permission prompt on start should immediately open the Decisions window"
+      "Permission prompt on start should immediately open the Workspace window"
     )
 
     let acpDecisionID = "acp-permission:preview-acp-permission-1"

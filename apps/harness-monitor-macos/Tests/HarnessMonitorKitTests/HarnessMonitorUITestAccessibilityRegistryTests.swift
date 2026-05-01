@@ -48,8 +48,8 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.review.task.improver.task-1"
     )
     #expect(
-      HarnessMonitorAccessibility.agentsTaskSelection("task-1")
-        == "harness.agents.task.selection.task-1"
+      HarnessMonitorAccessibility.workspaceTaskSelection("task-1")
+        == "harness.workspace.task.selection.task-1"
     )
   }
 
@@ -234,35 +234,35 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   func agentsRuntimeIdentifiersMirror() {
     #expect(
       HarnessMonitorAccessibility.agentRuntimeStrip("worker-codex")
-        == "harness.agents.detail.runtime.strip.worker-codex"
+        == "harness.workspace.detail.runtime.strip.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeWatchdog("worker-codex")
-        == "harness.agents.detail.runtime.watchdog.worker-codex"
+        == "harness.workspace.detail.runtime.watchdog.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimePendingPermissions("worker-codex")
-        == "harness.agents.detail.runtime.pending-permissions.worker-codex"
+        == "harness.workspace.detail.runtime.pending-permissions.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDeadline("worker-codex")
-        == "harness.agents.detail.runtime.deadline.worker-codex"
+        == "harness.workspace.detail.runtime.deadline.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDisclosure("worker-codex")
-        == "harness.agents.detail.runtime.disclosure.worker-codex"
+        == "harness.workspace.detail.runtime.disclosure.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDisclosureContent("worker-codex")
-        == "harness.agents.detail.runtime.disclosure-content.worker-codex"
+        == "harness.workspace.detail.runtime.disclosure-content.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeWatchdogAccessibilityState
-        == "harness.agents.detail.runtime.watchdog.accessibility.state"
+        == "harness.workspace.detail.runtime.watchdog.accessibility.state"
     )
     #expect(
       HarnessMonitorAccessibility.toolCallTimelineAccessibilityState
-        == "harness.window.agents.tool-call-timeline.accessibility.state"
+        == "harness.window.workspace.tool-call-timeline.accessibility.state"
     )
   }
 
@@ -352,6 +352,52 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @MainActor
+  @Test("Harness MCP tracked press actions execute through the shared runtime service")
+  func harnessTrackedPressActionsExecuteThroughTheSharedRuntimeService() async {
+    let service = HarnessMonitorMCPAccessibilityService.shared
+    let registry = service.registry
+    let identifier = "harness.test.semantic-press"
+    let probe = SemanticPressProbe()
+
+    await registry.unregisterElement(identifier: identifier)
+
+    let host = NSHostingView(
+      rootView: Button("Semantic Press") {}
+        .harnessMCPButton(
+          identifier,
+          label: "Semantic Press",
+          pressAction: { probe.recordPress() }
+        )
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 320, height: 120),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier)?.actions == [.press]
+      }
+    )
+
+    let result = await service.performSemanticAction(identifier: identifier, action: .press)
+    #expect(result == .performed)
+    #expect(probe.pressCount == 1)
+  }
+
   private func sourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
@@ -384,5 +430,14 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       try? await Task.sleep(for: interval)
     }
     return await predicate()
+  }
+}
+
+@MainActor
+private final class SemanticPressProbe {
+  private(set) var pressCount = 0
+
+  func recordPress() {
+    pressCount += 1
   }
 }

@@ -146,38 +146,37 @@ public enum HarnessMonitorAccessibility {
   public static let connectionCard = "harness.preferences.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
   public static let agentTuiButton = "harness.session.agent-tui"
-  public static let agentsSheet = agentTuiSheet, agentsState = agentTuiState
+  public static let workspaceSheet = agentTuiSheet, workspaceState = agentTuiState
   public static let workspaceCommandRoutingState = "harness.window.workspace.command-routing"
-  public static let agentsCreateTab = agentTuiCreateTab
-  public static let agentsCreateModePicker = agentTuiCreateModePicker
-  public static let agentsRuntimePicker = agentTuiRuntimePicker
-  public static let agentsRolePicker = agentTuiRolePicker
-  public static let agentsFallbackRolePicker = agentTuiFallbackRolePicker
-  public static let agentsNameField = agentTuiNameField
-  public static let agentsPromptField = agentTuiPromptField
-  public static let agentsProjectDirField = agentTuiProjectDirField
-  public static let agentsArgvField = agentTuiArgvField
-  public static let agentsLaunchPane = agentTuiLaunchPane
-  public static let agentsSessionPane = agentTuiSessionPane
-  public static let agentsViewport = agentTuiViewport
-  public static let agentsInputField = agentTuiInputField
-  public static let agentsInputModePicker = agentTuiInputModePicker
-  public static let agentsSubmitWithEnterToggle = agentTuiSubmitWithEnterToggle
-  public static let agentsRefreshButton = agentTuiRefreshButton
-  public static let agentsStartButton = agentTuiStartButton
-  public static let agentsSendButton = agentTuiSendButton
-  public static let agentsResizeButton = agentTuiResizeButton
-  public static let agentsStopButton = agentTuiStopButton
-  public static let agentsRevealTranscriptButton = agentTuiRevealTranscriptButton
-  public static let agentsRecoveryBanner = agentTuiRecoveryBanner
-  public static let agentsPendingUserPrompt = agentTuiPendingUserPrompt
-  public static let agentsEnableBridgeButton = agentTuiEnableBridgeButton
-  public static let agentsCopyCommandButton = agentTuiCopyCommandButton
-  public static let agentsBackToCreateButton = agentTuiBackToCreateButton
-  public static let agentsWrapToggle = agentTuiWrapToggle
-  public static let agentsNavigateBackButton = agentTuiNavigateBackButton
-  public static let agentsNavigateForwardButton = agentTuiNavigateForwardButton
-  public static let agentsPersonaPicker = agentTuiPersonaPicker
+  public static let workspaceCreateTab = agentTuiCreateTab
+  public static let workspaceCreateModePicker = agentTuiCreateModePicker
+  public static let workspaceRuntimePicker = agentTuiRuntimePicker
+  public static let workspaceRolePicker = agentTuiRolePicker
+  public static let workspaceFallbackRolePicker = agentTuiFallbackRolePicker
+  public static let workspaceNameField = agentTuiNameField
+  public static let workspacePromptField = agentTuiPromptField
+  public static let workspaceProjectDirField = agentTuiProjectDirField
+  public static let workspaceArgvField = agentTuiArgvField
+  public static let workspaceLaunchPane = agentTuiLaunchPane
+  public static let workspaceSessionPane = agentTuiSessionPane
+  public static let workspaceViewport = agentTuiViewport
+  public static let workspaceInputField = agentTuiInputField
+  public static let workspaceInputModePicker = agentTuiInputModePicker
+  public static let workspaceSubmitWithEnterToggle = agentTuiSubmitWithEnterToggle
+  public static let workspaceRefreshButton = agentTuiRefreshButton
+  public static let workspaceStartButton = agentTuiStartButton
+  public static let workspaceSendButton = agentTuiSendButton
+  public static let workspaceResizeButton = agentTuiResizeButton
+  public static let workspaceStopButton = agentTuiStopButton
+  public static let workspaceRevealTranscriptButton = agentTuiRevealTranscriptButton
+  public static let workspaceRecoveryBanner = agentTuiRecoveryBanner
+  public static let workspacePendingUserPrompt = agentTuiPendingUserPrompt
+  public static let workspaceEnableBridgeButton = agentTuiEnableBridgeButton
+  public static let workspaceCopyCommandButton = agentTuiCopyCommandButton
+  public static let workspaceBackToCreateButton = agentTuiBackToCreateButton
+  public static let workspaceWrapToggle = agentTuiWrapToggle
+  public static let workspaceNavigateBackButton = agentTuiNavigateBackButton
+  public static let workspaceNavigateForwardButton = agentTuiNavigateForwardButton
   public static let workspaceDecisionDesk = "harness.window.workspace.decisions"
   public static let workspaceDecisionFiltersMenu = "harness.window.workspace.decisions.filters"
   public static let workspaceDecisionClearFiltersButton =
@@ -219,13 +218,13 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiWrapToggle = "harness.sheet.agent-tui.wrap-toggle"
   public static let agentTuiNavigateBackButton = "harness.sheet.agent-tui.navigate-back"
   public static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
-  public static let agentTuiPersonaPicker = "harness.window.agents.persona"
-  public static func agentTuiPersonaCard(_ identifier: String) -> String {
-    "harness.window.agents.persona.\(identifier)"
+  public static let workspacePersonaPicker = "harness.window.workspace.persona"
+  public static func workspacePersonaCard(_ identifier: String) -> String {
+    "harness.window.workspace.persona.\(identifier)"
   }
-  public static let agentsModelPicker = "harness.window.agents.model"
-  public static let agentsCustomModelField = "harness.window.agents.model.custom"
-  public static let agentsEffortPicker = "harness.window.agents.effort"
+  public static let workspaceModelPicker = "harness.window.workspace.model"
+  public static let workspaceCustomModelField = "harness.window.workspace.model.custom"
+  public static let workspaceEffortPicker = "harness.window.workspace.effort"
   public static let newSessionSheet = "harness.new-session.sheet"
   public static let newSessionTitle = "harness.new-session.title"
   public static let newSessionContext = "harness.new-session.context"
@@ -368,7 +367,7 @@ public enum HarnessMonitorAccessibility {
   }
 
   public static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
-    "harness.window.agents.codex.approval.\(slug(approvalID)).\(slug(decision))"
+    "harness.window.workspace.codex.approval.\(slug(approvalID)).\(slug(decision))"
   }
 
   public static func agentTuiTab(_ tuiID: String) -> String {

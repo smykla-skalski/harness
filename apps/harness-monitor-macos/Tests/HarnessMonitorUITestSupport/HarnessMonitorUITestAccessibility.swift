@@ -18,13 +18,12 @@ enum HarnessMonitorUITestAccessibility {
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   static let mcpToolbarStatus = "harness.toolbar.mcp.status"
   static let mcpBanner = "harness.content.mcp.banner"
-  static let supervisorBadge = "harness.supervisor.badge"
-  static let supervisorBadgeState = "harness.supervisor.badge.state"
-  static let supervisorForceTick = "harness.supervisor.force-tick"
-  static let agentsWindow = "harness.agents.window"
-  static let agentsWindowDetailAwaitingDecisionState =
-    "harness.agents.detail.awaiting-decision.state"
-  static let decisionsWindow = agentsWindow
+  static let workspaceToolbarButton = "harness.toolbar.workspace"
+  static let workspaceToolbarButtonState = "harness.toolbar.workspace.state"
+  static let workspaceToolbarForceTick = "harness.toolbar.workspace.force-tick"
+  static let workspaceWindow = "harness.workspace.window"
+  static let workspaceDetailAwaitingDecisionState =
+    "harness.workspace.detail.awaiting-decision.state"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"
   static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
@@ -218,11 +217,11 @@ enum HarnessMonitorUITestAccessibility {
   static let acpPermissionToastAccessibilityState =
     "harness.acp-permission.toast.accessibility.state"
   static let toolCallTimelineAccessibilityState =
-    "harness.window.agents.tool-call-timeline.accessibility.state"
+    "harness.window.workspace.tool-call-timeline.accessibility.state"
   static let agentRuntimeWatchdogAccessibilityState =
-    "harness.agents.detail.runtime.watchdog.accessibility.state"
+    "harness.workspace.detail.runtime.watchdog.accessibility.state"
   static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
-  static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
+  static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-workspace"
   static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"
   static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"

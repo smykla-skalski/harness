@@ -106,15 +106,23 @@ extension WorkspaceWindowCreatePane {
             .tag(role)
             .accessibilityIdentifier(
               HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentsRolePicker,
+                HarnessMonitorAccessibility.workspaceRolePicker,
                 option: role.title
               )
+            )
+            .harnessMCPMenuItem(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.workspaceRolePicker,
+                option: role.title
+              ),
+              label: role.title,
+              pressAction: { formModel.selectedRole = role }
             )
         }
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
-      .harnessMCPButton(HarnessMonitorAccessibility.agentsRolePicker, label: "Role")
+      .harnessMCPButton(HarnessMonitorAccessibility.workspaceRolePicker, label: "Role")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -130,22 +138,35 @@ extension WorkspaceWindowCreatePane {
           .tag("")
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.segmentedOption(
-              HarnessMonitorAccessibility.agentTuiPersonaPicker,
+              HarnessMonitorAccessibility.workspacePersonaPicker,
               option: "None"
             )
+          )
+          .harnessMCPMenuItem(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.workspacePersonaPicker,
+              option: "None"
+            ),
+            label: "None",
+            pressAction: { formModel.selectedPersonaID = "" }
           )
         ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
           Text(persona.name)
             .tag(persona.identifier)
             .accessibilityIdentifier(
-              HarnessMonitorAccessibility.agentTuiPersonaCard(persona.identifier)
+              HarnessMonitorAccessibility.workspacePersonaCard(persona.identifier)
+            )
+            .harnessMCPMenuItem(
+              HarnessMonitorAccessibility.workspacePersonaCard(persona.identifier),
+              label: persona.name,
+              pressAction: { formModel.selectedPersonaID = persona.identifier }
             )
         }
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
       .harnessMCPButton(
-        HarnessMonitorAccessibility.agentTuiPersonaPicker,
+        HarnessMonitorAccessibility.workspacePersonaPicker,
         label: "Persona"
       )
 
@@ -169,16 +190,24 @@ extension WorkspaceWindowCreatePane {
             .tag(role)
             .accessibilityIdentifier(
               HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentsFallbackRolePicker,
+                HarnessMonitorAccessibility.workspaceFallbackRolePicker,
                 option: role.title
               )
+            )
+            .harnessMCPMenuItem(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.workspaceFallbackRolePicker,
+                option: role.title
+              ),
+              label: role.title,
+              pressAction: { formModel.selectedAcpFallbackRole = role }
             )
         }
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
       .harnessMCPButton(
-        HarnessMonitorAccessibility.agentsFallbackRolePicker,
+        HarnessMonitorAccessibility.workspaceFallbackRolePicker,
         label: "Fallback role"
       )
     }

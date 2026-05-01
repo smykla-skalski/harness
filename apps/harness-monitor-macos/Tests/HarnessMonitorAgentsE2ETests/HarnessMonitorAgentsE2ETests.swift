@@ -18,7 +18,7 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
     let app = launchLiveAgentsApp(using: harness)
 
     openLiveSessionCockpit(in: app, sessionID: harness.sessionID, harness: harness)
-    openAgentsWindow(in: app, harness: harness)
+    openWorkspaceWindow(in: app, harness: harness)
 
     selectSegment(
       in: app,
@@ -42,7 +42,13 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
       identifier: Accessibility.agentTuiStartButton,
       title: "Start Codex"
     )
-    tapButton(in: app, identifier: Accessibility.agentTuiStartButton)
+    let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    XCTAssertTrue(waitForElement(launchPane, timeout: Self.liveActionTimeout))
+    let startButton = descendantButton(
+      in: launchPane, identifier: Accessibility.agentTuiStartButton)
+    XCTAssertTrue(waitForElement(startButton, timeout: Self.liveActionTimeout))
+    XCTAssertTrue(startButton.isHittable, "Start Codex should be visible before tapping")
+    tapViaCoordinate(in: app, element: startButton)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
@@ -77,7 +83,7 @@ final class HarnessMonitorAgentsE2ETests: HarnessMonitorUITestCase {
     let app = launchLiveAgentsApp(using: harness)
 
     openLiveSessionCockpit(in: app, sessionID: harness.sessionID, harness: harness)
-    openAgentsWindow(in: app, harness: harness)
+    openWorkspaceWindow(in: app, harness: harness)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     launchSteeredCodexRun(in: app)

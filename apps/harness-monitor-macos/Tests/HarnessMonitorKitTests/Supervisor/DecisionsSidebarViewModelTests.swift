@@ -284,7 +284,7 @@ final class AgentTuiCodexApprovalViewModelTests: XCTestCase {
       suggestedActionsJSON: suggestedActionsJSON
     )
 
-    let items = AgentsWindowView.codexApprovalItems(for: run, decisions: [decision])
+    let items = WorkspaceWindowView.codexApprovalItems(for: run, decisions: [decision])
 
     XCTAssertEqual(items.count, 1)
     XCTAssertEqual(items[0].approvalID, "approval-1")
@@ -341,7 +341,7 @@ final class AgentTuiCodexApprovalViewModelTests: XCTestCase {
         """
     )
 
-    let items = AgentsWindowView.codexApprovalItems(for: run, decisions: [decision])
+    let items = WorkspaceWindowView.codexApprovalItems(for: run, decisions: [decision])
 
     XCTAssertEqual(items.count, 1)
     XCTAssertEqual(items[0].approvalID, "pending-approval")
@@ -395,7 +395,7 @@ final class AgentTuiCodexApprovalViewModelTests: XCTestCase {
       suggestedActionsJSON: actionsJSON
     )
 
-    let items = AgentsWindowView.codexApprovalItems(
+    let items = WorkspaceWindowView.codexApprovalItems(
       for: run,
       decisions: [firstDecision, duplicateDecision]
     )

@@ -5,7 +5,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class PreferencesUITestsAcpPermissionLogReveal:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   private enum PermissionLogRevealExpectation {
     case opensLog

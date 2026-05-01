@@ -356,14 +356,14 @@ struct SessionTaskCardLayoutTests {
 }
 
 @MainActor
-@Suite("Agents window mounting")
-struct AgentsWindowMountTests {
-  @Test("Agents window mounts from the cockpit preview store without crashing")
-  func agentsWindowMountsFromCockpitPreviewStore() async {
+@Suite("Workspace window mounting")
+struct WorkspaceWindowMountTests {
+  @Test("Workspace window mounts from the cockpit preview store without crashing")
+  func workspaceWindowMountsFromCockpitPreviewStore() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
-    let navigationBridge = AgentsWindowNavigationBridge()
+    let navigationBridge = WorkspaceWindowNavigationBridge()
     let host = NSHostingView(
-      rootView: AgentsWindowView(
+      rootView: WorkspaceWindowView(
         store: store,
         navigationBridge: navigationBridge
       )

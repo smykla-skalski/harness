@@ -114,17 +114,17 @@ extension WorkspaceWindowView {
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(store.isDaemonActionInFlight || viewModel.isSubmitting)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexEnableBridgeButton)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceCodexEnableBridgeButton)
       }
       CopyableCommandBox(
         command: codexBridgeCommand,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexCopyCommandButton
+        accessibilityIdentifier: HarnessMonitorAccessibility.workspaceCodexCopyCommandButton
       )
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexRecoveryBanner)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceCodexRecoveryBanner)
   }
 
   var codexBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {
@@ -191,17 +191,17 @@ extension WorkspaceWindowView {
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(store.isDaemonActionInFlight || viewModel.isSubmitting)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentsAcpEnableBridgeButton)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceAcpEnableBridgeButton)
       }
       CopyableCommandBox(
         command: acpBridgeCommand,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentsAcpCopyCommandButton
+        accessibilityIdentifier: HarnessMonitorAccessibility.workspaceAcpCopyCommandButton
       )
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentsAcpRecoveryBanner)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceAcpRecoveryBanner)
   }
 
   var acpBridgeState: HarnessMonitorStore.HostBridgeCapabilityState {

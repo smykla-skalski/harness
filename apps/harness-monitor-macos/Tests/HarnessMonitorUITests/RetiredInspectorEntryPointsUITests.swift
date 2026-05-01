@@ -31,7 +31,7 @@ final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
     verifyCreateTaskSheet(in: app)
     verifyLeaderTransferSheet(in: app)
     verifyDecisionsObserverFocus(in: app)
-    openAgentsWindow(in: app)
+    openWorkspaceWindow(in: app)
     selectFirstAgentsTask(in: app)
     verifyReviewPanelReachable(in: app)
     verifyTaskActionsSheet(in: app)
@@ -148,10 +148,10 @@ extension RetiredInspectorEntryPointsUITests {
     )
     tapElement(in: app, identifier: Accessibility.observeSummaryButton)
 
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { decisionsWindow.exists },
-      "Decisions window should open after tapping the cockpit observer summary"
+      waitUntil(timeout: Self.actionTimeout) { workspaceWindow.exists },
+      "Workspace window should open after tapping the cockpit observer summary"
     )
     let observerPanel = element(in: app, identifier: Accessibility.decisionsObserverPanel)
     XCTAssertTrue(
@@ -161,33 +161,33 @@ extension RetiredInspectorEntryPointsUITests {
 
     app.typeKey("w", modifierFlags: .command)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { !decisionsWindow.exists },
-      "Decisions window should close on Cmd+W"
+      waitUntil(timeout: Self.actionTimeout) { !workspaceWindow.exists },
+      "Workspace window should close on Cmd+W"
     )
   }
 
-  fileprivate func openAgentsWindow(in app: XCUIApplication) {
+  fileprivate func openWorkspaceWindow(in app: XCUIApplication) {
     app.activate()
-    let trigger = button(in: app, identifier: Accessibility.agentsButton)
+    let trigger = button(in: app, identifier: Accessibility.workspaceToolbarButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         trigger.exists && !trigger.frame.isEmpty
       },
       "Agents toolbar button should be visible"
     )
-    tapElement(in: app, identifier: Accessibility.agentsButton)
+    tapElement(in: app, identifier: Accessibility.workspaceToolbarButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
           || self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
-          || self.button(in: app, identifier: Accessibility.agentsTaskTab("task-ui")).exists
+          || self.button(in: app, identifier: Accessibility.workspaceTaskTab("task-ui")).exists
       },
-      "Agents window should open after tapping the toolbar Agents action"
+      "Workspace window should open after tapping the toolbar Workspace action"
     )
   }
 
   fileprivate func selectFirstAgentsTask(in app: XCUIApplication) {
-    let taskTab = button(in: app, identifier: Accessibility.agentsTaskTab("task-ui"))
+    let taskTab = button(in: app, identifier: Accessibility.workspaceTaskTab("task-ui"))
     let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
     while Date.now < deadline, !(taskTab.exists && !taskTab.frame.isEmpty) {
       let scrollTarget = mainWindow(in: app)
@@ -198,8 +198,8 @@ extension RetiredInspectorEntryPointsUITests {
       taskTab.exists && !taskTab.frame.isEmpty,
       "Agents sidebar should expose the preview task row"
     )
-    tapElement(in: app, identifier: Accessibility.agentsTaskTab("task-ui"))
-    let detailCard = element(in: app, identifier: Accessibility.agentsTaskCard)
+    tapElement(in: app, identifier: Accessibility.workspaceTaskTab("task-ui"))
+    let detailCard = element(in: app, identifier: Accessibility.workspaceTaskCard)
     XCTAssertTrue(
       detailCard.waitForExistence(timeout: Self.actionTimeout),
       "Agents task detail pane should render after selecting a task"

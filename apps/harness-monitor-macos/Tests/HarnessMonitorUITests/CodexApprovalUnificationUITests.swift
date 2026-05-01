@@ -13,7 +13,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentsWindow(in: app)
+    reopenWorkspaceWindow(in: app)
 
     let acceptIdentifier = Accessibility.codexApprovalButton(
       "approval-preview-1",
@@ -39,7 +39,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentsWindow(in: app)
+    reopenWorkspaceWindow(in: app)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
     let approveIdentifier = Accessibility.codexApprovalButton(
@@ -76,10 +76,10 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    reopenAgentsWindow(in: app)
+    reopenWorkspaceWindow(in: app)
 
     let state = element(in: app, identifier: Accessibility.agentTuiState)
-    let badgeState = element(in: app, identifier: Accessibility.supervisorBadgeState)
+    let badgeState = element(in: app, identifier: Accessibility.workspaceToolbarButtonState)
     let approveIdentifier = Accessibility.codexApprovalButton(
       "approval-preview-1",
       decision: "accept"
@@ -99,7 +99,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
     )
     let initialBadgeCount = badgeCount(for: badgeState)
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
 
     let decisionRow = button(
       in: app,
@@ -121,7 +121,7 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
       }
     )
 
-    reopenAgentsWindow(in: app)
+    reopenWorkspaceWindow(in: app)
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         state.label.contains("selection=codex:preview-codex-approval-run")
@@ -134,8 +134,8 @@ final class CodexApprovalUnificationUITests: HarnessMonitorUITestCase {
     )
   }
 
-  private func reopenAgentsWindow(in app: XCUIApplication) {
-    tapDockButton(in: app, identifier: Accessibility.agentsButton)
+  private func reopenWorkspaceWindow(in app: XCUIApplication) {
+    tapDockButton(in: app, identifier: Accessibility.workspaceToolbarButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists

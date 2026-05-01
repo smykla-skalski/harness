@@ -15,21 +15,21 @@
       "index": 0
     },
     {
-      "id": "AgentsWindowView",
-      "description": "Agents window with terminal + sidebar",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/AgentsWindowViewPreviews.swift",
+      "id": "WorkspaceWindowView",
+      "description": "Workspace window with terminal + sidebar",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
       "index": 0
     },
     {
-      "id": "AgentsWindowOpeningLight",
+      "id": "WorkspaceWindowOpeningLight",
       "description": "Workspace opening shell before live content mounts in light appearance",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/AgentsWindowOpeningView.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
       "index": 0
     },
     {
-      "id": "AgentsWindowOpeningDark",
+      "id": "WorkspaceWindowOpeningDark",
       "description": "Workspace opening shell before live content mounts in dark appearance",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/AgentsWindowOpeningView.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
       "index": 1
     },
     {

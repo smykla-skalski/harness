@@ -187,25 +187,41 @@ extension WorkspaceWindowCreatePane {
             .tag(model.id)
             .accessibilityIdentifier(
               HarnessMonitorAccessibility.segmentedOption(
-                HarnessMonitorAccessibility.agentsModelPicker,
+                HarnessMonitorAccessibility.workspaceModelPicker,
                 option: model.displayName
               )
+            )
+            .harnessMCPMenuItem(
+              HarnessMonitorAccessibility.segmentedOption(
+                HarnessMonitorAccessibility.workspaceModelPicker,
+                option: model.displayName
+              ),
+              label: model.displayName,
+              pressAction: { context.modelBinding.wrappedValue = model.id }
             )
         }
         Text("Custom...")
           .tag(RuntimeCustomModel.tag)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.segmentedOption(
-              HarnessMonitorAccessibility.agentsModelPicker,
+              HarnessMonitorAccessibility.workspaceModelPicker,
               option: "Custom"
             )
+          )
+          .harnessMCPMenuItem(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.workspaceModelPicker,
+              option: "Custom"
+            ),
+            label: "Custom",
+            pressAction: { context.modelBinding.wrappedValue = RuntimeCustomModel.tag }
           )
       }
       .pickerStyle(.menu)
       .harnessNativeFormControl()
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsModelPicker).frame")
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceModelPicker).frame")
       .accessibilityLabel("Model")
-      .harnessMCPButton(HarnessMonitorAccessibility.agentsModelPicker, label: "Model")
+      .harnessMCPButton(HarnessMonitorAccessibility.workspaceModelPicker, label: "Model")
 
       Text(selectedTerminalModelStateText(context: context))
         .scaledFont(.caption)
@@ -216,7 +232,7 @@ extension WorkspaceWindowCreatePane {
         TextField("Provider-specific model id", text: context.customModelBinding)
           .harnessNativeFormControl()
           .harnessMCPTextField(
-            HarnessMonitorAccessibility.agentsCustomModelField,
+            HarnessMonitorAccessibility.workspaceCustomModelField,
             label: "Provider-specific model id",
             value: context.customModelBinding.wrappedValue
           )
@@ -299,15 +315,23 @@ extension WorkspaceWindowCreatePane {
               .tag(level)
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.segmentedOption(
-                  HarnessMonitorAccessibility.agentsEffortPicker,
+                  HarnessMonitorAccessibility.workspaceEffortPicker,
                   option: level
                 )
+              )
+              .harnessMCPButton(
+                HarnessMonitorAccessibility.segmentedOption(
+                  HarnessMonitorAccessibility.workspaceEffortPicker,
+                  option: level
+                ),
+                label: level.capitalized,
+                pressAction: { context.effortBinding.wrappedValue = level }
               )
           }
         }
         .pickerStyle(.segmented)
         .harnessNativeFormControl()
-        .harnessMCPButton(HarnessMonitorAccessibility.agentsEffortPicker, label: "Effort")
+        .harnessMCPButton(HarnessMonitorAccessibility.workspaceEffortPicker, label: "Effort")
       }
     }
   }
