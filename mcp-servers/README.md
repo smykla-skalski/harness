@@ -101,7 +101,7 @@ If neither `harness-monitor-input` (the bundled Swift helper) nor `cliclick` is 
 | `scroll` | Resolve identifier to frame, then scroll at its center by `deltaX` / `deltaY`. |
 | `drag_drop` | Resolve source/destination identifiers to frames, then drag from one center to the other. |
 | `type_text` | Type Unicode text into the focused window. |
-| `screenshot_window` | Capture Harness Monitor windows only. When `windowID` is provided it is revalidated against the live registry window set; otherwise the server captures the current registry window set for that same app run, optionally narrowed to `displayID`. The default path can return multiple PNGs — one per live registry window — and each inline image is omitted only when it exceeds the safe payload limit. |
+| `screenshot_window` | Capture Harness Monitor windows only. `outputPath` is required and must point to a directory where PNG files will be written. When `windowID` is provided it is revalidated against the live registry window set; otherwise the server captures the current registry window set for that same app run, optionally narrowed to `displayID`. The tool response returns full absolute paths for every saved screenshot. |
 
 Coordinates are in global screen space, origin at top-left (matching `CGEvent`).
 
