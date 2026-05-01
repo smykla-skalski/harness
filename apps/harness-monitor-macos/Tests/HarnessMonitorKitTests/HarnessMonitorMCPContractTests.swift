@@ -386,6 +386,46 @@ struct HarnessMonitorMCPContractTests {
     )
   }
 
+  @Test("late replacement delivery after disable does not resurrect remote mode")
+  func lateReplacementDeliveryAfterDisableDoesNotResurrectRemoteMode() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socketURL = root.appendingPathComponent("mcp.sock", isDirectory: false)
+
+    let service = HarnessMonitorMCPAccessibilityService(
+      socketPathResolver: { socketURL },
+      pingInfoProvider: {
+        PingResult(
+          protocolVersion: registryProtocolVersion,
+          appVersion: "30.31.2",
+          bundleIdentifier: "io.harnessmonitor.app",
+          capabilities: [.clientSnapshots, .clientSnapshotLeases, .replacementNotice]
+        )
+      }
+    )
+    let notice = RegistryReplacementNotice(
+      socketPath: socketURL.path,
+      protocolVersion: registryProtocolVersion,
+      appVersion: "30.32.0",
+      bundleIdentifier: "io.harnessmonitor.app",
+      message: "replacement incoming"
+    )
+
+    let disposition = await service.handleReplacementNotice(notice)
+    #expect(disposition.ack.applied == true)
+
+    await service.setEnabled(false)
+    if let onDelivered = disposition.onDelivered {
+      await onDelivered()
+    } else {
+      Issue.record("expected replacement delivery callback")
+    }
+
+    #expect(service.runtimeState == .disabled)
+    #expect(service.isRunning == false)
+    #expect(await service.probeRuntimeState() == .disabled)
+  }
+
   // MARK: - Helpers
 
   private func isolatedDefaults() throws -> (defaults: UserDefaults, suiteName: String) {
