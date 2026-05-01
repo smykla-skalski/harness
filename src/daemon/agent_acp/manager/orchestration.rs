@@ -21,10 +21,7 @@ impl AcpAgentManagerHandle {
         display_name: &str,
         agent_session_id: Option<&str>,
     ) -> Result<AcpOrchestrationRegistration, CliError> {
-        let db =
-            self.state.db.get().cloned().ok_or_else(|| {
-                CliErrorKind::workflow_io("daemon database unavailable".to_string())
-            })?;
+        let db = self.db()?;
         let db = db.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
         })?;
@@ -70,10 +67,7 @@ impl AcpAgentManagerHandle {
         runtime_name: &str,
         agent_session_id: &str,
     ) -> Result<bool, CliError> {
-        let db =
-            self.state.db.get().cloned().ok_or_else(|| {
-                CliErrorKind::workflow_io("daemon database unavailable".to_string())
-            })?;
+        let db = self.db()?;
         let db = db.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
         })?;
@@ -171,10 +165,7 @@ impl AcpAgentManagerHandle {
         reason: &DisconnectReason,
         stderr_tail: Option<&String>,
     ) -> Result<bool, CliError> {
-        let db =
-            self.state.db.get().cloned().ok_or_else(|| {
-                CliErrorKind::workflow_io("daemon database unavailable".to_string())
-            })?;
+        let db = self.db()?;
         let db = db.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
         })?;
