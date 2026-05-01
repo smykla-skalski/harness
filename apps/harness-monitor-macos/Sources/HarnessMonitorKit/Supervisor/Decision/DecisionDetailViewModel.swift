@@ -6,8 +6,8 @@ import Observation
 /// through a `DecisionActionHandler`.
 ///
 /// The view model is independent of SwiftData — callers pass an already-fetched `Decision`.
-/// Phase 2 worker 20 uses it from the Decisions window; Phase 2 worker 27 (Codex unification)
-/// reuses it in the Agents window so both surfaces resolve through a single code path.
+/// Phase 2 worker 20 uses it from the workspace window; Phase 2 worker 27 (Codex unification)
+/// reuses it in the Workspace window so both surfaces resolve through a single code path.
 @MainActor
 @Observable
 public final class DecisionDetailViewModel {

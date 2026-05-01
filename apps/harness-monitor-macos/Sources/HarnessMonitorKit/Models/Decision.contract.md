@@ -8,7 +8,7 @@ This file exists to keep the human-facing map aligned with those concrete owners
 
 The Decisions system enforces a single operator queue for policy decisions.
 Goal is single-queue policy enforcement, not interruption fidelity.
-Presentation can change from modal to Decisions window, but queue ownership, auditability, and idempotent resolution must remain stable.
+Presentation can change from modal to workspace window, but queue ownership, auditability, and idempotent resolution must remain stable.
 
 ## Canonical Type Map
 
@@ -40,7 +40,7 @@ Override rule: do not delete the modal on calendar grounds alone if abandoned pe
 Compatibility deletion ledger:
 
 - `presentingAcpPermissionBatch` and `reconcilePresentedAcpPermissionBatch` in `Stores/HarnessMonitorStore+AcpAgents.swift` remain modal-only bridge seams.
-- `AcpPermissionModal` and `AgentsWindowView+AcpPermissionPresentation.swift` remain compatibility readers over the Decisions-owned ACP state.
+- `AcpPermissionModal` and `WorkspaceWindowView+AcpPermissionPresentation.swift` remain compatibility readers over the Decisions-owned ACP state.
 - No new ACP behavior may depend on those modal-only seams; new work must attach to deterministic ACP `Decision` ids and shared `BatchResolutionState` instead.
 
 ## Daemon API Stability Budget

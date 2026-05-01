@@ -59,7 +59,8 @@ private struct WorkspaceSidebarDecisionFilterMenu: View {
       .harnessMCPMenuItem(
         HarnessMonitorAccessibility.decisionsSidebarAllChip,
         label: "All severities",
-        enabled: hasActiveFilters
+        enabled: hasActiveFilters,
+        pressAction: { setSelectedSeverities([]) }
       )
 
       Divider()
@@ -76,7 +77,8 @@ private struct WorkspaceSidebarDecisionFilterMenu: View {
         }
         .harnessMCPMenuItem(
           HarnessMonitorAccessibility.decisionsSidebarSeverityChip(severity.rawValue),
-          label: severity.chipLabel
+          label: severity.chipLabel,
+          pressAction: { toggle(severity) }
         )
       }
     } label: {

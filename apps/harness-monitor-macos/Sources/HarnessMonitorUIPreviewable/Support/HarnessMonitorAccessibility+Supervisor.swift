@@ -37,8 +37,8 @@ extension HarnessMonitorAccessibility {
   public static let acpPermissionModal = "harness.acp-permission.modal"
   public static let acpPermissionModalSelectionSummary =
     "harness.acp-permission.selection-summary"
-  public static let acpPermissionModalOpenDecisions =
-    "harness.acp-permission.open-decisions"
+  public static let acpPermissionModalOpenWorkspace =
+    "harness.acp-permission.open-workspace"
   public static let acpPermissionModalClose = "harness.acp-permission.close"
 
   public static func decisionRow(_ id: String) -> String {

@@ -8,40 +8,40 @@ import Testing
 @Suite("AgentDetailSection skeleton")
 @MainActor
 struct AgentDetailSectionTests {
-  @Test("Section publishes the agents-window detail accessibility identifier")
+  @Test("Section publishes the workspace detail accessibility identifier")
   func publishesAccessibilityIdentifier() {
-    #expect(HarnessMonitorAccessibility.agentsWindowDetailCard == "harness.agents.detail-card")
+    #expect(HarnessMonitorAccessibility.workspaceDetailCard == "harness.workspace.detail-card")
   }
 
   @Test("Section publishes external-addition accessibility identifiers")
   func publishesExternalAdditionIdentifiers() {
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailPersona
-        == "harness.agents.detail.persona"
+      HarnessMonitorAccessibility.workspaceDetailPersona
+        == "harness.workspace.detail.persona"
     )
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailAssignedTasks
-        == "harness.agents.detail.assigned-tasks"
+      HarnessMonitorAccessibility.workspaceDetailAssignedTasks
+        == "harness.workspace.detail.assigned-tasks"
     )
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailTimeline
-        == "harness.agents.detail.timeline"
+      HarnessMonitorAccessibility.workspaceDetailTimeline
+        == "harness.workspace.detail.timeline"
     )
   }
 
   @Test("Section publishes role-action accessibility identifiers")
   func publishesRoleActionIdentifiers() {
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailRolePicker
-        == "harness.agents.detail.role-picker"
+      HarnessMonitorAccessibility.workspaceDetailRolePicker
+        == "harness.workspace.detail.role-picker"
     )
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailRoleChange
-        == "harness.agents.detail.role-change"
+      HarnessMonitorAccessibility.workspaceDetailRoleChange
+        == "harness.workspace.detail.role-change"
     )
     #expect(
-      HarnessMonitorAccessibility.agentsWindowDetailRoleRemove
-        == "harness.agents.detail.role-remove"
+      HarnessMonitorAccessibility.workspaceDetailRoleRemove
+        == "harness.workspace.detail.role-remove"
     )
   }
 

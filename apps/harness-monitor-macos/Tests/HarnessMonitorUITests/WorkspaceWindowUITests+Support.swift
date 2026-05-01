@@ -3,10 +3,10 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-protocol AgentsWindowUITestSupporting: AnyObject {}
+protocol WorkspaceWindowUITestSupporting: AnyObject {}
 
 @MainActor
-extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
+extension WorkspaceWindowUITestSupporting where Self: HarnessMonitorUITestCase {
   func launchInCockpitPreview(
     additionalEnvironment: [String: String] = [:]
   ) -> XCUIApplication {
@@ -20,8 +20,8 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     )
   }
 
-  func openAgentsWindow(in app: XCUIApplication) {
-    tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
+  func openWorkspaceWindow(in app: XCUIApplication) {
+    tapDockButton(in: app, identifier: Accessibility.workspaceToolbarButton, label: "workspace")
     XCTAssertTrue(
       waitForElement(
         element(in: app, identifier: Accessibility.agentTuiLaunchPane),
@@ -30,8 +30,8 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     )
   }
 
-  func reopenAgentsWindow(in app: XCUIApplication) {
-    tapDockButton(in: app, identifier: Accessibility.agentsButton, label: "agents")
+  func reopenWorkspaceWindow(in app: XCUIApplication) {
+    tapDockButton(in: app, identifier: Accessibility.workspaceToolbarButton, label: "workspace")
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.element(in: app, identifier: Accessibility.agentTuiLaunchPane).exists
@@ -40,7 +40,7 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     )
   }
 
-  func closeAgentsWindow(in app: XCUIApplication) {
+  func closeWorkspaceWindow(in app: XCUIApplication) {
     app.typeKey("w", modifierFlags: .command)
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
@@ -71,40 +71,129 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     app.activate()
     app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
 
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let stateLabel = state.label
+        return
+          sessionPane.exists
+          || stateLabel.contains("startTui=1:")
+          || stateLabel.contains("codexStart=1:")
+          || stateLabel.contains("toast=failure:")
+      },
+      """
+      Starting the agent pane did not make progress after the launch action fired.
+      state=\(state.label)
+      """
+    )
+
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.element(in: app, identifier: Accessibility.agentTuiSessionPane).exists
+        sessionPane.exists
       }
     )
   }
 
-  func revealAgentsLaunchAction(in app: XCUIApplication, identifier: String) {
+  func revealWorkspaceLaunchAction(in app: XCUIApplication, identifier: String) {
+    let maxRevealAttempts = 2
+    let revealDragDistanceRatio: CGFloat = 0.4
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     XCTAssertTrue(waitForElement(launchPane, timeout: Self.actionTimeout))
-    var launchAction = button(in: app, identifier: identifier)
+    var launchAction = descendantButton(in: launchPane, identifier: identifier)
     XCTAssertTrue(waitForElement(launchAction, timeout: Self.actionTimeout))
 
-    let scrollTarget = agentsLaunchScrollTarget(in: app, launchPane: launchPane)
-    for _ in 0..<8 {
-      launchAction = button(in: app, identifier: identifier)
+    let scrollTarget = workspaceLaunchScrollTarget(in: app, launchPane: launchPane)
+    var previousRevealSignature: String?
+    recordWorkspaceLaunchTrace(
+      in: app,
+      event: "reveal.begin",
+      context: WorkspaceLaunchTraceContext(
+        launchPane: launchPane,
+        scrollTarget: scrollTarget,
+        launchAction: launchAction,
+        identifier: identifier
+      ),
+      extraDetails: ["attempt": "initial"]
+    )
+
+    for attempt in 0..<maxRevealAttempts {
+      launchAction = descendantButton(in: launchPane, identifier: identifier)
       if launchActionIsVisible(
         in: app,
+        launchPane: launchPane,
         scrollTarget: scrollTarget,
         launchAction: launchAction,
         identifier: identifier
       ) {
+        recordWorkspaceLaunchTrace(
+          in: app,
+          event: "reveal.visible",
+          context: WorkspaceLaunchTraceContext(
+            launchPane: launchPane,
+            scrollTarget: scrollTarget,
+            launchAction: launchAction,
+            identifier: identifier
+          ),
+          extraDetails: ["attempt": String(attempt)]
+        )
         return
       }
 
-      dragUp(in: app, element: scrollTarget, distanceRatio: 0.18)
+      let revealSignature = workspaceLaunchRevealSignature(
+        in: app,
+        launchPane: launchPane,
+        scrollTarget: scrollTarget,
+        identifier: identifier
+      )
+      if let previousRevealSignature, previousRevealSignature == revealSignature {
+        recordWorkspaceLaunchTrace(
+          in: app,
+          event: "reveal.stalled",
+          context: WorkspaceLaunchTraceContext(
+            launchPane: launchPane,
+            scrollTarget: scrollTarget,
+            launchAction: launchAction,
+            identifier: identifier
+          ),
+          extraDetails: ["attempt": String(attempt)]
+        )
+        break
+      }
+      previousRevealSignature = revealSignature
+
+      recordWorkspaceLaunchTrace(
+        in: app,
+        event: "reveal.scroll",
+        context: WorkspaceLaunchTraceContext(
+          launchPane: launchPane,
+          scrollTarget: scrollTarget,
+          launchAction: launchAction,
+          identifier: identifier
+        ),
+        extraDetails: ["attempt": String(attempt)]
+      )
+      dragUp(in: app, element: scrollTarget, distanceRatio: revealDragDistanceRatio)
       RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     }
 
+    recordWorkspaceLaunchTrace(
+      in: app,
+      event: "reveal.failed",
+      context: WorkspaceLaunchTraceContext(
+        launchPane: launchPane,
+        scrollTarget: scrollTarget,
+        launchAction: launchAction,
+        identifier: identifier
+      ),
+      extraDetails: ["attempt": "failed"]
+    )
     XCTFail("Failed to reveal launch action \(identifier)")
   }
 
   private func launchActionIsVisible(
     in app: XCUIApplication,
+    launchPane: XCUIElement,
     scrollTarget: XCUIElement,
     launchAction: XCUIElement,
     identifier: String
@@ -113,13 +202,18 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
       return true
     }
 
-    let frameMarker = element(in: app, identifier: "\(identifier).frame")
+    let frameMarker = descendantFrameElement(in: launchPane, identifier: "\(identifier).frame")
     guard frameMarker.exists, !frameMarker.frame.isEmpty else {
       return false
     }
 
-    let windowFrame = mainWindow(in: app).frame
-    let visibleFrame = scrollTarget.frame.intersection(windowFrame)
+    let containingWindow = window(in: app, containing: frameMarker)
+    let viewportFrame = scrollTarget.frame.intersection(containingWindow.frame)
+    guard !viewportFrame.isNull, !viewportFrame.isEmpty else {
+      return false
+    }
+
+    let visibleFrame = viewportFrame.intersection(frameMarker.frame)
     guard !visibleFrame.isNull, !visibleFrame.isEmpty else {
       return false
     }
@@ -128,7 +222,7 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     return visibleFrame.height >= minimumVisibleHeight
   }
 
-  private func agentsLaunchScrollTarget(
+  private func workspaceLaunchScrollTarget(
     in app: XCUIApplication,
     launchPane: XCUIElement
   ) -> XCUIElement {
@@ -137,6 +231,10 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
 
     if let scrollView = visibleLargestScrollTarget(in: nestedScrollViews, window: launchWindow) {
       return scrollView
+    }
+
+    if launchPane.exists, !launchPane.frame.isEmpty, launchPane.elementType == .scrollView {
+      return launchPane
     }
 
     if let scrollView = overlappingDetailScrollTarget(
@@ -254,136 +352,4 @@ extension AgentsWindowUITestSupporting where Self: HarnessMonitorUITestCase {
     }
   }
 
-  func tapDockButton(
-    in app: XCUIApplication,
-    identifier: String,
-    label: String
-  ) {
-    app.activate()
-    XCTAssertTrue(
-      waitForButtonReady(in: app, identifier: identifier, timeout: Self.actionTimeout),
-      "\(label) dock button should be visible in cockpit preview"
-    )
-    tapButton(in: app, identifier: identifier)
-  }
-
-  func tapViaCoordinate(in app: XCUIApplication, element: XCUIElement) {
-    guard tapElementReliably(in: app, element: element) else {
-      XCTFail("Failed to resolve coordinate for \(element)")
-      return
-    }
-  }
-
-  func openAgentsDecisionFilters(in app: XCUIApplication) {
-    let filterButton = button(in: app, identifier: Accessibility.agentsDecisionFiltersMenu)
-    XCTAssertTrue(
-      waitForElement(filterButton, timeout: Self.fastActionTimeout),
-      "Agents window decision filter menu should exist before opening it"
-    )
-
-    app.activate()
-    if let coordinate = centerCoordinate(in: app, for: filterButton) {
-      coordinate.click()
-    } else if filterButton.isHittable {
-      filterButton.click()
-    } else {
-      XCTFail("Failed to resolve the actual agents decision filter control")
-      return
-    }
-
-    XCTAssertTrue(
-      waitForElement(element(in: app, title: "Critical"), timeout: Self.fastActionTimeout),
-      "Agents decision filter menu should present the severity filter commands"
-    )
-  }
-
-  func resetAgentsDecisionSeveritiesIfNeeded(in app: XCUIApplication) {
-    let filterState = element(in: app, identifier: Accessibility.agentsDecisionFilterState)
-    XCTAssertTrue(
-      waitForElement(filterState, timeout: Self.fastActionTimeout),
-      "Agents window decision filter state should exist before resetting severities"
-    )
-    guard !filterState.label.contains("severities=all") else {
-      return
-    }
-
-    openAgentsDecisionFilters(in: app)
-    tapButton(in: app, title: "All severities")
-
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        filterState.label.contains("severities=all")
-      },
-      """
-      Resetting the agents decision severity menu should restore the full severity set \
-      before the test continues.
-      state=\(filterState.label)
-      """
-    )
-  }
-
-  func agentTuiActionExists(
-    in app: XCUIApplication,
-    title: String,
-    identifier: String
-  ) -> Bool {
-    button(in: app, identifier: identifier).exists
-      || element(in: app, identifier: identifier).exists
-      || element(in: app, identifier: "\(identifier).frame").exists
-      || button(in: app, title: title).exists
-      || element(in: app, title: title).exists
-  }
-
-  func dragViewportDivider(
-    in app: XCUIApplication,
-    viewport: XCUIElement,
-    controls: XCUIElement,
-    verticalOffset: CGFloat
-  ) {
-    let window = window(in: app, containing: viewport)
-    XCTAssertTrue(waitForElement(window, timeout: Self.fastActionTimeout))
-
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let start = origin.withOffset(
-      CGVector(
-        dx: viewport.frame.midX - window.frame.minX,
-        dy: controls.frame.minY - window.frame.minY - 2
-      )
-    )
-    let end = start.withOffset(CGVector(dx: 0, dy: verticalOffset))
-    start.press(forDuration: 0.01, thenDragTo: end)
-  }
-
-  func agentTuiSize(from label: String) -> (rows: Int, cols: Int)? {
-    guard let markerRange = label.range(of: "size=") else {
-      return nil
-    }
-    let sizeText = label[markerRange.upperBound...]
-      .split(separator: ",", maxSplits: 1)
-      .first
-    guard let sizeText else {
-      return nil
-    }
-    let components = sizeText.split(separator: "x", maxSplits: 1)
-    guard components.count == 2,
-      let rows = Int(components[0]),
-      let cols = Int(components[1])
-    else {
-      return nil
-    }
-    return (rows, cols)
-  }
-
-  func agentTuiViewportContainsText(
-    in app: XCUIApplication,
-    text: String
-  ) -> Bool {
-    let viewport = element(in: app, identifier: Accessibility.agentTuiViewport)
-    if viewport.label.contains(text) {
-      return true
-    }
-    let predicate = NSPredicate(format: "label CONTAINS %@", text)
-    return viewport.staticTexts.matching(predicate).firstMatch.exists
-      || app.staticTexts.matching(predicate).firstMatch.exists
-  }
 }

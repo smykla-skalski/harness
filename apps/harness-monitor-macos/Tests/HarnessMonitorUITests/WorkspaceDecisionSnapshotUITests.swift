@@ -6,7 +6,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class WorkspaceDecisionSnapshotUITests:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
@@ -22,10 +22,10 @@ final class WorkspaceDecisionSnapshotUITests:
     XCTAssertTrue(waitForElement(observerSummary, timeout: Self.actionTimeout))
     tapElement(in: app, identifier: Accessibility.observeSummaryButton)
 
-    let workspaceWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
       waitForElement(workspaceWindow, timeout: Self.uiTimeout),
-      "Workspace window should open after tapping the supervisor badge"
+      "Workspace window should open after tapping the workspace toolbar button"
     )
 
     let observerPanel = element(in: app, identifier: Accessibility.decisionsObserverPanel)
@@ -46,9 +46,9 @@ final class WorkspaceDecisionSnapshotUITests:
       ]
     )
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
 
-    let workspaceWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(waitForElement(workspaceWindow, timeout: Self.uiTimeout))
 
     let decisionRow = button(

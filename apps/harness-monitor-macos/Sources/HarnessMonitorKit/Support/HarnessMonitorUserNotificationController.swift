@@ -112,7 +112,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
   }
 
   /// Attaches the supervisor `DecisionStore` so notification action handlers can mutate
-  /// decisions without going through the Decisions window. `Acknowledge` maps to
+  /// decisions without going through the workspace window. `Acknowledge` maps to
   /// `DecisionStore.dismiss(id:)` because the notification action is a lightweight dismissal,
   /// not an in-app suggested-action resolution.
   public func attachDecisionStore(_ store: DecisionStore) {
@@ -122,13 +122,13 @@ public final class HarnessMonitorUserNotificationController: NSObject,
         try await store.dismiss(id: id)
       } catch {
         // Swallow resolve errors here - the notification tap handler logs via `lastResult`
-        // and the decision stays visible in the Decisions window for manual resolution.
+        // and the decision stays visible in the workspace window for manual resolution.
       }
     }
   }
 
   /// Installs a closure that handles supervisor decision resolution triggered from outside the
-  /// Decisions window (for example, the `Acknowledge` notification action). The closure is
+  /// workspace window (for example, the `Acknowledge` notification action). The closure is
   /// `@Sendable` and called from a detached task.
   public func attachResolveHandler(_ handler: @escaping DecisionResolveHandler) {
     resolveHandler = handler
@@ -337,11 +337,11 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     case HarnessMonitorNotificationActionID.acknowledge:
       dismissDecision(decisionID: decisionID)
     case UNNotificationDismissActionIdentifier:
-      // User swiped the notification away; leave the decision untouched so the Decisions window
+      // User swiped the notification away; leave the decision untouched so the workspace window
       // still surfaces it.
       break
     default:
-      // Rule-specific actions route through the Decisions window once opened.
+      // Rule-specific actions route through the workspace window once opened.
       publishDecisionRequest(decisionID: decisionID)
     }
   }

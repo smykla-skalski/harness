@@ -8,7 +8,7 @@ import Testing
 struct AgentCapabilityPickerTests {
   @Test("built-in runtimes merge matching ACP descriptors into one row")
   func mergesMatchingAcpDescriptors() throws {
-    let options = AgentsWindowView.agentCapabilityOptions(
+    let options = WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: [
         descriptor(id: "copilot", displayName: "GitHub Copilot"),
         descriptor(id: "gemini", displayName: "Gemini CLI"),
@@ -132,7 +132,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("sandboxed monitor disables ACP transport even when binary exists")
   func sandboxedMonitorDisablesAcpTransport() throws {
-    let options = AgentsWindowView.agentCapabilityOptions(
+    let options = WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -159,7 +159,7 @@ struct AgentCapabilityPickerTests {
     "sandboxed monitor keeps ACP transport enabled via host bridge even when local probe is missing"
   )
   func sandboxedMonitorAllowsAcpTransportViaHostBridge() throws {
-    let options = AgentsWindowView.agentCapabilityOptions(
+    let options = WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -215,7 +215,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("missing selected ACP descriptor falls back to runtime TUI choice")
   func missingSelectedAcpDescriptorFallsBackToRuntime() {
-    let options = AgentsWindowView.agentCapabilityOptions(
+    let options = WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -230,7 +230,7 @@ struct AgentCapabilityPickerTests {
       )
     )
 
-    let normalizedSelection = AgentsWindowView.normalizedLaunchSelection(
+    let normalizedSelection = WorkspaceWindowView.normalizedLaunchSelection(
       options: options,
       selection: .acp("removed-agent"),
       fallbackRuntime: .gemini

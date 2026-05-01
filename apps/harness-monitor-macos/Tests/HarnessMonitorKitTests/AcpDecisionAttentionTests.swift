@@ -96,7 +96,7 @@ struct AcpDecisionAttentionTests {
     #expect(events.first?.decisionID == "acp-permission:batch-1")
     #expect(events.first?.agentID == "worker-codex")
     #expect(events.first?.agentName == "Worker Codex")
-    #expect(events.first?.toastMessage == "Permission requested by Worker Codex. Decisions window.")
+    #expect(events.first?.toastMessage == "Permission requested by Worker Codex. Workspace window.")
   }
 
   @Test("ACP attention always routes pending batches to a matching ACP decision")

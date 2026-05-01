@@ -78,7 +78,8 @@ extension WorkspaceWindowView {
           .harnessMCPMenuItem(
             HarnessMonitorAccessibility.decisionBulkDismissSelected,
             label: "Dismiss selected decision",
-            enabled: decisionScope.selectedDecision != nil
+            enabled: decisionScope.selectedDecision != nil,
+            pressAction: { Task { await dismissSelectedDecision() } }
           )
 
           Button("Dismiss all visible") {
@@ -88,7 +89,8 @@ extension WorkspaceWindowView {
           .harnessMCPMenuItem(
             HarnessMonitorAccessibility.decisionBulkDismissVisible,
             label: "Dismiss all visible decisions",
-            enabled: !decisionScope.visibleDecisionIDs.isEmpty
+            enabled: !decisionScope.visibleDecisionIDs.isEmpty,
+            pressAction: beginDismissAllVisible
           )
 
           if let reopenBatch = currentReopenBatch {
@@ -97,7 +99,8 @@ extension WorkspaceWindowView {
             }
             .harnessMCPMenuItem(
               HarnessMonitorAccessibility.decisionBulkReopenBatch,
-              label: "Reopen dismissed batch"
+              label: "Reopen dismissed batch",
+              pressAction: { Task { await reopenDismissedBatch(reopenBatch) } }
             )
           }
 
@@ -114,7 +117,8 @@ extension WorkspaceWindowView {
             label: decisionScope.hasActiveFilters
               ? "Snooze filtered critical for 1 hour"
               : "Snooze visible critical for 1 hour",
-            enabled: !decisionScope.visibleCriticalDecisionIDs.isEmpty
+            enabled: !decisionScope.visibleCriticalDecisionIDs.isEmpty,
+            pressAction: { Task { await snoozeAllCritical() } }
           )
 
           Button(
@@ -130,7 +134,8 @@ extension WorkspaceWindowView {
             label: decisionScope.hasActiveFilters
               ? "Dismiss filtered info decisions"
               : "Dismiss visible info decisions",
-            enabled: !decisionScope.visibleInfoDecisionIDs.isEmpty
+            enabled: !decisionScope.visibleInfoDecisionIDs.isEmpty,
+            pressAction: { Task { await dismissAllInfo() } }
           )
         } label: {
           Label("Bulk actions", systemImage: "ellipsis.circle")
@@ -156,7 +161,8 @@ extension WorkspaceWindowView {
         )
         .harnessMCPButton(
           HarnessMonitorAccessibility.decisionInspectorToggle,
-          label: isDecisionInspectorVisible ? "Hide decision inspector" : "Show decision inspector"
+          label: isDecisionInspectorVisible ? "Hide decision inspector" : "Show decision inspector",
+          pressAction: { isDecisionInspectorVisible.toggle() }
         )
       }
     }

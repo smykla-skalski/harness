@@ -277,7 +277,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
 
   func testAct11FindsSelectedAgentsTaskDetail() {
     let text = """
-      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.agents.task.selection.task-4', label: 'task-4'
+      Other, 0x1, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.workspace.task.selection.task-4', label: 'task-4'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act11",

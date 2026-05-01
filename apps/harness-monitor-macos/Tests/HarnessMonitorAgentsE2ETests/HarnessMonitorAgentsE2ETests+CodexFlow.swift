@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 extension HarnessMonitorAgentsE2ETests {
-  private static let codexApprovalIdentifierPrefix = "harness.window.agents.codex.approval."
+  private static let codexApprovalIdentifierPrefix = "harness.window.workspace.codex.approval."
 
   func launchSteeredCodexRun(in app: XCUIApplication) {
     selectSegment(
@@ -14,16 +14,16 @@ extension HarnessMonitorAgentsE2ETests {
     selectFastModelForCodex(in: app)
     replaceText(
       in: app,
-      identifier: Accessibility.agentsCodexPromptField,
+      identifier: Accessibility.workspaceCodexPromptField,
       text: "Execute the shell command `sleep 5`, then reply with exactly SHOULD_NOT_APPEAR."
     )
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.agentsCodexSubmitButton,
+      identifier: Accessibility.workspaceCodexSubmitButton,
       title: "Start Codex"
     )
-    tapButton(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+    tapButton(in: app, identifier: Accessibility.workspaceCodexSubmitButton)
   }
 
   func assertCodexRunBecomesActive(
@@ -45,16 +45,16 @@ extension HarnessMonitorAgentsE2ETests {
   func steerCodexRun(in app: XCUIApplication) {
     replaceText(
       in: app,
-      identifier: Accessibility.agentsCodexContextField,
+      identifier: Accessibility.workspaceCodexContextField,
       text: "Instead, when the command finishes, reply with exactly UI_CODEX_STEERED and stop."
     )
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiSessionPane,
-      identifier: Accessibility.agentsCodexSteerButton,
+      identifier: Accessibility.workspaceCodexSteerButton,
       title: "Send Context"
     )
-    tapButton(in: app, identifier: Accessibility.agentsCodexSteerButton)
+    tapButton(in: app, identifier: Accessibility.workspaceCodexSteerButton)
   }
 
   func assertSteeredCodexRunCompletes(
@@ -62,7 +62,7 @@ extension HarnessMonitorAgentsE2ETests {
     state: XCUIElement,
     harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
-    let steeredFinalMessage = element(in: app, identifier: Accessibility.agentsCodexFinalMessage)
+    let steeredFinalMessage = element(in: app, identifier: Accessibility.workspaceCodexFinalMessage)
     XCTAssertTrue(
       waitUntil(timeout: Self.codexCompletionTimeout) {
         steeredFinalMessage.exists
@@ -92,12 +92,12 @@ extension HarnessMonitorAgentsE2ETests {
     )
     selectSegment(
       in: app,
-      controlIdentifier: Accessibility.agentsCodexModePicker,
+      controlIdentifier: Accessibility.workspaceCodexModePicker,
       title: "Approval"
     )
     replaceText(
       in: app,
-      identifier: Accessibility.agentsCodexPromptField,
+      identifier: Accessibility.workspaceCodexPromptField,
       text:
         """
         Create a file named approved.txt in the current workspace containing exactly UI_APPROVAL_OK.
@@ -107,10 +107,10 @@ extension HarnessMonitorAgentsE2ETests {
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.agentsCodexSubmitButton,
+      identifier: Accessibility.workspaceCodexSubmitButton,
       title: "Start Codex"
     )
-    tapButton(in: app, identifier: Accessibility.agentsCodexSubmitButton)
+    tapButton(in: app, identifier: Accessibility.workspaceCodexSubmitButton)
   }
 
   func assertApprovalCodexRunCompletes(
@@ -120,7 +120,10 @@ extension HarnessMonitorAgentsE2ETests {
   ) {
     var sawApproval = false
     var submittedApproval = false
-    let approvalFinalMessage = element(in: app, identifier: Accessibility.agentsCodexFinalMessage)
+    let approvalFinalMessage = element(
+      in: app,
+      identifier: Accessibility.workspaceCodexFinalMessage
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.codexCompletionTimeout, pollInterval: 0.25) {
         if approvalFinalMessage.exists

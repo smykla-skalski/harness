@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
+final class WorkspaceToolbarButtonUITests: HarnessMonitorUITestCase {
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let seededSnapshotKey = "HARNESS_MONITOR_SUPERVISOR_SEED_SNAPSHOT"
   private static let decisionID = "stuck-agent:session-ui-stuck:agent-ui-stuck:task-ui-stuck"
@@ -18,42 +18,42 @@ final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    let forceTick = button(in: app, identifier: Accessibility.supervisorForceTick)
+    let forceTick = button(in: app, identifier: Accessibility.workspaceToolbarForceTick)
     XCTAssertTrue(
       waitForElement(forceTick, timeout: Self.actionTimeout),
-      "UI test host should expose a force-supervisor-tick control"
+      "UI test host should expose a workspace toolbar force-tick control"
     )
-    tapButton(in: app, identifier: Accessibility.supervisorForceTick)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarForceTick)
 
-    let badge = button(in: app, identifier: Accessibility.supervisorBadge)
+    let badge = button(in: app, identifier: Accessibility.workspaceToolbarButton)
     XCTAssertTrue(
       waitForElement(badge, timeout: Self.actionTimeout),
-      "Supervisor toolbar badge should exist on launch"
+      "Workspace toolbar button should exist on launch"
     )
-    let badgeState = element(in: app, identifier: Accessibility.supervisorBadgeState)
+    let badgeState = element(in: app, identifier: Accessibility.workspaceToolbarButtonState)
     XCTAssertTrue(
       waitForElement(badgeState, timeout: Self.actionTimeout),
-      "UI test host should publish supervisor badge state"
+      "UI test host should publish workspace toolbar state"
     )
 
     let activeBadgeState =
-      "count=1 severity=needsUser tint=orange symbol=bell.badge.fill"
+      "count=1 severity=needsUser tint=orange badge=visible"
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         badge.exists && self.markerText(for: badgeState) == activeBadgeState
       },
       """
-      Badge state should report one orange warning after the forced supervisor tick.
+      Toolbar state should report one orange warning after the forced tick.
       actual='\(markerText(for: badgeState))'
       """
     )
 
-    tapButton(in: app, identifier: Accessibility.supervisorBadge)
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
 
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { decisionsWindow.exists },
-      "Decisions window should open after tapping the toolbar badge"
+      waitUntil(timeout: Self.actionTimeout) { workspaceWindow.exists },
+      "Workspace window should open after tapping the toolbar button"
     )
 
     let decisionRow = button(
@@ -79,10 +79,10 @@ final class SupervisorToolbarBadgeUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         self.markerText(for: badgeState)
-          == "count=0 severity=none tint=secondary symbol=bell.badge"
+          == "count=0 severity=none tint=secondary badge=hidden"
       },
       """
-      Resolving the decision should clear the toolbar badge state.
+      Resolving the decision should clear the workspace toolbar state.
       actual='\(markerText(for: badgeState))'
       """
     )

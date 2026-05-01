@@ -39,11 +39,6 @@ extension HarnessMonitorUITestCase {
   }
 
   func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
-    let primaryWindow = mainWindow(in: app)
-    if primaryWindow.exists, primaryWindow.frame.contains(element.frame) {
-      return primaryWindow
-    }
-
     let windows = app.windows
     let searchCount = min(windows.count, Self.maxWindowSearchCount)
     var bestMatch: XCUIElement?
@@ -65,7 +60,13 @@ extension HarnessMonitorUITestCase {
     if let bestMatch {
       return bestMatch
     }
-    return mainWindow(in: app)
+
+    let primaryWindow = mainWindow(in: app)
+    if primaryWindow.exists {
+      return primaryWindow
+    }
+
+    return app.windows.firstMatch
   }
 
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
@@ -143,6 +144,26 @@ extension HarnessMonitorUITestCase {
     }
 
     return app.buttons.matching(identifier: identifier).firstMatch
+  }
+
+  func descendantButton(in container: XCUIElement, identifier: String) -> XCUIElement {
+    let roles: [XCUIElement.ElementType] = [
+      .button,
+      .menuButton,
+      .radioButton,
+      .cell,
+    ]
+
+    for role in roles {
+      let match = container.descendants(matching: role)
+        .matching(identifier: identifier)
+        .firstMatch
+      if match.exists {
+        return match
+      }
+    }
+
+    return descendantElement(in: container, identifier: identifier)
   }
 
   func button(in app: XCUIApplication, title: String) -> XCUIElement {
@@ -307,7 +328,7 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.sleepPreventionButton,
       HarnessMonitorUITestAccessibility.sidebarFiltersCard,
       HarnessMonitorUITestAccessibility.sidebarNewSessionButton,
-      HarnessMonitorUITestAccessibility.agentsButton,
+      HarnessMonitorUITestAccessibility.workspaceToolbarButton,
     ]
     let toolbarButtons = mainWindow(in: app).toolbars.buttons
     let searchCount = min(toolbarButtons.count, Self.maxToolbarButtonSearchCount)

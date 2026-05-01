@@ -94,7 +94,10 @@ struct WorkspaceSidebarDecisionSection: View {
     .harnessMCPTab(
       HarnessMonitorAccessibility.workspaceDecisionDesk,
       label: decisionDeskAccessibilityLabel,
-      value: decisionDeskAccessibilityValue
+      value: decisionDeskAccessibilityValue,
+      pressAction: {
+        selection = .decisions(sessionID: currentSessionID)
+      }
     )
   }
 
@@ -115,7 +118,8 @@ struct WorkspaceSidebarDecisionSection: View {
         .harnessMCPButton(
           HarnessMonitorAccessibility.workspaceDecisionClearFiltersButton,
           label: "Clear decision filters",
-          value: activeSearchSummary
+          value: activeSearchSummary,
+          pressAction: clearFilters
         )
         Text(activeSearchSummary)
           .scaledFont(.caption2)

@@ -247,7 +247,8 @@ struct AgentsCreateProviderRow: View {
           option: option.title
         ),
         label: option.title,
-        hint: isSelected ? "Selected provider" : "Select provider"
+        hint: isSelected ? "Selected provider" : "Select provider",
+        pressAction: { selection = normalizedSelection }
       )
     }
     .accessibilityElement(children: .contain)
@@ -256,7 +257,8 @@ struct AgentsCreateProviderRow: View {
     .harnessMCPRow(
       HarnessMonitorAccessibility.agentCapabilityRow(option.id),
       label: accessibilityRowLabel,
-      value: isSelected ? "Selected" : ""
+      value: isSelected ? "Selected" : "",
+      pressAction: { selection = normalizedSelection }
     )
   }
 }
@@ -314,7 +316,8 @@ struct AgentsCreateTransportChoiceButton: View {
         label: "\(providerTitle), \(choice.title)",
         value: isSelected ? "Selected" : "",
         hint: isEnabled ? "" : (unavailableReason ?? "Unavailable"),
-        enabled: isEnabled
+        enabled: isEnabled,
+        pressAction: { selection.wrappedValue = choice.id }
       )
 
       if !isEnabled, let unavailableReason {
@@ -346,7 +349,8 @@ struct AgentsCreateDiagnosticsDisclosure: View {
       .harnessMCPButton(
         HarnessMonitorAccessibility.newSessionDiagnosticsToggle(option.id),
         label: "\(isExpanded ? "Hide" : "Show") setup details for \(option.title)",
-        hint: option.statusText
+        hint: option.statusText,
+        pressAction: { isExpanded.toggle() }
       )
 
       if isExpanded, let doctorProbeText = option.doctorProbeText {

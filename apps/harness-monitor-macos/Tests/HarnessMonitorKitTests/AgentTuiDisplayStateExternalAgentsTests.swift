@@ -4,13 +4,13 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Agents window external-agents derivation")
+@Suite("Workspace window external-agents derivation")
 @MainActor
 struct AgentTuiDisplayStateExternalAgentsTests {
   @Test("Returns empty when no session is selected")
   func emptyWhenNoSession() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    let state = AgentsWindowView.AgentTuiDisplayState(store: store)
+    let state = WorkspaceWindowView.AgentTuiDisplayState(store: store)
     #expect(state.externalAgents.isEmpty)
   }
 
@@ -21,7 +21,7 @@ struct AgentTuiDisplayStateExternalAgentsTests {
       makeAgent(id: "alpha", name: "Alpha"),
       makeAgent(id: "bravo", name: "Bravo"),
     ])
-    let state = AgentsWindowView.AgentTuiDisplayState(store: store)
+    let state = WorkspaceWindowView.AgentTuiDisplayState(store: store)
     #expect(state.externalAgents.map(\.agentId) == ["alpha", "bravo"])
   }
 
@@ -34,7 +34,7 @@ struct AgentTuiDisplayStateExternalAgentsTests {
       makeAgent(id: "charlie", name: "Charlie"),
     ])
     store.selectedAgentTuis = [makeTuiSnapshot(tuiID: "tui-bravo", agentID: "bravo")]
-    let state = AgentsWindowView.AgentTuiDisplayState(store: store)
+    let state = WorkspaceWindowView.AgentTuiDisplayState(store: store)
     #expect(state.externalAgents.map(\.agentId) == ["alpha", "bravo", "charlie"])
   }
 
@@ -46,7 +46,7 @@ struct AgentTuiDisplayStateExternalAgentsTests {
       makeAgent(id: "a", name: "Alpha"),
       makeAgent(id: "m", name: "Mu"),
     ])
-    let state = AgentsWindowView.AgentTuiDisplayState(store: store)
+    let state = WorkspaceWindowView.AgentTuiDisplayState(store: store)
     #expect(state.externalAgents.map(\.name) == ["Alpha", "Mu", "Zeta"])
   }
 

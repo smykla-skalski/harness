@@ -2,33 +2,32 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-/// UI tests covering the macOS HIG menu bar restructure: the new Window menu
-/// items must open the Agents and Decisions windows.
+/// UI tests covering the consolidated Workspace window menu affordances.
 @MainActor
 final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   // swiftlint:disable:next static_over_final_class
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
-  func testWindowMenuOpensAgentsWindow() throws {
+  func testWindowMenuOpensWorkspaceWindow() throws {
     let app = launch(mode: "preview")
-    invokeMenuItem(in: app, menu: "Window", title: "Agents")
+    invokeMenuItem(in: app, menu: "Window", title: "Workspace")
 
-    let agentsWindow = element(in: app, identifier: Accessibility.agentsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { agentsWindow.exists },
-      "Agents window should appear after invoking Window > Agents"
+      waitUntil(timeout: Self.uiTimeout) { workspaceWindow.exists },
+      "Workspace window should appear after invoking Window > Workspace"
     )
   }
 
-  func testWindowMenuOpensDecisionsWindow() throws {
+  func testWindowMenuDoesNotExposeLegacyWindowItems() throws {
     let app = launch(mode: "preview")
-    invokeMenuItem(in: app, menu: "Window", title: "Decisions")
+    let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
+    XCTAssertTrue(windowMenu.waitForExistence(timeout: Self.uiTimeout))
+    windowMenu.click()
 
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { decisionsWindow.exists },
-      "Decisions window should appear after invoking Window > Decisions"
-    )
+    XCTAssertFalse(windowMenu.menuItems["Agents"].exists)
+    XCTAssertFalse(windowMenu.menuItems["Decisions"].exists)
+    windowMenu.typeKey(.escape, modifierFlags: [])
   }
 
   func testWindowMenuHasNoTabbingItems() throws {

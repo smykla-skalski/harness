@@ -145,13 +145,13 @@ extension WorkspaceWindowView {
       if let finalMessage = run.finalMessage, !finalMessage.isEmpty {
         codexTextSection(title: "Final", text: finalMessage)
           .accessibilityTestProbe(
-            HarnessMonitorAccessibility.agentsCodexFinalMessage,
+            HarnessMonitorAccessibility.workspaceCodexFinalMessage,
             label: finalMessage
           )
       } else if let latestSummary = run.latestSummary, !latestSummary.isEmpty {
         codexTextSection(title: "Latest", text: latestSummary)
           .accessibilityTestProbe(
-            HarnessMonitorAccessibility.agentsCodexLatestSummary,
+            HarnessMonitorAccessibility.workspaceCodexLatestSummary,
             label: latestSummary
           )
       }
@@ -159,7 +159,7 @@ extension WorkspaceWindowView {
         codexTextSection(title: "Error", text: error)
           .foregroundStyle(HarnessMonitorTheme.danger)
           .accessibilityTestProbe(
-            HarnessMonitorAccessibility.agentsCodexErrorMessage,
+            HarnessMonitorAccessibility.workspaceCodexErrorMessage,
             label: error
           )
       }
@@ -234,7 +234,7 @@ extension WorkspaceWindowView {
           .disabled(viewModel.isSubmitting || isInterrupting)
           .accessibilityLabel("Interrupt whole run")
           .accessibilityValue(isInterrupting ? "Interrupting" : "")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexInterruptButton)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceCodexInterruptButton)
         }
       }
     }
@@ -312,17 +312,17 @@ extension WorkspaceWindowView {
         text: Binding(get: { viewModel.codexContext }, set: { viewModel.codexContext = $0 }),
         field: .input,
         minHeight: 88,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexContextField
+        accessibilityIdentifier: HarnessMonitorAccessibility.workspaceCodexContextField
       )
       Button("Send Context") {
         steerCodexRun(run)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: nil)
       .disabled(!canSteerCodex)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentsCodexSteerButton)
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentsCodexSteerButton).frame")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceCodexSteerButton)
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceCodexSteerButton).frame")
       .accessibilityTestProbe(
-        HarnessMonitorAccessibility.agentsCodexSteerButton, label: "Send Context")
+        HarnessMonitorAccessibility.workspaceCodexSteerButton, label: "Send Context")
     }
   }
 

@@ -210,7 +210,8 @@ public struct WorkspaceWindowView: View {
           }
           .harnessMCPButton(
             HarnessMonitorAccessibility.agentTuiRefreshButton,
-            label: "Refresh workspace"
+            label: "Refresh workspace",
+            pressAction: refresh
           )
         }
       }
@@ -272,12 +273,14 @@ public struct WorkspaceWindowView: View {
         .harnessMCPButton(
           HarnessMonitorAccessibility.decisionBulkDismissVisibleConfirm,
           label: "Dismiss selected visible decisions",
-          enabled: dismissAllVisibleDraft == "\(pendingDismissBatch?.count ?? -1)"
+          enabled: dismissAllVisibleDraft == "\(pendingDismissBatch?.count ?? -1)",
+          pressAction: { Task { await confirmDismissAllVisible() } }
         )
         Button("Cancel", role: .cancel) {}
           .harnessMCPButton(
             HarnessMonitorAccessibility.decisionBulkDismissVisibleCancel,
-            label: "Cancel dismiss all visible decisions"
+            label: "Cancel dismiss all visible decisions",
+            pressAction: { showDismissAllVisibleConfirmation = false }
           )
       } message: {
         Text(dismissConfirmationMessage)

@@ -5,7 +5,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 @MainActor
 final class AttentionInfrastructureUITestsUserNotification:
   HarnessMonitorUITestCase,
-  AgentsWindowUITestSupporting
+  WorkspaceWindowUITestSupporting
 {
   private struct ForegroundToastContext {
     let app: XCUIApplication
@@ -40,7 +40,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     )
     XCTAssertTrue(
       waitForElement(openDecisionsButton, timeout: Self.uiTimeout),
-      "Foreground ACP toast should expose an Open Decisions button before capture"
+      "Foreground ACP toast should expose an Open Workspace button before capture"
     )
 
     recordDiagnosticsSnapshot(in: app, named: "acp-permission-toast")
@@ -118,7 +118,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     )
     XCTAssertTrue(
       waitForElement(openDecisionsButton, timeout: Self.uiTimeout),
-      "Foreground ACP toast should expose an Open Decisions button"
+      "Foreground ACP toast should expose an Open Workspace button"
     )
 
     let toastState = element(in: app, identifier: Accessibility.acpPermissionToastState)
@@ -217,7 +217,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     XCTAssertTrue(
       didPublishRoute,
       """
-      Open Decisions button should publish the ACP toast route marker
+      Open Workspace button should publish the ACP toast route marker
       button=\(context.preTapButtonState)
       toast=\(markerText(for: context.toastState))
       route=\(markerText(for: context.routeState))
@@ -231,10 +231,10 @@ final class AttentionInfrastructureUITestsUserNotification:
   }
 
   private func assertToastRouteFocusesDecision(_ app: XCUIApplication) {
-    let decisionsWindow = element(in: app, identifier: Accessibility.decisionsWindow)
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
-      waitForElement(decisionsWindow, timeout: Self.uiTimeout),
-      "Toast route should open the Decisions window"
+      waitForElement(workspaceWindow, timeout: Self.uiTimeout),
+      "Toast route should open the Workspace window"
     )
 
     let decisionRow = button(in: app, identifier: Accessibility.decisionRow(Self.decisionID))

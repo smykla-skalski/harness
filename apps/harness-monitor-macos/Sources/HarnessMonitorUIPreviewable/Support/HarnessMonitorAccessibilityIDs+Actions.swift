@@ -11,7 +11,7 @@ extension HarnessMonitorAccessibility {
   public static let updateTaskQueuePolicyButton = "harness.action.task.update-queue-policy"
   public static let updateTaskStatusButton = "harness.action.task.update-status"
   public static let checkpointTaskButton = "harness.action.task.checkpoint"
-  public static let manageTaskOpenButton = "harness.agents.task.manage-open"
+  public static let manageTaskOpenButton = "harness.workspace.task.manage-open"
 
   public static let leaderTransferSheet = "harness.action.leader-transfer.sheet"
   public static let leaderTransferSheetDismiss = "harness.action.leader-transfer.dismiss"
