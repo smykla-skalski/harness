@@ -56,7 +56,12 @@ fn env_override() -> Option<PathBuf> {
 }
 
 pub(crate) async fn default_helper_candidate() -> Option<PathBuf> {
-    default_helper_candidate_in(&repo_root_guess()).await
+    for root in helper_search_roots() {
+        if let Some(candidate) = default_helper_candidate_in(&root).await {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 pub(crate) async fn default_helper_candidate_in(repo_root: &Path) -> Option<PathBuf> {
@@ -120,8 +125,29 @@ fn prefers_candidate(candidate: &Path, incumbent: &Path) -> bool {
             .any(|component| component.as_os_str() == "debug")
 }
 
-fn repo_root_guess() -> PathBuf {
-    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+fn helper_search_roots() -> Vec<PathBuf> {
+    helper_search_roots_from(env::current_dir().ok(), env::current_exe().ok())
+}
+
+pub(crate) fn helper_search_roots_from(
+    current_dir: Option<PathBuf>,
+    current_exe: Option<PathBuf>,
+) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    push_unique_ancestors(current_exe.as_deref().and_then(Path::parent), &mut roots);
+    push_unique_ancestors(current_dir.as_deref(), &mut roots);
+    roots
+}
+
+fn push_unique_ancestors(start: Option<&Path>, roots: &mut Vec<PathBuf>) {
+    let Some(start) = start else {
+        return;
+    };
+    for ancestor in start.ancestors() {
+        if !roots.iter().any(|root| root == ancestor) {
+            roots.push(ancestor.to_path_buf());
+        }
+    }
 }
 
 async fn file_exists(path: &Path) -> bool {

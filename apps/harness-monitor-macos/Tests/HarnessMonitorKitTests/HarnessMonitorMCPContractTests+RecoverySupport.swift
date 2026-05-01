@@ -14,7 +14,7 @@ extension HarnessMonitorMCPContractTests {
   }
 
   func waitForCondition(
-    attempts: Int = 40,
+    attempts: Int = 200,
     condition: @escaping @MainActor () -> Bool
   ) async {
     for _ in 0..<attempts {
@@ -32,6 +32,7 @@ final class RecoveryStubMCPService: HarnessMonitorMCPStartupControlling {
   private let fallbackEnabledRuntimeState: HarnessMonitorMCPRuntimeState
   var runtimeState: HarnessMonitorMCPRuntimeState = .disabled
   var nextEnabledRuntimeStates: [HarnessMonitorMCPRuntimeState]
+  var nextProbeRuntimeStates: [HarnessMonitorMCPRuntimeState] = []
   private(set) var recordedEnabledStates: [Bool] = []
 
   init(
@@ -56,5 +57,13 @@ final class RecoveryStubMCPService: HarnessMonitorMCPStartupControlling {
     } else {
       runtimeState = nextEnabledRuntimeStates.removeFirst()
     }
+  }
+
+  func probeRuntimeState() async -> HarnessMonitorMCPRuntimeState {
+    if nextProbeRuntimeStates.isEmpty {
+      return runtimeState
+    }
+    runtimeState = nextProbeRuntimeStates.removeFirst()
+    return runtimeState
   }
 }

@@ -9,6 +9,7 @@ use crate::mcp::registry::ElementKind;
 use super::accessibility::{get_element_args, list_elements_args};
 use super::backend::{
     Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_in, detect_backend,
+    helper_search_roots_from,
 };
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
 use super::screenshot::{ScreenshotOptions, screencapture_args};
@@ -189,4 +190,19 @@ async fn default_helper_candidate_prefers_newest_platform_build() {
 
     let candidate = default_helper_candidate_in(temp.path()).await;
     assert_eq!(candidate, Some(debug));
+}
+
+#[test]
+fn helper_search_roots_include_executable_and_current_dir_ancestors_once() {
+    let current_dir = PathBuf::from("/tmp/harness/worktrees/main/apps/harness-monitor-macos");
+    let current_exe = PathBuf::from("/tmp/harness/target/debug/harness");
+
+    let roots = helper_search_roots_from(Some(current_dir), Some(current_exe));
+
+    assert_eq!(roots.first(), Some(&PathBuf::from("/tmp/harness/target/debug")));
+    assert!(roots.contains(&PathBuf::from("/tmp/harness")));
+    assert_eq!(
+        roots.iter().filter(|root| **root == PathBuf::from("/tmp/harness")).count(),
+        1
+    );
 }

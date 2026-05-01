@@ -22,12 +22,16 @@ public actor AccessibilityRegistry {
 
   private enum ElementOwnership: Equatable {
     case manual
+    case trackedElement(ownerID: UUID)
     case trackedWindowSnapshot(windowID: Int, ownerID: UUID)
   }
 
   private var elements: [String: StoredElement] = [:]
   private var windows: [Int: StoredWindow] = [:]
   private var trackedWindowElements: [Int: TrackedWindowElements] = [:]
+  // TrackAccessibility publishes asynchronously, so identifier ownership must be
+  // claimed separately from element writes to ignore stale register/unregister tasks.
+  private var trackedElementOwners: [String: UUID] = [:]
 
   private struct TrackedWindowElements {
     let ownerID: UUID
@@ -38,12 +42,55 @@ public actor AccessibilityRegistry {
 
   public func registerElement(_ element: RegistryElement) {
     removeTrackedSnapshotReference(for: element.identifier)
+    trackedElementOwners[element.identifier] = nil
     elements[element.identifier] = StoredElement(element: element, ownership: .manual)
   }
 
   public func unregisterElement(identifier: String) {
     removeTrackedSnapshotReference(for: identifier)
+    trackedElementOwners[identifier] = nil
     elements[identifier] = nil
+  }
+
+  public func claimTrackedElement(identifier: String, ownerID: UUID) {
+    trackedElementOwners[identifier] = ownerID
+    guard case .trackedWindowSnapshot = elements[identifier]?.ownership else {
+      return
+    }
+    removeTrackedSnapshotReference(for: identifier)
+    elements[identifier] = nil
+  }
+
+  public func registerTrackedElement(_ element: RegistryElement, ownerID: UUID) {
+    guard trackedElementOwners[element.identifier] == ownerID else {
+      return
+    }
+    removeTrackedSnapshotReference(for: element.identifier)
+    elements[element.identifier] = StoredElement(
+      element: element,
+      ownership: .trackedElement(ownerID: ownerID)
+    )
+  }
+
+  public func clearTrackedElement(identifier: String, ownerID: UUID) {
+    guard trackedElementOwners[identifier] == ownerID else {
+      return
+    }
+    guard
+      case .trackedElement(let storedOwnerID) = elements[identifier]?.ownership,
+      storedOwnerID == ownerID
+    else {
+      return
+    }
+    elements[identifier] = nil
+  }
+
+  public func unregisterTrackedElement(identifier: String, ownerID: UUID) {
+    guard trackedElementOwners[identifier] == ownerID else {
+      return
+    }
+    trackedElementOwners[identifier] = nil
+    clearTrackedElementStorage(identifier: identifier, ownerID: ownerID)
   }
 
   public func registerWindow(_ window: RegistryWindow) {
@@ -55,6 +102,9 @@ public actor AccessibilityRegistry {
   }
 
   public func registerTrackedWindow(_ window: RegistryWindow, ownerID: UUID) {
+    guard windows[window.id]?.ownership != .manual else {
+      return
+    }
     windows[window.id] = StoredWindow(window: window, ownership: .tracked(ownerID))
   }
 
@@ -89,6 +139,13 @@ public actor AccessibilityRegistry {
     for element in replacement {
       var normalized = element
       normalized.windowID = windowID
+      // Manual MCP-tracked elements are the explicit operator seam. Window
+      // snapshots can fill gaps, but they must not clobber those registrations.
+      if trackedElementOwners[normalized.identifier] != nil
+        || hasExplicitManualOwnership(elements[normalized.identifier]?.ownership)
+      {
+        continue
+      }
       removeTrackedSnapshotReference(for: normalized.identifier)
       elements[normalized.identifier] = StoredElement(
         element: normalized,
@@ -97,10 +154,14 @@ public actor AccessibilityRegistry {
       identifiers.insert(normalized.identifier)
     }
 
-    trackedWindowElements[windowID] = TrackedWindowElements(
-      ownerID: ownerID,
-      identifiers: identifiers
-    )
+    if identifiers.isEmpty {
+      trackedWindowElements[windowID] = nil
+    } else {
+      trackedWindowElements[windowID] = TrackedWindowElements(
+        ownerID: ownerID,
+        identifiers: identifiers
+      )
+    }
   }
 
   public func unregisterTrackedWindowElements(windowID: Int, ownerID: UUID) {
@@ -142,6 +203,7 @@ public actor AccessibilityRegistry {
     elements.removeAll()
     windows.removeAll()
     trackedWindowElements.removeAll()
+    trackedElementOwners.removeAll()
   }
 
   private func clearTrackedWindowElements(windowID: Int) {
@@ -173,6 +235,28 @@ public actor AccessibilityRegistry {
     }
 
     trackedWindowElements[windowID] = nil
+  }
+
+  private func clearTrackedElementStorage(identifier: String, ownerID: UUID) {
+    guard
+      case .trackedElement(let storedOwnerID) = elements[identifier]?.ownership,
+      storedOwnerID == ownerID
+    else {
+      return
+    }
+    elements[identifier] = nil
+  }
+
+  private func hasExplicitManualOwnership(_ ownership: ElementOwnership?) -> Bool {
+    guard let ownership else {
+      return false
+    }
+    switch ownership {
+    case .manual, .trackedElement:
+      return true
+    case .trackedWindowSnapshot:
+      return false
+    }
   }
 
   private func removeTrackedSnapshotReference(for identifier: String) {

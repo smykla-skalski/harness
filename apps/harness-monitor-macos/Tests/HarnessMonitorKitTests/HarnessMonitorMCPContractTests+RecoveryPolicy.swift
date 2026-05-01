@@ -234,10 +234,10 @@ extension HarnessMonitorMCPContractTests {
     let service = RecoveryStubMCPService(
       nextEnabledRuntimeStates: [
         .healthy(socketPath: "/tmp/mcp.sock"),
-        degradedState,
         .healthy(socketPath: "/tmp/mcp.sock"),
       ]
     )
+    service.nextProbeRuntimeStates = [degradedState]
     let controller = HarnessMonitorMCPStartupController(
       service: service,
       defaults: defaults.defaults,
@@ -273,6 +273,7 @@ extension HarnessMonitorMCPContractTests {
             maximumRetryCount: 1,
             nextRetryDelay: .seconds(5)
           )
+        && clock.pendingSleepCount == 1
     }
 
     #expect(controller.runtimeState == degradedState)
@@ -284,20 +285,23 @@ extension HarnessMonitorMCPContractTests {
           nextRetryDelay: .seconds(5)
         )
     )
+    #expect(clock.pendingSleepCount == 1)
 
     await clock.advance(by: .seconds(5))
     await waitForCondition {
-      service.recordedEnabledStates == [true, true, true]
+      service.recordedEnabledStates == [true, true]
         && controller.runtimeState
           == HarnessMonitorMCPRuntimeState.healthy(socketPath: "/tmp/mcp.sock")
+        && clock.pendingSleepCount == 1
     }
 
-    #expect(service.recordedEnabledStates == [true, true, true])
+    #expect(service.recordedEnabledStates == [true, true])
     #expect(
       controller.runtimeState
         == HarnessMonitorMCPRuntimeState.healthy(socketPath: "/tmp/mcp.sock")
     )
     #expect(controller.recoveryStatus == nil)
+    #expect(clock.pendingSleepCount == 1)
 
     await controller.stop()
   }

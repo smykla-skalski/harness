@@ -56,26 +56,26 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   public var title: String {
     switch runtimeState {
     case .disabled:
-      "Disabled"
+      "Registry Disabled"
     case .starting:
-      "Starting"
+      "Registry Starting"
     case .healthy:
-      "Ready"
+      "Registry Ready"
     case .degraded:
-      isRecovering ? "Degraded - Recovering" : "Degraded"
+      isRecovering ? "Registry Degraded - Recovering" : "Registry Degraded"
     }
   }
 
   public var toolbarLabel: String {
     switch runtimeState {
     case .disabled:
-      "MCP Off"
+      "Registry Off"
     case .starting:
-      "MCP Starting"
+      "Registry Starting"
     case .healthy:
-      "MCP Ready"
+      "Registry Ready"
     case .degraded:
-      isRecovering ? "MCP Recovering" : "MCP Degraded"
+      isRecovering ? "Registry Recovering" : "Registry Degraded"
     }
   }
 
@@ -92,10 +92,11 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return "The in-app MCP accessibility registry is ready at \(socketPath)."
     case .degraded(_, let reason):
       let summary = recoverySummary
+      let guidance = recoveryGuidance
       if let summary {
-        return "MCP is unavailable: \(reason). \(summary)"
+        return "The MCP registry is unavailable: \(reason). \(summary) \(guidance)"
       }
-      return "MCP is unavailable: \(reason)."
+      return "The MCP registry is unavailable: \(reason). \(guidance)"
     }
   }
 
@@ -129,7 +130,7 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
   }
 
   public var accessibilityLabel: String {
-    "MCP status"
+    "MCP accessibility registry status"
   }
 
   public var accessibilityValue: String {
@@ -141,9 +142,9 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return nil
     }
     if let recoverySummary {
-      return "MCP degraded: \(reason). \(recoverySummary)"
+      return "MCP registry degraded: \(reason). \(recoverySummary) \(recoveryGuidance)"
     }
-    return "MCP degraded: \(reason)."
+    return "MCP registry degraded: \(reason). \(recoveryGuidance)"
   }
 
   private var isRecovering: Bool {
@@ -151,6 +152,13 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
       return false
     }
     return recoveryStatus?.nextRetryDelay != nil
+  }
+
+  private var recoveryGuidance: String {
+    if isRecovering {
+      return "You can keep working while the registry retries in the background."
+    }
+    return "Correct the problem, then open Preferences > MCP to re-enable the registry host."
   }
 
   private func formattedDelay(_ delay: Duration) -> String {
