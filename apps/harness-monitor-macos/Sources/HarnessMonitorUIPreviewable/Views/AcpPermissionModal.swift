@@ -88,6 +88,7 @@ struct AcpPermissionModal: View {
       Spacer()
       if payload.isRenderable {
         Button("Review in Workspace") {
+          store.requestWorkspaceDecisionSelection(decisionID: decisionID)
           store.supervisorSelectedDecisionID = decisionID
           store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
           openWindow(id: HarnessMonitorWindowID.workspace)

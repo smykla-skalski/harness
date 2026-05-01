@@ -31,6 +31,7 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
     guard payload.isRenderable else {
       return
     }
+    store.requestWorkspaceDecisionSelection(decisionID: payload.decisionID)
     store.supervisorSelectedDecisionID = payload.decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: payload.decisionID)
     openWindow(id: HarnessMonitorWindowID.workspace)

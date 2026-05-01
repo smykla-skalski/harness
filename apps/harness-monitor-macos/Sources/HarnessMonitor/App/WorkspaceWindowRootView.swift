@@ -1,13 +1,19 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct WorkspaceWindowRootView: View {
+  private static let contentRevealMinimumSize = CGSize(width: 1_020, height: 680)
+  private static let contentRevealPollAttempts = 40
+  private static let contentRevealPollInterval = Duration.milliseconds(25)
+
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
   let acpAttentionState: AcpPermissionAttentionState
   let navigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
+  let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
@@ -58,6 +64,7 @@ struct WorkspaceWindowRootView: View {
           routingState: windowCommandRouting
         )
       )
+      .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
       .instantFocusRing()
       .modifier(
         HarnessMonitorSceneAppearanceModifier(
@@ -94,11 +101,44 @@ struct WorkspaceWindowRootView: View {
       return
     }
 
-    // Let AppKit commit the shell window before mounting the heavier workspace view tree.
-    await Task.yield()
-    guard !Task.isCancelled else {
-      return
+    // Wait for AppKit to finish creating and sizing the shell window before
+    // mounting the heavier split-view tree. Opening into a 0x0 window frame
+    // triggers AttributeGraph churn on the first workspace layout pass.
+    for _ in 0..<Self.contentRevealPollAttempts {
+      await Task.yield()
+      guard !Task.isCancelled else {
+        return
+      }
+      if Self.workspaceWindowHasStableFrame() {
+        showsWorkspaceContent = true
+        return
+      }
+      try? await Task.sleep(for: Self.contentRevealPollInterval)
     }
+
     showsWorkspaceContent = true
   }
+
+  private static func workspaceWindowHasStableFrame() -> Bool {
+    guard let window = workspaceWindow() else {
+      return false
+    }
+    let frame = window.frame
+    return
+      window.isVisible
+      && !window.isMiniaturized
+      && frame.width >= contentRevealMinimumSize.width
+      && frame.height >= contentRevealMinimumSize.height
+  }
+
+  private static func workspaceWindow() -> NSWindow? {
+    NSApplication.shared.windows.first { window in
+      let identifier = window.identifier?.rawValue ?? ""
+      return KeyWindowObserver.matchesWindowID(
+        identifier,
+        expected: HarnessMonitorWindowID.workspace
+      )
+    }
+  }
+
 }

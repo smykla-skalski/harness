@@ -111,6 +111,8 @@ public enum HarnessMonitorAccessibility {
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   public static let mcpToolbarStatus = "harness.toolbar.mcp.status"
   public static let mcpBanner = "harness.content.mcp.banner"
+  public static let windowMenuWorkspaceItem = "harness.menu.window.workspace"
+  public static let windowMenuMainItem = "harness.menu.window.main"
   public static let sessionHeaderCard = "harness.session.header"
   public static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"
   public static let sessionTaskListHeader = "harness.session.tasks.header"

@@ -28,10 +28,13 @@ extension WorkspaceWindowCreatePane {
             )
           }
         }
-        .onChange(of: formModel.selectedLaunchSelection, initial: true) { _, newValue in
-          formModel.runtime = newValue.preferredRuntime
+        .onChange(of: formModel.selectedLaunchSelection) { _, newValue in
+          let preferredRuntime = newValue.preferredRuntime
+          if formModel.runtime != preferredRuntime {
+            formModel.runtime = preferredRuntime
+          }
         }
-        .onChange(of: agentCapabilityOptions, initial: true) { _, options in
+        .onChange(of: agentCapabilityOptions) { _, options in
           let normalizedSelection = WorkspaceWindowView.normalizedLaunchSelection(
             options: options,
             selection: formModel.selectedLaunchSelection,

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "HarnessMonitorE2E",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     products: [
         .executable(name: "harness-monitor-e2e", targets: ["harness-monitor-e2e"]),
         .library(name: "HarnessMonitorE2ECore", targets: ["HarnessMonitorE2ECore"]),

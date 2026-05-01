@@ -88,21 +88,12 @@ extension WorkspaceWindowCreatePane {
   }
 
   var roleAndPersonaSection: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
-        roleMenu
-        if showsAcpFallbackRoleMenu {
-          acpFallbackRoleMenu
-        }
-        personaMenu
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      roleMenu
+      if showsAcpFallbackRoleMenu {
+        acpFallbackRoleMenu
       }
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        roleMenu
-        if showsAcpFallbackRoleMenu {
-          acpFallbackRoleMenu
-        }
-        personaMenu
-      }
+      personaMenu
     }
   }
 

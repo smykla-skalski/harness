@@ -172,16 +172,7 @@ pub fn type_text_args(backend: &Backend, text: &str) -> Option<(OsString, Vec<Os
             OsString::from("cliclick"),
             vec![OsString::from(format!("t:{text}"))],
         )),
-        Backend::None => Some((
-            OsString::from("/usr/bin/osascript"),
-            vec![
-                OsString::from("-e"),
-                OsString::from(format!(
-                    "tell application \"System Events\" to keystroke {}",
-                    json_string(text),
-                )),
-            ],
-        )),
+        Backend::None => None,
     }
 }
 
@@ -255,18 +246,20 @@ pub async fn drag_drop(
 /// Type `text` into the focused window.
 ///
 /// # Errors
-/// Returns `AutomationError` when the underlying helper fails.
+/// Returns `AutomationError` when no text-input backend is available or when
+/// the backend fails.
 pub async fn type_text(text: &str) -> Result<(), AutomationError> {
     if text.is_empty() {
         return Ok(());
     }
     let backend = detect_backend().await;
     let Some((program, args)) = type_text_args(&backend, text) else {
-        return Err(AutomationError::MouseBackendMissing);
+        return Err(AutomationError::KeyboardBackendMissing);
     };
     match &backend {
         Backend::HarnessInput(_) => run_with_stdin(&program, &args, text).await,
-        _ => run_command(&program, &args).await,
+        Backend::Cliclick => run_command(&program, &args).await,
+        Backend::None => Err(AutomationError::KeyboardBackendMissing),
     }
 }
 
@@ -346,8 +339,4 @@ fn round_to_string(value: f64) -> String {
 
 fn os_string_from_path(path: &Path) -> OsString {
     path.as_os_str().to_owned()
-}
-
-fn json_string(text: &str) -> String {
-    serde_json::to_string(text).unwrap_or_else(|_| format!("\"{}\"", text.replace('"', "\\\"")))
 }

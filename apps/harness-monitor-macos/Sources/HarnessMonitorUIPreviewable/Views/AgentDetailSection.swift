@@ -368,6 +368,7 @@ struct AgentDetailSection: View {
       }?.id
 
     if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
+      store.requestWorkspaceDecisionSelection(decisionID: decisionID)
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }

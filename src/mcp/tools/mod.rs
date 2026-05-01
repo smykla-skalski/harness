@@ -46,5 +46,5 @@ pub fn register_all(registry: &mut ToolRegistry, client: &Arc<RegistryClient>) {
     registry.register(Box::new(ScrollTool::new(Arc::clone(client))));
     registry.register(Box::new(DragDropTool::new(Arc::clone(client))));
     registry.register(Box::new(TypeTextTool));
-    registry.register(Box::new(ScreenshotWindowTool));
+    registry.register(Box::new(ScreenshotWindowTool::new(Arc::clone(client))));
 }
