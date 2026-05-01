@@ -21,6 +21,12 @@ private enum WorkspaceChromeMetrics {
 }
 
 public struct AgentsWindowView: View {
+  private static let initialDecisionFilters = DecisionsSidebarViewModel.FilterState(
+    query: "",
+    severities: [],
+    scope: .summary
+  )
+
   struct DismissBatchSnapshot: Equatable {
     let ids: [String]
     let count: Int
@@ -40,10 +46,10 @@ public struct AgentsWindowView: View {
   var openWindow
   @State private var stateViewModel: ViewModel
   @State private var decisionsRuntime = DecisionsWindowRuntime()
-  @State private var decisionFilters = DecisionsSidebarViewModel.FilterState(
-    query: "",
-    severities: [],
-    scope: .summary
+  @State private var decisionFilters = Self.initialDecisionFilters
+  @State private var decisionWorkspaceScopeState = DecisionWorkspaceScope(
+    decisions: [],
+    filters: Self.initialDecisionFilters
   )
   @State private var decisionDetailTab: DecisionDetailTab = .context
   @State private var dismissAllVisibleDraft = ""
@@ -77,6 +83,24 @@ public struct AgentsWindowView: View {
         createSessionID: store.selectedSessionID
       )
     )
+    _decisionWorkspaceScopeState = State(
+      initialValue: DecisionWorkspaceScope(
+        decisions: [],
+        filters: Self.initialDecisionFilters,
+        selectedDecisionID: initialSelection.decisionID
+      )
+    )
+  }
+
+  var cachedDecisionWorkspaceScope: DecisionWorkspaceScope {
+    decisionWorkspaceScopeState
+  }
+
+  func replaceDecisionWorkspaceScope(_ nextScope: DecisionWorkspaceScope) {
+    guard decisionWorkspaceScopeState != nextScope else {
+      return
+    }
+    decisionWorkspaceScopeState = nextScope
   }
 
   let commonKeys: [AgentTuiKey] = [
@@ -209,6 +233,9 @@ public struct AgentsWindowView: View {
       }
       .onChange(of: store.selectedAgentTui?.tuiId) { _, selectedTuiID in
         handleSelectedTuiChange(selectedTuiID, viewModel: viewModel)
+      }
+      .onChange(of: decisionFilters) { _, _ in
+        refreshDecisionWorkspaceScope()
       }
       .onChange(of: viewModel.selection) { oldValue, newValue in
         handleViewSelectionChange(from: oldValue, to: newValue, viewModel: viewModel)

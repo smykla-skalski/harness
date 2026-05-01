@@ -1,4 +1,4 @@
-extension AgentsWindowView {
+extension AgentsWindowCreatePane {
   var createPaneDescription: String {
     switch viewModel.createMode {
     case .terminal:

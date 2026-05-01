@@ -1,8 +1,47 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
 extension AgentsWindowView {
   var createPane: some View {
+    AgentsWindowCreatePane(
+      store: store,
+      viewModel: viewModel,
+      displayState: displayState,
+      focusedFieldBinding: focusedFieldBinding,
+      startAction: { startTui() },
+      renderSessionActionBanner: { message in
+        AnyView(createPaneSessionActionBanner(message: message))
+      },
+      renderAcpUnavailableBanner: {
+        AnyView(acpUnavailableBanner)
+      },
+      renderAgentTuiUnavailableBanner: {
+        AnyView(agentTuiUnavailableBanner)
+      },
+      renderCodexUnavailableBanner: {
+        AnyView(codexUnavailableBanner)
+      }
+    )
+  }
+}
+
+struct AgentsWindowCreatePane: View {
+  typealias ViewModel = AgentsWindowView.ViewModel
+  typealias DisplayState = AgentsWindowView.AgentTuiDisplayState
+  typealias Field = AgentsWindowView.Field
+
+  let store: HarnessMonitorStore
+  let viewModel: ViewModel
+  let displayState: DisplayState
+  let focusedFieldBinding: FocusState<Field?>.Binding
+  let startAction: () -> Void
+  let renderSessionActionBanner: (String) -> AnyView
+  let renderAcpUnavailableBanner: () -> AnyView
+  let renderAgentTuiUnavailableBanner: () -> AnyView
+  let renderCodexUnavailableBanner: () -> AnyView
+
+  var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createPaneHeader
@@ -23,7 +62,9 @@ extension AgentsWindowView {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiLaunchPane)
   }
+}
 
+extension AgentsWindowCreatePane {
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(viewModel.createMode.headerTitle)
@@ -76,12 +117,10 @@ extension AgentsWindowView {
   }
 
   private var terminalCreateSummaryFacts: [AgentsCreateSummaryFact] {
-    let facts = [
+    [
       AgentsCreateSummaryFact(title: "Provider", value: selectedAgentLaunchTitle),
       AgentsCreateSummaryFact(title: "Starts with", value: selectedTransportSummaryTitle),
     ]
-
-    return facts
   }
 
   private var codexCreateSummaryFacts: [AgentsCreateSummaryFact] {
@@ -108,52 +147,56 @@ extension AgentsWindowView {
     return selectedChoice.id.isAcp ? "Project Access" : "Terminal"
   }
 
-  private var selectedPersonaName: String? {
-    guard let selectedPersona = viewModel.selectedPersona else {
-      return nil
-    }
-
-    return viewModel.availablePersonas.first { $0.identifier == selectedPersona }?.name
-  }
-
   private var selectedCodexModelTitle: String {
-    let catalog = codexCatalog(viewModel)
-    let selectedModelID = viewModel.selectedCodexModel ?? catalog?.default ?? RuntimeCustomModel.tag
+    let selectedModelID =
+      viewModel.selectedCodexModel
+      ?? codexRuntimeCatalog?.default
+      ?? RuntimeCustomModel.tag
     if selectedModelID == RuntimeCustomModel.tag {
       return "Custom model"
     }
-    return catalog?.models.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
+    return codexRuntimeCatalog?.models.first { $0.id == selectedModelID }?.displayName
+      ?? selectedModelID
   }
 
   private var selectedCodexEffortTitle: String? {
-    let catalog = codexCatalog(viewModel)
-    let selectedModelID = viewModel.selectedCodexModel ?? catalog?.default ?? RuntimeCustomModel.tag
+    let selectedModelID =
+      viewModel.selectedCodexModel
+      ?? codexRuntimeCatalog?.default
+      ?? RuntimeCustomModel.tag
     let availableEffortValues =
-      catalog.map { Self.effortValues(catalog: $0, selectedModelId: selectedModelID) }
-      ?? Self.allEffortLevels
+      codexRuntimeCatalog.map {
+        AgentsWindowView.effortValues(catalog: $0, selectedModelId: selectedModelID)
+      }
+      ?? AgentsWindowView.allEffortLevels
     guard !availableEffortValues.isEmpty else {
       return nil
     }
     let selectedEffort =
-      viewModel.selectedCodexEffort ?? Self.defaultEffortLevel(from: availableEffortValues)
+      viewModel.selectedCodexEffort
+      ?? AgentsWindowView.defaultEffortLevel(from: availableEffortValues)
     return selectedEffort.capitalized
   }
 
-  @ViewBuilder var createPaneBanners: some View {
+  private var codexRuntimeCatalog: RuntimeModelCatalog? {
+    viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
+  }
+
+  @ViewBuilder private var createPaneBanners: some View {
     if let message = createPaneSessionActionUnavailableNote {
-      createPaneSessionActionBanner(message: message)
+      renderSessionActionBanner(message)
     }
     if viewModel.createMode == .terminal {
       if viewModel.selectedLaunchSelection.isAcp {
         if displayState.acpUnavailable {
-          acpUnavailableBanner
+          renderAcpUnavailableBanner()
         }
       } else if displayState.agentTuiUnavailable {
-        agentTuiUnavailableBanner
+        renderAgentTuiUnavailableBanner()
       }
     }
     if viewModel.createMode == .codex && displayState.codexUnavailable {
-      codexUnavailableBanner
+      renderCodexUnavailableBanner()
     }
   }
 
@@ -209,18 +252,21 @@ extension AgentsWindowView {
 
   private var codexConfigurationCard: some View {
     @Bindable var formModel = viewModel
-    let catalog = codexCatalog(formModel)
     let modelBinding = Binding<String>(
-      get: { formModel.selectedCodexModel ?? catalog?.default ?? RuntimeCustomModel.tag },
+      get: {
+        formModel.selectedCodexModel
+          ?? codexRuntimeCatalog?.default
+          ?? RuntimeCustomModel.tag
+      },
       set: { formModel.selectedCodexModel = $0 }
     )
     let customModelBinding = Binding<String>(
       get: { formModel.customCodexModel ?? "" },
       set: { formModel.customCodexModel = $0 }
     )
-    let catalogModels = catalog?.models ?? []
+    let catalogModels = codexRuntimeCatalog?.models ?? []
     let effortValues =
-      catalog
+      codexRuntimeCatalog
       .map {
         AgentsWindowView.effortValues(catalog: $0, selectedModelId: modelBinding.wrappedValue)
       } ?? AgentsWindowView.allEffortLevels
@@ -344,12 +390,30 @@ extension AgentsWindowView {
           accessibilityIdentifier: HarnessMonitorAccessibility.agentsCodexSubmitButton,
           fillsWidth: false
         ) {
-          startTui()
+          startAction()
         }
         .keyboardShortcut(.defaultAction)
         .disabled(!canStartCodex)
       }
     }
+  }
+
+  var resolvedCreateSessionID: String? {
+    viewModel.selection.sessionID ?? viewModel.createSessionID ?? store.selectedSessionID
+  }
+
+  var createPaneSessionActionUnavailableNote: String? {
+    store.sessionActionUnavailableMessage(sessionID: resolvedCreateSessionID)
+  }
+
+  private var trimmedCodexPrompt: String {
+    viewModel.codexPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var canStartCodex: Bool {
+    createPaneSessionActionUnavailableNote == nil
+      && !viewModel.isSubmitting
+      && !trimmedCodexPrompt.isEmpty
   }
 
 }

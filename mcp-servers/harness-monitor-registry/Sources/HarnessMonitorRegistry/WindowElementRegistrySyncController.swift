@@ -136,15 +136,26 @@ final class WindowElementRegistrySyncController {
 
 @MainActor
 enum WindowAccessibilityChildNodeCollector {
-  static func collect<S: Sequence>(from values: S) -> [any NSAccessibilityProtocol] {
+  static func collect(from values: [Any]) -> [any NSAccessibilityProtocol] {
     var children: [any NSAccessibilityProtocol] = []
     var seen: Set<ObjectIdentifier> = []
     append(contentsOf: values, to: &children, seen: &seen)
     return children
   }
 
-  static func append<S: Sequence>(
-    contentsOf values: S?,
+  static func append(
+    contentsOf values: [Any]?,
+    to children: inout [any NSAccessibilityProtocol],
+    seen: inout Set<ObjectIdentifier>
+  ) {
+    guard let values else { return }
+    for value in values {
+      append(value, to: &children, seen: &seen)
+    }
+  }
+
+  static func append(
+    contentsOf values: [any NSAccessibilityElementProtocol]?,
     to children: inout [any NSAccessibilityProtocol],
     seen: inout Set<ObjectIdentifier>
   ) {
@@ -167,6 +178,16 @@ enum WindowAccessibilityChildNodeCollector {
       return
     }
     children.append(child)
+  }
+
+  static func append(
+    contentsOf values: [NSView],
+    to children: inout [any NSAccessibilityProtocol],
+    seen: inout Set<ObjectIdentifier>
+  ) {
+    for value in values {
+      append(value, to: &children, seen: &seen)
+    }
   }
 }
 
@@ -212,7 +233,7 @@ private enum WindowAccessibilityElementSnapshotter {
     var seen: Set<ObjectIdentifier> = []
 
     if let view = node as? NSView {
-      if view.subviews.isEmpty {
+      if view.subviews.isEmpty, shouldTraversePublishedAccessibilityChildren(of: view) {
         WindowAccessibilityChildNodeCollector.append(
           contentsOf: view.accessibilityChildrenInNavigationOrder(),
           to: &children,
@@ -237,18 +258,32 @@ private enum WindowAccessibilityElementSnapshotter {
       return children
     }
 
-    WindowAccessibilityChildNodeCollector.append(
-      contentsOf: node.accessibilityChildrenInNavigationOrder(),
-      to: &children,
-      seen: &seen
-    )
-    WindowAccessibilityChildNodeCollector.append(
-      contentsOf: node.accessibilityChildren(),
-      to: &children,
-      seen: &seen
-    )
+    let object = node as AnyObject
+    if shouldTraversePublishedAccessibilityChildren(of: object) {
+      WindowAccessibilityChildNodeCollector.append(
+        contentsOf: node.accessibilityChildrenInNavigationOrder(),
+        to: &children,
+        seen: &seen
+      )
+      WindowAccessibilityChildNodeCollector.append(
+        contentsOf: node.accessibilityChildren(),
+        to: &children,
+        seen: &seen
+      )
+    }
 
     return children
+  }
+
+  private static func shouldTraversePublishedAccessibilityChildren(of object: AnyObject) -> Bool {
+    let bundle = Bundle(for: type(of: object))
+    if bundle == .main {
+      return true
+    }
+    if let bundleIdentifier = bundle.bundleIdentifier {
+      return bundleIdentifier.hasPrefix("io.harnessmonitor") || bundleIdentifier.hasSuffix(".xctest")
+    }
+    return bundle.bundleURL.pathExtension == "xctest"
   }
 
   private static func registryElement(
