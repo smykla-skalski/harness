@@ -14,7 +14,7 @@ use super::support::{
 };
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn session_start_creates_workspace_layout() {
     let tmp = tempdir().expect("tempdir");
@@ -97,7 +97,7 @@ fn session_start_creates_workspace_layout() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn session_list_shows_session_id() {
     let tmp = tempdir().expect("tempdir");
@@ -134,7 +134,7 @@ fn session_list_shows_session_id() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn session_status_shows_session_id_and_title() {
     let tmp = tempdir().expect("tempdir");
@@ -176,7 +176,7 @@ fn session_status_shows_session_id_and_title() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn session_delete_removes_worktree_branch_and_state_files() {
     let tmp = tempdir().expect("tempdir");
@@ -239,8 +239,8 @@ fn session_delete_removes_worktree_branch_and_state_files() {
     daemon.kill().expect("kill daemon");
 }
 
-/// Slow: spawns daemon; verifies that base_ref routes worktree to the named branch tip.
-#[ignore]
+/// Slow: spawns daemon; verifies that `base_ref` routes worktree to the named branch tip.
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn session_start_with_base_ref_routes_to_requested_branch() {
     let tmp = tempdir().expect("tempdir");

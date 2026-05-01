@@ -1,6 +1,19 @@
 // Integration test crate root.
 // Declares all submodules under tests/integration/.
 
+#![allow(
+    clippy::absolute_paths,
+    reason = "integration scenarios use explicit crate and std paths to keep setup readable"
+)]
+#![allow(
+    clippy::cognitive_complexity,
+    reason = "integration tests are clearer when full end-to-end flows stay together"
+)]
+#![allow(
+    clippy::too_many_lines,
+    reason = "integration tests keep complete scenario setup and assertions in one place"
+)]
+
 mod integration {
     mod acp_streaming;
     mod agent_assets;

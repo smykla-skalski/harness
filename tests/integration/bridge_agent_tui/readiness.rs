@@ -1,9 +1,9 @@
 use super::*;
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
-/// Verify the full readiness callback flow: start a TUI, call signal_ready
-/// from a separate thread (simulating the SessionStart hook), and verify the
-/// agent_tui_ready event is broadcast.
+/// Verify the full readiness callback flow: start a TUI, call `signal_ready`
+/// from a separate thread (simulating the `SessionStart` hook), and verify the
+/// `agent_tui_ready` event is broadcast.
 #[test]
 fn readiness_callback_triggers_agent_tui_ready_event() {
     let tmp = tempdir().expect("tempdir");
@@ -69,8 +69,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
     while Instant::now() < deadline && !saw_ready {
         match receiver.try_recv() {
             Ok(event) if event.event == "agent_tui_ready" => saw_ready = true,
-            Ok(_) => {}
-            Err(broadcast::error::TryRecvError::Lagged(_)) => {}
+            Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => {}
             Err(_) => thread::sleep(Duration::from_millis(20)),
         }
     }

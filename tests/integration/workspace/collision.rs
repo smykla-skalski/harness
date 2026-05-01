@@ -11,7 +11,7 @@ use super::support::{
 };
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn two_origins_same_basename_get_distinct_project_names() {
     let tmp = tempdir().expect("tempdir");
@@ -133,7 +133,7 @@ fn two_origins_same_basename_get_distinct_project_names() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn invalid_project_dir_returns_error_status() {
     let tmp = tempdir().expect("tempdir");

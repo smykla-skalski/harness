@@ -49,10 +49,7 @@ fn wait_until<F: Fn() -> bool>(predicate: F) -> Result<(), String> {
             return Ok(());
         }
         if Instant::now() >= deadline {
-            return Err(format!(
-                "condition not met within {:?}",
-                BRIDGE_WAIT_TIMEOUT
-            ));
+            return Err(format!("condition not met within {BRIDGE_WAIT_TIMEOUT:?}"));
         }
         thread::sleep(BRIDGE_POLL_INTERVAL);
     }
@@ -132,13 +129,7 @@ impl LegacyBridgeServer {
                 let operation = request["request"]["operation"]
                     .as_str()
                     .expect("operation string");
-                let response = if request["token"].as_str() != Some(thread_token.as_str()) {
-                    serde_json::json!({
-                        "ok": false,
-                        "code": "WORKFLOW_IO",
-                        "message": "bridge token mismatch"
-                    })
-                } else {
+                let response = if request["token"].as_str() == Some(thread_token.as_str()) {
                     match operation {
                         "status" => serde_json::json!({
                             "ok": true,
@@ -158,6 +149,12 @@ impl LegacyBridgeServer {
                             "message": "unsupported legacy test request"
                         }),
                     }
+                } else {
+                    serde_json::json!({
+                        "ok": false,
+                        "code": "WORKFLOW_IO",
+                        "message": "bridge token mismatch"
+                    })
                 };
                 stream
                     .write_all(
@@ -261,19 +258,17 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
             else {
                 return false;
             };
-            file.try_lock_exclusive()
-                .map(|()| {
-                    let _ = file.unlock();
-                    false
-                })
-                .unwrap_or(true) // WouldBlock means held
+            file.try_lock_exclusive().map_or(true, |()| {
+                let _ = file.unlock();
+                false
+            }) // WouldBlock means held
         })
     });
 
-    if ready.is_err() {
+    if let Err(error) = ready {
         let _ = first_bridge.kill();
         let _ = first_bridge.wait();
-        ready.expect("bridge lock was not held within timeout");
+        panic!("bridge lock was not held within timeout: {error}");
     }
 
     // Second bridge start must fail because the lock is held.
