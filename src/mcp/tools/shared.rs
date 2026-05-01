@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::iter::once;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -100,7 +101,7 @@ fn list_elements_retry_delays(
     } else {
         &[]
     };
-    std::iter::once(None).chain(retry_delays.iter().copied().map(Some))
+    once(None).chain(retry_delays.iter().copied().map(Some))
 }
 
 async fn resolve_list_elements_after_empty(
@@ -135,22 +136,93 @@ where
     F: Fn(Option<i64>, Option<ElementKind>) -> Fut,
     Fut: Future<Output = Result<ListElementsResult, AccessibilityQueryError>>,
 {
-    match request_list_elements_from_registry(client, window_id, kind).await {
-        Ok(result) if !result.elements.is_empty() => Ok(result),
-        // A successful empty registry answer stays a success. The helper can
-        // enrich it with real AX data, but it must not turn an empty success
-        // into a helper-dependent error.
-        Ok(result) => match fallback(window_id, kind).await {
-            Ok(fallback_result) if !fallback_result.elements.is_empty() => Ok(fallback_result),
-            Ok(_) | Err(_) => Ok(result),
-        },
-        Err(registry_error) => match fallback(window_id, kind).await {
-            Ok(result) => Ok(result),
-            Err(accessibility_error) => Err(ToolError::internal(format!(
-                "{registry_error}; accessibility fallback failed: {accessibility_error}"
-            ))),
-        },
+    let registry_result = request_list_elements_from_registry(client, window_id, kind).await;
+    resolve_list_elements_with_fallback(registry_result, window_id, kind, fallback).await
+}
+
+async fn resolve_list_elements_with_fallback<F, Fut>(
+    registry_result: Result<ListElementsResult, RegistryError>,
+    window_id: Option<i64>,
+    kind: Option<ElementKind>,
+    fallback: F,
+) -> Result<ListElementsResult, ToolError>
+where
+    F: Fn(Option<i64>, Option<ElementKind>) -> Fut,
+    Fut: Future<Output = Result<ListElementsResult, AccessibilityQueryError>>,
+{
+    match registry_result {
+        Ok(result) => resolve_empty_list_elements(result, window_id, kind, fallback).await,
+        Err(registry_error) => fallback_or_combined_error(
+            &registry_error.to_string(),
+            fallback(window_id, kind).await,
+        ),
     }
+}
+
+async fn resolve_empty_list_elements<F, Fut>(
+    registry_result: ListElementsResult,
+    window_id: Option<i64>,
+    kind: Option<ElementKind>,
+    fallback: F,
+) -> Result<ListElementsResult, ToolError>
+where
+    F: Fn(Option<i64>, Option<ElementKind>) -> Fut,
+    Fut: Future<Output = Result<ListElementsResult, AccessibilityQueryError>>,
+{
+    if !registry_result.elements.is_empty() {
+        return Ok(registry_result);
+    }
+    match fallback(window_id, kind).await {
+        Ok(fallback_result) if !fallback_result.elements.is_empty() => Ok(fallback_result),
+        Ok(_) | Err(_) => Ok(registry_result),
+    }
+}
+
+fn fallback_or_combined_error<T>(
+    registry_error: &str,
+    fallback_result: Result<T, AccessibilityQueryError>,
+) -> Result<T, ToolError> {
+    match fallback_result {
+        Ok(result) => Ok(result),
+        Err(accessibility_error) => Err(ToolError::internal(format!(
+            "{registry_error}; accessibility fallback failed: {accessibility_error}"
+        ))),
+    }
+}
+
+fn get_element_request(client: &RegistryClient, identifier: &str) -> RegistryRequest {
+    RegistryRequest::GetElement {
+        id: client.next_request_id(),
+        identifier: identifier.to_string(),
+    }
+}
+
+fn map_not_found_fallback_error(
+    registry_error: &RegistryError,
+    accessibility_error: AccessibilityQueryError,
+) -> ToolError {
+    match accessibility_error {
+        AccessibilityQueryError::NotFound => map_registry_error(registry_error),
+        other => map_accessibility_query_error(&other),
+    }
+}
+
+async fn resolve_get_element_fallback<F, Fut>(
+    identifier: &str,
+    registry_error: RegistryError,
+    fallback: F,
+) -> Result<GetElementResult, ToolError>
+where
+    F: Fn(String) -> Fut,
+    Fut: Future<Output = Result<GetElementResult, AccessibilityQueryError>>,
+{
+    let fallback_result = fallback(identifier.to_string()).await;
+    if let RegistryError::Server { code, .. } = &registry_error
+        && code == "not-found"
+    {
+        return fallback_result.map_err(|error| map_not_found_fallback_error(&registry_error, error));
+    }
+    fallback_or_combined_error(&registry_error.to_string(), fallback_result)
 }
 
 async fn request_list_elements_from_registry(
@@ -186,27 +258,9 @@ where
     F: Fn(String) -> Fut,
     Fut: Future<Output = Result<GetElementResult, AccessibilityQueryError>>,
 {
-    let id = client.next_request_id();
-    let request = RegistryRequest::GetElement {
-        id,
-        identifier: identifier.to_string(),
-    };
+    let request = get_element_request(client, identifier);
     match client.request::<GetElementResult>(&request).await {
         Ok(result) => Ok(result),
-        Err(ref registry_error @ RegistryError::Server { ref code, .. }) if code == "not-found" => {
-            match fallback(identifier.to_string()).await {
-                Ok(result) => Ok(result),
-                Err(AccessibilityQueryError::NotFound) => Err(map_registry_error(&registry_error)),
-                Err(accessibility_error) => {
-                    Err(map_accessibility_query_error(&accessibility_error))
-                }
-            }
-        }
-        Err(registry_error) => match fallback(identifier.to_string()).await {
-            Ok(result) => Ok(result),
-            Err(accessibility_error) => Err(ToolError::internal(format!(
-                "{registry_error}; accessibility fallback failed: {accessibility_error}"
-            ))),
-        },
+        Err(registry_error) => resolve_get_element_fallback(identifier, registry_error, fallback).await,
     }
 }

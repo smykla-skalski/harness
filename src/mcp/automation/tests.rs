@@ -254,7 +254,7 @@ fn helper_search_roots_include_executable_and_current_dir_ancestors_once() {
     let current_dir = PathBuf::from("/tmp/harness/worktrees/main/apps/harness-monitor-macos");
     let current_exe = PathBuf::from("/tmp/harness/target/debug/harness");
 
-    let roots = helper_search_roots_from(Some(current_dir), Some(current_exe));
+    let roots = helper_search_roots_from(Some(&current_dir), Some(&current_exe));
 
     assert_eq!(roots.first(), Some(&PathBuf::from("/tmp/harness/target/debug")));
     assert!(roots.contains(&PathBuf::from("/tmp/harness")));
