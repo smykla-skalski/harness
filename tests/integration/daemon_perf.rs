@@ -42,8 +42,8 @@ struct PerfResult {
 fn median(values: &mut [f64]) -> f64 {
     values.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let mid = values.len() / 2;
-    if values.len() % 2 == 0 {
-        (values[mid - 1] + values[mid]) / 2.0
+    if values.len().is_multiple_of(2) {
+        f64::midpoint(values[mid - 1], values[mid])
     } else {
         values[mid]
     }
@@ -197,13 +197,13 @@ fn seed_workspace(tmp: &std::path::Path) {
     }
 }
 
-#[ignore]
+#[ignore = "performance budget integration test with real daemon timing"]
 #[tokio::test]
 async fn daemon_http_endpoint_performance_budgets() {
     let tmp = tempdir().expect("tempdir");
 
     with_perf_test_env(tmp.path(), "perf-test-session", || {
-        seed_workspace(tmp.path())
+        seed_workspace(tmp.path());
     });
 
     let db_path = tmp.path().join("harness/daemon/harness.db");
@@ -262,8 +262,8 @@ async fn daemon_http_endpoint_performance_budgets() {
 }
 
 /// Measure `status_report()` which is the CLI `daemon status` code path.
-/// Uses SQLite when the DB exists, file-based discovery otherwise.
-#[ignore]
+/// Uses `SQLite` when the DB exists, file-based discovery otherwise.
+#[ignore = "performance budget integration test with real daemon timing"]
 #[test]
 fn daemon_status_report_within_budget() {
     let tmp = tempdir().expect("tempdir");
@@ -287,7 +287,7 @@ fn daemon_status_report_within_budget() {
 
     for _ in 0..SAMPLE_COUNT {
         let start = Instant::now();
-        with_isolated_harness_env(tmp.path(), || service::status_report()).expect("status report");
+        with_isolated_harness_env(tmp.path(), service::status_report).expect("status report");
         samples.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 

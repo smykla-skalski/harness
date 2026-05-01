@@ -92,13 +92,9 @@ impl Drop for ManagedChild {
         let Some(child) = self.child.as_mut() else {
             return;
         };
-        match child.try_wait() {
-            Ok(Some(_)) => {}
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-            Err(_) => {}
+        if matches!(child.try_wait(), Ok(None)) {
+            let _ = child.kill();
+            let _ = child.wait();
         }
 
         // If a managed child existed, also attempt to clean up any lingering
@@ -110,13 +106,13 @@ impl Drop for ManagedChild {
         {
             // Try graceful AppleScript quit for both UI testing host and shipping app
             let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args(&[
+                .args([
                     "-e",
                     "tell application \"Harness Monitor UI Testing\" to quit",
                 ])
                 .status();
             let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args(&["-e", "tell application \"Harness Monitor\" to quit"])
+                .args(["-e", "tell application \"Harness Monitor\" to quit"])
                 .status();
 
             // Short wait to allow graceful shutdown
@@ -129,15 +125,14 @@ impl Drop for ManagedChild {
             ];
             for pat in patterns {
                 let _ = ProcessCommand::new("/usr/bin/pgrep")
-                    .args(&["-f", pat])
+                    .args(["-f", pat])
                     .status()
-                    .and_then(|s| {
+                    .inspect(|s| {
                         if s.success() {
                             let _ = ProcessCommand::new("/usr/bin/pkill")
-                                .args(&["-TERM", "-f", pat])
+                                .args(["-TERM", "-f", pat])
                                 .status();
                         }
-                        Ok(s)
                     });
             }
         }

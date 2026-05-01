@@ -379,7 +379,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                 Some(&db),
             )
             .expect("start session");
-            let session_id = session_state.session_id.clone();
+            let session_id = session_state.session_id;
 
             let db_slot = Arc::new(OnceLock::new());
             db_slot.set(Arc::new(Mutex::new(db))).expect("install db");
@@ -436,7 +436,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                     Err(broadcast::error::TryRecvError::Empty) => {
                         thread::sleep(Duration::from_millis(20));
                     }
-                    Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::TryRecvError::Lagged(_)) => {}
                     Err(broadcast::error::TryRecvError::Closed) => {
                         panic!("broadcast channel closed before receiving live refresh event");
                     }

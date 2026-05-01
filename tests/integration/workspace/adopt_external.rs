@@ -122,7 +122,7 @@ fn list_sessions(endpoint: &str, token: &str) -> Value {
 // list, `external_origin` is absent.
 // ---------------------------------------------------------------------------
 
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_b_layout_session() {
     unsafe {
@@ -165,15 +165,12 @@ fn adopt_external_b_layout_session() {
     // Confirm the session appears in the daemon's in-memory session list via
     // GET /v1/sessions.
     let sessions = list_sessions(&endpoint, &token);
-    let found_in_list = sessions
-        .as_array()
-        .map(|arr| {
-            arr.iter().any(|entry| {
-                entry["session_id"].as_str() == Some("abc12345")
-                    || entry["state"]["session_id"].as_str() == Some("abc12345")
-            })
+    let found_in_list = sessions.as_array().is_some_and(|arr| {
+        arr.iter().any(|entry| {
+            entry["session_id"].as_str() == Some("abc12345")
+                || entry["state"]["session_id"].as_str() == Some("abc12345")
         })
-        .unwrap_or(false);
+    });
     assert!(
         found_in_list,
         "adopted session must appear in GET /v1/sessions; response: {sessions}"
@@ -199,7 +196,7 @@ fn adopt_external_b_layout_session() {
 // Test 2 — adopt once succeeds; second adopt returns 409 `already-attached`.
 // ---------------------------------------------------------------------------
 
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_is_idempotent_with_409() {
     unsafe {
@@ -253,7 +250,7 @@ fn adopt_external_is_idempotent_with_409() {
 // and `external_origin` is populated in the returned state.
 // ---------------------------------------------------------------------------
 
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_outside_sessions_root_sets_flag() {
     unsafe {

@@ -10,7 +10,7 @@ use super::support::{
 };
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn two_sessions_same_origin_get_distinct_workspaces() {
     let tmp = tempdir().expect("tempdir");
@@ -92,7 +92,7 @@ fn two_sessions_same_origin_get_distinct_workspaces() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn deleting_one_session_leaves_other_intact() {
     let tmp = tempdir().expect("tempdir");
@@ -164,7 +164,7 @@ fn deleting_one_session_leaves_other_intact() {
 }
 
 /// Slow: spawns daemon.
-#[ignore]
+#[ignore = "slow integration test that spawns a real daemon"]
 #[test]
 fn active_json_tracks_each_session() {
     let tmp = tempdir().expect("tempdir");
