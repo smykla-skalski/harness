@@ -4,6 +4,19 @@ import Testing
 
 @Suite("AccessibilityRegistry")
 struct AccessibilityRegistryTests {
+  @Test("child collector accepts native accessibility arrays")
+  @MainActor
+  func childCollectorAcceptsSwiftChildren() {
+    let child = NSButton(title: "Child", target: nil, action: nil)
+
+    let collected = WindowAccessibilityChildNodeCollector.collect(
+      from: [child]
+    )
+
+    #expect(collected.count == 1)
+    #expect((collected.first as? NSButton) === child)
+  }
+
   @Test("registers and retrieves elements by identifier")
   func registerAndRetrieve() async {
     let registry = AccessibilityRegistry()
@@ -454,7 +467,10 @@ struct AccessibilityRegistryTests {
   @Test("window element sync harvests and replaces tracked controls")
   func windowElementSyncHarvestsTrackedControls() async {
     let registry = AccessibilityRegistry()
-    let controller = WindowElementRegistrySyncController(registry: registry)
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
     let window = NSWindow(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
       styleMask: [.titled, .closable],
@@ -498,10 +514,13 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
-  @Test("window element sync harvests accessibility-only navigation-order children")
+  @Test("window element sync harvests accessibility-only children")
   func windowElementSyncHarvestsAccessibilityOnlyChildren() async {
     let registry = AccessibilityRegistry()
-    let controller = WindowElementRegistrySyncController(registry: registry)
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
     let window = NSWindow(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
       styleMask: [.titled, .closable],
@@ -522,11 +541,44 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window element sync ignores non-accessibility array members in accessibilityChildren")
+  func windowElementSyncIgnoresNonAccessibilityArrayMembers() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = MixedAccessibilityChildrenHostView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["mixed.child"])
+  }
+
+  @MainActor
   @Test("stale tracker teardown does not clear replacement harvested elements for the same window")
   func staleTrackerTeardownDoesNotClearReplacementWindowElements() async {
     let registry = AccessibilityRegistry()
-    let staleController = WindowElementRegistrySyncController(registry: registry)
-    let replacementController = WindowElementRegistrySyncController(registry: registry)
+    let staleController = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let replacementController = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
     let window = NSWindow(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
       styleMask: [.titled, .closable],
@@ -560,7 +612,10 @@ struct AccessibilityRegistryTests {
   @Test("same controller window switch preserves clear before replacement harvest")
   func sameControllerWindowSwitchPreservesClearBeforeReplacementHarvest() async {
     let registry = AccessibilityRegistry()
-    let controller = WindowElementRegistrySyncController(registry: registry)
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
 
     let firstWindow = NSWindow(
       contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
@@ -607,6 +662,46 @@ struct AccessibilityRegistryTests {
     let secondElements = await registry.allElements(windowID: secondWindow.windowNumber)
     #expect(secondElements.map(\.identifier) == ["session.second.button"])
   }
+
+  @MainActor
+  @Test("window element sync rate-limits rapid updates and keeps only the latest snapshot")
+  func windowElementSyncRateLimitsRapidUpdates() async {
+    let registry = AccessibilityRegistry()
+    var replacementApplyCount = 0
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .milliseconds(120),
+      onReplacementApplied: { replacementApplyCount += 1 }
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let button = NSButton(title: "Start", target: nil, action: nil)
+    button.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    button.setAccessibilityIdentifier("session.controls.initial")
+    root.addSubview(button)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    button.setAccessibilityIdentifier("session.controls.intermediate")
+    controller.sync(window: window, generation: generation)
+    button.setAccessibilityIdentifier("session.controls.latest")
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let elements = await registry.allElements(windowID: window.windowNumber)
+    #expect(elements.map(\.identifier) == ["session.controls.latest"])
+    #expect(replacementApplyCount == 2)
+  }
 }
 
 @MainActor
@@ -628,11 +723,11 @@ private final class NavigationOrderOnlyHostView: NSView {
   }
 
   override func accessibilityChildren() -> [Any]? {
-    nil
+    [navigationChild]
   }
 
   override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
-    [navigationChild]
+    nil
   }
 }
 
@@ -672,5 +767,32 @@ private final class AccessibilityNavigationChildView: NSView {
 
   override func isAccessibilityEnabled() -> Bool {
     true
+  }
+}
+
+@MainActor
+private final class MixedAccessibilityChildrenHostView: NSView {
+  private let mixedChild: AccessibilityNavigationChildView
+
+  override init(frame frameRect: NSRect) {
+    mixedChild = AccessibilityNavigationChildView(
+      frame: NSRect(x: 24, y: 24, width: 120, height: 32),
+      identifier: "mixed.child",
+      label: "Mixed child"
+    )
+    super.init(frame: frameRect)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    [mixedChild, "non-accessibility-member"]
   }
 }
