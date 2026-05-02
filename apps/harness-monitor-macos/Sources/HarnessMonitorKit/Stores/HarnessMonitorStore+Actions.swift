@@ -160,6 +160,76 @@ extension HarnessMonitorStore {
     )
   }
 
+  @discardableResult
+  func removeSession(
+    sessionID: String,
+    actorID: String
+  ) async -> Bool {
+    let actionName = "Remove session"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    let actionID = ActionID.removeSession(sessionID: sessionID).key
+    let startedAt = ContinuousClock.now
+    let interactionType = actionName.lowercased().replacingOccurrences(of: " ", with: "_")
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "user.action.\(interactionType)",
+        kind: .internal,
+        attributes: ["user.action.name": .string(actionName), "session.id": .string(sessionID)]
+      )
+    #endif
+
+    isSessionActionInFlight = true
+    inFlightActionID = actionID
+    defer {
+      isSessionActionInFlight = false
+      if inFlightActionID == actionID {
+        inFlightActionID = nil
+      }
+      #if HARNESS_FEATURE_OTEL
+        span.end()
+        let elapsed = startedAt.duration(to: ContinuousClock.now)
+        let durationMs = harnessMonitorDurationMilliseconds(elapsed)
+        HarnessMonitorTelemetry.shared.recordUserInteraction(
+          interaction: interactionType,
+          sessionID: sessionID,
+          durationMs: durationMs
+        )
+      #else
+        _ = startedAt
+        _ = interactionType
+      #endif
+    }
+
+    do {
+      let measuredArchive = try await Self.measureOperation {
+        try await action.client.archiveSession(
+          sessionID: sessionID,
+          request: SessionArchiveRequest(actor: actorID)
+        )
+      }
+      _ = measuredArchive
+      recordRequestSuccess()
+      let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
+      await pruneRemovedSessionFromCache(
+        sessions: localSnapshot.sessions,
+        projects: localSnapshot.projects
+      )
+      presentSuccessFeedback(actionName)
+      await refresh(using: action.client, preserveSelection: true)
+      return true
+    } catch {
+      #if HARNESS_FEATURE_OTEL
+        span.status = .error(description: error.localizedDescription)
+        HarnessMonitorTelemetry.shared.recordError(error, on: span)
+      #endif
+      reportSelectedSessionActionFailure(actionName, sessionID: sessionID, error: error)
+      presentSelectedSessionMutationFailure(error, actionID: actionID)
+      return false
+    }
+  }
+
   func removeAgent(
     sessionID: String,
     agentID: String,
@@ -194,6 +264,17 @@ extension HarnessMonitorStore {
       agentID: agentID,
       actorID: actorID
     )
+  }
+
+  public func requestRemoveSessionConfirmation(sessionID: String) {
+    requestRemoveSessionConfirmation(sessionID: sessionID, actor: "harness-app")
+  }
+
+  func requestRemoveSessionConfirmation(sessionID: String, actor: String) {
+    let actionName = "Remove session"
+    guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
+    let actorID = controlPlaneActionActor(for: actor)
+    pendingConfirmation = .removeSession(sessionID: sessionID, actorID: actorID)
   }
 
   public func setDaemonLogLevel(_ level: String) async {

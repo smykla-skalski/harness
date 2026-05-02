@@ -8,9 +8,10 @@ use axum::{Json, Router};
 
 use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
-    ControlPlaneActorRequest, ObserveSessionRequest, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionStartRequest,
-    SessionTitleRequest, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse, http_paths,
+    ControlPlaneActorRequest, ObserveSessionRequest, SessionArchiveRequest, SessionArchiveResponse,
+    SessionDetail, SessionEndRequest, SessionJoinRequest, SessionLeaveRequest,
+    SessionMutationResponse, SessionStartRequest, SessionTitleRequest, TimelineCursor,
+    TimelineWindowRequest, TimelineWindowResponse, http_paths,
 };
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
@@ -46,6 +47,7 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
         )
         .route(http_paths::SESSION_TITLE, post(post_session_title))
         .route(http_paths::SESSION_END, post(post_end_session))
+        .route(http_paths::SESSION_ARCHIVE, post(post_session_archive))
         .route(http_paths::SESSION_LEAVE, post(post_leave_session))
         .route(http_paths::SESSION_OBSERVE, post(post_observe_session))
 }
@@ -230,6 +232,30 @@ pub(super) async fn post_end_session(
         broadcast_session_end(&state, &session_id).await;
     }
     timed_json("POST", http_paths::SESSION_END, &request_id, start, result)
+}
+
+pub(super) async fn post_session_archive(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<SessionArchiveRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
+        return *response;
+    }
+    let result = archive_session_response(&state, &session_id, &request).await;
+    if result.is_ok() {
+        broadcast_sessions_list_changed(&state).await;
+    }
+    timed_json(
+        "POST",
+        http_paths::SESSION_ARCHIVE,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 pub(super) async fn post_leave_session(
@@ -439,6 +465,19 @@ async fn end_session_response(
     let db = ensure_shared_db(&state.db)?;
     let db_guard = db.lock().expect("db lock");
     service::end_session(session_id, request, Some(&db_guard))
+}
+
+async fn archive_session_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    request: &SessionArchiveRequest,
+) -> Result<SessionArchiveResponse, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::archive_session_async(session_id, request, async_db.as_ref()).await;
+    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = db.lock().expect("db lock");
+    service::archive_session(session_id, request, Some(&db_guard))
 }
 
 async fn leave_session_response(

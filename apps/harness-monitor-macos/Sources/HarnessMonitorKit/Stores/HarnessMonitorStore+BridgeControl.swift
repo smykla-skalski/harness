@@ -211,9 +211,10 @@ extension HarnessMonitorStore {
   ) async -> HostBridgeCapabilityMutationResult {
     switch daemonOwnership {
     case .external:
+      let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
       let message =
         "Connected daemon does not support live host bridge reconfiguration yet. "
-        + "Restart `harness daemon dev` and try again."
+        + "Restart `\(daemonCommand)` and try again."
       appendConnectionEvent(kind: .error, detail: message)
       presentFailureFeedback(message)
       return .failed

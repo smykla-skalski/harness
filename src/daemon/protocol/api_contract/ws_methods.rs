@@ -23,6 +23,7 @@ pub const SESSION_JOIN: &str = "session.join";
 pub const SESSION_RUNTIME_SESSION: &str = "session.runtime_session";
 pub const SESSION_TITLE: &str = "session.title";
 pub const SESSION_END: &str = "session.end";
+pub const SESSION_ARCHIVE: &str = "session.archive";
 pub const SESSION_LEAVE: &str = "session.leave";
 pub const SESSION_OBSERVE: &str = "session.observe";
 pub const TASK_CREATE: &str = "task.create";

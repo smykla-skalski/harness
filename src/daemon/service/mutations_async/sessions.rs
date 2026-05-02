@@ -4,6 +4,8 @@ use super::super::{
     session_detail_from_async_daemon_db, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
+use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
+use crate::session::storage as session_storage;
 
 /// Transfer session leadership through the canonical async daemon DB.
 ///
@@ -66,4 +68,39 @@ pub(crate) async fn end_session_async(
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+/// Archive a session so daemon reads stop surfacing it to Monitor clients.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or archiving fails.
+pub(crate) async fn archive_session_async(
+    session_id: &str,
+    request: &SessionArchiveRequest,
+    async_db: &AsyncDaemonDb,
+) -> Result<SessionArchiveResponse, CliError> {
+    let project_dir =
+        effective_project_dir(&resolved_session_for_mutation(async_db, session_id).await?)
+            .to_path_buf();
+    let now = utc_now();
+    let (archived_at, state) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let archived_at = session_service::apply_archive_session(state, &request.actor, &now)?;
+            Ok((archived_at, state.clone()))
+        })
+        .await?;
+    let layout = session_storage::layout_from_project_dir(&project_dir, session_id)?;
+    session_storage::save_state(&layout, &state)?;
+    super::append_log(
+        async_db,
+        session_id,
+        session_service::log_session_archived(),
+        &request.actor,
+    )
+    .await?;
+    bump_session(async_db, session_id).await?;
+    Ok(SessionArchiveResponse {
+        session_id: session_id.to_string(),
+        archived_at,
+    })
 }

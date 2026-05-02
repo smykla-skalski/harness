@@ -320,6 +320,9 @@ pub fn broadcast_session_snapshot(
     db: Option<&super::db::DaemonDb>,
 ) {
     broadcast_sessions_updated(sender, db);
+    if db.is_some_and(|db| matches!(db.resolve_session(session_id), Ok(None))) {
+        return;
+    }
     broadcast_session_updated_core(sender, session_id, db);
     broadcast_session_extensions(sender, session_id, db);
 }
@@ -330,6 +333,11 @@ pub(crate) async fn broadcast_session_snapshot_async(
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) {
     broadcast_sessions_updated_async(sender, async_db).await;
+    if let Some(async_db) = async_db
+        && matches!(async_db.resolve_session(session_id).await, Ok(None))
+    {
+        return;
+    }
     broadcast_session_updated_core_async(sender, session_id, async_db).await;
     broadcast_session_extensions_async(sender, session_id, async_db).await;
 }

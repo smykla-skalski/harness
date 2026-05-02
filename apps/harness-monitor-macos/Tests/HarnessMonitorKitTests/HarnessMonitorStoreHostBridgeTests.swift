@@ -66,6 +66,25 @@ struct HarnessMonitorStoreHostBridgeTests {
     #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
   }
 
+  @Test("Host bridge command inherits the current runtime profile env prefix")
+  func hostBridgeCommandInheritsRuntimeProfilePrefix() async {
+    setenv(HarnessMonitorRuntimeProfile.environmentKey, "dev-profile", 1)
+    setenv(HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey, "/tmp/harness-profile-home", 1)
+    setenv(HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey, "31337", 1)
+    defer {
+      unsetenv(HarnessMonitorRuntimeProfile.environmentKey)
+      unsetenv(HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey)
+      unsetenv(HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey)
+    }
+
+    let store = await makeBootstrappedStore()
+
+    #expect(
+      store.hostBridgeStartCommand(for: "codex")
+        == "HARNESS_MONITOR_RUNTIME_PROFILE='dev-profile' HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' HARNESS_CODEX_WS_PORT='31337' harness bridge start"
+    )
+  }
+
   @Test("Preview store inherits forced bridge issues from process environment")
   func previewStoreInheritsForcedBridgeIssuesFromEnvironment() async {
     setenv("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES", "agent-tui,codex", 1)

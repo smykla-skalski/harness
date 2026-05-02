@@ -143,13 +143,14 @@ extension HarnessMonitorStore {
   }
 
   func bootstrapExternalDaemon() async {
+    let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
     let registrationState = await daemonController.launchAgentRegistrationState()
     if registrationState == .enabled {
       appendConnectionEvent(
         kind: .error,
         detail: "SMAppService launch agent is still registered. Remove it in "
           + "System Settings > General > Login Items to avoid conflicts with "
-          + "`harness daemon dev`."
+          + "`\(daemonCommand)`."
       )
     }
     do {
@@ -162,7 +163,7 @@ extension HarnessMonitorStore {
     } catch {
       let message =
         (error as? DaemonControlError)?.errorDescription
-        ?? "External daemon not running. Start it with `harness daemon dev` in a terminal."
+        ?? "External daemon not running. Start it with `\(daemonCommand)` in a terminal."
       markConnectionOffline(message)
       presentFailureFeedback(message)
       await restorePersistedSessionState()

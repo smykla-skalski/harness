@@ -2,7 +2,7 @@ use super::{
     BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, daemon_index,
     daemon_protocol, db_error, project_context_dir, project_context_id, usize_from_i64,
 };
-use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::service::canonicalize_persisted_session_state;
 use crate::workspace::utc_now;
 
 impl DaemonDb {
@@ -70,6 +70,10 @@ impl DaemonDb {
                     COUNT(s.session_id) AS total_count
                  FROM projects p
                  LEFT JOIN sessions s ON s.project_id = p.project_id
+                    AND (s.archived_at IS NULL OR (
+                        s.status = 'ended'
+                        AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+                    ))
                  GROUP BY p.project_id, p.checkout_id
                  ORDER BY p.name, p.checkout_name",
             )
@@ -157,6 +161,12 @@ impl DaemonDb {
                     p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name
                  FROM sessions s
                  JOIN projects p ON p.project_id = s.project_id
+                 WHERE (
+                    s.archived_at IS NULL OR (
+                        s.status = 'ended'
+                        AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+                    )
+                 )
                  ORDER BY s.updated_at DESC",
             )
             .map_err(|error| db_error(format!("prepare session summaries: {error}")))?;
@@ -210,6 +220,12 @@ impl DaemonDb {
             .prepare(
                 "SELECT s.project_id, s.state_json FROM sessions s
                  JOIN projects p ON p.project_id = s.project_id
+                 WHERE (
+                    s.archived_at IS NULL OR (
+                        s.status = 'ended'
+                        AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+                    )
+                 )
                  ORDER BY s.updated_at DESC",
             )
             .map_err(|error| db_error(format!("prepare session list: {error}")))?;
@@ -228,7 +244,7 @@ impl DaemonDb {
         for (project_id, json) in all_rows {
             let mut state: SessionState = serde_json::from_str(&json)
                 .map_err(|error| db_error(format!("parse session state: {error}")))?;
-            if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+            if canonicalize_persisted_session_state(&mut state, &utc_now()) {
                 self.sync_session(&project_id, &state)?;
             }
             sessions.push(state);
@@ -250,7 +266,13 @@ impl DaemonDb {
                     p.checkout_id, p.checkout_name, p.context_root, p.is_worktree, p.worktree_name
              FROM sessions s
              JOIN projects p ON p.project_id = s.project_id
-             WHERE s.session_id = ?1",
+             WHERE s.session_id = ?1
+               AND (
+                    s.archived_at IS NULL OR (
+                        s.status = 'ended'
+                        AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+                    )
+               )",
             [session_id],
             |row| {
                 Ok((
@@ -294,7 +316,7 @@ impl DaemonDb {
                     is_worktree,
                     worktree_name,
                 };
-                if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+                if canonicalize_persisted_session_state(&mut state, &utc_now()) {
                     self.sync_session(&project.project_id, &state)?;
                 }
                 Ok(Some(daemon_index::ResolvedSession { project, state }))
@@ -377,7 +399,7 @@ impl SessionSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
         };
-        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
             db.sync_session(&project.project_id, &state)?;
         }
         let pending_leader_transfer = state.pending_leader_transfer.clone();

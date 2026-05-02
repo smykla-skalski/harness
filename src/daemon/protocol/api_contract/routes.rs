@@ -195,6 +195,14 @@ pub const HTTP_API_CONTRACT: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_ARCHIVE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::SESSION_ARCHIVE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::SESSION_LEAVE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::SESSION_LEAVE,

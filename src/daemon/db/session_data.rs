@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::daemon::index as daemon_index;
-use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage as session_storage;
 use crate::workspace::utc_now;
 
@@ -59,7 +59,7 @@ impl DaemonDb {
             Ok((project_id, json)) => {
                 let mut state: SessionState = serde_json::from_str(&json)
                     .map_err(|error| db_error(format!("parse session state: {error}")))?;
-                if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+                if canonicalize_persisted_session_state(&mut state, &utc_now()) {
                     self.sync_session(&project_id, &state)?;
                 }
                 Ok(Some(state))

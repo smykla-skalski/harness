@@ -76,6 +76,25 @@ actor PreviewHarnessClientState {
     }
   }
 
+  func archiveSession(sessionID: String) throws -> SessionArchiveResponse {
+    guard sessionSummaries.contains(where: { $0.sessionId == sessionID }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview session available.")
+    }
+
+    sessionSummaries.removeAll { $0.sessionId == sessionID }
+    detailsBySessionID.removeValue(forKey: sessionID)
+    coreDetailsBySessionID.removeValue(forKey: sessionID)
+    timelinesBySessionID.removeValue(forKey: sessionID)
+    agentTuisBySessionID.removeValue(forKey: sessionID)
+    acpAgentsBySessionID.removeValue(forKey: sessionID)
+    codexRunsBySessionID.removeValue(forKey: sessionID)
+
+    return SessionArchiveResponse(
+      sessionId: sessionID,
+      archivedAt: Self.mutationTimestamp
+    )
+  }
+
   func timeline(for sessionID: String) -> [TimelineEntry] {
     timelinesBySessionID[sessionID] ?? fallbackTimeline
   }

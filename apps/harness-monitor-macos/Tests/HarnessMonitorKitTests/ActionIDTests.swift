@@ -71,6 +71,12 @@ struct ActionIDTests {
     #expect(id.key == "sess-1/endSession")
   }
 
+  @Test("Remove session key uses session only")
+  func removeSessionKey() {
+    let id = ActionID.removeSession(sessionID: "sess-1")
+    #expect(id.key == "sess-1/removeSession")
+  }
+
   @Test("Send signal key includes agent subject")
   func sendSignalKey() {
     let id = ActionID.sendSignal(sessionID: "sess-1", agentID: "agent-7")

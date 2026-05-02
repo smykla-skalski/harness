@@ -25,7 +25,7 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
         titleVisibility: .visible
       ) {
         switch shellUI.pendingConfirmation {
-        case .endSession, .removeAgent, .interruptCodexRun:
+        case .endSession, .removeSession, .removeAgent, .interruptCodexRun:
           Button(confirmButtonTitle, role: .destructive) {
             Task { await store.confirmPendingAction() }
           }
@@ -45,6 +45,7 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
   private var title: String {
     switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
+    case .removeSession: "Remove Session?"
     case .removeAgent: "Remove Agent?"
     case .interruptCodexRun: "Interrupt Whole Run?"
     case nil: ""
@@ -55,6 +56,8 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
     switch shellUI.pendingConfirmation {
     case .endSession:
       "End Session Now"
+    case .removeSession:
+      "Remove Session Now"
     case .removeAgent:
       "Remove Agent Now"
     case .interruptCodexRun:
@@ -70,6 +73,13 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       """
       This ends \(store.confirmationSessionSubject(sessionID: sessionID)). \
       Active task work must already be closed.
+      """
+    case .removeSession(let sessionID, _):
+      """
+      This removes \(store.confirmationSessionSubject(sessionID: sessionID)) from Monitor \
+      immediately. It disappears from the sidebar, open cockpit views, and cached data. \
+      If the underlying session is still running, Monitor will stop showing it. Restoring \
+      it requires a manual database operation.
       """
     case .removeAgent(let sessionID, let agentID, _):
       """

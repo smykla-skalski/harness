@@ -234,29 +234,7 @@ struct SidebarSessionListContent: View {
         .accessibilityAction(named: "Toggle Bookmark") {
           toggleBookmark(session.sessionId, session.projectId)
         }
-        .contextMenu {
-          Button {
-            toggleBookmark(session.sessionId, session.projectId)
-          } label: {
-            if renderState.bookmarkedSessionIDs.contains(session.sessionId) {
-              Label("Remove Bookmark", systemImage: "bookmark.slash")
-            } else {
-              Label("Bookmark", systemImage: "bookmark")
-            }
-          }
-          Divider()
-          Button {
-            HarnessMonitorClipboard.copy(session.title)
-          } label: {
-            Label("Copy Title", systemImage: "doc.on.doc")
-          }
-          .disabled(session.title.isEmpty)
-          Button {
-            HarnessMonitorClipboard.copy(session.sessionId)
-          } label: {
-            Label("Copy Session ID", systemImage: "doc.on.doc")
-          }
-        }
+        .contextMenu { sessionContextMenu(for: session) }
     } else {
       baseRow
         .accessibilityFrameMarker(
@@ -266,6 +244,7 @@ struct SidebarSessionListContent: View {
           HarnessMonitorAccessibility.sessionRowSelectionFrame(session.sessionId),
           when: isSelectedForUITest
         )
+        .contextMenu { sessionContextMenu(for: session) }
     }
   }
 
@@ -310,6 +289,39 @@ struct SidebarSessionListContent: View {
 
   private func scaledSidebarFont(_ font: Font) -> Font {
     HarnessMonitorTextSize.scaledFont(font, by: renderState.fontScale)
+  }
+
+  @ViewBuilder
+  private func sessionContextMenu(for session: SessionSummary) -> some View {
+    if renderState.isPersistenceAvailable {
+      Button {
+        toggleBookmark(session.sessionId, session.projectId)
+      } label: {
+        if renderState.bookmarkedSessionIDs.contains(session.sessionId) {
+          Label("Remove Bookmark", systemImage: "bookmark.slash")
+        } else {
+          Label("Bookmark", systemImage: "bookmark")
+        }
+      }
+      Divider()
+    }
+    Button {
+      HarnessMonitorClipboard.copy(session.title)
+    } label: {
+      Label("Copy Title", systemImage: "doc.on.doc")
+    }
+    .disabled(session.title.isEmpty)
+    Button {
+      HarnessMonitorClipboard.copy(session.sessionId)
+    } label: {
+      Label("Copy Session ID", systemImage: "doc.on.doc")
+    }
+    Divider()
+    Button(role: .destructive) {
+      store.requestRemoveSessionConfirmation(sessionID: session.sessionId)
+    } label: {
+      Label("Remove Session...", systemImage: "trash")
+    }
   }
 }
 

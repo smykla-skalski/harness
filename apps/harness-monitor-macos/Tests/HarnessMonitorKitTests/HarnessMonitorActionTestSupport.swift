@@ -107,6 +107,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case adoptSession(bookmarkID: String?, sessionRoot: URL)
     case startSession(projectDir: String, baseRef: String?)
     case endSession(sessionID: String, actor: String)
+    case removeSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
     case removeAgent(sessionID: String, agentID: String, actor: String)
     case resolveCodexApproval(
@@ -186,6 +187,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var queuedProjectsErrors: [any Error] = []
   var queuedSessionsErrors: [any Error] = []
   var mutationDelay: Duration?
+  var archiveSessionMutatesReadSnapshots = true
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var sessionDetailsByID: [String: SessionDetail] = [:]

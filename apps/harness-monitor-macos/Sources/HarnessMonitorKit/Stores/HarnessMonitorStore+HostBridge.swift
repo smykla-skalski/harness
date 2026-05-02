@@ -120,10 +120,13 @@ extension HarnessMonitorStore {
 
   public func hostBridgeStartCommand(for capability: String) -> String {
     let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
+    let baseCommand: String
     if hostBridge.running {
-      return "harness bridge reconfigure --enable \(capability)"
+      baseCommand = "harness bridge reconfigure --enable \(capability)"
+    } else {
+      baseCommand = "harness bridge start"
     }
-    return "harness bridge start"
+    return HarnessMonitorPaths.shellCommand(baseCommand)
   }
 
   public func clearHostBridgeIssue(for capability: String) {

@@ -116,6 +116,8 @@ extension HarnessMonitorStore {
     switch pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       _ = await endSession(sessionID: sessionID, actorID: actorID)
+    case .removeSession(let sessionID, let actorID):
+      _ = await removeSession(sessionID: sessionID, actorID: actorID)
     case .removeAgent(let sessionID, let agentID, let actorID):
       _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
     case .interruptCodexRun(let sessionID, let runID, _):

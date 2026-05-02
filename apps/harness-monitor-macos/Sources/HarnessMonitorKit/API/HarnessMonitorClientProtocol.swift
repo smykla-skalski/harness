@@ -118,6 +118,10 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: SessionEndRequest
   ) async throws -> SessionDetail
+  func archiveSession(
+    sessionID: String,
+    request: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse
   func sendSignal(
     sessionID: String,
     request: SignalSendRequest
@@ -244,6 +248,13 @@ extension HarnessMonitorClientProtocol {
     sessionRoot _: URL
   ) async throws -> SessionSummary {
     throw HarnessMonitorAPIError.server(code: 501, message: "Session adoption unavailable.")
+  }
+
+  public func archiveSession(
+    sessionID _: String,
+    request _: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Session removal unavailable.")
   }
 
   public func submitTaskForReview(

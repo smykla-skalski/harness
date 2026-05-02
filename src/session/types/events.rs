@@ -62,6 +62,7 @@ pub enum SessionTransition {
         title: String,
         context: String,
     },
+    SessionArchived,
     SessionEnded,
     AgentJoined {
         agent_id: String,

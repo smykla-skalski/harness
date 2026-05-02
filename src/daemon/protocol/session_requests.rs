@@ -81,6 +81,11 @@ pub struct SessionEndRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionArchiveRequest {
+    pub actor: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionLeaveRequest {
     pub agent_id: String,
 }
@@ -205,6 +210,12 @@ pub struct ImproverApplyRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMutationResponse {
     pub state: SessionState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionArchiveResponse {
+    pub session_id: String,
+    pub archived_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

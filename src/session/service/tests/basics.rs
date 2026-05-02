@@ -34,6 +34,41 @@ fn join_adds_agent() {
 }
 
 #[test]
+fn archived_session_is_hidden_from_local_queries_even_with_include_all() {
+    with_temp_project(|project| {
+        let state = start_active_session(
+            "archive me",
+            "",
+            project,
+            Some("claude"),
+            Some("archived-local"),
+        )
+        .expect("start");
+        let layout = crate::session::storage::layout_from_project_dir(project, &state.session_id)
+            .expect("layout");
+        crate::session::storage::update_state(&layout, |state| {
+            state.archived_at = Some("2026-05-02T00:00:00Z".into());
+            Ok(())
+        })
+        .expect("archive state");
+
+        assert!(
+            list_sessions(project, true)
+                .expect("list archived session")
+                .is_empty()
+        );
+        assert!(
+            session_status(&state.session_id, project).is_err(),
+            "archived sessions must be hidden from local status queries"
+        );
+        assert!(
+            resolve_session_project_dir(&state.session_id, project).is_err(),
+            "archived sessions must be hidden from local project-dir resolution"
+        );
+    });
+}
+
+#[test]
 fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
     with_temp_project(|project| {
         let state = start_active_session_with_policy(

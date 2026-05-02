@@ -4,6 +4,7 @@ use super::super::{
     effective_project_dir, index, project_dir_for_db_session, refresh_signal_index_for_db,
     session_detail, session_detail_from_daemon_db, session_not_found, session_service, utc_now,
 };
+use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 
 /// Transfer session leadership through the shared session service.
 ///
@@ -86,4 +87,41 @@ pub fn end_session(
     let project_dir = effective_project_dir(&resolved);
     session_service::end_session(session_id, &request.actor, project_dir)?;
     session_detail(session_id, db)
+}
+
+/// Archive a session so daemon reads stop surfacing it to Monitor clients.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or archiving fails.
+pub fn archive_session(
+    session_id: &str,
+    request: &SessionArchiveRequest,
+    db: Option<&super::super::db::DaemonDb>,
+) -> Result<SessionArchiveResponse, CliError> {
+    let db = db.ok_or_else(|| {
+        CliError::new(crate::errors::CliErrorKind::usage_error(
+            "daemon database is required for session archive mutations",
+        ))
+    })?;
+    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+        return Err(session_not_found(session_id));
+    };
+    let archived_at =
+        session_service::apply_archive_session(&mut state, &request.actor, &utc_now())?;
+    let project_id = db
+        .project_id_for_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    db.save_session_state(&project_id, &state)?;
+    db.append_log_entry(&build_log_entry(
+        session_id,
+        session_service::log_session_archived(),
+        Some(&request.actor),
+        None,
+    ))?;
+    db.bump_change(session_id)?;
+    db.bump_change("global")?;
+    Ok(SessionArchiveResponse {
+        session_id: session_id.to_string(),
+        archived_at,
+    })
 }

@@ -174,6 +174,34 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func archiveSession(
+    sessionID: String,
+    request: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.removeSession(sessionID: sessionID, actor: request.actor))
+    if archiveSessionMutatesReadSnapshots {
+      let archivedState = lock.withLock {
+        let remainingSummaries =
+          (sessionSummariesStorage ?? [detailStorage.session]).filter { $0.sessionId != sessionID }
+        var details = sessionDetailsByID
+        details.removeValue(forKey: sessionID)
+        var timelines = timelinesBySessionID
+        timelines.removeValue(forKey: sessionID)
+        return (remainingSummaries, details, timelines)
+      }
+      configureSessions(
+        summaries: archivedState.0,
+        detailsByID: archivedState.1,
+        timelinesBySessionID: archivedState.2
+      )
+    }
+    return SessionArchiveResponse(
+      sessionId: sessionID,
+      archivedAt: "2026-03-28T14:26:00Z"
+    )
+  }
+
   func sendSignal(
     sessionID: String,
     request: SignalSendRequest

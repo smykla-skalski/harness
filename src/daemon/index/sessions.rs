@@ -9,6 +9,7 @@ use crate::agents::runtime::{
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
+use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
 use crate::workspace::layout::sessions_root as workspace_sessions_root;
@@ -94,7 +95,7 @@ pub fn load_session_state(
     if let Some(project_dir) = project.project_dir.as_deref() {
         for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
             if let Some(state) = storage::load_state(&layout)? {
-                return Ok(Some(state));
+                return Ok(index_visible_session_state(state));
             }
         }
     } else {
@@ -102,7 +103,7 @@ pub fn load_session_state(
             storage::layout_candidates_from_context_root(&project.context_root, session_id)
         {
             if let Some(state) = storage::load_state(&layout)? {
-                return Ok(Some(state));
+                return Ok(index_visible_session_state(state));
             }
         }
     }
@@ -324,12 +325,12 @@ fn load_session_state_for_project(
 ) -> Result<Option<SessionState>, CliError> {
     let legacy_path = session_state_path(&project.context_root, session_id);
     if legacy_path.is_file() {
-        return read_json_typed(&legacy_path).map(Some);
+        return read_json_typed(&legacy_path).map(index_visible_session_state);
     }
     if let Some(project_dir) = project.project_dir.as_deref() {
         for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
             if let Some(state) = storage::load_state(&layout)? {
-                return Ok(Some(state));
+                return Ok(index_visible_session_state(state));
             }
         }
     } else {
@@ -391,12 +392,12 @@ fn load_session_state_from_context_root(
 ) -> Result<Option<SessionState>, CliError> {
     let legacy_path = session_state_path(context_root, session_id);
     if legacy_path.is_file() {
-        return read_json_typed(&legacy_path).map(Some);
+        return read_json_typed(&legacy_path).map(index_visible_session_state);
     }
 
     for layout in storage::layout_candidates_from_context_root(context_root, session_id) {
         if let Some(state) = storage::load_state(&layout)? {
-            return Ok(Some(state));
+            return Ok(index_visible_session_state(state));
         }
     }
 
@@ -411,12 +412,18 @@ fn load_session_state_from_context_root(
                 .join(session_id)
                 .join("state.json");
             if state_path.is_file() {
-                return read_json_typed(&state_path).map(Some);
+                return read_json_typed(&state_path).map(index_visible_session_state);
             }
         }
     }
 
     Ok(None)
+}
+
+fn index_visible_session_state(state: SessionState) -> Option<SessionState> {
+    let mut state = state;
+    canonicalize_persisted_session_state(&mut state, &crate::workspace::utc_now());
+    state.archived_at.is_none().then_some(state)
 }
 
 fn load_native_conversation_events(

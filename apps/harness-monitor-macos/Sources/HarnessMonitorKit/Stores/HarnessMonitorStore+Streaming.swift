@@ -165,6 +165,9 @@ extension HarnessMonitorStore {
     sessionID: String,
     payload: SessionUpdatedPayload
   ) {
+    guard !shouldIgnoreLocallyRemovedSession(sessionID) else {
+      return
+    }
     let detail = sessionDetailPreservingSelectedExtensions(
       sessionID: sessionID,
       detail: payload.detail,
@@ -235,6 +238,9 @@ extension HarnessMonitorStore {
     payload: SessionUpdatedPayload
   ) {
     guard let sessionID = event.sessionId else {
+      return
+    }
+    guard !shouldIgnoreLocallyRemovedSession(sessionID) else {
       return
     }
     let detail = sessionDetailPreservingSelectedExtensions(

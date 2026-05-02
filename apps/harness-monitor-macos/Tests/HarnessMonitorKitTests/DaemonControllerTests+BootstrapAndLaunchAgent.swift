@@ -257,4 +257,22 @@ extension DaemonControllerTests {
     #expect(offlineSnapshot.installed == false)
     #expect(offlineSnapshot.loaded == false)
   }
+
+  @Test("launchAgentSnapshot uses the profiled launch-agent label")
+  func launchAgentSnapshotUsesProfiledLaunchAgentLabel() async {
+    let manager = RecordingLaunchAgentManager(state: .enabled)
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorRuntimeProfile.environmentKey: "Bart Dev"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    )
+    let controller = DaemonController(
+      environment: environment,
+      launchAgentManager: manager
+    )
+
+    let snapshot = await controller.launchAgentSnapshot()
+
+    #expect(snapshot.label == "io.harnessmonitor.daemon.bart-dev")
+    #expect(snapshot.serviceTarget == "io.harnessmonitor.daemon.bart-dev")
+  }
 }

@@ -20,7 +20,7 @@ use super::{
     u64_from_i64, utc_now,
 };
 use crate::errors::CliErrorKind;
-use crate::session::service::{agent_status_db_label, canonicalize_active_session_without_leader};
+use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
 use crate::session::types::ManagedAgentKind;
 
 const LOAD_SESSION_FOR_MUTATION_SQL: &str =
@@ -298,7 +298,7 @@ async fn sync_session_in_transaction(
 ) -> Result<(), CliError> {
     let now = utc_now();
     let mut canonical_state = state.clone();
-    canonicalize_active_session_without_leader(&mut canonical_state, &now);
+    canonicalize_persisted_session_state(&mut canonical_state, &now);
     let state_json = serde_json::to_string(&canonical_state)
         .map_err(|error| db_error(format!("serialize async session state: {error}")))?;
     let metrics_json = serde_json::to_string(&canonical_state.metrics)

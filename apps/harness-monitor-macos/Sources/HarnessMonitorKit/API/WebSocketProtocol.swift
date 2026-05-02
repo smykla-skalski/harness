@@ -70,6 +70,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case sessionRuntimeSession = "session.runtime_session"
   case sessionTitle = "session.title"
   case sessionEnd = "session.end"
+  case sessionArchive = "session.archive"
   case sessionLeave = "session.leave"
   case signalSend = "signal.send"
   case signalCancel = "signal.cancel"

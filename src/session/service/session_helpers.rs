@@ -89,6 +89,27 @@ pub(crate) fn canonicalize_active_session_without_leader(
     true
 }
 
+pub(crate) fn canonicalize_persisted_session_state(state: &mut SessionState, now: &str) -> bool {
+    let mut changed = canonicalize_active_session_without_leader(state, now);
+    if canonicalize_legacy_ended_archive_semantics(state) {
+        changed = true;
+    }
+    changed
+}
+
+fn canonicalize_legacy_ended_archive_semantics(state: &mut SessionState) -> bool {
+    if state.schema_version >= CURRENT_VERSION
+        || state.status != SessionStatus::Ended
+        || state.archived_at.is_none()
+    {
+        return false;
+    }
+
+    state.schema_version = CURRENT_VERSION;
+    state.archived_at = None;
+    true
+}
+
 pub(crate) fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {
     if !state.status.allows_task_creation() {
         return Err(CliErrorKind::session_not_active(format!(

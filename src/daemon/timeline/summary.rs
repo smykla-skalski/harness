@@ -15,6 +15,11 @@ pub(super) fn transition_summary(
             },
         ),
         SessionTransition::SessionEnded => ("session_ended", None, "Session ended".into()),
+        SessionTransition::SessionArchived => (
+            "session_archived",
+            None,
+            "Session removed from Monitor".into(),
+        ),
         SessionTransition::AgentJoined {
             agent_id,
             role,

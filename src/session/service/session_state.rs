@@ -2,15 +2,15 @@ use crate::agents::kind::{DisconnectReason, RuntimeKind};
 use crate::session::types::ManagedAgentRef;
 
 use super::{
-    AgentRegistration, AgentStatus, CliError, CliErrorKind, END_SESSION_SIGNAL_ACTION_HINT,
-    END_SESSION_SIGNAL_MESSAGE, LeaderTransferPlan, LeaveSignalRecord, Path,
-    REMOVE_AGENT_SIGNAL_ACTION_HINT, REMOVE_AGENT_SIGNAL_MESSAGE, SessionAction, SessionRole,
-    SessionState, SessionStatus, TaskQueuePolicy, TaskStartSignalRecord, TaskStatus,
-    build_initial_state, build_leave_signal_record, clear_pending_leader_transfer,
-    ensure_session_can_end, leave_signal_delivery_error, next_available_agent_id,
-    plan_leader_transfer, refresh_session, require_active, require_active_target_agent,
-    require_endable_session, require_permission, require_removable_agent, runtime,
-    runtime_capabilities, touch_agent,
+    AgentRegistration, AgentStatus, CURRENT_VERSION, CliError, CliErrorKind,
+    END_SESSION_SIGNAL_ACTION_HINT, END_SESSION_SIGNAL_MESSAGE, LeaderTransferPlan,
+    LeaveSignalRecord, Path, REMOVE_AGENT_SIGNAL_ACTION_HINT, REMOVE_AGENT_SIGNAL_MESSAGE,
+    SessionAction, SessionRole, SessionState, SessionStatus, TaskQueuePolicy,
+    TaskStartSignalRecord, TaskStatus, build_initial_state, build_leave_signal_record,
+    clear_pending_leader_transfer, ensure_session_can_end, leave_signal_delivery_error,
+    next_available_agent_id, plan_leader_transfer, refresh_session, require_active,
+    require_active_target_agent, require_endable_session, require_permission,
+    require_removable_agent, runtime, runtime_capabilities, touch_agent,
 };
 
 // ---------------------------------------------------------------------------
@@ -321,9 +321,22 @@ pub(crate) fn apply_end_session(
     state.leader_id = None;
     state.pending_leader_transfer = None;
     state.status = SessionStatus::Ended;
-    state.archived_at = Some(now.to_string());
     refresh_session(state, now);
     Ok(())
+}
+
+pub(crate) fn apply_archive_session(
+    state: &mut SessionState,
+    actor_id: &str,
+    now: &str,
+) -> Result<String, CliError> {
+    require_permission(state, actor_id, SessionAction::EndSession)?;
+    touch_agent(state, actor_id, now);
+    state.schema_version = CURRENT_VERSION;
+    let archived_at = state.archived_at.clone().unwrap_or_else(|| now.to_string());
+    state.archived_at = Some(archived_at.clone());
+    refresh_session(state, now);
+    Ok(archived_at)
 }
 
 /// Change an agent's role. Returns the previous role.

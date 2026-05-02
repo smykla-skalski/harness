@@ -11,6 +11,16 @@ fn set_adoption_metadata(project: &Path, session_id: &str) {
     .expect("update adoption metadata");
 }
 
+fn archive_session_state(project: &Path, session_id: &str) {
+    let layout =
+        crate::session::storage::layout_from_project_dir(project, session_id).expect("layout");
+    crate::session::storage::update_state(&layout, |state| {
+        state.archived_at = Some("2026-05-02T00:00:00Z".into());
+        Ok(())
+    })
+    .expect("archive session state");
+}
+
 #[test]
 fn session_detail_promotes_live_worker_and_hides_dead_leader() {
     with_temp_project(|project| {
@@ -91,6 +101,43 @@ fn list_sessions_db_promotes_live_worker_and_excludes_dead_members() {
 }
 
 #[test]
+fn archived_sessions_are_hidden_from_sync_db_summary_detail_and_timeline_reads() {
+    with_temp_project(|project| {
+        let fixture = setup_session_with_worker_logs(
+            project,
+            "daemon archived sync reads",
+            "daemon-archived-sync-reads",
+        );
+        archive_session_state(project, &fixture.state.session_id);
+
+        let db = setup_db_with_project(project);
+        let project_id = index::discovered_project_for_checkout(project).project_id;
+        let mut archived_state = fixture.state.clone();
+        archived_state.archived_at = Some("2026-05-02T00:00:00Z".into());
+        db.sync_session(&project_id, &archived_state).expect("sync");
+        let request = TimelineWindowRequest {
+            limit: Some(20),
+            ..TimelineWindowRequest::default()
+        };
+
+        assert!(
+            list_sessions(true, Some(&db))
+                .expect("session summaries")
+                .into_iter()
+                .all(|summary| summary.session_id != fixture.state.session_id)
+        );
+        assert!(
+            session_detail(&fixture.state.session_id, Some(&db)).is_err(),
+            "archived sessions must be hidden from detail reads"
+        );
+        assert!(
+            session_timeline_window(&fixture.state.session_id, &request, Some(&db)).is_err(),
+            "archived sessions must be hidden from timeline reads"
+        );
+    });
+}
+
+#[test]
 fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
     with_temp_project(|project| {
         let fixture = setup_session_with_worker_logs(
@@ -139,6 +186,67 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
                 .expect("promoted agent");
             assert_eq!(promoted.runtime, "codex");
             assert_eq!(promoted.role, SessionRole::Leader);
+        });
+    });
+}
+
+#[test]
+fn archived_sessions_are_hidden_from_async_db_summary_detail_and_timeline_reads() {
+    with_temp_project(|project| {
+        let fixture = setup_session_with_worker_logs(
+            project,
+            "daemon archived async reads",
+            "daemon-archived-async-reads",
+        );
+        archive_session_state(project, &fixture.state.session_id);
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = Arc::new(
+                crate::daemon::db::AsyncDaemonDb::connect(&project.join("daemon.sqlite"))
+                    .await
+                    .expect("open async daemon db"),
+            );
+            let resolved_project = index::discovered_project_for_checkout(project);
+            async_db
+                .sync_project(&resolved_project)
+                .await
+                .expect("sync project");
+            let mut archived_state = fixture.state.clone();
+            archived_state.archived_at = Some("2026-05-02T00:00:00Z".into());
+            async_db
+                .save_session_state(&resolved_project.project_id, &archived_state)
+                .await
+                .expect("save session state");
+            clear_session_liveness_refresh_cache_entry(&fixture.state.session_id);
+            let request = TimelineWindowRequest {
+                limit: Some(20),
+                ..TimelineWindowRequest::default()
+            };
+
+            assert!(
+                list_sessions_async(true, Some(async_db.as_ref()))
+                    .await
+                    .expect("session summaries")
+                    .into_iter()
+                    .all(|summary| summary.session_id != fixture.state.session_id)
+            );
+            assert!(
+                session_detail_async(&fixture.state.session_id, Some(async_db.as_ref()))
+                    .await
+                    .is_err(),
+                "archived sessions must be hidden from async detail reads"
+            );
+            assert!(
+                session_timeline_window_async(
+                    &fixture.state.session_id,
+                    &request,
+                    Some(async_db.as_ref())
+                )
+                .await
+                .is_err(),
+                "archived sessions must be hidden from async timeline reads"
+            );
         });
     });
 }
