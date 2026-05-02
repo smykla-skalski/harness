@@ -30,6 +30,27 @@ export HARNESS_MONITOR_RUNTIME_PROFILE
 HARNESS_MONITOR_RUNTIME_PROFILE="$(resolve_user_runtime_profile)"
 harness_monitor_apply_runtime_profile_environment
 
+persist_user_derived_data_path() {
+  harness_monitor_store_user_derived_data_path \
+    "$ROOT" \
+    "$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
+}
+
+refresh_user_workspace_settings_if_generated() {
+  local workspace_root="$ROOT/HarnessMonitor.xcworkspace"
+  local project_workspace_root="$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace"
+  if [[ ! -d "$workspace_root" ]] && [[ ! -d "$project_workspace_root" ]]; then
+    return 0
+  fi
+
+  harness_monitor_write_user_workspace_settings \
+    "$ROOT" \
+    "$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
+}
+
+persist_user_derived_data_path
+refresh_user_workspace_settings_if_generated
+
 if (( $# == 0 )); then
   printf 'Harness Monitor user profile: %s\n' "$HARNESS_MONITOR_RUNTIME_PROFILE"
   printf 'DerivedData: %s\n' "$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"

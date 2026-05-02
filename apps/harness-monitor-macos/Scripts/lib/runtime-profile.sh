@@ -8,6 +8,7 @@ HARNESS_MONITOR_RUNTIME_LABEL_BASE="io.harnessmonitor.daemon"
 HARNESS_MONITOR_RUNTIME_APP_GROUP_DEFAULT="Q498EB36N4.io.harnessmonitor"
 HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE=4600
 HARNESS_MONITOR_RUNTIME_CODEX_PORT_SPAN=20000
+HARNESS_MONITOR_RUNTIME_USER_DERIVED_DATA_FILE=".xcode-user-derived-data-path"
 
 harness_monitor_trim_whitespace() {
   local value="$1"
@@ -199,6 +200,92 @@ harness_monitor_runtime_derived_data_path() {
     "$root_name" \
     "$HARNESS_MONITOR_RUNTIME_PROFILE_DIR" \
     "$profile"
+}
+
+harness_monitor_runtime_user_derived_data_path_file() {
+  local app_root="$1"
+  printf '%s/%s\n' "${app_root%/}" "$HARNESS_MONITOR_RUNTIME_USER_DERIVED_DATA_FILE"
+}
+
+harness_monitor_current_xcode_user_data_dir() {
+  local user_name
+  user_name="${USER:-}"
+  if [[ -z "$user_name" ]]; then
+    user_name="$(id -un 2>/dev/null || true)"
+  fi
+  user_name="$(harness_monitor_trim_whitespace "$user_name")"
+  if [[ -z "$user_name" ]]; then
+    user_name="user"
+  fi
+  user_name="${user_name//\//-}"
+  printf '%s.xcuserdatad\n' "$user_name"
+}
+
+harness_monitor_write_workspace_settings() {
+  local settings_path="$1"
+  local derived_data_path="$2"
+
+  mkdir -p "$(dirname "$settings_path")"
+  cat > "$settings_path" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BuildLocationStyle</key>
+	<string>CustomLocation</string>
+	<key>DerivedDataCustomLocation</key>
+	<string>${derived_data_path}</string>
+	<key>IDEWorkspaceSharedSettings_AutocreateContextsIfNeeded</key>
+	<false/>
+</dict>
+</plist>
+EOF
+}
+
+harness_monitor_write_user_workspace_settings() {
+  local app_root="$1"
+  local derived_data_path="$2"
+  local user_data_dir
+  user_data_dir="$(harness_monitor_current_xcode_user_data_dir)"
+
+  harness_monitor_write_workspace_settings \
+    "$app_root/HarnessMonitor.xcworkspace/xcuserdata/$user_data_dir/WorkspaceSettings.xcsettings" \
+    "$derived_data_path"
+  harness_monitor_write_workspace_settings \
+    "$app_root/HarnessMonitor.xcodeproj/project.xcworkspace/xcuserdata/$user_data_dir/WorkspaceSettings.xcsettings" \
+    "$derived_data_path"
+}
+
+harness_monitor_store_user_derived_data_path() {
+  local app_root="$1"
+  local derived_data_path="$2"
+  local state_path
+  derived_data_path="$(harness_monitor_trim_whitespace "$derived_data_path")"
+  [[ -n "$derived_data_path" ]] || return 1
+  state_path="$(harness_monitor_runtime_user_derived_data_path_file "$app_root")"
+  mkdir -p "$(dirname "$state_path")"
+  printf '%s\n' "$derived_data_path" > "$state_path"
+}
+
+harness_monitor_saved_user_derived_data_path() {
+  local app_root="$1"
+  local state_path derived_data_path
+  state_path="$(harness_monitor_runtime_user_derived_data_path_file "$app_root")"
+  [[ -f "$state_path" ]] || return 1
+  IFS= read -r derived_data_path < "$state_path" || true
+  derived_data_path="$(harness_monitor_trim_whitespace "$derived_data_path")"
+  if [[ -z "$derived_data_path" ]] || [[ "$derived_data_path" != /* ]]; then
+    return 1
+  fi
+  printf '%s\n' "$derived_data_path"
+}
+
+harness_monitor_restore_saved_user_workspace_settings() {
+  local app_root="$1"
+  local derived_data_path
+  derived_data_path="$(harness_monitor_saved_user_derived_data_path "$app_root" || true)"
+  [[ -n "$derived_data_path" ]] || return 1
+  harness_monitor_write_user_workspace_settings "$app_root" "$derived_data_path"
 }
 
 harness_monitor_apply_runtime_profile_environment() {
