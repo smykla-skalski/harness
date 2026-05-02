@@ -293,8 +293,8 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
 
-    send_initialize(&connection, initialize_timeout).await?;
-    let acp_session_id = send_new_session(&connection, project_dir).await?;
+    send_initialize(&supervisor, &connection, initialize_timeout).await?;
+    let acp_session_id = send_new_session(&supervisor, &connection, project_dir).await?;
     let registered = manager
         .bind_orchestration_runtime_session_async(
             &session_id,
@@ -315,6 +315,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
     let run_result = async {
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
             let cancelled = send_prompt_or_cancel(
+                &supervisor,
                 &connection,
                 &mut cancel_rx,
                 acp_session_id.clone(),
@@ -328,6 +329,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
             }
         }
         run_protocol_command_loop(
+            Arc::clone(&supervisor),
             &connection,
             &mut cancel_rx,
             &mut command_rx,
@@ -363,9 +365,11 @@ struct RunConnectionArgs {
 }
 
 async fn send_initialize(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     initialize_timeout: Duration,
 ) -> AcpResult<()> {
+    let _guard = supervisor.enter_pending_request();
     timeout(
         initialize_timeout,
         connection
@@ -378,9 +382,11 @@ async fn send_initialize(
 }
 
 async fn send_new_session(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
 ) -> AcpResult<SessionId> {
+    let _guard = supervisor.enter_pending_request();
     let response = connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
@@ -389,12 +395,14 @@ async fn send_new_session(
 }
 
 async fn send_prompt_or_cancel(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     cancel_rx: &mut mpsc::UnboundedReceiver<()>,
     session_id: SessionId,
     prompt_timeout: Duration,
     prompt: String,
 ) -> AcpResult<bool> {
+    let _guard = supervisor.enter_pending_request();
     let request = PromptRequest::new(
         session_id.clone(),
         vec![ContentBlock::Text(TextContent::new(prompt))],

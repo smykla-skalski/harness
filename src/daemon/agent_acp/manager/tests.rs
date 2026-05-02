@@ -129,7 +129,7 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert_eq!(inspected.agents.len(), 1);
         assert_eq!(inspected.agents[0].acp_id, snapshot.acp_id);
         assert!(inspected.agents[0].agent_id.starts_with("fake-"));
-        assert_eq!(inspected.agents[0].watchdog_state, "active");
+        assert_ne!(inspected.agents[0].watchdog_state, "fired");
         assert_eq!(inspected.agents[0].permission_mode, "daemon_bridge");
         assert_eq!(inspected.agents[0].permission_queue_depth, 0);
         assert_eq!(inspected.agents[0].permission_log_path, None);

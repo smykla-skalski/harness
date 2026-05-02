@@ -4,8 +4,10 @@
 //!
 //! - `initialize` deadline: 30s default
 //! - `session/prompt` deadline: 10 min default (configurable per descriptor)
-//! - Gateway-aware watchdog: 60s no-events default, paused while any
-//!   agent-initiated `Client` call is in flight
+//! - Pending-request watchdog: 60s no-events default, only Active while a
+//!   daemon-issued request (initialize, `new_session`, prompt) is awaiting an
+//!   agent response. Paused for idle agents and while any agent-initiated
+//!   `Client` call is in flight (daemon is the one processing then).
 //! - Process-group reaper: `killpg(pgid, SIGTERM)` then 3s → `SIGKILL`
 //! - Per-session terminal cap (16) and per-terminal wall-clock (5 min)
 //!
@@ -116,13 +118,15 @@ impl WatchdogState {
 
 /// Supervisor for an ACP session.
 ///
-/// Tracks process group, watchdog state, and pending client calls.
+/// Tracks process group, watchdog state, in-flight agent-to-daemon calls, and
+/// daemon-to-agent pending requests.
 pub struct AcpSessionSupervisor {
     pgid: i32,
     pid: u32,
     config: SupervisionConfig,
     state: AtomicU64,
     in_flight_calls: AtomicU64,
+    pending_requests: AtomicU64,
     shutting_down: AtomicBool,
     last_event_at: Mutex<Instant>,
     last_client_call_at: Mutex<Option<String>>,
@@ -131,6 +135,9 @@ pub struct AcpSessionSupervisor {
 
 impl AcpSessionSupervisor {
     /// Create a supervisor for a spawned child.
+    ///
+    /// The watchdog starts Paused: an idle agent with no daemon-issued request
+    /// awaiting a response is healthy, not a kill candidate.
     #[must_use]
     pub fn new(child: &Child, config: SupervisionConfig) -> Self {
         #[cfg(unix)]
@@ -142,8 +149,9 @@ impl AcpSessionSupervisor {
             pgid,
             pid: child.id(),
             config,
-            state: AtomicU64::new(state_to_u64(WatchdogState::Active)),
+            state: AtomicU64::new(state_to_u64(WatchdogState::Paused)),
             in_flight_calls: AtomicU64::new(0),
+            pending_requests: AtomicU64::new(0),
             shutting_down: AtomicBool::new(false),
             last_event_at: Mutex::new(Instant::now()),
             last_client_call_at: Mutex::new(None),
@@ -196,10 +204,11 @@ impl AcpSessionSupervisor {
             return;
         }
         let in_flight = self.in_flight_calls.load(Ordering::SeqCst);
-        let new_state = if in_flight > 0 {
-            WatchdogState::Paused
-        } else {
+        let pending = self.pending_requests.load(Ordering::SeqCst);
+        let new_state = if in_flight == 0 && pending > 0 {
             WatchdogState::Active
+        } else {
+            WatchdogState::Paused
         };
         self.state.store(state_to_u64(new_state), Ordering::SeqCst);
     }
@@ -214,6 +223,42 @@ impl AcpSessionSupervisor {
     #[must_use]
     pub fn in_flight_call_count(&self) -> u64 {
         self.in_flight_calls.load(Ordering::SeqCst)
+    }
+
+    /// Number of daemon-issued requests awaiting an agent response.
+    #[must_use]
+    pub fn pending_request_count(&self) -> u64 {
+        self.pending_requests.load(Ordering::SeqCst)
+    }
+
+    /// Acquire a pending-request guard. While held, the watchdog runs only if
+    /// the agent has not produced events for `watchdog_timeout`. Last-event
+    /// timestamp resets on entry so each daemon-issued request gets a fresh
+    /// silence budget.
+    ///
+    /// # Panics
+    /// Panics if the last-event mutex is poisoned.
+    pub fn enter_pending_request(&self) -> PendingRequestGuard<'_> {
+        *self.last_event_at.lock().unwrap() = Instant::now();
+        self.pending_requests.fetch_add(1, Ordering::SeqCst);
+        self.update_watchdog_state();
+        self.watchdog_notify.notify_one();
+        PendingRequestGuard { supervisor: self }
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn exit_pending_request(&self) {
+        let result = self
+            .pending_requests
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
+        if result.is_err() {
+            warn!("exit_pending_request without matching enter; counter already at 0");
+        }
+        self.update_watchdog_state();
+        self.watchdog_notify.notify_one();
     }
 
     /// Last time an agent-initiated client call began.
@@ -298,6 +343,18 @@ pub struct ClientCallGuard<'a> {
 impl Drop for ClientCallGuard<'_> {
     fn drop(&mut self) {
         self.supervisor.exit_client_call();
+    }
+}
+
+/// RAII guard that activates the watchdog while a daemon-issued request is
+/// awaiting an agent response. Drop releases the slot.
+pub struct PendingRequestGuard<'a> {
+    supervisor: &'a AcpSessionSupervisor,
+}
+
+impl Drop for PendingRequestGuard<'_> {
+    fn drop(&mut self) {
+        self.supervisor.exit_pending_request();
     }
 }
 
