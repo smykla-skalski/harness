@@ -1,7 +1,6 @@
 //! Terminal management for ACP client.
 //!
-//! Unix-specific process group handling uses `setsid(2)` and `killpg(2)`.
-#![allow(unsafe_code)]
+//! Unix-specific process group handling uses `killpg(2)`.
 
 use std::collections::HashMap;
 use std::sync::Arc;

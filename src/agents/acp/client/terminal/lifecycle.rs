@@ -2,7 +2,10 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use agent_client_protocol::schema::TerminalExitStatus;
+use nix::sys::signal::{Signal, killpg};
+use nix::unistd::Pid;
 use portable_pty::ExitStatus as PtyExitStatus;
+use tracing::warn;
 
 use super::TerminalState;
 use super::output::wait_for_output_drain;
@@ -45,15 +48,7 @@ pub(super) fn terminate_terminal(state: &mut TerminalState) {
 fn terminate_running_terminal(state: &mut TerminalState) {
     #[cfg(unix)]
     if let Some(pgid) = state.pgid {
-        unsafe {
-            libc::killpg(pgid, libc::SIGTERM);
-        }
-
-        if !poll_terminal_exit(state, Duration::from_secs(3)).unwrap_or(false) {
-            unsafe {
-                libc::killpg(pgid, libc::SIGKILL);
-            }
-        }
+        send_signals_and_drain(pgid, state);
     } else {
         let _ = state.child.kill();
     }
@@ -72,12 +67,32 @@ fn terminate_running_terminal(state: &mut TerminalState) {
     close_reader(state);
 }
 
+#[cfg(unix)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn send_signals_and_drain(pgid: i32, state: &mut TerminalState) {
+    if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM) {
+        warn!(pgid, error = %e, "SIGTERM to terminal process group failed");
+    }
+    if !poll_terminal_exit(state, Duration::from_secs(3)).unwrap_or(false)
+        && let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL)
+    {
+        warn!(pgid, error = %e, "SIGKILL to terminal process group failed");
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub(super) fn terminate_process_group(state: &TerminalState) {
     #[cfg(unix)]
-    if let Some(pgid) = state.pgid {
-        unsafe {
-            libc::killpg(pgid, libc::SIGTERM);
-        }
+    if let Some(pgid) = state.pgid
+        && let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM)
+    {
+        warn!(pgid, error = %e, "SIGTERM to terminal process group failed");
     }
 }
 

@@ -1,11 +1,13 @@
 //! Tests for ACP session supervision.
-#![allow(unsafe_code)]
 
 use std::fs;
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use nix::sys::signal::{Signal, killpg};
+use nix::unistd::Pid;
 
 use super::*;
 
@@ -15,12 +17,7 @@ fn spawn_sleep_child() -> Child {
         use std::os::unix::process::CommandExt;
         let mut cmd = Command::new("sleep");
         cmd.arg("60");
-        unsafe {
-            cmd.pre_exec(|| {
-                libc::setsid();
-                Ok(())
-            });
-        }
+        cmd.process_group(0);
         cmd.spawn().expect("spawn sleep")
     }
     #[cfg(not(unix))]
@@ -53,9 +50,7 @@ fn supervisor_starts_paused() {
     assert_eq!(supervisor.pending_request_count(), 0);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -76,9 +71,7 @@ fn pending_request_guard_activates_watchdog() {
     assert_eq!(supervisor.pending_request_count(), 0);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -101,9 +94,7 @@ fn client_call_guard_pauses_watchdog() {
     assert_eq!(supervisor.in_flight_call_count(), 0);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -122,9 +113,7 @@ fn watchdog_does_not_fire_while_paused() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -144,9 +133,7 @@ fn idle_supervisor_does_not_fire_watchdog() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -165,9 +152,7 @@ fn watchdog_fires_after_timeout() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[tokio::test]
@@ -184,9 +169,7 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[tokio::test]
@@ -214,9 +197,7 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
     assert_eq!(reason, None);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[tokio::test]
@@ -238,9 +219,7 @@ async fn watchdog_loop_returns_none_when_session_is_done() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Done);
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -258,9 +237,7 @@ fn record_event_resets_watchdog() {
     assert!(supervisor.elapsed_since_last_event() < Duration::from_millis(20));
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
 #[test]
@@ -299,12 +276,7 @@ fn kill_process_group_escalates_when_child_traps_sigterm() {
              echo ready >> \"$HARNESS_TEST_SIGNAL_LOG\"; while :; do sleep 1; done",
         )
         .env("HARNESS_TEST_SIGNAL_LOG", &log_path);
-    unsafe {
-        command.pre_exec(|| {
-            libc::setsid();
-            Ok(())
-        });
-    }
+    command.process_group(0);
     let mut child = command.spawn().expect("spawn trap child");
     wait_for_file_marker(&log_path, "ready");
 
@@ -313,7 +285,7 @@ fn kill_process_group_escalates_when_child_traps_sigterm() {
 
     let status = child.try_wait().expect("try_wait after kill");
     let status = status.expect("child should be dead");
-    assert_eq!(status.signal(), Some(libc::SIGKILL));
+    assert_eq!(status.signal(), Some(Signal::SIGKILL as i32));
     wait_for_file_marker(&log_path, "term");
 }
 
@@ -342,7 +314,5 @@ fn begin_shutdown_returns_true_once() {
     assert!(supervisor.is_shutting_down());
 
     #[cfg(unix)]
-    unsafe {
-        libc::killpg(supervisor.pgid(), libc::SIGKILL);
-    }
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
