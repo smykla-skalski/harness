@@ -203,6 +203,22 @@ extension HarnessMonitorStore {
     }
 
     do {
+      HarnessMonitorLogger.store.info(
+        """
+        Remove session started; \
+        sessionID=\(sessionID, privacy: .public); \
+        selectedSessionID=\(self.selectedSessionID ?? "nil", privacy: .public); \
+        visibleSessionCount=\(self.visibleSessionIDs.count, privacy: .public)
+        """
+      )
+      HarnessMonitorUITestTrace.record(
+        component: "store.remove-session",
+        event: "started",
+        details: [
+          "session_id": sessionID,
+          "selected_session_id": selectedSessionID ?? "nil"
+        ]
+      )
       let measuredArchive = try await Self.measureOperation {
         try await action.client.archiveSession(
           sessionID: sessionID,
@@ -211,15 +227,61 @@ extension HarnessMonitorStore {
       }
       _ = measuredArchive
       recordRequestSuccess()
-      let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
-      await pruneRemovedSessionFromCache(
-        sessions: localSnapshot.sessions,
-        projects: localSnapshot.projects
+      HarnessMonitorLogger.store.info(
+        "Remove session archive succeeded; sessionID=\(sessionID, privacy: .public)"
       )
-      presentSuccessFeedback(actionName)
-      await refresh(using: action.client, preserveSelection: true)
-      return true
+      HarnessMonitorUITestTrace.record(
+        component: "store.remove-session",
+        event: "archive-succeeded",
+        details: ["session_id": sessionID]
+      )
+      return await finalizeLocalSessionRemoval(
+        sessionID: sessionID,
+        actionName: actionName,
+        client: action.client
+      )
     } catch {
+      if shouldTreatMissingRemoveSessionArchiveAsLocalSuccess(error) {
+        recordRequestSuccess()
+        HarnessMonitorLogger.store.info(
+          """
+          Remove session falling back to local success after daemon missing-session reply; \
+          sessionID=\(sessionID, privacy: .public); \
+          serverMessage=\(self.removeSessionServerMessage(from: error), privacy: .public); \
+          serverSemanticCode=\(self.removeSessionServerSemanticCode(from: error), privacy: .public)
+          """
+        )
+        HarnessMonitorUITestTrace.record(
+          component: "store.remove-session",
+          event: "archive-missing-treated-as-success",
+          details: [
+            "session_id": sessionID,
+            "error": String(describing: error)
+          ]
+        )
+        return await finalizeLocalSessionRemoval(
+          sessionID: sessionID,
+          actionName: actionName,
+          client: action.client
+        )
+      }
+      HarnessMonitorUITestTrace.record(
+        component: "store.remove-session",
+        event: "failed",
+        details: [
+          "session_id": sessionID,
+          "error": String(describing: error)
+        ]
+      )
+      HarnessMonitorLogger.store.error(
+        """
+        Remove session failed; \
+        sessionID=\(sessionID, privacy: .public); \
+        serverMessage=\(self.removeSessionServerMessage(from: error), privacy: .public); \
+        serverSemanticCode=\(self.removeSessionServerSemanticCode(from: error), privacy: .public); \
+        error=\(error.localizedDescription, privacy: .public)
+        """
+      )
       #if HARNESS_FEATURE_OTEL
         span.status = .error(description: error.localizedDescription)
         HarnessMonitorTelemetry.shared.recordError(error, on: span)
@@ -275,6 +337,94 @@ extension HarnessMonitorStore {
     guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
     let actorID = controlPlaneActionActor(for: actor)
     pendingConfirmation = .removeSession(sessionID: sessionID, actorID: actorID)
+  }
+
+  private func finalizeLocalSessionRemoval(
+    sessionID: String,
+    actionName: String,
+    client: any HarnessMonitorClientProtocol
+  ) async -> Bool {
+    let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
+    HarnessMonitorUITestTrace.record(
+      component: "store.remove-session",
+      event: "local-removal-applied",
+      details: [
+        "session_id": sessionID,
+        "remaining_session_count": String(localSnapshot.sessions.count),
+        "remaining_project_count": String(localSnapshot.projects.count),
+        "selected_session_id": selectedSessionID ?? "nil"
+      ]
+    )
+    HarnessMonitorLogger.store.info(
+      """
+      Remove session local removal applied; \
+      sessionID=\(sessionID, privacy: .public); \
+      remainingSessionCount=\(localSnapshot.sessions.count, privacy: .public); \
+      remainingProjectCount=\(localSnapshot.projects.count, privacy: .public)
+      """
+    )
+    await pruneRemovedSessionFromCache(
+      sessions: localSnapshot.sessions,
+      projects: localSnapshot.projects
+    )
+    presentSuccessFeedback(actionName)
+    await refresh(
+      using: client,
+      preserveSelection: true,
+      allowPreviewReadySelection: false
+    )
+    HarnessMonitorUITestTrace.record(
+      component: "store.remove-session",
+      event: "refresh-finished",
+      details: [
+        "session_id": sessionID,
+        "selected_session_id": selectedSessionID ?? "nil",
+        "visible_session_count": String(visibleSessionIDs.count)
+      ]
+    )
+    HarnessMonitorLogger.store.info(
+      """
+      Remove session refresh finished; \
+      sessionID=\(sessionID, privacy: .public); \
+      selectedSessionID=\(self.selectedSessionID ?? "nil", privacy: .public); \
+      visibleSessionCount=\(self.visibleSessionIDs.count, privacy: .public)
+      """
+    )
+    return true
+  }
+
+  private func shouldTreatMissingRemoveSessionArchiveAsLocalSuccess(
+    _ error: any Error
+  ) -> Bool {
+    guard let apiError = error as? HarnessMonitorAPIError else {
+      return false
+    }
+    guard case .server(let code, _) = apiError, (400...404).contains(code) else {
+      return false
+    }
+
+    if apiError.serverSemanticCode?.lowercased() == "session_not_active" {
+      return removeSessionServerMessage(from: error).localizedCaseInsensitiveContains("not found")
+    }
+
+    let message = removeSessionServerMessage(from: error).lowercased()
+    return message.contains("session not active")
+      && message.contains("session")
+      && message.contains("not found")
+  }
+
+  private func removeSessionServerMessage(from error: any Error) -> String {
+    guard let apiError = error as? HarnessMonitorAPIError else {
+      return error.localizedDescription
+    }
+    return apiError.serverMessage ?? error.localizedDescription
+  }
+
+  private func removeSessionServerSemanticCode(from error: any Error) -> String {
+    guard let apiError = error as? HarnessMonitorAPIError else {
+      return "nil"
+    }
+    return apiError.serverSemanticCode ?? "nil"
   }
 
   public func setDaemonLogLevel(_ level: String) async {

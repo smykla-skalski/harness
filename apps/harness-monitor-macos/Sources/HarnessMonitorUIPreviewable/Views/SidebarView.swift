@@ -124,15 +124,46 @@ struct SidebarSessionListColumn: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
-        if newValue == nil, sidebarUI.selectedSessionID != nil {
-          return
+          HarnessMonitorUITestTrace.record(
+            component: "sidebar.selection-binding",
+            event: "set",
+            details: [
+              "new_value": newValue ?? "nil",
+              "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
+              "rendered_selection_id": renderedSidebarSelectionID ?? "nil"
+            ]
+          )
+          if newValue == nil, shouldIgnoreFilteredSidebarDeselection {
+            HarnessMonitorUITestTrace.record(
+              component: "sidebar.selection-binding",
+              event: "ignored-nil-clear",
+              details: [
+                "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
+                "rendered_selection_id": renderedSidebarSelectionID ?? "nil"
+              ]
+            )
+            return
+          }
+          guard sidebarUI.selectedSessionID != newValue else {
+            HarnessMonitorUITestTrace.record(
+              component: "sidebar.selection-binding",
+              event: "ignored-duplicate",
+              details: [
+                "new_value": newValue ?? "nil"
+              ]
+            )
+            return
+          }
+          store.selectSessionFromList(newValue)
         }
-        guard sidebarUI.selectedSessionID != newValue else {
-          return
-        }
-        store.selectSessionFromList(newValue)
-      }
     )
+  }
+
+  private var shouldIgnoreFilteredSidebarDeselection: Bool {
+    guard sidebarUI.selectedSessionID != nil else {
+      return false
+    }
+    return renderedSidebarSelectionID == nil
   }
 
   private var renderedSidebarSelectionID: String? {

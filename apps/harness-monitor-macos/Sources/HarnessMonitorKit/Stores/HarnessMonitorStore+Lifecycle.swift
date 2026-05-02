@@ -318,7 +318,11 @@ extension HarnessMonitorStore {
       selectedSessionID.map { selectedSessionID in
         filteredSnapshot.sessions.contains { $0.sessionId == selectedSessionID } == false
       } ?? false
-    if selectionMissingFromSnapshot {
+    let presentedDetailMissingFromSnapshot =
+      contentUI.sessionDetail.presentedSessionDetail.map { presentedDetail in
+        filteredSnapshot.sessions.contains { $0.sessionId == presentedDetail.session.sessionId } == false
+      } ?? false
+    if selectionMissingFromSnapshot || presentedDetailMissingFromSnapshot {
       primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
       stopSessionStream()
     }

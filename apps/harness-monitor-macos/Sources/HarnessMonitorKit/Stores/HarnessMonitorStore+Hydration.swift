@@ -8,11 +8,15 @@ extension HarnessMonitorStore {
     guard connectionState == .connecting else { return }
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
+      let filteredCached = sessionIndexSnapshotApplyingRemovedSessionSuppression(
+        projects: cached.projects,
+        sessions: cached.sessions
+      )
       guard connectionState == .connecting else { return }
       withUISyncBatch {
         sessionIndex.replaceSnapshot(
-          projects: cached.projects,
-          sessions: cached.sessions
+          projects: filteredCached.projects,
+          sessions: filteredCached.sessions
         )
       }
     }
@@ -139,10 +143,14 @@ extension HarnessMonitorStore {
     await refreshPersistedSessionMetadata()
 
     if sessions.isEmpty, let cached = await loadCachedSessionList() {
+      let filteredCached = sessionIndexSnapshotApplyingRemovedSessionSuppression(
+        projects: cached.projects,
+        sessions: cached.sessions
+      )
       withUISyncBatch {
         sessionIndex.replaceSnapshot(
-          projects: cached.projects,
-          sessions: cached.sessions
+          projects: filteredCached.projects,
+          sessions: filteredCached.sessions
         )
       }
     }

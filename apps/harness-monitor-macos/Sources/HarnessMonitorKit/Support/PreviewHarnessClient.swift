@@ -132,7 +132,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func projects() async throws -> [ProjectSummary] {
-    fixtures.projects
+    await state.projects(templateProjects: fixtures.projects)
   }
 
   public func sessions() async throws -> [SessionSummary] {

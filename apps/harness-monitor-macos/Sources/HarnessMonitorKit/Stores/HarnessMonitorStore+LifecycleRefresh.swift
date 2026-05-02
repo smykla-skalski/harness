@@ -121,13 +121,18 @@ extension HarnessMonitorStore {
 
   func refresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    allowPreviewReadySelection: Bool = true
   ) async {
     isRefreshing = true
     defer { isRefreshing = false }
 
     do {
-      try await performRefresh(using: client, preserveSelection: preserveSelection)
+      try await performRefresh(
+        using: client,
+        preserveSelection: preserveSelection,
+        allowPreviewReadySelection: allowPreviewReadySelection
+      )
     } catch {
       _ = disconnectActiveConnection()
       markConnectionOffline(Self.describeRefreshSnapshotError(error))
@@ -171,6 +176,7 @@ extension HarnessMonitorStore {
   private func performRefresh(
     using client: any HarnessMonitorClientProtocol,
     preserveSelection: Bool,
+    allowPreviewReadySelection: Bool = true,
     recordConnectionTelemetry: Bool = true
   ) async throws {
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
@@ -178,6 +184,7 @@ extension HarnessMonitorStore {
       refreshSnapshot,
       using: client,
       preserveSelection: preserveSelection,
+      allowPreviewReadySelection: allowPreviewReadySelection,
       recordConnectionTelemetry: recordConnectionTelemetry
     )
   }
@@ -186,20 +193,25 @@ extension HarnessMonitorStore {
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
     preserveSelection: Bool,
+    allowPreviewReadySelection: Bool,
     recordConnectionTelemetry: Bool
   ) {
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
     let measuredSessions = refreshSnapshot.sessions
+    let filteredSnapshot = sessionIndexSnapshotApplyingRemovedSessionSuppression(
+      projects: measuredProjects.value,
+      sessions: measuredSessions.value
+    )
 
     withUISyncBatch {
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
       daemonStatus = DaemonStatusReport(
         diagnosticsReport: measuredDiagnostics.value,
-        fallbackProjectCount: measuredProjects.value.count,
-        fallbackWorktreeCount: measuredProjects.value.reduce(0) { $0 + $1.worktrees.count },
-        fallbackSessionCount: measuredSessions.value.count
+        fallbackProjectCount: filteredSnapshot.projects.count,
+        fallbackWorktreeCount: filteredSnapshot.projects.reduce(0) { $0 + $1.worktrees.count },
+        fallbackSessionCount: filteredSnapshot.sessions.count
       )
       daemonLogLevel =
         measuredDiagnostics.value.health?.logLevel
@@ -216,8 +228,8 @@ extension HarnessMonitorStore {
     }
 
     applySessionIndexSnapshot(
-      projects: measuredProjects.value,
-      sessions: measuredSessions.value
+      projects: filteredSnapshot.projects,
+      sessions: filteredSnapshot.sessions
     )
 
     if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
@@ -225,9 +237,10 @@ extension HarnessMonitorStore {
       startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
     } else {
       synchronizeActionActor()
-      if let previewReadySessionID = previewReadySessionID(
+      if allowPreviewReadySelection,
+        let previewReadySessionID = previewReadySessionID(
         client: client,
-        sessions: measuredSessions.value
+        sessions: filteredSnapshot.sessions
       ) {
         Task { @MainActor [weak self] in
           await self?.selectSession(previewReadySessionID)
@@ -237,7 +250,7 @@ extension HarnessMonitorStore {
 
     schedulePersistedSnapshotHydration(
       using: client,
-      sessions: measuredSessions.value
+      sessions: filteredSnapshot.sessions
     )
   }
 
@@ -250,6 +263,7 @@ extension HarnessMonitorStore {
       refreshSnapshot,
       using: client,
       preserveSelection: preserveSelection,
+      allowPreviewReadySelection: true,
       recordConnectionTelemetry: false
     )
   }

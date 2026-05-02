@@ -189,6 +189,80 @@ extension PersistenceSnapshotIntegrationTests {
     #expect(store.isShowingCachedData == false)
   }
 
+  @Test("Offline restore suppresses locally removed sessions from stale cached lists")
+  func offlineRestoreSuppressesLocallyRemovedSessionsFromCachedList() async {
+    let store = harness.makeStore()
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let session = makeSession(
+      .init(
+        sessionId: "sess-removed-restore",
+        context: "Removed restore",
+        status: .active,
+        leaderId: "leader-removed-restore",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+
+    await store.cacheSessionList([session], projects: [project])
+    store.locallyRemovedSessionIDs.insert(session.sessionId)
+    store.connectionState = .offline("offline restore")
+
+    await store.restorePersistedSessionState()
+
+    #expect(store.sessions.isEmpty)
+    #expect(store.visibleSessionIDs.isEmpty)
+    #expect(store.projects.isEmpty)
+  }
+
+  @Test("Refresh hydration skips locally removed sessions from stale refresh snapshots")
+  func refreshHydrationSkipsLocallyRemovedSessionsFromStaleRefreshSnapshots() async {
+    let session = makeSession(
+      .init(
+        sessionId: "sess-removed-hydration",
+        context: "Removed hydration",
+        status: .active,
+        leaderId: "leader-removed-hydration",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-removed-hydration",
+      workerName: "Removed Hydration Worker"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Removed hydration timeline"
+    )
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [session],
+      detailsByID: [session.sessionId: detail],
+      timelinesBySessionID: [session.sessionId: timeline]
+    )
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      voiceCapture: NativeVoiceCaptureService(),
+      modelContainer: harness.container
+    )
+    await store.cacheSessionDetail(detail, timeline: [], markViewed: true)
+    store.locallyRemovedSessionIDs.insert(session.sessionId)
+    store.connectionState = .online
+
+    await store.refresh(using: client, preserveSelection: false)
+    try? await Task.sleep(for: .milliseconds(100))
+
+    #expect(store.sessions.isEmpty)
+    #expect(client.readCallCount(.sessionDetail(session.sessionId)) == 0)
+    #expect(client.readCallCount(.timelineWindow(session.sessionId)) == 0)
+  }
+
   @Test("Websocket hydration applies selected timeline batches before final completion")
   func websocketHydrationAppliesSelectedTimelineBatchesBeforeFinalCompletion() async throws {
     let session = makeSession(

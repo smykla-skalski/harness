@@ -188,6 +188,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var queuedSessionsErrors: [any Error] = []
   var mutationDelay: Duration?
   var archiveSessionMutatesReadSnapshots = true
+  var archiveSessionError: (any Error)?
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var sessionDetailsByID: [String: SessionDetail] = [:]

@@ -245,6 +245,14 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(app.staticTexts["Remove Session?"].exists)
     confirmButton.tap()
 
+    XCTAssertTrue(
+      waitForAppTraceEvents(
+        ["confirm-tapped", "dismissed", "dispatch-remove-session"],
+        timeout: Self.fastActionTimeout
+      ),
+      "Remove-session UI flow should dispatch the destructive action after dialog dismissal"
+    )
+
     XCTAssertTrue(waitForElement(dashboard, timeout: Self.fastActionTimeout))
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) { !sessionRow.exists },
