@@ -27,6 +27,30 @@ fn session_start_cli_reads_project_policy_file() {
 }
 
 #[test]
+fn session_start_cli_uses_custom_ancestor_policy_file() {
+    let temp_dir = tempfile::tempdir().expect("temp dir");
+    let project_dir = temp_dir.path().join("project");
+    let nested_dir = project_dir.join("nested").join("child");
+    std::fs::create_dir_all(project_dir.join(".aff")).expect("policy dir");
+    std::fs::create_dir_all(&nested_dir).expect("nested dir");
+    std::fs::write(
+        project_dir.join(".aff").join("session_start.md"),
+        "custom session-start sentinel\n",
+    )
+    .expect("policy file");
+
+    let assert = Command::cargo_bin("aff")
+        .expect("aff binary")
+        .current_dir(&nested_dir)
+        .args(["session-start", "--agent", "codex"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(stdout.contains("custom session-start sentinel"));
+    assert!(!stdout.contains("local binary must be reinstalled"));
+}
+
+#[test]
 fn denies_raw_cargo_with_task_replacement() {
     let reason = manual_command_denial_reason("cargo test --lib cli::tests")
         .expect("command should parse")
@@ -215,6 +239,22 @@ fn rejects_unsupported_hook_events() {
 #[test]
 fn session_start_cli_is_noop_without_project_policy_file() {
     let temp_dir = tempfile::tempdir().expect("temp dir");
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .current_dir(temp_dir.path())
+        .args(["session-start", "--agent", "codex"])
+        .assert()
+        .success()
+        .stdout(is_empty());
+}
+
+#[test]
+fn session_start_cli_is_noop_with_empty_project_policy_file() {
+    let temp_dir = tempfile::tempdir().expect("temp dir");
+    std::fs::create_dir_all(temp_dir.path().join(".aff")).expect("policy dir");
+    std::fs::write(temp_dir.path().join(".aff").join("session_start.md"), "\n")
+        .expect("empty policy file");
+
     Command::cargo_bin("aff")
         .expect("aff binary")
         .current_dir(temp_dir.path())

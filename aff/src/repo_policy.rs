@@ -346,9 +346,8 @@ fn passthrough_task(env_prefix: &[String], task: &str, args: &[String]) -> Optio
     } else {
         format!(" -- {}", shell_words::join(args.iter().map(String::as_str)))
     };
-    let verb = if task == "install" { "run " } else { "" };
     Some(SuggestedTask {
-        replacement: format!("{env_prefix}mise {verb}{task}{passthrough}"),
+        replacement: format!("{env_prefix}mise run {task}{passthrough}"),
     })
 }
 
@@ -357,9 +356,8 @@ fn exact_task(env_prefix: &[String], task: &str) -> Option<SuggestedTask> {
         return None;
     }
     let env_prefix = render_env_prefix(env_prefix);
-    let verb = if task == "install" { "run " } else { "" };
     Some(SuggestedTask {
-        replacement: format!("{env_prefix}mise {verb}{task}"),
+        replacement: format!("{env_prefix}mise run {task}"),
     })
 }
 
