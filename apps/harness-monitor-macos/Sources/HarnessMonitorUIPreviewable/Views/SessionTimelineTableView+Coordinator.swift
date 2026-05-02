@@ -108,8 +108,6 @@ extension SessionTimelineTableView {
         rowSnapshot = nextSnapshot
         tableView.reloadData()
         tableView.layoutSubtreeIfNeeded()
-      } else {
-        refreshVisibleRows()
       }
       resizeColumn(in: scrollView, columnWidth: columnWidth)
 
@@ -263,32 +261,6 @@ extension SessionTimelineTableView {
         contentHeight: tableView.bounds.height,
         viewportHeight: scrollView.contentSize.height
       )
-    }
-
-    private func refreshVisibleRows() {
-      guard
-        let tableView,
-        let scrollView,
-        let columnIndex = tableView.tableColumns.indices.first
-      else {
-        return
-      }
-      let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
-      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
-        return
-      }
-      let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
-      for row in rowRange where rows.indices.contains(row) {
-        let view = tableView.view(
-          atColumn: columnIndex,
-          row: row,
-          makeIfNecessary: false
-        )
-        (view as? SessionTimelineTableCellView)?.update(
-          row: rows[row],
-          actionHandler: actionHandler
-        )
-      }
     }
 
     private func invalidateVisibleRowHeights() {
