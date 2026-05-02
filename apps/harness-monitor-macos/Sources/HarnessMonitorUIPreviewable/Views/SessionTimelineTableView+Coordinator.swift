@@ -4,9 +4,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionTimelineTableView {
+  // Coordinator pushes viewport state into `viewport` via methods only; it
+  // never reads viewport properties from inside `updateNSView` or any path
+  // SwiftUI's observation tracker can see. Reading would re-introduce the
+  // body re-eval loop the model exists to break.
   @MainActor
   final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
-    var viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
+    weak var viewport: SessionTimelineViewportModel?
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
     private var rowHeightCache: [String: CGFloat] = [:]
@@ -30,21 +34,25 @@ extension SessionTimelineTableView {
     private var cancellables = Set<AnyCancellable>()
 
     init(
-      viewportStatsChanged: @escaping (SessionTimelineTableViewportStats) -> Void,
+      viewport: SessionTimelineViewportModel,
       scrollBoundaryChanged: @escaping SessionTimelineScrollBoundaryHandler
     ) {
-      self.viewportStatsChanged = viewportStatsChanged
+      self.viewport = viewport
       self.scrollBoundaryChanged = scrollBoundaryChanged
     }
 
     func configure(tableView: NSTableView, scrollView: NSScrollView) {
       self.tableView = tableView
       self.scrollView = scrollView
+      // Defensive: if a representable re-make calls configure twice, cancel
+      // the prior subscription so we never double-observe boundsDidChange.
+      cancellables.removeAll()
       // AppKit posts boundsDidChangeNotification synchronously when the contentView
       // shifts, including from scroll(to:) calls inside updateNSView. Calling
-      // viewportStatsChanged directly would write SwiftUI @State during the view-update
-      // phase and produce an AttributeGraph cycle; defer the publish to the next runloop
-      // turn and coalesce successive notifications via pendingPublish.
+      // model writes directly would mutate SwiftUI observable state during the
+      // view-update phase and produce an AttributeGraph cycle; defer the publish
+      // to the next runloop turn and coalesce successive notifications via
+      // pendingPublish.
       NotificationCenter.default
         .publisher(for: NSView.boundsDidChangeNotification, object: scrollView.contentView)
         .receive(on: RunLoop.main)
@@ -333,7 +341,7 @@ extension SessionTimelineTableView {
       )
       if lastViewportStats != stats {
         lastViewportStats = stats
-        viewportStatsChanged(stats)
+        viewport?.recordViewportStats(stats)
       }
 
       let boundaryState = SessionTimelineScrollBoundaryState(
