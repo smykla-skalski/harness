@@ -99,6 +99,14 @@ enum HarnessMonitorAppStoreFactory {
     let previewActionDelay = previewActionDelay(environment: environment)
     let supervisorSeedScenario = SupervisorSeedScenario(environment: environment)
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
+      HarnessMonitorUITestTrace.record(
+        component: "app.startup",
+        event: "preview-scenario-override",
+        details: [
+          "raw_value": previewScenario.rawValue,
+          "scenario": String(describing: previewScenario.scenario)
+        ]
+      )
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
         hostBridgeOverride: previewHostBridgeOverride,

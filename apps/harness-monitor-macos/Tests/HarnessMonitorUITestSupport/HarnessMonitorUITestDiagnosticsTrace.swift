@@ -72,6 +72,16 @@ func diagnosticsTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
     .appendingPathComponent("ui-trace.jsonl")
 }
 
+func preservedDiagnosticsTraceFileURL() -> URL {
+  let bundleIdentifier = (Bundle.main.bundleIdentifier ?? "harnessmonitor-uitests")
+    .replacingOccurrences(of: ".", with: "-")
+  return FileManager.default.temporaryDirectory
+    .appendingPathComponent("HarnessMonitorUITestPreservedArtifacts", isDirectory: true)
+    .appendingPathComponent(
+      "\(bundleIdentifier)-\(ProcessInfo.processInfo.processIdentifier)-ui-trace.jsonl"
+    )
+}
+
 func appTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
   diagnosticsArtifactsDirectory(for: artifactsDirectoryKey)?
     .appendingPathComponent("app-trace.jsonl")
@@ -111,16 +121,19 @@ func appendDiagnosticsTrace(
   details: [String: String] = [:],
   artifactsDirectoryKey: String
 ) {
-  guard let fileURL = diagnosticsTraceFileURL(for: artifactsDirectoryKey) else {
+  let fileURLs = [diagnosticsTraceFileURL(for: artifactsDirectoryKey), preservedDiagnosticsTraceFileURL()]
+    .compactMap { $0 }
+  guard !fileURLs.isEmpty else {
     return
   }
-
-  HarnessMonitorUITestTraceWriter(fileURL: fileURL).append(
-    component: component,
-    event: event,
-    testName: testName,
-    details: details
-  )
+  for fileURL in fileURLs {
+    HarnessMonitorUITestTraceWriter(fileURL: fileURL).append(
+      component: component,
+      event: event,
+      testName: testName,
+      details: details
+    )
+  }
 }
 
 extension HarnessMonitorUITestCase {

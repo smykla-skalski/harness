@@ -101,6 +101,8 @@ private struct DashboardSessionCard: View {
       .padding(HarnessMonitorTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSessionCard(session.sessionId))
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.dashboardSessionCardFrame(session.sessionId))
     .onHover { isHovered = $0 }
     .contextMenu {
       Button {
@@ -119,6 +121,12 @@ private struct DashboardSessionCard: View {
         HarnessMonitorClipboard.copy(session.sessionId)
       } label: {
         Label("Copy Session ID", systemImage: "doc.on.doc")
+      }
+      Divider()
+      Button(role: .destructive) {
+        store.requestRemoveSessionConfirmation(sessionID: session.sessionId)
+      } label: {
+        Label("Remove Session...", systemImage: "trash")
       }
     }
   }

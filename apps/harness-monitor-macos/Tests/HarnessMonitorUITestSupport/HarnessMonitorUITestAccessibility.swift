@@ -342,6 +342,14 @@ enum HarnessMonitorUITestAccessibility {
     "harness.sidebar.session.\(slug(sessionID))"
   }
 
+  static func dashboardSessionCard(_ sessionID: String) -> String {
+    "harness.board.session.\(slug(sessionID))"
+  }
+
+  static func dashboardSessionCardFrame(_ sessionID: String) -> String {
+    "\(dashboardSessionCard(sessionID)).frame"
+  }
+
   static func slug(_ value: String) -> String {
     let lowercased = value.lowercased()
     return

@@ -45,6 +45,81 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testRemovingDashboardSessionCardHidesItImmediately() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
+    )
+    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    let sessionCard = sessionTrigger(
+      in: app,
+      identifier: Accessibility.dashboardSessionCard("sess1234")
+    )
+    let sessionCardFrame = frameElement(
+      in: app,
+      identifier: Accessibility.dashboardSessionCardFrame("sess1234")
+    )
+    let cockpitScrollView = frameElement(
+      in: app,
+      identifier: Accessibility.sessionCockpitScrollView
+    )
+
+    XCTAssertTrue(
+      boardRoot.waitForExistence(timeout: Self.actionTimeout),
+      """
+      Dashboard root should be visible before exercising dashboard card actions
+      cockpitVisible=\(cockpitScrollView.exists)
+      """
+    )
+    XCTAssertTrue(
+      sessionCardFrame.waitForExistence(timeout: Self.actionTimeout),
+      "Dashboard session card frame should be visible before opening its context menu"
+    )
+
+    let contextMenuTarget = sessionCard.exists ? sessionCard : sessionCardFrame
+    if rightClickElementReliably(in: app, element: contextMenuTarget) == false {
+      recordDiagnosticsSnapshot(in: app, named: "dashboard-card-context-menu-target-missing")
+      XCTFail("Dashboard session cards should expose the native remove-session context menu")
+    }
+
+    let removeSessionItem = app.menuItems["Remove Session..."].firstMatch
+    if removeSessionItem.waitForExistence(timeout: Self.fastActionTimeout) == false {
+      recordDiagnosticsSnapshot(in: app, named: "dashboard-card-context-menu-missing-remove")
+      XCTFail(
+        """
+        Dashboard session card context menu should expose Remove Session...
+        buttonExists=\(sessionCard.exists)
+        frameExists=\(sessionCardFrame.exists)
+        """
+      )
+    }
+
+    XCTAssertTrue(
+      removeSessionItem.exists,
+      "Dashboard session cards should expose Remove Session... in the native context menu"
+    )
+    removeSessionItem.tap()
+
+    let confirmButton = confirmationDialogButton(in: app, title: "Remove Session Now")
+    XCTAssertTrue(confirmButton.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(app.staticTexts["Remove Session?"].exists)
+    confirmButton.tap()
+
+    XCTAssertTrue(
+      waitForAppTraceEvents(
+        ["confirm-tapped", "dismissed", "dispatch-remove-session"],
+        timeout: Self.fastActionTimeout
+      ),
+      "Dashboard remove-session flow should dispatch the destructive action after dialog dismissal"
+    )
+
+    XCTAssertTrue(waitForElement(boardRoot, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) { !sessionCardFrame.exists },
+      "Removed sessions should disappear from the dashboard card list immediately"
+    )
+  }
+
   func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {
     let app = launch(
       mode: "preview",

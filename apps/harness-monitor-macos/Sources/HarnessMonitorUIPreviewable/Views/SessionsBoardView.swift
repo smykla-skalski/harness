@@ -32,6 +32,16 @@ struct SessionsBoardView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionsBoardRoot)
+    .task {
+      HarnessMonitorUITestTrace.record(
+        component: "sessions.board",
+        event: "mounted",
+        details: [
+          "recent_session_count": String(sessionCatalog.recentSessions.count),
+          "selected_session_id": store.selectedSessionID ?? "nil"
+        ]
+      )
+    }
   }
 
 }

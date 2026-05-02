@@ -42,9 +42,13 @@ public struct ContentView<CornerContent: View>: View {
   private var profilingAttributes: [String: String] {
     [
       "harness.view.surface":
-        contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit",
+        currentSurfaceLabel,
       "harness.view.column_visibility": columnVisibilityProfilingLabel,
     ]
+  }
+
+  private var currentSurfaceLabel: String {
+    contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit"
   }
 
   private var columnVisibilityProfilingLabel: String {
@@ -134,6 +138,16 @@ public struct ContentView<CornerContent: View>: View {
     .modifier(
       ContentAnnouncementsModifier(shellUI: contentShell)
     )
+    .task(id: currentSurfaceLabel) {
+      HarnessMonitorUITestTrace.record(
+        component: "content.surface",
+        event: "surface-changed",
+        details: [
+          "surface": currentSurfaceLabel,
+          "selected_session_id": store.selectedSessionID ?? "nil"
+        ]
+      )
+    }
   }
 
   private var contentToolbarModel: ContentWindowToolbarModel {
