@@ -135,6 +135,35 @@ fn renders_copilot_pre_tool_use_denial_output() {
 }
 
 #[test]
+fn allows_non_shell_tool_inputs_without_command_field() {
+    let output = pre_tool_use_output(
+        HookAgent::Claude,
+        br#"{
+            "hook_event_name":"PreToolUse",
+            "tool_name":"Read",
+            "tool_input":{"file_path":"/tmp/example"}
+        }"#,
+    )
+    .expect("non-shell tool input should be allowed silently");
+    assert_eq!(output.exit_code, 0);
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn allows_copilot_tool_args_without_command_field() {
+    let output = pre_tool_use_output(
+        HookAgent::Copilot,
+        br#"{
+            "toolName":"read",
+            "toolArgs":"{\"file_path\":\"/tmp/example\"}"
+        }"#,
+    )
+    .expect("non-shell copilot tool input should be allowed silently");
+    assert_eq!(output.exit_code, 0);
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
 fn rejects_malformed_hook_payloads() {
     let error = pre_tool_use_output(HookAgent::Codex, br#"{"hook_event_name":"PreToolUse""#)
         .expect_err("malformed payload should fail");

@@ -35,10 +35,12 @@ pub fn pre_tool_use_output(
             payload.event
         ));
     }
-    let command_text = payload.command_text.as_deref().ok_or_else(|| {
-        "invalid hook payload: repo-policy expected a shell command in tool_input.command"
-            .to_string()
-    })?;
+    // Non-shell tools (Read, ToolSearch, etc.) carry no `tool_input.command` and
+    // there is nothing for repo-policy to evaluate; allow them through silently
+    // so the matcher can stay broad without spamming hook errors.
+    let Some(command_text) = payload.command_text.as_deref() else {
+        return Ok(RenderedHookResponse::allow());
+    };
     let Some(reason) = manual_command_denial_reason(command_text)? else {
         return Ok(RenderedHookResponse::allow());
     };
