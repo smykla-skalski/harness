@@ -125,7 +125,7 @@ Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-veri
 
 ## Versioning
 
-Every feature change must evaluate semver and bump the version in the same change. Do not ship feature work without updating the version surfaces that track the release.
+Every change must evaluate semver. Never bump versions without explicit user approval. Small changes can skip a bump unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled; those changes require a bump once the user approves it.
 
 - `major` - any breaking change to CLI commands or flags, hook payload contracts, persisted state/schema/artifact formats, machine-consumed output, or behavior that user scripts or suites can reasonably rely on
 - `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
