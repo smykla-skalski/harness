@@ -4,6 +4,7 @@ use super::{
     load_state_or_err, reconcile_expired_pending_signals, storage, summary_to_session_state,
     validate_policy_preset,
 };
+use crate::workspace::utc_now;
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 
 /// Load the current session state.
@@ -196,6 +197,6 @@ pub fn resolve_session_project_dir(
 
 fn visible_local_session_state(state: SessionState) -> Option<SessionState> {
     let mut state = state;
-    canonicalize_persisted_session_state(&mut state, &crate::workspace::utc_now());
+    canonicalize_persisted_session_state(&mut state, &utc_now());
     state.archived_at.is_none().then_some(state)
 }

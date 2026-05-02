@@ -5,6 +5,7 @@ use super::super::{
     session_detail, session_detail_from_daemon_db, session_not_found, session_service, utc_now,
 };
 use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
+use crate::errors::CliErrorKind;
 
 /// Transfer session leadership through the shared session service.
 ///
@@ -99,7 +100,7 @@ pub fn archive_session(
     db: Option<&super::super::db::DaemonDb>,
 ) -> Result<SessionArchiveResponse, CliError> {
     let db = db.ok_or_else(|| {
-        CliError::new(crate::errors::CliErrorKind::usage_error(
+        CliError::new(CliErrorKind::usage_error(
             "daemon database is required for session archive mutations",
         ))
     })?;
