@@ -13,7 +13,7 @@ use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
 use crate::workspace::layout::sessions_root as workspace_sessions_root;
-use crate::workspace::{harness_data_root, project_context_dir};
+use crate::workspace::{harness_data_root, project_context_dir, utc_now};
 
 use super::io::{for_each_nonempty_line, read_json_lines};
 use super::paths::{
@@ -422,7 +422,7 @@ fn load_session_state_from_context_root(
 
 fn index_visible_session_state(state: SessionState) -> Option<SessionState> {
     let mut state = state;
-    canonicalize_persisted_session_state(&mut state, &crate::workspace::utc_now());
+    canonicalize_persisted_session_state(&mut state, &utc_now());
     state.archived_at.is_none().then_some(state)
 }
 
