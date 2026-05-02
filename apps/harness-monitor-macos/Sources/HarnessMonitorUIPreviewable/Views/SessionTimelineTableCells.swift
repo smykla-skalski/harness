@@ -36,6 +36,27 @@ final class SessionTimelineTableCellView: NSTableCellView {
     hostingView.rootView = SessionTimelineHostedRow(row: row, actionHandler: actionHandler)
   }
 
+  @MainActor private static let sizingHost = NSHostingView(
+    rootView: SessionTimelineHostedRow.empty
+  )
+
+  @MainActor
+  static func measuredHeight(for row: SessionTimelineRow, columnWidth: CGFloat) -> CGFloat {
+    guard columnWidth > 1 else {
+      return SessionTimelineTableMetrics.estimatedHeight(for: row)
+    }
+    return autoreleasepool {
+      sizingHost.rootView = SessionTimelineHostedRow(
+        row: row,
+        actionHandler: NullDecisionActionHandler()
+      )
+      sizingHost.frame = NSRect(x: 0, y: 0, width: columnWidth, height: 2_000)
+      sizingHost.layoutSubtreeIfNeeded()
+      let measured = sizingHost.fittingSize.height
+      return measured > 4 ? measured : SessionTimelineTableMetrics.estimatedHeight(for: row)
+    }
+  }
+
 }
 
 private struct SessionTimelineHostedRow: View {
@@ -52,12 +73,12 @@ private struct SessionTimelineHostedRow: View {
         Rectangle()
           .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
           .frame(width: 2)
-          .padding(.top, HarnessMonitorTheme.spacingSM)
           .offset(x: SessionTimelineLayout.railLineOffset - 1)
           .accessibilityHidden(true)
 
         SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
           .padding(.trailing, HarnessMonitorTheme.spacingXS)
+          .padding(.bottom, HarnessMonitorTheme.itemSpacing)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
