@@ -36,6 +36,7 @@ mod response;
 mod runtime_session;
 mod sessions;
 mod sessions_adopt;
+mod sessions_mutations;
 mod signals;
 mod stream;
 mod tasks;

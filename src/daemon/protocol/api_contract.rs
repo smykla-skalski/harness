@@ -52,6 +52,8 @@ pub struct HttpApiRouteContract {
 
 pub mod http_paths;
 mod routes;
+mod routes_sessions_infra;
+mod routes_tasks_agents_voice;
 #[cfg(test)]
 mod tests;
 pub mod ws_methods;
