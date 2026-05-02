@@ -181,8 +181,7 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
     let task = tokio::spawn(watchdog_loop(Arc::clone(&supervisor)));
 
-    let timed_out =
-        tokio::time::timeout(Duration::from_millis(100), &mut Box::pin(async {})).await;
+    let timed_out = tokio::time::timeout(Duration::from_millis(100), &mut Box::pin(async {})).await;
     assert!(timed_out.is_ok());
     tokio::time::sleep(Duration::from_millis(80)).await;
     assert!(
