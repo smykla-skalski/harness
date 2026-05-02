@@ -9,6 +9,7 @@ source "$ROOT/apps/harness-monitor-macos/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
+AFF_CARGO_TOML="$ROOT/aff/Cargo.toml"
 CARGO_LOCK="$ROOT/Cargo.lock"
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor-macos"
 MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
@@ -214,7 +215,8 @@ validate_semver() {
 }
 
 check_sync() {
-  local version testkit_version lock_harness_version lock_testkit_version
+  local version testkit_version aff_version
+  local lock_harness_version lock_testkit_version lock_aff_version
   local marketing_version current_version daemon_version daemon_build_version
   local generated_marketing_version generated_current_version
   local -a generated_marketing_versions=()
@@ -223,16 +225,20 @@ check_sync() {
 
   version="$(canonical_version)"
   testkit_version="$(manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit")"
+  aff_version="$(manifest_package_version "$AFF_CARGO_TOML" "aff")"
   lock_harness_version="$(lock_package_version "$CARGO_LOCK" "harness")"
   lock_testkit_version="$(lock_package_version "$CARGO_LOCK" "harness-testkit")"
+  lock_aff_version="$(lock_package_version "$CARGO_LOCK" "aff")"
   marketing_version="$(build_settings_marketing_version)"
   current_version="$(build_settings_current_version)"
   daemon_version="$(daemon_plist_version)"
   daemon_build_version="$(daemon_plist_build_version)"
 
   [ "$testkit_version" = "$version" ] || errors+=("testkit/Cargo.toml version $testkit_version != Cargo.toml version $version")
+  [ "$aff_version" = "$version" ] || errors+=("aff/Cargo.toml version $aff_version != Cargo.toml version $version")
   [ "$lock_harness_version" = "$version" ] || errors+=("Cargo.lock harness version $lock_harness_version != Cargo.toml version $version")
   [ "$lock_testkit_version" = "$version" ] || errors+=("Cargo.lock harness-testkit version $lock_testkit_version != Cargo.toml version $version")
+  [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
   [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
   [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
   [ "$daemon_version" = "$version" ] || errors+=("apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist version $daemon_version != Cargo.toml version $version")
@@ -280,8 +286,10 @@ sync_all() {
   local version="$1"
 
   set_manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit" "$version"
+  set_manifest_package_version "$AFF_CARGO_TOML" "aff" "$version"
   set_lock_package_version "harness" "$version"
   set_lock_package_version "harness-testkit" "$version"
+  set_lock_package_version "aff" "$version"
   sync_monitor "$version"
 }
 
