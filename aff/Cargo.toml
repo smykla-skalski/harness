@@ -1,6 +1,6 @@
 [package]
 name = "aff"
-version = "30.16.2"
+version = "30.18.0"
 edition = "2024"
 rust-version = "1.94"
 
