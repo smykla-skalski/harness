@@ -40,6 +40,18 @@ Validation expectations (run from repo root):
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
+## Debugging discipline
+
+For Harness Monitor macOS and UI regressions:
+
+- Start with real data. Reproduce with the smallest targeted build/test command and collect the preserved app/UI traces, screenshots, and failure artifacts before changing behavior.
+- If the signal path is weak - bare `XCTAssertTrue`, missing preserved traces, cleaned-up artifacts, or ambiguous failures - stop and improve observability first. Fix the test/tracing surface before patching product code.
+- Correlate the failure across layers before editing: UI-test host trace, preserved app trace, and the concrete source path that emitted the event.
+- Reuse known-good setups. Compare against existing passing tests, fixtures, preview scenarios, and launch helpers before inventing a new launch path or interaction flow.
+- Do not trust preview-scenario names or assumed UI state. Trace the recognized scenario and the actual mounted surface (`dashboard` vs `cockpit`) and patch the proven cause only.
+- Avoid infer -> patch -> rerun loops. The correct loop is observe -> instrument -> prove -> patch -> rerun.
+- Keep each iteration single-cause and targeted: one hypothesis, one instrumentation or code change, one narrow rerun.
+
 ## Performance measurement
 
 Two-layer system for performance regression detection and diagnostic attribution.
