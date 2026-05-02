@@ -1,23 +1,53 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  public func requestWorkspaceSelection(_ selection: WorkspaceSelection) {
-    pendingWorkspaceSelection = selection
+  public struct PendingWorkspaceSelectionRequest: Equatable {
+    public let selection: WorkspaceSelection
+    public let resetDecisionFilters: Bool
+
+    public init(selection: WorkspaceSelection, resetDecisionFilters: Bool) {
+      self.selection = selection
+      self.resetDecisionFilters = resetDecisionFilters
+    }
   }
 
-  public func requestWorkspaceDecisionSelection(decisionID: String) {
+  public func requestWorkspaceSelection(
+    _ selection: WorkspaceSelection,
+    resetDecisionFilters: Bool = false
+  ) {
+    pendingWorkspaceSelection = selection
+    pendingWorkspaceDecisionFilterResetRequested = resetDecisionFilters
+  }
+
+  public func requestWorkspaceDecisionSelection(
+    decisionID: String,
+    resetDecisionFilters: Bool = true
+  ) {
     requestWorkspaceSelection(
       .decision(
         sessionID: workspaceSessionID(forDecisionID: decisionID),
         decisionID: decisionID
-      )
+      ),
+      resetDecisionFilters: resetDecisionFilters
     )
   }
 
   public func consumePendingWorkspaceSelection() -> WorkspaceSelection? {
-    let next = pendingWorkspaceSelection
+    consumePendingWorkspaceSelectionRequest()?.selection
+  }
+
+  public func consumePendingWorkspaceSelectionRequest() -> PendingWorkspaceSelectionRequest? {
+    guard let selection = pendingWorkspaceSelection else {
+      pendingWorkspaceDecisionFilterResetRequested = false
+      return nil
+    }
     pendingWorkspaceSelection = nil
-    return next
+    let request = PendingWorkspaceSelectionRequest(
+      selection: selection,
+      resetDecisionFilters: pendingWorkspaceDecisionFilterResetRequested
+    )
+    pendingWorkspaceDecisionFilterResetRequested = false
+    return request
   }
 
   private func workspaceSessionID(forDecisionID decisionID: String) -> String? {

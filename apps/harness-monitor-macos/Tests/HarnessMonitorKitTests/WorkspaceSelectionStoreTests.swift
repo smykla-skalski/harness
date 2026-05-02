@@ -21,6 +21,19 @@ struct WorkspaceSelectionStoreTests {
     #expect(store.consumePendingWorkspaceSelection() == nil)
   }
 
+  @Test("Attention-driven workspace requests carry the decision-filter reset flag")
+  func requestCarriesDecisionFilterResetFlag() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let selection = WorkspaceSelection.decisions(sessionID: "sess-alpha")
+    store.requestWorkspaceSelection(selection, resetDecisionFilters: true)
+
+    let request = store.consumePendingWorkspaceSelectionRequest()
+
+    #expect(request?.selection == selection)
+    #expect(request?.resetDecisionFilters == true)
+    #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+  }
+
   @Test("Multiple pending requests keep the latest value")
   func latestRequestWins() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

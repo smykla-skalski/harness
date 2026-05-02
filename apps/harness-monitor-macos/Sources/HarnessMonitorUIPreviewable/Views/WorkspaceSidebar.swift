@@ -1,6 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum WorkspaceDecisionFilterDefaults {
+  static let severitiesKey = "harness.workspace.sidebar.severitiesCSV"
+  static let searchScopeKey = "harness.workspace.sidebar.searchScope"
+
+  static func reset(in defaults: UserDefaults = .standard) {
+    defaults.set("", forKey: severitiesKey)
+    defaults.set(DecisionsSidebarSearchScope.summary.rawValue, forKey: searchScopeKey)
+  }
+}
+
 struct WorkspaceSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
@@ -19,9 +29,9 @@ struct WorkspaceSidebar: View {
   let tasks: [WorkItem]
   let refresh: () -> Void
 
-  @AppStorage("harness.workspace.sidebar.severitiesCSV")
+  @AppStorage(WorkspaceDecisionFilterDefaults.severitiesKey)
   private var decisionSeveritiesCSV = ""
-  @AppStorage("harness.workspace.sidebar.searchScope")
+  @AppStorage(WorkspaceDecisionFilterDefaults.searchScopeKey)
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
   @Environment(\.fontScale)

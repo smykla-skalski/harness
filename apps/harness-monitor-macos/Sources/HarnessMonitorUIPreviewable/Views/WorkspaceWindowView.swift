@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct WorkspaceWindowView: View {
-  private static let initialDecisionFilters = DecisionsSidebarViewModel.FilterState(
+  static let initialDecisionFilters = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
     scope: .summary
@@ -29,7 +29,7 @@ public struct WorkspaceWindowView: View {
   @State private var hasCompletedInitialWorkspacePreparation = false
   @State private var stateViewModel: ViewModel
   @State private var decisionsRuntime = WorkspaceDecisionRuntime()
-  @State private var decisionFilters = Self.initialDecisionFilters
+  @State var decisionFilters = Self.initialDecisionFilters
   // Cache the expensive visible decision snapshot by decisions + filters only.
   // Selection stays live in `decisionWorkspaceScope` so selection hops never
   // rebuild the filtered/grouped sidebar data.
@@ -354,6 +354,7 @@ public struct WorkspaceWindowView: View {
     )
     await Task.yield()
     await loadAgentPickerCatalogs()
+    await reloadDecisions()
     resolveInitialWorkspaceSelection()
     await Task.yield()
     guard !Task.isCancelled else {

@@ -39,7 +39,10 @@ public struct WorkspaceToolbarButton: View {
 
   private func openWorkspace(focusesDecisions: Bool) {
     if focusesDecisions {
-      store.requestWorkspaceSelection(.decisions(sessionID: store.selectedSessionID))
+      store.requestWorkspaceSelection(
+        .decisions(sessionID: store.selectedSessionID),
+        resetDecisionFilters: true
+      )
     }
     openWindow(id: HarnessMonitorWindowID.workspace)
   }

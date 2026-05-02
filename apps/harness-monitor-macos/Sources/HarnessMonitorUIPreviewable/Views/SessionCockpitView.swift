@@ -22,7 +22,10 @@ struct SessionCockpitView: View {
   }
 
   private func focusObserver() {
-    store.requestWorkspaceSelection(.decisions(sessionID: detail.session.sessionId))
+    store.requestWorkspaceSelection(
+      .decisions(sessionID: detail.session.sessionId),
+      resetDecisionFilters: true
+    )
     openWindow(id: HarnessMonitorWindowID.workspace)
   }
 

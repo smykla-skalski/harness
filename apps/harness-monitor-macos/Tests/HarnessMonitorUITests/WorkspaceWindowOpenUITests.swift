@@ -70,7 +70,7 @@ final class WorkspaceWindowOpenUITests: HarnessMonitorUITestCase {
     )
 
     XCTAssertTrue(
-      waitForElement(seededRow, timeout: Self.uiTimeout),
+      waitForElement(seededRow, timeout: Self.actionTimeout),
       "Workspace window should contain the seeded decision row"
     )
   }
