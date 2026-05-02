@@ -4,15 +4,54 @@ use std::fmt::Display;
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_sdk::Resource;
-use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::error::OTelSdkResult;
+use opentelemetry_sdk::logs::{LogBatch, LogExporter as SdkLogExporter, SdkLoggerProvider};
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
-use tokio::runtime::{Builder as TokioRuntimeBuilder, Runtime as TokioRuntime};
+use std::future::{Future, ready};
+use std::time::Duration;
+
+use tokio::runtime::{
+    Builder as TokioRuntimeBuilder, Handle as TokioHandle, Runtime as TokioRuntime,
+};
 use tonic::metadata::{MetadataKey, MetadataMap, MetadataValue};
 
 use crate::errors::{CliError, CliErrorKind};
 
 use super::config::{ExportProtocol, ResolvedTelemetryConfig, RuntimeService};
+
+// BatchLogProcessor spawns a plain OS thread and calls
+// `futures_executor::block_on(exporter.export(batch))`.  Tonic channels require a
+// tokio reactor, so that call panics.  This wrapper captures the runtime handle and
+// runs the inner export on it via `handle.block_on`, which is safe from non-tokio
+// threads.  It returns an already-resolved `Ready` future so the outer
+// `futures_executor::block_on` has nothing to drive itself.
+#[derive(Debug)]
+struct TokioLogExporter<E> {
+    inner: E,
+    handle: TokioHandle,
+}
+
+impl<E: SdkLogExporter> SdkLogExporter for TokioLogExporter<E> {
+    fn export(
+        &self,
+        batch: LogBatch<'_>,
+    ) -> impl Future<Output = OTelSdkResult> + Send {
+        let result = self.handle.block_on(self.inner.export(batch));
+        ready(result)
+    }
+
+    fn shutdown_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> OTelSdkResult {
+        self.inner.shutdown_with_timeout(timeout)
+    }
+
+    fn set_resource(&mut self, resource: &Resource) {
+        self.inner.set_resource(resource);
+    }
+}
 
 pub(crate) fn build_export_providers(
     export: &ResolvedTelemetryConfig,
@@ -184,9 +223,13 @@ fn build_logger_provider(
         }
     };
 
+    let handle = TokioHandle::current();
     Ok(SdkLoggerProvider::builder()
         .with_resource(resource)
-        .with_batch_exporter(exporter)
+        .with_batch_exporter(TokioLogExporter {
+            inner: exporter,
+            handle,
+        })
         .build())
 }
 
