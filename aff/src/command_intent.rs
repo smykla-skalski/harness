@@ -160,6 +160,15 @@ fn has_unsupported_embedded_control_operator(text: &str) -> bool {
             continue;
         };
 
+        // `>&` and `<&` are I/O redirection tokens (e.g., `2>&1`), not control
+        // operators, so they are allowed even when not space-delimited.
+        if character == '&' && operator_len == 1 {
+            let prev_char = text[..index].chars().next_back();
+            if matches!(prev_char, Some('>' | '<')) {
+                continue;
+            }
+        }
+
         let prev_is_whitespace = text[..index]
             .chars()
             .next_back()
@@ -221,5 +230,19 @@ mod tests {
     fn supported_parser_allows_quoted_urls_with_ampersands() {
         parse_supported_command_text("curl 'https://example.com?a=1&b=2'", "top-level")
             .expect("quoted URL should stay allowed");
+    }
+
+    #[test]
+    fn supported_parser_allows_redirection_to_fd_one() {
+        parse_supported_command_text("cargo build 2>&1", "top-level")
+            .expect("`2>&1` redirect should not be treated as a control operator");
+        parse_supported_command_text("cargo build 2>&1 | tee log", "top-level")
+            .expect("redirect followed by piped command should stay allowed");
+    }
+
+    #[test]
+    fn supported_parser_allows_input_fd_redirection() {
+        parse_supported_command_text("cat <&3", "top-level")
+            .expect("`<&3` redirect should not be treated as a control operator");
     }
 }
