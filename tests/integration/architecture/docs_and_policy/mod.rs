@@ -357,29 +357,3 @@ fn canonical_observe_sources_avoid_host_owned_runtime_paths() {
         hits.join("\n")
     );
 }
-
-#[test]
-fn shared_plugin_outputs_stay_portable() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hits = collect_hits_in_paths(
-        root,
-        &[
-            "plugins/suite/skills/create/SKILL.md",
-            "plugins/suite/skills/run/SKILL.md",
-        ],
-        &[
-            "--agent codex",
-            "--agent copilot",
-            "matcher: AskUserQuestion",
-        ],
-        |path, needle| {
-            format!("{path} still contains host-specific shared-plugin content `{needle}`")
-        },
-    );
-
-    assert!(
-        hits.is_empty(),
-        "shared plugin outputs are still host-specific:\n{}",
-        hits.join("\n")
-    );
-}

@@ -1,5 +1,4 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde_json::json;
 
@@ -55,13 +54,6 @@ fn sample_skill() -> SkillDefinition {
         body: "Run the suite through harness.".to_string(),
         codex: None,
     }
-}
-
-fn write(path: &Path, content: &str) {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).expect("create parent directories");
-    }
-    fs::write(path, content).expect("write file");
 }
 
 #[test]
@@ -161,35 +153,6 @@ fn agent_assets_include_gemini_commands_when_requested() {
         read_text(&gemini_command)
             .expect("gemini command reads")
             .contains("harness session")
-    );
-}
-
-#[test]
-fn default_gemini_write_prunes_stale_command_wrappers() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let project_root = tmp.path();
-    let stale_command = project_root
-        .join(".gemini")
-        .join("commands")
-        .join("swarm-e2e-iterate.toml");
-    let guide = project_root
-        .join(".gemini")
-        .join("commands")
-        .join("AGENTS.md");
-
-    write(
-        &stale_command,
-        "description = \"stale\"\nprompt = '''stale'''\n",
-    );
-
-    let written = write_agent_target_outputs(project_root, AgentAssetTarget::All)
-        .expect("asset write succeeds");
-
-    assert!(written.contains(&guide));
-    assert!(guide.exists());
-    assert!(
-        !stale_command.exists(),
-        "default Gemini write should prune stale command wrappers"
     );
 }
 

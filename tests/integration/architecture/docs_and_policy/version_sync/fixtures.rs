@@ -215,10 +215,12 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
     for relative_path in [
         "Cargo.toml",
         "Cargo.lock",
+        "aff/Cargo.toml",
         "testkit/Cargo.toml",
         "src/observe/output.rs",
         "scripts/version.sh",
         "apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh",
+        "apps/harness-monitor-macos/Scripts/lib/xcode-version.sh",
         "apps/harness-monitor-macos/Scripts/patch-tuist-pbxproj.py",
         "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
         "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
