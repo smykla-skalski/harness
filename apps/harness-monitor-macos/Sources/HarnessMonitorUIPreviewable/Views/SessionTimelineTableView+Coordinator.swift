@@ -23,6 +23,7 @@ extension SessionTimelineTableView {
       visibleMaxY: 0,
       contentHeight: .greatestFiniteMagnitude
     )
+    private var pendingPublish = false
 
     init(
       viewportStatsChanged: @escaping (SessionTimelineTableViewportStats) -> Void,
@@ -134,9 +135,20 @@ extension SessionTimelineTableView {
       false
     }
 
+    // AppKit posts boundsDidChangeNotification synchronously when the contentView
+    // shifts, including from the scroll(to:) calls inside updateNSView. Calling
+    // viewportStatsChanged directly would write SwiftUI @State during the view-update
+    // phase and produce an AttributeGraph cycle; defer the publish to the next runloop
+    // turn and coalesce successive notifications via pendingPublish.
     @objc
     private func contentBoundsDidChange(_: Notification) {
-      publishViewportState()
+      guard !pendingPublish else { return }
+      pendingPublish = true
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        self.pendingPublish = false
+        self.publishViewportState()
+      }
     }
 
     private func resizeColumn(in scrollView: NSScrollView) -> Bool {
