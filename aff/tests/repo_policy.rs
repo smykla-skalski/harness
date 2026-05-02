@@ -10,6 +10,8 @@ fn session_start_context_mentions_mise_and_signing_requirements() {
     assert!(context.contains("mise tasks ls"));
     assert!(context.contains("mise run <task>"));
     assert!(context.contains("Every commit uses `-sS`"));
+    assert!(context.contains("explicit user approval"));
+    assert!(context.contains("local binary must be reinstalled"));
 }
 
 #[test]

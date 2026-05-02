@@ -113,6 +113,18 @@ fn docs_describe_automatic_version_sync_workflow() {
         !claude.contains("Manual bump surfaces for harness:"),
         "CLAUDE.md should describe the automatic version sync workflow instead of manual bump surfaces"
     );
+    assert!(
+        agents.contains("explicit user approval")
+            && claude.contains("explicit user approval")
+            && readme.contains("explicit user approval"),
+        "version workflow docs should gate version bumps behind explicit user approval"
+    );
+    assert!(
+        agents.contains("local binary must be reinstalled")
+            && claude.contains("local binary must be reinstalled")
+            && readme.contains("local binary must be reinstalled"),
+        "version workflow docs should require bumps for shipped harness/aff logic changes that force local reinstalls"
+    );
 }
 
 #[test]

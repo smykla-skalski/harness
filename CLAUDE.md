@@ -113,7 +113,7 @@ Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-veri
 
 ## Versioning
 
-Every feature change must evaluate semver and bump the version. When working on `main` directly, bump in the same change. When working in a worktree or feature branch, never bump the version there - version bumps happen on `main` after the branch merges, because parallel worktrees would create conflicting version changes. The `/do` skill gates this behind user approval automatically.
+Every change must evaluate semver. Never bump versions without explicit user approval. Small changes can skip a bump unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled; those changes require a bump once approved. When working on `main`, make the approved bump in the same change. In a worktree or feature branch, defer the approved bump to `main` after merge to avoid conflicts.
 
 - `major` - any breaking change to CLI commands or flags, hook payload contracts, persisted state/schema/artifact formats, machine-consumed output, or behavior that user scripts or suites can reasonably rely on
 - `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
