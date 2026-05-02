@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import HarnessMonitorKit
 import SwiftUI
 
@@ -9,6 +10,8 @@ extension SessionTimelineTableView {
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
     private var rowHeightCache: [String: CGFloat] = [:]
+    private var lastColumnWidth: CGFloat = 0
+    private var lastPreMeasuredWidth: CGFloat = 0
     private var rows: [SessionTimelineRow] = []
     private var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
@@ -24,6 +27,7 @@ extension SessionTimelineTableView {
       contentHeight: .greatestFiniteMagnitude
     )
     private var pendingPublish = false
+    private var cancellables = Set<AnyCancellable>()
 
     init(
       viewportStatsChanged: @escaping (SessionTimelineTableViewportStats) -> Void,
@@ -33,26 +37,29 @@ extension SessionTimelineTableView {
       self.scrollBoundaryChanged = scrollBoundaryChanged
     }
 
-    deinit {
-      NotificationCenter.default.removeObserver(self)
-    }
-
     func configure(tableView: NSTableView, scrollView: NSScrollView) {
       self.tableView = tableView
       self.scrollView = scrollView
-      NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(contentBoundsDidChange(_:)),
-        name: NSView.boundsDidChangeNotification,
-        object: scrollView.contentView
-      )
+      // AppKit posts boundsDidChangeNotification synchronously when the contentView
+      // shifts, including from scroll(to:) calls inside updateNSView. Calling
+      // viewportStatsChanged directly would write SwiftUI @State during the view-update
+      // phase and produce an AttributeGraph cycle; defer the publish to the next runloop
+      // turn and coalesce successive notifications via pendingPublish.
+      NotificationCenter.default
+        .publisher(for: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+        .receive(on: RunLoop.main)
+        .sink { [weak self] _ in
+          Task { @MainActor in self?.boundsDidChange() }
+        }
+        .store(in: &cancellables)
     }
 
     func update(
       rows: [SessionTimelineRow],
       actionHandler: any DecisionActionHandler,
       scrollCommand: SessionTimelineScrollCommand?,
-      scrollView: NSScrollView
+      scrollView: NSScrollView,
+      columnWidth: CGFloat
     ) {
       guard let tableView else {
         return
@@ -68,8 +75,20 @@ extension SessionTimelineTableView {
           rowHeightCache[rowID] = tableView.rect(ofRow: rowIndex).height
         }
 
-        for row in rows where rowHeightCache[row.id] == nil {
-          rowHeightCache[row.id] = SessionTimelineTableMetrics.estimatedHeight(for: row)
+        // Pre-measure at the SwiftUI-provided column width (from GeometryReader).
+        // This is always valid — GeometryReader gives the real layout width before
+        // updateNSView runs, unlike scrollView.contentView.bounds which is zero
+        // until AppKit completes its first layout pass.
+        if columnWidth > 1 {
+          lastPreMeasuredWidth = columnWidth
+          autoreleasepool {
+            for row in rows where rowHeightCache[row.id] == nil {
+              rowHeightCache[row.id] = SessionTimelineTableCellView.measuredHeight(
+                for: row,
+                columnWidth: columnWidth
+              )
+            }
+          }
         }
 
         self.rows = rows
@@ -84,9 +103,7 @@ extension SessionTimelineTableView {
       } else {
         refreshVisibleRows()
       }
-      if resizeColumn(in: scrollView) {
-        invalidateVisibleRowHeights()
-      }
+      resizeColumn(in: scrollView, columnWidth: columnWidth)
 
       if scrollCommand != lastScrollCommand {
         pendingScrollCommand = scrollCommand
@@ -101,13 +118,25 @@ extension SessionTimelineTableView {
       rows.count
     }
 
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+    func tableView(_: NSTableView, heightOfRow row: Int) -> CGFloat {
       guard rows.indices.contains(row) else {
         return SessionTimelineTableMetrics.estimatedBaseRowHeight
       }
       let rowData = rows[row]
       if let cached = rowHeightCache[rowData.id] {
         return cached
+      }
+      // Lazy path: cache was nil (width was ≤1 when rowsChanged ran).
+      // resizeColumn sets lastColumnWidth before calling noteHeightOfRows, so
+      // lastColumnWidth is always valid here — unlike scrollView.contentView.bounds.width
+      // which may still be zero until AppKit completes its first layout pass.
+      if lastColumnWidth > 1 {
+        let h = SessionTimelineTableCellView.measuredHeight(
+          for: rowData,
+          columnWidth: lastColumnWidth
+        )
+        rowHeightCache[rowData.id] = h
+        return h
       }
       return SessionTimelineTableMetrics.estimatedHeight(for: rowData)
     }
@@ -139,13 +168,7 @@ extension SessionTimelineTableView {
       false
     }
 
-    // AppKit posts boundsDidChangeNotification synchronously when the contentView
-    // shifts, including from the scroll(to:) calls inside updateNSView. Calling
-    // viewportStatsChanged directly would write SwiftUI @State during the view-update
-    // phase and produce an AttributeGraph cycle; defer the publish to the next runloop
-    // turn and coalesce successive notifications via pendingPublish.
-    @objc
-    private func contentBoundsDidChange(_: Notification) {
+    private func boundsDidChange() {
       guard !pendingPublish else { return }
       pendingPublish = true
       Task { @MainActor [weak self] in
@@ -155,16 +178,25 @@ extension SessionTimelineTableView {
       }
     }
 
-    private func resizeColumn(in scrollView: NSScrollView) -> Bool {
-      guard let tableView, let column = tableView.tableColumns.first else {
-        return false
+    private func resizeColumn(in scrollView: NSScrollView, columnWidth: CGFloat) {
+      guard let tableView, let column = tableView.tableColumns.first else { return }
+      guard columnWidth > 1, column.width != columnWidth else { return }
+      let isFirstRealWidth = lastColumnWidth <= 1
+      lastColumnWidth = columnWidth
+      column.width = columnWidth
+      if isFirstRealWidth {
+        // First layout with a valid width. If rowsChanged already pre-measured at
+        // this exact width, the cache is correct — just notify AppKit. Otherwise
+        // (columnWidth changed between pre-measure and resizeColumn, edge case),
+        // discard stale cache so heightOfRow remeasures at the current width.
+        if lastPreMeasuredWidth != columnWidth {
+          for row in rows { rowHeightCache.removeValue(forKey: row.id) }
+        }
+        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+      } else {
+        // Subsequent window resize: updating visible rows is sufficient.
+        invalidateVisibleRowHeights()
       }
-      let width = max(1, scrollView.contentView.bounds.width)
-      if column.width != width {
-        column.width = width
-        return true
-      }
-      return false
     }
 
     private func performPendingScrollCommand() -> Bool {
@@ -252,14 +284,14 @@ extension SessionTimelineTableView {
     }
 
     private func invalidateVisibleRowHeights() {
-      guard let tableView, let scrollView else {
-        return
-      }
+      guard let tableView, let scrollView else { return }
       let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
-      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
-        return
-      }
+      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return }
       let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
+      // Evict cached heights so heightOfRow remeasures at the new column width.
+      for row in rowRange where rows.indices.contains(row) {
+        rowHeightCache.removeValue(forKey: rows[row].id)
+      }
       tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rowRange))
     }
 

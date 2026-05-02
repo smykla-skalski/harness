@@ -156,22 +156,25 @@ struct SessionCockpitTimelineSection: View {
       if presentation.rows.isEmpty {
         timelinePlaceholderContent(for: presentation)
       } else {
-        SessionTimelineTableView(
-          rows: presentation.rows,
-          scrollCommand: scrollCommand,
-          actionHandler: actionHandler,
-          viewportStatsChanged: { viewportStats in
-            updateVisibleAnchor(viewportStats.anchorRowID)
-            rebuildVisibilityStats(viewportStats: viewportStats)
-          },
-          scrollBoundaryChanged: { oldValue, newValue in
-            handleScrollBoundaryChange(
-              from: oldValue,
-              to: newValue,
-              presentation: presentation
-            )
-          }
-        )
+        GeometryReader { geo in
+          SessionTimelineTableView(
+            columnWidth: geo.size.width,
+            rows: presentation.rows,
+            scrollCommand: scrollCommand,
+            actionHandler: actionHandler,
+            viewportStatsChanged: { viewportStats in
+              updateVisibleAnchor(viewportStats.anchorRowID)
+              rebuildVisibilityStats(viewportStats: viewportStats)
+            },
+            scrollBoundaryChanged: { oldValue, newValue in
+              handleScrollBoundaryChange(
+                from: oldValue,
+                to: newValue,
+                presentation: presentation
+              )
+            }
+          )
+        }
       }
     }
     .frame(height: presentation.viewportHeight)

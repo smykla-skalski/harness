@@ -34,6 +34,7 @@ struct SessionTimelineTableAnchor {
 }
 
 struct SessionTimelineTableView: NSViewRepresentable {
+  let columnWidth: CGFloat
   let rows: [SessionTimelineRow]
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
@@ -59,7 +60,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     tableView.backgroundColor = .clear
     tableView.usesAlternatingRowBackgroundColors = false
     tableView.gridStyleMask = []
-    tableView.intercellSpacing = NSSize(width: 0, height: HarnessMonitorTheme.itemSpacing)
+    tableView.intercellSpacing = .zero
     tableView.usesAutomaticRowHeights = false
     tableView.selectionHighlightStyle = .none
     tableView.allowsEmptySelection = true
@@ -89,7 +90,8 @@ struct SessionTimelineTableView: NSViewRepresentable {
       rows: rows,
       actionHandler: actionHandler,
       scrollCommand: scrollCommand,
-      scrollView: scrollView
+      scrollView: scrollView,
+      columnWidth: columnWidth
     )
   }
 
