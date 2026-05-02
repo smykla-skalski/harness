@@ -224,6 +224,15 @@ public struct SessionEndRequest: Codable, Equatable, Sendable {
   public let actor: String
 }
 
+public struct SessionArchiveRequest: Codable, Equatable, Sendable {
+  public let actor: String
+}
+
+public struct SessionArchiveResponse: Codable, Equatable, Sendable {
+  public let sessionId: String
+  public let archivedAt: String
+}
+
 public struct ObserveSessionRequest: Codable, Equatable, Sendable {
   public let actor: String
 }

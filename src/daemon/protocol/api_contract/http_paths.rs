@@ -19,6 +19,7 @@ pub const SESSION_JOIN: &str = "/v1/sessions/{session_id}/join";
 pub const SESSION_RUNTIME_SESSION: &str = "/v1/sessions/{session_id}/runtime-session";
 pub const SESSION_TITLE: &str = "/v1/sessions/{session_id}/title";
 pub const SESSION_END: &str = "/v1/sessions/{session_id}/end";
+pub const SESSION_ARCHIVE: &str = "/v1/sessions/{session_id}/archive";
 pub const SESSION_LEAVE: &str = "/v1/sessions/{session_id}/leave";
 pub const SESSION_OBSERVE: &str = "/v1/sessions/{session_id}/observe";
 pub const SESSION_TASK_CREATE: &str = "/v1/sessions/{session_id}/task";

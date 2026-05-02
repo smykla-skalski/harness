@@ -310,23 +310,33 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
+    let filteredSnapshot = sessionIndexSnapshotApplyingRemovedSessionSuppression(
+      projects: projects,
+      sessions: sessions
+    )
     let selectionMissingFromSnapshot =
       selectedSessionID.map { selectedSessionID in
-        sessions.contains { $0.sessionId == selectedSessionID } == false
+        filteredSnapshot.sessions.contains { $0.sessionId == selectedSessionID } == false
       } ?? false
     if selectionMissingFromSnapshot {
-      primeSessionSelection(nil)
+      primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
       stopSessionStream()
     }
 
     var didChange = false
     withUISyncBatch {
-      didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
+      didChange = sessionIndex.replaceSnapshot(
+        projects: filteredSnapshot.projects,
+        sessions: filteredSnapshot.sessions
+      )
       isShowingCachedCatalog = false
     }
     if didChange {
       scheduleCacheWrite { service in
-        await service.cacheSessionList(sessions, projects: projects)
+        await service.cacheSessionList(
+          filteredSnapshot.sessions,
+          projects: filteredSnapshot.projects
+        )
       }
     }
     #if HARNESS_FEATURE_OTEL
@@ -334,12 +344,15 @@ extension HarnessMonitorStore {
     #endif
 
     if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
-      primeSessionSelection(nil)
+      primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
       stopSessionStream()
     }
   }
 
   func applySessionSummaryUpdate(_ summary: SessionSummary) {
+    guard !shouldIgnoreLocallyRemovedSession(summary.sessionId) else {
+      return
+    }
     let didChange = sessionIndex.applySessionSummary(summary)
     guard didChange else {
       return

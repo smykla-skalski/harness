@@ -329,6 +329,14 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return try await sessionDetail(id: "")
   }
 
+  public func archiveSession(
+    sessionID: String,
+    request _: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse {
+    try await performActionDelay()
+    return try await state.archiveSession(sessionID: sessionID)
+  }
+
   public func sendSignal(
     sessionID _: String,
     request _: SignalSendRequest
@@ -403,14 +411,4 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return updatedTui
   }
 
-  public func logLevel() async throws -> LogLevelResponse {
-    LogLevelResponse(
-      level: HarnessMonitorLogger.defaultDaemonLogLevel,
-      filter: HarnessMonitorLogger.defaultDaemonFilter
-    )
-  }
-
-  public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
-    LogLevelResponse(level: level, filter: "harness=\(level)")
-  }
 }

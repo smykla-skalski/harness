@@ -63,29 +63,31 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case commandFailed(String)
 
   public var errorDescription: String? {
+    let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
     switch self {
     case .harnessBinaryNotFound:
-      "Unable to locate the bundled harness daemon helper."
+      return "Unable to locate the bundled harness daemon helper."
     case .manifestMissing:
-      "The harness daemon manifest is missing."
+      return "The harness daemon manifest is missing."
     case .manifestUnreadable:
-      "The harness daemon manifest could not be read."
+      return "The harness daemon manifest could not be read."
     case .invalidManifest(let message):
-      "The harness daemon manifest failed trust validation: \(message)"
+      return "The harness daemon manifest failed trust validation: \(message)"
     case .managedDaemonVersionMismatch(let expected, let actual):
-      "The managed daemon is running version \(actual), but this app bundle expects \(expected)."
+      return
+        "The managed daemon is running version \(actual), but this app bundle expects \(expected)."
     case .daemonOffline:
-      "The harness daemon is offline. Start the daemon to load live sessions."
+      return "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
-      "The harness daemon did not become healthy before the timeout."
+      return "The harness daemon did not become healthy before the timeout."
     case .externalDaemonOffline(let manifestPath):
-      "External daemon not running. Start it in a terminal: `harness daemon dev`. "
+      return "External daemon not running. Start it in a terminal: `\(daemonCommand)`. "
         + "Manifest expected at \(manifestPath)."
     case .externalDaemonManifestStale(let manifestPath):
-      "Stale manifest detected at \(manifestPath). The external daemon exited "
-        + "without cleanup. Restart it with `harness daemon dev` in a terminal."
+      return "Stale manifest detected at \(manifestPath). The external daemon exited "
+        + "without cleanup. Restart it with `\(daemonCommand)` in a terminal."
     case .commandFailed(let message):
-      message
+      return message
     }
   }
 }

@@ -236,6 +236,23 @@ pub(super) fn migrate_v11_to_v12(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
+pub(super) fn migrate_v12_to_v13(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+    object.insert("schema_version".to_string(), json!(13));
+
+    let is_ended = object
+        .get("status")
+        .and_then(Value::as_str)
+        .is_some_and(|status| status == "ended");
+    if is_ended {
+        object.insert("archived_at".to_string(), Value::Null);
+    }
+
+    Ok(value)
+}
+
 fn migrate_runtime_field(agent: &mut serde_json::Map<String, Value>) {
     let Some(runtime) = agent.get("runtime") else {
         return;

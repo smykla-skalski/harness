@@ -21,10 +21,11 @@ use super::parity::{
     dispatch_managed_agent_resolve_codex_approval, dispatch_managed_agent_start_acp,
     dispatch_managed_agent_start_codex, dispatch_managed_agent_start_terminal,
     dispatch_managed_agent_steer_codex, dispatch_managed_agent_stop,
-    dispatch_managed_agent_stop_acp, dispatch_session_adopt, dispatch_session_delete,
-    dispatch_session_join, dispatch_session_leave, dispatch_session_runtime_session,
-    dispatch_session_title, dispatch_signal_ack, dispatch_voice_append_audio,
-    dispatch_voice_append_transcript, dispatch_voice_finish_session, dispatch_voice_start_session,
+    dispatch_managed_agent_stop_acp, dispatch_session_adopt, dispatch_session_archive,
+    dispatch_session_delete, dispatch_session_join, dispatch_session_leave,
+    dispatch_session_runtime_session, dispatch_session_title, dispatch_signal_ack,
+    dispatch_voice_append_audio, dispatch_voice_append_transcript, dispatch_voice_finish_session,
+    dispatch_voice_start_session,
 };
 use super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
@@ -385,6 +386,7 @@ async fn dispatch_session_teardown_mutation(
     match request.method.as_str() {
         ws_methods::LEADER_TRANSFER => Some(dispatch_leader_transfer(request, state).await),
         ws_methods::SESSION_END => Some(dispatch_session_end(request, state).await),
+        ws_methods::SESSION_ARCHIVE => Some(dispatch_session_archive(request, state).await),
         ws_methods::SESSION_LEAVE => Some(dispatch_session_leave(request, state).await),
         ws_methods::BRIDGE_RECONFIGURE => Some(dispatch_bridge_reconfigure(request, state).await),
         _ => None,

@@ -2,7 +2,7 @@ use serde_json::json;
 
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
-    migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11, migrate_v11_to_v12,
+    migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11, migrate_v11_to_v12, migrate_v12_to_v13,
 };
 use super::registry::{ProjectOriginRecord, merge_project_origin};
 
@@ -359,6 +359,32 @@ fn migrate_v11_to_v12_rejects_conflicting_tui_marker_ids() {
             "session state agent 'agent-1' has conflicting managed terminal capabilities"
         )
     );
+}
+
+#[test]
+fn migrate_v12_to_v13_clears_legacy_end_session_archive_timestamp() {
+    let migrated = migrate_v12_to_v13(json!({
+        "schema_version": 12,
+        "state_version": 3,
+        "session_id": "sess-1",
+        "title": "session title",
+        "context": "session goal",
+        "status": "ended",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "agents": {},
+        "tasks": {},
+        "leader_id": null,
+        "archived_at": "2026-01-01T00:10:00Z",
+        "last_activity_at": null,
+        "observe_id": null,
+        "pending_leader_transfer": null,
+        "metrics": {}
+    }))
+    .expect("migrate v12");
+
+    assert_eq!(migrated["schema_version"], json!(13));
+    assert!(migrated["archived_at"].is_null());
 }
 
 // TODO(b-task-8): is_worktree and worktree_name were removed from ProjectOriginRecord.

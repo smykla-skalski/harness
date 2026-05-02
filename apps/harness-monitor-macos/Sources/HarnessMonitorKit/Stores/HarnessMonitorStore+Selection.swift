@@ -124,7 +124,10 @@ extension HarnessMonitorStore {
 
   // MARK: - Selection
 
-  public func primeSessionSelection(_ sessionID: String?) {
+  public func primeSessionSelection(
+    _ sessionID: String?,
+    retainPresentedDetailWhenSelectionClears: Bool = true
+  ) {
     let isChangingSelectedSession = selectedSession?.session.sessionId != sessionID
 
     if isChangingSelectedSession {
@@ -141,7 +144,7 @@ extension HarnessMonitorStore {
       if isChangingSelectedSession, inFlightActionID != nil {
         inFlightActionID = nil
       }
-      selection.retainPresentedDetailWhenSelectionClears = true
+      selection.retainPresentedDetailWhenSelectionClears = retainPresentedDetailWhenSelectionClears
       selectedSessionID = sessionID
       isExtensionsLoading = false
       if pendingExtensions != nil {

@@ -203,6 +203,7 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
 
     let bookmarkItem = app.menuItems["Bookmark"].firstMatch
     let copySessionIDItem = app.menuItems["Copy Session ID"].firstMatch
+    let removeSessionItem = app.menuItems["Remove Session..."].firstMatch
 
     XCTAssertTrue(
       bookmarkItem.waitForExistence(timeout: Self.fastActionTimeout),
@@ -212,8 +213,44 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
       copySessionIDItem.waitForExistence(timeout: Self.fastActionTimeout),
       "Selected sidebar rows should keep the native copy context menu action"
     )
+    XCTAssertTrue(
+      removeSessionItem.waitForExistence(timeout: Self.fastActionTimeout),
+      "Selected sidebar rows should expose the destructive remove-session action"
+    )
 
     app.typeKey(.escape, modifierFlags: [])
+  }
+
+  func testRemovingSelectedSessionFallsBackToDashboardAndHidesSidebarRow() throws {
+    let app = launch(mode: "preview")
+    let sessionRow = previewSessionTrigger(in: app)
+    let dashboard = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    let observeButton = button(in: app, identifier: Accessibility.observeSummaryButton)
+
+    XCTAssertTrue(waitForElement(sessionRow, timeout: Self.fastActionTimeout))
+
+    tapPreviewSession(in: app)
+    XCTAssertTrue(waitForElement(observeButton, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      rightClickElementReliably(in: app, element: sessionRow),
+      "Selected sidebar row should expose the remove-session action via context menu"
+    )
+
+    let removeSessionItem = app.menuItems["Remove Session..."].firstMatch
+    XCTAssertTrue(removeSessionItem.waitForExistence(timeout: Self.fastActionTimeout))
+    removeSessionItem.tap()
+
+    let confirmButton = confirmationDialogButton(in: app, title: "Remove Session Now")
+    XCTAssertTrue(confirmButton.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(app.staticTexts["Remove Session?"].exists)
+    confirmButton.tap()
+
+    XCTAssertTrue(waitForElement(dashboard, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) { !sessionRow.exists },
+      "Removed sessions should disappear from the sidebar immediately"
+    )
+    XCTAssertFalse(observeButton.exists)
   }
 
   func testSidebarSessionRowKeepsStatClusterAndTimestampSeparatedAtLargeTextSize() throws {

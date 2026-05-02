@@ -1,7 +1,8 @@
 use super::{
     CliError, CliErrorKind, DaemonClient, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
-    SessionStatus, daemon_index, detail_to_session_state, load_state_or_err,
-    reconcile_expired_pending_signals, storage, summary_to_session_state, validate_policy_preset,
+    SessionStatus, canonicalize_persisted_session_state, daemon_index, detail_to_session_state,
+    load_state_or_err, reconcile_expired_pending_signals, storage, summary_to_session_state,
+    validate_policy_preset,
 };
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 
@@ -18,7 +19,10 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     }
 
     reconcile_expired_pending_signals(session_id, project_dir)?;
-    let mut state = load_state_or_err(session_id, project_dir)?;
+    let mut state = visible_local_session_state(load_state_or_err(session_id, project_dir)?)
+        .ok_or_else(|| {
+            CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
+        })?;
     state.metrics = SessionMetrics::recalculate(&state);
     Ok(state)
 }
@@ -111,7 +115,10 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
     let mut sessions = Vec::new();
     for session_id in session_ids {
         let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
-        if let Some(mut state) = storage::load_state(&layout)? {
+        if let Some(state) = storage::load_state(&layout)? {
+            let Some(mut state) = visible_local_session_state(state) else {
+                continue;
+            };
             state.metrics = SessionMetrics::recalculate(&state);
             sessions.push(state);
         }
@@ -167,7 +174,10 @@ pub fn resolve_session_project_dir(
     local_project_dir: &Path,
 ) -> Result<PathBuf, CliError> {
     let local_layout = storage::layout_from_project_dir(local_project_dir, session_id)?;
-    if storage::load_state(&local_layout)?.is_some() {
+    if storage::load_state(&local_layout)?
+        .and_then(visible_local_session_state)
+        .is_some()
+    {
         return Ok(local_project_dir.to_path_buf());
     }
     if let Some(client) = DaemonClient::try_connect() {
@@ -182,4 +192,10 @@ pub fn resolve_session_project_dir(
         .project
         .project_dir
         .unwrap_or(resolved.project.context_root))
+}
+
+fn visible_local_session_state(state: SessionState) -> Option<SessionState> {
+    let mut state = state;
+    canonicalize_persisted_session_state(&mut state, &crate::workspace::utc_now());
+    state.archived_at.is_none().then_some(state)
 }

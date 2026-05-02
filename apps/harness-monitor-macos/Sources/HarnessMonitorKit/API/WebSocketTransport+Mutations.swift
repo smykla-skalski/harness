@@ -142,6 +142,15 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func archiveSession(
+    sessionID: String,
+    request: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse {
+    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let value = try await rpc(method: .sessionArchive, params: params)
+    return try decode(value)
+  }
+
   public func sendSignal(
     sessionID: String,
     request: SignalSendRequest

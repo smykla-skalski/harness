@@ -9,7 +9,7 @@ use super::{
     async_bootstrap, daemon_index, daemon_protocol, db_error, trace_async_db_operation,
     usize_from_i64,
 };
-use crate::session::service::canonicalize_active_session_without_leader;
+use crate::session::service::canonicalize_persisted_session_state;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
 use crate::workspace::utc_now;
 
@@ -36,6 +36,12 @@ const PROJECT_SUMMARIES_SQL: &str = "SELECT
     COUNT(s.session_id) AS total_session_count
  FROM projects p
  LEFT JOIN sessions s ON s.project_id = p.project_id
+    AND (
+      s.archived_at IS NULL OR (
+        s.status = 'ended'
+        AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+      )
+    )
  GROUP BY p.project_id, p.checkout_id
  ORDER BY p.name, p.checkout_name";
 const SESSION_SUMMARIES_SQL: &str = "SELECT
@@ -62,6 +68,12 @@ const SESSION_SUMMARIES_SQL: &str = "SELECT
     p.worktree_name
  FROM sessions s
  JOIN projects p ON p.project_id = s.project_id
+ WHERE (
+    s.archived_at IS NULL OR (
+      s.status = 'ended'
+      AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+    )
+ )
  ORDER BY s.updated_at DESC";
 const RESOLVE_SESSION_SQL: &str = "SELECT
     s.state_json,
@@ -76,7 +88,13 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
     p.worktree_name
  FROM sessions s
  JOIN projects p ON p.project_id = s.project_id
- WHERE s.session_id = ?1";
+ WHERE s.session_id = ?1
+   AND (
+     s.archived_at IS NULL OR (
+       s.status = 'ended'
+       AND COALESCE(json_extract(s.state_json, '$.schema_version'), 0) < 13
+     )
+   )";
 
 /// Async `SQLx` pool over the canonical daemon `SQLite` database.
 #[derive(Debug)]
@@ -395,7 +413,7 @@ impl AsyncSessionSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
         };
-        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
             db.save_session_state(&project.project_id, &state).await?;
         }
         Ok(daemon_protocol::SessionSummary {
@@ -458,7 +476,7 @@ impl AsyncResolvedSessionRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
         };
-        if canonicalize_active_session_without_leader(&mut state, &utc_now()) {
+        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
             db.save_session_state(&project.project_id, &state).await?;
         }
         Ok(daemon_index::ResolvedSession { project, state })

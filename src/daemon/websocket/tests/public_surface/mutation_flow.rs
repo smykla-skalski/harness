@@ -174,6 +174,66 @@ fn websocket_session_delete_returns_deleted_flag() {
 }
 
 #[test]
+fn websocket_session_archive_returns_archived_at_and_hides_session() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("ws-archive-session-leader"),
+            || {
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let project_dir = sandbox.path().join("project");
+                    init_git_project(&project_dir);
+
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_websocket_state_with_empty_async_db(&db_path).await;
+                    let session_id = "ws-archive-session";
+                    start_async_session(&state, &project_dir, session_id).await;
+                    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+                    let request = WsRequest {
+                        id: "req-session-archive".into(),
+                        method: ws_methods::SESSION_ARCHIVE.into(),
+                        params: serde_json::json!({
+                            "session_id": session_id,
+                            "actor": "spoofed-client",
+                        }),
+                        trace_context: None,
+                    };
+
+                    let response = dispatch(&request, &state, &connection).await;
+
+                    assert!(response.error.is_none());
+                    assert_eq!(
+                        response
+                            .result
+                            .as_ref()
+                            .and_then(|result| result["session_id"].as_str()),
+                        Some(session_id)
+                    );
+                    assert!(
+                        response
+                            .result
+                            .as_ref()
+                            .and_then(|result| result["archived_at"].as_str())
+                            .is_some()
+                    );
+
+                    let async_db = state.async_db.get().expect("async db");
+                    assert!(
+                        async_db
+                            .resolve_session(session_id)
+                            .await
+                            .expect("resolve archived session")
+                            .is_none()
+                    );
+                });
+            },
+        );
+    });
+}
+
+#[test]
 fn websocket_async_signal_ack_mutation_succeeds_without_sync_db() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {

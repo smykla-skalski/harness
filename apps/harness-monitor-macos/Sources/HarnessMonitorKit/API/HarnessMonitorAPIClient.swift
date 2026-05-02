@@ -180,6 +180,13 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/end", body: request)
   }
 
+  public func archiveSession(
+    sessionID: String,
+    request: SessionArchiveRequest
+  ) async throws -> SessionArchiveResponse {
+    try await post("/v1/sessions/\(sessionID)/archive", body: request)
+  }
+
   public func sendSignal(
     sessionID: String,
     request: SignalSendRequest

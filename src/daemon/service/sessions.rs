@@ -239,6 +239,10 @@ pub(crate) async fn session_timeline_window_async(
             "async daemon database pool is required for async session timeline reads",
         ))
     })?;
+    async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
     reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
     async_db
         .load_session_timeline_window(session_id, request)
@@ -291,6 +295,10 @@ pub(crate) fn session_timeline_window(
     request: &TimelineWindowRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<TimelineWindowResponse, CliError> {
+    if let Some(db) = db {
+        db.resolve_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+    }
     if let Some(db) = db
         && let Some(response) = db.load_session_timeline_window(session_id, request)?
     {

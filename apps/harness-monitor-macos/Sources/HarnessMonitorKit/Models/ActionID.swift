@@ -18,6 +18,7 @@ public enum ActionID: Hashable, Sendable {
   case transferLeader(sessionID: String, newLeaderID: String)
   case observeSession(sessionID: String)
   case endSession(sessionID: String)
+  case removeSession(sessionID: String)
   case sendSignal(sessionID: String, agentID: String)
   case cancelSignal(sessionID: String, signalID: String)
 
@@ -57,6 +58,8 @@ public enum ActionID: Hashable, Sendable {
       return "\(sessionID)/observeSession"
     case .endSession(let sessionID):
       return "\(sessionID)/endSession"
+    case .removeSession(let sessionID):
+      return "\(sessionID)/removeSession"
     case .sendSignal(let sessionID, let agentID):
       return "\(sessionID)/sendSignal/\(agentID)"
     case .cancelSignal(let sessionID, let signalID):

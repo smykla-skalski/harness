@@ -11,7 +11,7 @@ mod sessions;
 mod tasks;
 
 pub(crate) use agents::{change_role_async, remove_agent_async};
-pub(crate) use sessions::{end_session_async, transfer_leader_async};
+pub(crate) use sessions::{archive_session_async, end_session_async, transfer_leader_async};
 pub(crate) use tasks::{
     assign_task_async, checkpoint_task_async, create_task_async, drop_task_async,
     update_task_async, update_task_queue_policy_async,

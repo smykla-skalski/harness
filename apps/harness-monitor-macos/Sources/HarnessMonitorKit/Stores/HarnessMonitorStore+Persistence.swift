@@ -75,6 +75,17 @@ extension HarnessMonitorStore {
     await applyPersistedCacheWriteResult(result)
   }
 
+  func pruneRemovedSessionFromCache(
+    sessions: [SessionSummary],
+    projects: [ProjectSummary]
+  ) async {
+    guard let cacheService, persistenceError == nil else { return }
+    cancelPendingCacheWrite()
+    await awaitOutstandingDirectPersistenceConflicts()
+    let result = await cacheService.cacheSessionList(sessions, projects: projects)
+    await applyPersistedCacheWriteResult(result)
+  }
+
   func loadCachedSessionList() async -> (
     sessions: [SessionSummary],
     projects: [ProjectSummary]

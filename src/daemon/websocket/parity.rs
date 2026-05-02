@@ -10,9 +10,9 @@ use crate::daemon::http::{
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
-    CodexSteerRequest, HostBridgeReconfigureRequest, ManagedAgentSnapshot, SessionJoinRequest,
-    SessionLeaveRequest, SessionMutationResponse, SessionTitleRequest, SignalAckRequest,
-    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    CodexSteerRequest, HostBridgeReconfigureRequest, ManagedAgentSnapshot, SessionArchiveRequest,
+    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionTitleRequest,
+    SignalAckRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
     VoiceTranscriptUpdateRequest, WsErrorPayload, WsRequest, WsResponse,
     bind_control_plane_actor_value,
 };
@@ -189,6 +189,44 @@ pub(crate) async fn dispatch_session_delete(
             data: Some(json!({ "error": "session not found" })),
         },
     )
+}
+
+pub(crate) async fn dispatch_session_archive(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(session_id) = extract_session_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+    let mut params = request.params.clone();
+    bind_control_plane_actor_value(&mut params);
+    let body: SessionArchiveRequest = match serde_json::from_value(params) {
+        Ok(body) => body,
+        Err(error) => {
+            return error_response(
+                &request.id,
+                "INVALID_PARAMS",
+                &format!("failed to parse request params: {error}"),
+            );
+        }
+    };
+
+    let result = if let Some(async_db) = state.async_db.get() {
+        service::archive_session_async(&session_id, &body, async_db.as_ref()).await
+    } else {
+        ensure_shared_db(&state.db).and_then(|db| {
+            service::archive_session(&session_id, &body, Some(&db.lock().expect("db lock")))
+        })
+    };
+    if result.is_ok() {
+        if let Some(async_db) = state.async_db.get() {
+            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
+        } else if let Ok(db) = ensure_shared_db(&state.db) {
+            let db_guard = db.lock().expect("db lock");
+            service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+        }
+    }
+    dispatch_query_result(&request.id, result)
 }
 
 pub(crate) async fn dispatch_session_join(

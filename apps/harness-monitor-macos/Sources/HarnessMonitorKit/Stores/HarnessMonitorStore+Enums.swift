@@ -43,6 +43,7 @@ extension HarnessMonitorStore {
 
   public enum PendingConfirmation: Equatable {
     case endSession(sessionID: String, actorID: String)
+    case removeSession(sessionID: String, actorID: String)
     case removeAgent(sessionID: String, agentID: String, actorID: String)
     case interruptCodexRun(sessionID: String, runID: String, runTitle: String)
   }

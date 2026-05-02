@@ -224,40 +224,41 @@ extension DaemonController {
   }
 
   func launchAgentStatus() -> LaunchAgentStatus {
+    let label = HarnessMonitorPaths.launchAgentLabel(using: environment)
     switch launchAgentManager.registrationState() {
     case .enabled:
-      LaunchAgentStatus(
+      return LaunchAgentStatus(
         installed: true,
         loaded: true,
-        label: "io.harnessmonitor.daemon",
+        label: label,
         path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
+        serviceTarget: label,
         state: "enabled"
       )
     case .requiresApproval:
-      LaunchAgentStatus(
+      return LaunchAgentStatus(
         installed: true,
         loaded: false,
-        label: "io.harnessmonitor.daemon",
+        label: label,
         path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
+        serviceTarget: label,
         statusError: "Approval required in System Settings > General > Login Items"
       )
     case .notRegistered:
-      LaunchAgentStatus(
+      return LaunchAgentStatus(
         installed: false,
         loaded: false,
-        label: "io.harnessmonitor.daemon",
+        label: label,
         path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon"
+        serviceTarget: label
       )
     case .notFound:
-      LaunchAgentStatus(
+      return LaunchAgentStatus(
         installed: false,
         loaded: false,
-        label: "io.harnessmonitor.daemon",
+        label: label,
         path: HarnessMonitorPaths.launchAgentBundleRelativePath,
-        serviceTarget: "io.harnessmonitor.daemon",
+        serviceTarget: label,
         statusError: "Bundled daemon launch agent plist was not found"
       )
     }

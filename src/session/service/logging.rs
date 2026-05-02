@@ -26,6 +26,10 @@ pub(crate) fn log_session_ended() -> SessionTransition {
     SessionTransition::SessionEnded
 }
 
+pub(crate) fn log_session_archived() -> SessionTransition {
+    SessionTransition::SessionArchived
+}
+
 pub(crate) fn log_session_adopted(session_id: &str) -> SessionTransition {
     SessionTransition::SessionAdopted {
         session_id: session_id.to_string(),

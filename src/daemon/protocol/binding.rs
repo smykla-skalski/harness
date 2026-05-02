@@ -4,12 +4,12 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 
 use super::{
     AgentRemoveRequest, CodexRunRequest, ImproverApplyRequest, LeaderTransferRequest,
-    ObserveSessionRequest, RoleChangeRequest, SessionEndRequest, SignalCancelRequest,
-    SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest, TaskCheckpointRequest,
-    TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest,
+    ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
+    SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
+    TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
+    TaskSubmitReviewRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
+    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
 };
 
 /// Rebind actor-bearing daemon requests to the authenticated control-plane
@@ -105,6 +105,12 @@ impl ControlPlaneActorRequest for TaskCheckpointRequest {
 }
 
 impl ControlPlaneActorRequest for SessionEndRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for SessionArchiveRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.actor);
     }
