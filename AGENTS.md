@@ -200,5 +200,5 @@ All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ 
 
 - `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
-- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
+- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools. For `apps/harness-monitor-macos` work in a shared checkout, use `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...` instead of raw `xcodebuildmcp` / plain `monitor:*` wrappers so agent Xcode state stays isolated from the developer's local Xcode.
 - `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.

@@ -122,6 +122,35 @@ harness_monitor_default_user_runtime_profile() {
   harness_monitor_sanitize_profile "${USER:-}"
 }
 
+harness_monitor_agent_session_id() {
+  local env_name value
+  for env_name in \
+    HARNESS_AGENT_ID \
+    CODEX_SESSION_ID \
+    CODEX_THREAD_ID \
+    CLAUDE_SESSION_ID \
+    GEMINI_SESSION_ID \
+    COPILOT_SESSION_ID \
+    OPENCODE_SESSION_ID \
+    VIBE_SESSION_ID; do
+    value="${!env_name:-}"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done
+  return 1
+}
+
+harness_monitor_default_agent_runtime_profile() {
+  local session_id profile
+  session_id="$(harness_monitor_agent_session_id || true)"
+  [[ -n "$session_id" ]] || return 1
+  profile="$(harness_monitor_sanitize_profile "agent-$session_id")"
+  [[ -n "$profile" ]] || return 1
+  printf '%s\n' "$profile"
+}
+
 harness_monitor_runtime_app_group_id() {
   local app_group_id
   app_group_id="$(harness_monitor_trim_whitespace "${HARNESS_APP_GROUP_ID:-$HARNESS_MONITOR_RUNTIME_APP_GROUP_DEFAULT}")"
@@ -284,6 +313,51 @@ harness_monitor_restore_saved_user_workspace_settings() {
   derived_data_path="$(harness_monitor_saved_user_derived_data_path "$app_root" || true)"
   [[ -n "$derived_data_path" ]] || return 1
   harness_monitor_write_user_workspace_settings "$app_root" "$derived_data_path"
+}
+
+harness_monitor_runtime_xcodebuildmcp_socket_path() {
+  local profile
+  profile="$(harness_monitor_runtime_profile || true)"
+  [[ -n "$profile" ]] || return 1
+  printf '%s/.xcodebuildmcp/agents/%s.sock\n' "${HOME:?missing HOME}" "$profile"
+}
+
+harness_monitor_normalize_developer_dir() {
+  local candidate="$1"
+  candidate="$(harness_monitor_trim_whitespace "$candidate")"
+  [[ -n "$candidate" ]] || return 1
+  if [[ -d "$candidate/Contents/Developer" ]]; then
+    printf '%s/Contents/Developer\n' "$candidate"
+    return 0
+  fi
+  if [[ -d "$candidate" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  return 1
+}
+
+harness_monitor_resolve_agent_developer_dir() {
+  local candidate developer_dir
+  if [[ -n "${HARNESS_MONITOR_AGENT_DEVELOPER_DIR:-}" ]]; then
+    harness_monitor_normalize_developer_dir "$HARNESS_MONITOR_AGENT_DEVELOPER_DIR"
+    return $?
+  fi
+
+  shopt -s nullglob
+  local -a candidates=(/Applications/Xcode-*.app /Applications/Xcode*.app)
+  shopt -u nullglob
+  for candidate in "${candidates[@]}"; do
+    if [[ "$candidate" == "/Applications/Xcode.app" ]]; then
+      continue
+    fi
+    developer_dir="$(harness_monitor_normalize_developer_dir "$candidate" || true)"
+    if [[ -n "$developer_dir" ]]; then
+      printf '%s\n' "$developer_dir"
+      return 0
+    fi
+  done
+  return 1
 }
 
 harness_monitor_apply_runtime_profile_environment() {

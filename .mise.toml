@@ -197,6 +197,30 @@ run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/carg
 description = "Run `harness bridge start` with the current user's isolated runtime profile"
 run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
 
+[tasks."monitor:agent"]
+description = "Print the current agent's isolated Xcode / XcodeBuildMCP profile and exact next commands"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh"
+
+[tasks."monitor:agent:build"]
+description = "Build the Harness Monitor macOS app (Debug) with the current agent's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+
+[tasks."monitor:agent:test"]
+description = "Build-for-testing and test the Harness Monitor macOS app with the current agent's isolated runtime profile (set XCODE_ONLY_TESTING for focused selectors)"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/test-swift.sh"
+
+[tasks."monitor:agent:xcodebuild"]
+description = "Run the lock-aware Harness Monitor xcodebuild wrapper with the current agent's isolated runtime profile (pass xcodebuild args after --)"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
+
+[tasks."monitor:agent:xcodebuildmcp"]
+description = "Run xcodebuildmcp with the current agent's isolated DerivedData, daemon socket, and optional alternate Xcode install (pass xcodebuildmcp args after --)"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp"
+
+[tasks."monitor:agent:mcp"]
+description = "Start an isolated xcodebuildmcp MCP server for the current agent"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp mcp"
+
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
 run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
