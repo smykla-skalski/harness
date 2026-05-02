@@ -185,6 +185,19 @@ Tracing macros inflate `clippy::cognitive_complexity` scores artificially (tokio
 
 Never add `#[expect(clippy::cognitive_complexity)]` as a first move. Always simplify first.
 
+## Debugging discipline
+
+When debugging regressions, especially Harness Monitor macOS/UI work:
+
+1. Start with real data. Reproduce with the smallest targeted command and collect the preserved app/UI traces, logs, screenshots, or failure artifacts before changing behavior.
+2. If the signal path is weak - bare `XCTAssertTrue`, missing preserved traces, cleaned-up artifacts, or ambiguous failures - stop and improve observability first. Fix the test or tracing surface before patching product code.
+3. Correlate the failing path across layers before editing: UI-test host trace, app-side trace/logging, and the concrete source path that emitted the event.
+4. Reuse known-good setups. Compare against existing passing tests, fixtures, and launch scenarios before inventing a new preview path, launch mode, or test harness flow.
+5. Do not trust scenario names or assumptions about mounted UI. Trace the recognized scenario and the actual rendered surface (`dashboard` vs `cockpit`) and patch the proven cause only.
+6. Avoid infer -> patch -> rerun loops. The correct loop is observe -> instrument -> prove -> patch -> rerun.
+7. Keep each iteration single-cause and targeted: one hypothesis, one instrumentation or code change, one narrow rerun. Do not bundle speculative fixes.
+8. Keep task state honest. Close or reset stale `in_progress` work when the scope shifts so the todo list reflects reality.
+
 ## Grafana dashboards
 
 All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ responsive auto-grid layout. When creating or modifying dashboards:
