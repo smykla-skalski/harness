@@ -35,6 +35,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
   func update(row: SessionTimelineRow, actionHandler: any DecisionActionHandler) {
     hostingView.rootView = SessionTimelineHostedRow(row: row, actionHandler: actionHandler)
   }
+
 }
 
 private struct SessionTimelineHostedRow: View {
