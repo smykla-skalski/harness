@@ -43,6 +43,49 @@ actor PreviewHarnessClientState {
     sessionSummaries
   }
 
+  func projects(templateProjects: [ProjectSummary]) -> [ProjectSummary] {
+    let sessionsByProject = Dictionary(grouping: sessionSummaries, by: \.projectId)
+    let activeSessionCount: (SessionSummary) -> Int = { $0.status == .ended ? 0 : 1 }
+
+    return templateProjects.compactMap { project -> ProjectSummary? in
+      let projectSessions = sessionsByProject[project.projectId] ?? []
+      guard !projectSessions.isEmpty else {
+        return nil
+      }
+
+      let sessionsByCheckout = Dictionary(grouping: projectSessions, by: \.checkoutId)
+      let worktrees = project.worktrees.compactMap { worktree -> WorktreeSummary? in
+        let checkoutSessions = sessionsByCheckout[worktree.checkoutId] ?? []
+        guard !checkoutSessions.isEmpty else {
+          return nil
+        }
+
+        return WorktreeSummary(
+          checkoutId: worktree.checkoutId,
+          name: worktree.name,
+          checkoutRoot: worktree.checkoutRoot,
+          contextRoot: worktree.contextRoot,
+          activeSessionCount: checkoutSessions.reduce(into: 0) { partialResult, session in
+            partialResult += activeSessionCount(session)
+          },
+          totalSessionCount: checkoutSessions.count
+        )
+      }
+
+      return ProjectSummary(
+        projectId: project.projectId,
+        name: project.name,
+        projectDir: project.projectDir,
+        contextRoot: project.contextRoot,
+        activeSessionCount: projectSessions.reduce(into: 0) { partialResult, session in
+          partialResult += activeSessionCount(session)
+        },
+        totalSessionCount: projectSessions.count,
+        worktrees: worktrees
+      )
+    }
+  }
+
   func detail(for sessionID: String, scope: String?) -> SessionDetail? {
     if scope == "core", let coreDetail = coreDetailsBySessionID[sessionID] {
       return coreDetail

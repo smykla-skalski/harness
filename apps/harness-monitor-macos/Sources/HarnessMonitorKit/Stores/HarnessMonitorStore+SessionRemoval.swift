@@ -4,12 +4,24 @@ extension HarnessMonitorStore {
   func applyLocalSessionRemoval(
     sessionID: String
   ) -> (projects: [ProjectSummary], sessions: [SessionSummary]) {
+    let clearsPresentation = shouldClearRemovedSessionPresentation(sessionID: sessionID)
+    HarnessMonitorUITestTrace.record(
+      component: "store.session-removal",
+      event: "local-removal-begin",
+      details: [
+        "session_id": sessionID,
+        "selected_session_id": selectedSessionID ?? "nil",
+        "selected_summary_id": selectedSessionSummary?.sessionId ?? "nil",
+        "presented_detail_id": contentUI.sessionDetail.presentedSessionDetail?.session.sessionId ?? "nil",
+        "clears_presentation": String(clearsPresentation)
+      ]
+    )
     locallyRemovedSessionIDs.insert(sessionID)
     cancelPendingListSelection()
     cancelSessionPushFallback(for: sessionID)
     cancelSelectedSessionRefreshFallback(for: sessionID)
 
-    if selectedSessionID == sessionID {
+    if clearsPresentation {
       primeSessionSelection(nil, retainPresentedDetailWhenSelectionClears: false)
       stopSessionStream()
     }
@@ -22,6 +34,16 @@ extension HarnessMonitorStore {
       _ = sessionIndex.replaceSnapshot(projects: updatedProjects, sessions: updatedSessions)
       isShowingCachedCatalog = false
     }
+    HarnessMonitorUITestTrace.record(
+      component: "store.session-removal",
+      event: "local-removal-end",
+      details: [
+        "session_id": sessionID,
+        "remaining_session_count": String(updatedSessions.count),
+        "remaining_project_count": String(updatedProjects.count),
+        "selected_session_id": selectedSessionID ?? "nil"
+      ]
+    )
     return (updatedProjects, updatedSessions)
   }
 
@@ -43,20 +65,47 @@ extension HarnessMonitorStore {
       return (projects, filteredSessions)
     }
 
-    return (self.projects, filteredSessions)
+    return (
+      projectSnapshotRemovingRemovedSessions(
+        templateProjects: projects,
+        remainingSessions: filteredSessions
+      ),
+      filteredSessions
+    )
   }
 
   func shouldIgnoreLocallyRemovedSession(_ sessionID: String) -> Bool {
     locallyRemovedSessionIDs.contains(sessionID)
   }
 
+  private func shouldClearRemovedSessionPresentation(sessionID: String) -> Bool {
+    if selectedSessionID == sessionID {
+      return true
+    }
+    if selectedSessionSummary?.sessionId == sessionID {
+      return true
+    }
+    if contentUI.session.selectedSessionSummary?.sessionId == sessionID {
+      return true
+    }
+    if selectedSession?.session.sessionId == sessionID {
+      return true
+    }
+    if contentUI.sessionDetail.presentedSessionDetail?.session.sessionId == sessionID {
+      return true
+    }
+    return false
+  }
+
   private func projectSnapshotRemovingRemovedSessions(
+    templateProjects: [ProjectSummary]? = nil,
     remainingSessions: [SessionSummary]
   ) -> [ProjectSummary] {
     let sessionsByProject = Dictionary(grouping: remainingSessions, by: \.projectId)
     let activeSessionCount: (SessionSummary) -> Int = { $0.status == .ended ? 0 : 1 }
+    let sourceProjects = templateProjects ?? projects
 
-    return projects.compactMap { project -> ProjectSummary? in
+    return sourceProjects.compactMap { project -> ProjectSummary? in
       let projectSessions = sessionsByProject[project.projectId] ?? []
       guard !projectSessions.isEmpty else {
         return nil

@@ -96,10 +96,25 @@ extension HarnessMonitorStore {
   }
 
   public func cancelConfirmation() {
+    HarnessMonitorUITestTrace.record(
+      component: "store.confirmation",
+      event: "cancelled",
+      details: [
+        "pending_confirmation": pendingConfirmation?.uiTestTraceLabel ?? "nil"
+      ]
+    )
     pendingConfirmation = nil
   }
 
   public func confirmPendingAction() async {
+    HarnessMonitorUITestTrace.record(
+      component: "store.confirmation",
+      event: "confirm-current",
+      details: [
+        "pending_confirmation": pendingConfirmation?.uiTestTraceLabel ?? "nil",
+        "is_session_read_only": String(isSessionReadOnly)
+      ]
+    )
     guard !isSessionReadOnly else {
       pendingConfirmation = nil
       reportUnavailableSelectedSessionAction(
@@ -111,12 +126,47 @@ extension HarnessMonitorStore {
     guard let pendingConfirmation else {
       return
     }
-    self.pendingConfirmation = nil
+    await confirmPendingAction(pendingConfirmation)
+  }
+
+  public func confirmPendingAction(_ pendingConfirmation: PendingConfirmation) async {
+    HarnessMonitorUITestTrace.record(
+      component: "store.confirmation",
+      event: "confirm-captured",
+      details: [
+        "captured_confirmation": pendingConfirmation.uiTestTraceLabel,
+        "store_pending_confirmation": self.pendingConfirmation?.uiTestTraceLabel ?? "nil",
+        "is_session_read_only": String(isSessionReadOnly)
+      ]
+    )
+    guard !isSessionReadOnly else {
+      if self.pendingConfirmation == pendingConfirmation {
+        self.pendingConfirmation = nil
+      }
+      reportUnavailableSelectedSessionAction(
+        "Confirm pending action",
+        message: readOnlySessionAccessMessage
+      )
+      return
+    }
+    if self.pendingConfirmation == pendingConfirmation {
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "clearing-store-pending",
+        details: ["captured_confirmation": pendingConfirmation.uiTestTraceLabel]
+      )
+      self.pendingConfirmation = nil
+    }
 
     switch pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       _ = await endSession(sessionID: sessionID, actorID: actorID)
     case .removeSession(let sessionID, let actorID):
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "dispatch-remove-session",
+        details: ["session_id": sessionID]
+      )
       _ = await removeSession(sessionID: sessionID, actorID: actorID)
     case .removeAgent(let sessionID, let agentID, let actorID):
       _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)

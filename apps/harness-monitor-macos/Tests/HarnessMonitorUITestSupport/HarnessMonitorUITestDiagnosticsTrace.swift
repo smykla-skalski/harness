@@ -5,7 +5,7 @@ struct HarnessMonitorUITestTraceEvent: Codable, Equatable {
   let timestamp: String
   let component: String
   let event: String
-  let testName: String
+  let testName: String?
   let details: [String: String]
 }
 
@@ -72,6 +72,38 @@ func diagnosticsTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
     .appendingPathComponent("ui-trace.jsonl")
 }
 
+func appTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
+  diagnosticsArtifactsDirectory(for: artifactsDirectoryKey)?
+    .appendingPathComponent("app-trace.jsonl")
+}
+
+func preservedAppTraceFileURLs() -> [URL] {
+  let preservedDirectory =
+    FileManager.default.temporaryDirectory
+    .appendingPathComponent("HarnessMonitorUITestPreservedArtifacts", isDirectory: true)
+  guard
+    let fileURLs = try? FileManager.default.contentsOfDirectory(
+      at: preservedDirectory,
+      includingPropertiesForKeys: [.contentModificationDateKey],
+      options: [.skipsHiddenFiles]
+    )
+  else {
+    return []
+  }
+
+  return fileURLs
+    .filter { $0.lastPathComponent.hasSuffix("-app-trace.jsonl") }
+    .sorted { lhs, rhs in
+      let lhsDate =
+        (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        ?? .distantPast
+      let rhsDate =
+        (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        ?? .distantPast
+      return lhsDate > rhsDate
+    }
+}
+
 func appendDiagnosticsTrace(
   component: String,
   event: String,
@@ -125,6 +157,57 @@ extension HarnessMonitorUITestCase {
 
   func diagnosticsTracePath() -> String? {
     diagnosticsTraceFileURL(for: Self.artifactsDirectoryKey)?.path
+  }
+
+  func waitForAppTraceEvents(
+    _ expectedEvents: [String],
+    timeout: TimeInterval
+  ) -> Bool {
+    return waitUntil(timeout: timeout) {
+      let candidateFiles =
+        [appTraceFileURL(for: Self.artifactsDirectoryKey)].compactMap { $0 }
+        + preservedAppTraceFileURLs()
+      guard !candidateFiles.isEmpty else {
+        return false
+      }
+
+      for fileURL in candidateFiles {
+        guard let data = try? Data(contentsOf: fileURL),
+          let contents = String(data: data, encoding: .utf8)
+        else {
+          continue
+        }
+        let events = contents
+          .split(whereSeparator: \.isNewline)
+          .compactMap(Self.decodeTraceEvent(from:))
+          .map(\.event)
+        if Self.containsSubsequence(expectedEvents, in: events) {
+          return true
+        }
+      }
+      return false
+    }
+  }
+
+  private static func decodeTraceEvent(from line: Substring) -> HarnessMonitorUITestTraceEvent? {
+    guard let data = String(line).data(using: .utf8) else {
+      return nil
+    }
+    return try? JSONDecoder().decode(HarnessMonitorUITestTraceEvent.self, from: data)
+  }
+
+  private static func containsSubsequence(_ expected: [String], in actual: [String]) -> Bool {
+    guard !expected.isEmpty else {
+      return true
+    }
+    var nextIndex = 0
+    for event in actual where event == expected[nextIndex] {
+      nextIndex += 1
+      if nextIndex == expected.count {
+        return true
+      }
+    }
+    return false
   }
 
   private func frameSummary(_ frame: CGRect) -> String {

@@ -91,8 +91,91 @@ struct HarnessMonitorStoreRemoveSessionTests {
     await store.confirmPendingAction()
 
     #expect(store.sessions.isEmpty)
-    #expect(store.projects.allSatisfy { $0.totalSessionCount == 0 })
+    #expect(store.projects.isEmpty)
     #expect(store.selectedSessionID == nil)
     #expect(store.contentUI.session.selectedSessionSummary == nil)
+  }
+
+  @Test("Preview removal does not auto-reselect the ready session after refresh")
+  func previewRemovalDoesNotAutoReselectReadySessionAfterRefresh() async {
+    let client = PreviewHarnessClient(fixtures: .populated, isLaunchAgentInstalled: true)
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId)
+
+    store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
+    await store.confirmPendingAction()
+    await Task.yield()
+    await Task.yield()
+
+    #expect(store.sessions.isEmpty)
+    #expect(store.projects.isEmpty)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+  }
+
+  @Test("Captured confirmation still removes the session after dialog dismissal clears store state")
+  func capturedConfirmationSurvivesDialogDismissalRace() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let pendingConfirmation = HarnessMonitorStore.PendingConfirmation.removeSession(
+      sessionID: PreviewFixtures.summary.sessionId,
+      actorID: "harness-app"
+    )
+    store.pendingConfirmation = pendingConfirmation
+
+    store.cancelConfirmation()
+    await store.confirmPendingAction(pendingConfirmation)
+
+    #expect(store.sessions.isEmpty)
+    #expect(store.selectedSessionID == nil)
+    #expect(
+      client.recordedCalls()
+        == [
+          .removeSession(
+            sessionID: PreviewFixtures.summary.sessionId,
+            actor: "harness-app"
+          )
+        ]
+     )
+   }
+
+  @Test("Daemon missing-session archive replies still remove the stale session locally")
+  func missingSessionArchiveReplyStillRemovesSessionLocally() async {
+    let client = RecordingHarnessClient()
+    client.archiveSessionMutatesReadSnapshots = false
+    client.configureArchiveSessionError(
+      HarnessMonitorAPIError.server(
+        code: 400,
+        message:
+          "session not active: session '\(PreviewFixtures.summary.sessionId)' not found"
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
+    await store.confirmPendingAction()
+
+    #expect(store.sessions.isEmpty)
+    #expect(store.projects.isEmpty)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+    #expect(store.currentSuccessFeedbackMessage == "Remove session")
+    #expect(
+      client.recordedCalls()
+        == [
+          .removeSession(
+            sessionID: PreviewFixtures.summary.sessionId,
+            actor: "harness-app"
+          )
+        ]
+    )
   }
 }

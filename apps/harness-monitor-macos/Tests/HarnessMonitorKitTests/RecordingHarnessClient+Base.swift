@@ -180,6 +180,9 @@ extension RecordingHarnessClient {
   ) async throws -> SessionArchiveResponse {
     try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.removeSession(sessionID: sessionID, actor: request.actor))
+    if let archiveSessionError = lock.withLock({ archiveSessionError }) {
+      throw archiveSessionError
+    }
     if archiveSessionMutatesReadSnapshots {
       let archivedState = lock.withLock {
         let remainingSummaries =

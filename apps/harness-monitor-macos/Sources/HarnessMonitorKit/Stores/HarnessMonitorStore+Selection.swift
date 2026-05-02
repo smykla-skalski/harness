@@ -191,6 +191,14 @@ extension HarnessMonitorStore {
   }
 
   public func selectSessionFromList(_ sessionID: String?) {
+    HarnessMonitorUITestTrace.record(
+      component: "store.selection",
+      event: "list-selection-scheduled",
+      details: [
+        "session_id": sessionID ?? "nil",
+        "selected_session_id": selectedSessionID ?? "nil"
+      ]
+    )
     cancelPendingListSelection()
 
     pendingListSelectionTaskToken &+= 1
@@ -207,7 +215,24 @@ extension HarnessMonitorStore {
   }
 
   private func applyListSessionSelection(_ sessionID: String?) {
+    HarnessMonitorUITestTrace.record(
+      component: "store.selection",
+      event: "list-selection-applying",
+      details: [
+        "session_id": sessionID ?? "nil",
+        "selected_session_id": selectedSessionID ?? "nil",
+        "session_exists": String(sessionIndex.sessionSummary(for: sessionID) != nil)
+      ]
+    )
     guard !shouldIgnoreDuplicateListSelection(for: sessionID) else {
+      HarnessMonitorUITestTrace.record(
+        component: "store.selection",
+        event: "list-selection-ignored",
+        details: [
+          "session_id": sessionID ?? "nil",
+          "selected_session_id": selectedSessionID ?? "nil"
+        ]
+      )
       return
     }
 

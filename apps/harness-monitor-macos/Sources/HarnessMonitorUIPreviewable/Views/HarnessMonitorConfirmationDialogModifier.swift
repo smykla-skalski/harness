@@ -18,21 +18,39 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
           get: { shellUI.pendingConfirmation != nil },
           set: { isPresented in
             if !isPresented {
+              HarnessMonitorUITestTrace.record(
+                component: "confirmation-dialog",
+                event: "dismissed",
+                details: [
+                  "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
+                ]
+              )
               store.cancelConfirmation()
             }
           }
         ),
         titleVisibility: .visible
       ) {
-        switch shellUI.pendingConfirmation {
-        case .endSession, .removeSession, .removeAgent, .interruptCodexRun:
+        if let pendingConfirmation = shellUI.pendingConfirmation {
           Button(confirmButtonTitle, role: .destructive) {
-            Task { await store.confirmPendingAction() }
+            HarnessMonitorUITestTrace.record(
+              component: "confirmation-dialog",
+              event: "confirm-tapped",
+              details: ["pending_confirmation": pendingConfirmation.uiTestTraceLabel]
+            )
+            Task { await store.confirmPendingAction(pendingConfirmation) }
           }
-        case nil:
+        } else {
           EmptyView()
         }
         Button("Cancel", role: .cancel) {
+          HarnessMonitorUITestTrace.record(
+            component: "confirmation-dialog",
+            event: "cancel-tapped",
+            details: [
+              "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
+            ]
+          )
           store.cancelConfirmation()
         }
       } message: {
