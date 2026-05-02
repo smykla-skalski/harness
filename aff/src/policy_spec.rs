@@ -45,27 +45,27 @@ pub(crate) struct WordRoute {
 pub(crate) const ENFORCEMENT_EXAMPLES: &[EnforcementExample] = &[
     EnforcementExample {
         command: "cargo test --lib cli::tests",
-        replacement: "mise cargo:local -- test --lib cli::tests",
+        replacement: "mise run cargo:local -- test --lib cli::tests",
     },
     EnforcementExample {
         command: "harness setup bootstrap --agents codex",
-        replacement: "mise setup:bootstrap -- --agents codex",
+        replacement: "mise run setup:bootstrap -- --agents codex",
     },
     EnforcementExample {
         command: "./scripts/version.sh check",
-        replacement: "mise version:check",
+        replacement: "mise run version:check",
     },
     EnforcementExample {
-        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise monitor:macos:test'",
-        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise monitor:macos:test",
+        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:macos:test'",
+        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:macos:test",
     },
     EnforcementExample {
         command: "./scripts/observability.sh stop && ./scripts/observability.sh start",
-        replacement: "mise observability:restart",
+        replacement: "mise run observability:restart",
     },
     EnforcementExample {
         command: "./scripts/host-metrics.sh logs",
-        replacement: "mise host-metrics:logs",
+        replacement: "mise run host-metrics:logs",
     },
 ];
 
