@@ -338,11 +338,14 @@ impl SpawnConfig {
     ///
     /// Returns an error if the process fails to spawn.
     #[cfg(unix)]
-    #[expect(unsafe_code, reason = "pre_exec runs between fork and exec; unsafe is irreducible")]
+    #[expect(
+        unsafe_code,
+        reason = "pre_exec runs between fork and exec; unsafe is irreducible"
+    )]
     pub fn spawn(&self) -> io::Result<Child> {
+        use nix::unistd::setsid;
         use std::os::unix::process::CommandExt;
         use std::process::Command;
-        use nix::unistd::setsid;
 
         let program = resolve_program(&self.command).unwrap_or_else(|| self.command.clone().into());
         let mut cmd = Command::new(program);
