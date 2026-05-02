@@ -45,11 +45,35 @@ fn wait_for_file_marker(path: &Path, marker: &str) {
 }
 
 #[test]
-fn supervisor_starts_active() {
+fn supervisor_starts_paused() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
-    assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
     assert_eq!(supervisor.in_flight_call_count(), 0);
+    assert_eq!(supervisor.pending_request_count(), 0);
+
+    #[cfg(unix)]
+    unsafe {
+        libc::killpg(supervisor.pgid(), libc::SIGKILL);
+    }
+}
+
+#[test]
+fn pending_request_guard_activates_watchdog() {
+    let child = spawn_sleep_child();
+    let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
+
+    {
+        let _pending = supervisor.enter_pending_request();
+        assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
+        assert_eq!(supervisor.pending_request_count(), 1);
+
+        let _pending2 = supervisor.enter_pending_request();
+        assert_eq!(supervisor.pending_request_count(), 2);
+    }
+
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
+    assert_eq!(supervisor.pending_request_count(), 0);
 
     #[cfg(unix)]
     unsafe {
@@ -61,6 +85,8 @@ fn supervisor_starts_active() {
 fn client_call_guard_pauses_watchdog() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
+    let _pending = supervisor.enter_pending_request();
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
 
     {
         let _guard = supervisor.enter_client_call();
@@ -88,10 +114,33 @@ fn watchdog_does_not_fire_while_paused() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
 
+    let _pending = supervisor.enter_pending_request();
     let _guard = supervisor.enter_client_call();
     std::thread::sleep(Duration::from_millis(50));
 
     assert!(!supervisor.should_fire_watchdog());
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
+
+    #[cfg(unix)]
+    unsafe {
+        libc::killpg(supervisor.pgid(), libc::SIGKILL);
+    }
+}
+
+#[test]
+fn idle_supervisor_does_not_fire_watchdog() {
+    let mut config = SupervisionConfig::default();
+    config.watchdog_timeout = Duration::from_millis(10);
+
+    let child = spawn_sleep_child();
+    let supervisor = AcpSessionSupervisor::new(&child, config);
+
+    std::thread::sleep(Duration::from_millis(50));
+
+    assert!(
+        !supervisor.should_fire_watchdog(),
+        "idle agent with no pending request must not fire watchdog"
+    );
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
 
     #[cfg(unix)]
@@ -107,6 +156,7 @@ fn watchdog_fires_after_timeout() {
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
+    let _pending = supervisor.enter_pending_request();
 
     std::thread::sleep(Duration::from_millis(50));
 
@@ -127,10 +177,41 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
 
     let child = spawn_sleep_child();
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
+    let _pending = supervisor.enter_pending_request();
 
     let reason = watchdog_loop(Arc::clone(&supervisor)).await;
     assert_eq!(reason, Some(DisconnectReason::WatchdogFired));
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
+
+    #[cfg(unix)]
+    unsafe {
+        libc::killpg(supervisor.pgid(), libc::SIGKILL);
+    }
+}
+
+#[tokio::test]
+async fn watchdog_loop_does_not_fire_for_idle_agent() {
+    let mut config = SupervisionConfig::default();
+    config.watchdog_timeout = Duration::from_millis(20);
+
+    let child = spawn_sleep_child();
+    let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
+    let task = tokio::spawn(watchdog_loop(Arc::clone(&supervisor)));
+
+    let timed_out =
+        tokio::time::timeout(Duration::from_millis(100), &mut Box::pin(async {})).await;
+    assert!(timed_out.is_ok());
+    tokio::time::sleep(Duration::from_millis(80)).await;
+    assert!(
+        !task.is_finished(),
+        "watchdog must keep idle agents alive indefinitely"
+    );
+    supervisor.mark_done();
+    let reason = tokio::time::timeout(Duration::from_millis(100), task)
+        .await
+        .expect("watchdog should wake on done")
+        .expect("watchdog task should not panic");
+    assert_eq!(reason, None);
 
     #[cfg(unix)]
     unsafe {

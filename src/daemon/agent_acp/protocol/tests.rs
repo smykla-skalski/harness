@@ -124,7 +124,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
         panic!("expected text content");
     };
     assert_eq!(text.text, "second ACP descriptor smoke");
-    assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
+    assert_ne!(supervisor.watchdog_state(), WatchdogState::Fired);
 
     cancel_tx.send(()).expect("send cancel");
     let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)

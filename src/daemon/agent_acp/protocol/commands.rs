@@ -1,5 +1,6 @@
 use std::future::pending;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -11,6 +12,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
 
 use super::session_guard::{RouteTarget, SessionRouteGuard};
+use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::daemon::agent_acp::prompt_gate::PromptLease;
 
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
@@ -125,6 +127,7 @@ fn receive_response<T>(
 }
 
 pub(super) async fn run_protocol_command_loop(
+    supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     cancel_rx: &mut tokio_mpsc::UnboundedReceiver<()>,
     command_rx: &mut tokio_mpsc::UnboundedReceiver<ProtocolCommand>,
@@ -140,6 +143,7 @@ pub(super) async fn run_protocol_command_loop(
             }
             Some(command) = command_rx.recv() => {
                 handle_protocol_command(
+                    Arc::clone(&supervisor),
                     connection,
                     session_guard,
                     command,
@@ -152,6 +156,7 @@ pub(super) async fn run_protocol_command_loop(
 }
 
 async fn handle_protocol_command(
+    supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     session_guard: &SessionRouteGuard,
     command: ProtocolCommand,
@@ -164,9 +169,15 @@ async fn handle_protocol_command(
             project_dir,
             response_tx,
         } => {
-            let result =
-                attach_protocol_session(connection, session_guard, acp_id, session_id, project_dir)
-                    .await;
+            let result = attach_protocol_session(
+                &supervisor,
+                connection,
+                session_guard,
+                acp_id,
+                session_id,
+                project_dir,
+            )
+            .await;
             let _ = response_tx.send(result);
         }
         ProtocolCommand::PromptSession {
@@ -178,6 +189,7 @@ async fn handle_protocol_command(
             response_tx,
         } => {
             let result = attach_prompt_session(
+                Arc::clone(&supervisor),
                 connection,
                 session_guard,
                 prompt_timeout,
@@ -203,23 +215,28 @@ async fn handle_protocol_command(
 }
 
 async fn attach_protocol_session(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     session_guard: &SessionRouteGuard,
     acp_id: String,
     session_id: String,
     project_dir: PathBuf,
 ) -> ProtocolCommandResult<SessionId> {
-    let response = connection
-        .send_request(NewSessionRequest::new(project_dir))
-        .block_task()
-        .await
-        .map_err(|error| error.to_string())?;
+    let response = {
+        let _guard = supervisor.enter_pending_request();
+        connection
+            .send_request(NewSessionRequest::new(project_dir))
+            .block_task()
+            .await
+            .map_err(|error| error.to_string())?
+    };
     let protocol_session_id = response.session_id;
     session_guard.start_session(&protocol_session_id, RouteTarget { acp_id, session_id });
     Ok(protocol_session_id)
 }
 
 async fn attach_prompt_session(
+    supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     session_guard: &SessionRouteGuard,
     prompt_timeout: Duration,
@@ -232,9 +249,17 @@ async fn attach_prompt_session(
         prompt,
         prompt_lease,
     } = input;
-    let protocol_session_id =
-        attach_protocol_session(connection, session_guard, acp_id, session_id, project_dir).await?;
+    let protocol_session_id = attach_protocol_session(
+        &supervisor,
+        connection,
+        session_guard,
+        acp_id,
+        session_id,
+        project_dir,
+    )
+    .await?;
     if let Err(error) = spawn_prompt_task(
+        Arc::clone(&supervisor),
         connection,
         protocol_session_id.clone(),
         prompt,
@@ -257,6 +282,7 @@ struct AttachPromptInput {
 }
 
 fn spawn_prompt_task(
+    supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     session_id: SessionId,
     prompt: String,
@@ -265,18 +291,27 @@ fn spawn_prompt_task(
 ) -> AcpResult<()> {
     let prompt_connection = connection.clone();
     connection.spawn(async move {
-        let result = send_prompt(&prompt_connection, session_id, prompt_timeout, prompt).await;
+        let result = send_prompt(
+            &supervisor,
+            &prompt_connection,
+            session_id,
+            prompt_timeout,
+            prompt,
+        )
+        .await;
         drop(prompt_lease);
         result
     })
 }
 
 async fn send_prompt(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     session_id: SessionId,
     prompt_timeout: Duration,
     prompt: String,
 ) -> AcpResult<()> {
+    let _guard = supervisor.enter_pending_request();
     let request = PromptRequest::new(
         session_id,
         vec![ContentBlock::Text(TextContent::new(prompt))],
