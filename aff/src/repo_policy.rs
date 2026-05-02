@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{env, fs, path::Path};
 
 use crate::command_intent::{
     is_shell_control_op, normalized_binary_name, parse_supported_command_text,
@@ -8,7 +8,7 @@ use crate::hook_payload::HookEvent;
 use crate::hook_render::{HookResult, RenderedHookResponse, render_pre_tool_use_output};
 use crate::policy_spec::{
     BINARY_POLICIES, EXACT_CHAIN_POLICIES, HARNESS_ROUTES, NAMESPACE_POLICIES, SCRIPT_POLICIES,
-    SESSION_START_CONTEXT, VERSION_ROUTES, WordRoute,
+    VERSION_ROUTES, WordRoute,
 };
 
 mod wrapped;
@@ -20,8 +20,29 @@ struct SuggestedTask {
     replacement: String,
 }
 
-pub fn session_start_context() -> &'static str {
-    SESSION_START_CONTEXT.as_str()
+const SESSION_START_DIR: &str = ".aff";
+const SESSION_START_FILE: &str = "session_start.md";
+
+pub fn session_start_context() -> Result<Option<String>, String> {
+    let current_dir = env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
+    session_start_context_from(&current_dir)
+}
+
+fn session_start_context_from(start_dir: &Path) -> Result<Option<String>, String> {
+    for directory in start_dir.ancestors() {
+        let policy_path = directory.join(SESSION_START_DIR).join(SESSION_START_FILE);
+        if !policy_path.is_file() {
+            continue;
+        }
+        let contents = fs::read_to_string(&policy_path)
+            .map_err(|error| format!("failed to read {}: {error}", policy_path.display()))?;
+        if contents.trim().is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(contents));
+    }
+    Ok(None)
 }
 
 pub fn pre_tool_use_output(
@@ -394,7 +415,11 @@ fn is_mcp_input_helper_build(words: &[String]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::manual_command_denial_reason;
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use super::{manual_command_denial_reason, session_start_context_from};
     use crate::policy_spec::ENFORCEMENT_EXAMPLES;
 
     #[test]
@@ -410,5 +435,34 @@ mod tests {
                 example.command
             );
         }
+    }
+
+    #[test]
+    fn session_start_context_reads_project_file_from_ancestor() {
+        let temp_dir = tempdir().expect("temp dir");
+        let project_dir = temp_dir.path().join("project");
+        let nested_dir = project_dir.join("nested").join("child");
+        fs::create_dir_all(project_dir.join(".aff")).expect("policy dir");
+        fs::create_dir_all(&nested_dir).expect("nested dir");
+        fs::write(
+            project_dir.join(".aff").join("session_start.md"),
+            "Use `mise run <task>`.\n",
+        )
+        .expect("policy file");
+
+        let context = session_start_context_from(&nested_dir)
+            .expect("context should load")
+            .expect("policy text should be present");
+        assert!(context.contains("mise run <task>"));
+    }
+
+    #[test]
+    fn session_start_context_is_none_when_file_is_missing() {
+        let temp_dir = tempdir().expect("temp dir");
+        assert!(
+            session_start_context_from(temp_dir.path())
+                .expect("missing file should not error")
+                .is_none()
+        );
     }
 }

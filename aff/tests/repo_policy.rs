@@ -1,17 +1,29 @@
 use assert_cmd::Command;
-use predicates::str::contains;
+use predicates::str::{contains, is_empty};
 
 use aff::hook_agent::HookAgent;
-use aff::repo_policy::{manual_command_denial_reason, pre_tool_use_output, session_start_context};
+use aff::repo_policy::{manual_command_denial_reason, pre_tool_use_output};
+
+fn repo_root() -> &'static std::path::Path {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root")
+}
 
 #[test]
-fn session_start_context_mentions_mise_and_signing_requirements() {
-    let context = session_start_context();
-    assert!(context.contains("mise tasks ls"));
-    assert!(context.contains("mise run <task>"));
-    assert!(context.contains("Every commit uses `-sS`"));
-    assert!(context.contains("explicit user approval"));
-    assert!(context.contains("local binary must be reinstalled"));
+fn session_start_cli_reads_project_policy_file() {
+    Command::cargo_bin("aff")
+        .expect("aff binary")
+        .current_dir(repo_root())
+        .args(["session-start", "--agent", "codex"])
+        .assert()
+        .success()
+        .stdout(contains("\"hookEventName\":\"SessionStart\""))
+        .stdout(contains("mise tasks ls"))
+        .stdout(contains("mise run <task>"))
+        .stdout(contains("git commit -sS"))
+        .stdout(contains("explicit user approval"))
+        .stdout(contains("local binary must be reinstalled"));
 }
 
 #[test]
@@ -201,14 +213,15 @@ fn rejects_unsupported_hook_events() {
 }
 
 #[test]
-fn session_start_cli_emits_hook_output_json() {
+fn session_start_cli_is_noop_without_project_policy_file() {
+    let temp_dir = tempfile::tempdir().expect("temp dir");
     Command::cargo_bin("aff")
         .expect("aff binary")
+        .current_dir(temp_dir.path())
         .args(["session-start", "--agent", "codex"])
         .assert()
         .success()
-        .stdout(contains("\"hookEventName\":\"SessionStart\""))
-        .stdout(contains("mise tasks ls"));
+        .stdout(is_empty());
 }
 
 #[test]

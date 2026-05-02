@@ -66,11 +66,10 @@ impl RepoPolicyArgs {
 
 impl SessionStartArgs {
     fn execute(self) -> Result<i32, String> {
-        let json = hook_render::render_session_start_output(
-            self.agent,
-            repo_policy::session_start_context(),
-        )?;
-        print!("{json}");
+        if let Some(additional_context) = repo_policy::session_start_context()? {
+            let json = hook_render::render_session_start_output(self.agent, &additional_context)?;
+            print!("{json}");
+        }
         Ok(0)
     }
 }

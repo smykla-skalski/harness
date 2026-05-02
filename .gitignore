@@ -23,6 +23,8 @@ resources/observability/.env
 __pycache__/
 
 # AI tool config dirs
+.aff/*
+!.aff/session_start.md
 .claude/settings.local.json
 .claude/worktrees/
 .claude/plugins/suite/harness
