@@ -119,6 +119,7 @@ optimize_image() {
 
 # Track files to clean up on exit
 _cleanup_files=()
+# shellcheck disable=SC2329  # Invoked by trap below.
 cleanup() {
   for f in "${_cleanup_files[@]}"; do
     rm -f "$f" 2>/dev/null || true

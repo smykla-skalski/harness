@@ -20,7 +20,7 @@ harness_monitor_apply_runtime_profile_environment
 
 build_server_build_root_for_app_root() {
   if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
-    printf '../../%s\n' "${DERIVED_DATA_PATH#$REPO_ROOT/}"
+    printf '../../%s\n' "${DERIVED_DATA_PATH#"$REPO_ROOT"/}"
     return 0
   fi
   printf '%s\n' "$DERIVED_DATA_PATH"
@@ -28,7 +28,7 @@ build_server_build_root_for_app_root() {
 
 build_server_build_root_for_repo_root() {
   if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
-    printf '%s\n' "${DERIVED_DATA_PATH#$REPO_ROOT/}"
+    printf '%s\n' "${DERIVED_DATA_PATH#"$REPO_ROOT"/}"
     return 0
   fi
   printf '%s\n' "$DERIVED_DATA_PATH"

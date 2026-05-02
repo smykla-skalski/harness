@@ -4,16 +4,16 @@ set -eu
 if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
   candidate="${CLAUDE_PROJECT_DIR}/.claude/plugins/suite/harness"
   if [ -x "${candidate}" ]; then
-    current=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")
+    current=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")
     if [ "$(cd -- "$(dirname -- "${candidate}")" && pwd)/$(basename -- "${candidate}")" != "${current}" ]; then
       exec "${candidate}" "$@"
     fi
   fi
 fi
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 current="${script_dir}/$(basename -- "$0")"
-repo_root=$(CDPATH= cd -- "${script_dir}/../../.." && pwd)
+repo_root=$(CDPATH='' cd -- "${script_dir}/../../.." && pwd)
 
 repo_version() {
   command awk '
@@ -37,7 +37,7 @@ fi
 
 if command -v harness >/dev/null 2>&1; then
   candidate="$(command -v harness)"
-  candidate_dir=$(CDPATH= cd -- "$(dirname -- "${candidate}")" && pwd)
+  candidate_dir=$(CDPATH='' cd -- "$(dirname -- "${candidate}")" && pwd)
   candidate_path="${candidate_dir}/$(basename -- "${candidate}")"
   if [ "${candidate_path}" = "${current}" ]; then
     echo "harness: unable to resolve a current harness binary" >&2
