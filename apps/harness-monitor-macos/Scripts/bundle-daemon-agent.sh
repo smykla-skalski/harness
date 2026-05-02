@@ -35,10 +35,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Shared helpers keep path selection testable without executing the bundle flow.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
 source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$SCRIPT_DIR/lib/runtime-profile.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-cargo-build.sh
 source "$SCRIPT_DIR/lib/daemon-cargo-build.sh"
 
 repo_root="$(resolve_repo_root)"
+harness_monitor_apply_runtime_profile_environment
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
@@ -92,6 +95,8 @@ helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
 plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
+launch_agent_label="$(harness_monitor_runtime_launch_agent_label)"
+app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
 /bin/cp "$daemon_source" "$daemon_target"
@@ -99,6 +104,17 @@ plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
 /usr/bin/xattr -dr com.apple.provenance "$daemon_target" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.quarantine "$daemon_target" 2>/dev/null || true
 /bin/cp "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" "$plist_target"
+/usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target"
+/usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target"
+if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_DATA_HOME -string "$HARNESS_DAEMON_DATA_HOME" "$plist_target"
+fi
+if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_CODEX_WS_PORT -string "$HARNESS_CODEX_WS_PORT" "$plist_target"
+fi
+if [[ -n "${HARNESS_MONITOR_RUNTIME_PROFILE:-}" ]]; then
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_PROFILE -string "$HARNESS_MONITOR_RUNTIME_PROFILE" "$plist_target"
+fi
 /usr/bin/plutil -lint "$plist_target"
 
 if ! /usr/bin/otool -l "$daemon_target" | /usr/bin/grep -q "__info_plist"; then

@@ -8,9 +8,31 @@ BUILD_SERVER_VERSION="1.3.0"
 source "$ROOT/Scripts/lib/swift-tool-env.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/non-indexable-roots.sh
 source "$ROOT/Scripts/lib/non-indexable-roots.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$ROOT/Scripts/lib/runtime-profile.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcode-version.sh
 source "$ROOT/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
+
+DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$(harness_monitor_runtime_derived_data_path "$REPO_ROOT" "xcode-derived")}"
+export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
+harness_monitor_apply_runtime_profile_environment
+
+build_server_build_root_for_app_root() {
+  if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
+    printf '../../%s\n' "${DERIVED_DATA_PATH#$REPO_ROOT/}"
+    return 0
+  fi
+  printf '%s\n' "$DERIVED_DATA_PATH"
+}
+
+build_server_build_root_for_repo_root() {
+  if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
+    printf '%s\n' "${DERIVED_DATA_PATH#$REPO_ROOT/}"
+    return 0
+  fi
+  printf '%s\n' "$DERIVED_DATA_PATH"
+}
 
 write_build_server_config() {
   local config_path="$1"
@@ -73,26 +95,27 @@ write_build_server_config \
   "$ROOT/buildServer.json" \
   "./Scripts/run-xcode-build-server.sh" \
   "HarnessMonitor.xcworkspace" \
-  "../../xcode-derived"
+  "$(build_server_build_root_for_app_root)"
 
 write_build_server_config \
   "$REPO_ROOT/buildServer.json" \
   "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
   "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
-  "xcode-derived"
+  "$(build_server_build_root_for_repo_root)"
 
 ensure_monitor_build_artifact_roots_non_indexable "$REPO_ROOT"
+ensure_non_indexable_directory "$DERIVED_DATA_PATH"
 
 write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
-  "$REPO_ROOT/xcode-derived"
+  "$DERIVED_DATA_PATH"
 
 write_workspace_settings \
   "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
-  "$REPO_ROOT/xcode-derived"
+  "$DERIVED_DATA_PATH"
 
 seed_generated_app_entitlements \
-  "$REPO_ROOT/xcode-derived/Build/Intermediates.noindex/HarnessMonitor.build"
+  "$DERIVED_DATA_PATH/Build/Intermediates.noindex/HarnessMonitor.build"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"

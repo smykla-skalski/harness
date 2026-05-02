@@ -33,13 +33,13 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:macos:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
+For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
 
 Harness Monitor app validation expectations:
 
-- `mise run monitor:macos:build`
-- `mise run monitor:macos:test`
-- `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
+- `mise run monitor:build`
+- `mise run monitor:test`
+- `mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
 - All xcodebuild invocations must use one of the approved repo-root `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
   - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
@@ -139,7 +139,7 @@ Automatic sync workflow:
 
 - bump the canonical version with `mise run version:set -- <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
 - `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
-- `mise run monitor:macos:generate` regenerates the Tuist project, then `Scripts/post-generate.sh` resyncs the monitor version metadata from the root package version so the regenerated project always tracks the canonical Cargo version
+- `mise run monitor:generate` regenerates the Tuist project, then `Scripts/post-generate.sh` resyncs the monitor version metadata from the root package version so the regenerated project always tracks the canonical Cargo version
 
 Derived surfaces maintained by the `mise run version:*` sync workflow:
 

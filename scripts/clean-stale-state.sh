@@ -19,7 +19,6 @@ export STALE_SCAN_ROOT STALE_SCAN_COMMON_REPO_ROOT
 source "$ROOT/scripts/lib/stale-scan.sh"
 
 readonly MONITOR_APP_PATTERN='/Harness Monitor[.]app/Contents/MacOS/Harness Monitor'
-readonly LAUNCHD_LABEL="io.harnessmonitor.daemon"
 
 signal_pids() {
   local signal="$1"
@@ -84,6 +83,9 @@ block_live_repo_gate_helpers() {
 }
 
 quit_monitor_app() {
+  if stale_scan_is_profile_scoped; then
+    return
+  fi
   if ! pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; then
     return
   fi
@@ -102,12 +104,14 @@ quit_monitor_app() {
 
 stop_launchd_daemon() {
   local uid
+  local launchd_label
+  launchd_label="${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-io.harnessmonitor.daemon}"
   uid="$(id -u)"
-  if ! launchctl print "gui/$uid/$LAUNCHD_LABEL" >/dev/null 2>&1; then
+  if ! launchctl print "gui/$uid/$launchd_label" >/dev/null 2>&1; then
     return
   fi
-  echo "stopping launchd daemon $LAUNCHD_LABEL..."
-  launchctl bootout "gui/$uid/$LAUNCHD_LABEL" 2>/dev/null || true
+  echo "stopping launchd daemon $launchd_label..."
+  launchctl bootout "gui/$uid/$launchd_label" 2>/dev/null || true
 }
 
 kill_orphan_harness_processes() {
@@ -263,8 +267,11 @@ wipe_bridge_state_in_root() {
 
 wipe_stale_bridge_state() {
   echo "wiping stale bridge state files..."
-  wipe_bridge_state_in_root "$STALE_SCAN_GROUP_CONTAINER_ROOT"
-  wipe_bridge_state_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+  local daemon_root
+  while IFS= read -r daemon_root; do
+    [[ -n "$daemon_root" ]] || continue
+    wipe_bridge_state_in_root "$daemon_root"
+  done < <(stale_scan_daemon_roots)
 }
 
 # Remove orphan SQLite sidecars (harness.db-wal, harness.db-shm) when the DB
@@ -285,8 +292,11 @@ remove_orphan_sqlite_sidecars_in_root() {
 
 remove_orphan_sqlite_sidecars() {
   echo "sweeping orphan SQLite sidecars..."
-  remove_orphan_sqlite_sidecars_in_root "$STALE_SCAN_GROUP_CONTAINER_ROOT"
-  remove_orphan_sqlite_sidecars_in_root "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+  local daemon_root
+  while IFS= read -r daemon_root; do
+    [[ -n "$daemon_root" ]] || continue
+    remove_orphan_sqlite_sidecars_in_root "$daemon_root"
+  done < <(stale_scan_daemon_roots)
 }
 
 remove_stale_swarm_e2e_worktrees() {
@@ -332,8 +342,10 @@ quit_monitor_app
 stop_launchd_daemon
 kill_orphan_harness_processes
 kill_orphan_monitor_wrapper_processes
-kill_live_harness_processes "$STALE_SCAN_GROUP_CONTAINER_ROOT"
-kill_live_harness_processes "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+while IFS= read -r daemon_root; do
+  [[ -n "$daemon_root" ]] || continue
+  kill_live_harness_processes "$daemon_root"
+done < <(stale_scan_daemon_roots)
 kill_orphan_codex_app_servers
 remove_tmp_bridge_artifacts
 wipe_stale_bridge_state

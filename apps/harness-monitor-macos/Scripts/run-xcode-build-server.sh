@@ -7,9 +7,14 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$APP_ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
-BUILD_ROOT="${XCODE_BUILD_SERVER_BUILD_ROOT:-$COMMON_REPO_ROOT/xcode-derived}"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$SCRIPT_DIR/lib/runtime-profile.sh"
+BUILD_ROOT="${XCODE_BUILD_SERVER_BUILD_ROOT:-$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")}"
 SCHEME="${XCODE_BUILD_SERVER_SCHEME:-HarnessMonitor}"
 SERVER_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/harness-xcode-build-server.XXXXXX")"
+
+export XCODEBUILD_DERIVED_DATA_PATH="$BUILD_ROOT"
+harness_monitor_apply_runtime_profile_environment
 
 cleanup() {
   rm -rf "$SERVER_TMP_DIR"

@@ -127,7 +127,7 @@ Automatic sync workflow:
 
 - bump the canonical version with `mise run version:set -- <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
 - `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
-- `mise run monitor:macos:generate` regenerates the Tuist project, then `Scripts/post-generate.sh` resyncs the monitor version metadata from the root package version so the regenerated project always tracks the canonical Cargo version
+- `mise run monitor:generate` regenerates the Tuist project, then `Scripts/post-generate.sh` resyncs the monitor version metadata from the root package version so the regenerated project always tracks the canonical Cargo version
 
 Derived surfaces maintained by the `mise run version:*` sync workflow:
 

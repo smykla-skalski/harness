@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Canonical Harness Monitor project generator. Runs Tuist to materialize the
 # Xcode project, then post-generate.sh to write buildServer.json and sync
-# version metadata. Invoked by mise (monitor:macos:generate) and by the
+# version metadata. Invoked by mise (monitor:generate) and by the
 # scripts that need a generated project as a precondition.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

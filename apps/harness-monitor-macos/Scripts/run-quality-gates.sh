@@ -6,11 +6,16 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
-DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$ROOT/Scripts/lib/runtime-profile.sh"
+DERIVED_DATA_PATH="$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 LOG_BIN="${LOG_BIN:-log}"
 APP_ENTITLEMENTS_PATH="${HARNESS_MONITOR_APP_ENTITLEMENTS_PATH:-$ROOT/HarnessMonitor.entitlements}"
 DAEMON_ENTITLEMENTS_PATH="${HARNESS_MONITOR_DAEMON_ENTITLEMENTS_PATH:-$ROOT/HarnessMonitorDaemon.entitlements}"
+
+export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
+harness_monitor_apply_runtime_profile_environment
 
 if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   echo "build-for-testing script is not executable: ${BUILD_FOR_TESTING_SCRIPT}" >&2

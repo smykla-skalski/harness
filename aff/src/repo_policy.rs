@@ -256,7 +256,7 @@ fn command_head_task(env_prefix: &[String], words: &[String], head: &str) -> Opt
         // These remain code because the routing depends on flag presence rather
         // than a stable prefix table. Keep them narrow and test-backed.
         "python" | "python3" if is_monitor_script_test_command(words) => {
-            exact_task(env_prefix, "monitor:macos:test:scripts")
+            exact_task(env_prefix, "monitor:test:scripts")
         }
         "swift" if is_mcp_input_helper_build(words) => {
             exact_task(env_prefix, "mcp:build:input-helper")

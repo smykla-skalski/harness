@@ -135,70 +135,104 @@ run = "./scripts/cargo-local.sh"
 description = "Print the local cargo wrapper environment used by mise tasks"
 run = "./scripts/cargo-local.sh --print-env"
 
-[tasks."monitor:macos:generate"]
+[tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
 run = "apps/harness-monitor-macos/Scripts/generate.sh"
 
-[tasks."monitor:macos:xcodebuild"]
+[tasks."monitor:user:profile"]
+description = "Print the personal Harness Monitor runtime profile, DerivedData root, daemon root, port, and launch-agent label"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
+
+[tasks."monitor:user"]
+description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile and print the exact next commands"
+run = [
+  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh",
+  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh",
+]
+
+[tasks."monitor:user:bootstrap"]
+description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile"
+run = [
+  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh",
+  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh",
+]
+
+[tasks."monitor:xcodebuild"]
 description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"
 run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
 
-[tasks."monitor:macos:build"]
+[tasks."monitor:build"]
 description = "Build the Harness Monitor macOS app (Debug) via the lock-aware shared xcodebuild wrapper"
 run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
-[tasks."monitor:macos:lint"]
+[tasks."monitor:user:build"]
+description = "Build the Harness Monitor macOS app (Debug) with the current user's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+
+[tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
 run = "apps/harness-monitor-macos/Scripts/run-lint.sh"
 
-[tasks."monitor:macos:quality-gate"]
+[tasks."monitor:quality-gate"]
 description = "Run the slower build-based sandbox and daemon quality gates for the Harness Monitor macOS app"
 run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
-[tasks."monitor:macos:test"]
+[tasks."monitor:test"]
 description = "Build-for-testing and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
-[tasks."monitor:macos:test:scripts"]
+[tasks."monitor:user:test"]
+description = "Build-for-testing and test the Harness Monitor macOS app with the current user's isolated runtime profile (set XCODE_ONLY_TESTING for focused selectors)"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/test-swift.sh"
+
+[tasks."monitor:test:scripts"]
 description = "Run the Harness Monitor Instruments/parser Python regression tests"
 run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'"
 
-[tasks."monitor:macos:tools:build:e2e"]
+[tasks."monitor:user:daemon:dev"]
+description = "Run `harness daemon dev` with the current user's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
+
+[tasks."monitor:user:bridge:start"]
+description = "Run `harness bridge start` with the current user's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+
+[tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
 run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
 
-[tasks."monitor:macos:tools:test:e2e"]
+[tasks."monitor:tools:test:e2e"]
 description = "Run unit tests for the agents e2e helper Swift CLI"
 run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
 
-[tasks."monitor:macos:test:agents-e2e"]
+[tasks."monitor:test:agents-e2e"]
 description = "Run the explicit Harness Monitor Agents end-to-end UI lane"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Scripts/test-agents-e2e.sh"
 
-[tasks."monitor:macos:test:swarm-e2e"]
+[tasks."monitor:test:swarm-e2e"]
 description = "Run the single-scenario Harness Monitor swarm e2e lane"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
 
 [tasks."e2e:swarm:full"]
 description = "Real-runtime 16-act swarm full flow orchestrator"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
 
 [tasks."e2e:swarm:inject-heuristic"]
 description = "Append deterministic transcript lines to trigger observer heuristics"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e inject-heuristic"
 
 [tasks."e2e:swarm:seed"]
 description = "Pre-seed data home to bypass onboarding"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e seed-session-state"
 
 [tasks."e2e:swarm:probe-runtimes"]
 description = "Probe availability of each runtime; emit JSON"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e probe-runtimes"
 
 [tasks."e2e:swarm:gaps-open"]
@@ -211,30 +245,30 @@ run = "./scripts/e2e/clean-recordings.sh"
 
 [tasks."e2e:swarm:triage:recording"]
 description = "Run every universal recording-triage detector against a triage run dir (positional <run-dir>)"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "./scripts/e2e/recording-triage/run-all.sh"
 
 [tasks."e2e:swarm:triage:recording:test"]
 description = "Run the recording-triage shell-wrapper test suite"
-depends = ["monitor:macos:tools:build:e2e"]
+depends = ["monitor:tools:build:e2e"]
 run = "./scripts/e2e/recording-triage/tests/run-all.sh"
 
-[tasks."monitor:macos:tools:build:perf"]
+[tasks."monitor:tools:build:perf"]
 description = "Build the harness-monitor-perf Swift CLI (release)"
 run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
 
-[tasks."monitor:macos:tools:test:perf"]
+[tasks."monitor:tools:test:perf"]
 description = "Run unit tests for the harness-monitor-perf Swift CLI"
 run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
 
-[tasks."monitor:macos:audit"]
+[tasks."monitor:audit"]
 description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"
-depends = ["monitor:macos:tools:build:perf"]
+depends = ["monitor:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
 
-[tasks."monitor:macos:audit:from-ref"]
+[tasks."monitor:audit:from-ref"]
 description = "Run the Harness Monitor Instruments audit pipeline from a temporary detached worktree (pass args after --)"
-depends = ["monitor:macos:tools:build:perf"]
+depends = ["monitor:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
 
 [tasks."preview:render"]

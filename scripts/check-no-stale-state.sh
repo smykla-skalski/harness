@@ -96,23 +96,26 @@ collect_stale_lines() {
   # 2. Live installed harness daemon/bridge processes only count as stale
   #    when they still hold the well-known locks under the real Harness roots.
   if ! should_skip_live_daemon_lock_holder_check; then
-    local group_lock_holders app_support_lock_holders
-    group_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_GROUP_CONTAINER_ROOT")"
-    append_pid_block "live harness lock holders in $STALE_SCAN_GROUP_CONTAINER_ROOT" "$group_lock_holders"
-    app_support_lock_holders="$(stale_scan_root_lock_holder_pids "$STALE_SCAN_APPLICATION_SUPPORT_ROOT")"
-    append_pid_block "live harness lock holders in $STALE_SCAN_APPLICATION_SUPPORT_ROOT" "$app_support_lock_holders"
+    local daemon_root lock_holders
+    while IFS= read -r daemon_root; do
+      [[ -n "$daemon_root" ]] || continue
+      lock_holders="$(stale_scan_root_lock_holder_pids "$daemon_root")"
+      append_pid_block "live harness lock holders in $daemon_root" "$lock_holders"
+    done < <(stale_scan_daemon_roots)
   fi
 
   # 3. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
   #    anything in /tmp is from before the sandbox fix or from an unsandboxed
   #    bridge that did not unlink on shutdown. Sweep .sock, .pid, and .lock.
-  local tmp_artifacts=()
-  local artifact
-  while IFS= read -r artifact; do
-    [[ -n "$artifact" ]] && tmp_artifacts+=("$artifact")
-  done < <(stale_scan_tmp_bridge_artifacts)
-  if (( ${#tmp_artifacts[@]} > 0 )); then
-    append_path_block "stale /tmp bridge artifacts" "${tmp_artifacts[@]}"
+  if ! stale_scan_is_profile_scoped; then
+    local tmp_artifacts=()
+    local artifact
+    while IFS= read -r artifact; do
+      [[ -n "$artifact" ]] && tmp_artifacts+=("$artifact")
+    done < <(stale_scan_tmp_bridge_artifacts)
+    if (( ${#tmp_artifacts[@]} > 0 )); then
+      append_path_block "stale /tmp bridge artifacts" "${tmp_artifacts[@]}"
+    fi
   fi
 
   # 4. Orphan SQLite sidecars under daemon roots where harness.db is gone.
@@ -121,8 +124,10 @@ collect_stale_lines() {
   while IFS= read -r sidecar; do
     [[ -n "$sidecar" ]] && wal_orphans+=("$sidecar")
   done < <(
-    stale_scan_orphan_sqlite_sidecars "$STALE_SCAN_GROUP_CONTAINER_ROOT"
-    stale_scan_orphan_sqlite_sidecars "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+    while IFS= read -r daemon_root; do
+      [[ -n "$daemon_root" ]] || continue
+      stale_scan_orphan_sqlite_sidecars "$daemon_root"
+    done < <(stale_scan_daemon_roots)
   )
   if (( ${#wal_orphans[@]} > 0 )); then
     append_path_block "orphan SQLite sidecars (harness.db is gone)" "${wal_orphans[@]}"

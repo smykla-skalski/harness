@@ -56,8 +56,8 @@ pub(crate) const ENFORCEMENT_EXAMPLES: &[EnforcementExample] = &[
         replacement: "mise run version:check",
     },
     EnforcementExample {
-        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:macos:test'",
-        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:macos:test",
+        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:test'",
+        replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:test",
     },
     EnforcementExample {
         command: "./scripts/observability.sh stop && ./scripts/observability.sh start",
@@ -92,37 +92,37 @@ pub(crate) const SCRIPT_POLICIES: &[ScriptPolicy] = &[
     },
     ScriptPolicy {
         basename: "post-generate.sh",
-        task: "monitor:macos:generate",
+        task: "monitor:generate",
         passthrough_args: false,
     },
     ScriptPolicy {
         basename: "xcodebuild-with-lock.sh",
-        task: "monitor:macos:xcodebuild",
+        task: "monitor:xcodebuild",
         passthrough_args: true,
     },
     ScriptPolicy {
         basename: "run-quality-gates.sh",
-        task: "monitor:macos:lint",
+        task: "monitor:lint",
         passthrough_args: false,
     },
     ScriptPolicy {
         basename: "test-swift.sh",
-        task: "monitor:macos:test",
+        task: "monitor:test",
         passthrough_args: false,
     },
     ScriptPolicy {
         basename: "test-agents-e2e.sh",
-        task: "monitor:macos:test:agents-e2e",
+        task: "monitor:test:agents-e2e",
         passthrough_args: false,
     },
     ScriptPolicy {
         basename: "run-instruments-audit.sh",
-        task: "monitor:macos:audit",
+        task: "monitor:audit",
         passthrough_args: true,
     },
     ScriptPolicy {
         basename: "run-instruments-audit-from-ref.sh",
-        task: "monitor:macos:audit:from-ref",
+        task: "monitor:audit:from-ref",
         passthrough_args: true,
     },
     ScriptPolicy {
@@ -180,7 +180,7 @@ pub(crate) const BINARY_POLICIES: &[BinaryPolicy] = &[
     },
     BinaryPolicy {
         binary: "xcodebuild",
-        task: "monitor:macos:xcodebuild",
+        task: "monitor:xcodebuild",
         passthrough_args: true,
     },
 ];
