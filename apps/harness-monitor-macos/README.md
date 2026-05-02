@@ -105,6 +105,24 @@ mise run monitor:user:bridge:start
 
 `monitor:user:bootstrap` does the same setup as `monitor:user`; `monitor:user:profile` just reprints the chosen profile info later without regenerating anything.
 
+When agents need to use local Xcode wrappers or XcodeBuildMCP in the same checkout, do **not** point them at the raw shared commands. Use the agent-isolated entrypoint instead:
+
+```bash
+mise run monitor:agent
+```
+
+That wrapper derives an `agent-<session>` runtime profile from the active agent session ID, moves local monitor builds to `xcode-derived/profiles/<agent-profile>`, gives XcodeBuildMCP its own socket under `~/.xcodebuildmcp/agents/`, and auto-selects a non-default `/Applications/Xcode*.app` via `DEVELOPER_DIR` when one exists. The common commands are:
+
+```bash
+mise run monitor:agent:build
+mise run monitor:agent:test
+mise run monitor:agent:xcodebuild -- ...
+mise run monitor:agent:xcodebuildmcp -- macos build --scheme HarnessMonitor
+mise run monitor:agent:mcp
+```
+
+The agent wrapper intentionally disables `xcodebuildmcp xcode-ide` by default so an agent cannot attach to the developer's running Xcode session. To enable IDE-bridge tools safely, the machine must have a separate Xcode install for agents (for example `Xcode-beta.app` or another `Xcode*.app` bundle), `HARNESS_MONITOR_AGENT_DEVELOPER_DIR` can point at it explicitly when needed, and the agent must also provide `XCODEBUILDMCP_XCODE_PID` or `XCODEBUILDMCP_XCODE_SESSION_ID` for that dedicated Xcode session together with `HARNESS_MONITOR_AGENT_ALLOW_XCODE_IDE=1`.
+
 `XCODE_ONLY_TESTING` also accepts a comma-separated list when you need more than one focused selector. Class-level selectors are expanded through Xcode test enumeration before execution so the lane fails instead of reporting a misleading zero-test pass when Xcode does not run class selectors directly. `HarnessMonitorUITests` run against the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `Harness Monitor.app`.
 
 Versioning for the monitor app is derived from the repo root `Cargo.toml`. Use `mise run version:set -- <version>` from the repo root when you bump a release. `mise run monitor:generate` regenerates the Xcode project via Tuist, then `Scripts/post-generate.sh` resyncs the marker-anchored version literals in `Tuist/ProjectDescriptionHelpers/BuildSettings.swift` (the `// VERSION_MARKER_CURRENT` and `// VERSION_MARKER_MARKETING` lines), the repo-root and app-local `buildServer.json` SourceKit configs, and the bundled daemon helper Info.plist from that canonical version.

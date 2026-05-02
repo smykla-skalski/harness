@@ -133,6 +133,14 @@ class RuntimeProfileHelperTests(unittest.TestCase):
 
             self.assertEqual(output, "bartsmykla")
 
+    def test_default_agent_profile_uses_agent_session_id(self) -> None:
+        env = os.environ.copy()
+        env["CODEX_SESSION_ID"] = "sess-agent-123"
+
+        output = run_helper("harness_monitor_default_agent_runtime_profile", env)
+
+        self.assertEqual(output, "agent-sess-agent-123")
+
     def test_user_runtime_profile_script_prints_profile_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             home_dir = Path(tmp_dir) / "home"

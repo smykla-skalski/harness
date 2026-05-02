@@ -189,3 +189,4 @@ All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ 
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
+- If using XcodeBuildMCP for `apps/harness-monitor-macos` work in a shared checkout, go through `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...` instead of raw `xcodebuildmcp` / plain `monitor:*` wrappers so agent Xcode state stays isolated from the developer's local Xcode.
