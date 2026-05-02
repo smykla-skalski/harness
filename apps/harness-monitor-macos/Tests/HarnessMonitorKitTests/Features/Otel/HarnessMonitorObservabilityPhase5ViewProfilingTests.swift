@@ -237,8 +237,7 @@ struct Phase5ViewProfilingTests {
         timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
         decisions: [],
         isTimelineLoading: false,
-        actionHandler: NullDecisionActionHandler(),
-        loadWindow: { _ in }
+        store: store
       ),
       width: 960,
       height: 720

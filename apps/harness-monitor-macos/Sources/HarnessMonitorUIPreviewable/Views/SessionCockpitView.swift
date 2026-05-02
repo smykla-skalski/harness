@@ -30,7 +30,10 @@ struct SessionCockpitView: View {
   }
 
   var body: some View {
-    ViewBodySignposter.measure("SessionCockpitView") {
+    #if DEBUG
+      let _ = Self._printChanges()
+    #endif
+    return ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
         horizontalPadding: 24,
         verticalPadding: HarnessMonitorTheme.spacingXL,
@@ -64,10 +67,7 @@ struct SessionCockpitView: View {
             timelineWindow: timelineWindow,
             decisions: store.supervisorOpenDecisions,
             isTimelineLoading: isTimelineLoading,
-            actionHandler: store.supervisorDecisionActionHandler(),
-            loadWindow: { request in
-              await store.loadSelectedTimelineWindow(request: request)
-            }
+            store: store
           )
         }
         .frame(maxWidth: .infinity, alignment: .leading)

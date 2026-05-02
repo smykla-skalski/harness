@@ -7,8 +7,7 @@ struct SessionCockpitTimelineSection: View {
   let timelineWindow: TimelineWindowResponse?
   let decisions: [Decision]
   let isTimelineLoading: Bool
-  let actionHandler: any DecisionActionHandler
-  let loadWindow: @Sendable (TimelineWindowRequest) async -> Void
+  let store: HarnessMonitorStore
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -27,6 +26,9 @@ struct SessionCockpitTimelineSection: View {
   }
 
   var body: some View {
+    #if DEBUG
+      let _ = Self._printChanges()
+    #endif
     let input = presentationInput
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
       content(for: cachedPresentation)
@@ -37,6 +39,14 @@ struct SessionCockpitTimelineSection: View {
     .onChange(of: input) { _, newInput in
       rebuildPresentationIfNeeded(for: newInput)
     }
+  }
+
+  private func loadWindow(_ request: TimelineWindowRequest) async {
+    await store.loadSelectedTimelineWindow(request: request)
+  }
+
+  private var actionHandler: any DecisionActionHandler {
+    store.supervisorDecisionActionHandler()
   }
 
   private var presentationInput: SessionTimelinePresentationInput {
