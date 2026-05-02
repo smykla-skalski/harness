@@ -111,35 +111,55 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
 
 struct SessionTimelineNavigationControls: View {
   let navigation: SessionTimelineWindowNavigation
-  let canScrollOlder: Bool
-  let canScrollNewer: Bool
-  let visibilityStats: SessionTimelineVisibilityStats
+  let presentation: SessionTimelineSectionPresentation
+  let scrollCommandTargetID: String?
+  let viewport: SessionTimelineViewportModel
   let performAction: (SessionTimelineWindowAction) -> Void
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      horizontalControls
-      verticalControls
+    let anchorID = viewport.visibleAnchorID ?? scrollCommandTargetID
+    let canOlder = presentation.canScrollOlder(from: anchorID)
+    let canNewer = presentation.canScrollNewer(from: anchorID)
+    let visibilityStats = viewport.visibilityStats
+    return ViewThatFits(in: .horizontal) {
+      horizontalControls(
+        canOlder: canOlder,
+        canNewer: canNewer,
+        visibilityStats: visibilityStats
+      )
+      verticalControls(
+        canOlder: canOlder,
+        canNewer: canNewer,
+        visibilityStats: visibilityStats
+      )
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Timeline navigation")
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigation)
   }
 
-  private var horizontalControls: some View {
+  private func horizontalControls(
+    canOlder: Bool,
+    canNewer: Bool,
+    visibilityStats: SessionTimelineVisibilityStats
+  ) -> some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       statusLabel
-      visibleStatusLabel
+      visibleStatusLabel(visibilityStats)
       Spacer(minLength: 0)
-      buttons
+      buttons(canOlder: canOlder, canNewer: canNewer)
     }
   }
 
-  private var verticalControls: some View {
+  private func verticalControls(
+    canOlder: Bool,
+    canNewer: Bool,
+    visibilityStats: SessionTimelineVisibilityStats
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       statusLabel
-      visibleStatusLabel
-      buttons
+      visibleStatusLabel(visibilityStats)
+      buttons(canOlder: canOlder, canNewer: canNewer)
     }
   }
 
@@ -150,20 +170,22 @@ struct SessionTimelineNavigationControls: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
   }
 
-  private var visibleStatusLabel: some View {
+  private func visibleStatusLabel(
+    _ visibilityStats: SessionTimelineVisibilityStats
+  ) -> some View {
     Text(visibilityStats.statusText)
       .scaledFont(.caption2.monospaced())
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
   }
 
-  private var buttons: some View {
+  private func buttons(canOlder: Bool, canNewer: Bool) -> some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       navigationButton(
         title: "Older",
         systemImage: "chevron.down",
         action: .older,
-        isEnabled: canScrollOlder,
+        isEnabled: canOlder,
         identifier: HarnessMonitorAccessibility.sessionTimelineOlderButton
       )
       navigationButton(
@@ -177,7 +199,7 @@ struct SessionTimelineNavigationControls: View {
         title: "Newer",
         systemImage: "chevron.up",
         action: .newer,
-        isEnabled: canScrollNewer,
+        isEnabled: canNewer,
         identifier: HarnessMonitorAccessibility.sessionTimelineNewerButton
       )
     }

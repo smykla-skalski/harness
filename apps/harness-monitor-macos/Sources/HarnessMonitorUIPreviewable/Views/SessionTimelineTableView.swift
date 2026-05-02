@@ -38,12 +38,12 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let rows: [SessionTimelineRow]
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
-  let viewportStatsChanged: (SessionTimelineTableViewportStats) -> Void
+  let viewport: SessionTimelineViewportModel
   let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
-      viewportStatsChanged: viewportStatsChanged,
+      viewport: viewport,
       scrollBoundaryChanged: scrollBoundaryChanged
     )
   }
@@ -84,7 +84,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   }
 
   func updateNSView(_ scrollView: NSScrollView, context: Context) {
-    context.coordinator.viewportStatsChanged = viewportStatsChanged
+    context.coordinator.viewport = viewport
     context.coordinator.scrollBoundaryChanged = scrollBoundaryChanged
     context.coordinator.update(
       rows: rows,

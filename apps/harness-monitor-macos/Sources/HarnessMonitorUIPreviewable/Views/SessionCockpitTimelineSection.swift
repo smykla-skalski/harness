@@ -14,14 +14,13 @@ struct SessionCockpitTimelineSection: View {
   private var dateTimeConfiguration
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var visibleAnchorID: String?
   @State private var scrollCommand: SessionTimelineScrollCommand?
   @State private var scrollCommandGeneration = 0
   @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
   @State private var pendingNavigationGeneration = 0
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
-  @State private var cachedVisibilityStats = SessionTimelineVisibilityStats.empty
+  @State private var viewport = SessionTimelineViewportModel()
 
   private var contentIdentity: SessionTimelineContentIdentity {
     SessionTimelineContentIdentity(sessionID: sessionID)
@@ -80,11 +79,13 @@ struct SessionCockpitTimelineSection: View {
       dateTimeConfiguration: dateTimeConfiguration
     )
     cachedPresentationInput = input
-    rebuildVisibilityStats(
-      viewportStats: SessionTimelineTableViewportStats.initial(
-        estimatedVisibleRows: cachedPresentation.fallbackVisibleRowCount,
-        totalRows: cachedPresentation.rows.count
-      )
+    viewport.updatePresentationCounts(
+      loaded: cachedPresentation.navigation.loadedCount,
+      total: cachedPresentation.navigation.totalCount
+    )
+    viewport.recordInitialViewport(
+      estimatedVisibleRows: cachedPresentation.fallbackVisibleRowCount,
+      totalRows: cachedPresentation.rows.count
     )
   }
 
@@ -106,7 +107,7 @@ struct SessionCockpitTimelineSection: View {
       requestLatestWindowIfNeeded(presentation)
     }
     .onChange(of: sessionID) { _, _ in
-      visibleAnchorID = nil
+      viewport.clear()
       scrollCommand = nil
       pendingNavigationAfterLoad = nil
       requestLatestWindow()
@@ -120,12 +121,11 @@ struct SessionCockpitTimelineSection: View {
   private func timelineSurface(for presentation: SessionTimelineSectionPresentation) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       if presentation.navigation.showsNavigation {
-        let anchorID = navigationAnchorID
         SessionTimelineNavigationControls(
           navigation: presentation.navigation,
-          canScrollOlder: presentation.canScrollOlder(from: anchorID),
-          canScrollNewer: presentation.canScrollNewer(from: anchorID),
-          visibilityStats: cachedVisibilityStats,
+          presentation: presentation,
+          scrollCommandTargetID: scrollCommand?.targetID,
+          viewport: viewport,
           performAction: { action in
             performNavigationAction(action, presentation: presentation)
           }
@@ -162,10 +162,7 @@ struct SessionCockpitTimelineSection: View {
             rows: presentation.rows,
             scrollCommand: scrollCommand,
             actionHandler: actionHandler,
-            viewportStatsChanged: { viewportStats in
-              updateVisibleAnchor(viewportStats.anchorRowID)
-              rebuildVisibilityStats(viewportStats: viewportStats)
-            },
+            viewport: viewport,
             scrollBoundaryChanged: { oldValue, newValue in
               handleScrollBoundaryChange(
                 from: oldValue,
@@ -201,24 +198,15 @@ struct SessionCockpitTimelineSection: View {
     .scrollClipDisabled(false)
   }
 
-  private func rebuildVisibilityStats(
-    viewportStats: SessionTimelineTableViewportStats
-  ) {
-    let stats = SessionTimelineVisibilityStats(
-      visibleRowCount: viewportStats.visibleRowCount,
-      renderedRowCount: viewportStats.renderedRowCount,
-      loadedEventCount: cachedPresentation.navigation.loadedCount,
-      totalEventCount: cachedPresentation.navigation.totalCount
-    )
-    if cachedVisibilityStats != stats {
-      cachedVisibilityStats = stats
-    }
-  }
 }
 
 extension SessionCockpitTimelineSection {
+  // navigationAnchorID is read only from non-body code paths (async Tasks
+  // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
+  // therefore does NOT register a SwiftUI body dependency on the model and
+  // does not re-introduce the per-scroll re-eval loop.
   private var navigationAnchorID: String? {
-    visibleAnchorID ?? scrollCommand?.targetID
+    viewport.visibleAnchorID ?? scrollCommand?.targetID
   }
 
   private func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -357,29 +345,24 @@ extension SessionCockpitTimelineSection {
 
   private func reconcileTimelineAnchor(with ids: [String]) {
     guard !ids.isEmpty else {
-      visibleAnchorID = nil
+      viewport.setAnchorID(nil)
       scrollCommand = nil
       return
     }
     guard let anchorID = navigationAnchorID else {
-      visibleAnchorID = ids.first
+      viewport.setAnchorID(ids.first)
       issueScrollCommand(ids.first)
       return
     }
     if !ids.contains(anchorID) {
-      visibleAnchorID = ids.first
+      viewport.setAnchorID(ids.first)
       issueScrollCommand(ids.first)
     }
   }
 
-  private func updateVisibleAnchor(_ anchorID: String?) {
-    guard let anchorID, visibleAnchorID != anchorID else { return }
-    visibleAnchorID = anchorID
-  }
-
   @MainActor
   private func issueScroll(to targetID: String?) {
-    visibleAnchorID = targetID
+    viewport.setAnchorID(targetID)
     issueScrollCommand(targetID)
   }
 
