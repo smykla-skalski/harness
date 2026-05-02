@@ -4,10 +4,14 @@ import SwiftUI
 extension WorkspaceWindowView {
   @discardableResult
   func consumePendingWorkspaceSelection() -> Bool {
-    guard let pending = store.consumePendingWorkspaceSelection() else {
+    guard let pending = store.consumePendingWorkspaceSelectionRequest() else {
       return false
     }
-    applyProgrammaticSelection(pending, recordHistory: true)
+    if pending.resetDecisionFilters {
+      WorkspaceDecisionFilterDefaults.reset()
+      decisionFilters = Self.initialDecisionFilters
+    }
+    applyProgrammaticSelection(pending.selection, recordHistory: true)
     return true
   }
 
