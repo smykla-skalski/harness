@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 #[test]
 fn every_non_exempt_http_route_has_a_ws_mapping() {
-    for route in HTTP_API_CONTRACT {
+    for route in HTTP_API_CONTRACT.iter() {
         if matches!(route.parity, HttpRouteParity::Exempt { .. }) {
             continue;
         }
