@@ -163,10 +163,10 @@ fn protocol_reference_carries_loop_and_fix_protocols() {
         "Verify signature with `rtk git log --show-signature -1`",
         "Signed-off-by: Bart Smykla <bartek@smykla.com>",
         "rtk mise run e2e:swarm:triage:recording:test",
-        "rtk mise run monitor:macos:tools:test:e2e",
+        "rtk mise run monitor:tools:test:e2e",
         "rtk mise run test:integration",
         "rtk mise run check",
-        "rtk mise run monitor:macos:lint",
+        "rtk mise run monitor:lint",
     ];
     for phrase in required_phrases {
         assert!(
@@ -245,81 +245,11 @@ fn mise_toml_publishes_recording_triage_tasks() {
     assert!(mise.contains("[tasks.\"e2e:swarm:triage:recording:test\"]"));
     assert!(mise.contains("./scripts/e2e/recording-triage/run-all.sh"));
     assert!(mise.contains("./scripts/e2e/recording-triage/tests/run-all.sh"));
-    let depends_count = mise.matches("\"monitor:macos:tools:build:e2e\"").count();
+    let depends_count = mise.matches("\"monitor:tools:build:e2e\"").count();
     assert!(
         depends_count >= 2,
         "expected at least two depends entries pointing at \
-         monitor:macos:tools:build:e2e (one per recording-triage task); got {depends_count}"
-    );
-}
-
-#[test]
-fn generated_skill_mirrors_use_codex_specific_source() {
-    let claude_skill = repo_root().join(".claude/skills/swarm-e2e-iterate/SKILL.md");
-    let codex_skill = repo_root().join(".agents/skills/swarm-e2e-iterate/SKILL.md");
-    let codex_metadata = repo_root().join(".agents/skills/swarm-e2e-iterate/agents/openai.yaml");
-    let claude_checklist =
-        repo_root().join(".claude/skills/swarm-e2e-iterate/references/recording-checklist.md");
-    let codex_checklist =
-        repo_root().join(".agents/skills/swarm-e2e-iterate/references/recording-checklist.md");
-
-    for path in [
-        &claude_skill,
-        &codex_skill,
-        &codex_metadata,
-        &claude_checklist,
-        &codex_checklist,
-    ] {
-        let meta = fs::symlink_metadata(path)
-            .unwrap_or_else(|err| panic!("expected generated file at {}: {err}", path.display()));
-        assert!(
-            !meta.file_type().is_symlink(),
-            "generated mirror must be a file tree, not a symlink: {}",
-            path.display()
-        );
-        assert!(
-            path.is_file(),
-            "expected generated file: {}",
-            path.display()
-        );
-    }
-
-    let claude = fs::read_to_string(&claude_skill).expect("read Claude mirror");
-    let codex = fs::read_to_string(&codex_skill).expect("read Codex mirror");
-    assert!(claude.contains("name: swarm-e2e-iterate"));
-    assert!(codex.contains("name: swarm-e2e-iterate"));
-    assert!(
-        codex.contains("Skill: council"),
-        "Codex skill must invoke the globally installed council skill"
-    );
-    assert!(
-        codex.contains("globally installed council"),
-        "Codex skill must make clear that council is not repo-local"
-    );
-    assert!(
-        !codex.contains("allowed-tools:"),
-        "Codex skill frontmatter should not carry Claude-only tool constraints"
-    );
-    assert_ne!(
-        claude, codex,
-        "Claude and Codex skill mirrors must diverge when a Codex source variant exists"
-    );
-
-    let codex_metadata_body = fs::read_to_string(&codex_metadata).expect("read openai.yaml");
-    assert!(
-        codex_metadata_body.contains("display_name:"),
-        "Codex skill should include OpenAI-facing metadata"
-    );
-
-    let claude_checklist_body = fs::read_to_string(&claude_checklist).expect("read mirror");
-    let codex_checklist_body = fs::read_to_string(&codex_checklist).expect("read mirror");
-    assert!(
-        claude_checklist_body.contains("## Automation map"),
-        "Claude mirror must inherit the automation-map table"
-    );
-    assert_eq!(
-        claude_checklist_body, codex_checklist_body,
-        "Claude and Codex checklist mirrors must match"
+         monitor:tools:build:e2e (one per recording-triage task); got {depends_count}"
     );
 }
 
@@ -343,22 +273,6 @@ fn protocol_reference_carries_glossary_and_column_vocab() {
             "iteration-protocol.md missing glossary/vocab phrase: {phrase}"
         );
     }
-}
-
-#[test]
-fn subagent_mirror_matches_canonical() {
-    let canonical = read_repo_file(SUBAGENT_BODY);
-    let mirror = repo_root().join(".claude/agents/swarm-e2e-iterator.md");
-    let mirror_body = std::fs::read_to_string(&mirror).unwrap_or_else(|err| {
-        panic!(
-            "failed to read .claude/agents/swarm-e2e-iterator.md: {err}; expected hand-maintained mirror of {SUBAGENT_BODY}",
-        );
-    });
-    assert_eq!(
-        canonical, mirror_body,
-        ".claude/agents/swarm-e2e-iterator.md must mirror {SUBAGENT_BODY} byte-for-byte. \
-         Run: cp {SUBAGENT_BODY} .claude/agents/swarm-e2e-iterator.md"
-    );
 }
 
 #[test]

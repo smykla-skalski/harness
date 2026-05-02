@@ -4,9 +4,9 @@ use axum::http::StatusCode;
 use tempfile::tempdir;
 
 use crate::daemon::protocol::{
-    AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest, SessionArchiveRequest,
-    SessionEndRequest, SessionJoinRequest, SessionTitleRequest, TaskCreateRequest, TaskDropRequest,
-    TaskDropTarget, TaskQueuePolicyRequest, TaskUpdateRequest,
+    AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest, SessionEndRequest,
+    SessionJoinRequest, SessionTitleRequest, TaskCreateRequest, TaskDropRequest, TaskDropTarget,
+    TaskQueuePolicyRequest, TaskUpdateRequest,
 };
 use crate::session::types::{SessionRole, TaskQueuePolicy, TaskSeverity, TaskStatus};
 use harness_testkit::with_isolated_harness_env;
