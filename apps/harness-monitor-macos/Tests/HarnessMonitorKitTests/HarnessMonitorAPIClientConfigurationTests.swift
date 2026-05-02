@@ -41,9 +41,12 @@ private func makeClient() -> HarnessMonitorAPIClient {
   let configuration = URLSessionConfiguration.ephemeral
   configuration.protocolClasses = [ConfigurationURLProtocol.self]
   let session = URLSession(configuration: configuration)
+  guard let endpoint = URL(string: "http://127.0.0.1:9999") else {
+    fatalError("loopback URL must parse")
+  }
   return HarnessMonitorAPIClient(
     connection: HarnessMonitorConnection(
-      endpoint: URL(string: "http://127.0.0.1:9999")!,
+      endpoint: endpoint,
       token: "token"
     ),
     session: session
@@ -126,20 +129,20 @@ private final class ConfigurationURLProtocol: URLProtocol, @unchecked Sendable {
     let runtimeProbe =
       includeRuntimeProbe
       ? #"""
-        ,
-        "runtime_probe": {
-          "probes": [
-            {
-              "agent_id": "copilot",
-              "display_name": "GitHub Copilot",
-              "binary_present": true,
-              "auth_state": "ready",
-              "version": "1.0.0"
-            }
-          ],
-          "checked_at": "2026-05-01T00:00:00Z"
-        }
-        """#
+      ,
+      "runtime_probe": {
+        "probes": [
+          {
+            "agent_id": "copilot",
+            "display_name": "GitHub Copilot",
+            "binary_present": true,
+            "auth_state": "ready",
+            "version": "1.0.0"
+          }
+        ],
+        "checked_at": "2026-05-01T00:00:00Z"
+      }
+      """#
       : ""
     return #"""
       {

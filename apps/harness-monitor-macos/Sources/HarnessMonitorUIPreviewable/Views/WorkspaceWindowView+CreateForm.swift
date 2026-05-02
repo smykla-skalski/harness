@@ -18,8 +18,8 @@ extension WorkspaceWindowView {
 
 struct WorkspaceWindowCreatePane<
   AcpUnavailableBanner: View,
-  AgentTuiUnavailableBanner: View,
-  CodexUnavailableBanner: View
+  AgentTuiBanner: View,
+  CodexBanner: View
 >: View {
   typealias ViewModel = WorkspaceWindowView.ViewModel
   typealias DisplayState = WorkspaceWindowView.AgentTuiDisplayState
@@ -31,8 +31,8 @@ struct WorkspaceWindowCreatePane<
   let focusedFieldBinding: FocusState<Field?>.Binding
   let startAction: () -> Void
   let acpUnavailableBanner: AcpUnavailableBanner
-  let agentTuiUnavailableBanner: AgentTuiUnavailableBanner
-  let codexUnavailableBanner: CodexUnavailableBanner
+  let agentTuiUnavailableBanner: AgentTuiBanner
+  let codexUnavailableBanner: CodexBanner
 
   var body: some View {
     ScrollView {

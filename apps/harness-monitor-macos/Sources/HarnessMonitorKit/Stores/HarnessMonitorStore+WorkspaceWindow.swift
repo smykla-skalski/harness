@@ -21,7 +21,8 @@ extension HarnessMonitorStore {
   }
 
   private func workspaceSessionID(forDecisionID decisionID: String) -> String? {
-    if let sessionID = supervisorOpenDecisions
+    if let sessionID =
+      supervisorOpenDecisions
       .first(where: { $0.id == decisionID })?
       .sessionID
     {

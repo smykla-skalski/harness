@@ -114,7 +114,9 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("auto transport bootstrap upgrades to WebSocket when it becomes ready within the default grace period")
+  @Test(
+    "auto transport bootstrap upgrades to WebSocket when it becomes ready within the default grace period"
+  )
   func autoTransportBootstrapUpgradesToWebSocketWithinDefaultGracePeriod() async throws {
     let httpClient = RecordingHarnessClient()
     let webSocketClient = RecordingHarnessClient()
