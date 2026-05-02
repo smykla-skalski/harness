@@ -9,6 +9,9 @@ private final class SupervisorStack {
   let lifecycle: SupervisorLifecycle
   let auditRetention: SupervisorAuditRetention?
   let relayTask: Task<Void, Never>
+  // Identity-stable handler reused for the lifetime of this stack so views that
+  // accept the handler never see a fresh existential per parent body eval.
+  private var cachedActionHandler: StoreDecisionActionHandler?
 
   init(
     decisionStore: DecisionStore,
@@ -27,6 +30,16 @@ private final class SupervisorStack {
     self.auditRetention = auditRetention
     self.relayTask = relayTask
   }
+
+  @MainActor
+  func actionHandler(for store: HarnessMonitorStore) -> StoreDecisionActionHandler {
+    if let cached = cachedActionHandler {
+      return cached
+    }
+    let handler = StoreDecisionActionHandler(store: store, decisions: decisionStore)
+    cachedActionHandler = handler
+    return handler
+  }
 }
 
 final class SupervisorBindings {
@@ -43,6 +56,10 @@ private enum SupervisorBindingsKey {
 }
 
 private enum SupervisorStartTaskKey {
+  nonisolated(unsafe) static var key: UInt8 = 0
+}
+
+private enum SupervisorNullActionHandlerKey {
   nonisolated(unsafe) static var key: UInt8 = 0
 }
 
@@ -91,6 +108,21 @@ extension HarnessMonitorStore {
     }
   }
 
+  fileprivate var _cachedNullActionHandler: NullDecisionActionHandler? {
+    get {
+      objc_getAssociatedObject(self, &SupervisorNullActionHandlerKey.key)
+        as? NullDecisionActionHandler
+    }
+    set {
+      objc_setAssociatedObject(
+        self,
+        &SupervisorNullActionHandlerKey.key,
+        newValue,
+        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+      )
+    }
+  }
+
   public var supervisorDecisionStore: DecisionStore? {
     _stack?.decisionStore
   }
@@ -131,10 +163,15 @@ extension HarnessMonitorStore {
   }
 
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {
-    guard let decisionStore = _stack?.decisionStore else {
-      return NullDecisionActionHandler()
+    if let stack = _stack {
+      return stack.actionHandler(for: self)
     }
-    return StoreDecisionActionHandler(store: self, decisions: decisionStore)
+    if let cached = _cachedNullActionHandler {
+      return cached
+    }
+    let handler = NullDecisionActionHandler()
+    _cachedNullActionHandler = handler
+    return handler
   }
 
   public func startSupervisor() async {

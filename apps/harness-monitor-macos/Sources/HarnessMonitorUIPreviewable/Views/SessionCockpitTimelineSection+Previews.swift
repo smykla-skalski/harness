@@ -9,8 +9,7 @@ extension SessionCockpitTimelineSection {
       timelineWindow: PreviewFixtures.richSessionTimelineWindow,
       decisions: PreviewFixtures.richSessionTimelineDecisions,
       isTimelineLoading: false,
-      actionHandler: NullDecisionActionHandler(),
-      loadWindow: { _ in }
+      store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
     )
     .padding()
     .frame(width: 960)
@@ -41,8 +40,7 @@ extension SessionCockpitTimelineSection {
     ),
     decisions: [],
     isTimelineLoading: false,
-    actionHandler: NullDecisionActionHandler(),
-    loadWindow: { _ in }
+    store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
   )
   .padding()
   .frame(width: 960)
