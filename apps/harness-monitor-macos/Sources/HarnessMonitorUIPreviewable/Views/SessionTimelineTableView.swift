@@ -60,8 +60,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     tableView.usesAlternatingRowBackgroundColors = false
     tableView.gridStyleMask = []
     tableView.intercellSpacing = NSSize(width: 0, height: HarnessMonitorTheme.itemSpacing)
-    tableView.rowHeight = SessionTimelineTableMetrics.estimatedBaseRowHeight
-    tableView.usesAutomaticRowHeights = true
+    tableView.usesAutomaticRowHeights = false
     tableView.selectionHighlightStyle = .none
     tableView.allowsEmptySelection = true
     tableView.allowsColumnSelection = false

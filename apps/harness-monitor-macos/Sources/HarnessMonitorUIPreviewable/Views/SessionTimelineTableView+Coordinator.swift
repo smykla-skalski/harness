@@ -68,6 +68,10 @@ extension SessionTimelineTableView {
           rowHeightCache[rowID] = tableView.rect(ofRow: rowIndex).height
         }
 
+        for row in rows where rowHeightCache[row.id] == nil {
+          rowHeightCache[row.id] = SessionTimelineTableMetrics.estimatedHeight(for: row)
+        }
+
         self.rows = rows
         rowIndexByID = Dictionary(
           uniqueKeysWithValues: rows.enumerated().map { index, row in
