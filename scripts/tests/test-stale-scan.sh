@@ -301,7 +301,7 @@ scenario_test_runners_not_gate_bucket() {
   local mise_test_pid="$LAST_SPAWN_PID"
   spawn_labelled "./scripts/cargo-local.sh test --lib" || { fail "spawn cargo test failed"; return; }
   local cargo_test_pid="$LAST_SPAWN_PID"
-  spawn_labelled "mise run monitor:macos:test" || { fail "spawn monitor test failed"; return; }
+  spawn_labelled "mise run monitor:test" || { fail "spawn monitor test failed"; return; }
   local monitor_test_pid="$LAST_SPAWN_PID"
 
   stale_scan_refresh_ps
@@ -338,7 +338,40 @@ scenario_tmp_artifacts() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 8: custom-root lock holder detection via lsof
+# Scenario 8: profile-scoped scans skip global /tmp bridge artifacts
+# ---------------------------------------------------------------------------
+scenario_profile_scoped_tmp_artifacts_are_ignored() {
+  start_test "profile-scoped scans ignore global /tmp bridge artifacts"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-profile.sock"
+  : >"$marker"
+  TMP_MARKERS+=("$marker")
+
+  local found
+  found="$(HARNESS_DAEMON_DATA_HOME="$SANDBOX/profile-home" stale_scan_tmp_bridge_artifacts)"
+  if [[ -z "$found" ]]; then
+    pass
+  else
+    fail "expected profile-scoped /tmp scan to be empty, got: $found"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 9: profile-scoped daemon roots resolve from HARNESS_DAEMON_DATA_HOME
+# ---------------------------------------------------------------------------
+scenario_profile_scoped_daemon_root() {
+  start_test "profile-scoped daemon roots use HARNESS_DAEMON_DATA_HOME"
+  local daemon_data_home="$SANDBOX/profile-home"
+  local roots
+  roots="$(HARNESS_DAEMON_DATA_HOME="$daemon_data_home" stale_scan_daemon_roots)"
+  if [[ "$roots" == "$daemon_data_home/harness/daemon" ]]; then
+    pass
+  else
+    fail "expected scoped daemon root, got: $roots"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10: custom-root lock holder detection via lsof
 # ---------------------------------------------------------------------------
 scenario_lock_holder() {
   start_test "lock-holder detection for custom root"
@@ -364,7 +397,7 @@ scenario_lock_holder() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 9: pid_describe formats PID/ETIME/COMMAND
+# Scenario 11: pid_describe formats PID/ETIME/COMMAND
 # ---------------------------------------------------------------------------
 scenario_pid_describe_format() {
   start_test "pid_describe emits PID + etime + command"
@@ -565,7 +598,7 @@ scenario_installed_not_in_build_bucket() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 15: ps snapshot caching - refreshing produces updated view.
+# Scenario 17: ps snapshot caching - refreshing produces updated view.
 # ---------------------------------------------------------------------------
 scenario_refresh_updates_cache() {
   start_test "stale_scan_refresh_ps reflects newly-spawned pids"
@@ -583,7 +616,7 @@ scenario_refresh_updates_cache() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 16: refreshing the ps snapshot must also invalidate the cached
+# Scenario 18: refreshing the ps snapshot must also invalidate the cached
 # pid->ppid map. Otherwise repo-gate ancestor exclusion can reuse stale
 # lineage and flag the current lane's own parent helper as foreign.
 # ---------------------------------------------------------------------------
@@ -614,7 +647,7 @@ scenario_refresh_invalidates_ppid_map() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 17: SQLite sidecar orphan detection - .db-wal present, .db absent.
+# Scenario 19: SQLite sidecar orphan detection - .db-wal present, .db absent.
 # ---------------------------------------------------------------------------
 scenario_orphan_wal() {
   start_test "orphan harness.db-wal detected when harness.db is gone"
@@ -629,7 +662,7 @@ scenario_orphan_wal() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 18: SQLite sidecar orphan detection - .db-shm present, .db absent.
+# Scenario 20: SQLite sidecar orphan detection - .db-shm present, .db absent.
 # ---------------------------------------------------------------------------
 scenario_orphan_shm() {
   start_test "orphan harness.db-shm detected when harness.db is gone"
@@ -644,7 +677,7 @@ scenario_orphan_shm() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 19: sidecars alongside a live harness.db are NOT flagged. The DB
+# Scenario 21: sidecars alongside a live harness.db are NOT flagged. The DB
 # is the source of truth; sidecars are normal WAL-mode companions.
 # ---------------------------------------------------------------------------
 scenario_sidecars_with_db_noop() {
@@ -665,7 +698,7 @@ scenario_sidecars_with_db_noop() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 20: nonexistent daemon root is a clean no-op (never errors).
+# Scenario 22: nonexistent daemon root is a clean no-op (never errors).
 # ---------------------------------------------------------------------------
 scenario_orphan_sidecar_missing_root() {
   start_test "sidecar scan on missing root is a no-op"
@@ -679,7 +712,7 @@ scenario_orphan_sidecar_missing_root() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 20: launchctl drift parser - missing program path emits drift line.
+# Scenario 23: launchctl drift parser - missing program path emits drift line.
 # ---------------------------------------------------------------------------
 scenario_launchd_drift_parser_missing() {
   start_test "launchd drift parser reports missing program path"
@@ -695,7 +728,7 @@ scenario_launchd_drift_parser_missing() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 21: launchctl drift parser - existing program path emits nothing.
+# Scenario 24: launchctl drift parser - existing program path emits nothing.
 # /bin/sh is guaranteed present on macOS.
 # ---------------------------------------------------------------------------
 scenario_launchd_drift_parser_present() {
@@ -712,7 +745,7 @@ scenario_launchd_drift_parser_present() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 22: launchctl drift parser - empty input is a no-op.
+# Scenario 25: launchctl drift parser - empty input is a no-op.
 # ---------------------------------------------------------------------------
 scenario_launchd_drift_parser_empty() {
   start_test "launchd drift parser tolerates empty input"
@@ -726,7 +759,7 @@ scenario_launchd_drift_parser_empty() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 23: launchctl drift parser - output without a program line is a
+# Scenario 26: launchctl drift parser - output without a program line is a
 # no-op (BundleProgram-backed services do not surface one).
 # ---------------------------------------------------------------------------
 scenario_launchd_drift_parser_no_program() {
@@ -772,7 +805,7 @@ time.sleep(300)
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 24: foreign process listening on the Codex WS port is flagged.
+# Scenario 27: foreign process listening on the Codex WS port is flagged.
 # ---------------------------------------------------------------------------
 scenario_foreign_ws_listener() {
   start_test "foreign TCP listener on Codex port is flagged as conflict"
@@ -789,7 +822,7 @@ scenario_foreign_ws_listener() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 25: harness-labelled listener is NOT flagged as foreign. We write
+# Scenario 28: harness-labelled listener is NOT flagged as foreign. We write
 # the listener script at a path containing target/debug/harness so macOS ps
 # (which ignores exec -a for framework-wrapped Python) still surfaces an
 # argv line that matches the build-bucket regex.
@@ -838,7 +871,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 26: codex WS port helper respects HARNESS_CODEX_WS_PORT.
+# Scenario 29: codex WS port helper respects HARNESS_CODEX_WS_PORT.
 # ---------------------------------------------------------------------------
 scenario_codex_ws_port_env() {
   start_test "stale_scan_codex_ws_port honors env override"
@@ -858,7 +891,7 @@ scenario_codex_ws_port_env() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 27: bridge-spawned Codex app-server listener is detected for cleanup.
+# Scenario 30: bridge-spawned Codex app-server listener is detected for cleanup.
 # ---------------------------------------------------------------------------
 scenario_codex_app_server_listener_detected() {
   start_test "codex app-server listener on Codex port is detected for cleanup"
@@ -912,7 +945,7 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 28: parentless xcodebuild wrapper without surviving lease metadata
+# Scenario 31: parentless xcodebuild wrapper without surviving lease metadata
 # is detected as a stale orphan.
 # ---------------------------------------------------------------------------
 scenario_orphan_monitor_wrapper_detected() {
@@ -1335,6 +1368,8 @@ run_all() {
   scenario_gate_bucket
   scenario_test_runners_not_gate_bucket
   scenario_tmp_artifacts
+  scenario_profile_scoped_tmp_artifacts_are_ignored
+  scenario_profile_scoped_daemon_root
   scenario_lock_holder
   scenario_pid_describe_format
   scenario_ancestor_exclusion

@@ -17,10 +17,16 @@ STALE_SCAN_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 source "$STALE_SCAN_LIB_DIR/common-repo-root.sh"
 # shellcheck source=scripts/lib/process-state.sh
 source "$STALE_SCAN_LIB_DIR/process-state.sh"
+STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB="$STALE_SCAN_ROOT/apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh"
+if [[ -f "$STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB" ]]; then
+  # shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+  source "$STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB"
+  harness_monitor_apply_runtime_profile_environment
+fi
 STALE_SCAN_COMMON_REPO_ROOT="${STALE_SCAN_COMMON_REPO_ROOT:-$(resolve_common_repo_root "$STALE_SCAN_ROOT")}"
 
 # shellcheck disable=SC2034  # consumed by scripts that source this lib
-readonly STALE_SCAN_APP_GROUP_ID="Q498EB36N4.io.harnessmonitor"
+readonly STALE_SCAN_APP_GROUP_ID="${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}"
 # shellcheck disable=SC2034  # consumed by scripts that source this lib
 readonly STALE_SCAN_GROUP_CONTAINER_ROOT="$HOME/Library/Group Containers/$STALE_SCAN_APP_GROUP_ID/harness/daemon"
 # shellcheck disable=SC2034  # consumed by scripts that source this lib
@@ -28,6 +34,20 @@ readonly STALE_SCAN_APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/
 
 # Single cached ps snapshot. Callers may force-refresh between kill cycles.
 _stale_scan_ps_snapshot=""
+
+stale_scan_is_profile_scoped() {
+  [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" || -n "${HARNESS_MONITOR_RUNTIME_PROFILE:-}" ]]
+}
+
+stale_scan_daemon_roots() {
+  if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
+    printf '%s\n' "$HARNESS_DAEMON_DATA_HOME/harness/daemon"
+    return 0
+  fi
+
+  printf '%s\n' "$STALE_SCAN_GROUP_CONTAINER_ROOT"
+  printf '%s\n' "$STALE_SCAN_APPLICATION_SUPPORT_ROOT"
+}
 
 stale_scan_refresh_ps() {
   _stale_scan_ps_snapshot="$(ps -Ao pid=,ppid=,etime=,command=)"
@@ -55,7 +75,7 @@ stale_scan_matching_pids() {
       if (process_kind == "live"  && $0 ~ /(^|\/)harness (daemon serve|bridge start)( |$)/) matched = 1
       if (process_kind == "gate") {
         if ($0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) matched = 1
-        if ($0 ~ /(^| )mise run monitor:macos:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
+        if ($0 ~ /(^| )mise run monitor:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
         if ($0 ~ /(^| )bash (([^ ]*\/)?scripts\/check(\.sh|-scripts\.sh))( |$)/) matched = 1
         if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|run --quiet -- setup agents generate --check)( |$)/) matched = 1
         if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
@@ -255,6 +275,9 @@ stale_scan_tmp_bridge_root() {
 }
 
 stale_scan_tmp_bridge_artifacts() {
+  if stale_scan_is_profile_scoped; then
+    return 0
+  fi
   local bridge_tmp_root
   bridge_tmp_root="$(stale_scan_tmp_bridge_root)"
   shopt -s nullglob
@@ -408,7 +431,7 @@ stale_scan_launchd_drift_from_output() {
 
 # Query launchctl for the given GUI-domain label and report drift.
 stale_scan_launchd_drift() {
-  local label="${1:-io.harnessmonitor.daemon}"
+  local label="${1:-${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-io.harnessmonitor.daemon}}"
   command -v launchctl >/dev/null 2>&1 || return 0
   local uid
   uid="$(id -u)"

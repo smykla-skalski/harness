@@ -69,12 +69,12 @@ fn denies_harness_setup_bootstrap_with_task_replacement() {
 #[test]
 fn denies_shell_wrapped_command_and_preserves_env_prefix() {
     let reason = manual_command_denial_reason(
-        "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:macos:test'",
+        "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:test'",
     )
     .expect("command should parse")
     .expect("shell-wrapped mise command should be blocked");
     assert!(reason.contains("XCODE_ONLY_TESTING="));
-    assert!(reason.contains("mise run monitor:macos:test"));
+    assert!(reason.contains("mise run monitor:test"));
 }
 
 #[test]

@@ -377,13 +377,13 @@ mise run test                        # default aggregate: harness + aff fast tes
 mise run test:unit                   # harness unit tests (opt-in; not run by default)
 mise run test:integration            # harness integration tests (opt-in; not run by default)
 mise run aff:test                    # aff-only tests (opt-in; not run by default)
-mise run monitor:macos:test          # generate + lint + test the macOS Harness Monitor app
-mise run monitor:macos:quality-gate  # slower build-based sandbox + daemon validation for the macOS app
-XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:macos:test  # focused macOS XCTest via the shared wrapper
+mise run monitor:test          # generate + lint + test the macOS Harness Monitor app
+mise run monitor:quality-gate  # slower build-based sandbox + daemon validation for the macOS app
+XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:test  # focused macOS XCTest via the shared wrapper
 ```
 
-The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:macos:generate` to materialize them before opening the project in Xcode.
-Its fast lint lane runs `swift format` directly and runs `swiftlint lint` outside the Xcode build graph with a shared cache. Build-based sandbox and daemon validation now live in `mise run monitor:macos:quality-gate`, so routine linting stays off the daemon/Xcode path.
+The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:generate` to materialize them before opening the project in Xcode.
+Its fast lint lane runs `swift format` directly and runs `swiftlint lint` outside the Xcode build graph with a shared cache. Build-based sandbox and daemon validation now live in `mise run monitor:quality-gate`, so routine linting stays off the daemon/Xcode path.
 
 Only bump the release version with explicit user approval. Small changes can skip it unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled. After approval, update the canonical package version with `mise run version:set -- <version>` or `./scripts/version.sh set <version>`. That syncs the derived surfaces in `testkit/`, the marker-anchored version literals in `apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
 

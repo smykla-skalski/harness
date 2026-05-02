@@ -39,7 +39,7 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
     def test_mise_monitor_xcodebuild_task_still_points_at_the_wrapper(self) -> None:
         mise_toml = MISE_TOML.read_text(encoding="utf-8")
         self.assertIn(
-            '[tasks."monitor:macos:xcodebuild"]',
+            '[tasks."monitor:xcodebuild"]',
             mise_toml,
         )
         self.assertIn(

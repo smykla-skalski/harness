@@ -100,7 +100,7 @@ class RunLintScriptTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 64)
             self.assertIn("swift format failed", completed.stderr)
-            self.assertIn("[monitor:macos:lint] failed (exit 64)", completed.stderr)
+            self.assertIn("[monitor:lint] failed (exit 64)", completed.stderr)
             self.assertIn("monitor:macos lint/quality-gate: failed", completed.stderr)
 
 

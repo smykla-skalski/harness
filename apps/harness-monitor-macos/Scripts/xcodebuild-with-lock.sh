@@ -20,6 +20,8 @@ LEGACY_TUIST_OPT_OUT="${HARNESS_MONITOR_USE_TUIST_TEST:-}"
 # This wrapper is the canonical xcodebuild entrypoint for repo scripts.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$SCRIPT_DIR/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$SCRIPT_DIR/lib/runtime-profile.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/non-indexable-roots.sh
 source "$SCRIPT_DIR/lib/non-indexable-roots.sh"
 # shellcheck source=scripts/lib/lease-lock.sh
@@ -146,7 +148,7 @@ normalize_xcodebuild_path_args() {
 
 normalize_default_derived_data_path() {
   local raw_path normalized_path
-  raw_path="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived}"
+  raw_path="$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
   normalized_path="$(resolve_derived_data_path_arg "$raw_path")"
   record_normalized_path_mapping "-derivedDataPath" "$raw_path" "$normalized_path"
   printf '%s\n' "$normalized_path"
@@ -169,6 +171,9 @@ done
 if (( has_derived_data_path == 0 )); then
   args=("-derivedDataPath" "$derive_data_path" "${args[@]}")
 fi
+
+export XCODEBUILD_DERIVED_DATA_PATH="$derive_data_path"
+harness_monitor_apply_runtime_profile_environment
 
 ensure_non_indexable_directory "$derive_data_path"
 

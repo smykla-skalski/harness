@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 report_lint_failure() {
   local status="$?"
-  echo "[monitor:macos:lint] failed (exit ${status})" >&2
+  echo "[monitor:lint] failed (exit ${status})" >&2
   echo "monitor:macos lint/quality-gate: failed" >&2
   exit "${status}"
 }

@@ -6,24 +6,24 @@ This file provides guidance to coding agents when working in the Harness Monitor
 
 Optional features (Lottie dancing-llama, future OTel/observability slices, etc.) are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at project-generation time. The Tuist `FeatureFlags` helper (`Tuist/ProjectDescriptionHelpers/FeatureFlags.swift`) reads them and adds the matching Swift compilation conditions. The all-features-OFF graph is the canonical baseline.
 
-The Xcode project is generated from `Project.swift` (and `Tuist/Package.swift`) via Tuist 4. Sources are declared as globs in `Project.swift`, so adding a Swift file in an existing source root needs no manifest edit, but new targets, dependencies, build phases, schemes, or compilation conditions land in the manifests. Regenerate with `mise run monitor:macos:generate` (`Scripts/generate.sh` under the hood: `tuist install` when needed, `tuist generate`, then `Scripts/post-generate.sh` for `buildServer.json` and version sync). The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked.
+The Xcode project is generated from `Project.swift` (and `Tuist/Package.swift`) via Tuist 4. Sources are declared as globs in `Project.swift`, so adding a Swift file in an existing source root needs no manifest edit, but new targets, dependencies, build phases, schemes, or compilation conditions land in the manifests. Regenerate with `mise run monitor:generate` (`Scripts/generate.sh` under the hood: `tuist install` when needed, `tuist generate`, then `Scripts/post-generate.sh` for `buildServer.json` and version sync). The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked.
 The manifest tags targets for focused generation, so partial graphs can use selectors such as `tuist generate tag:feature:monitor`, `tuist generate tag:feature:previews`, or `tuist generate tag:feature:ui-testing`.
 Native Xcode local compilation cache is enabled directly through the generated build settings with `COMPILATION_CACHE_ENABLE_CACHING=YES`. This keeps the project auth-free for normal Tuist generation/builds; the remote-plugin settings (`COMPILATION_CACHE_ENABLE_PLUGIN` / `COMPILATION_CACHE_REMOTE_SERVICE_PATH`) are intentionally left unset here.
 
 Validation expectations (run from repo root):
 
-- `mise run monitor:macos:lint`
-- `mise run monitor:macos:quality-gate`
-- `mise run monitor:macos:build`
-- `mise run monitor:macos:test`
-- `mise run monitor:macos:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
+- `mise run monitor:lint`
+- `mise run monitor:quality-gate`
+- `mise run monitor:build`
+- `mise run monitor:test`
+- `mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
 - All xcodebuild invocations must use one of the approved `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
   - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
-  The `mise run monitor:macos:xcodebuild` wrapper resolves those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout.
+  The `mise run monitor:xcodebuild` wrapper resolves those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout. When `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` is set, the default local build root becomes `xcode-derived/profiles/<slug>` and the scripts derive a matching daemon data home, Codex bridge port, and launch-agent label so a personal dev lane does not interfere with parallel agents.
   The wrapper does not re-run Tuist after every successful `xcodebuild` by default; set `HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD=1` only for lanes that explicitly need regenerated shared scheme metadata afterward.
 - For local macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'`. Xcode sees both `My Mac` and `Any Mac`, prints `Using the first of multiple matching destinations`, and silently picks one. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64` destinations. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless you intentionally need a stricter `id=...` selector.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
@@ -34,8 +34,8 @@ Validation expectations (run from repo root):
 - Reuse the existing UI-test helpers exactly. New preflight/wait helpers for action controls must mirror `HarnessMonitorUITestInteractionSupport.tapButton(...)`: search button-role queries first, then the generic identified element, then the `identifier.frame` marker via `element(in:app,identifier:)` (not `frameElement(...)`, which is narrower and can miss real markers).
 - Do not put `.accessibilityIdentifier(...)` on a container that wraps interactive children with their own IDs or `.accessibilityFrameMarker(...)` probes. In the macOS accessibility tree, the container identifier can clobber the nested button/marker contract. Use `.accessibilityTestProbe(...)` for container-level probes and keep child control identifiers on the controls themselves.
 - Prefer existing container-aware patterns before inventing new gestures: `window(in:app,containing:)`, `descendantElement(...)`, `descendantFrameElement(...)`, and the visible-frame click flow from `PreferencesUITests+AcpPermissionLogReveal.swift` for controls inside scroll views or secondary windows.
-- SwiftLint runs externally via `mise run monitor:macos:lint` and CI, not as an Xcode build plugin or part of `mise run monitor:macos:test`. The lint lane is intentionally non-build-only: it generate-checks the workspace, runs `swift format`, and runs `swiftlint` without invoking `xcodebuild` or daemon bundle logic. Config lives in `.swiftlint.yml`.
-- `mise run monitor:macos:quality-gate` owns the slower build-based sandbox and daemon validation that used to be bundled into the lint lane.
+- SwiftLint runs externally via `mise run monitor:lint` and CI, not as an Xcode build plugin or part of `mise run monitor:test`. The lint lane is intentionally non-build-only: it generate-checks the workspace, runs `swift format`, and runs `swiftlint` without invoking `xcodebuild` or daemon bundle logic. Config lives in `.swiftlint.yml`.
+- `mise run monitor:quality-gate` owns the slower build-based sandbox and daemon validation that used to be bundled into the lint lane.
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
@@ -56,21 +56,21 @@ Targeted run (single scenario):
 
 ```bash
 XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate \
-  mise run monitor:macos:test
+  mise run monitor:test
 ```
 
-**Layer 2: Instruments xctrace pipeline** (`mise run monitor:macos:audit`) - periodic deep-dive attribution for data no public API exposes (SwiftUI body evaluations, update groups, causes, allocation call trees):
+**Layer 2: Instruments xctrace pipeline** (`mise run monitor:audit`) - periodic deep-dive attribution for data no public API exposes (SwiftUI body evaluations, update groups, causes, allocation call trees):
 
 ```bash
 # Full baseline capture
-mise run monitor:macos:audit -- --label baseline
+mise run monitor:audit -- --label baseline
 
 # Compare against baseline
-mise run monitor:macos:audit -- \
+mise run monitor:audit -- \
   --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
 
 # Parser regression tests
-mise run monitor:macos:test:scripts
+mise run monitor:test:scripts
 ```
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/`. Each run produces `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and optional comparison reports.
@@ -99,7 +99,7 @@ Harness Monitor supports two daemon ownership modes. Pick the right one for the 
 
 ### External daemon (recommended dev workflow)
 
-Launch the app under the `HarnessMonitor (External Daemon)` scheme in Xcode and run `harness daemon dev` in a terminal. The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container so the sandboxed Monitor app can read it, and spawns codex as its own stdio child - no `harness codex-bridge` process required.
+Launch the app under the `HarnessMonitor (External Daemon)` scheme in Xcode and run `harness daemon dev` in a terminal. The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container so the sandboxed Monitor app can read it, and spawns codex as its own stdio child - no `harness codex-bridge` process required. For an isolated personal lane, export `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` before generating/building and use the same env prefix in the terminal where you start `harness daemon dev` or `harness bridge start`. If you want that configured automatically, the simplest path is `mise run monitor:user`; after that, stick to the small `monitor:user:{build,test,daemon:dev,bridge:start}` task set.
 
 Debugging is `lldb -- harness daemon dev` or `cargo run --bin harness -- daemon dev` in a terminal. The scheme sets `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout so the app can wait for you to start the daemon after launch. Starting the app before the daemon also works: the manifest watcher fires on the first manifest write and auto-reconnects within ~250ms.
 
@@ -109,7 +109,7 @@ The `HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated behind `#if DEBUG` in `Daemo
 
 ### Managed daemon (release and distribution)
 
-Use the default `HarnessMonitor` scheme. This exercises the shipping path: the daemon runs under the macOS App Sandbox via `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. Subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart) are gated off in sandboxed mode and surface structured errors.
+Use the default `HarnessMonitor` scheme. This exercises the shipping path: the daemon runs under the macOS App Sandbox via `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. With `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` set during the build, the bundled launch agent also gets a profile-specific label plus matching `HARNESS_DAEMON_DATA_HOME` and `HARNESS_CODEX_WS_PORT` env so concurrent managed dev builds stay isolated. Subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart) are gated off in sandboxed mode and surface structured errors.
 
 Run this scheme before cutting a TestFlight / notarized build - it's the only way to validate the release code path end-to-end.
 
