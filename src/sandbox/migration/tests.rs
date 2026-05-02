@@ -19,7 +19,7 @@ fn migrates_when_old_has_data_and_new_empty() {
 }
 
 #[test]
-fn skips_when_new_has_data() {
+fn acknowledges_split_when_both_roots_have_content() {
     let tmp = TempDir::new().unwrap();
     let old = tmp.path().join("old/harness");
     let new = tmp.path().join("new/harness");
@@ -28,10 +28,15 @@ fn skips_when_new_has_data() {
     fs::create_dir_all(&new).unwrap();
     fs::write(new.join("b.json"), b"{}").unwrap();
 
-    let outcome = migrate(&old, &new).unwrap();
-    assert!(matches!(outcome, MigrationOutcome::SkippedNewNotEmpty));
+    let first = migrate(&old, &new).unwrap();
+    assert_eq!(first, MigrationOutcome::SplitAcknowledged);
     assert!(old.join("a.json").exists());
     assert!(new.join("b.json").exists());
+    let split_marker = super::load_split_marker(&new).unwrap().unwrap();
+    assert_eq!(split_marker.from_path, old);
+
+    let second = migrate(&old, &new).unwrap();
+    assert_eq!(second, MigrationOutcome::SplitAlreadyAcknowledged);
 }
 
 #[test]
@@ -93,4 +98,53 @@ fn idempotent_after_marker() {
     assert!(matches!(first, MigrationOutcome::Migrated));
     let second = migrate(&old, &new).unwrap();
     assert!(matches!(second, MigrationOutcome::AlreadyMigrated));
+}
+
+#[test]
+fn reacknowledges_split_when_old_root_changes() {
+    let tmp = TempDir::new().unwrap();
+    let old = tmp.path().join("old/harness");
+    let new = tmp.path().join("new/harness");
+    fs::create_dir_all(&old).unwrap();
+    fs::write(old.join("a.json"), b"{}").unwrap();
+    fs::create_dir_all(&new).unwrap();
+    fs::write(new.join("b.json"), b"{}").unwrap();
+
+    let first = migrate(&old, &new).unwrap();
+    assert_eq!(first, MigrationOutcome::SplitAcknowledged);
+    let first_marker = super::load_split_marker(&new).unwrap().unwrap();
+
+    fs::write(old.join("c.json"), b"updated").unwrap();
+
+    let second = migrate(&old, &new).unwrap();
+    assert_eq!(second, MigrationOutcome::SplitAcknowledged);
+    let second_marker = super::load_split_marker(&new).unwrap().unwrap();
+    assert_ne!(first_marker.old_root_digest, second_marker.old_root_digest);
+
+    let third = migrate(&old, &new).unwrap();
+    assert_eq!(third, MigrationOutcome::SplitAlreadyAcknowledged);
+}
+
+#[test]
+fn reacknowledges_when_legacy_root_reappears_after_migration() {
+    let tmp = TempDir::new().unwrap();
+    let old = tmp.path().join("old/harness");
+    let new = tmp.path().join("new/harness");
+    fs::create_dir_all(&old).unwrap();
+    fs::write(old.join("session.json"), b"{}").unwrap();
+    fs::create_dir_all(new.parent().unwrap()).unwrap();
+
+    let first = migrate(&old, &new).unwrap();
+    assert_eq!(first, MigrationOutcome::Migrated);
+    assert!(new.join(".migrated-from").exists());
+
+    fs::create_dir_all(&old).unwrap();
+    fs::write(old.join("legacy.json"), b"{}").unwrap();
+
+    let second = migrate(&old, &new).unwrap();
+    assert_eq!(second, MigrationOutcome::SplitAcknowledged);
+    assert!(super::load_split_marker(&new).unwrap().is_some());
+
+    let third = migrate(&old, &new).unwrap();
+    assert_eq!(third, MigrationOutcome::SplitAlreadyAcknowledged);
 }
