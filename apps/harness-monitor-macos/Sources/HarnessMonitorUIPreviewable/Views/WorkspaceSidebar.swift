@@ -52,14 +52,6 @@ struct WorkspaceSidebar: View {
     )
   }
 
-  private var persistedDecisionSeverities: Set<DecisionSeverity> {
-    Set(
-      decisionSeveritiesCSV
-        .split(separator: ",")
-        .compactMap { DecisionSeverity(rawValue: String($0)) }
-    )
-  }
-
   private var decisionFiltersMenuEnabled: Bool {
     decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
   }
@@ -101,8 +93,7 @@ struct WorkspaceSidebar: View {
       }
   }
 
-  @ViewBuilder
-  private var searchableSidebarList: some View {
+  @ViewBuilder private var searchableSidebarList: some View {
     if isStartupFocusParticipationEnabled, showsDecisionSearchChrome {
       sidebarList
         .searchable(
@@ -354,8 +345,18 @@ struct WorkspaceSidebar: View {
     return store.acpPermissionDecisionPayload(for: decision.id)
       ?? AcpPermissionDecisionPayload.decode(from: decision)
   }
+}
 
-  private func restorePersistedDecisionFiltersIfNeeded() {
+extension WorkspaceSidebar {
+  fileprivate var persistedDecisionSeverities: Set<DecisionSeverity> {
+    Set(
+      decisionSeveritiesCSV
+        .split(separator: ",")
+        .compactMap { DecisionSeverity(rawValue: String($0)) }
+    )
+  }
+
+  fileprivate func restorePersistedDecisionFiltersIfNeeded() {
     let isDefaultState =
       decisionFilters.query.isEmpty
       && decisionFilters.severities.isEmpty
@@ -370,11 +371,11 @@ struct WorkspaceSidebar: View {
     }
   }
 
-  private func setDecisionSeverities(_ newValue: Set<DecisionSeverity>) {
+  fileprivate func setDecisionSeverities(_ newValue: Set<DecisionSeverity>) {
     updateDecisionFilters(severities: newValue)
   }
 
-  private func updateDecisionFilters(
+  fileprivate func updateDecisionFilters(
     query: String? = nil,
     severities: Set<DecisionSeverity>? = nil,
     scope: DecisionsSidebarSearchScope? = nil
@@ -392,7 +393,7 @@ struct WorkspaceSidebar: View {
     syncPersistedDecisionPreferences(from: next)
   }
 
-  private func syncPersistedDecisionPreferences(
+  fileprivate func syncPersistedDecisionPreferences(
     from filters: DecisionsSidebarViewModel.FilterState
   ) {
     let severityCSV = filters.severities.map(\.rawValue).sorted().joined(separator: ",")
@@ -405,7 +406,7 @@ struct WorkspaceSidebar: View {
   }
 
   @MainActor
-  private func hydratePersistedDecisionFiltersIfNeeded() async {
+  fileprivate func hydratePersistedDecisionFiltersIfNeeded() async {
     guard !hasHydratedPersistedDecisionFilters else {
       return
     }
@@ -416,5 +417,4 @@ struct WorkspaceSidebar: View {
     hasHydratedPersistedDecisionFilters = true
     restorePersistedDecisionFiltersIfNeeded()
   }
-
 }
