@@ -131,7 +131,10 @@ public enum TraceRecorder {
 
         try afterRecordHook?()
 
-        let runDirAnchor = inputs.traceURL.deletingLastPathComponent().deletingLastPathComponent()
+        let runDirAnchor = inputs.traceURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let traceRel = relativePath(from: runDirAnchor, to: inputs.traceURL)
         let captureRecord = ManifestBuilder.CaptureRecord(
             scenario: inputs.scenario,
