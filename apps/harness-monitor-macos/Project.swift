@@ -400,6 +400,19 @@ private let externalDaemonScheme: Scheme = .scheme(
     )
 )
 
+private let uiTestHostScheme: Scheme = .scheme(
+    name: "HarnessMonitorUITestHost",
+    shared: true,
+    buildAction: .buildAction(
+        targets: [.target("HarnessMonitorUITestHost")],
+        preActions: [BuildPhases.prepareAppEntitlementsPreAction()]
+    ),
+    runAction: .runAction(
+        configuration: "Debug",
+        executable: .target("HarnessMonitorUITestHost")
+    )
+)
+
 private let agentsE2EScheme: Scheme = .scheme(
     name: "HarnessMonitorAgentsE2E",
     shared: true,
@@ -478,6 +491,7 @@ let project = Project(
         kitTestsScheme,
         appTestsScheme,
         externalDaemonScheme,
+        uiTestHostScheme,
         agentsE2EScheme,
         uiPreviewableScheme,
         uiPreviewsScheme
