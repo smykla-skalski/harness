@@ -64,27 +64,6 @@ write_build_server_config() {
 EOF
 }
 
-write_workspace_settings() {
-  local settings_path="$1"
-  local derived_data_path="$2"
-
-  mkdir -p "$(dirname "$settings_path")"
-  cat > "$settings_path" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>BuildLocationStyle</key>
-	<string>CustomLocation</string>
-	<key>DerivedDataCustomLocation</key>
-	<string>${derived_data_path}</string>
-	<key>IDEWorkspaceSharedSettings_AutocreateContextsIfNeeded</key>
-	<false/>
-</dict>
-</plist>
-EOF
-}
-
 seed_generated_app_entitlements() {
   local project_temp_dir="$1"
 
@@ -106,13 +85,21 @@ write_build_server_config \
 ensure_monitor_build_artifact_roots_non_indexable "$REPO_ROOT"
 ensure_non_indexable_directory "$DERIVED_DATA_PATH"
 
-write_workspace_settings \
+harness_monitor_write_workspace_settings \
   "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$DERIVED_DATA_PATH"
 
-write_workspace_settings \
+harness_monitor_write_workspace_settings \
   "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
   "$DERIVED_DATA_PATH"
+
+USER_DERIVED_DATA_PATH="$(harness_monitor_saved_user_derived_data_path "$ROOT" || true)"
+if [[ -n "$USER_DERIVED_DATA_PATH" ]]; then
+  harness_monitor_restore_saved_user_workspace_settings "$ROOT"
+  ensure_non_indexable_directory "$USER_DERIVED_DATA_PATH"
+  seed_generated_app_entitlements \
+    "$USER_DERIVED_DATA_PATH/Build/Intermediates.noindex/HarnessMonitor.build"
+fi
 
 seed_generated_app_entitlements \
   "$DERIVED_DATA_PATH/Build/Intermediates.noindex/HarnessMonitor.build"

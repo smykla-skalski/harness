@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ from pathlib import Path
 APP_ROOT = Path(__file__).resolve().parents[2]
 HELPER_PATH = APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh"
 USER_PROFILE_SCRIPT = APP_ROOT / "Scripts" / "user-runtime-profile.sh"
+COMMON_REPO_ROOT_SOURCE = APP_ROOT.parents[1] / "scripts" / "lib" / "common-repo-root.sh"
 DEFAULT_APP_GROUP_ID = "Q498EB36N4.io.harnessmonitor"
 
 
@@ -135,16 +137,36 @@ class RuntimeProfileHelperTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             home_dir = Path(tmp_dir) / "home"
             home_dir.mkdir()
+            repo_root = Path(tmp_dir) / "repo"
+            app_root = repo_root / "apps" / "harness-monitor-macos"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            workspace_roots = (
+                app_root / "HarnessMonitor.xcworkspace",
+                app_root / "HarnessMonitor.xcodeproj" / "project.xcworkspace",
+            )
+            lib_root.mkdir(parents=True)
+            for workspace_root in workspace_roots:
+                workspace_root.mkdir(parents=True)
+            shutil.copy(USER_PROFILE_SCRIPT, scripts_root / "user-runtime-profile.sh")
+            shutil.copy(HELPER_PATH, lib_root / "runtime-profile.sh")
+            common_repo_root_destination = repo_root / "scripts" / "lib"
+            common_repo_root_destination.mkdir(parents=True)
+            shutil.copy(
+                COMMON_REPO_ROOT_SOURCE,
+                common_repo_root_destination / "common-repo-root.sh",
+            )
             env = os.environ.copy()
             env.update(
                 {
                     "HOME": str(home_dir),
                     "HARNESS_MONITOR_USER_RUNTIME_PROFILE": "Bart Dev",
+                    "USER": "bart.smykla@konghq.com",
                 }
             )
 
             completed = subprocess.run(
-                ["bash", str(USER_PROFILE_SCRIPT)],
+                ["bash", str(scripts_root / "user-runtime-profile.sh")],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -159,6 +181,28 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             self.assertIn("Launch agent label: io.harnessmonitor.daemon.bart-dev", completed.stdout)
             self.assertIn("mise run monitor:user:build", completed.stdout)
             self.assertIn("mise run monitor:user:daemon:dev", completed.stdout)
+            self.assertEqual(
+                (app_root / ".xcode-user-derived-data-path").read_text().strip(),
+                str(repo_root / "xcode-derived" / "profiles" / "bart-dev"),
+            )
+            for settings_path in (
+                app_root
+                / "HarnessMonitor.xcworkspace"
+                / "xcuserdata"
+                / "bart.smykla@konghq.com.xcuserdatad"
+                / "WorkspaceSettings.xcsettings",
+                app_root
+                / "HarnessMonitor.xcodeproj"
+                / "project.xcworkspace"
+                / "xcuserdata"
+                / "bart.smykla@konghq.com.xcuserdatad"
+                / "WorkspaceSettings.xcsettings",
+            ):
+                with self.subTest(settings_path=settings_path):
+                    self.assertIn(
+                        str(repo_root / "xcode-derived" / "profiles" / "bart-dev"),
+                        settings_path.read_text(),
+                    )
 
 
 if __name__ == "__main__":
