@@ -16,8 +16,6 @@
 //!
 //! - window-close → `session/cancel` → drop → killpg cascade
 //! - daemon SIGTERM → flush `session/cancel` to all + send `-32099` to pending
-#![allow(unsafe_code)]
-
 use std::process::Child;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -25,6 +23,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use nix::sys::signal::{Signal, killpg};
+use nix::unistd::Pid;
 use tokio::sync::Notify;
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
@@ -387,8 +387,8 @@ fn u64_to_state(val: u64) -> WatchdogState {
 )]
 pub fn kill_process_group(pgid: i32, child: &mut Child) {
     info!(pgid, "sending SIGTERM to process group");
-    unsafe {
-        libc::killpg(pgid, libc::SIGTERM);
+    if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM) {
+        warn!(pgid, error = %e, "SIGTERM to process group failed");
     }
 
     thread::sleep(SIGTERM_GRACE_PERIOD);
@@ -402,15 +402,15 @@ pub fn kill_process_group(pgid: i32, child: &mut Child) {
                 pgid,
                 "process did not exit within grace period; sending SIGKILL"
             );
-            unsafe {
-                libc::killpg(pgid, libc::SIGKILL);
+            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
+                warn!(pgid, error = %e, "SIGKILL to process group failed");
             }
             let _ = child.wait();
         }
         Err(e) => {
             warn!(pgid, error = %e, "failed to check process status; sending SIGKILL");
-            unsafe {
-                libc::killpg(pgid, libc::SIGKILL);
+            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
+                warn!(pgid, error = %e, "SIGKILL to process group failed");
             }
             let _ = child.wait();
         }

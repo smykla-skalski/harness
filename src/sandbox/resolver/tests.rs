@@ -32,15 +32,12 @@ fn plain_bookmark_can_bootstrap_security_scoped_bookmark() {
 
 #[test]
 fn is_sandboxed_reads_env() {
-    let orig = std::env::var_os("HARNESS_SANDBOXED");
-    // SAFETY: single-threaded test binary; no other threads read this var concurrently.
-    unsafe { std::env::set_var("HARNESS_SANDBOXED", "1") };
-    assert!(is_sandboxed());
-    unsafe { std::env::remove_var("HARNESS_SANDBOXED") };
-    assert!(!is_sandboxed());
-    if let Some(v) = orig {
-        unsafe { std::env::set_var("HARNESS_SANDBOXED", v) };
-    }
+    temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+        assert!(is_sandboxed());
+    });
+    temp_env::with_var("HARNESS_SANDBOXED", None::<&str>, || {
+        assert!(!is_sandboxed());
+    });
 }
 
 /// Synthesize a security-scoped bookmark for `path` using CFURL APIs.

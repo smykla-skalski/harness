@@ -125,71 +125,69 @@ fn list_sessions(endpoint: &str, token: &str) -> Value {
 #[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_b_layout_session() {
-    unsafe {
-        std::env::remove_var("CLAUDE_SESSION_ID");
-    }
+    temp_env::with_var("CLAUDE_SESSION_ID", None::<&str>, || {
+        let tmp = tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        let xdg = tmp.path().join("xdg");
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&xdg).unwrap();
 
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path().join("home");
-    let xdg = tmp.path().join("xdg");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&xdg).unwrap();
+        // Fake project origin directory (does not need to be a git repo for adopt).
+        let origin = tmp.path().join("src").join("kuma");
+        fs::create_dir_all(&origin).unwrap();
 
-    // Fake project origin directory (does not need to be a git repo for adopt).
-    let origin = tmp.path().join("src").join("kuma");
-    fs::create_dir_all(&origin).unwrap();
+        // Place the session under the daemon's canonical sessions root so it is
+        // treated as an internal (non-external) session.
+        let project_dir = xdg.join("harness").join("sessions").join("kuma");
+        fs::create_dir_all(&project_dir).unwrap();
+        let session_root = write_b_layout_session(&project_dir, "abc12345", &origin);
 
-    // Place the session under the daemon's canonical sessions root so it is
-    // treated as an internal (non-external) session.
-    let project_dir = xdg.join("harness").join("sessions").join("kuma");
-    fs::create_dir_all(&project_dir).unwrap();
-    let session_root = write_b_layout_session(&project_dir, "abc12345", &origin);
+        let mut daemon = spawn_daemon_serve(&home, &xdg);
+        wait_for_daemon_ready(&home, &xdg);
+        let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
-    let mut daemon = spawn_daemon_serve(&home, &xdg);
-    wait_for_daemon_ready(&home, &xdg);
-    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+        let (status, body) = adopt(&endpoint, &token, &session_root);
+        assert_eq!(status, 200, "adopt should return 200; body: {body}");
+        assert_eq!(
+            body["state"]["session_id"].as_str(),
+            Some("abc12345"),
+            "response must carry session_id"
+        );
+        assert!(
+            body["state"]["external_origin"].is_null(),
+            "internal session must have no external_origin; got: {}",
+            body["state"]["external_origin"]
+        );
 
-    let (status, body) = adopt(&endpoint, &token, &session_root);
-    assert_eq!(status, 200, "adopt should return 200; body: {body}");
-    assert_eq!(
-        body["state"]["session_id"].as_str(),
-        Some("abc12345"),
-        "response must carry session_id"
-    );
-    assert!(
-        body["state"]["external_origin"].is_null(),
-        "internal session must have no external_origin; got: {}",
-        body["state"]["external_origin"]
-    );
+        // Confirm the session appears in the daemon's in-memory session list via
+        // GET /v1/sessions.
+        let sessions = list_sessions(&endpoint, &token);
+        let found_in_list = sessions.as_array().is_some_and(|arr| {
+            arr.iter().any(|entry| {
+                entry["session_id"].as_str() == Some("abc12345")
+                    || entry["state"]["session_id"].as_str() == Some("abc12345")
+            })
+        });
+        assert!(
+            found_in_list,
+            "adopted session must appear in GET /v1/sessions; response: {sessions}"
+        );
 
-    // Confirm the session appears in the daemon's in-memory session list via
-    // GET /v1/sessions.
-    let sessions = list_sessions(&endpoint, &token);
-    let found_in_list = sessions.as_array().is_some_and(|arr| {
-        arr.iter().any(|entry| {
-            entry["session_id"].as_str() == Some("abc12345")
-                || entry["state"]["session_id"].as_str() == Some("abc12345")
-        })
+        // Also confirm the per-project `.active.json` registry was written.
+        let active_registry = project_dir.join(".active.json");
+        assert!(
+            active_registry.exists(),
+            "active registry must exist: {}",
+            active_registry.display()
+        );
+        let registry_text = fs::read_to_string(&active_registry).expect("read active registry");
+        assert!(
+            registry_text.contains("abc12345"),
+            "active registry must contain adopted session id; got: {registry_text}"
+        );
+
+        daemon.kill().expect("kill daemon");
     });
-    assert!(
-        found_in_list,
-        "adopted session must appear in GET /v1/sessions; response: {sessions}"
-    );
-
-    // Also confirm the per-project `.active.json` registry was written.
-    let active_registry = project_dir.join(".active.json");
-    assert!(
-        active_registry.exists(),
-        "active registry must exist: {}",
-        active_registry.display()
-    );
-    let registry_text = fs::read_to_string(&active_registry).expect("read active registry");
-    assert!(
-        registry_text.contains("abc12345"),
-        "active registry must contain adopted session id; got: {registry_text}"
-    );
-
-    daemon.kill().expect("kill daemon");
 }
 
 // ---------------------------------------------------------------------------
@@ -199,50 +197,48 @@ fn adopt_external_b_layout_session() {
 #[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_is_idempotent_with_409() {
-    unsafe {
-        std::env::remove_var("CLAUDE_SESSION_ID");
-    }
+    temp_env::with_var("CLAUDE_SESSION_ID", None::<&str>, || {
+        let tmp = tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        let xdg = tmp.path().join("xdg");
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&xdg).unwrap();
 
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path().join("home");
-    let xdg = tmp.path().join("xdg");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&xdg).unwrap();
+        let origin = tmp.path().join("src").join("kuma");
+        fs::create_dir_all(&origin).unwrap();
 
-    let origin = tmp.path().join("src").join("kuma");
-    fs::create_dir_all(&origin).unwrap();
+        let project_dir = xdg.join("harness").join("sessions").join("kuma");
+        fs::create_dir_all(&project_dir).unwrap();
+        let session_root = write_b_layout_session(&project_dir, "abcdabcd", &origin);
 
-    let project_dir = xdg.join("harness").join("sessions").join("kuma");
-    fs::create_dir_all(&project_dir).unwrap();
-    let session_root = write_b_layout_session(&project_dir, "abcdabcd", &origin);
+        let mut daemon = spawn_daemon_serve(&home, &xdg);
+        wait_for_daemon_ready(&home, &xdg);
+        let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
-    let mut daemon = spawn_daemon_serve(&home, &xdg);
-    wait_for_daemon_ready(&home, &xdg);
-    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+        let (first_status, first_body) = adopt(&endpoint, &token, &session_root);
+        assert_eq!(
+            first_status, 200,
+            "first adopt must succeed; body: {first_body}"
+        );
 
-    let (first_status, first_body) = adopt(&endpoint, &token, &session_root);
-    assert_eq!(
-        first_status, 200,
-        "first adopt must succeed; body: {first_body}"
-    );
+        let (second_status, second_body) = adopt(&endpoint, &token, &session_root);
+        assert_eq!(
+            second_status, 409,
+            "second adopt must return 409; body: {second_body}"
+        );
+        assert_eq!(
+            second_body["error"].as_str(),
+            Some("already-attached"),
+            "error field must be 'already-attached'"
+        );
+        assert_eq!(
+            second_body["session_id"].as_str(),
+            Some("abcdabcd"),
+            "session_id must be echoed in the conflict body"
+        );
 
-    let (second_status, second_body) = adopt(&endpoint, &token, &session_root);
-    assert_eq!(
-        second_status, 409,
-        "second adopt must return 409; body: {second_body}"
-    );
-    assert_eq!(
-        second_body["error"].as_str(),
-        Some("already-attached"),
-        "error field must be 'already-attached'"
-    );
-    assert_eq!(
-        second_body["session_id"].as_str(),
-        Some("abcdabcd"),
-        "session_id must be echoed in the conflict body"
-    );
-
-    daemon.kill().expect("kill daemon");
+        daemon.kill().expect("kill daemon");
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -253,43 +249,41 @@ fn adopt_external_is_idempotent_with_409() {
 #[ignore = "slow integration test that spawns a real daemon for adopt flow coverage"]
 #[test]
 fn adopt_external_outside_sessions_root_sets_flag() {
-    unsafe {
-        std::env::remove_var("CLAUDE_SESSION_ID");
-    }
+    temp_env::with_var("CLAUDE_SESSION_ID", None::<&str>, || {
+        let tmp = tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
+        let xdg = tmp.path().join("xdg");
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&xdg).unwrap();
 
-    let tmp = tempdir().expect("tempdir");
-    let home = tmp.path().join("home");
-    let xdg = tmp.path().join("xdg");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&xdg).unwrap();
+        let origin = tmp.path().join("src").join("kuma");
+        fs::create_dir_all(&origin).unwrap();
 
-    let origin = tmp.path().join("src").join("kuma");
-    fs::create_dir_all(&origin).unwrap();
+        // External project dir — lives completely outside `xdg/harness/sessions/`.
+        let external_project = tmp.path().join("external-root").join("kuma");
+        fs::create_dir_all(&external_project).unwrap();
+        let session_root = write_b_layout_session(&external_project, "ffff0000", &origin);
 
-    // External project dir — lives completely outside `xdg/harness/sessions/`.
-    let external_project = tmp.path().join("external-root").join("kuma");
-    fs::create_dir_all(&external_project).unwrap();
-    let session_root = write_b_layout_session(&external_project, "ffff0000", &origin);
+        let mut daemon = spawn_daemon_serve(&home, &xdg);
+        wait_for_daemon_ready(&home, &xdg);
+        let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
-    let mut daemon = spawn_daemon_serve(&home, &xdg);
-    wait_for_daemon_ready(&home, &xdg);
-    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+        let (status, body) = adopt(&endpoint, &token, &session_root);
+        assert_eq!(
+            status, 200,
+            "adopt of external session must return 200; body: {body}"
+        );
 
-    let (status, body) = adopt(&endpoint, &token, &session_root);
-    assert_eq!(
-        status, 200,
-        "adopt of external session must return 200; body: {body}"
-    );
+        let external_origin = body["state"]["external_origin"].as_str();
+        assert!(
+            external_origin.is_some(),
+            "external_origin must be populated for sessions outside the sessions root; body: {body}"
+        );
+        assert!(
+            !external_origin.unwrap().is_empty(),
+            "external_origin must be non-empty"
+        );
 
-    let external_origin = body["state"]["external_origin"].as_str();
-    assert!(
-        external_origin.is_some(),
-        "external_origin must be populated for sessions outside the sessions root; body: {body}"
-    );
-    assert!(
-        !external_origin.unwrap().is_empty(),
-        "external_origin must be non-empty"
-    );
-
-    daemon.kill().expect("kill daemon");
+        daemon.kill().expect("kill daemon");
+    });
 }
