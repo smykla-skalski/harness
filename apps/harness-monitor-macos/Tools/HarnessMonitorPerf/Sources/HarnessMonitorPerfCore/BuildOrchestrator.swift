@@ -18,7 +18,7 @@ public enum BuildOrchestrator {
 
     public struct BuildInputs {
         public var xcodebuildRunner: URL
-        public var projectPath: URL
+        public var workspacePath: URL
         public var derivedDataPath: URL
         public var destination: String
         public var arch: String
@@ -34,7 +34,7 @@ public enum BuildOrchestrator {
         public var buildStartedAtUTC: String
 
         public init(
-            xcodebuildRunner: URL, projectPath: URL, derivedDataPath: URL,
+            xcodebuildRunner: URL, workspacePath: URL, derivedDataPath: URL,
             destination: String, arch: String, shippingScheme: String, hostScheme: String,
             buildShipping: Bool, forceClean: Bool, skipDaemonBundle: Bool,
             daemonCargoTargetDir: URL,
@@ -42,7 +42,7 @@ public enum BuildOrchestrator {
             workspaceFingerprint: String, buildStartedAtUTC: String
         ) {
             self.xcodebuildRunner = xcodebuildRunner
-            self.projectPath = projectPath
+            self.workspacePath = workspacePath
             self.derivedDataPath = derivedDataPath
             self.destination = destination
             self.arch = arch
@@ -152,7 +152,7 @@ public enum BuildOrchestrator {
         common: [String], daemonBundleEnv: [String]?
     ) throws {
         var arguments: [String] = [
-            "-project", inputs.projectPath.path,
+            "-workspace", inputs.workspacePath.path,
             "-scheme", scheme,
             "-configuration", "Release",
             "-derivedDataPath", inputs.derivedDataPath.path,

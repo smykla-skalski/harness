@@ -102,7 +102,30 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
   }
 
   func testTimelineBurstHitchRate() {
-    measureScenario("timeline-burst")
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let signpostMetric = XCTOSSignpostMetric(
+      subsystem: "io.harnessmonitor",
+      category: "perf",
+      name: "timeline-burst"
+    )
+    let options = XCTMeasureOptions()
+    options.iterationCount = 3
+
+    measure(metrics: [XCTHitchMetric(application: app), signpostMetric], options: options) {
+      let launched = launchForPerf(app: app, scenario: "timeline-burst")
+      waitForScenarioCompletion(app: launched, scenario: "timeline-burst")
+
+      let timelineNav = element(in: launched, identifier: Accessibility.sessionTimelineNavigation)
+      if timelineNav.waitForExistence(timeout: Self.actionTimeout) {
+        dragUp(in: launched, element: timelineNav, distanceRatio: 2.0)
+        dragUp(in: launched, element: timelineNav, distanceRatio: 2.0)
+        dragDown(in: launched, element: timelineNav, distanceRatio: 2.0)
+        dragUp(in: launched, element: timelineNav, distanceRatio: 2.0)
+        dragDown(in: launched, element: timelineNav, distanceRatio: 2.0)
+      }
+
+      launched.terminate()
+    }
   }
 
   func testOfflineCachedOpenHitchRate() {

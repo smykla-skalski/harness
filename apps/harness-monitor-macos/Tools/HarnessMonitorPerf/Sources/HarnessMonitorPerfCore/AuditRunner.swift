@@ -139,7 +139,7 @@ public enum AuditRunner {
             BuildOrchestrator.purgeReleaseProducts(hostAppPath: hostAppPath, shippingAppPath: shippingAppPath)
             try BuildOrchestrator.buildReleaseTargets(.init(
                 xcodebuildRunner: inputs.xcodebuildRunner,
-                projectPath: inputs.appRoot.appendingPathComponent("HarnessMonitor.xcodeproj"),
+                workspacePath: inputs.appRoot.appendingPathComponent("HarnessMonitor.xcworkspace"),
                 derivedDataPath: inputs.derivedDataPath,
                 destination: inputs.destination,
                 arch: inputs.arch,
