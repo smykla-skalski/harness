@@ -76,7 +76,7 @@ harness_monitor_runtime_profile() {
   local candidate path
   candidate="$(harness_monitor_sanitize_profile "${HARNESS_MONITOR_RUNTIME_PROFILE:-}")"
   if [[ -n "$candidate" ]]; then
-    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
+    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 2
     printf '%s\n' "$candidate"
     return 0
   fi
@@ -87,11 +87,11 @@ harness_monitor_runtime_profile() {
     "${TARGET_BUILD_DIR:-}" \
     "${BUILT_PRODUCTS_DIR:-}" \
     "${BUILD_DIR:-}" \
-    "${PROJECT_TEMP_DIR:-}" \
-    "${TARGET_TEMP_DIR:-}"; do
+      "${PROJECT_TEMP_DIR:-}" \
+      "${TARGET_TEMP_DIR:-}"; do
     candidate="$(harness_monitor_profile_from_path "$path" || true)"
     if [[ -n "$candidate" ]]; then
-      harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
+      harness_monitor_validate_resolved_runtime_profile "$candidate" || return 2
       printf '%s\n' "$candidate"
       return 0
     fi
@@ -99,7 +99,7 @@ harness_monitor_runtime_profile() {
 
   candidate="$(harness_monitor_default_agent_runtime_profile || true)"
   if [[ -n "$candidate" ]]; then
-    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
+    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 2
     printf '%s\n' "$candidate"
     return 0
   fi
@@ -161,6 +161,10 @@ harness_monitor_default_agent_runtime_profile() {
   profile="$(harness_monitor_sanitize_profile "agent-$session_id")"
   [[ -n "$profile" ]] || return 1
   printf '%s\n' "$profile"
+}
+
+harness_monitor_agent_session_active() {
+  harness_monitor_agent_session_id >/dev/null 2>&1
 }
 
 harness_monitor_env_flag_enabled() {
@@ -230,14 +234,18 @@ harness_monitor_runtime_app_group_id() {
 }
 
 harness_monitor_runtime_daemon_data_home() {
-  local profile app_group_id
-  if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
+  local profile app_group_id status
+  if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]] && ! harness_monitor_agent_session_active; then
     printf '%s\n' "$HARNESS_DAEMON_DATA_HOME"
     return 0
   fi
 
-  profile="$(harness_monitor_runtime_profile || true)"
-  [[ -n "$profile" ]] || return 1
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    return "$status"
+  fi
   app_group_id="$(harness_monitor_runtime_app_group_id)"
   printf '%s/Library/Group Containers/%s/%s/%s\n' \
     "${HOME:?missing HOME}" \
@@ -403,14 +411,18 @@ harness_monitor_port_registry_resolve() {
 }
 
 harness_monitor_runtime_codex_ws_port() {
-  local profile registry_path port lock_path
-  if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
+  local profile registry_path port lock_path status
+  if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]] && ! harness_monitor_agent_session_active; then
     printf '%s\n' "$HARNESS_CODEX_WS_PORT"
     return 0
   fi
 
-  profile="$(harness_monitor_runtime_profile || true)"
-  [[ -n "$profile" ]] || return 1
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    return "$status"
+  fi
   registry_path="$(harness_monitor_port_registry_path)"
 
   port="$(harness_monitor_port_registry_lookup "$registry_path" "$profile" || true)"
@@ -434,13 +446,23 @@ harness_monitor_runtime_codex_ws_port() {
 }
 
 harness_monitor_runtime_launch_agent_label() {
-  local profile
-  if [[ -n "${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-}" ]]; then
+  local profile status
+  if [[ -n "${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-}" ]] \
+      && ! harness_monitor_agent_session_active; then
     printf '%s\n' "$HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"
     return 0
   fi
 
-  profile="$(harness_monitor_runtime_profile || true)"
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    if [[ "$status" == "1" ]]; then
+      printf '%s\n' "$HARNESS_MONITOR_RUNTIME_LABEL_BASE"
+      return 0
+    fi
+    return "$status"
+  fi
   if [[ -z "$profile" ]]; then
     printf '%s\n' "$HARNESS_MONITOR_RUNTIME_LABEL_BASE"
     return 0
@@ -451,13 +473,22 @@ harness_monitor_runtime_launch_agent_label() {
 harness_monitor_runtime_derived_data_path() {
   local common_repo_root="$1"
   local root_name="${2:-xcode-derived}"
-  local profile
-  if [[ -n "${XCODEBUILD_DERIVED_DATA_PATH:-}" ]]; then
+  local profile status
+  if [[ -n "${XCODEBUILD_DERIVED_DATA_PATH:-}" ]] && ! harness_monitor_agent_session_active; then
     printf '%s\n' "$XCODEBUILD_DERIVED_DATA_PATH"
     return 0
   fi
 
-  profile="$(harness_monitor_runtime_profile || true)"
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    if [[ "$status" == "1" ]]; then
+      printf '%s/%s\n' "$common_repo_root" "$root_name"
+      return 0
+    fi
+    return "$status"
+  fi
   if [[ -z "$profile" ]]; then
     printf '%s/%s\n' "$common_repo_root" "$root_name"
     return 0
@@ -572,9 +603,13 @@ harness_monitor_restore_saved_user_workspace_settings() {
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {
-  local profile
-  profile="$(harness_monitor_runtime_profile || true)"
-  [[ -n "$profile" ]] || return 1
+  local profile status
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    return "$status"
+  fi
   printf '%s/.xcodebuildmcp/agents/%s.sock\n' "${HOME:?missing HOME}" "$profile"
 }
 
@@ -617,20 +652,32 @@ harness_monitor_resolve_agent_developer_dir() {
 }
 
 harness_monitor_apply_runtime_profile_environment() {
-  local profile
-  profile="$(harness_monitor_runtime_profile || true)"
-  if [[ -z "$profile" ]]; then
-    return 0
+  local profile status
+  if profile="$(harness_monitor_runtime_profile)"; then
+    :
+  else
+    status="$?"
+    if [[ "$status" == "1" ]]; then
+      return 0
+    fi
+    return "$status"
   fi
 
   export HARNESS_MONITOR_RUNTIME_PROFILE="$profile"
-  if [[ -z "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
+  if harness_monitor_agent_session_active; then
     export HARNESS_DAEMON_DATA_HOME
     HARNESS_DAEMON_DATA_HOME="$(harness_monitor_runtime_daemon_data_home)"
-  fi
-  if [[ -z "${HARNESS_CODEX_WS_PORT:-}" ]]; then
     export HARNESS_CODEX_WS_PORT
     HARNESS_CODEX_WS_PORT="$(harness_monitor_runtime_codex_ws_port)"
+  else
+    if [[ -z "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
+      export HARNESS_DAEMON_DATA_HOME
+      HARNESS_DAEMON_DATA_HOME="$(harness_monitor_runtime_daemon_data_home)"
+    fi
+    if [[ -z "${HARNESS_CODEX_WS_PORT:-}" ]]; then
+      export HARNESS_CODEX_WS_PORT
+      HARNESS_CODEX_WS_PORT="$(harness_monitor_runtime_codex_ws_port)"
+    fi
   fi
   export HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL
   HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL="$(harness_monitor_runtime_launch_agent_label)"

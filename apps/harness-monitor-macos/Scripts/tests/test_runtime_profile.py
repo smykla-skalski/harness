@@ -80,6 +80,10 @@ def base_env() -> dict[str, str]:
     env = os.environ.copy()
     for key in AGENT_SESSION_ENV_KEYS:
         env.pop(key, None)
+    for key in PROFILE_SOURCE_KEYS:
+        env.pop(key, None)
+    env.pop("HARNESS_CODEX_WS_PORT", None)
+    env.pop("HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL", None)
     env.pop("HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE", None)
     env.pop("HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE", None)
     return env
@@ -268,7 +272,7 @@ class RuntimeProfileHelperTests(unittest.TestCase):
                     "foreign-agent-profile",
                     FOREIGN_AGENT_PROFILE,
                     {},
-                    1,
+                    2,
                     None,
                     "targets a different agent session",
                 ),
@@ -276,7 +280,7 @@ class RuntimeProfileHelperTests(unittest.TestCase):
                     "non-agent-profile",
                     NON_AGENT_PROFILE_RAW,
                     {},
-                    1,
+                    2,
                     None,
                     f"Resolved profile '{NON_AGENT_PROFILE}' is not allowed.",
                 ),
@@ -292,7 +296,7 @@ class RuntimeProfileHelperTests(unittest.TestCase):
                     "foreign-agent-profile-with-non-agent-override",
                     FOREIGN_AGENT_PROFILE,
                     {"HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE": "1"},
-                    1,
+                    2,
                     None,
                     "targets a different agent session",
                 ),
@@ -327,6 +331,70 @@ class RuntimeProfileHelperTests(unittest.TestCase):
                             self.assertEqual(completed.stdout.strip(), expected_output)
                         if expected_error is not None:
                             self.assertIn(expected_error, completed.stderr)
+
+    def test_runtime_derived_data_path_rejects_foreign_inherited_path_in_agent_session(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            home_dir = Path(tmp_dir) / "home"
+            home_dir.mkdir(parents=True)
+            env = agent_session_env(home_dir)
+            env["XCODEBUILD_DERIVED_DATA_PATH"] = profile_source_env_value(
+                "XCODEBUILD_DERIVED_DATA_PATH", FOREIGN_AGENT_PROFILE, home_dir
+            )
+
+            completed = run_helper_result(
+                "harness_monitor_runtime_derived_data_path /repo-common", env
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("targets a different agent session", completed.stderr)
+
+    def test_apply_runtime_profile_environment_recomputes_agent_runtime_outputs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            home_dir = Path(tmp_dir) / "home"
+            home_dir.mkdir(parents=True)
+            env = agent_session_env(home_dir)
+            env.update(
+                {
+                    "HARNESS_MONITOR_RUNTIME_PROFILE": CURRENT_AGENT_PROFILE,
+                    "HARNESS_DAEMON_DATA_HOME": profile_source_env_value(
+                        "HARNESS_DAEMON_DATA_HOME", FOREIGN_AGENT_PROFILE, home_dir
+                    ),
+                    "HARNESS_CODEX_WS_PORT": "9999",
+                    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": (
+                        f"io.harnessmonitor.daemon.{FOREIGN_AGENT_PROFILE}"
+                    ),
+                }
+            )
+
+            output = run_helper(
+                "harness_monitor_apply_runtime_profile_environment; "
+                "printf '%s\\n%s\\n%s\\n%s\\n' "
+                '"$HARNESS_MONITOR_RUNTIME_PROFILE" '
+                '"$HARNESS_DAEMON_DATA_HOME" '
+                '"$HARNESS_CODEX_WS_PORT" '
+                '"$HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"',
+                env,
+            )
+            profile, daemon_data_home, codex_port, label = output.splitlines()
+
+            self.assertEqual(profile, CURRENT_AGENT_PROFILE)
+            self.assertEqual(
+                daemon_data_home,
+                str(
+                    home_dir
+                    / "Library"
+                    / "Group Containers"
+                    / DEFAULT_APP_GROUP_ID
+                    / "runtime-profiles"
+                    / CURRENT_AGENT_PROFILE
+                ),
+            )
+            self.assertEqual(codex_port, expected_profile_port(CURRENT_AGENT_PROFILE))
+            self.assertEqual(label, f"io.harnessmonitor.daemon.{CURRENT_AGENT_PROFILE}")
 
     def test_user_runtime_profile_script_prints_profile_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

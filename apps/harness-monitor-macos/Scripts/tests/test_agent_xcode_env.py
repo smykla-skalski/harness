@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import stat
@@ -49,9 +50,25 @@ def base_env() -> dict[str, str]:
     env = os.environ.copy()
     for key in AGENT_SESSION_ENV_KEYS:
         env.pop(key, None)
+    for key in (
+        "HARNESS_MONITOR_RUNTIME_PROFILE",
+        "HARNESS_DAEMON_DATA_HOME",
+        "HARNESS_CODEX_WS_PORT",
+        "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL",
+        "XCODEBUILD_DERIVED_DATA_PATH",
+        "XCODEBUILDMCP_DERIVED_DATA_PATH",
+        "XCODEBUILDMCP_SOCKET",
+        "XCODEBUILDCLI_SOCKET",
+    ):
+        env.pop(key, None)
     env.pop("HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE", None)
     env.pop("HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE", None)
     return env
+
+
+def expected_profile_port(profile: str) -> str:
+    digest_prefix = hashlib.sha256(profile.encode("utf-8")).hexdigest()[:8]
+    return str(4600 + (int(digest_prefix, 16) % 20000))
 
 
 class AgentXcodeEnvTests(unittest.TestCase):
@@ -235,6 +252,92 @@ class AgentXcodeEnvTests(unittest.TestCase):
                     / "agents"
                     / "agent-sess-agent-123.sock"
                 ),
+            )
+
+    def test_recomputes_inherited_foreign_runtime_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            repo_root, script_path = prepare_agent_script_root(temp_root)
+            home_dir = temp_root / "home"
+            home_dir.mkdir()
+
+            env = base_env()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "HARNESS_DAEMON_DATA_HOME": str(
+                        home_dir
+                        / "Library"
+                        / "Group Containers"
+                        / "Q498EB36N4.io.harnessmonitor"
+                        / "runtime-profiles"
+                        / "agent-foreign-session"
+                    ),
+                    "HARNESS_CODEX_WS_PORT": "9999",
+                    "XCODEBUILD_DERIVED_DATA_PATH": str(
+                        repo_root / "xcode-derived" / "profiles" / "agent-foreign-session"
+                    ),
+                    "XCODEBUILDMCP_DERIVED_DATA_PATH": str(
+                        repo_root / "xcode-derived" / "profiles" / "agent-foreign-session"
+                    ),
+                    "XCODEBUILDMCP_SOCKET": str(
+                        home_dir / ".xcodebuildmcp" / "agents" / "agent-foreign-session.sock"
+                    ),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(script_path),
+                    "bash",
+                    "-lc",
+                    "printf '%s\\n%s\\n%s\\n%s\\n%s\\n' "
+                    '"$HARNESS_DAEMON_DATA_HOME" '
+                    '"$HARNESS_CODEX_WS_PORT" '
+                    '"$XCODEBUILD_DERIVED_DATA_PATH" '
+                    '"$XCODEBUILDMCP_DERIVED_DATA_PATH" '
+                    '"$XCODEBUILDMCP_SOCKET"',
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            (
+                daemon_data_home,
+                codex_port,
+                derived_data_path,
+                xcodebuildmcp_derived_data_path,
+                socket_path,
+            ) = completed.stdout.strip().splitlines()
+            expected_profile = "agent-sess-agent-123"
+            expected_derived_data_path = str(
+                repo_root / "xcode-derived" / "profiles" / expected_profile
+            )
+            self.assertEqual(
+                daemon_data_home,
+                str(
+                    home_dir
+                    / "Library"
+                    / "Group Containers"
+                    / "Q498EB36N4.io.harnessmonitor"
+                    / "runtime-profiles"
+                    / expected_profile
+                ),
+            )
+            self.assertEqual(codex_port, expected_profile_port(expected_profile))
+            self.assertEqual(derived_data_path, expected_derived_data_path)
+            self.assertEqual(
+                xcodebuildmcp_derived_data_path,
+                expected_derived_data_path,
+            )
+            self.assertEqual(
+                socket_path,
+                str(home_dir / ".xcodebuildmcp" / "agents" / f"{expected_profile}.sock"),
             )
 
 

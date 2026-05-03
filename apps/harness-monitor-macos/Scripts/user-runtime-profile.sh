@@ -44,6 +44,10 @@ resolve_user_runtime_profile() {
 
 reject_agent_user_lane
 
+if allow_agent_user_lane; then
+  export HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE=1
+fi
+
 export HARNESS_MONITOR_RUNTIME_PROFILE
 HARNESS_MONITOR_RUNTIME_PROFILE="$(resolve_user_runtime_profile)"
 harness_monitor_apply_runtime_profile_environment

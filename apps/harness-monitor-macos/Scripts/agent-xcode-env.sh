@@ -65,13 +65,13 @@ configure_agent_xcode_environment() {
   harness_monitor_apply_runtime_profile_environment
 
   derived_data_path="$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
-  export XCODEBUILD_DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$derived_data_path}"
+  export XCODEBUILD_DERIVED_DATA_PATH="$derived_data_path"
   export XCODEBUILDMCP_WORKSPACE_PATH="${XCODEBUILDMCP_WORKSPACE_PATH:-$ROOT/HarnessMonitor.xcworkspace}"
   export XCODEBUILDMCP_SCHEME="${XCODEBUILDMCP_SCHEME:-HarnessMonitor}"
   export XCODEBUILDMCP_CONFIGURATION="${XCODEBUILDMCP_CONFIGURATION:-Debug}"
-  export XCODEBUILDMCP_DERIVED_DATA_PATH="${XCODEBUILDMCP_DERIVED_DATA_PATH:-$derived_data_path}"
+  export XCODEBUILDMCP_DERIVED_DATA_PATH="$derived_data_path"
 
-  socket_path="${XCODEBUILDMCP_SOCKET:-$(harness_monitor_runtime_xcodebuildmcp_socket_path)}"
+  socket_path="$(harness_monitor_runtime_xcodebuildmcp_socket_path)"
   mkdir -p "$(dirname "$socket_path")"
   export XCODEBUILDMCP_SOCKET="$socket_path"
   export XCODEBUILDCLI_SOCKET="$socket_path"
