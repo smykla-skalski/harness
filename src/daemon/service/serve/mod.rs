@@ -49,7 +49,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         started_at: utc_now(),
         token_path: state::auth_token_path().display().to_string(),
         sandboxed: config.sandboxed,
-        host_bridge: bridge::host_bridge_manifest()?,
+        host_bridge: bridge::host_bridge_manifest_with_discovery()?,
         // write_manifest bumps revision/updated_at for us - these are
         // just placeholders so the struct literal is well-typed.
         revision: 0,

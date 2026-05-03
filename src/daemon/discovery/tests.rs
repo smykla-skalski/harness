@@ -296,6 +296,131 @@ fn adopt_returns_no_running_daemon_when_nothing_alive() {
 }
 
 #[test]
+fn profile_family_recognises_agent_runtime_profiles() {
+    let path = Path::new(
+        "/Users/bart/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-profiles/agent-abc/harness/daemon",
+    );
+    assert_eq!(profile_family_of(path), ProfileFamily::Agent("abc".into()));
+}
+
+#[test]
+fn profile_family_treats_named_user_profiles_as_non_agent() {
+    let path = Path::new(
+        "/Users/bart/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-profiles/bartsmykla/harness/daemon",
+    );
+    assert_eq!(profile_family_of(path), ProfileFamily::NonAgent);
+}
+
+#[test]
+fn profile_family_treats_base_group_container_as_non_agent() {
+    let path = Path::new(
+        "/Users/bart/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/daemon",
+    );
+    assert_eq!(profile_family_of(path), ProfileFamily::NonAgent);
+}
+
+#[test]
+fn families_compatible_blocks_cross_family_adoption() {
+    let agent_a = ProfileFamily::Agent("abc".into());
+    let agent_b = ProfileFamily::Agent("def".into());
+    let non_agent = ProfileFamily::NonAgent;
+
+    assert!(families_compatible(&agent_a, &agent_a));
+    assert!(families_compatible(&non_agent, &non_agent));
+    assert!(!families_compatible(&agent_a, &agent_b));
+    assert!(!families_compatible(&agent_a, &non_agent));
+    assert!(!families_compatible(&non_agent, &agent_b));
+}
+
+#[test]
+fn adopt_refuses_to_cross_agent_to_non_agent_boundary() {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    // Agent lane sets explicit HARNESS_DAEMON_DATA_HOME so its
+    // NaturalDefault becomes the agent profile root.
+    let agent_data_home = home
+        .join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join(RUNTIME_PROFILES_DIR)
+        .join("agent-foo");
+    let agent_daemon_root = agent_data_home.join("harness").join("daemon");
+    fs::create_dir_all(&agent_daemon_root).expect("agent root");
+    // Non-agent live daemon at the base group container.
+    let base_root = home
+        .join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join("harness")
+        .join("daemon");
+    let _holder = fake_running_daemon(&base_root);
+    temp_env::with_vars(
+        [
+            (
+                "HARNESS_DAEMON_DATA_HOME",
+                Some(agent_data_home.to_str().expect("utf8 path")),
+            ),
+            ("HARNESS_APP_GROUP_ID", None::<&str>),
+            ("XDG_DATA_HOME", Some(home.to_str().expect("utf8 path"))),
+            ("HOME", Some(home.to_str().expect("utf8 path"))),
+            ("HARNESS_HOST_HOME", Some(home.to_str().expect("utf8 path"))),
+        ],
+        || {
+            reset_override();
+            let outcome = adopt_running_daemon_root();
+            assert!(
+                matches!(outcome, AdoptionOutcome::NoRunningDaemon { .. }),
+                "agent lane must not adopt non-agent root, got {outcome:?}"
+            );
+            // The override must remain unset so the agent lane stays
+            // hermetic and writes to its own (empty) root.
+            assert_eq!(state::daemon_root(), agent_daemon_root);
+            reset_override();
+        },
+    );
+}
+
+#[test]
+fn adopt_refuses_to_cross_non_agent_to_agent_boundary() {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    // Live agent daemon at runtime-profiles/agent-bar.
+    let agent_root = home
+        .join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join(RUNTIME_PROFILES_DIR)
+        .join("agent-bar")
+        .join("harness")
+        .join("daemon");
+    let _holder = fake_running_daemon(&agent_root);
+    temp_env::with_vars(
+        [
+            ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("XDG_DATA_HOME", Some(home.to_str().expect("utf8 path"))),
+            ("HOME", Some(home.to_str().expect("utf8 path"))),
+            ("HARNESS_HOST_HOME", Some(home.to_str().expect("utf8 path"))),
+        ],
+        || {
+            reset_override();
+            let outcome = adopt_running_daemon_root();
+            assert!(
+                matches!(outcome, AdoptionOutcome::NoRunningDaemon { .. }),
+                "non-agent lane must not adopt agent root, got {outcome:?}"
+            );
+            reset_override();
+        },
+    );
+}
+
+#[test]
 fn adopt_respects_explicit_env_when_that_root_is_live() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();

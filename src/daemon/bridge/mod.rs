@@ -21,8 +21,9 @@ mod types;
 pub(crate) use bridge_state::acquire_bridge_lock_exclusive;
 pub use bridge_state::{
     LivenessMode, bridge_config_path, bridge_socket_path, bridge_state_path,
-    codex_websocket_endpoint, ensure_host_context, host_bridge_manifest, load_running_bridge_state,
-    pid_alive, read_bridge_state, running_codex_capability, status_report,
+    codex_websocket_endpoint, ensure_host_context, host_bridge_manifest,
+    host_bridge_manifest_with_discovery, load_running_bridge_state, pid_alive, read_bridge_state,
+    running_codex_capability, status_report,
 };
 pub use client::BridgeClient;
 pub use commands::BridgeCommand;

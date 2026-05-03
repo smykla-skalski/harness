@@ -27,11 +27,74 @@
 //! other plausible roots. This keeps the "I know what I am doing" escape
 //! hatch working.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::daemon::state;
 use crate::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use crate::workspace::{harness_data_root, host_home_dir};
+
+/// Marker directory the runtime-profile shell helpers use under the macOS
+/// app group container to namespace per-profile state. Kept as an
+/// `&'static str` so the classifier and the renderer cannot drift.
+pub const RUNTIME_PROFILES_DIR: &str = "runtime-profiles";
+
+/// Prefix attached to every agent-session profile name. Mirrors the
+/// `agent-` token that the shell helpers in
+/// `apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh` apply to
+/// `CLAUDE_SESSION_ID`/`CODEX_SESSION_ID` etc, so classification stays
+/// consistent end-to-end.
+pub const AGENT_PROFILE_PREFIX: &str = "agent-";
+
+/// Profile family of a daemon root. Adoption is allowed only between
+/// roots in the same family so an agent's daemon/bridge can never
+/// silently take over someone else's lane (and vice versa).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfileFamily {
+    /// `runtime-profiles/agent-<id>/...`. Each agent session is its own
+    /// hard isolation boundary; only roots with the *same* `id` interop.
+    Agent(String),
+    /// Anything else (base app group container, XDG fallback, named
+    /// non-agent profiles such as `runtime-profiles/<user>`). All
+    /// non-agent roots interop freely with each other so the user lane
+    /// stays ergonomic for personal dev.
+    NonAgent,
+}
+
+/// Classify a daemon root by walking its components for a
+/// `runtime-profiles/<name>` segment. The presence of `<name>` decides
+/// whether the root is an agent isolation boundary or part of the
+/// flexible non-agent family.
+#[must_use]
+pub fn profile_family_of(root: &Path) -> ProfileFamily {
+    let mut iter = root.components().peekable();
+    while let Some(component) = iter.next() {
+        if component.as_os_str() == RUNTIME_PROFILES_DIR
+            && let Some(next) = iter.next()
+        {
+            let name = next.as_os_str().to_string_lossy();
+            if let Some(agent_id) = name.strip_prefix(AGENT_PROFILE_PREFIX) {
+                return ProfileFamily::Agent(agent_id.to_string());
+            }
+            // Named non-agent profile (`runtime-profiles/<user>`).
+            // Treated as part of the NonAgent family on purpose.
+        }
+    }
+    ProfileFamily::NonAgent
+}
+
+/// Adoption is allowed only between roots whose [`ProfileFamily`] match.
+/// An [`ProfileFamily::Agent`] is matched only by the **same** agent id;
+/// every [`ProfileFamily::NonAgent`] root interops with every other
+/// [`ProfileFamily::NonAgent`].
+#[must_use]
+pub fn families_compatible(own: &ProfileFamily, sibling: &ProfileFamily) -> bool {
+    match (own, sibling) {
+        (ProfileFamily::Agent(a), ProfileFamily::Agent(b)) => a == b,
+        (ProfileFamily::Agent(_), ProfileFamily::NonAgent)
+        | (ProfileFamily::NonAgent, ProfileFamily::Agent(_)) => false,
+        (ProfileFamily::NonAgent, ProfileFamily::NonAgent) => true,
+    }
+}
 
 /// A candidate daemon root we might scan for a running daemon.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,17 +224,24 @@ pub fn running_daemon_location() -> Option<DaemonLocation> {
 ///
 /// 1. If the currently effective `state::daemon_root()` is alive, return
 ///    [`AdoptionOutcome::AlreadyCoherent`] unchanged.
-/// 2. Otherwise, scan [`candidate_daemon_locations`] for a live candidate.
-///    On the first hit, install an override via
+/// 2. Otherwise, scan [`candidate_daemon_locations`] for a live candidate
+///    whose [`ProfileFamily`] matches the effective root's family. On the
+///    first compatible hit, install an override via
 ///    [`state::set_daemon_root_override`] and return
 ///    [`AdoptionOutcome::Adopted`].
-/// 3. If nothing is alive anywhere, leave the override untouched and return
-///    [`AdoptionOutcome::NoRunningDaemon`] so the caller can warn.
+/// 3. If nothing compatible is alive, leave the override untouched and
+///    return [`AdoptionOutcome::NoRunningDaemon`] so the caller can warn.
+///
+/// **Strict isolation**: an [`ProfileFamily::Agent`] root never adopts a
+/// non-agent or different-agent root, and a [`ProfileFamily::NonAgent`]
+/// root never adopts an agent root. This is what stops a user lane from
+/// silently inheriting an in-flight agent session's daemon (and vice
+/// versa).
 ///
 /// Adoption never overrides a live user-specified root, so the escape
 /// hatch (`HARNESS_DAEMON_DATA_HOME`, `HARNESS_APP_GROUP_ID`) keeps
-/// working: if that explicit target is actually running a daemon, it wins.
-/// Adoption only steps in when the default target is empty.
+/// working: if that explicit target is actually running a daemon, it
+/// wins. Adoption only steps in when the default target is empty.
 #[must_use]
 pub fn adopt_running_daemon_root() -> AdoptionOutcome {
     let effective_root = state::daemon_root();
@@ -182,8 +252,12 @@ pub fn adopt_running_daemon_root() -> AdoptionOutcome {
         };
     }
 
+    let own_family = profile_family_of(&effective_root);
     for candidate in candidate_daemon_locations() {
         if candidate.root == effective_root {
+            continue;
+        }
+        if !families_compatible(&own_family, &profile_family_of(&candidate.root)) {
             continue;
         }
         let lock = candidate.root.join(state::DAEMON_LOCK_FILE);
