@@ -1,9 +1,29 @@
 import Foundation
 
+/// Outcome of `HarnessMonitorStore.applyAcpAgent`.
+///
+/// Lets callers distinguish "applied to the active session" from "ignored
+/// because the user has navigated away," so the success toast can stay honest
+/// about the snapshot's visibility instead of relying on a magic Bool.
+public enum AcpAgentApplyOutcome: Equatable, Sendable {
+  case applied
+  case droppedSessionMismatch
+}
+
 extension HarnessMonitorStore {
-  func applyAcpAgent(_ snapshot: AcpAgentSnapshot) {
+  @discardableResult
+  func applyAcpAgent(_ snapshot: AcpAgentSnapshot) -> AcpAgentApplyOutcome {
     guard snapshot.sessionId == selectedSessionID else {
-      return
+      HarnessMonitorLogger.store.warning(
+        """
+        applyAcpAgent dropped snapshot for inactive session \
+        snapshotSession=\(snapshot.sessionId, privacy: .public) \
+        selectedSession=\(self.selectedSessionID ?? "<nil>", privacy: .public) \
+        agent=\(snapshot.agentId, privacy: .public) \
+        acp=\(snapshot.acpId, privacy: .public)
+        """
+      )
+      return .droppedSessionMismatch
     }
     noteAcpSessionActivity(sessionID: snapshot.sessionId)
 
@@ -24,6 +44,7 @@ extension HarnessMonitorStore {
     dropAcpInspectSnapshot(acpID: snapshot.acpId, agentID: snapshot.agentId)
     reconcilePresentedAcpPermissionBatch()
     reconcileAcpPermissionDecisions()
+    return AcpAgentApplyOutcome.applied
   }
 
   func replaceAcpAgents(
