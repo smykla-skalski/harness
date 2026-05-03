@@ -18,7 +18,7 @@ extension HarnessMonitorStore {
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
       daemonStatus = DaemonStatusReport(diagnosticsReport: measuredDiagnostics.value)
-      reconcileAcpBridgeIncidentVisibility()
+      clearTransientHostBridgeIssues()
       recordRequestSuccess()
     } catch {
       presentFailureFeedback(error.localizedDescription)

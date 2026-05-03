@@ -8,6 +8,9 @@ extension RecordingHarnessClient {
   }
 
   func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
+  func configuredDiagnosticsReport() -> DaemonDiagnosticsReport? {
+    lock.withLock { diagnosticsReportOverride }
+  }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { projectSummariesStorage } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { sessionSummariesStorage } }
 

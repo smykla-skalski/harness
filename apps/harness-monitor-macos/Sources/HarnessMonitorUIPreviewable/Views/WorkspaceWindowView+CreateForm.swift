@@ -172,14 +172,14 @@ extension WorkspaceWindowCreatePane {
     }
     if viewModel.createMode == .terminal {
       if viewModel.selectedLaunchSelection.isAcp {
-        if displayState.acpUnavailable {
+        if store.acpUnavailable {
           acpUnavailableBanner
         }
-      } else if displayState.agentTuiUnavailable {
+      } else if store.agentTuiUnavailable {
         agentTuiUnavailableBanner
       }
     }
-    if viewModel.createMode == .codex && displayState.codexUnavailable {
+    if viewModel.createMode == .codex && store.codexUnavailable {
       codexUnavailableBanner
     }
   }

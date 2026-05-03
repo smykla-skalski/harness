@@ -221,4 +221,100 @@ struct HarnessMonitorStoreBridgeRefreshTests {
 
     store.stopAllStreams()
   }
+
+  @Test("refreshDaemonStatus clears unavailable when daemon status reports a healthy bridge")
+  func refreshDaemonStatusClearsUnavailableWhenDaemonReportsHealthyBridge() async {
+    let daemon = RecordingDaemonController(
+      statusReport: makeSandboxedStatus(
+        hostBridge: HostBridgeManifest(
+          running: true,
+          socketPath: "/tmp/bridge.sock",
+          capabilities: [
+            "codex": HostBridgeCapabilityManifest(
+              healthy: true,
+              transport: "websocket",
+              endpoint: "ws://127.0.0.1:4500"
+            )
+          ]
+        )
+      )
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+    store.hostBridgeCapabilityIssues["codex"] = .unavailable
+
+    await store.refreshDaemonStatus()
+
+    #expect(store.codexUnavailable == false)
+    #expect(store.hostBridgeCapabilityIssues.isEmpty)
+  }
+
+  @Test("refreshDiagnostics clears unavailable when diagnostics report a healthy bridge")
+  func refreshDiagnosticsClearsUnavailableWhenDiagnosticsReportHealthyBridge() async {
+    let client = RecordingHarnessClient()
+    client.configureDiagnosticsReport(
+      DaemonDiagnosticsReport(
+        health: HealthResponse(
+          status: "ok",
+          version: "19.8.1",
+          pid: 111,
+          endpoint: "http://127.0.0.1:9999",
+          startedAt: "2026-04-12T09:00:00Z",
+          logLevel: HarnessMonitorLogger.defaultDaemonLogLevel,
+          projectCount: 1,
+          sessionCount: 1
+        ),
+        manifest: DaemonManifest(
+          version: "19.8.1",
+          pid: 111,
+          endpoint: "http://127.0.0.1:9999",
+          startedAt: "2026-04-12T09:00:00Z",
+          tokenPath: "/tmp/token",
+          sandboxed: true,
+          hostBridge: HostBridgeManifest(
+            running: true,
+            socketPath: "/tmp/bridge.sock",
+            capabilities: [
+              "codex": HostBridgeCapabilityManifest(
+                healthy: true,
+                transport: "websocket",
+                endpoint: "ws://127.0.0.1:4500"
+              )
+            ]
+          )
+        ),
+        launchAgent: LaunchAgentStatus(
+          installed: true,
+          loaded: true,
+          label: "io.harness.daemon",
+          path: "/tmp/io.harness.daemon.plist",
+          domainTarget: "gui/501",
+          serviceTarget: "gui/501/io.harness.daemon",
+          state: "running",
+          pid: 4_242,
+          lastExitStatus: 0
+        ),
+        workspace: DaemonDiagnostics(
+          daemonRoot: "/tmp/harness/daemon",
+          manifestPath: "/tmp/harness/daemon/manifest.json",
+          authTokenPath: "/tmp/token",
+          authTokenPresent: true,
+          eventsPath: "/tmp/harness/daemon/events.jsonl",
+          databasePath: "/tmp/harness/daemon/harness.db",
+          databaseSizeBytes: 1_024,
+          lastEvent: nil
+        ),
+        recentEvents: []
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+    store.hostBridgeCapabilityIssues["codex"] = .unavailable
+
+    await store.refreshDiagnostics()
+
+    #expect(store.codexUnavailable == false)
+    #expect(store.hostBridgeCapabilityIssues.isEmpty)
+  }
 }

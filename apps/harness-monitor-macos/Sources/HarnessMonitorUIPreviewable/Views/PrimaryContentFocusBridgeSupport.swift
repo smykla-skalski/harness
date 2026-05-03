@@ -54,6 +54,9 @@ extension View {
       let focusedTarget =
         targetView
         .focusable()
+        // This focus target exists to route paging/default focus through the
+        // invisible bridge responder, not to paint a halo around whole detail panes.
+        .focusEffectDisabled()
         .prefersDefaultFocus(prefersDefaultFocus, in: focusScope)
       if let listIdentifier {
         focusedTarget.harnessMCPList(
