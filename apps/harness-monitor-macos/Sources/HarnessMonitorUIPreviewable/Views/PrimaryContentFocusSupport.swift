@@ -34,9 +34,15 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
     setAccessibilityHidden(true)
   }
 
-  override var acceptsFirstResponder: Bool { true }
+  // Gating accepts/becomes-key on a live window prevents SwiftUI's FocusBridge
+  // from caching a reference to this view after it has been removed from its
+  // window and re-installing it as first responder for a different window
+  // (e.g. when SidebarCreateMenu opens a fresh Workspace via openWindow).
+  // AppKit logs that as "Setting <bridge> as first responder for window N, but
+  // it is in a different window ((null))" with a "would eventually crash" tail.
+  override var acceptsFirstResponder: Bool { window != nil }
 
-  override var canBecomeKeyView: Bool { true }
+  override var canBecomeKeyView: Bool { window != nil }
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
@@ -45,6 +51,9 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
+    if newWindow == nil, let currentWindow = window, currentWindow.firstResponder === self {
+      currentWindow.makeFirstResponder(nil)
+    }
     restoreSuppressedFocusRings()
     cancelPendingRequests()
     unregisterWindowObserver()
