@@ -54,7 +54,7 @@ mod protocol;
 mod sandbox_proxy;
 
 pub use manager::{
-    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle, AcpAgentSnapshot,
-    AcpAgentStartRequest,
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle,
+    AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest,
 };
 pub use permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem};

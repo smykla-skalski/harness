@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::SyncSender;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio::sync::{Notify, broadcast::Sender as BroadcastSender};
-use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::agents::acp::client::{DAEMON_SHUTDOWN, PERMISSION_CAP_REACHED, PERMISSION_TIMEOUT};
@@ -26,6 +25,9 @@ use crate::workspace::utc_now;
 const COALESCE_WINDOW: Duration = Duration::from_millis(5);
 pub(crate) const DEFAULT_PERMISSION_CAP: usize = 8;
 const BRIDGE_CHANNEL_BUFFER: usize = 64;
+
+mod runtime;
+use runtime::{PermissionBridgeRuntime, spawn_batch_expiration};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AcpPermissionItem {
@@ -57,7 +59,7 @@ pub enum AcpPermissionDecision {
 pub struct PermissionBridgeHandle {
     tx: mpsc::Sender<PermissionBridgeRequest>,
     state: Arc<PermissionBridgeState>,
-    worker: Arc<Mutex<Option<JoinHandle<()>>>>,
+    runtime: Arc<PermissionBridgeRuntime>,
 }
 
 struct PermissionBridgeState {
@@ -97,15 +99,14 @@ impl PermissionBridgeHandle {
             shutdown: AtomicBool::new(false),
             shutdown_notify: Notify::new(),
         });
+        let runtime = Arc::new(PermissionBridgeRuntime::new());
         let worker_state = Arc::clone(&state);
+        let worker_runtime = Arc::downgrade(&runtime);
         let worker = tokio::spawn(async move {
-            permission_worker(rx, worker_state).await;
+            permission_worker(rx, worker_state, worker_runtime).await;
         });
-        Self {
-            tx,
-            state,
-            worker: Arc::new(Mutex::new(Some(worker))),
-        }
+        *recover_lock(&runtime.worker, "permission bridge worker lock") = Some(worker);
+        Self { tx, state, runtime }
     }
 
     #[must_use]
@@ -156,10 +157,11 @@ impl PermissionBridgeHandle {
             self.state
                 .broadcast("acp_permission_shutdown", &batch.batch);
         }
-        let worker_alive = recover_lock(self.worker.as_ref(), "permission bridge worker lock")
+        let worker_alive = recover_lock(&self.runtime.worker, "permission bridge worker lock")
             .take()
             .is_some();
         self.state.shutdown_notify.notify_waiters();
+        self.runtime.abort_expiration_tasks();
         pending_count.max(usize::from(worker_alive))
     }
 
@@ -171,6 +173,7 @@ impl PermissionBridgeHandle {
         decision: &AcpPermissionDecision,
     ) -> Option<AcpPermissionBatch> {
         let pending = self.state.lock_pending().remove(batch_id)?;
+        self.runtime.cancel_expiration_task(batch_id);
         for responder in &pending.responders {
             let allow = decision.allows(&responder.request_id);
             let response = response_for_options(&responder.options, allow);
@@ -192,6 +195,11 @@ impl PermissionBridgeHandle {
             panic!("poison permission bridge pending lock");
         })
         .join();
+    }
+
+    #[cfg(test)]
+    pub(in crate::daemon::agent_acp) fn expiration_task_count(&self) -> usize {
+        self.runtime.expiration_task_count()
     }
 }
 
@@ -258,6 +266,7 @@ impl PermissionBridgeState {
 async fn permission_worker(
     mut rx: mpsc::Receiver<PermissionBridgeRequest>,
     state: Arc<PermissionBridgeState>,
+    runtime: Weak<PermissionBridgeRuntime>,
 ) {
     loop {
         tokio::select! {
@@ -270,7 +279,7 @@ async fn permission_worker(
                     reject_queued_requests(&mut rx);
                     return;
                 }
-                if !process_permission_request(&mut rx, &state, first).await {
+                if !process_permission_request(&mut rx, &state, &runtime, first).await {
                     return;
                 }
             }
@@ -285,13 +294,14 @@ async fn permission_worker(
 async fn process_permission_request(
     rx: &mut mpsc::Receiver<PermissionBridgeRequest>,
     state: &Arc<PermissionBridgeState>,
+    runtime: &Weak<PermissionBridgeRuntime>,
     first: PermissionBridgeRequest,
 ) -> bool {
     let mut requests = vec![first];
     tokio::select! {
         () = sleep(COALESCE_WINDOW) => {
             drain_concurrent_requests(rx, &mut requests);
-            enqueue_or_reject_batch(state, requests);
+            enqueue_or_reject_batch(state, runtime, requests);
             true
         }
         () = state.shutdown_notify.notified() => {
@@ -313,6 +323,7 @@ fn drain_concurrent_requests(
 
 fn enqueue_or_reject_batch(
     state: &Arc<PermissionBridgeState>,
+    runtime: &Weak<PermissionBridgeRuntime>,
     requests: Vec<PermissionBridgeRequest>,
 ) {
     let mut accepted = Vec::new();
@@ -334,7 +345,7 @@ fn enqueue_or_reject_batch(
     drop(pending);
     let batch_id = batch.batch_id.clone();
     state.broadcast("acp_permission_requested", &batch);
-    spawn_batch_expiration(Arc::clone(state), batch_id, deadline);
+    spawn_batch_expiration(Arc::clone(state), runtime, batch_id, deadline);
 }
 
 fn enqueue_batch_locked(
@@ -388,14 +399,10 @@ fn enqueue_batch_locked(
     (batch, deadline)
 }
 
-fn spawn_batch_expiration(state: Arc<PermissionBridgeState>, batch_id: String, deadline: Duration) {
-    tokio::spawn(async move {
-        sleep(deadline).await;
-        expire_batch(&state, &batch_id);
-    });
-}
-
 fn expire_batch(state: &PermissionBridgeState, batch_id: &str) {
+    if state.shutdown.load(Ordering::SeqCst) {
+        return;
+    }
     let pending = state.lock_pending().remove(batch_id);
     let Some(pending) = pending else {
         return;
@@ -472,6 +479,15 @@ fn recover_lock<'a, T>(mutex: &'a Mutex<T>, label: &str) -> MutexGuard<'a, T> {
             tracing::warn!(%error, lock = label, "recovering poisoned ACP permission bridge lock");
             error.into_inner()
         })
+}
+
+impl Drop for PermissionBridgeHandle {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.runtime) != 1 {
+            return;
+        }
+        let _ = self.shutdown_pending();
+    }
 }
 
 #[cfg(test)]

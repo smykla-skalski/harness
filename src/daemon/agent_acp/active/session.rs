@@ -111,24 +111,26 @@ impl ActiveAcpSession {
         snapshot
     }
 
-    pub(in crate::daemon::agent_acp) fn inspect_snapshot(&self) -> AcpAgentInspectSnapshot {
-        let snapshot = self.snapshot_with_live_counts();
+    pub(in crate::daemon::agent_acp) fn inspect_snapshot_for(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+    ) -> AcpAgentInspectSnapshot {
         let prompt_timeout = self.process.supervisor.config().prompt_timeout;
         let elapsed_since_last_event = self.process.supervisor.elapsed_since_last_event();
         let remaining = prompt_timeout
             .checked_sub(elapsed_since_last_event)
             .unwrap_or_default();
         AcpAgentInspectSnapshot {
-            acp_id: snapshot.acp_id,
-            session_id: snapshot.session_id,
-            agent_id: snapshot.agent_id,
-            display_name: snapshot.display_name,
+            acp_id: snapshot.acp_id.clone(),
+            session_id: snapshot.session_id.clone(),
+            agent_id: snapshot.agent_id.clone(),
+            display_name: snapshot.display_name.clone(),
             pid: snapshot.pid,
             pgid: snapshot.pgid,
-            process_key: snapshot.process_key,
+            process_key: snapshot.process_key.clone(),
             uptime_ms: u64::try_from(self.process.started_at.elapsed().as_millis())
                 .unwrap_or(u64::MAX),
-            last_update_at: snapshot.updated_at,
+            last_update_at: snapshot.updated_at.clone(),
             last_client_call_at: self.process.supervisor.last_client_call_at(),
             watchdog_state: self
                 .process
@@ -136,8 +138,8 @@ impl ActiveAcpSession {
                 .watchdog_state()
                 .as_str()
                 .to_string(),
-            permission_mode: snapshot.permission_mode,
-            permission_log_path: snapshot.permission_log_path,
+            permission_mode: snapshot.permission_mode.clone(),
+            permission_log_path: snapshot.permission_log_path.clone(),
             pending_permissions: snapshot.pending_permissions,
             permission_queue_depth: snapshot.permission_queue_depth,
             terminal_count: snapshot.terminal_count,

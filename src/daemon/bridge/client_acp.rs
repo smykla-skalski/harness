@@ -1,11 +1,13 @@
 use crate::daemon::agent_acp::{
-    AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpPermissionDecision,
+    AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest,
+    AcpPermissionDecision,
 };
 use crate::errors::CliError;
 
 use super::acp_rpc::{
     BridgeAcpEventsRequest, BridgeAcpEventsResponse, BridgeAcpGetRequest, BridgeAcpInspectRequest,
-    BridgeAcpListRequest, BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
+    BridgeAcpListRequest, BridgeAcpReconcileRequest, BridgeAcpResolvePermissionRequest,
+    BridgeAcpStartRequest,
 };
 use super::client::BridgeClient;
 use super::types::BridgeCapability;
@@ -63,6 +65,19 @@ impl BridgeClient {
             &BridgeAcpInspectRequest {
                 session_id: session_id.map(ToOwned::to_owned),
             },
+        )
+    }
+
+    /// Load a batched ACP reconcile snapshot for sandbox resync.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge rejects the request or payload
+    /// decoding fails.
+    pub(crate) fn acp_reconcile(&self) -> Result<AcpAgentReconcileResponse, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::Acp,
+            "reconcile",
+            &BridgeAcpReconcileRequest::default(),
         )
     }
 

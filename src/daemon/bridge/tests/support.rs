@@ -5,6 +5,8 @@ use super::{
 
 pub(super) fn with_temp_daemon_root<F: FnOnce()>(f: F) {
     let tmp = tempdir().expect("tempdir");
+    let home_tmp = tempdir().expect("home tempdir");
+    let home_path = home_tmp.path().to_str().expect("utf8 home");
     temp_env::with_vars(
         [
             (
@@ -14,6 +16,11 @@ pub(super) fn with_temp_daemon_root<F: FnOnce()>(f: F) {
             ("HARNESS_APP_GROUP_ID", None),
             ("HARNESS_SANDBOXED", None),
             ("XDG_DATA_HOME", None),
+            // Pin the host home so `candidate_daemon_locations()` does
+            // not scan the developer's real `~/Library/Group
+            // Containers/...` lane and discover their live bridge.
+            ("HARNESS_HOST_HOME", Some(home_path)),
+            ("HOME", Some(home_path)),
         ],
         f,
     );

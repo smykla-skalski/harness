@@ -1,4 +1,5 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, OnceLock};
 
 use super::incidents::{
     AcpBridgeResyncIncidentPayload, bridge_resync_incident_events,
@@ -6,8 +7,10 @@ use super::incidents::{
 };
 use super::*;
 use crate::agents::kind::DisconnectReason;
-use crate::daemon::agent_acp::AcpAgentInspectResponse;
-use crate::daemon::agent_acp::AcpAgentInspectSnapshot;
+use crate::daemon::agent_acp::{
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle,
+    AcpAgentReconcileResponse,
+};
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliErrorKind;
 use crate::session::types::AgentStatus;
@@ -247,6 +250,76 @@ fn count_live_bridge_snapshots_fails_closed_on_snapshot_errors() {
 }
 
 #[test]
+fn sandbox_proxy_reconcile_batch_replays_full_snapshot_in_one_pass() {
+    let (sender, mut rx) = tokio::sync::broadcast::channel::<StreamEvent>(16);
+    let manager = AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()));
+    manager.set_sandbox_known_sessions(BTreeSet::from([String::from("sess-stale")]));
+
+    manager.apply_sandbox_reconcile(
+        AcpAgentReconcileResponse {
+            inspect: AcpAgentInspectResponse {
+                agents: vec![
+                    inspect_snapshot("sess-live", "pk-live"),
+                    inspect_snapshot("sess-other", "pk-other"),
+                ],
+                available: true,
+                issue_message: None,
+            },
+            agents: vec![
+                acp_snapshot_for_session("acp-live", "sess-live", "pk-live", AgentStatus::Active),
+                acp_snapshot_for_session("acp-other", "sess-other", "pk-other", AgentStatus::Idle),
+            ],
+        },
+        &mut BTreeMap::new(),
+    );
+
+    let mut reconciled = BTreeMap::<String, serde_json::Value>::new();
+    for _ in 0..4 {
+        let Ok(event) = rx.try_recv() else {
+            continue;
+        };
+        if event.event == "acp_agents_reconciled"
+            && let Some(session_id) = event.session_id
+        {
+            reconciled.insert(session_id, event.payload);
+        }
+    }
+
+    assert_eq!(
+        reconciled.keys().cloned().collect::<Vec<_>>(),
+        vec![
+            "sess-live".to_string(),
+            "sess-other".to_string(),
+            "sess-stale".to_string(),
+        ]
+    );
+    assert_eq!(
+        reconciled["sess-live"]["agents"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        reconciled["sess-live"]["inspect"]["agents"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        reconciled["sess-stale"]["agents"].as_array().map(Vec::len),
+        Some(0)
+    );
+    assert_eq!(
+        reconciled["sess-stale"]["inspect"]["agents"]
+            .as_array()
+            .map(Vec::len),
+        Some(0)
+    );
+    assert_eq!(
+        manager.sandbox_known_sessions(),
+        BTreeSet::from([String::from("sess-live"), String::from("sess-other")])
+    );
+}
+
+#[test]
 fn pool_key_mismatch_incident_events_fan_out_by_session() {
     let payload = AcpPoolKeyMismatchIncidentPayload {
         kind: "pool_key_mismatch".to_string(),
@@ -344,16 +417,25 @@ fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnaps
 }
 
 fn acp_snapshot(acp_id: &str, status: AgentStatus) -> AcpAgentSnapshot {
+    acp_snapshot_for_session(acp_id, "sess-1", "pk", status)
+}
+
+fn acp_snapshot_for_session(
+    acp_id: &str,
+    session_id: &str,
+    process_key: &str,
+    status: AgentStatus,
+) -> AcpAgentSnapshot {
     AcpAgentSnapshot {
         acp_id: acp_id.to_string(),
-        session_id: "sess-1".to_string(),
+        session_id: session_id.to_string(),
         agent_id: "fake".to_string(),
         display_name: "Fake ACP".to_string(),
         status,
         pid: 1,
         pgid: 1,
         project_dir: "/tmp/project".to_string(),
-        process_key: "pk".to_string(),
+        process_key: process_key.to_string(),
         pending_permissions: 0,
         permission_queue_depth: 0,
         pending_permission_batches: Vec::new(),

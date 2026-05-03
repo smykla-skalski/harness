@@ -191,6 +191,7 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
             ),
             ("list", serde_json::json!({ "session_id": "sess-1" })),
             ("inspect", serde_json::json!({ "session_id": "sess-1" })),
+            ("reconcile", serde_json::json!({})),
             ("get", serde_json::json!({ "acp_id": "acp-1" })),
             ("stop", serde_json::json!({ "acp_id": "acp-1" })),
             (
@@ -242,6 +243,7 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
     assert!(client.acp_start("sess-1", &start_request, true).is_err());
     assert!(client.acp_list("sess-1").is_err());
     assert!(client.acp_inspect(Some("sess-1")).is_err());
+    assert!(client.acp_reconcile().is_err());
     assert!(client.acp_get("acp-1").is_err());
     assert!(client.acp_stop("acp-1").is_err());
     assert!(

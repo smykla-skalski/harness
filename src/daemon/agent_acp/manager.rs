@@ -40,6 +40,7 @@ mod locks;
 mod orchestration;
 mod process_fault;
 mod process_pool;
+mod reconcile;
 mod session_access;
 #[cfg(test)]
 mod shutdown_tests;
@@ -47,6 +48,7 @@ mod shutdown_tests;
 mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
 pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
+pub use reconcile::AcpAgentReconcileResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -297,7 +299,7 @@ impl AcpAgentManagerHandle {
             if snapshot.status.is_disconnected() {
                 continue;
             }
-            agents.push(session.inspect_snapshot());
+            agents.push(session.inspect_snapshot_for(&snapshot));
         }
         agents.sort_by(|a, b| {
             b.last_update_at

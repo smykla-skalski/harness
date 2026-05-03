@@ -17,7 +17,7 @@ use crate::workspace::utc_now;
 
 use super::acp_rpc::{
     BridgeAcpEventsRequest, BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest,
-    BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
+    BridgeAcpReconcileRequest, BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
 };
 use super::bridge_state::{write_bridge_config, write_bridge_state};
 use super::client::{
@@ -323,6 +323,11 @@ impl BridgeServer {
             "inspect" => {
                 let request: BridgeAcpInspectRequest = parse_bridge_payload(payload)?;
                 let response = self.inspect_acp(request.session_id.as_deref())?;
+                Ok(BridgeResponse::ok_payload(&response)?.into())
+            }
+            "reconcile" => {
+                let _: BridgeAcpReconcileRequest = parse_bridge_payload(payload)?;
+                let response = self.reconcile_acp()?;
                 Ok(BridgeResponse::ok_payload(&response)?.into())
             }
             "get" => {
