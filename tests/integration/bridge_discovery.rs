@@ -154,17 +154,16 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
     let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
 
     let adopted_state_path = group_daemon_root.join("bridge.json");
-    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+    let profile_state_path = profile_data_home
+        .join("harness")
+        .join("daemon")
+        .join("bridge.json");
 
-    wait_for_state_at(&adopted_state_path).expect("bridge state file did not appear at adopted root");
+    wait_for_state_at(&adopted_state_path)
+        .expect("bridge state file did not appear at adopted root");
 
-    let stop_output = run_bridge_with_profile(
-        home,
-        &xdg,
-        profile,
-        &profile_data_home,
-        &["bridge", "stop"],
-    );
+    let stop_output =
+        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -219,18 +218,17 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
         .stderr(Stdio::piped());
     let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
 
-    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+    let profile_state_path = profile_data_home
+        .join("harness")
+        .join("daemon")
+        .join("bridge.json");
     let group_state_path = group_daemon_root(home).join("bridge.json");
 
-    wait_for_state_at(&profile_state_path).expect("bridge state file did not appear at personal profile root");
+    wait_for_state_at(&profile_state_path)
+        .expect("bridge state file did not appear at personal profile root");
 
-    let stop_output = run_bridge_with_profile(
-        home,
-        &xdg,
-        profile,
-        &profile_data_home,
-        &["bridge", "stop"],
-    );
+    let stop_output =
+        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -286,18 +284,17 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
         .stderr(Stdio::piped());
     let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
 
-    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+    let profile_state_path = profile_data_home
+        .join("harness")
+        .join("daemon")
+        .join("bridge.json");
     let group_state_path = group_daemon_root.join("bridge.json");
 
-    wait_for_state_at(&profile_state_path).expect("bridge state file did not appear at agent profile root");
+    wait_for_state_at(&profile_state_path)
+        .expect("bridge state file did not appear at agent profile root");
 
-    let stop_output = run_bridge_with_profile(
-        home,
-        &xdg,
-        profile,
-        &profile_data_home,
-        &["bridge", "stop"],
-    );
+    let stop_output =
+        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);

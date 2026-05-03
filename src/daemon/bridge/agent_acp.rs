@@ -70,6 +70,7 @@ impl BridgeServer {
         known_epoch: Option<&str>,
         known_continuity: Option<u64>,
     ) -> Result<BridgeAcpEventsResponse, CliError> {
+        self.ensure_acp_capability()?;
         let buffer = self.acp_events.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("bridge ACP event buffer lock poisoned: {error}"))
         })?;
@@ -105,5 +106,32 @@ impl BridgeServer {
             return Ok(());
         }
         Err(CliErrorKind::sandbox_feature_disabled(BridgeCapability::Acp.sandbox_feature()).into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    use crate::daemon::bridge::types::PersistedBridgeConfig;
+    use crate::daemon::state::HostBridgeCapabilityManifest;
+
+    use super::*;
+
+    #[test]
+    fn acp_events_since_requires_enabled_capability() {
+        let server = BridgeServer::new(
+            "token".to_string(),
+            PathBuf::from("/tmp/harness-acp-events.sock"),
+            PersistedBridgeConfig::default(),
+            BTreeMap::<String, HostBridgeCapabilityManifest>::new(),
+        );
+
+        let error = server
+            .acp_events_since(None, None, None)
+            .expect_err("events_since must be gated with the rest of ACP");
+
+        assert!(error.to_string().contains("acp.host-bridge"));
     }
 }

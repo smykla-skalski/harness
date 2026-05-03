@@ -13,10 +13,14 @@ SCRIPT_PATH = APP_ROOT / "Scripts" / "test-agents-e2e.sh"
 class TestAgentsE2EScriptTests(unittest.TestCase):
     def test_build_for_testing_skips_daemon_bundle_version_check(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
-        self.assertIn(
-            'HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 "$XCODEBUILD_RUNNER"',
-            script,
-            "build-for-testing and test-without-building must skip the daemon-bundle gate so the e2e runner does not block on shipping-bundle parity",
+        # Both xcodebuild invocations (build-for-testing and test-without-building) must
+        # set HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1 as an inline env prefix so the
+        # e2e runner does not block on shipping-bundle parity.  The flag is on its own
+        # backslash-continuation line, not directly adjacent to "$XCODEBUILD_RUNNER".
+        self.assertEqual(
+            script.count("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1"),
+            2,
+            "build-for-testing and test-without-building must both skip the daemon-bundle gate so the e2e runner does not block on shipping-bundle parity",
         )
 
     def test_lifecycle_orchestrated_by_swift_e2e_cli(self) -> None:

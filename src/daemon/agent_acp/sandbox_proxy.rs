@@ -119,15 +119,9 @@ impl AcpAgentManagerHandle {
     }
 
     pub(super) fn live_session_count_via_bridge() -> Result<usize, CliError> {
-        BridgeClient::for_capability(BridgeCapability::Acp)
-            .and_then(|bridge| bridge.acp_inspect(None))
-            .map(|response| {
-                response
-                    .agents
-                    .into_iter()
-                    .filter(|agent| agent.watchdog_state == "active")
-                    .count()
-            })
+        let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
+        let inspect = bridge.acp_inspect(None)?;
+        count_live_bridge_snapshots(inspect, |acp_id| bridge.acp_get(acp_id))
     }
 
     fn ensure_sandbox_event_poller(&self) {
@@ -359,6 +353,16 @@ fn inspect_for_session(
         available: inspect.available,
         issue_message: inspect.issue_message.clone(),
     }
+}
+
+fn count_live_bridge_snapshots(
+    inspect: AcpAgentInspectResponse,
+    mut snapshot_for: impl FnMut(&str) -> Result<AcpAgentSnapshot, CliError>,
+) -> Result<usize, CliError> {
+    inspect.agents.into_iter().try_fold(0usize, |count, agent| {
+        let snapshot = snapshot_for(&agent.acp_id)?;
+        Ok(count + usize::from(!snapshot.status.is_disconnected()))
+    })
 }
 
 #[expect(

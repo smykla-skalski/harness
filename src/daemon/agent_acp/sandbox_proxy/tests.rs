@@ -5,9 +5,12 @@ use super::incidents::{
     pool_key_mismatch_incident_events,
 };
 use super::*;
+use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::agent_acp::AcpAgentInspectSnapshot;
 use crate::daemon::protocol::StreamEvent;
+use crate::errors::CliErrorKind;
+use crate::session::types::AgentStatus;
 
 #[test]
 fn replay_safe_resync_events_keeps_safe_events_only() {
@@ -200,6 +203,50 @@ fn distinct_process_keys_for_session_dedupes_and_sorts_keys() {
 }
 
 #[test]
+fn count_live_bridge_snapshots_uses_agent_status_not_watchdog_state() {
+    let mut idle_inspect = inspect_snapshot("sess-1", "pk-idle");
+    idle_inspect.acp_id = "acp-idle".to_string();
+    idle_inspect.watchdog_state = "paused".to_string();
+    let mut disconnected_inspect = inspect_snapshot("sess-1", "pk-disconnected");
+    disconnected_inspect.acp_id = "acp-disconnected".to_string();
+    disconnected_inspect.watchdog_state = "active".to_string();
+    let inspect = AcpAgentInspectResponse {
+        agents: vec![idle_inspect, disconnected_inspect],
+        available: true,
+        issue_message: None,
+    };
+
+    let live = count_live_bridge_snapshots(inspect, |acp_id| match acp_id {
+        "acp-idle" => Ok(acp_snapshot("acp-idle", AgentStatus::Idle)),
+        "acp-disconnected" => Ok(acp_snapshot(
+            "acp-disconnected",
+            AgentStatus::disconnected(DisconnectReason::SessionStopped),
+        )),
+        unexpected => panic!("unexpected ACP id {unexpected}"),
+    })
+    .expect("count live bridge snapshots");
+
+    assert_eq!(live, 1);
+}
+
+#[test]
+fn count_live_bridge_snapshots_fails_closed_on_snapshot_errors() {
+    let mut inspect_snapshot = inspect_snapshot("sess-1", "pk-a");
+    inspect_snapshot.acp_id = "acp-a".to_string();
+    let inspect = AcpAgentInspectResponse {
+        agents: vec![inspect_snapshot],
+        available: true,
+        issue_message: None,
+    };
+    let error = count_live_bridge_snapshots(inspect, |_| {
+        Err(CliErrorKind::workflow_io("snapshot unavailable").into())
+    })
+    .expect_err("snapshot errors must block force-less disable");
+
+    assert!(error.to_string().contains("snapshot unavailable"));
+}
+
+#[test]
 fn pool_key_mismatch_incident_events_fan_out_by_session() {
     let payload = AcpPoolKeyMismatchIncidentPayload {
         kind: "pool_key_mismatch".to_string(),
@@ -293,6 +340,28 @@ fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnaps
         permission_queue_depth: 0,
         terminal_count: 0,
         prompt_deadline_remaining_ms: 0,
+    }
+}
+
+fn acp_snapshot(acp_id: &str, status: AgentStatus) -> AcpAgentSnapshot {
+    AcpAgentSnapshot {
+        acp_id: acp_id.to_string(),
+        session_id: "sess-1".to_string(),
+        agent_id: "fake".to_string(),
+        display_name: "Fake ACP".to_string(),
+        status,
+        pid: 1,
+        pgid: 1,
+        project_dir: "/tmp/project".to_string(),
+        process_key: "pk".to_string(),
+        pending_permissions: 0,
+        permission_queue_depth: 0,
+        pending_permission_batches: Vec::new(),
+        permission_mode: "daemon_bridge".to_string(),
+        permission_log_path: None,
+        terminal_count: 0,
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
     }
 }
 

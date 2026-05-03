@@ -283,21 +283,20 @@ mod tests {
 
     #[test]
     fn pinned_runtime_profile_returns_value_when_env_is_set() {
-        temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, Some("agent-foo"), || {
-            assert_eq!(
-                pinned_runtime_profile(),
-                Some(OsString::from("agent-foo"))
-            );
-        });
+        temp_env::with_var(
+            HARNESS_MONITOR_RUNTIME_PROFILE_ENV,
+            Some("agent-foo"),
+            || {
+                assert_eq!(pinned_runtime_profile(), Some(OsString::from("agent-foo")));
+            },
+        );
     }
 
     #[test]
     fn pinned_runtime_profile_is_none_when_env_is_unset() {
-        temp_env::with_var(
-            HARNESS_MONITOR_RUNTIME_PROFILE_ENV,
-            None::<&str>,
-            || assert_eq!(pinned_runtime_profile(), None),
-        );
+        temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, None::<&str>, || {
+            assert_eq!(pinned_runtime_profile(), None)
+        });
     }
 
     #[test]

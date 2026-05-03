@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use axum::Json;
 
 use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::{
@@ -15,9 +15,9 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::session::types::SessionState;
 
+use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
-use super::DaemonHttpState;
 
 pub(super) async fn post_end_session(
     Path(session_id): Path<String>,
