@@ -248,12 +248,26 @@ extension WorkspaceWindowView {
     previousVisibleDecisionIDs: [String],
     requestedDecisionID: String?
   ) {
+    reconcileDecisionRouteAfterReload(
+      previousSelection: previousSelection,
+      previousVisibleDecisionIDs: previousVisibleDecisionIDs,
+      requestedDecisionID: requestedDecisionID,
+      currentScope: decisionWorkspaceScope
+    )
+  }
+
+  func reconcileDecisionRouteAfterReload(
+    previousSelection: WorkspaceSelection,
+    previousVisibleDecisionIDs: [String],
+    requestedDecisionID: String?,
+    currentScope: DecisionWorkspaceScope
+  ) {
     guard
       let repair = Self.repairedDecisionSelectionAfterReload(
         previousSelection: previousSelection,
         previousVisibleDecisionIDs: previousVisibleDecisionIDs,
         requestedDecisionID: requestedDecisionID,
-        currentScope: decisionWorkspaceScope,
+        currentScope: currentScope,
         fallbackSessionID: store.selectedSessionID
       )
     else {
