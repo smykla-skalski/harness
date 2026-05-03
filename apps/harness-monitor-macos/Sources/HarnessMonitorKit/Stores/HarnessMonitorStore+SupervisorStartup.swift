@@ -71,6 +71,14 @@ extension HarnessMonitorStore {
         "supervisor.seed_decisions_failed error=\(String(describing: error))"
       )
     }
+    reconcileAcpPermissionDecisions()
+    do {
+      try await seedPendingAcpPermissionDecisionsIfNeeded(decisionStore)
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.seed_acp_decisions_failed error=\(String(describing: error))"
+      )
+    }
 
     let relayTask = Task { @MainActor [weak self] in
       guard let self else {
@@ -119,5 +127,24 @@ extension HarnessMonitorStore {
       await controller.syncAppBadgeCount(openDecisions.count)
     }
     supervisorDecisionRefreshTick &+= 1
+  }
+
+  private func seedPendingAcpPermissionDecisionsIfNeeded(
+    _ decisionStore: DecisionStore
+  ) async throws {
+    let payloads = acpPermissionPayloadsByDecisionID.values.sorted {
+      if $0.rawBatch.createdAt != $1.rawBatch.createdAt {
+        return $0.rawBatch.createdAt < $1.rawBatch.createdAt
+      }
+      return $0.decisionID < $1.decisionID
+    }
+    HarnessMonitorUITestTrace.record(
+      component: "supervisor.startup",
+      event: "seed-acp-decisions",
+      details: ["count": String(payloads.count)]
+    )
+    for payload in payloads {
+      try await decisionStore.upsertOpen(payload.decisionDraft)
+    }
   }
 }

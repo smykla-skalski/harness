@@ -7,6 +7,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   case launchDashboard = "launch-dashboard"
   case selectSessionCockpit = "select-session-cockpit"
+  case permissionModal = "permission-modal"
   case refreshAndSearch = "refresh-and-search"
   case sidebarOverflowSearch = "sidebar-overflow-search"
   case settingsBackdropCycle = "settings-backdrop-cycle"
@@ -29,6 +30,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     switch self {
     case .launchDashboard, .selectSessionCockpit:
       return "dashboard-landing"
+    case .permissionModal:
+      return "cockpit"
     case .settingsBackdropCycle, .settingsBackgroundCycle:
       return "dashboard"
     case .refreshAndSearch, .sidebarOverflowSearch:
@@ -46,6 +49,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       return .appearance
     case .launchDashboard,
       .selectSessionCockpit,
+      .permissionModal,
       .refreshAndSearch,
       .sidebarOverflowSearch,
       .timelineBurst,
@@ -69,6 +73,13 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .isEmpty ?? true
     if previewScenarioIsEmpty {
       values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = defaultPreviewScenario
+    }
+    let acpPendingOverrideIsEmpty =
+      values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"]?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .isEmpty ?? true
+    if self == .permissionModal, acpPendingOverrideIsEmpty {
+      values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] = "1"
     }
     let inspectorOverrideIsEmpty =
       values["HARNESS_MONITOR_SHOW_INSPECTOR_OVERRIDE"]?

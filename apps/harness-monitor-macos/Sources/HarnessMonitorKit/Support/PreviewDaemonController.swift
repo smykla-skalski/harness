@@ -14,6 +14,7 @@ public actor PreviewDaemonController: DaemonControlling {
   }
 
   private let fixtures: PreviewHarnessClient.Fixtures
+  private let environment: HarnessMonitorEnvironment
   private let hostBridgeState: PreviewHostBridgeState
   private let actionDelay: Duration?
   private let codexStartBehavior: PreviewCodexStartBehavior
@@ -22,6 +23,7 @@ public actor PreviewDaemonController: DaemonControlling {
 
   public init(
     mode: Mode = .populated,
+    environment: HarnessMonitorEnvironment = .current,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
     actionDelay: Duration? = nil,
     codexStartBehavior: PreviewCodexStartBehavior = .unsupported
@@ -49,6 +51,7 @@ public actor PreviewDaemonController: DaemonControlling {
       }
 
     self.fixtures = fixtures
+    self.environment = environment
     hostBridgeState = PreviewHostBridgeState(override: hostBridgeOverride)
     self.actionDelay = actionDelay
     self.codexStartBehavior = codexStartBehavior
@@ -58,6 +61,7 @@ public actor PreviewDaemonController: DaemonControlling {
 
   init(
     fixtures: PreviewHarnessClient.Fixtures,
+    environment: HarnessMonitorEnvironment = .current,
     isDaemonRunning: Bool = true,
     isLaunchAgentInstalled: Bool = true,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
@@ -65,6 +69,7 @@ public actor PreviewDaemonController: DaemonControlling {
     codexStartBehavior: PreviewCodexStartBehavior = .unsupported
   ) {
     self.fixtures = fixtures
+    self.environment = environment
     hostBridgeState = PreviewHostBridgeState(override: hostBridgeOverride)
     self.actionDelay = actionDelay
     self.codexStartBehavior = codexStartBehavior
@@ -74,6 +79,7 @@ public actor PreviewDaemonController: DaemonControlling {
 
   public init(
     previewFixtureSetRawValue rawValue: String?,
+    environment: HarnessMonitorEnvironment = .current,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
     actionDelay: Duration? = nil,
     codexStartBehavior: PreviewCodexStartBehavior = .unsupported
@@ -98,6 +104,7 @@ public actor PreviewDaemonController: DaemonControlling {
       }
     self.init(
       mode: mode,
+      environment: environment,
       hostBridgeOverride: hostBridgeOverride,
       actionDelay: actionDelay,
       codexStartBehavior: codexStartBehavior
@@ -173,6 +180,7 @@ public actor PreviewDaemonController: DaemonControlling {
   private func makeClient() -> PreviewHarnessClient {
     PreviewHarnessClient(
       fixtures: fixtures,
+      environment: environment,
       isLaunchAgentInstalled: isLaunchAgentInstalled,
       hostBridgeState: hostBridgeState,
       actionDelay: actionDelay,

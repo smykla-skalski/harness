@@ -109,6 +109,7 @@ enum HarnessMonitorAppStoreFactory {
       )
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
+        environment: environment,
         hostBridgeOverride: previewHostBridgeOverride,
         codexStartBehavior: previewCodexStartBehavior,
         actionDelay: previewActionDelay,
@@ -135,6 +136,7 @@ enum HarnessMonitorAppStoreFactory {
         return HarnessMonitorStore(
           daemonController: PreviewDaemonController(
             mode: supervisorSeedScenario.mode,
+            environment: environment,
             hostBridgeOverride: previewHostBridgeOverride,
             actionDelay: previewActionDelay,
             codexStartBehavior: previewCodexStartBehavior
@@ -144,12 +146,13 @@ enum HarnessMonitorAppStoreFactory {
           persistenceError: persistenceError
         )
       }
-      return HarnessMonitorStore(
-        daemonController: PreviewDaemonController(
-          previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
-          hostBridgeOverride: previewHostBridgeOverride,
-          actionDelay: previewActionDelay,
-          codexStartBehavior: previewCodexStartBehavior
+        return HarnessMonitorStore(
+          daemonController: PreviewDaemonController(
+            previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
+            environment: environment,
+            hostBridgeOverride: previewHostBridgeOverride,
+            actionDelay: previewActionDelay,
+            codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -160,6 +163,7 @@ enum HarnessMonitorAppStoreFactory {
         return HarnessMonitorStore(
           daemonController: PreviewDaemonController(
             mode: supervisorSeedScenario.mode,
+            environment: environment,
             hostBridgeOverride: previewHostBridgeOverride,
             actionDelay: previewActionDelay,
             codexStartBehavior: previewCodexStartBehavior
@@ -169,12 +173,13 @@ enum HarnessMonitorAppStoreFactory {
           persistenceError: persistenceError
         )
       }
-      return HarnessMonitorStore(
-        daemonController: PreviewDaemonController(
-          mode: .empty,
-          hostBridgeOverride: previewHostBridgeOverride,
-          actionDelay: previewActionDelay,
-          codexStartBehavior: previewCodexStartBehavior
+        return HarnessMonitorStore(
+          daemonController: PreviewDaemonController(
+            mode: .empty,
+            environment: environment,
+            hostBridgeOverride: previewHostBridgeOverride,
+            actionDelay: previewActionDelay,
+            codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,

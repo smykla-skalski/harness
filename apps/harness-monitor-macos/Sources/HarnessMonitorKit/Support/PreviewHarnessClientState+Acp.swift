@@ -77,11 +77,7 @@ extension PreviewHarnessClientState {
       acpAgentsBySessionID[sessionID] = updatedAgents
       return updated
     }
-    let seedsPermission =
-      ProcessInfo.processInfo.environment[
-        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
-      ] == "1"
-      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+    let seedsPermission = Self.seedsPendingAcp(in: environment)
     if seedsPermission,
       let detail = fallbackDetail,
       !detail.session.sessionId.isEmpty
@@ -128,7 +124,7 @@ extension PreviewHarnessClientState {
     let sortedAgents =
       sessions
       .flatMap { acpAgentsBySessionID[$0] ?? [] }
-      .map(Self.inspectSnapshot(from:))
+      .map { Self.inspectSnapshot(from: $0, environment: environment) }
       .sorted {
         if $0.displayName != $1.displayName {
           return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
@@ -138,13 +134,12 @@ extension PreviewHarnessClientState {
     return AcpAgentInspectResponse(agents: sortedAgents)
   }
 
-  static func inspectSnapshot(from snapshot: AcpAgentSnapshot) -> AcpAgentInspectSnapshot {
-    let seedsPendingDeadline =
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-      || ProcessInfo.processInfo.environment[
-        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
-      ] == "1"
-    let permissionLogPath = previewAcpPermissionLogPath()
+  static func inspectSnapshot(
+    from snapshot: AcpAgentSnapshot,
+    environment: HarnessMonitorEnvironment = .current
+  ) -> AcpAgentInspectSnapshot {
+    let seedsPendingDeadline = Self.seedsPendingAcp(in: environment)
+    let permissionLogPath = previewAcpPermissionLogPath(environment: environment)
     return AcpAgentInspectSnapshot(
       acpId: snapshot.acpId,
       sessionId: snapshot.sessionId,
@@ -165,10 +160,12 @@ extension PreviewHarnessClientState {
     )
   }
 
-  private static func previewAcpPermissionLogPath() -> String? {
+  private static func previewAcpPermissionLogPath(
+    environment: HarnessMonitorEnvironment
+  ) -> String? {
     let key = "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_LOG_PATH"
-    if let rawValue = getenv(key) {
-      let value = String(cString: rawValue)
+    let value = environment.values[key]
+    if let value {
       return value.isEmpty || value == "__missing__" ? nil : value
     }
     return "/tmp/harness/permission-log.ndjson"
@@ -178,11 +175,7 @@ extension PreviewHarnessClientState {
     sessionID: String,
     acpID: String
   ) -> [AcpPermissionBatch] {
-    guard
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-          == "1"
-    else {
+    guard Self.seedsPendingAcp(in: environment) else {
       return []
     }
     return [

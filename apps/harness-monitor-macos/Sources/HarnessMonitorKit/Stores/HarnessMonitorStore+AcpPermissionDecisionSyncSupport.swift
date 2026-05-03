@@ -1,7 +1,119 @@
 import Foundation
 import SwiftData
 
+typealias AcpPermissionTaskMapKeyPath =
+  ReferenceWritableKeyPath<HarnessMonitorStore, [String: Task<Void, Never>]>
+typealias AcpPermissionTaskTokenMapKeyPath =
+  ReferenceWritableKeyPath<HarnessMonitorStore, [String: UInt64]>
+
 extension HarnessMonitorStore {
+  func makeCancellationAwareAcpPermissionTask(
+    _ operation: @escaping @MainActor (HarnessMonitorStore) async -> Void
+  ) -> Task<Void, Never> {
+    Task { @MainActor [weak self] in
+      // Give immediate invalidation/reset paths one turn to cancel before this
+      // task touches the decision store or writes audit rows.
+      await Task.yield()
+      guard !Task.isCancelled, let self else {
+        return
+      }
+      await operation(self)
+    }
+  }
+
+  private func startAcpPermissionResolutionTask(
+    decisionID: String,
+    taskKeyPath: AcpPermissionTaskMapKeyPath,
+    tokenKeyPath: AcpPermissionTaskTokenMapKeyPath,
+    operation: @escaping @MainActor (HarnessMonitorStore) async -> Void
+  ) {
+    cancelAcpPermissionResolutionTask(
+      decisionID: decisionID,
+      taskKeyPath: taskKeyPath,
+      tokenKeyPath: tokenKeyPath
+    )
+    let token = nextAcpPermissionResolutionTaskToken(
+      decisionID: decisionID,
+      tokenKeyPath: tokenKeyPath
+    )
+    let task = makeCancellationAwareAcpPermissionTask { store in
+      defer {
+        store.finishAcpPermissionResolutionTask(
+          decisionID: decisionID,
+          taskKeyPath: taskKeyPath,
+          tokenKeyPath: tokenKeyPath,
+          token: token
+        )
+      }
+      await operation(store)
+    }
+    self[keyPath: taskKeyPath][decisionID] = task
+  }
+
+  func startAcpPermissionDeadlineResolutionTask(
+    decisionID: String,
+    operation: @escaping @MainActor (HarnessMonitorStore) async -> Void
+  ) {
+    startAcpPermissionResolutionTask(
+      decisionID: decisionID,
+      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
+      tokenKeyPath: \.acpDeadlineResolutionTokens,
+      operation: operation
+    )
+  }
+
+  func startAcpPermissionShutdownResolutionTask(
+    decisionID: String,
+    operation: @escaping @MainActor (HarnessMonitorStore) async -> Void
+  ) {
+    startAcpPermissionResolutionTask(
+      decisionID: decisionID,
+      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
+      tokenKeyPath: \.acpShutdownResolutionTokens,
+      operation: operation
+    )
+  }
+
+  func cancelAcpPermissionDeadlineResolutionTask(for decisionID: String) {
+    cancelAcpPermissionResolutionTask(
+      decisionID: decisionID,
+      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
+      tokenKeyPath: \.acpDeadlineResolutionTokens
+    )
+  }
+
+  func cancelAcpPermissionShutdownResolutionTask(for decisionID: String) {
+    cancelAcpPermissionResolutionTask(
+      decisionID: decisionID,
+      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
+      tokenKeyPath: \.acpShutdownResolutionTokens
+    )
+  }
+
+  func cancelAcpPermissionTerminalResolutionTasks(for decisionID: String) {
+    cancelAcpPermissionDeadlineResolutionTask(for: decisionID)
+    cancelAcpPermissionShutdownResolutionTask(for: decisionID)
+  }
+
+  func cancelAllAcpPermissionResolutionTasks() {
+    cancelAcpPermissionResolutionTasks(
+      taskKeyPath: \.acpPermissionDeadlineResolutionTasks,
+      tokenKeyPath: \.acpDeadlineResolutionTokens
+    )
+    cancelAcpPermissionResolutionTasks(
+      taskKeyPath: \.acpPermissionShutdownResolutionTasks,
+      tokenKeyPath: \.acpShutdownResolutionTokens
+    )
+  }
+
+  func stopAcpPermissionDecisionProcessing() {
+    cancelAllAcpPermissionResolutionTasks()
+    invalidateAcpPermissionDecisionSync()
+    acpPermissionPendingTimeoutDecisionIDs.removeAll()
+    acpPermissionPendingShutdownDecisionIDs.removeAll()
+    acpPermissionTerminalOutcomesByID.removeAll()
+  }
+
   func appendAcpPermissionShutdownAudit(
     for batch: AcpPermissionBatch,
     decisionID: String,
@@ -92,7 +204,7 @@ extension HarnessMonitorStore {
       reason: "client_deadline_exceeded"
     )
     guard
-      let data = try? JSONEncoder().encode(payload),
+      let data = try? acpPermissionAuditEncoder.encode(payload),
       let json = String(data: data, encoding: .utf8)
     else {
       return #"{"reason":"client_deadline_exceeded"}"#
@@ -117,7 +229,7 @@ extension HarnessMonitorStore {
       uiAnnotation: "removed_after_daemon_shutdown"
     )
     guard
-      let data = try? JSONEncoder().encode(payload),
+      let data = try? acpPermissionAuditEncoder.encode(payload),
       let json = String(data: data, encoding: .utf8)
     else {
       return #"{"reason":"daemon_shutdown","uiAnnotation":"removed_after_daemon_shutdown"}"#
@@ -143,13 +255,14 @@ extension HarnessMonitorStore {
     let attempts = 20
     let poll = Duration.milliseconds(50)
     for index in 0...attempts {
+      try Task.checkCancellation()
       if let decision = try await decisionStore.decision(id: decisionID) {
         return decision
       }
       guard index < attempts else {
         break
       }
-      try? await Task.sleep(for: poll)
+      try await Task.sleep(for: poll)
     }
     return nil
   }
@@ -176,7 +289,7 @@ extension HarnessMonitorStore {
       decision.statusRaw == "resolved",
       let resolutionJSON = decision.resolutionJSON,
       let data = resolutionJSON.data(using: .utf8),
-      let outcome = try? JSONDecoder().decode(DecisionOutcome.self, from: data)
+      let outcome = try? acpPermissionOutcomeDecoder.decode(DecisionOutcome.self, from: data)
     else {
       return false
     }
@@ -197,6 +310,48 @@ extension HarnessMonitorStore {
     )
     descriptor.fetchLimit = 1
     return try context.fetch(descriptor).isEmpty == false
+  }
+
+  private func nextAcpPermissionResolutionTaskToken(
+    decisionID: String,
+    tokenKeyPath: AcpPermissionTaskTokenMapKeyPath
+  ) -> UInt64 {
+    let nextToken = (self[keyPath: tokenKeyPath][decisionID] ?? 0) &+ 1
+    self[keyPath: tokenKeyPath][decisionID] = nextToken
+    return nextToken
+  }
+
+  private func finishAcpPermissionResolutionTask(
+    decisionID: String,
+    taskKeyPath: AcpPermissionTaskMapKeyPath,
+    tokenKeyPath: AcpPermissionTaskTokenMapKeyPath,
+    token: UInt64
+  ) {
+    guard self[keyPath: tokenKeyPath][decisionID] == token else {
+      return
+    }
+    self[keyPath: taskKeyPath].removeValue(forKey: decisionID)
+    self[keyPath: tokenKeyPath].removeValue(forKey: decisionID)
+  }
+
+  private func cancelAcpPermissionResolutionTask(
+    decisionID: String,
+    taskKeyPath: AcpPermissionTaskMapKeyPath,
+    tokenKeyPath: AcpPermissionTaskTokenMapKeyPath
+  ) {
+    let task = self[keyPath: taskKeyPath].removeValue(forKey: decisionID)
+    self[keyPath: tokenKeyPath].removeValue(forKey: decisionID)
+    task?.cancel()
+  }
+
+  private func cancelAcpPermissionResolutionTasks(
+    taskKeyPath: AcpPermissionTaskMapKeyPath,
+    tokenKeyPath: AcpPermissionTaskTokenMapKeyPath
+  ) {
+    let tasks = Array(self[keyPath: taskKeyPath].values)
+    self[keyPath: taskKeyPath].removeAll()
+    self[keyPath: tokenKeyPath].removeAll()
+    for task in tasks { task.cancel() }
   }
 }
 
