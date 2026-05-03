@@ -125,6 +125,121 @@ struct SessionCockpitTimelineSectionTests {
     #expect(event?.actions.isEmpty == true)
   }
 
+  @Test("Retention keeps the last rendered rows during a same-session transient empty refresh")
+  func retentionKeepsLastRenderedRowsDuringTransientEmptyRefresh() {
+    let previousTimeline = [
+      makeTimelineEntry(entryID: "entry-visible", summary: "Visible timeline row")
+    ]
+    let previousPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: previousTimeline,
+      isTimelineLoading: false
+    )
+    let previousInput = makeInput(
+      sessionID: "session-1",
+      timeline: previousTimeline,
+      isTimelineLoading: false
+    )
+    let nextPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: false
+    )
+    let nextInput = makeInput(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: false
+    )
+
+    #expect(
+      SessionTimelinePresentationRetention.shouldRetainPreviousPresentation(
+        previousPresentation: previousPresentation,
+        previousInput: previousInput,
+        nextPresentation: nextPresentation,
+        nextInput: nextInput
+      )
+    )
+
+    let resolved = SessionTimelinePresentationRetention.resolved(
+      previousPresentation: previousPresentation,
+      previousInput: previousInput,
+      nextPresentation: nextPresentation,
+      nextInput: nextInput
+    )
+
+    #expect(resolved.rows.map(\.id) == previousPresentation.rows.map(\.id))
+    #expect(resolved.navigation.totalCount == previousPresentation.navigation.totalCount)
+  }
+
+  @Test("Retention does not pin stale rows once the selected session changes")
+  func retentionDoesNotPinRowsAcrossSessionSwitches() {
+    let previousTimeline = [
+      makeTimelineEntry(entryID: "entry-visible", summary: "Visible timeline row")
+    ]
+    let previousPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: previousTimeline,
+      isTimelineLoading: false
+    )
+    let previousInput = makeInput(
+      sessionID: "session-1",
+      timeline: previousTimeline,
+      isTimelineLoading: false
+    )
+    let nextPresentation = makePresentation(
+      sessionID: "session-2",
+      timeline: [],
+      isTimelineLoading: false
+    )
+    let nextInput = makeInput(
+      sessionID: "session-2",
+      timeline: [],
+      isTimelineLoading: false
+    )
+
+    #expect(
+      SessionTimelinePresentationRetention.shouldRetainPreviousPresentation(
+        previousPresentation: previousPresentation,
+        previousInput: previousInput,
+        nextPresentation: nextPresentation,
+        nextInput: nextInput
+      ) == false
+    )
+  }
+
+  @Test("Retention does not fabricate rows when the previous presentation was already empty")
+  func retentionDoesNotFabricateRowsWithoutPreviousContent() {
+    let previousPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: false
+    )
+    let previousInput = makeInput(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: false
+    )
+    let nextPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: true
+    )
+    let nextInput = makeInput(
+      sessionID: "session-1",
+      timeline: [],
+      isTimelineLoading: true
+    )
+
+    #expect(
+      SessionTimelinePresentationRetention.shouldRetainPreviousPresentation(
+        previousPresentation: previousPresentation,
+        previousInput: previousInput,
+        nextPresentation: nextPresentation,
+        nextInput: nextInput
+      ) == false
+    )
+  }
+
   private func makeTimelineEntry(
     entryID: String = "entry-1",
     recordedAt: String = "2026-04-30T12:00:00Z",
@@ -178,6 +293,48 @@ struct SessionCockpitTimelineSectionTests {
 
   private func isoString(_ date: Date) -> String {
     ISO8601DateFormatter().string(from: date)
+  }
+
+  private func makePresentation(
+    sessionID: String,
+    timeline: [TimelineEntry],
+    isTimelineLoading: Bool
+  ) -> SessionTimelineSectionPresentation {
+    SessionTimelineSectionPresentation(
+      sessionID: sessionID,
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      isTimelineLoading: isTimelineLoading,
+      reduceMotion: false,
+      dateTimeConfiguration: .default
+    )
+  }
+
+  private func makeInput(
+    sessionID: String,
+    timeline: [TimelineEntry],
+    isTimelineLoading: Bool
+  ) -> SessionTimelinePresentationInput {
+    SessionTimelinePresentationInput(
+      sessionID: sessionID,
+      timelineCount: timeline.count,
+      firstTimelineEntryID: timeline.first?.entryId,
+      firstTimelineRecordedAt: timeline.first?.recordedAt,
+      lastTimelineEntryID: timeline.last?.entryId,
+      lastTimelineRecordedAt: timeline.last?.recordedAt,
+      timelineWindowRevision: nil,
+      timelineWindowStart: nil,
+      timelineWindowEnd: nil,
+      timelineWindowHasOlder: false,
+      timelineWindowHasNewer: false,
+      decisionCount: 0,
+      firstDecisionID: nil,
+      lastDecisionID: nil,
+      isTimelineLoading: isTimelineLoading,
+      reduceMotion: false,
+      dateTimeConfiguration: .default
+    )
   }
 }
 

@@ -67,7 +67,7 @@ struct SessionCockpitTimelineSection: View {
     guard force || cachedPresentationInput != input else {
       return
     }
-    cachedPresentation = SessionTimelineSectionPresentation(
+    let nextPresentation = SessionTimelineSectionPresentation(
       sessionID: sessionID,
       timeline: timeline,
       timelineWindow: timelineWindow,
@@ -75,6 +75,12 @@ struct SessionCockpitTimelineSection: View {
       isTimelineLoading: isTimelineLoading,
       reduceMotion: reduceMotion,
       dateTimeConfiguration: dateTimeConfiguration
+    )
+    cachedPresentation = SessionTimelinePresentationRetention.resolved(
+      previousPresentation: cachedPresentation,
+      previousInput: cachedPresentationInput,
+      nextPresentation: nextPresentation,
+      nextInput: input
     )
     cachedPresentationInput = input
     viewport.updatePresentationCounts(
