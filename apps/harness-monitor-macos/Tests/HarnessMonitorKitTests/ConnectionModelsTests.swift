@@ -29,6 +29,8 @@ struct ConnectionModelsTests {
     let metrics = ConnectionMetrics.initial
     #expect(metrics.transportKind == .httpSSE)
     #expect(metrics.latencyMs == nil)
+    #expect(metrics.transportLatencyMs == nil)
+    #expect(metrics.requestLatencyMs == nil)
     #expect(metrics.messagesReceived == 0)
     #expect(metrics.messagesSent == 0)
     #expect(metrics.reconnectCount == 0)
@@ -36,13 +38,16 @@ struct ConnectionModelsTests {
     #expect(metrics.quality == .disconnected)
   }
 
-  @Test("ConnectionMetrics quality derived from latency")
+  @Test("ConnectionMetrics quality prefers transport latency and falls back to request latency")
   func metricsQuality() {
     var metrics = ConnectionMetrics.initial
-    metrics.latencyMs = 24
+    metrics.transportLatencyMs = 24
     #expect(metrics.quality == .excellent)
-    metrics.latencyMs = 200
+    #expect(metrics.latencySource == .transport)
+    metrics.transportLatencyMs = nil
+    metrics.requestLatencyMs = 200
     #expect(metrics.quality == .degraded)
+    #expect(metrics.latencySource == .request)
   }
 
   @Test("ConnectionEvent initializes with current timestamp")

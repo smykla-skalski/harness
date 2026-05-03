@@ -193,7 +193,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
   @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURL()
-  var latencySamplesMs: [Int] = []
+  var transportLatencySamplesMs: [Int] = []
+  var requestLatencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0

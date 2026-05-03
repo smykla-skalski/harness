@@ -16,9 +16,9 @@ extension ConnectionQuality {
 
 extension ConnectionMetrics {
   var latencyTint: Color {
-    guard latencyMs != nil else {
+    guard transportLatencyMs != nil else {
       return HarnessMonitorTheme.ink
     }
-    return quality.themeColor
+    return transportQuality.themeColor
   }
 }

@@ -8,16 +8,16 @@ use super::{
     bridge, broadcast, env, http, index, log_sandbox_startup, process_id, state, tokio_watch,
     utc_now, watch,
 };
+use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
+use acp_inspect_publisher::spawn_acp_inspect_publisher;
+use binary_stamp::current_binary_stamp;
 use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
-
-use acp_inspect_publisher::spawn_acp_inspect_publisher;
-use binary_stamp::current_binary_stamp;
 
 /// Start the daemon TCP server and service all incoming connections.
 ///
@@ -80,6 +80,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
+    schedule_probe_cache_refresh();
     let codex_controller = CodexControllerHandle::new_with_async_db(
         sender.clone(),
         db.clone(),

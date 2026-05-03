@@ -1,7 +1,28 @@
 use super::*;
+use crate::agents::acp::probe::{
+    AcpAuthState, AcpRuntimeProbe, AcpRuntimeProbeResponse, lock_probe_cache_for_tests,
+    replace_probe_cache_for_tests,
+};
+use std::time::Duration;
 
 #[test]
 fn diagnostics_report_includes_workspace_and_recent_events() {
+    let _guard = lock_probe_cache_for_tests();
+    replace_probe_cache_for_tests(
+        Some(AcpRuntimeProbeResponse {
+            probes: vec![AcpRuntimeProbe {
+                agent_id: "copilot".to_string(),
+                display_name: "GitHub Copilot".to_string(),
+                binary_present: true,
+                auth_state: AcpAuthState::Ready,
+                version: Some("1.0.0".to_string()),
+                install_hint: None,
+            }],
+            checked_at: "2026-05-03T20:00:00Z".to_string(),
+        }),
+        Duration::ZERO,
+        false,
+    );
     let tmp = tempdir().expect("tempdir");
     let home = tempdir().expect("tempdir");
     temp_env::with_vars(
@@ -55,6 +76,7 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
             );
         },
     );
+    replace_probe_cache_for_tests(None, Duration::ZERO, false);
 }
 
 /// Baseline: `diagnostics_report` returns running=false when no bridge is present.

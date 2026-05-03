@@ -221,7 +221,7 @@ extension HarnessMonitorStore {
     if recordConnectionTelemetry {
       recordRequestSuccess(
         latencyMs: measuredDiagnostics.latencyMs,
-        updatesLatency: true
+        latencySource: .request
       )
       recordRequestSuccess()
       recordRequestSuccess()
