@@ -4,17 +4,16 @@ import SwiftUI
 
 extension FocusedValues {
   @Entry var harnessPreservePrimaryContentFocus: Bool?
-  @Entry public var harnessPrimaryContentResetSuppression: PrimaryContentResetSuppression?
 }
 
-public struct PrimaryContentResetSuppression: Equatable {
-  public let preservesPrimaryContentFocus: Bool
-  public let hasFocusedEditorField: Bool
-  public let hasPresentedSheet: Bool
-  public let hasPendingConfirmation: Bool
-  public let hasDismissConfirmation: Bool
+struct PrimaryContentResetSuppression: Equatable {
+  let preservesPrimaryContentFocus: Bool
+  let hasFocusedEditorField: Bool
+  let hasPresentedSheet: Bool
+  let hasPendingConfirmation: Bool
+  let hasDismissConfirmation: Bool
 
-  public init(
+  init(
     preservesPrimaryContentFocus: Bool,
     hasFocusedEditorField: Bool = false,
     hasPresentedSheet: Bool,
@@ -28,7 +27,7 @@ public struct PrimaryContentResetSuppression: Equatable {
     self.hasDismissConfirmation = hasDismissConfirmation
   }
 
-  public var isSuppressed: Bool {
+  var isSuppressed: Bool {
     if preservesPrimaryContentFocus { return true }
     if hasFocusedEditorField { return true }
     if hasPresentedSheet { return true }
@@ -43,12 +42,14 @@ extension View {
     focusScope: Namespace.ID? = nil,
     prefersDefaultFocus: Bool = false,
     pagingResponderRequest: Int = 0,
+    pagingResponderEnabled: Bool? = nil,
     listIdentifier: String? = nil,
     listLabel: String? = nil
   ) -> some View {
+    let isPagingResponderEnabled = pagingResponderEnabled ?? prefersDefaultFocus
     let targetView = self.harnessPrimaryContentPagingResponder(
       request: pagingResponderRequest,
-      isEnabled: prefersDefaultFocus
+      isEnabled: isPagingResponderEnabled
     )
     if let focusScope {
       let focusedTarget =

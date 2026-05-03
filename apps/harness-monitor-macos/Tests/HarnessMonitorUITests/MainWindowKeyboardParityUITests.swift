@@ -61,7 +61,7 @@ final class MainWindowKeyboardParityUITests: HarnessMonitorUITestCase {
       """
     )
 
-    app.typeKey(.downArrow, modifierFlags: [])
+    app.typeKey(.upArrow, modifierFlags: [])
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {

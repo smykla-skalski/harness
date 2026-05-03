@@ -56,6 +56,16 @@ struct SessionTimelineNodeCluster: View {
 private struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
+  private let statusBadges: [SessionTimelineStatusBadge]
+
+  init(
+    row: SessionTimelineRow,
+    actionHandler: any DecisionActionHandler
+  ) {
+    self.row = row
+    self.actionHandler = actionHandler
+    statusBadges = Self.makeStatusBadges(for: row.node)
+  }
 
   private var node: SessionTimelineNode {
     row.node
@@ -168,12 +178,7 @@ private struct SessionTimelineNodeRow: View {
   }
 
   private var rightBadges: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-      ForEach(statusBadges) { badge in
-        SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
-      }
-    }
-    .fixedSize(horizontal: true, vertical: false)
+    SessionTimelineBadgeStrip(badges: statusBadges)
   }
 
   private var typeTint: Color {
@@ -194,7 +199,9 @@ private struct SessionTimelineNodeRow: View {
     return node.decision?.severity.color ?? HarnessMonitorTheme.secondaryInk
   }
 
-  private var statusBadges: [SessionTimelineStatusBadge] {
+  private static func makeStatusBadges(
+    for node: SessionTimelineNode
+  ) -> [SessionTimelineStatusBadge] {
     var badges: [SessionTimelineStatusBadge] = []
     if let eventTone = node.eventTone {
       badges.append(SessionTimelineStatusBadge(label: eventTone.badgeLabel, tint: eventTone.color))
@@ -208,6 +215,19 @@ private struct SessionTimelineNodeRow: View {
       )
     }
     return badges
+  }
+}
+
+private struct SessionTimelineBadgeStrip: View {
+  let badges: [SessionTimelineStatusBadge]
+
+  var body: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      ForEach(badges) { badge in
+        SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
+      }
+    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 }
 

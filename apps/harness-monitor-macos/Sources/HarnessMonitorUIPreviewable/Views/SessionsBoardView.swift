@@ -7,6 +7,7 @@ struct SessionsBoardView: View {
   let primaryContentFocusScope: Namespace.ID?
   let primaryContentPagingResponderRequest: Int
   let prefersPrimaryContentFocus: Bool
+  let primaryContentPagingResponderEnabled: Bool
 
   init(
     store: HarnessMonitorStore,
@@ -14,13 +15,15 @@ struct SessionsBoardView: View {
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     primaryContentFocusScope: Namespace.ID? = nil,
     primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false
+    prefersPrimaryContentFocus: Bool = false,
+    primaryContentPagingResponderEnabled: Bool = false
   ) {
     self.store = store
     self.sessionCatalog = sessionCatalog
     self.primaryContentFocusScope = primaryContentFocusScope
     self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
     self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
+    self.primaryContentPagingResponderEnabled = primaryContentPagingResponderEnabled
   }
 
   var body: some View {
@@ -34,7 +37,8 @@ struct SessionsBoardView: View {
       scrollSurfaceLabel: "Sessions board",
       primaryFocusScope: primaryContentFocusScope,
       prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest
+      pagingResponderRequest: primaryContentPagingResponderRequest,
+      pagingResponderEnabled: primaryContentPagingResponderEnabled
     ) {
       VStack(alignment: .leading, spacing: 24) {
         SessionsBoardRecentSessionsSection(

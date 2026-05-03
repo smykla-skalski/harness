@@ -16,12 +16,6 @@ public struct ContentView<CornerContent: View>: View {
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   private let toast: ToastSlice
   let auditBuildState: AuditBuildDisplayState?
-  @Environment(\.resetFocus)
-  private var resetFocus
-  @FocusedValue(\.harnessPreservePrimaryContentFocus)
-  private var preservesPrimaryContentFocus
-  @FocusedValue(\.harnessPrimaryContentResetSuppression)
-  private var resetSuppression
   @State private var primaryContentPagingResponderRequest = 0
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
@@ -69,15 +63,6 @@ public struct ContentView<CornerContent: View>: View {
     return .dashboard
   }
 
-  private var contentPrimaryContentFocusResetToken: String {
-    [
-      currentSessionContentPrimaryFocusTarget.rawValue,
-      store.selectedSessionID ?? "nil",
-      String(isStartupFocusParticipationEnabled),
-      keyWindowObserver?.snapshot.routingToken ?? "key=untracked",
-    ].joined(separator: "|")
-  }
-
   private var columnVisibilityProfilingLabel: String {
     if columnVisibility == .all {
       return "all"
@@ -89,19 +74,6 @@ public struct ContentView<CornerContent: View>: View {
     // equality bucket on macOS. This window drives explicit visibility, so the
     // ambiguous branch represents the middle two-column state.
     return "doubleColumn"
-  }
-
-  private var isContentWindowKey: Bool {
-    keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.main) ?? true
-  }
-
-  private var currentResetSuppression: PrimaryContentResetSuppression {
-    PrimaryContentResetSuppression(
-      preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
-      hasFocusedEditorField: false,
-      hasPresentedSheet: contentShell.presentedSheet != nil,
-      hasPendingConfirmation: contentShell.pendingConfirmation != nil
-    )
   }
 
   @MainActor
@@ -189,10 +161,6 @@ public struct ContentView<CornerContent: View>: View {
         ]
       )
     }
-    .task(id: contentPrimaryContentFocusResetToken) {
-      await resetPrimaryContentFocusIfNeeded()
-    }
-    .focusedSceneValue(\.harnessPrimaryContentResetSuppression, currentResetSuppression)
   }
 
   private var contentToolbarModel: ContentWindowToolbarModel {
@@ -281,28 +249,6 @@ public struct ContentView<CornerContent: View>: View {
       primaryContentFocusTarget: currentSessionContentPrimaryFocusTarget,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
-  }
-
-  @MainActor
-  private func resetPrimaryContentFocusIfNeeded() async {
-    guard
-      isStartupFocusParticipationEnabled,
-      isContentWindowKey,
-      // nil during startup or when window is not key; local fallback is correct in both cases.
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
-    else {
-      return
-    }
-    await Task.yield()
-    guard
-      isStartupFocusParticipationEnabled,
-      isContentWindowKey,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
-    else {
-      return
-    }
-    resetFocus(in: primaryContentFocusScope)
-    primaryContentPagingResponderRequest += 1
   }
 
   private func enableStartupFocusParticipation() {
