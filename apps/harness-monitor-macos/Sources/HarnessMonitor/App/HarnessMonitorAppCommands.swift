@@ -62,9 +62,8 @@ struct HarnessMonitorAppCommands: Commands {
       let menuLabel = sidebarSearchFocus?.menuLabel ?? .findGeneric
       let isAvailable = sidebarSearchFocus?.isAvailable == true
       Button {
-        if sidebarVisibilityRequest?.isCollapsed == true {
-          sidebarVisibilityRequest?.expander.expand()
-        }
+        // expand() is idempotent — the handler guards against no-op expansion.
+        sidebarVisibilityRequest?.expander.expand()
         sidebarSearchFocus?.invoke()
       } label: {
         Text(menuLabel.localizedTitle)

@@ -69,10 +69,13 @@ public final class HarnessSidebarVisibilityExpander {
 }
 
 public struct HarnessSidebarVisibilityRequest: Equatable {
-  public let isCollapsed: Bool
   public let expander: HarnessSidebarVisibilityExpander
 
+  // Equality by identity: two requests are the same iff they share the same
+  // expander object (i.e. the same window's expander). This lets @FocusedValue
+  // detect key-window switches even when both windows happen to have the same
+  // visible/collapsed state.
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.isCollapsed == rhs.isCollapsed && lhs.expander === rhs.expander
+    lhs.expander === rhs.expander
   }
 }
