@@ -58,21 +58,4 @@ public struct HarnessSidebarSearchFocus: Equatable {
 
 extension FocusedValues {
   @Entry public var harnessSidebarSearchFocusAction: HarnessSidebarSearchFocus?
-  @Entry public var harnessSidebarVisibilityRequest: HarnessSidebarVisibilityRequest?
-}
-
-@MainActor
-public final class HarnessSidebarVisibilityExpander {
-  public var handler: (() -> Void)?
-  public init() {}
-  public func expand() { handler?() }
-}
-
-public struct HarnessSidebarVisibilityRequest: Equatable {
-  public let isCollapsed: Bool
-  public let expander: HarnessSidebarVisibilityExpander
-
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.isCollapsed == rhs.isCollapsed && lhs.expander === rhs.expander
-  }
 }

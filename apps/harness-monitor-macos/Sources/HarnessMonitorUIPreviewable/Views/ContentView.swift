@@ -20,8 +20,6 @@ public struct ContentView<CornerContent: View>: View {
   private var resetFocus
   @FocusedValue(\.harnessPreservePrimaryContentFocus)
   private var preservesPrimaryContentFocus
-  @FocusedValue(\.harnessPrimaryContentResetSuppression)
-  private var resetSuppression
   @State private var primaryContentPagingResponderRequest = 0
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
@@ -95,8 +93,8 @@ public struct ContentView<CornerContent: View>: View {
     keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.main) ?? true
   }
 
-  private var currentResetSuppression: PrimaryContentResetSuppression {
-    PrimaryContentResetSuppression(
+  private var shouldSuppressPrimaryContentFocusReset: Bool {
+    HarnessMonitorUIPreviewable.shouldSuppressPrimaryContentFocusReset(
       preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
       hasFocusedEditorField: false,
       hasPresentedSheet: contentShell.presentedSheet != nil,
@@ -192,7 +190,6 @@ public struct ContentView<CornerContent: View>: View {
     .task(id: contentPrimaryContentFocusResetToken) {
       await resetPrimaryContentFocusIfNeeded()
     }
-    .focusedSceneValue(\.harnessPrimaryContentResetSuppression, currentResetSuppression)
   }
 
   private var contentToolbarModel: ContentWindowToolbarModel {
@@ -288,7 +285,7 @@ public struct ContentView<CornerContent: View>: View {
     guard
       isStartupFocusParticipationEnabled,
       isContentWindowKey,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !shouldSuppressPrimaryContentFocusReset
     else {
       return
     }
@@ -296,7 +293,7 @@ public struct ContentView<CornerContent: View>: View {
     guard
       isStartupFocusParticipationEnabled,
       isContentWindowKey,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !shouldSuppressPrimaryContentFocusReset
     else {
       return
     }

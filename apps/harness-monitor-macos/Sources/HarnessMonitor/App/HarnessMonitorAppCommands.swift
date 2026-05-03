@@ -14,8 +14,6 @@ struct HarnessMonitorAppCommands: Commands {
   private var openWindow
   @FocusedValue(\.harnessSidebarSearchFocusAction)
   private var sidebarSearchFocus
-  @FocusedValue(\.harnessSidebarVisibilityRequest)
-  private var sidebarVisibilityRequest
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -62,7 +60,6 @@ struct HarnessMonitorAppCommands: Commands {
       let menuLabel = sidebarSearchFocus?.menuLabel ?? .findGeneric
       let isAvailable = sidebarSearchFocus?.isAvailable == true
       Button {
-        sidebarVisibilityRequest?.expander.expand()
         sidebarSearchFocus?.invoke()
       } label: {
         Text(menuLabel.localizedTitle)

@@ -4,37 +4,6 @@ import SwiftUI
 
 extension FocusedValues {
   @Entry var harnessPreservePrimaryContentFocus: Bool?
-  @Entry public var harnessPrimaryContentResetSuppression: PrimaryContentResetSuppression?
-}
-
-public struct PrimaryContentResetSuppression: Equatable {
-  public let preservesPrimaryContentFocus: Bool
-  public let hasFocusedEditorField: Bool
-  public let hasPresentedSheet: Bool
-  public let hasPendingConfirmation: Bool
-  public let extraSuppressor: Bool
-
-  public init(
-    preservesPrimaryContentFocus: Bool,
-    hasFocusedEditorField: Bool = false,
-    hasPresentedSheet: Bool,
-    hasPendingConfirmation: Bool,
-    extraSuppressor: Bool = false
-  ) {
-    self.preservesPrimaryContentFocus = preservesPrimaryContentFocus
-    self.hasFocusedEditorField = hasFocusedEditorField
-    self.hasPresentedSheet = hasPresentedSheet
-    self.hasPendingConfirmation = hasPendingConfirmation
-    self.extraSuppressor = extraSuppressor
-  }
-
-  public var isSuppressed: Bool {
-    if preservesPrimaryContentFocus { return true }
-    if hasFocusedEditorField { return true }
-    if hasPresentedSheet { return true }
-    if hasPendingConfirmation { return true }
-    return extraSuppressor
-  }
 }
 
 extension View {
