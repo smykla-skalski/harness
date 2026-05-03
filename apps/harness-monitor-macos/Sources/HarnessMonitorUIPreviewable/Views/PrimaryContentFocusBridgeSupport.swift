@@ -2,8 +2,21 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-extension FocusedValues {
-  @Entry var harnessPreservePrimaryContentFocus: Bool?
+// PreferenceKey instead of FocusedValue: every Workspace render had multiple
+// .focusedSceneValue(\.harnessPreservePrimaryContentFocus, ...) publishers
+// active at once (sidebar, create form, terminal, task detail pane, codex
+// pane). SwiftUI cannot uniquely resolve same-key scene publishers in one
+// frame and emits "FocusedValue update tried to update multiple times per
+// frame" + AttributeGraph cycles every frame. PreferenceKey reduces the
+// contributions deterministically and bubbles a single value up to
+// WorkspaceWindowView, which reads it via .onPreferenceChange instead of
+// @FocusedValue.
+struct HarnessPreservePrimaryContentFocusPreference: PreferenceKey {
+  static let defaultValue: Bool = false
+
+  static func reduce(value: inout Bool, nextValue: () -> Bool) {
+    value = value || nextValue()
+  }
 }
 
 struct PrimaryContentResetSuppression: Equatable {
@@ -78,7 +91,7 @@ extension View {
   }
 
   func harnessPreservePrimaryContentFocus(_ isPreserved: Bool = true) -> some View {
-    focusedSceneValue(\.harnessPreservePrimaryContentFocus, isPreserved)
+    preference(key: HarnessPreservePrimaryContentFocusPreference.self, value: isPreserved)
   }
 
   func harnessPrimaryContentPagingResponder(

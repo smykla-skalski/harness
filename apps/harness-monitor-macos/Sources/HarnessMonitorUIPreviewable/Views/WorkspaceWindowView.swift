@@ -27,8 +27,7 @@ public struct WorkspaceWindowView: View {
   let navigationBridge: WorkspaceWindowNavigationBridge
   @Environment(\.resetFocus)
   private var resetFocus
-  @FocusedValue(\.harnessPreservePrimaryContentFocus)
-  private var preservesPrimaryContentFocus
+  @State private var preservesPrimaryContentFocus = false
   @State private var sidebarVisibilityExpander = HarnessSidebarVisibilityExpander()
   @Environment(\.openWindow)
   var openWindow
@@ -257,7 +256,7 @@ public struct WorkspaceWindowView: View {
 
   private var currentResetSuppression: PrimaryContentResetSuppression {
     PrimaryContentResetSuppression(
-      preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
+      preservesPrimaryContentFocus: preservesPrimaryContentFocus,
       hasFocusedEditorField: stateFocusedField != nil,
       hasPresentedSheet: store.presentedSheet != nil,
       hasPendingConfirmation: store.pendingConfirmation != nil,
@@ -357,6 +356,12 @@ public struct WorkspaceWindowView: View {
         hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
         sidebarVisibilityExpander.handler = nil
+      }
+      .onPreferenceChange(HarnessPreservePrimaryContentFocusPreference.self) { newValue in
+        Task { @MainActor in
+          guard preservesPrimaryContentFocus != newValue else { return }
+          preservesPrimaryContentFocus = newValue
+        }
       }
       .acpPermissionPresentation(store: store)
       .focusedSceneValue(
