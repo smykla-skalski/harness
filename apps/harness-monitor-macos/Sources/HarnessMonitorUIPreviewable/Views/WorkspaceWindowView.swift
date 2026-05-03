@@ -29,8 +29,6 @@ public struct WorkspaceWindowView: View {
   private var resetFocus
   @FocusedValue(\.harnessPreservePrimaryContentFocus)
   private var preservesPrimaryContentFocus
-  @FocusedValue(\.harnessPrimaryContentResetSuppression)
-  private var resetSuppression
   @State private var sidebarVisibilityExpander = HarnessSidebarVisibilityExpander()
   @Environment(\.openWindow)
   var openWindow
@@ -361,7 +359,6 @@ public struct WorkspaceWindowView: View {
         sidebarVisibilityExpander.handler = nil
       }
       .acpPermissionPresentation(store: store)
-      .focusedSceneValue(\.harnessPrimaryContentResetSuppression, currentResetSuppression)
       .focusedSceneValue(
         \.harnessSidebarVisibilityRequest,
         HarnessSidebarVisibilityRequest(expander: sidebarVisibilityExpander)
@@ -390,14 +387,19 @@ public struct WorkspaceWindowView: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
   }
 
+  // currentResetSuppression is computed locally instead of routed through a
+  // FocusedValue: focus state is nil during startup and when the window is
+  // not key, and a self-published FocusedValue here would create an
+  // AttributeGraph cycle (publisher and subscriber on the same view fires
+  // SwiftUI's "FocusedValue update tried to update multiple times per frame"
+  // fault). isWorkspaceKeyWindow already gates the not-key case.
   @MainActor
   private func resetPrimaryContentFocusIfNeeded() async {
     guard
       hasCompletedInitialWorkspacePreparation,
       isStartupFocusParticipationEnabled,
       isWorkspaceKeyWindow,
-      // nil during startup or when window is not key; local fallback is correct in both cases.
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !currentResetSuppression.isSuppressed
     else {
       return
     }
@@ -406,7 +408,7 @@ public struct WorkspaceWindowView: View {
       hasCompletedInitialWorkspacePreparation,
       isStartupFocusParticipationEnabled,
       isWorkspaceKeyWindow,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !currentResetSuppression.isSuppressed
     else {
       return
     }
