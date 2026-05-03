@@ -22,6 +22,17 @@ enum AgentTaskDropAction {
     }
   }
 
+  var pendingFeedback: AgentTaskDropFeedback {
+    switch self {
+    case .start:
+      .deliveringStart()
+    case .queue:
+      .deliveringQueue()
+    case .unavailable(let feedback):
+      feedback
+    }
+  }
+
   init(
     agent: AgentRegistration,
     queuedTaskCount: Int,
@@ -53,6 +64,26 @@ struct AgentTaskDropFeedback {
 
   var accessibilityLabel: String {
     "\(title). \(detail)"
+  }
+
+  static func deliveringStart() -> Self {
+    Self(
+      title: "Delivering task",
+      detail: "Sending the live handoff now.",
+      systemImage: "paperplane.fill",
+      tint: HarnessMonitorTheme.accent,
+      isActionable: true
+    )
+  }
+
+  static func deliveringQueue() -> Self {
+    Self(
+      title: "Queueing task",
+      detail: "Saving it behind the current work.",
+      systemImage: "text.line.last.and.arrowtriangle.forward",
+      tint: HarnessMonitorTheme.caution,
+      isActionable: true
+    )
   }
 
   init(

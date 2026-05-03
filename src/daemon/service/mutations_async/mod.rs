@@ -1,9 +1,18 @@
+use crate::agents::runtime::signal::SignalAck;
+use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::index::ResolvedSession;
+use tokio::time::{Instant as TokioInstant, sleep};
 
+use super::signals::{
+    agent_tui_id_for_registration, handled_active_signal_ack_wait_result,
+    handled_active_signal_wake_result, managed_tui_wake, wake_tui_for_signal,
+    warn_active_signal_ack_record_failure,
+};
 use super::{
-    AgentTuiManagerHandle, CliError, SessionTransition, build_log_entry, effective_project_dir,
-    session_not_found, session_service, snapshot, sync_file_state_for_resolved,
-    task_drop_effect_signal_records, try_wake_started_workers, write_task_start_signals,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
+    AgentTuiManagerHandle, CliError, Path, SessionTransition, SignalAckRequest, build_log_entry,
+    effective_project_dir, session_not_found, session_service, snapshot,
+    sync_file_state_for_resolved, task_drop_effect_signal_records, write_task_start_signals,
 };
 
 mod agents;
@@ -100,6 +109,118 @@ async fn append_leave_signal_logs_async(
     Ok(())
 }
 
+async fn wait_for_task_start_ack_async(
+    runtime: &dyn AgentRuntime,
+    project_dir: &Path,
+    signal_session_id: &str,
+    signal_id: &str,
+) -> Result<Option<SignalAck>, CliError> {
+    let deadline = TokioInstant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
+    loop {
+        if let Some(ack) = runtime
+            .read_acknowledgments(project_dir, signal_session_id)?
+            .into_iter()
+            .find(|ack| ack.signal_id == signal_id)
+        {
+            return Ok(Some(ack));
+        }
+        if TokioInstant::now() >= deadline {
+            return Ok(None);
+        }
+        sleep(ACTIVE_SIGNAL_ACK_POLL_INTERVAL).await;
+    }
+}
+
+async fn try_wake_started_workers_async(
+    resolved: &ResolvedSession,
+    effects: &[session_service::TaskDropEffect],
+    session_id: &str,
+    project_dir: &Path,
+    async_db: &super::db::AsyncDaemonDb,
+    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+) {
+    let Some(manager) = agent_tui_manager else {
+        return;
+    };
+    for effect in effects {
+        let session_service::TaskDropEffect::Started(record) = effect else {
+            continue;
+        };
+        let Some(runtime) = runtime_for_name(&record.runtime) else {
+            continue;
+        };
+        let tui_id = resolved
+            .state
+            .agents
+            .get(&record.agent_id)
+            .and_then(agent_tui_id_for_registration);
+        let Some(managed_tui) = managed_tui_wake(tui_id, Some(manager)) else {
+            continue;
+        };
+        let Some(woke_tui) = handled_active_signal_wake_result(
+            &ActiveSignalDelivery {
+                session_id,
+                agent_id: &record.agent_id,
+                signal: &record.signal,
+                runtime,
+                project_dir,
+                signal_session_id: &record.signal_session_id,
+                db: None,
+            },
+            wake_tui_for_signal(&managed_tui, &record.signal),
+        ) else {
+            continue;
+        };
+        if !woke_tui {
+            continue;
+        }
+
+        let ack_result = wait_for_task_start_ack_async(
+            runtime,
+            project_dir,
+            &record.signal_session_id,
+            &record.signal.signal_id,
+        )
+        .await;
+        let Some(ack) = handled_active_signal_ack_wait_result(
+            &ActiveSignalDelivery {
+                session_id,
+                agent_id: &record.agent_id,
+                signal: &record.signal,
+                runtime,
+                project_dir,
+                signal_session_id: &record.signal_session_id,
+                db: None,
+            },
+            ack_result,
+        ) else {
+            continue;
+        };
+        let ack_request = SignalAckRequest {
+            agent_id: record.agent_id.clone(),
+            signal_id: record.signal.signal_id.clone(),
+            result: ack.result,
+            project_dir: project_dir.display().to_string(),
+        };
+        if let Err(error) =
+            super::record_signal_ack_direct_async(session_id, &ack_request, async_db).await
+        {
+            warn_active_signal_ack_record_failure(
+                &ActiveSignalDelivery {
+                    session_id,
+                    agent_id: &record.agent_id,
+                    signal: &record.signal,
+                    runtime,
+                    project_dir,
+                    signal_session_id: &record.signal_session_id,
+                    db: None,
+                },
+                &error,
+            );
+        }
+    }
+}
+
 async fn persist_task_signal_effects(
     async_db: &super::db::AsyncDaemonDb,
     resolved: &ResolvedSession,
@@ -122,14 +243,15 @@ async fn persist_task_signal_effects(
             &task_drop_effect_signal_records(session_id, effects),
         )
         .await?;
-    try_wake_started_workers(
-        &resolved.state,
+    try_wake_started_workers_async(
+        resolved,
         effects,
         session_id,
         &project_dir,
-        None,
+        async_db,
         agent_tui_manager,
-    );
+    )
+    .await;
     bump_session(async_db, session_id).await
 }
 
