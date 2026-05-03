@@ -190,9 +190,6 @@ extension WorkspaceWindowView {
     let sortedCodexRuns: [CodexRunSnapshot]
     let codexTitlesByID: [String: String]
     let externalAgents: [AgentRegistration]
-    let agentTuiUnavailable: Bool
-    let acpUnavailable: Bool
-    let codexUnavailable: Bool
     var hasAgentTuis: Bool {
       !sortedAgentTuis.isEmpty
     }
@@ -208,9 +205,6 @@ extension WorkspaceWindowView {
       sortedCodexRuns = []
       codexTitlesByID = [:]
       externalAgents = []
-      agentTuiUnavailable = false
-      acpUnavailable = false
-      codexUnavailable = false
     }
 
     @MainActor
@@ -270,9 +264,6 @@ extension WorkspaceWindowView {
       self.sortedCodexRuns = sortedCodexRuns
       self.codexTitlesByID = codexTitlesByID
       self.externalAgents = externalAgents
-      self.agentTuiUnavailable = store.agentTuiUnavailable
-      self.acpUnavailable = store.acpUnavailable
-      self.codexUnavailable = store.codexUnavailable
     }
 
     /// Hold back active managed items until the first refresh completes so reopening the window

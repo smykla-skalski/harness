@@ -31,6 +31,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureDiagnosticsReport(_ report: DaemonDiagnosticsReport?) {
+    lock.withLock {
+      diagnosticsReportOverride = report
+    }
+  }
+
   func configureDiagnosticsErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedDiagnosticsErrors = errors

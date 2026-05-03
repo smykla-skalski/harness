@@ -32,6 +32,9 @@ extension RecordingHarnessClient {
       throw error
     }
     try await sleepIfNeeded(configuredDiagnosticsDelay())
+    if let override = configuredDiagnosticsReport() {
+      return override
+    }
     return DaemonDiagnosticsReport(
       health: try await health(),
       manifest: DaemonManifest(

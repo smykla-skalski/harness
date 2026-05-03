@@ -7,9 +7,6 @@ extension WorkspaceWindowView {
     let codexRuns: [CodexRunRefreshSignature]
     let selectedCodexRunID: String?
     let session: SessionRefreshSignature?
-    let agentTuiUnavailable: Bool
-    let acpUnavailable: Bool
-    let codexUnavailable: Bool
   }
 
   struct AgentTuiRefreshSignature: Equatable {
@@ -98,10 +95,7 @@ extension WorkspaceWindowView {
       selectedAgentTuiID: store.selectedAgentTui?.tuiId,
       codexRuns: store.selectedCodexRuns.map(CodexRunRefreshSignature.init),
       selectedCodexRunID: store.selectedCodexRun?.runId,
-      session: store.selectedSession.map(SessionRefreshSignature.init),
-      agentTuiUnavailable: store.agentTuiUnavailable,
-      acpUnavailable: store.acpUnavailable,
-      codexUnavailable: store.codexUnavailable
+      session: store.selectedSession.map(SessionRefreshSignature.init)
     )
   }
 }
