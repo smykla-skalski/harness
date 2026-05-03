@@ -30,6 +30,7 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     alphaValue = 0
+    focusRingType = .none
     setAccessibilityHidden(true)
   }
 

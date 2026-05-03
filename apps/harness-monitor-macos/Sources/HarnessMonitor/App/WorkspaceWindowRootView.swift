@@ -16,6 +16,7 @@ struct WorkspaceWindowRootView: View {
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
+  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -66,7 +67,11 @@ struct WorkspaceWindowRootView: View {
         )
       )
       .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
-      .instantFocusRing()
+      .modifier(
+        OptionalInstantFocusRingModifier(
+          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
+        )
+      )
       .modifier(
         HarnessMonitorSceneAppearanceModifier(
           themeMode: $themeMode,
