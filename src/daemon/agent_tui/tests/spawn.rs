@@ -116,8 +116,8 @@ fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
             .expect("spawn process");
 
             assert!(
-                project.join(".codex").join("config.toml").is_file(),
-                "spawn should bootstrap Codex config before launch"
+                !project.join(".codex").join("config.toml").exists(),
+                "spawn should not create a per-project Codex config"
             );
             assert!(
                 project
