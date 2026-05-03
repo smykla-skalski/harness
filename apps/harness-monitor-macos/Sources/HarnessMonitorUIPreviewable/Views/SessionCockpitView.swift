@@ -14,6 +14,7 @@ struct SessionCockpitView: View {
   let primaryContentFocusScope: Namespace.ID?
   let primaryContentPagingResponderRequest: Int
   let prefersPrimaryContentFocus: Bool
+  let primaryContentPagingResponderEnabled: Bool
   @Environment(\.openWindow)
   private var openWindow
 
@@ -29,7 +30,8 @@ struct SessionCockpitView: View {
     isExtensionsLoading: Bool,
     primaryContentFocusScope: Namespace.ID? = nil,
     primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false
+    prefersPrimaryContentFocus: Bool = false,
+    primaryContentPagingResponderEnabled: Bool = false
   ) {
     self.store = store
     self.detail = detail
@@ -43,6 +45,7 @@ struct SessionCockpitView: View {
     self.primaryContentFocusScope = primaryContentFocusScope
     self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
     self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
+    self.primaryContentPagingResponderEnabled = primaryContentPagingResponderEnabled
   }
 
   private func openAgent(_ agentID: String) {
@@ -72,7 +75,8 @@ struct SessionCockpitView: View {
         scrollSurfaceLabel: "Session cockpit scroll view",
         primaryFocusScope: primaryContentFocusScope,
         prefersDefaultFocus: prefersPrimaryContentFocus,
-        pagingResponderRequest: primaryContentPagingResponderRequest
+        pagingResponderRequest: primaryContentPagingResponderRequest,
+        pagingResponderEnabled: primaryContentPagingResponderEnabled
       ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(

@@ -39,6 +39,9 @@ struct SessionContentContainer: View {
   }
 
   var body: some View {
+    // Keep paging wired to the active detail surface without stealing the
+    // visible keyboard focus away from the sidebar selection.
+    let isPagingResponderEnabled = primaryContentFocusTarget == mode.focusTarget
     ZStack(alignment: .topLeading) {
       switch mode {
       case .dashboard:
@@ -48,7 +51,8 @@ struct SessionContentContainer: View {
           dashboardUI: dashboardUI,
           primaryContentFocusScope: primaryContentFocusScope,
           primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: primaryContentFocusTarget == .dashboard
+          prefersPrimaryContentFocus: false,
+          primaryContentPagingResponderEnabled: isPagingResponderEnabled
         )
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
@@ -63,14 +67,16 @@ struct SessionContentContainer: View {
           isExtensionsLoading: state.isExtensionsLoading,
           primaryContentFocusScope: primaryContentFocusScope,
           primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: primaryContentFocusTarget == .cockpit
+          prefersPrimaryContentFocus: false,
+          primaryContentPagingResponderEnabled: isPagingResponderEnabled
         )
       case .loading(let summary):
         SessionCockpitLoadingSurface(
           summary: summary,
           primaryContentFocusScope: primaryContentFocusScope,
           primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: primaryContentFocusTarget == .loading
+          prefersPrimaryContentFocus: false,
+          primaryContentPagingResponderEnabled: isPagingResponderEnabled
         )
       }
     }
@@ -82,6 +88,17 @@ private enum SessionContentMode {
   case dashboard
   case cockpit(SessionDetail)
   case loading(SessionSummary)
+
+  var focusTarget: SessionContentPrimaryFocusTarget {
+    switch self {
+    case .dashboard:
+      .dashboard
+    case .cockpit:
+      .cockpit
+    case .loading:
+      .loading
+    }
+  }
 }
 
 private struct SessionCockpitLoadingSurface: View {
@@ -89,6 +106,7 @@ private struct SessionCockpitLoadingSurface: View {
   let primaryContentFocusScope: Namespace.ID?
   let primaryContentPagingResponderRequest: Int
   let prefersPrimaryContentFocus: Bool
+  let primaryContentPagingResponderEnabled: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -107,7 +125,8 @@ private struct SessionCockpitLoadingSurface: View {
     .harnessPrimaryContentFocusTarget(
       focusScope: primaryContentFocusScope,
       prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest
+      pagingResponderRequest: primaryContentPagingResponderRequest,
+      pagingResponderEnabled: primaryContentPagingResponderEnabled
     )
   }
 }

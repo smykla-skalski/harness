@@ -233,8 +233,14 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
     if firstResponder === self || firstResponder === window {
       return true
     }
-    return !isTextInputResponder(firstResponder)
-      && resolvedScrollView() != nil
+    guard !isTextInputResponder(firstResponder) else {
+      return false
+    }
+    let scrollView = resolvedScrollView()
+    if isListLikeResponder(firstResponder, primaryScrollView: scrollView) {
+      return true
+    }
+    return scrollView != nil
       && responderName(firstResponder) == "AppKitWindow"
   }
 
@@ -246,6 +252,33 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
       return false
     }
     return view is NSTextField || view is NSText
+  }
+
+  func isListLikeResponder(
+    _ responder: NSResponder,
+    primaryScrollView: NSScrollView?
+  ) -> Bool {
+    guard let view = responder as? NSView else {
+      return false
+    }
+    if let primaryScrollView, view.isDescendant(of: primaryScrollView) {
+      return false
+    }
+    if let enclosingScrollView = view.enclosingScrollView,
+      enclosingScrollView !== primaryScrollView,
+      let documentView = enclosingScrollView.documentView,
+      documentView is NSTableView || documentView is NSCollectionView
+    {
+      return true
+    }
+    var ancestor: NSView? = view
+    while let current = ancestor {
+      if current is NSTableView || current is NSCollectionView {
+        return true
+      }
+      ancestor = current.superview
+    }
+    return false
   }
 
   func recordLocalPagingEvent(_ event: NSEvent, window: NSWindow) {
