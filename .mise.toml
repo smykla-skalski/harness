@@ -195,7 +195,7 @@ run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/carg
 
 [tasks."monitor:user:bridge:start"]
 description = "Run `harness bridge start` with the current user's isolated runtime profile"
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+run = "HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
 
 [tasks."monitor:agent"]
 description = "Print the current agent's isolated Xcode / XcodeBuildMCP profile and exact next commands"
@@ -227,7 +227,7 @@ run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-loc
 
 [tasks."monitor:agent:bridge:start"]
 description = "Run `harness bridge start` with the current agent's isolated runtime profile"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+run = "HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
 
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"

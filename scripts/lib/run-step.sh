@@ -42,6 +42,23 @@ harness_status_summary() {
   printf 'exit status %s\n' "$status"
 }
 
+harness_status_is_accepted() {
+  local status="$1" accepted raw
+  # Interactive foreground tasks can opt into treating specific signal-shaped
+  # exits as expected teardown so wrapper noise does not turn Ctrl+C into a
+  # scary task failure. Keep this opt-in at the task boundary.
+  raw="${HARNESS_RUN_STEP_ACCEPT_STATUSES:-}"
+  [[ -n "$raw" ]] || return 1
+
+  raw="${raw//,/ }"
+  for accepted in $raw; do
+    if [[ "$accepted" =~ ^[0-9]+$ ]] && (( status == accepted )); then
+      return 0
+    fi
+  done
+  return 1
+}
+
 harness_run_step() {
   local label="$1"
   shift
@@ -68,6 +85,9 @@ harness_run_step() {
   fi
 
   if (( status == 0 )); then
+    return 0
+  fi
+  if harness_status_is_accepted "$status"; then
     return 0
   fi
 

@@ -78,6 +78,23 @@ scenario_status_summary_names_signals() {
   fi
 }
 
+scenario_accepted_status_suppresses_failure_output() {
+  start_test "accepted status suppresses failure output"
+  local output status=0
+  output="$(HARNESS_RUN_STEP_ACCEPT_STATUSES="130,143" \
+    harness_run_step "interruptible bridge" bash -c 'exit 143' 2>&1)" || status=$?
+
+  if (( status != 0 )); then
+    fail "expected status 0, got $status (output: $output)"
+    return
+  fi
+  if [[ -n "$output" ]]; then
+    fail "expected no failure output for accepted status, got: $output"
+    return
+  fi
+  pass
+}
+
 scenario_cargo_local_reports_failed_cargo_command() {
   start_test "cargo-local reports failed cargo command"
   local fake_bin="$SANDBOX/bin"
@@ -114,6 +131,7 @@ EOF
 run_all() {
   scenario_failed_step_preserves_output_and_reports_reason
   scenario_status_summary_names_signals
+  scenario_accepted_status_suppresses_failure_output
   scenario_cargo_local_reports_failed_cargo_command
 }
 
