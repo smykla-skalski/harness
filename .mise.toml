@@ -221,6 +221,14 @@ run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp"
 description = "Start an isolated xcodebuildmcp MCP server for the current agent"
 run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp mcp"
 
+[tasks."monitor:agent:daemon:dev"]
+description = "Run `harness daemon dev` with the current agent's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
+
+[tasks."monitor:agent:bridge:start"]
+description = "Run `harness bridge start` with the current agent's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
 run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
