@@ -25,7 +25,7 @@ Presentation can change from modal to workspace window, but queue ownership, aud
 - `HarnessMonitorStore.applyAcpEvents` in `Stores/HarnessMonitorStore+AcpAgents.swift`: Swift-side event application boundary after decode.
 - `DaemonPushEvent.Kind.acpPermissionBatchRemoved` in `Models/HarnessMonitorDaemonPushEvent.swift`: resolved, timeout, and daemon-shutdown removals for ACP batches.
 - `AcpEventBatchPayload` in `Models/HarnessMonitorTimelineModels.swift`: confirms UI-7 coalescing stays in-process Swift code and does not require a daemon wire-format change.
-- `AcpAgentsReconciledPayload` in `Models/HarnessMonitorDaemonPushEvent.swift`: confirms reconcile snapshots already exist in-tree and remain authoritative.
+- `AcpAgentsReconciledPayload` in `Models/HarnessMonitorDaemonPushEvent.swift`: confirms reconcile snapshots already exist in-tree, remain authoritative, and may carry inline ACP inspect telemetry so runtime chrome can hydrate without waiting for a separate inspect push.
 
 ## Front-Hall Channel
 

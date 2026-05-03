@@ -209,6 +209,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
+  var acpInspectResponsesBySessionID: [String: [AcpAgentInspectResponse]] = [:]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuisDelaysBySessionID: [String: Duration] = [:]
   var agentTuiInputErrorsByID: [String: any Error] = [:]
@@ -234,6 +235,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var recordedDiagnosticsCallCount = 0
   var recordedProjectsCallCount = 0
   var recordedSessionsCallCount = 0
+  var acpInspectCallCountsBySessionID: [String: Int] = [:]
   var sessionDetailCallCountsBySessionID: [String: Int] = [:]
   var timelineCallCountsBySessionID: [String: Int] = [:]
   var timelineWindowCallCountsBySessionID: [String: Int] = [:]

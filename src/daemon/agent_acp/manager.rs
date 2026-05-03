@@ -26,6 +26,10 @@ fn default_acp_role() -> SessionRole {
     SessionRole::Worker
 }
 
+const fn default_acp_inspect_available() -> bool {
+    true
+}
+
 #[derive(Debug, Clone)]
 pub(in crate::daemon::agent_acp) struct AcpOrchestrationRegistration {
     pub agent_id: String,
@@ -130,6 +134,10 @@ pub struct AcpAgentInspectSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentInspectResponse {
     pub agents: Vec<AcpAgentInspectSnapshot>,
+    #[serde(default = "default_acp_inspect_available")]
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue_message: Option<String>,
 }
 
 #[derive(Clone)]
@@ -291,7 +299,11 @@ impl AcpAgentManagerHandle {
                 .cmp(&a.last_update_at)
                 .then_with(|| a.acp_id.cmp(&b.acp_id))
         });
-        AcpAgentInspectResponse { agents }
+        AcpAgentInspectResponse {
+            agents,
+            available: true,
+            issue_message: None,
+        }
     }
 
     /// Load one ACP session snapshot.

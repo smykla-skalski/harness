@@ -85,13 +85,18 @@ extension HarnessMonitorStore {
     }
   }
 
-  func dropAcpInspectSnapshot(acpID: String, agentID: String) {
+  func reconcileAcpInspectSnapshot(with snapshot: AcpAgentSnapshot) {
     guard let selectedAcpInspectState else {
+      return
+    }
+    let incomingIdentity = AcpRuntimeIdentity(snapshot: snapshot)
+    guard selectedAcpInspectState.snapshot(for: incomingIdentity) == nil else {
       return
     }
     self.selectedAcpInspectState = selectedAcpInspectState.filtered(
       removingMatching: { identity in
-        identity.acpID == acpID || identity.agentID == agentID
+        identity != incomingIdentity
+          && (identity.acpID == snapshot.acpId || identity.agentID == snapshot.agentId)
       }
     )
   }

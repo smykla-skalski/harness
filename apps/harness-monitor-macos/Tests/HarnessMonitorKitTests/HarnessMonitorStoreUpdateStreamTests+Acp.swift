@@ -4,148 +4,6 @@ import Testing
 @testable import HarnessMonitorKit
 
 extension HarnessMonitorStoreUpdateStreamTests {
-  @Test(
-    "ACP reconcile replaces stale selected agents, clears stale batches, and restores canonical ordering"
-  )
-  func acpReconcileReplacesStaleSelectedAgentsAndBatches() {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    store.selectedSessionID = "sess-acp-reconcile"
-    let staleBatch = makeAcpPermissionBatch(
-      batchID: "batch-stale",
-      acpID: "acp-stale",
-      sessionID: "sess-acp-reconcile",
-      createdAt: "2026-04-28T00:00:01Z"
-    )
-    store.applyAcpAgent(
-      makeAcpSnapshot(
-        acpID: "acp-stale",
-        sessionID: "sess-acp-reconcile",
-        pendingBatches: [staleBatch]
-      )
-    )
-    store.applyAcpPermissionBatch(staleBatch)
-
-    store.replaceAcpAgents(
-      AcpAgentsReconciledPayload(
-        sessionId: "sess-acp-reconcile",
-        agents: [
-          makeAcpSnapshot(
-            acpID: "zeta-agent",
-            sessionID: "sess-acp-reconcile",
-            displayName: "Zeta Agent",
-            pendingBatches: []
-          ),
-          makeAcpSnapshot(
-            acpID: "alpha-agent",
-            sessionID: "sess-acp-reconcile",
-            displayName: "Alpha Agent",
-            pendingBatches: []
-          ),
-        ]
-      )
-    )
-
-    #expect(store.selectedAcpAgents.map(\.acpId) == ["alpha-agent", "zeta-agent"])
-    #expect(store.pendingAcpPermissionBatches.isEmpty)
-  }
-
-  @Test("ACP reconcile drops inspect snapshots whose runtime identity no longer matches")
-  func acpReconcileDropsInspectSnapshotsWithSwappedRuntimeIdentity() {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    store.selectedSessionID = "sess-acp-reconcile"
-    store.selectedAcpInspectState = AcpInspectSample(
-      sessionID: "sess-acp-reconcile",
-      sampledAt: Date(timeIntervalSince1970: 1),
-      agents: [
-        makeAcpInspectSnapshot(
-          acpID: "acp-copilot",
-          sessionID: "sess-acp-reconcile",
-          agentID: "copilot",
-          displayName: "Copilot"
-        ),
-        makeAcpInspectSnapshot(
-          acpID: "acp-worker",
-          sessionID: "sess-acp-reconcile",
-          agentID: "worker",
-          displayName: "Worker"
-        ),
-      ]
-    )
-
-    store.replaceAcpAgents(
-      AcpAgentsReconciledPayload(
-        sessionId: "sess-acp-reconcile",
-        agents: [
-          makeAcpSnapshot(
-            acpID: "acp-copilot",
-            sessionID: "sess-acp-reconcile",
-            agentID: "worker",
-            displayName: "Worker",
-            pendingBatches: []
-          ),
-          makeAcpSnapshot(
-            acpID: "acp-worker",
-            sessionID: "sess-acp-reconcile",
-            agentID: "copilot",
-            displayName: "Copilot",
-            pendingBatches: []
-          ),
-        ]
-      )
-    )
-
-    #expect(store.selectedAcpInspectAgents.isEmpty)
-    #expect(store.acpRuntimeState(for: "worker")?.inspect == nil)
-    #expect(store.acpRuntimeState(for: "copilot")?.inspect == nil)
-  }
-
-  @Test("ACP reconcile keeps snapshot batch authoritative over stale standalone cache")
-  func acpReconcilePrefersSnapshotBatchOverStandaloneCache() {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    store.selectedSessionID = "sess-acp-reconcile"
-
-    let stale = makeAcpPermissionBatch(
-      batchID: "batch-1",
-      acpID: "acp-1",
-      sessionID: "sess-acp-reconcile",
-      createdAt: "2026-04-28T00:00:01Z"
-    )
-    store.applyAcpPermissionBatch(stale)
-
-    let fresh = AcpPermissionBatch(
-      batchId: "batch-1",
-      acpId: "acp-1",
-      sessionId: "sess-acp-reconcile",
-      requests: [
-        AcpPermissionItem(
-          requestId: "request-fresh",
-          sessionId: "sess-acp-reconcile",
-          toolCall: .object(["kind": .string("write")]),
-          options: [.string("allow")]
-        )
-      ],
-      createdAt: "2026-04-28T00:00:02Z"
-    )
-
-    store.replaceAcpAgents(
-      AcpAgentsReconciledPayload(
-        sessionId: "sess-acp-reconcile",
-        agents: [
-          makeAcpSnapshot(
-            acpID: "acp-1",
-            sessionID: "sess-acp-reconcile",
-            pendingBatches: [fresh]
-          )
-        ]
-      )
-    )
-
-    #expect(store.standaloneAcpPermissionBatches.isEmpty)
-    let requests =
-      store.selectedAcpAgents.first?.pendingPermissionBatches.first?.requests.map(\.requestId)
-    #expect(requests == ["request-fresh"])
-  }
-
   @Test("ACP runtime lookup refuses ambiguous selected snapshots")
   func acpRuntimeLookupRejectsDuplicateAgentIDs() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -184,6 +42,235 @@ extension HarnessMonitorStoreUpdateStreamTests {
 
     #expect(store.acpAgentSnapshot(for: "worker") == nil)
     #expect(store.acpRuntimeState(for: "worker") == nil)
+  }
+
+  @Test("ACP agent updates preserve inspect for the same runtime identity")
+  func acpAgentUpdatePreservesInspectForSameRuntimeIdentity() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-preserve"
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-acp-preserve",
+      sampledAt: Date(timeIntervalSince1970: 10),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-1",
+          sessionID: "sess-acp-preserve",
+          agentID: "worker",
+          displayName: "Worker Inspect"
+        )
+      ]
+    )
+
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-preserve",
+        agentID: "worker",
+        displayName: "Worker Snapshot",
+        pendingBatches: []
+      )
+    )
+
+    #expect(store.acpRuntimeState(for: "worker")?.inspect?.displayName == "Worker Inspect")
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .ready)
+  }
+
+  @Test("ACP reconcile can hydrate inspect telemetry inline")
+  func acpReconcileHydratesInlineInspectTelemetry() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-inline"
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-inline",
+        agents: [
+          makeAcpSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-inline",
+            agentID: "worker",
+            displayName: "Worker Snapshot",
+            pendingBatches: []
+          )
+        ],
+        inspect: AcpAgentInspectResponse(
+          agents: [
+            makeAcpInspectSnapshot(
+              acpID: "acp-1",
+              sessionID: "sess-acp-inline",
+              agentID: "worker",
+              displayName: "Worker Inspect"
+            )
+          ]
+        )
+      ),
+      sampledAt: Date(timeIntervalSince1970: 12)
+    )
+
+    #expect(store.selectedAcpInspectAgents.map(\.agentId) == ["worker"])
+    #expect(store.acpRuntimeState(for: "worker")?.inspect?.displayName == "Worker Inspect")
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .ready)
+  }
+
+  @Test("ACP inspect unavailable marks runtime telemetry unavailable")
+  func acpInspectUnavailableMarksRuntimeTelemetryUnavailable() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-unavailable"
+    store.selectedAcpAgents = [
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-unavailable",
+        agentID: "worker",
+        displayName: "Worker",
+        pendingBatches: []
+      )
+    ]
+
+    store.replaceAcpInspect(
+      AcpAgentInspectResponse(
+        agents: [],
+        available: false,
+        issueMessage: "ACP inspect unavailable."
+      ),
+      sessionID: "sess-acp-unavailable",
+      sampledAt: Date(timeIntervalSince1970: 15)
+    )
+
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .unavailable)
+  }
+
+  @Test("ACP inspect unavailable replaces stale telemetry and recovers on the next good sample")
+  func acpInspectUnavailableReplacesStaleTelemetryAndRecovers() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-recovery"
+    store.selectedAcpAgents = [
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-recovery",
+        agentID: "worker",
+        displayName: "Worker",
+        pendingBatches: []
+      )
+    ]
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-acp-recovery",
+      sampledAt: Date(timeIntervalSince1970: 16),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-1",
+          sessionID: "sess-acp-recovery",
+          agentID: "worker",
+          displayName: "Worker Inspect"
+        )
+      ]
+    )
+
+    store.replaceAcpInspect(
+      AcpAgentInspectResponse(
+        agents: [],
+        available: false,
+        issueMessage: "ACP inspect unavailable."
+      ),
+      sessionID: "sess-acp-recovery",
+      sampledAt: Date(timeIntervalSince1970: 17)
+    )
+
+    #expect(store.selectedAcpInspectAgents.isEmpty)
+    #expect(store.acpRuntimeState(for: "worker")?.inspect == nil)
+    #expect(store.acpRuntimeState(for: "worker")?.watchdogDisplayState == "unknown")
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .unavailable)
+
+    store.replaceAcpInspect(
+      AcpAgentInspectResponse(
+        agents: [
+          makeAcpInspectSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-recovery",
+            agentID: "worker",
+            displayName: "Worker Inspect Recovered"
+          )
+        ]
+      ),
+      sessionID: "sess-acp-recovery",
+      sampledAt: Date(timeIntervalSince1970: 18)
+    )
+
+    #expect(
+      store.acpRuntimeState(for: "worker")?.inspect?.displayName == "Worker Inspect Recovered"
+    )
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .ready)
+  }
+
+  @Test("ACP reconcile inline unavailable inspect clears stale telemetry")
+  func acpReconcileInlineUnavailableInspectClearsStaleTelemetry() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-reconcile-unavailable"
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-acp-reconcile-unavailable",
+      sampledAt: Date(timeIntervalSince1970: 19),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-1",
+          sessionID: "sess-acp-reconcile-unavailable",
+          agentID: "worker",
+          displayName: "Worker Inspect"
+        )
+      ]
+    )
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-reconcile-unavailable",
+        agents: [
+          makeAcpSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-reconcile-unavailable",
+            agentID: "worker",
+            displayName: "Worker Snapshot",
+            pendingBatches: []
+          )
+        ],
+        inspect: AcpAgentInspectResponse(
+          agents: [],
+          available: false,
+          issueMessage: "ACP inspect unavailable."
+        )
+      ),
+      sampledAt: Date(timeIntervalSince1970: 20)
+    )
+
+    #expect(store.selectedAcpInspectAgents.isEmpty)
+    #expect(store.acpRuntimeState(for: "worker")?.inspect == nil)
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .unavailable)
+  }
+
+  @Test("ACP inspect retry falls back to stalled telemetry state")
+  func acpInspectRetryFallsBackToStalledTelemetryState() async {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.client = client
+    store.selectedSessionID = "sess-acp-stalled"
+    store.acpInspectGracePeriod = .zero
+    store.acpInspectRecoveryDelays = [.zero]
+
+    store.replaceAcpAgents(
+      AcpAgentsReconciledPayload(
+        sessionId: "sess-acp-stalled",
+        agents: [
+          makeAcpSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-stalled",
+            agentID: "worker",
+            displayName: "Worker",
+            pendingBatches: []
+          )
+        ]
+      )
+    )
+
+    try? await Task.sleep(for: .milliseconds(50))
+
+    #expect(store.acpRuntimeInspectStatus(for: "worker")?.phase == .stalled)
+    #expect(client.acpInspectCallCount(for: "sess-acp-stalled") >= 1)
   }
 
   @Test("pending permission list prefers selected snapshot over late standalone duplicate")

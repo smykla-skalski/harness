@@ -19,6 +19,7 @@ extension HarnessMonitorStore {
           sessionId: sessionID,
           agents: measuredAgents.value.agents.compactMap(\.acp)
         ),
+        sampledAt: Date(),
         allowAutoPresentation: shouldAutoPresentHydratedAcpPermissions()
       )
       return true
@@ -45,23 +46,35 @@ extension HarnessMonitorStore {
 
   func refreshAcpInspect(
     using client: any HarnessMonitorClientProtocol,
-    sessionID: String
+    sessionID: String,
+    shouldScheduleRecovery: Bool = true
   ) async -> Bool {
     do {
       let measuredInspect = try await Self.measureOperation {
         try await client.acpInspect(sessionID: sessionID)
       }
-      recordRequestSuccess()
-      clearHostBridgeIssue(for: "acp")
       guard selectedSessionID == sessionID else {
         return true
+      }
+      if measuredInspect.value.available {
+        recordRequestSuccess()
+        clearHostBridgeIssue(for: "acp")
+      } else if daemonStatus?.manifest?.sandboxed == true {
+        markHostBridgeIssue(for: "acp", statusCode: 503)
+        HarnessMonitorLogger.store.info(
+          """
+          managed ACP inspect unavailable: \
+          \(measuredInspect.value.issueMessage ?? self.acpHostBridgeFailureMessage(), privacy: .public)
+          """
+        )
       }
       replaceAcpInspect(
         measuredInspect.value,
         sessionID: sessionID,
-        sampledAt: Date()
+        sampledAt: Date(),
+        shouldScheduleRecovery: shouldScheduleRecovery
       )
-      return true
+      return measuredInspect.value.available
     } catch {
       guard selectedSessionID == sessionID else {
         return false

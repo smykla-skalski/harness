@@ -313,7 +313,10 @@ extension HarnessMonitorStore {
         sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
       )
     case .acpAgentsReconciled(let payload):
-      replaceAcpAgents(payload)
+      replaceAcpAgents(
+        payload,
+        sampledAt: Self.acpInspectSampledAt(from: event.recordedAt)
+      )
     case .acpEvents(let payload):
       applyAcpEvents(payload, recordedAt: event.recordedAt)
     case .acpProcessIncident(let payload):

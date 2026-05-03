@@ -41,7 +41,11 @@ extension HarnessMonitorStore {
       ),
       into: selectedAcpAgents
     )
-    dropAcpInspectSnapshot(acpID: snapshot.acpId, agentID: snapshot.agentId)
+    reconcileAcpInspectSnapshot(with: snapshot)
+    reconcileAcpInspectSyncState(
+      sessionID: snapshot.sessionId,
+      activeAgents: selectedAcpAgents
+    )
     reconcilePresentedAcpPermissionBatch()
     reconcileAcpPermissionDecisions()
     return AcpAgentApplyOutcome.applied
@@ -49,7 +53,9 @@ extension HarnessMonitorStore {
 
   func replaceAcpAgents(
     _ payload: AcpAgentsReconciledPayload,
-    allowAutoPresentation: Bool = true
+    sampledAt: Date? = nil,
+    allowAutoPresentation: Bool = true,
+    shouldScheduleRecovery: Bool = true
   ) {
     guard payload.sessionId == selectedSessionID else {
       return
@@ -72,9 +78,24 @@ extension HarnessMonitorStore {
         }
       )
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
+    if let inspect = payload.inspect {
+      replaceAcpInspect(
+        inspect,
+        sessionID: payload.sessionId,
+        sampledAt: sampledAt ?? .now,
+        shouldScheduleRecovery: false
+      )
+    }
     reconcileAcpInspectState(
       sessionID: payload.sessionId,
       activeAgents: selectedAcpAgents
+    )
+    reconcileAcpInspectSyncState(
+      sessionID: payload.sessionId,
+      activeAgents: selectedAcpAgents,
+      response: payload.inspect,
+      sampledAt: sampledAt ?? .now,
+      shouldScheduleRecovery: shouldScheduleRecovery
     )
     reconcilePresentedAcpPermissionBatch(
       allowAutoPresentation: allowAutoPresentation || hadPresentedBatch
@@ -85,18 +106,27 @@ extension HarnessMonitorStore {
   func replaceAcpInspect(
     _ response: AcpAgentInspectResponse,
     sessionID: String,
-    sampledAt: Date
+    sampledAt: Date,
+    shouldScheduleRecovery: Bool = true
   ) {
     guard sessionID == selectedSessionID else {
       return
     }
     noteAcpSessionActivity(sessionID: sessionID, at: sampledAt)
-    selectedAcpInspectState = AcpInspectSample(
+    let nextSample = AcpInspectSample(
       sessionID: sessionID,
       sampledAt: sampledAt,
       agents: sortedAcpInspectSnapshots(
         response.agents.filter { $0.sessionId == sessionID }
       )
+    )
+    selectedAcpInspectState = nextSample
+    reconcileAcpInspectSyncState(
+      sessionID: sessionID,
+      activeAgents: selectedAcpAgents,
+      response: response,
+      sampledAt: sampledAt,
+      shouldScheduleRecovery: shouldScheduleRecovery
     )
   }
 
@@ -213,6 +243,8 @@ extension HarnessMonitorStore {
   func resetSelectedAcpAgents() {
     selectedAcpAgents = []
     selectedAcpInspectState = nil
+    selectedAcpInspectSyncEntries = [:]
+    cancelAcpInspectRecovery()
     liveToolCallAnnouncementRowIDs = []
     toolCallTimelineOverflowNotice = nil
     standaloneAcpPermissionBatches = []

@@ -301,6 +301,30 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
 public struct AcpAgentsReconciledPayload: Codable, Equatable, Sendable {
   public let sessionId: String
   public let agents: [AcpAgentSnapshot]
+  public let inspect: AcpAgentInspectResponse?
+
+  public init(
+    sessionId: String,
+    agents: [AcpAgentSnapshot],
+    inspect: AcpAgentInspectResponse? = nil
+  ) {
+    self.sessionId = sessionId
+    self.agents = agents
+    self.inspect = inspect
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case sessionId
+    case agents
+    case inspect
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    sessionId = try container.decode(String.self, forKey: .sessionId)
+    agents = try container.decode([AcpAgentSnapshot].self, forKey: .agents)
+    inspect = try container.decodeIfPresent(AcpAgentInspectResponse.self, forKey: .inspect)
+  }
 }
 
 private struct AcpInspectPushPayload: Codable, Equatable, Sendable {

@@ -95,6 +95,10 @@ struct AgentDetailSection: View {
     store.acpRuntimeState(for: agent.agentId)
   }
 
+  private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
+    store.acpRuntimeInspectStatus(for: agent.agentId)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       if let pendingDecisionAttention {
@@ -123,8 +127,8 @@ struct AgentDetailSection: View {
           value: agent.agentId
         )
       }
-      if let acpRuntimeState {
-        runtimeView(runtimeState: acpRuntimeState)
+      if let acpRuntimeState, let acpRuntimeInspectStatus {
+        runtimeView(runtimeState: acpRuntimeState, inspectStatus: acpRuntimeInspectStatus)
       }
       Text(agent.name)
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
@@ -345,9 +349,13 @@ struct AgentDetailSection: View {
   }
 
   @ViewBuilder
-  private func runtimeView(runtimeState: AcpAgentRuntimeState) -> some View {
+  private func runtimeView(
+    runtimeState: AcpAgentRuntimeState,
+    inspectStatus: AcpRuntimeInspectStatus
+  ) -> some View {
     AcpRuntimeView(
       runtimeState: runtimeState,
+      inspectStatus: inspectStatus,
       presentation: runtimePresentation
     )
   }

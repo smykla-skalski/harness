@@ -3,6 +3,10 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  private func acpInspectResponseKey(_ sessionID: String?) -> String {
+    sessionID ?? "__all__"
+  }
+
   func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { projectSummariesStorage } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { sessionSummariesStorage } }
@@ -45,6 +49,29 @@ extension RecordingHarnessClient {
 
   func configuredCodexRunsDelay(for sessionID: String) -> Duration? {
     lock.withLock { codexRunsDelaysBySessionID[sessionID] }
+  }
+
+  func dequeueConfiguredAcpInspectResponse(for sessionID: String?) -> AcpAgentInspectResponse? {
+    lock.withLock {
+      let key = acpInspectResponseKey(sessionID)
+      guard var responses = acpInspectResponsesBySessionID[key], !responses.isEmpty else {
+        return nil
+      }
+      let response = responses.removeFirst()
+      acpInspectResponsesBySessionID[key] = responses
+      return response
+    }
+  }
+
+  func recordAcpInspectCall(for sessionID: String?) {
+    lock.withLock {
+      let key = acpInspectResponseKey(sessionID)
+      acpInspectCallCountsBySessionID[key, default: 0] += 1
+    }
+  }
+
+  func acpInspectCallCount(for sessionID: String?) -> Int {
+    lock.withLock { acpInspectCallCountsBySessionID[acpInspectResponseKey(sessionID), default: 0] }
   }
 
   func configuredAgentTuis(for sessionID: String) -> [AgentTuiSnapshot] {
