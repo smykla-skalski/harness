@@ -374,8 +374,36 @@ extension DaemonController {
     guard state.signaledManagedRecoveryManifestSignature != signature else {
       return
     }
+    guard refuseCrossProfileSignalIfNeeded(manifest: manifest) == false else {
+      state.signaledManagedRecoveryManifestSignature = signature
+      return
+    }
     state.signaledManagedRecoveryManifestSignature = signature
     Self.signalProcessToExit(pid: manifest.pid)
+  }
+
+  /// Defense-in-depth: refuse to SIGTERM a daemon whose on-disk root
+  /// belongs to a different profile family than the current process.
+  /// Returns `true` when the signal was refused. Mirrors the daemon-side
+  /// `families_compatible` check in `crate::daemon::discovery`.
+  func refuseCrossProfileSignalIfNeeded(manifest: DaemonManifest) -> Bool {
+    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+    let manifestRoot = manifestURL.deletingLastPathComponent()
+    let ownFamily = HarnessMonitorPaths.ownProfileFamily(using: environment)
+    let manifestFamily = HarnessMonitorPaths.profileFamily(forRoot: manifestRoot)
+    guard
+      HarnessMonitorProfileFamily.compatible(ownFamily, manifestFamily) == false
+    else {
+      return false
+    }
+    HarnessMonitorLogger.lifecycle.warning(
+      """
+      Refusing cross-profile SIGTERM to daemon \
+      pid=\(manifest.pid, privacy: .public) \
+      manifest_root=\(manifestRoot.path, privacy: .public)
+      """
+    )
+    return true
   }
 
 }

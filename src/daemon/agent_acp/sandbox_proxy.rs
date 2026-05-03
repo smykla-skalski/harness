@@ -12,7 +12,9 @@ use crate::daemon::service;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
 
-use super::manager::{AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot};
+use super::manager::{
+    AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentReconcileResponse, AcpAgentSnapshot,
+};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 mod incidents;
 use incidents::{
@@ -166,15 +168,19 @@ impl AcpAgentManagerHandle {
                             truncated = response.truncated,
                             "ACP bridge event continuity changed; forcing authoritative resync"
                         );
-                        let inspect = bridge.acp_inspect(None);
-                        let affected_logical_session_ids = inspect.as_ref().map_or_else(
-                            |_| {
-                                self.sandbox_known_sessions()
-                                    .into_iter()
-                                    .collect::<Vec<_>>()
-                            },
-                            |value| reconcile_sessions(self.sandbox_known_sessions(), value),
-                        );
+                        let reconcile = match bridge.acp_reconcile() {
+                            Ok(reconcile) => reconcile,
+                            Err(error) => {
+                                tracing::warn!(
+                                    %error,
+                                    "ACP sandbox reconcile batch fetch failed; retrying"
+                                );
+                                thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
+                                continue;
+                            }
+                        };
+                        let affected_logical_session_ids =
+                            reconcile_sessions(self.sandbox_known_sessions(), &reconcile.inspect);
                         let payload = bridge_resync_incident_payload(
                             response_epoch.clone(),
                             response_continuity,
@@ -187,25 +193,8 @@ impl AcpAgentManagerHandle {
                             emit_bridge_resync_incident(&self.sender(), &payload);
                             last_protocol_desync = Some(current_desync);
                         }
-                        match self.reconcile_sandbox_state(
-                            &bridge,
-                            inspect.ok(),
-                            &mut last_pool_key_mismatch,
-                        ) {
-                            Ok(true) => idle_polls = 0,
-                            Ok(false) => {
-                                tracing::warn!(
-                                    "ACP sandbox reconcile incomplete after snapshot fetch failures; retrying without cursor advance"
-                                );
-                                thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
-                                continue;
-                            }
-                            Err(error) => {
-                                tracing::warn!(%error, "ACP sandbox reconcile failed; retrying");
-                                thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
-                                continue;
-                            }
-                        }
+                        self.apply_sandbox_reconcile(reconcile, &mut last_pool_key_mismatch);
+                        idle_polls = 0;
                         // After authoritative reconcile, replay only timeline batches.
                         // State-mutating ACP events can be stale relative to reconcile.
                         replay_events =
@@ -230,42 +219,23 @@ impl AcpAgentManagerHandle {
         }
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "sandbox ACP reconcile must merge snapshot fetch failures with session fanout"
-    )]
-    fn reconcile_sandbox_state(
+    fn apply_sandbox_reconcile(
         &self,
-        bridge: &BridgeClient,
-        inspect: Option<AcpAgentInspectResponse>,
+        reconcile: AcpAgentReconcileResponse,
         last_pool_key_mismatch: &mut BTreeMap<String, Vec<String>>,
-    ) -> Result<bool, CliError> {
-        let inspect = inspect.unwrap_or(bridge.acp_inspect(None)?);
+    ) {
+        let AcpAgentReconcileResponse { inspect, agents } = reconcile;
         let mut agents_by_session = BTreeMap::<String, Vec<AcpAgentSnapshot>>::new();
-        let mut current_sessions = BTreeSet::new();
-        let mut had_fetch_failures = false;
-        for agent in &inspect.agents {
-            current_sessions.insert(agent.session_id.clone());
-            match bridge.acp_get(&agent.acp_id) {
-                Ok(snapshot) => {
-                    agents_by_session
-                        .entry(snapshot.session_id.clone())
-                        .or_default()
-                        .push(snapshot);
-                }
-                Err(error) => {
-                    had_fetch_failures = true;
-                    tracing::warn!(
-                        %error,
-                        session_id = %agent.session_id,
-                        acp_id = %agent.acp_id,
-                        "ACP sandbox reconcile skipped one agent after snapshot fetch failed"
-                    );
-                }
-            }
-        }
-        if had_fetch_failures {
-            return Ok(false);
+        let current_sessions = inspect
+            .agents
+            .iter()
+            .map(|agent| agent.session_id.clone())
+            .collect::<BTreeSet<_>>();
+        for snapshot in agents {
+            agents_by_session
+                .entry(snapshot.session_id.clone())
+                .or_default()
+                .push(snapshot);
         }
         for session_id in &current_sessions {
             let process_keys = distinct_process_keys_for_session(&inspect, session_id);
@@ -293,7 +263,6 @@ impl AcpAgentManagerHandle {
             }
         }
         self.set_sandbox_known_sessions(current_sessions);
-        Ok(true)
     }
 
     fn remember_sandbox_session(&self, session_id: &str) {

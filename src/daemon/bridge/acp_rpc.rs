@@ -22,6 +22,9 @@ pub(super) struct BridgeAcpInspectRequest {
     pub(super) session_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub(super) struct BridgeAcpReconcileRequest {}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct BridgeAcpGetRequest {
     pub(super) acp_id: String,

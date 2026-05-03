@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
+use tokio::time::{Interval, interval, sleep};
 
 use crate::daemon::state;
 use crate::errors::CliError;
@@ -109,12 +110,48 @@ pub fn spawn_manifest_watcher() -> JoinHandle<()> {
     })
 }
 
+/// Fallback poll interval that catches host-bridge state changes the
+/// filesystem watcher misses. The watcher only sees events on the
+/// daemon's own root (`RecursiveMode::NonRecursive`), so a sibling
+/// bridge that lands at a family-compatible cross-root via
+/// `host_bridge_manifest_with_discovery` does not raise an event here.
+/// Without a periodic refresh the daemon would publish a stale
+/// `host_bridge.running=false` until the next unrelated event.
+const MANIFEST_REFRESH_TICK: Duration = Duration::from_secs(5);
+
 async fn run_manifest_watcher() {
     let Some((_daemon_root, _watcher, mut event_rx)) = manifest_watcher_parts() else {
         return;
     };
     apply_bridge_state_to_manifest();
-    drive_manifest_watcher(&mut event_rx).await;
+    let mut tick = interval(MANIFEST_REFRESH_TICK);
+    tick.tick().await;
+    drive_manifest_watcher(&mut event_rx, &mut tick).await;
+}
+
+async fn drive_manifest_watcher(
+    event_rx: &mut mpsc::Receiver<notify::Result<notify::Event>>,
+    tick: &mut Interval,
+) {
+    loop {
+        tokio::select! {
+            event = event_rx.recv() => {
+                if event.is_none() {
+                    return;
+                }
+                handle_watcher_event(event_rx).await;
+            }
+            _ = tick.tick() => {
+                apply_bridge_state_to_manifest();
+            }
+        }
+    }
+}
+
+async fn handle_watcher_event(event_rx: &mut mpsc::Receiver<notify::Result<notify::Event>>) {
+    sleep(WATCH_DEBOUNCE).await;
+    while event_rx.try_recv().is_ok() {}
+    apply_bridge_state_to_manifest();
 }
 
 enum ManifestWatcherSetupError {
@@ -157,14 +194,6 @@ fn setup_manifest_watcher() -> Result<
     let watcher = build_manifest_watcher(&daemon_root, event_tx)
         .ok_or(ManifestWatcherSetupError::WatcherUnavailable)?;
     Ok((daemon_root, watcher, event_rx))
-}
-
-async fn drive_manifest_watcher(event_rx: &mut mpsc::Receiver<notify::Result<notify::Event>>) {
-    while event_rx.recv().await.is_some() {
-        sleep(WATCH_DEBOUNCE).await;
-        while event_rx.try_recv().is_ok() {}
-        apply_bridge_state_to_manifest();
-    }
 }
 
 fn ensure_watcher_root() -> Option<PathBuf> {
