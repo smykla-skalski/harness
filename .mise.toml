@@ -139,23 +139,39 @@ run = "./scripts/cargo-local.sh --print-env"
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
 run = "apps/harness-monitor-macos/Scripts/generate.sh"
 
+[tasks."monitor:user:generate"]
+description = "Generate the Harness Monitor macOS Xcode project with the current user's isolated runtime profile"
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh"
+
 [tasks."monitor:user:profile"]
 description = "Print the personal Harness Monitor runtime profile, DerivedData root, daemon root, port, and launch-agent label"
 run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
 
 [tasks."monitor:user"]
 description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile and print the exact next commands"
-run = [
-  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh",
-  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh",
-]
+depends = ["monitor:user:generate"]
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
 
 [tasks."monitor:user:bootstrap"]
 description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile"
-run = [
-  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh",
-  "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh",
-]
+depends = ["monitor:user:generate"]
+run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
+
+[tasks."monitor:user:xcode-native"]
+description = "Ensure the xcode-native Xcode MCP bridge is installed, healthy, and attached to the current user workspace"
+run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh"
+
+[tasks."monitor:user:xcode-native:status"]
+description = "Show xcode-native bridge launchd and health status"
+run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh status"
+
+[tasks."monitor:user:xcode-native:restart"]
+description = "Rebind the xcode-native Xcode MCP bridge against the current Xcode session"
+run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh restart"
+
+[tasks."monitor:user:xcode-native:logs"]
+description = "Show recent xcode-native bridge logs (pass extra xcode-cli-ctl logs args after --)"
+run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh logs"
 
 [tasks."monitor:xcodebuild"]
 description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"
