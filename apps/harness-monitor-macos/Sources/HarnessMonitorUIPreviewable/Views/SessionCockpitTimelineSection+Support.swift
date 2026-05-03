@@ -47,6 +47,40 @@ struct SessionTimelineContentIdentity: Hashable {
   let sessionID: String
 }
 
+enum SessionTimelinePresentationRetention {
+  static func shouldRetainPreviousPresentation(
+    previousPresentation: SessionTimelineSectionPresentation,
+    previousInput: SessionTimelinePresentationInput,
+    nextPresentation: SessionTimelineSectionPresentation,
+    nextInput: SessionTimelinePresentationInput
+  ) -> Bool {
+    guard previousInput.sessionID == nextInput.sessionID else {
+      return false
+    }
+    guard !previousPresentation.rows.isEmpty, nextPresentation.rows.isEmpty else {
+      return false
+    }
+    return nextInput.isTimelineLoading || nextPresentation.showsEmptyState
+  }
+
+  static func resolved(
+    previousPresentation: SessionTimelineSectionPresentation,
+    previousInput: SessionTimelinePresentationInput,
+    nextPresentation: SessionTimelineSectionPresentation,
+    nextInput: SessionTimelinePresentationInput
+  ) -> SessionTimelineSectionPresentation {
+    if shouldRetainPreviousPresentation(
+      previousPresentation: previousPresentation,
+      previousInput: previousInput,
+      nextPresentation: nextPresentation,
+      nextInput: nextInput
+    ) {
+      return previousPresentation
+    }
+    return nextPresentation
+  }
+}
+
 enum SessionTimelinePlaceholderShimmer {
   static let cycleDuration: TimeInterval = 1.8
   static let restingPhase: CGFloat = -0.6
