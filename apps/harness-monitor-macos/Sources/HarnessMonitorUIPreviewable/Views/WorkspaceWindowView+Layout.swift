@@ -48,7 +48,6 @@ extension WorkspaceWindowView {
         store: store,
         selection: selection,
         decisionFilters: decisionFiltersBinding,
-        columnVisibility: columnVisibilityBinding,
         isStartupFocusParticipationEnabled: startupFocusParticipationEnabled,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,
