@@ -1,4 +1,5 @@
 mod audit;
+mod config;
 mod locks;
 mod manifest;
 mod paths;

@@ -85,7 +85,7 @@ pub fn diagnostics_report(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
     let manifest = state::load_manifest()?.map(|mut m| {
-        if let Ok(live_bridge) = bridge::host_bridge_manifest() {
+        if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
             m.host_bridge = live_bridge;
         }
         m
@@ -123,7 +123,7 @@ pub(crate) async fn diagnostics_report_async(
         ))
     })?;
     let manifest = state::load_manifest()?.map(|mut m| {
-        if let Ok(live_bridge) = bridge::host_bridge_manifest() {
+        if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
             m.host_bridge = live_bridge;
         }
         m
@@ -204,8 +204,6 @@ pub fn request_shutdown() -> Result<DaemonControlResponse, CliError> {
     })
 }
 
-const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error"];
-
 pub(crate) fn current_log_level() -> String {
     crate::log_filter_handle().map_or_else(
         || crate::DEFAULT_LOG_LEVEL.to_string(),
@@ -213,7 +211,7 @@ pub(crate) fn current_log_level() -> String {
             handle
                 .with_current(|filter| {
                     let filter_string = filter.to_string();
-                    for level in VALID_LOG_LEVELS {
+                    for level in state::VALID_LOG_LEVELS {
                         if filter_string.contains(level) {
                             return (*level).to_string();
                         }
@@ -242,17 +240,23 @@ pub fn get_log_level() -> Result<LogLevelResponse, CliError> {
 }
 
 pub(crate) fn validate_and_reload_filter(level: &str) -> Result<LogLevelResponse, CliError> {
-    let handle = crate::log_filter_handle()
-        .ok_or_else(|| CliErrorKind::workflow_io("log filter handle unavailable"))?;
     let directive = format!("harness={level}");
-    let new_filter = tracing_subscriber::EnvFilter::new(&directive);
-    handle
-        .reload(new_filter)
-        .map_err(|error| CliErrorKind::workflow_io(format!("reload log filter: {error}")))?;
+    reload_filter(&directive)?;
     Ok(LogLevelResponse {
         level: level.to_string(),
         filter: directive,
     })
+}
+
+fn reload_filter(directive: &str) -> Result<(), CliError> {
+    let handle = crate::log_filter_handle()
+        .ok_or_else(|| CliErrorKind::workflow_io("log filter handle unavailable"))?;
+    let filter = tracing_subscriber::EnvFilter::try_new(directive).map_err(|error| {
+        CliErrorKind::workflow_parse(format!("parse log filter '{directive}': {error}"))
+    })?;
+    handle
+        .reload(filter)
+        .map_err(|error| CliErrorKind::workflow_io(format!("reload log filter: {error}")).into())
 }
 
 /// Update the daemon log level at runtime.
@@ -267,17 +271,20 @@ pub fn set_log_level(
     request: &SetLogLevelRequest,
     sender: &broadcast::Sender<StreamEvent>,
 ) -> Result<LogLevelResponse, CliError> {
-    let level = request.level.to_lowercase();
-    if !VALID_LOG_LEVELS.contains(&level.as_str()) {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "invalid log level '{}', expected one of: {}",
-            request.level,
-            VALID_LOG_LEVELS.join(", ")
-        ))
-        .into());
-    }
+    let level = state::parse_log_level(&request.level)?;
 
+    let previous = get_log_level()?;
     let response = validate_and_reload_filter(&level)?;
+    if let Err(error) = state::persist_log_level(Some(&level)) {
+        let rollback = reload_filter(&previous.filter);
+        return Err(match rollback {
+            Ok(()) => error,
+            Err(rollback_error) => CliErrorKind::workflow_io(format!(
+                "persist daemon log level: {error}; restore previous log filter: {rollback_error}"
+            ))
+            .into(),
+        });
+    }
 
     let payload = serde_json::to_value(&response).unwrap_or_default();
     let event = StreamEvent {

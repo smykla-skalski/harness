@@ -111,21 +111,14 @@ extension DaemonController {
       return nil
     }
     if let pendingRefresh = state.pendingBundleStampRefresh {
-      let currentStamp = try managedLaunchAgentCurrentBundleStamp()
-      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp
-      if publishedStamp == currentStamp {
-        state.pendingBundleStampRefresh = nil
-        return nil
-      }
       return pendingRefresh
     }
     guard launchAgentManager.registrationState() == .enabled else {
       return nil
     }
     guard
-      let publishedStamp = manifest.binaryStamp?.managedLaunchAgentBundleStamp,
       let currentStamp = try managedLaunchAgentCurrentBundleStamp(),
-      publishedStamp != currentStamp
+      currentStamp.matchesPublishedDaemonBinaryStamp(manifest.binaryStamp) == false
     else {
       return nil
     }
@@ -158,7 +151,7 @@ extension DaemonController {
       return false
     }
     HarnessMonitorLogger.lifecycle.notice(
-      "Bundled managed daemon helper changed and no healthy daemon is available; refreshing launch agent"
+      "Bundled managed daemon launch-agent assets changed and no healthy daemon is available; refreshing launch agent"
     )
     try refreshManagedLaunchAgent(currentStamp: currentStamp)
     state.pendingBundleStampRefresh = nil

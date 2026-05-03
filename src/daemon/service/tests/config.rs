@@ -1,5 +1,10 @@
 use super::*;
 
+static LOG_FILTER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static TEST_LOG_FILTER_LAYER: OnceLock<
+    tracing_subscriber::reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+> = OnceLock::new();
+
 #[test]
 fn daemon_serve_config_default_is_unsandboxed() {
     let config = DaemonServeConfig::default();
@@ -9,18 +14,23 @@ fn daemon_serve_config_default_is_unsandboxed() {
 
 fn with_isolated_transport_env<F: FnOnce()>(ws_url: Option<&str>, f: F) {
     let tmp = tempfile::tempdir().expect("tempdir");
-    temp_env::with_vars(
-        [
-            (
-                "HARNESS_DAEMON_DATA_HOME",
-                Some(tmp.path().to_str().expect("utf8 path")),
-            ),
-            ("HARNESS_APP_GROUP_ID", None),
-            ("HARNESS_CODEX_WS_URL", ws_url),
-            ("XDG_DATA_HOME", None),
-        ],
-        f,
+    with_isolated_harness_env(tmp.path(), || {
+        temp_env::with_var("HARNESS_CODEX_WS_URL", ws_url, f)
+    });
+}
+
+fn ensure_test_log_filter_handle() {
+    if crate::log_filter_handle().is_some() {
+        return;
+    }
+
+    let (layer, handle) = tracing_subscriber::reload::Layer::new(
+        tracing_subscriber::EnvFilter::new(crate::DEFAULT_LOG_FILTER_DIRECTIVE),
     );
+    TEST_LOG_FILTER_LAYER
+        .set(layer)
+        .expect("test log filter layer already initialized");
+    crate::set_log_filter_handle(handle);
 }
 
 #[test]
@@ -106,5 +116,51 @@ fn sandboxed_from_env_rejects_falsy_and_unset_values() {
 
 #[test]
 fn current_log_level_defaults_to_info_when_handle_is_unavailable() {
+    let _guard = LOG_FILTER_TEST_LOCK.lock().expect("log filter test lock");
+    ensure_test_log_filter_handle();
+    super::status::validate_and_reload_filter(crate::DEFAULT_LOG_LEVEL).expect("reset log filter");
     assert_eq!(current_log_level(), crate::DEFAULT_LOG_LEVEL);
+}
+
+#[test]
+fn set_log_level_repairs_malformed_runtime_config() {
+    let _guard = LOG_FILTER_TEST_LOCK.lock().expect("log filter test lock");
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        ensure_test_log_filter_handle();
+        super::status::validate_and_reload_filter(crate::DEFAULT_LOG_LEVEL)
+            .expect("reset log filter");
+        state::ensure_daemon_dirs().expect("ensure daemon dirs");
+        fs::write(state::config_path(), "{not-json").expect("write malformed config");
+
+        let (sender, _) = broadcast::channel(8);
+        let response = set_log_level(
+            &SetLogLevelRequest {
+                level: "debug".into(),
+            },
+            &sender,
+        )
+        .expect("repair malformed config via set_log_level");
+
+        assert_eq!(response.level, "debug");
+        assert_eq!(response.filter, "harness=debug");
+        assert_eq!(
+            state::load_runtime_config().expect("load repaired runtime config"),
+            Some(state::DaemonRuntimeConfig {
+                log_level: Some("debug".into()),
+            })
+        );
+
+        let events = state::read_recent_events(2).expect("read daemon events");
+        assert!(events.iter().any(|event| {
+            event.level == "warn"
+                && event
+                    .message
+                    .contains("replacing invalid daemon runtime config")
+        }));
+        assert!(
+            events.iter().any(|event| event.level == "info"
+                && event.message.contains("log level changed to debug"))
+        );
+    });
 }

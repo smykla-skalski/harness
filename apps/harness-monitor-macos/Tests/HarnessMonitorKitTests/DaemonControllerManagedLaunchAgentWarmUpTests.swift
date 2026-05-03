@@ -7,6 +7,9 @@ import Testing
 private let managedLaunchAgentHelperPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
   + "Harness Monitor.app/Contents/Helpers/harness"
+private let managedLaunchAgentPlistPathFixture =
+  "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
+  + "Harness Monitor.app/Contents/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
 
 @Suite("Daemon controller managed launch-agent warm-up")
 struct DaemonControllerManagedLaunchAgentWarmUpTests {
@@ -137,6 +140,79 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         #expect(manager.unregisterCallCount == 1)
         #expect(manager.registerCallCount == 1)
         #expect(await probedEndpoints.values() == [staleEndpoint, liveEndpoint])
+      }
+    }
+  }
+
+  @Test(
+    "awaitManifestWarmUp defers a managed launch-agent refresh when only the bundled plist changed"
+  )
+  func awaitManifestWarmUpDefersRefreshWhenOnlyBundledPlistChanged() async throws {
+    let currentStamp = ManagedLaunchAgentBundleStampFixture(
+      helperPath: managedLaunchAgentHelperPathFixture,
+      deviceIdentifier: 99,
+      inode: 128,
+      fileSize: 32_768,
+      modificationTimeIntervalSince1970: 1_714_000_000,
+      launchAgentPlistPath: managedLaunchAgentPlistPathFixture,
+      launchAgentPlistDeviceIdentifier: 99,
+      launchAgentPlistInode: 256,
+      launchAgentPlistFileSize: 2_048,
+      launchAgentPlistModificationTimeIntervalSince1970: 1_714_500_000
+    )
+    let stalePersistedStamp = ManagedLaunchAgentBundleStampFixture(
+      helperPath: managedLaunchAgentHelperPathFixture,
+      deviceIdentifier: 99,
+      inode: 128,
+      fileSize: 32_768,
+      modificationTimeIntervalSince1970: 1_714_000_000,
+      launchAgentPlistPath: managedLaunchAgentPlistPathFixture,
+      launchAgentPlistDeviceIdentifier: 99,
+      launchAgentPlistInode: 256,
+      launchAgentPlistFileSize: 1_024,
+      launchAgentPlistModificationTimeIntervalSince1970: 1_713_500_000
+    )
+    let liveEndpoint = "http://127.0.0.1:65531"
+
+    try await withSignalIgnoringSleepProcessPID { livePID in
+      try await withTempDaemonFixture(
+        pid: livePID,
+        endpoint: liveEndpoint,
+        binaryStamp: DaemonBinaryStampFixture(
+          helperPath: currentStamp.helperPath,
+          deviceIdentifier: currentStamp.deviceIdentifier,
+          inode: currentStamp.inode,
+          fileSize: currentStamp.fileSize,
+          modificationTimeIntervalSince1970: currentStamp.modificationTimeIntervalSince1970
+        )
+      ) { environment in
+        let client = PreviewHarnessClient()
+        try writeManagedLaunchAgentBundleStampFixture(stalePersistedStamp, environment: environment)
+        let manager = RecordingLaunchAgentManager(state: .enabled)
+        let probedEndpoints = EndpointProbeRecorder()
+        let controller = DaemonController(
+          environment: environment,
+          launchAgentManager: manager,
+          ownership: .managed,
+          sessionFactory: { _ in client },
+          endpointProbe: { endpoint in
+            await probedEndpoints.record(endpoint.absoluteString)
+            return endpoint.absoluteString == liveEndpoint
+          },
+          managedLaunchAgentCurrentBundleStamp: {
+            currentStamp.managedLaunchAgentBundleStamp
+          }
+        )
+
+        let bootstrappedClient = try await controller.awaitManifestWarmUp(timeout: .seconds(1))
+
+        #expect(bootstrappedClient as AnyObject === client as AnyObject)
+        #expect(manager.unregisterCallCount == 0)
+        #expect(manager.registerCallCount == 0)
+        #expect(await controller.performDeferredManagedLaunchAgentRefreshIfNeeded() == true)
+        #expect(manager.unregisterCallCount == 1)
+        #expect(manager.registerCallCount == 1)
+        #expect(await probedEndpoints.values() == [liveEndpoint])
       }
     }
   }

@@ -120,7 +120,7 @@ extension DaemonController {
           state.pendingBundleStampRefresh = nil
           HarnessMonitorLogger.lifecycle.notice(
             """
-            Managed daemon helper changed, but current daemon is healthy; \
+            Managed daemon launch-agent assets changed, but current daemon is healthy; \
             deferring launch-agent refresh until app inactivity
             """
           )

@@ -49,7 +49,7 @@ public struct PreferencesLoggingSection: View {
       .harnessNativeFormControl()
       .disabled(store.connectionState != .online)
       .accessibilityHint(
-        "Changes the daemon logging threshold until the daemon restarts"
+        "Changes the daemon logging threshold and persists across daemon restarts"
       )
       .accessibilityIdentifier("harness.preferences.daemon.logLevel")
 
@@ -67,7 +67,7 @@ public struct PreferencesLoggingSection: View {
       Text("Logging")
     } footer: {
       Text(
-        "Daemon logging updates the running harness process and resets on daemon restart."
+        "Daemon logging updates the running harness process and persists across daemon restarts."
           + " Supervisor logging controls app-local diagnostics and persists between launches."
       )
       .accessibilityIdentifier("harness.preferences.footer.logging")
