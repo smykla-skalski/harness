@@ -1,6 +1,11 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct WorkspaceDecisionReloadRepair: Equatable {
+  let selection: WorkspaceSelection?
+  let supervisorSelectedDecisionID: String?
+}
+
 extension WorkspaceWindowView {
   func focusDecisionDesk() {
     applyProgrammaticSelection(
@@ -86,17 +91,16 @@ extension WorkspaceWindowView {
   }
 
   func reloadDecisions() async {
+    let previousSelection = viewModel.selection
+    let previousVisibleDecisionIDs = cachedDecisionWorkspaceSnapshot.visibleDecisionIDs
+    let requestedDecisionID = store.supervisorSelectedDecisionID
     await currentDecisionsRuntime.reload(from: store)
     refreshDecisionWorkspaceSnapshot()
-    if viewModel.selection.isDecisionRoute,
-      let decisionID = viewModel.selection.decisionID,
-      !decisionItems.contains(where: { $0.id == decisionID })
-    {
-      applyProgrammaticSelection(
-        .decisions(sessionID: viewModel.selection.sessionID ?? store.selectedSessionID),
-        recordHistory: false
-      )
-    }
+    reconcileDecisionRouteAfterReload(
+      previousSelection: previousSelection,
+      previousVisibleDecisionIDs: previousVisibleDecisionIDs,
+      requestedDecisionID: requestedDecisionID
+    )
   }
 
   func refreshDecisionWorkspaceSnapshot() {
@@ -237,6 +241,133 @@ extension WorkspaceWindowView {
   func refreshDecisionWorkspaceAfterMutation() async {
     await reloadDecisions()
     syncSupervisorDecisionRoute(recordHistory: false)
+  }
+
+  func reconcileDecisionRouteAfterReload(
+    previousSelection: WorkspaceSelection,
+    previousVisibleDecisionIDs: [String],
+    requestedDecisionID: String?
+  ) {
+    guard
+      let repair = Self.repairedDecisionSelectionAfterReload(
+        previousSelection: previousSelection,
+        previousVisibleDecisionIDs: previousVisibleDecisionIDs,
+        requestedDecisionID: requestedDecisionID,
+        currentScope: decisionWorkspaceScope,
+        fallbackSessionID: store.selectedSessionID
+      )
+    else {
+      return
+    }
+
+    if let selection = repair.selection {
+      applyProgrammaticSelection(selection, recordHistory: false)
+    }
+    if store.supervisorSelectedDecisionID != repair.supervisorSelectedDecisionID {
+      store.supervisorSelectedDecisionID = repair.supervisorSelectedDecisionID
+    }
+  }
+
+  static func repairedDecisionSelectionAfterReload(
+    previousSelection: WorkspaceSelection,
+    previousVisibleDecisionIDs: [String],
+    requestedDecisionID: String?,
+    currentScope: DecisionWorkspaceScope,
+    fallbackSessionID: String?
+  ) -> WorkspaceDecisionReloadRepair? {
+    let decisionsByID = Dictionary(uniqueKeysWithValues: currentScope.decisions.map { ($0.id, $0) })
+
+    // Keep an explicit surviving external request first. Otherwise, if the
+    // requested route went stale but the currently displayed decision survived,
+    // re-synchronize the store back to the current detail route. Only then do
+    // we repair by visible-list order or fall back to the desk.
+    if let previousDecisionID = previousSelection.decisionID,
+      let requestedDecisionID,
+      previousDecisionID != requestedDecisionID,
+      let requestedDecision = decisionsByID[requestedDecisionID]
+    {
+      return WorkspaceDecisionReloadRepair(
+        selection: .decision(
+          sessionID: requestedDecision.sessionID,
+          decisionID: requestedDecisionID
+        ),
+        supervisorSelectedDecisionID: requestedDecisionID
+      )
+    }
+
+    if let previousDecisionID = previousSelection.decisionID,
+      let requestedDecisionID,
+      previousDecisionID != requestedDecisionID,
+      decisionsByID[requestedDecisionID] == nil,
+      let previousDecision = decisionsByID[previousDecisionID]
+    {
+      return WorkspaceDecisionReloadRepair(
+        selection: .decision(
+          sessionID: previousDecision.sessionID,
+          decisionID: previousDecisionID
+        ),
+        supervisorSelectedDecisionID: previousDecisionID
+      )
+    }
+
+    guard let missingDecisionID = previousSelection.decisionID ?? requestedDecisionID,
+      decisionsByID[missingDecisionID] == nil
+    else {
+      return nil
+    }
+
+    guard previousSelection.decisionID != nil else {
+      return WorkspaceDecisionReloadRepair(
+        selection: nil,
+        supervisorSelectedDecisionID: nil
+      )
+    }
+
+    guard
+      let replacementDecisionID = nextVisibleDecisionID(
+        afterRemoving: missingDecisionID,
+        previousVisibleDecisionIDs: previousVisibleDecisionIDs,
+        currentVisibleDecisionIDs: currentScope.visibleDecisionIDs
+      ),
+      let replacementDecision = decisionsByID[replacementDecisionID]
+    else {
+      return WorkspaceDecisionReloadRepair(
+        selection: .decisions(sessionID: previousSelection.sessionID ?? fallbackSessionID),
+        supervisorSelectedDecisionID: nil
+      )
+    }
+
+    return WorkspaceDecisionReloadRepair(
+      selection: .decision(
+        sessionID: replacementDecision.sessionID,
+        decisionID: replacementDecisionID
+      ),
+      supervisorSelectedDecisionID: replacementDecisionID
+    )
+  }
+
+  static func nextVisibleDecisionID(
+    afterRemoving removedDecisionID: String,
+    previousVisibleDecisionIDs: [String],
+    currentVisibleDecisionIDs: [String]
+  ) -> String? {
+    guard !currentVisibleDecisionIDs.isEmpty else {
+      return nil
+    }
+
+    let currentVisibleDecisionSet = Set(currentVisibleDecisionIDs)
+    if let removedIndex = previousVisibleDecisionIDs.firstIndex(of: removedDecisionID) {
+      for candidateID in previousVisibleDecisionIDs[(removedIndex + 1)...]
+      where currentVisibleDecisionSet.contains(candidateID) {
+        return candidateID
+      }
+      for candidateID in previousVisibleDecisionIDs[..<removedIndex].reversed()
+      where currentVisibleDecisionSet.contains(candidateID) {
+        return candidateID
+      }
+    }
+
+    return currentVisibleDecisionIDs.first
   }
 
   private func handleDecisionSelectionChange(
