@@ -364,18 +364,20 @@ public struct WorkspaceWindowView: View {
       .focusedSceneValue(\.harnessPrimaryContentResetSuppression, currentResetSuppression)
       .focusedSceneValue(
         \.harnessSidebarVisibilityRequest,
-        HarnessSidebarVisibilityRequest(
-          isCollapsed: columnVisibility == .detailOnly,
-          expander: sidebarVisibilityExpander
-        )
+        HarnessSidebarVisibilityRequest(expander: sidebarVisibilityExpander)
       )
       .task {
         let binding = columnVisibilityBinding
         sidebarVisibilityExpander.handler = {
           guard binding.wrappedValue == .detailOnly else { return }
           binding.wrappedValue = .all
-          Task { @MainActor in
-            if let contentView = NSApp.keyWindow?.contentView {
+          // Capture the workspace contentView synchronously before the async hop so
+          // the notification targets this window even if key focus shifts in 50ms.
+          // asyncAfter(0.05) gives SwiftUI a full rendering cycle to commit the
+          // column-visibility change before VoiceOver re-scans the AX tree.
+          let contentView = NSApp.keyWindow?.contentView
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            if let contentView {
               NSAccessibility.post(element: contentView, notification: .layoutChanged)
             }
           }
