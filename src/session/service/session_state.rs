@@ -8,9 +8,9 @@ use super::{
     SessionAction, SessionRole, SessionState, SessionStatus, TaskQueuePolicy,
     TaskStartSignalRecord, TaskStatus, build_initial_state, build_leave_signal_record,
     clear_pending_leader_transfer, ensure_session_can_end, leave_signal_delivery_error,
-    next_available_agent_id, plan_leader_transfer, refresh_session, require_active,
-    require_active_target_agent, require_endable_session, require_permission,
-    require_removable_agent, runtime, runtime_capabilities, touch_agent,
+    next_available_agent_id, plan_leader_transfer, promote_or_degrade, refresh_session,
+    release_agent_tasks, require_active, require_active_target_agent, require_endable_session,
+    require_permission, require_removable_agent, runtime, runtime_capabilities, touch_agent,
 };
 
 // ---------------------------------------------------------------------------
@@ -182,6 +182,34 @@ pub(crate) fn apply_register_agent_runtime_session(
         .expect("managed-agent lookup resolved mutable agent");
     agent.agent_session_id = Some(agent_session_id.to_string());
     Ok(true)
+}
+
+/// Remove a just-joined agent registration that never finished startup.
+///
+/// This is used for daemon-managed agent start failures that happen after the
+/// orchestration join was persisted but before the runtime session finished
+/// binding into the session ledger.
+pub(crate) fn apply_rollback_joined_agent(
+    state: &mut SessionState,
+    agent_id: &str,
+    now: &str,
+) -> bool {
+    let was_leader = state.leader_id.as_deref() == Some(agent_id);
+    if state.agents.remove(agent_id).is_none() {
+        return false;
+    }
+    clear_pending_leader_transfer(state, agent_id);
+    release_agent_tasks(state, agent_id, now);
+    if was_leader {
+        if state.agents.values().any(|agent| agent.status.is_alive()) {
+            promote_or_degrade(state, now);
+        } else {
+            state.leader_id = None;
+            state.status = SessionStatus::AwaitingLeader;
+        }
+    }
+    refresh_session(state, now);
+    true
 }
 
 pub(crate) fn resolve_join_role(

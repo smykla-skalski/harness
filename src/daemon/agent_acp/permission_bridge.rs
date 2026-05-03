@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::SyncSender;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
@@ -127,17 +127,11 @@ impl PermissionBridgeHandle {
     }
 
     /// Return unresolved permission batches for daemon inspection.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal pending-permission mutex is poisoned.
     #[must_use]
     pub fn pending_batches(&self) -> Vec<AcpPermissionBatch> {
         let mut batches: Vec<_> = self
             .state
-            .pending
-            .lock()
-            .expect("permission bridge pending lock")
+            .lock_pending()
             .values()
             .map(|pending| (pending.sequence, pending.batch.clone()))
             .collect();
@@ -146,21 +140,11 @@ impl PermissionBridgeHandle {
     }
 
     /// Fail every pending permission request with daemon shutdown.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal pending-permission mutex or worker mutex is poisoned.
     pub fn shutdown_pending(&self) -> usize {
         if self.state.shutdown.swap(true, Ordering::SeqCst) {
             return 0;
         }
-        let pending = mem::take(
-            &mut *self
-                .state
-                .pending
-                .lock()
-                .expect("permission bridge pending lock"),
-        );
+        let pending = mem::take(&mut *self.state.lock_pending());
         let pending_count: usize = pending
             .values()
             .map(|pending| pending.responders.len())
@@ -172,10 +156,7 @@ impl PermissionBridgeHandle {
             self.state
                 .broadcast("acp_permission_shutdown", &batch.batch);
         }
-        let worker_alive = self
-            .worker
-            .lock()
-            .expect("permission bridge worker lock")
+        let worker_alive = recover_lock(self.worker.as_ref(), "permission bridge worker lock")
             .take()
             .is_some();
         self.state.shutdown_notify.notify_waiters();
@@ -183,22 +164,13 @@ impl PermissionBridgeHandle {
     }
 
     /// Resolve a pending permission batch.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal pending-permission mutex is poisoned.
     #[must_use]
     pub fn resolve_batch(
         &self,
         batch_id: &str,
         decision: &AcpPermissionDecision,
     ) -> Option<AcpPermissionBatch> {
-        let pending = self
-            .state
-            .pending
-            .lock()
-            .expect("permission bridge pending lock")
-            .remove(batch_id)?;
+        let pending = self.state.lock_pending().remove(batch_id)?;
         for responder in &pending.responders {
             let allow = decision.allows(&responder.request_id);
             let response = response_for_options(&responder.options, allow);
@@ -207,6 +179,19 @@ impl PermissionBridgeHandle {
         self.state
             .broadcast("acp_permission_resolved", &pending.batch);
         Some(pending.batch)
+    }
+
+    #[cfg(test)]
+    pub(in crate::daemon::agent_acp) fn poison_pending_lock_for_test(&self) {
+        let state = Arc::clone(&self.state);
+        let _ = std::thread::spawn(move || {
+            let _guard = state
+                .pending
+                .lock()
+                .expect("permission bridge pending lock");
+            panic!("poison permission bridge pending lock");
+        })
+        .join();
     }
 }
 
@@ -222,9 +207,7 @@ impl AcpPermissionDecision {
 
 impl PermissionBridgeState {
     fn pending_permission_count(&self) -> usize {
-        self.pending
-            .lock()
-            .expect("permission bridge pending lock")
+        self.lock_pending()
             .values()
             .map(|pending| pending.responders.len())
             .sum()
@@ -265,6 +248,10 @@ impl PermissionBridgeState {
             session_id: Some(self.session_id.clone()),
             payload,
         })
+    }
+
+    fn lock_pending(&self) -> MutexGuard<'_, BTreeMap<String, PendingBatch>> {
+        recover_lock(&self.pending, "permission bridge pending lock")
     }
 }
 
@@ -329,10 +316,7 @@ fn enqueue_or_reject_batch(
     requests: Vec<PermissionBridgeRequest>,
 ) {
     let mut accepted = Vec::new();
-    let mut pending = state
-        .pending
-        .lock()
-        .expect("permission bridge pending lock");
+    let mut pending = state.lock_pending();
     let pending_count = PermissionBridgeState::pending_responder_count_locked(&pending);
     for request in requests {
         if state.shutdown.load(Ordering::SeqCst) {
@@ -412,11 +396,7 @@ fn spawn_batch_expiration(state: Arc<PermissionBridgeState>, batch_id: String, d
 }
 
 fn expire_batch(state: &PermissionBridgeState, batch_id: &str) {
-    let pending = state
-        .pending
-        .lock()
-        .expect("permission bridge pending lock")
-        .remove(batch_id);
+    let pending = state.lock_pending().remove(batch_id);
     let Some(pending) = pending else {
         return;
     };
@@ -479,6 +459,19 @@ fn response_for_options(options: &[PermissionOption], allow: bool) -> RequestPer
             ))
         },
     )
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn recover_lock<'a, T>(mutex: &'a Mutex<T>, label: &str) -> MutexGuard<'a, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|error: PoisonError<MutexGuard<'a, T>>| {
+            tracing::warn!(%error, lock = label, "recovering poisoned ACP permission bridge lock");
+            error.into_inner()
+        })
 }
 
 #[cfg(test)]

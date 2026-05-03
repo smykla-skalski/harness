@@ -1,6 +1,7 @@
-use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentManagerHandle};
 use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
 use crate::daemon::service::{broadcast, tokio_watch, utc_now};
+use crate::errors::CliError;
 use std::collections::BTreeSet;
 use tokio::task::JoinHandle;
 
@@ -71,12 +72,18 @@ fn publish_catchup_acp_inspect_events(
 }
 
 fn catchup_session_ids(acp_agent_manager: &AcpAgentManagerHandle) -> BTreeSet<String> {
-    acp_agent_manager
-        .inspect(None)
-        .agents
-        .into_iter()
-        .map(|agent| agent.session_id)
-        .collect()
+    inspect_response_or_log(
+        acp_agent_manager,
+        None,
+        "failed to inspect ACP sessions during catchup refresh",
+    )
+    .map_or_else(BTreeSet::new, |response| {
+        response
+            .agents
+            .into_iter()
+            .map(|agent| agent.session_id)
+            .collect()
+    })
 }
 
 fn handle_publisher_receive(
@@ -119,13 +126,30 @@ fn inspect_payload(
     acp_agent_manager: &AcpAgentManagerHandle,
     session_id: &str,
 ) -> Option<serde_json::Value> {
-    let payload = serde_json::to_value(WsAcpInspect {
-        inspect: acp_agent_manager.inspect(Some(session_id)),
-    });
+    let inspect = inspect_response_or_log(
+        acp_agent_manager,
+        Some(session_id),
+        "failed to build ACP inspect push payload",
+    )?;
+    let payload = serde_json::to_value(WsAcpInspect { inspect });
     if let Err(error) = &payload {
         log_inspect_payload_error(session_id, error);
     }
     payload.ok()
+}
+
+fn inspect_response_or_log(
+    acp_agent_manager: &AcpAgentManagerHandle,
+    session_id: Option<&str>,
+    message: &str,
+) -> Option<AcpAgentInspectResponse> {
+    match acp_agent_manager.inspect(session_id) {
+        Ok(response) => Some(response),
+        Err(error) => {
+            log_inspect_response_error(session_id, &error, message);
+            None
+        }
+    }
 }
 
 #[expect(
@@ -138,6 +162,29 @@ fn log_inspect_payload_error(session_id: &str, error: &serde_json::Error) {
         session_id,
         "failed to serialize ACP inspect push payload"
     );
+}
+
+fn log_inspect_response_error(session_id: Option<&str>, error: &CliError, message: &str) {
+    session_id.map_or_else(
+        || log_global_inspect_response_error(error, message),
+        |session_id| log_session_inspect_response_error(session_id, error, message),
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_global_inspect_response_error(error: &CliError, message: &str) {
+    tracing::warn!(%error, "{message}");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_session_inspect_response_error(session_id: &str, error: &CliError, message: &str) {
+    tracing::warn!(%error, session_id, "{message}");
 }
 
 #[cfg(test)]

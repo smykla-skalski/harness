@@ -173,14 +173,11 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    state.acp_agent_manager.shutdown_all();
-    timed_json(
-        "POST",
-        http_paths::DAEMON_STOP,
-        &request_id,
-        start,
-        service::request_shutdown(),
-    )
+    let result = state
+        .acp_agent_manager
+        .shutdown_all()
+        .and_then(|()| service::request_shutdown());
+    timed_json("POST", http_paths::DAEMON_STOP, &request_id, start, result)
 }
 
 async fn post_bridge_reconfigure(

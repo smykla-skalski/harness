@@ -240,19 +240,31 @@ impl BridgeServer {
     }
 
     pub(super) fn cleanup(&self) {
+        self.cleanup_active_tuis();
+        self.cleanup_codex();
+        self.cleanup_acp();
+    }
+
+    fn cleanup_active_tuis(&self) {
         if let Ok(mut active) = self.active_tuis.lock() {
             for (_, entry) in active.iter() {
                 let _ = entry.process.kill();
             }
             active.clear();
         }
+    }
+
+    fn cleanup_codex(&self) {
         if let Ok(mut codex) = self.codex.lock() {
             Self::stop_codex_process(&mut codex);
         }
-        let _ = self.with_acp_runtime(|| {
-            self.acp_agent_manager.shutdown_all();
-            Ok(())
-        });
+    }
+
+    fn cleanup_acp(&self) {
+        let result = self.with_acp_runtime(|| self.acp_agent_manager.shutdown_all());
+        if let Err(error) = result {
+            log_cleanup_acp_error(&error);
+        }
     }
 
     pub(super) fn capabilities(
@@ -302,4 +314,12 @@ impl BridgeServer {
             codex.take();
         }
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_cleanup_acp_error(error: &CliError) {
+    tracing::warn!(%error, "failed to shut down ACP sessions during bridge cleanup");
 }

@@ -7,9 +7,9 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use self::rollback::rollback_registration_best_effort;
 use self::snapshots::{
-    ReusedSnapshotInput, StartedSnapshotInput, preferred_project_dir, reused_snapshot,
-    started_snapshot, stream_event,
+    StartedSnapshotInput, preferred_project_dir, started_snapshot, stream_event,
 };
 use crate::agents::acp::catalog::AcpAgentDescriptor;
 use crate::agents::acp::connection::SpawnConfig;
@@ -33,6 +33,8 @@ use super::pool_key::AcpProcessPoolKey;
 use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task};
 
+mod reused_session;
+mod rollback;
 mod sandbox_state;
 mod snapshots;
 
@@ -85,129 +87,17 @@ impl AcpAgentManagerHandle {
             project_dir: &project_dir,
             process_key: &process_key,
         };
-        let _lifecycle = self
-            .state
-            .process_lifecycle
-            .lock()
-            .expect("ACP process lifecycle lock");
+        let _lifecycle = self.process_lifecycle_guard()?;
+        if self.start_requested_after_shutdown() {
+            return Err(CliErrorKind::workflow_io(
+                "ACP manager is shutting down; new ACP agents are blocked".to_string(),
+            )
+            .into());
+        }
         if let Some(snapshot) = self.try_start_reused_session(input)? {
             return Ok(snapshot);
         }
         self.start_new_process_session(input, &spawn)
-    }
-
-    fn try_start_reused_session(
-        &self,
-        input: DescriptorStartInput<'_>,
-    ) -> Result<Option<AcpAgentSnapshot>, CliError> {
-        let Some(existing) = self.reusable_session_for_process_key(input.process_key) else {
-            return Ok(None);
-        };
-        let runtime_session_id = Self::attach_reused_protocol_session(&existing, input)?;
-        let display_name = input
-            .request
-            .name
-            .clone()
-            .unwrap_or_else(|| input.descriptor.display_name.clone());
-        let registration = self.register_reused_orchestration_agent(
-            &existing,
-            &runtime_session_id,
-            input,
-            &display_name,
-        )?;
-        let snapshot = reused_snapshot(ReusedSnapshotInput {
-            acp_id: input.acp_id,
-            session_id: input.session_id,
-            request: input.request,
-            agent_id: &registration.agent_id,
-            display_name: &registration.display_name,
-            source: &existing.snapshot_with_live_counts(),
-            project_dir: input.project_dir,
-            permission_log_path: input
-                .request
-                .record_permissions
-                .then(|| recording_log_path_for_session(input.session_id)),
-        });
-        let active = Arc::new(ActiveAcpSession::new(
-            snapshot.clone(),
-            PermissionBridgeHandle::spawn(
-                input.acp_id.to_string(),
-                input.session_id.to_string(),
-                self.sender(),
-            ),
-            existing.process(),
-        ));
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .insert(input.acp_id.to_string(), active);
-        self.broadcast("acp_agent_started", &snapshot);
-        Ok(Some(snapshot))
-    }
-
-    fn attach_reused_protocol_session(
-        existing: &Arc<ActiveAcpSession>,
-        input: DescriptorStartInput<'_>,
-    ) -> Result<String, CliError> {
-        (if let Some(prompt) = prompt_text(input.request.prompt.as_deref()) {
-            existing.prompt_protocol_session(
-                input.acp_id,
-                input.session_id,
-                input.project_dir.to_path_buf(),
-                prompt,
-            )
-        } else {
-            existing.attach_protocol_session(
-                input.acp_id,
-                input.session_id,
-                input.project_dir.to_path_buf(),
-            )
-        })
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "attach reused ACP session '{}': {error}",
-                input.descriptor.id
-            ))
-            .into()
-        })
-    }
-
-    fn register_reused_orchestration_agent(
-        &self,
-        existing: &Arc<ActiveAcpSession>,
-        runtime_session_id: &str,
-        input: DescriptorStartInput<'_>,
-        display_name: &str,
-    ) -> Result<AcpOrchestrationRegistration, CliError> {
-        self.register_orchestration_agent(
-            input.session_id,
-            input.acp_id,
-            input.request,
-            input.descriptor,
-            display_name,
-            Some(runtime_session_id),
-        )
-        .inspect_err(|_| Self::detach_reused_session_after_registration_failure(existing, input))
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion in leaf logging helper"
-    )]
-    fn detach_reused_session_after_registration_failure(
-        existing: &Arc<ActiveAcpSession>,
-        input: DescriptorStartInput<'_>,
-    ) {
-        if let Err(detach_error) = existing.detach_protocol_session(input.acp_id, input.session_id)
-        {
-            tracing::warn!(
-                acp_id = input.acp_id,
-                session_id = input.session_id,
-                %detach_error,
-                "failed to detach reused ACP session after orchestration registration failure"
-            );
-        }
     }
 
     fn start_new_process_session(
@@ -231,15 +121,24 @@ impl AcpAgentManagerHandle {
             &protocol,
         )?;
         let event_task = spawn_event_forwarder(self.sender(), protocol.events);
-        protocol.start.send(()).map_err(|()| {
+        if protocol.start.send(()).is_err() {
             protocol.protocol.abort();
             protocol.batcher.abort();
+            event_task.abort();
             let _ = child.kill();
-            CliErrorKind::workflow_io(format!(
+            rollback_registration_best_effort(
+                self,
+                input.session_id,
+                input.acp_id,
+                &registration.agent_id,
+                "startup_failed",
+            );
+            return Err(CliErrorKind::workflow_io(format!(
                 "ACP protocol task exited before startup for '{}'",
                 input.descriptor.id
             ))
-        })?;
+            .into());
+        }
         let snapshot = started_snapshot(StartedSnapshotInput {
             acp_id: input.acp_id,
             session_id: input.session_id,
@@ -263,14 +162,23 @@ impl AcpAgentManagerHandle {
                 event: event_task,
             },
         ));
-        self.activate_started_session(
+        if let Err(error) = self.activate_started_session(
             input,
             snapshot.clone(),
             context.permissions,
             process,
             protocol.disconnects,
             context.supervisor,
-        );
+        ) {
+            rollback_registration_best_effort(
+                self,
+                input.session_id,
+                input.acp_id,
+                &registration.agent_id,
+                "startup_failed",
+            );
+            return Err(error);
+        }
         self.broadcast("acp_agent_started", &snapshot);
         Ok(snapshot)
     }
@@ -390,12 +298,33 @@ impl AcpAgentManagerHandle {
         process: Arc<ActiveAcpProcess>,
         disconnects: mpsc::Receiver<DisconnectReason>,
         supervisor: Arc<AcpSessionSupervisor>,
-    ) {
-        let active = Arc::new(ActiveAcpSession::new(
+    ) -> Result<(), CliError> {
+        let active = self.build_started_session(
             snapshot,
             permissions,
             Arc::clone(&process),
-        ));
+            disconnects,
+            supervisor,
+        );
+        self.sessions_guard()?
+            .insert(input.acp_id.to_string(), Arc::clone(&active));
+        if let Err(error) = self.insert_process(input.process_key.to_string(), process) {
+            self.rollback_started_session_after_process_insert_error(input);
+            drop(active);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn build_started_session(
+        &self,
+        snapshot: AcpAgentSnapshot,
+        permissions: PermissionBridgeHandle,
+        process: Arc<ActiveAcpProcess>,
+        disconnects: mpsc::Receiver<DisconnectReason>,
+        supervisor: Arc<AcpSessionSupervisor>,
+    ) -> Arc<ActiveAcpSession> {
+        let active = Arc::new(ActiveAcpSession::new(snapshot, permissions, process));
         active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
             self.clone(),
             Arc::downgrade(&active),
@@ -406,12 +335,25 @@ impl AcpAgentManagerHandle {
             Arc::downgrade(&active),
             supervisor,
         ));
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .insert(input.acp_id.to_string(), active);
-        self.insert_process(input.process_key.to_string(), process);
+        active
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn rollback_started_session_after_process_insert_error(&self, input: DescriptorStartInput<'_>) {
+        if let Err(remove_error) = self
+            .sessions_guard()
+            .map(|mut sessions| sessions.remove(input.acp_id))
+        {
+            tracing::warn!(
+                acp_id = input.acp_id,
+                session_id = input.session_id,
+                %remove_error,
+                "failed to remove ACP session registration after process insert error"
+            );
+        }
     }
 
     pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {
@@ -463,9 +405,7 @@ impl AcpAgentManagerHandle {
         let Some(db) = self.state.db.get() else {
             return Ok(None);
         };
-        let db = db.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
-        })?;
+        let db = Self::daemon_db_guard(db)?;
         db.project_dir_for_session(session_id)
     }
 }

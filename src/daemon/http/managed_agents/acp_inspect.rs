@@ -46,7 +46,7 @@ pub(super) async fn get_acp_inspect(
             .session_id
             .as_deref()
             .or(query.require_session_id.as_deref());
-        Ok(state.acp_agent_manager.inspect(effective))
+        state.acp_agent_manager.inspect(effective)
     })();
     timed_json(
         "GET",
