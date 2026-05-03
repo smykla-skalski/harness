@@ -29,6 +29,7 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
     let payload = store.acpPermissionDecisionPayload(for: batch)
     store.presentingAcpPermissionBatch = nil
     guard payload.isRenderable else {
+      store.supervisorSelectedDecisionID = nil
       return
     }
     store.requestWorkspaceDecisionSelection(decisionID: payload.decisionID)

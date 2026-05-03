@@ -2,10 +2,32 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+private struct AcpToastOpenDecisionsKey: EnvironmentKey {
+  static let defaultValue: @MainActor @Sendable () -> Void = {}
+}
+
+private struct AcpToastDismissKey: EnvironmentKey {
+  static let defaultValue: @MainActor @Sendable () -> Void = {}
+}
+
+extension EnvironmentValues {
+  public var acpToastOpenDecisions: @MainActor @Sendable () -> Void {
+    get { self[AcpToastOpenDecisionsKey.self] }
+    set { self[AcpToastOpenDecisionsKey.self] = newValue }
+  }
+
+  public var acpToastDismiss: @MainActor @Sendable () -> Void {
+    get { self[AcpToastDismissKey.self] }
+    set { self[AcpToastDismissKey.self] = newValue }
+  }
+}
+
 public struct AcpPermissionAttentionToastView: View {
   let attention: AcpPermissionAttentionEvent
-  let openDecisions: @MainActor @Sendable () -> Void
-  let dismiss: @MainActor @Sendable () -> Void
+  @Environment(\.acpToastOpenDecisions)
+  private var openDecisions
+  @Environment(\.acpToastDismiss)
+  private var dismiss
 
   @ScaledMetric(relativeTo: .callout)
   private var dismissButtonSize: CGFloat = 28
@@ -37,14 +59,8 @@ public struct AcpPermissionAttentionToastView: View {
     ].joined(separator: " ")
   }
 
-  public init(
-    attention: AcpPermissionAttentionEvent,
-    openDecisions: @escaping @MainActor @Sendable () -> Void,
-    dismiss: @escaping @MainActor @Sendable () -> Void
-  ) {
+  public init(attention: AcpPermissionAttentionEvent) {
     self.attention = attention
-    self.openDecisions = openDecisions
-    self.dismiss = dismiss
   }
 
   public var body: some View {
