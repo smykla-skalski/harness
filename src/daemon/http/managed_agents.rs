@@ -19,6 +19,7 @@ use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 
+mod acp_delete;
 mod acp_inspect;
 mod acp_start;
 mod attach;
@@ -40,7 +41,7 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         )
         .route(
             http_paths::MANAGED_AGENT_DETAIL,
-            get(get_managed_agent).delete(delete_acp_agent),
+            get(get_managed_agent).delete(acp_delete::delete_acp_agent),
         )
         .route(
             http_paths::MANAGED_AGENT_INPUT,
@@ -165,28 +166,6 @@ async fn post_codex_agent_start(
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_CODEX,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn delete_acp_agent(
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = ensure_acp_agent(&state, &agent_id)
-        .and_then(|()| state.acp_agent_manager.stop(&agent_id))
-        .map(ManagedAgentSnapshot::Acp);
-    timed_json(
-        "DELETE",
-        http_paths::MANAGED_AGENT_DELETE,
         &request_id,
         start,
         result,

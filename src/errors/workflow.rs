@@ -23,6 +23,10 @@ pub enum WorkflowError {
     SessionAgentConflict { detail: Cow<'static, str> },
     #[error("invalid project directory (no file_name component): {path}")]
     InvalidProjectDir { path: Cow<'static, str> },
+    #[error("ACP managed-agent routes are disabled")]
+    AcpDisabled,
+    #[error("session scope denied: {detail}")]
+    SessionScopeDenied { detail: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -39,6 +43,8 @@ impl WorkflowError {
             Self::SessionPermissionDenied { .. } => "KSRCLI091",
             Self::SessionAgentConflict { .. } => "KSRCLI092",
             Self::InvalidProjectDir { .. } => "KSRCLI093",
+            Self::AcpDisabled => "ACP_DISABLED",
+            Self::SessionScopeDenied { .. } => "SESSION_SCOPE_DENIED",
         }
     }
 
@@ -113,6 +119,18 @@ impl WorkflowError {
     #[must_use]
     pub fn invalid_project_dir(path: impl Into<Cow<'static, str>>) -> Self {
         Self::InvalidProjectDir { path: path.into() }
+    }
+
+    #[must_use]
+    pub fn acp_disabled() -> Self {
+        Self::AcpDisabled
+    }
+
+    #[must_use]
+    pub fn session_scope_denied(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionScopeDenied {
+            detail: detail.into(),
+        }
     }
 
     #[must_use]
