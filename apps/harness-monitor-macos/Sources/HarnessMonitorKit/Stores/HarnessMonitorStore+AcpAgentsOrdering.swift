@@ -7,24 +7,22 @@ extension HarnessMonitorStore {
   ) -> [AcpAgentSnapshot] {
     var result = snapshots.filter { $0.acpId != snapshot.acpId }
     let idx =
-      result.firstIndex { existing in
-        if snapshot.displayName != existing.displayName {
-          return snapshot.displayName.localizedStandardCompare(existing.displayName)
-            == .orderedAscending
-        }
-        return snapshot.acpId < existing.acpId
-      } ?? result.endIndex
+      result.firstIndex { existing in acpAgentPrecedes(snapshot, existing) } ?? result.endIndex
     result.insert(snapshot, at: idx)
     return result
   }
 
   func sortedAcpAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
-    snapshots.sorted {
-      if $0.displayName != $1.displayName {
-        return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
-      }
-      return $0.acpId < $1.acpId
+    snapshots.sorted { acpAgentPrecedes($0, $1) }
+  }
+
+  private func acpAgentPrecedes(
+    _ lhs: AcpAgentSnapshot, _ rhs: AcpAgentSnapshot
+  ) -> Bool {
+    if lhs.displayName != rhs.displayName {
+      return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
     }
+    return lhs.acpId < rhs.acpId
   }
 
   func sortedAcpInspectSnapshots(
@@ -76,7 +74,20 @@ extension HarnessMonitorStore {
     _ batch: AcpPermissionBatch,
     into batches: [AcpPermissionBatch]
   ) -> [AcpPermissionBatch] {
-    sortedAcpPermissionBatches(batches.filter { $0.batchId != batch.batchId } + [batch])
+    var result = batches.filter { $0.batchId != batch.batchId }
+    let idx =
+      result.firstIndex { existing in acpPermissionBatchPrecedes(batch, existing) } ?? result.endIndex
+    result.insert(batch, at: idx)
+    return result
+  }
+
+  private func acpPermissionBatchPrecedes(
+    _ lhs: AcpPermissionBatch, _ rhs: AcpPermissionBatch
+  ) -> Bool {
+    if lhs.createdAt != rhs.createdAt {
+      return lhs.createdAt < rhs.createdAt
+    }
+    return lhs.batchId < rhs.batchId
   }
 
   /// Canonical queue ordering for ACP batches.
