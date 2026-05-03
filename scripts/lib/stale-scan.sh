@@ -186,10 +186,72 @@ stale_scan_process_cwd() {
   lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
 }
 
+stale_scan_process_env_value() {
+  local pid="$1"
+  local key="$2"
+  local process_line value
+
+  process_line="$(ps eww -p "$pid" -o command= 2>/dev/null || true)"
+  [[ -n "$process_line" ]] || return 1
+
+  value="$(
+    awk -v key="$key" '
+      {
+        pattern = "(^|[[:space:]])" key "="
+        if (match($0, pattern)) {
+          value = substr($0, RSTART + RLENGTH)
+          sub(/[[:space:]].*$/, "", value)
+          print value
+        }
+      }
+    ' <<<"$process_line"
+  )"
+  [[ -n "$value" ]] || return 1
+  printf '%s\n' "$value"
+}
+
+stale_scan_current_runtime_profile() {
+  if ! declare -F harness_monitor_runtime_profile >/dev/null; then
+    return 1
+  fi
+  harness_monitor_runtime_profile 2>/dev/null || true
+}
+
+stale_scan_pid_runtime_profile() {
+  local pid="$1"
+  local profile
+
+  profile="$(stale_scan_process_env_value "$pid" HARNESS_MONITOR_RUNTIME_PROFILE || true)"
+  if declare -F harness_monitor_sanitize_profile >/dev/null; then
+    profile="$(harness_monitor_sanitize_profile "$profile")"
+  fi
+  [[ -n "$profile" ]] || return 1
+  printf '%s\n' "$profile"
+}
+
+stale_scan_gate_pid_conflicts_with_current_lane() {
+  local pid="$1"
+  local current_profile pid_profile
+
+  if ! stale_scan_is_profile_scoped; then
+    return 0
+  fi
+
+  current_profile="$(stale_scan_current_runtime_profile)"
+  if [[ -z "$current_profile" ]]; then
+    return 0
+  fi
+
+  pid_profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
+  [[ -z "$pid_profile" || "$pid_profile" == "$current_profile" ]]
+}
+
 # Gate-helper pids whose cwd is in the same common-root domain and which are
 # not in the reference_pid's ancestor chain (so we never flag ourselves).
-# All membership checks use herestrings to avoid `printf | grep -q` SIGPIPE
-# races under pipefail.
+# Unprofiled maintenance lanes still coordinate across the whole common-root.
+# Profile-scoped lanes only conflict with same-profile helpers (or unscoped
+# helpers that still target shared checkout state). All membership checks use
+# herestrings to avoid `printf | grep -q` SIGPIPE races under pipefail.
 stale_scan_process_in_common_repo_root() {
   local path="$1"
   local path_common_root
@@ -209,7 +271,10 @@ stale_scan_repo_gate_pids() {
       continue
     fi
     cwd="$(stale_scan_process_cwd "$pid")"
-    if stale_scan_process_in_common_repo_root "$cwd"; then
+    if ! stale_scan_process_in_common_repo_root "$cwd"; then
+      continue
+    fi
+    if stale_scan_gate_pid_conflicts_with_current_lane "$pid"; then
       echo "$pid"
     fi
   done < <(stale_scan_matching_pids gate)

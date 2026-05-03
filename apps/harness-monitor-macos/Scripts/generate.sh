@@ -11,6 +11,8 @@ ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/swift-tool-env.sh
 source "$SCRIPT_DIR/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
+source "$SCRIPT_DIR/lib/runtime-profile.sh"
 sanitize_xcode_only_swift_environment
 
 generation_inputs=(
@@ -95,6 +97,12 @@ oldest_mtime() {
   printf '%s\n' "$oldest"
 }
 
+profiled_non_owner_lane() {
+  local profile
+  profile="$(harness_monitor_runtime_profile || true)"
+  [[ -n "$profile" && "${HARNESS_MONITOR_OWNS_WORKSPACE:-0}" != "1" ]]
+}
+
 should_generate() {
   local latest_input oldest_output output
 
@@ -118,6 +126,14 @@ should_generate() {
 }
 
 if should_generate; then
+  # The generated project lives in the shared checkout. Profile-scoped lanes
+  # that do not own the workspace may consume existing outputs, but only the
+  # workspace owner (or an unscoped maintenance lane) may refresh them.
+  if profiled_non_owner_lane; then
+    echo "profile-scoped non-owner lanes must not regenerate the shared Harness Monitor Xcode project; run apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh from the workspace-owning user lane first" >&2
+    exit 1
+  fi
+
   TUIST_BIN="${TUIST_BIN:-$(type -P tuist || true)}"
   if [ -z "$TUIST_BIN" ]; then
     echo "tuist is required on PATH (pinned via mise)" >&2

@@ -18,6 +18,12 @@ DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$(harness_monitor_runtime_der
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 harness_monitor_apply_runtime_profile_environment
 
+shared_project_metadata_writes_allowed() {
+  local profile
+  profile="$(harness_monitor_runtime_profile || true)"
+  [[ -z "$profile" || "${HARNESS_MONITOR_OWNS_WORKSPACE:-0}" == "1" ]]
+}
+
 build_server_build_root_for_app_root() {
   if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
     printf '../../%s\n' "${DERIVED_DATA_PATH#"$REPO_ROOT"/}"
@@ -134,8 +140,10 @@ PREFERRED_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VER
 # `LastUpgradeCheck`, `LastSwiftUpdateCheck`, and project-object metadata.
 # Normalize the generated pbxproj in one place after every `tuist generate`,
 # using active Xcode's DTXcode value so patch releases do not bring back the
-# "Update to Recommended Settings" banner.
-if [ -f "$PBXPROJ" ]; then
+# "Update to Recommended Settings" banner. The shared pbxproj and version
+# surfaces stay owner-only for profile-scoped lanes so routine agent test
+# runs never rewrite checkout-global project metadata.
+if shared_project_metadata_writes_allowed && [ -f "$PBXPROJ" ]; then
   CANONICAL_VERSION="$("$REPO_ROOT/scripts/version.sh" show)"
   HARNESS_MONITOR_PBXPROJ="$PBXPROJ" \
   HARNESS_MONITOR_LAST_UPGRADE_CHECK="$LAST_UPGRADE_CHECK" \
@@ -149,6 +157,6 @@ if [ -f "$PBXPROJ" ]; then
     /usr/bin/python3 "$ROOT/Scripts/patch-tuist-pbxproj.py"
 fi
 
-if [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
+if shared_project_metadata_writes_allowed && [ "${HARNESS_MONITOR_SKIP_VERSION_SYNC:-0}" != "1" ]; then
   "$REPO_ROOT/scripts/version.sh" sync-monitor
 fi
