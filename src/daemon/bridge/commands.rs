@@ -1,5 +1,5 @@
 use std::env::{current_exe, var_os};
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 
 use clap::Subcommand;
 use fs_err as fs;
@@ -11,11 +11,12 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
 /// When this env var is set the bridge is being launched against a
-/// dedicated profile (parallel agent lane, personal user lane, etc).
-/// In that case the bridge must keep its state at the profile-specific
-/// daemon root - cross-profile adoption silently routes state to a
-/// stranger daemon and leads to mismatched ports / lost manifests.
+/// dedicated runtime profile (parallel agent lane, personal user lane,
+/// etc). Agent profiles stay isolated; personal profiles may still need
+/// to adopt the live daemon root so bridge state lands where the running
+/// app-managed daemon is watching.
 const HARNESS_MONITOR_RUNTIME_PROFILE_ENV: &str = "HARNESS_MONITOR_RUNTIME_PROFILE";
+const AGENT_RUNTIME_PROFILE_PREFIX: &str = "agent-";
 
 use super::bridge_state::{
     clear_bridge_state, ensure_host_context, status_report, write_bridge_config,
@@ -75,25 +76,34 @@ fn pinned_runtime_profile() -> Option<OsString> {
     Some(profile)
 }
 
+fn should_skip_daemon_root_adoption(profile: &OsStr) -> bool {
+    profile
+        .to_string_lossy()
+        .starts_with(AGENT_RUNTIME_PROFILE_PREFIX)
+}
+
 /// Adopt the running daemon's root for the duration of this bridge
 /// subcommand so its state writes target whatever daemon is actually
 /// running (sandboxed managed, `harness daemon dev`, or a plain
 /// `daemon serve`), regardless of which env vars the calling terminal
 /// had set. See [`crate::daemon::discovery`] for the scan algorithm.
 ///
-/// Adoption is skipped when `HARNESS_MONITOR_RUNTIME_PROFILE` is set:
-/// the caller has explicitly opted into an isolated profile lane and
-/// must not silently inherit a different profile's daemon root.
+/// Adoption is skipped only for `agent-*` runtime profiles: those lanes
+/// are intentionally isolated and must not silently inherit a different
+/// daemon root. Personal profiles still adopt the live daemon root when
+/// needed so Xcode-launched apps and terminal bridge commands stay aligned.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn adopt_daemon_root_for_bridge_command(command: &'static str) {
-    if let Some(profile) = pinned_runtime_profile() {
+    if let Some(profile) = pinned_runtime_profile()
+        && should_skip_daemon_root_adoption(profile.as_os_str())
+    {
         tracing::info!(
             command,
             profile = %profile.to_string_lossy(),
-            "bridge: profile pinned via env, skipping daemon root adoption"
+            "bridge: agent profile pinned via env, skipping daemon root adoption"
         );
         return;
     }
@@ -266,7 +276,10 @@ impl BridgeReconfigureArgs {
 
 #[cfg(test)]
 mod tests {
-    use super::{HARNESS_MONITOR_RUNTIME_PROFILE_ENV, OsString, pinned_runtime_profile};
+    use super::{
+        HARNESS_MONITOR_RUNTIME_PROFILE_ENV, OsString, pinned_runtime_profile,
+        should_skip_daemon_root_adoption,
+    };
 
     #[test]
     fn pinned_runtime_profile_returns_value_when_env_is_set() {
@@ -292,5 +305,19 @@ mod tests {
         temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, Some(""), || {
             assert_eq!(pinned_runtime_profile(), None);
         });
+    }
+
+    #[test]
+    fn agent_profiles_skip_daemon_root_adoption() {
+        assert!(should_skip_daemon_root_adoption(
+            OsString::from("agent-session-42").as_os_str()
+        ));
+    }
+
+    #[test]
+    fn personal_profiles_still_adopt_live_daemon_root() {
+        assert!(!should_skip_daemon_root_adoption(
+            OsString::from("bartsmykla").as_os_str()
+        ));
     }
 }

@@ -42,24 +42,8 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
     std::fs::create_dir_all(&xdg).expect("create xdg data home");
 
     // Fake running daemon at the macOS group container path.
-    let group_daemon_root = home
-        .join("Library")
-        .join("Group Containers")
-        .join(HARNESS_MONITOR_APP_GROUP_ID)
-        .join("harness")
-        .join("daemon");
-    std::fs::create_dir_all(&group_daemon_root).expect("create group daemon root");
-    let lock_path = group_daemon_root.join("daemon.lock");
-    let lock_file = std::fs::OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(&lock_path)
-        .expect("open fake lock file");
-    lock_file
-        .try_lock_exclusive()
-        .expect("hold exclusive flock on fake daemon lock");
+    let group_daemon_root = group_daemon_root(home);
+    let lock_file = hold_running_daemon_lock(&group_daemon_root);
 
     let mock_codex = create_mock_codex(home);
     let codex_port = unused_local_port();
@@ -124,6 +108,240 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
             state.socket_path
         );
     }
+}
+
+#[test]
+fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_empty() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let xdg = home.join("xdg-data");
+    std::fs::create_dir_all(&xdg).expect("create xdg data home");
+
+    let profile = "bartsmykla";
+    let profile_data_home = profile_data_home(home, profile);
+    std::fs::create_dir_all(&profile_data_home).expect("create profile data home");
+
+    let group_daemon_root = group_daemon_root(home);
+    let lock_file = hold_running_daemon_lock(&group_daemon_root);
+
+    let mock_codex = create_mock_codex(home);
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+
+    let mut command = Command::new(harness_binary());
+    command
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("XDG_DATA_HOME", &xdg)
+        .env("HOME", home)
+        .env("HARNESS_HOST_HOME", home)
+        .env("RUST_LOG", "harness=info")
+        .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
+        .env("HARNESS_DAEMON_DATA_HOME", &profile_data_home)
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+
+    let adopted_state_path = group_daemon_root.join("bridge.json");
+    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+
+    wait_for_state_at(&adopted_state_path).expect("bridge state file did not appear at adopted root");
+
+    let stop_output = run_bridge_with_profile(
+        home,
+        &xdg,
+        profile,
+        &profile_data_home,
+        &["bridge", "stop"],
+    );
+    let stop_text = output_text(&stop_output);
+    let stop_ok = stop_output.status.success();
+    let bridge_exit = wait_for_bridge_exit(&mut bridge);
+    drop(lock_file);
+
+    assert!(stop_ok, "bridge stop failed: {stop_text}");
+    bridge_exit.expect("bridge process did not exit after stop");
+    assert!(
+        !profile_state_path.exists(),
+        "personal profile bridge start must adopt the live group-container daemon root instead of writing to {}",
+        profile_state_path.display()
+    );
+}
+
+#[test]
+fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exists() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let xdg = home.join("xdg-data");
+    std::fs::create_dir_all(&xdg).expect("create xdg data home");
+
+    let profile = "bartsmykla";
+    let profile_data_home = profile_data_home(home, profile);
+    std::fs::create_dir_all(&profile_data_home).expect("create profile data home");
+
+    let mock_codex = create_mock_codex(home);
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+
+    let mut command = Command::new(harness_binary());
+    command
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("XDG_DATA_HOME", &xdg)
+        .env("HOME", home)
+        .env("HARNESS_HOST_HOME", home)
+        .env("RUST_LOG", "harness=info")
+        .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
+        .env("HARNESS_DAEMON_DATA_HOME", &profile_data_home)
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+
+    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+    let group_state_path = group_daemon_root(home).join("bridge.json");
+
+    wait_for_state_at(&profile_state_path).expect("bridge state file did not appear at personal profile root");
+
+    let stop_output = run_bridge_with_profile(
+        home,
+        &xdg,
+        profile,
+        &profile_data_home,
+        &["bridge", "stop"],
+    );
+    let stop_text = output_text(&stop_output);
+    let stop_ok = stop_output.status.success();
+    let bridge_exit = wait_for_bridge_exit(&mut bridge);
+
+    assert!(stop_ok, "bridge stop failed: {stop_text}");
+    bridge_exit.expect("bridge process did not exit after stop");
+    assert!(
+        !group_state_path.exists(),
+        "personal profile bridge start must stay on the profile root when no group-container daemon is running"
+    );
+}
+
+#[test]
+fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let xdg = home.join("xdg-data");
+    std::fs::create_dir_all(&xdg).expect("create xdg data home");
+
+    let profile = "agent-session-42";
+    let profile_data_home = profile_data_home(home, profile);
+    std::fs::create_dir_all(&profile_data_home).expect("create profile data home");
+
+    let group_daemon_root = group_daemon_root(home);
+    let lock_file = hold_running_daemon_lock(&group_daemon_root);
+
+    let mock_codex = create_mock_codex(home);
+    let codex_port = unused_local_port();
+    let codex_port_text = codex_port.to_string();
+
+    let mut command = Command::new(harness_binary());
+    command
+        .args([
+            "bridge",
+            "start",
+            "--capability",
+            "codex",
+            "--codex-port",
+            &codex_port_text,
+            "--codex-path",
+        ])
+        .arg(&mock_codex)
+        .env("XDG_DATA_HOME", &xdg)
+        .env("HOME", home)
+        .env("HARNESS_HOST_HOME", home)
+        .env("RUST_LOG", "harness=info")
+        .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
+        .env("HARNESS_DAEMON_DATA_HOME", &profile_data_home)
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_SANDBOXED")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+
+    let profile_state_path = profile_data_home.join("harness").join("daemon").join("bridge.json");
+    let group_state_path = group_daemon_root.join("bridge.json");
+
+    wait_for_state_at(&profile_state_path).expect("bridge state file did not appear at agent profile root");
+
+    let stop_output = run_bridge_with_profile(
+        home,
+        &xdg,
+        profile,
+        &profile_data_home,
+        &["bridge", "stop"],
+    );
+    let stop_text = output_text(&stop_output);
+    let stop_ok = stop_output.status.success();
+    let bridge_exit = wait_for_bridge_exit(&mut bridge);
+    drop(lock_file);
+
+    assert!(stop_ok, "bridge stop failed: {stop_text}");
+    bridge_exit.expect("bridge process did not exit after stop");
+    assert!(
+        !group_state_path.exists(),
+        "agent profile bridge start must stay isolated and avoid adopting the group-container daemon root {}",
+        group_state_path.display()
+    );
+}
+
+fn group_daemon_root(home: &Path) -> PathBuf {
+    home.join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join("harness")
+        .join("daemon")
+}
+
+fn profile_data_home(home: &Path, profile: &str) -> PathBuf {
+    home.join("Library")
+        .join("Group Containers")
+        .join(HARNESS_MONITOR_APP_GROUP_ID)
+        .join("runtime-profiles")
+        .join(profile)
+}
+
+fn hold_running_daemon_lock(daemon_root: &Path) -> std::fs::File {
+    std::fs::create_dir_all(daemon_root).expect("create daemon root");
+    let lock_path = daemon_root.join("daemon.lock");
+    let lock_file = std::fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(&lock_path)
+        .expect("open fake lock file");
+    lock_file
+        .try_lock_exclusive()
+        .expect("hold exclusive flock on fake daemon lock");
+    lock_file
 }
 
 fn wait_for_state_at(state_path: &Path) -> Result<(), String> {
@@ -221,6 +439,27 @@ fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
         .env("RUST_LOG", "harness=info")
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_DAEMON_DATA_HOME")
+        .env_remove("HARNESS_SANDBOXED")
+        .output()
+        .expect("run harness")
+}
+
+fn run_bridge_with_profile(
+    home: &Path,
+    xdg: &Path,
+    profile: &str,
+    profile_data_home: &Path,
+    args: &[&str],
+) -> Output {
+    Command::new(harness_binary())
+        .args(args)
+        .env("XDG_DATA_HOME", xdg)
+        .env("HOME", home)
+        .env("HARNESS_HOST_HOME", home)
+        .env("RUST_LOG", "harness=info")
+        .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
+        .env("HARNESS_DAEMON_DATA_HOME", profile_data_home)
+        .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
         .expect("run harness")
