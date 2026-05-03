@@ -118,8 +118,6 @@ struct WorkspaceWindowDecisionReloadTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let view = WorkspaceWindowView(store: store)
 
-    view.currentDecisionsRuntime.decisions = [currentDecision]
-    view.refreshDecisionWorkspaceSnapshot()
     view.viewModel.selection = .decision(
       sessionID: currentDecision.sessionID,
       decisionID: currentDecision.id
@@ -129,7 +127,8 @@ struct WorkspaceWindowDecisionReloadTests {
     view.reconcileDecisionRouteAfterReload(
       previousSelection: view.viewModel.selection,
       previousVisibleDecisionIDs: [currentDecision.id],
-      requestedDecisionID: "decision-stale"
+      requestedDecisionID: "decision-stale",
+      currentScope: scope(decisions: [currentDecision])
     )
 
     #expect(
