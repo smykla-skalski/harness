@@ -39,7 +39,9 @@ public struct FailedNudgeLoopRule: PolicyRule {
     var streaks: [String: FailureStreak] = [:]
 
     for event in events.sorted(by: { $0.createdAt < $1.createdAt }) {
-      guard event.ruleID == "stuck-agent", let agentID = agentID(from: event.id) else {
+      guard event.ruleID == "stuck-agent",
+        let agentID = agentID(from: event.actionKey ?? event.id)
+      else {
         continue
       }
       if event.kind == "actionFailed" {
@@ -102,22 +104,16 @@ public struct FailedNudgeLoopRule: PolicyRule {
   private func suggestedActions(for agentID: String) -> [SuggestedAction] {
     [
       .init(
-        id: "restart-agent",
-        title: "Restart agent",
-        kind: .custom,
-        payloadJSON: encode(ActionPayload(mode: "restartAgent", agentID: agentID))
-      ),
-      .init(
-        id: "stop-nudging-agent",
-        title: "Stop nudging this agent",
-        kind: .custom,
-        payloadJSON: encode(ActionPayload(mode: "stopNudgingAgent", agentID: agentID))
-      ),
-      .init(
         id: "investigate-agent",
         title: "Investigate manually",
         kind: .custom,
         payloadJSON: encode(ActionPayload(mode: "investigateManually", agentID: agentID))
+      ),
+      .init(
+        id: "dismiss-\(agentID)",
+        title: "Dismiss",
+        kind: .dismiss,
+        payloadJSON: "{}"
       ),
     ]
   }

@@ -278,6 +278,7 @@ final class SupervisorLifecycleTests: XCTestCase {
     await store.startSupervisor()
     defer { Task { await store.stopSupervisor() } }
 
+    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
   }
 
@@ -403,7 +404,7 @@ final class SupervisorLifecycleTests: XCTestCase {
     await store.startSupervisor()
     defer { Task { await store.stopSupervisor() } }
 
-    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(false)
@@ -411,7 +412,7 @@ final class SupervisorLifecycleTests: XCTestCase {
     XCTAssertFalse(store.isSupervisorAuditRetentionScheduledForTesting())
 
     store.setSupervisorRunInBackgroundEnabled(true)
-    XCTAssertFalse(store.isSupervisorBackgroundActivityScheduledForTesting())
+    XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())
   }
 

@@ -6,7 +6,7 @@ import XCTest
 ///
 /// Trigger: three consecutive `.actionFailed` events for the same agent emitted by
 /// `StuckAgentRule`. The rule reads history from `PolicyContext.history.recentEvents`
-/// and keys agent identity off the stored `actionKey` inside each summary's `id`.
+/// and keys agent identity off each summary's decoded `actionKey`.
 /// Every fire emits a `.queueDecision` with severity `needsUser`; the decision id is
 /// derived from the (ruleID, agentID) pair so the executor's idempotency cache
 /// treats the same unresolved loop as a duplicate until a new decision is warranted.
@@ -32,9 +32,8 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     XCTAssertEqual(payload.ruleID, "failed-nudge-loop")
     XCTAssertEqual(payload.agentID, "agent-a")
     XCTAssertTrue(payload.summary.contains("agent-a"))
-    XCTAssertTrue(payload.suggestedActionsJSON.contains("Restart agent"))
-    XCTAssertTrue(payload.suggestedActionsJSON.contains("Stop nudging this agent"))
     XCTAssertTrue(payload.suggestedActionsJSON.contains("Investigate manually"))
+    XCTAssertTrue(payload.suggestedActionsJSON.contains("Dismiss"))
   }
 
   func test_doesNotFireBelowThreshold() async {
@@ -57,10 +56,11 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
     let foreign = (0..<3).map { index in
       SupervisorEventSummary(
-        id: "nudge:other-rule:agent-a:snap-\(index)",
+        id: UUID().uuidString,
         kind: "actionFailed",
         ruleID: "other-rule",
-        createdAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(index))
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(index)),
+        actionKey: "nudge:other-rule:agent-a:snap-\(index)"
       )
     }
     let context = FailedNudgeLoopRuleFixtures.context(events: foreign)
@@ -75,10 +75,11 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
     let dispatched = (0..<3).map { index in
       SupervisorEventSummary(
-        id: "nudge:stuck-agent:agent-a:snap-\(index)",
+        id: UUID().uuidString,
         kind: "actionDispatched",
         ruleID: "stuck-agent",
-        createdAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(index))
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(index)),
+        actionKey: "nudge:stuck-agent:agent-a:snap-\(index)"
       )
     }
     let context = FailedNudgeLoopRuleFixtures.context(events: dispatched)
@@ -190,10 +191,11 @@ private enum FailedNudgeLoopRuleFixtures {
   ) -> [SupervisorEventSummary] {
     (0..<count).map { index in
       SupervisorEventSummary(
-        id: "nudge:stuck-agent:\(agentID):snap-\(index)",
+        id: UUID().uuidString,
         kind: "actionFailed",
         ruleID: "stuck-agent",
-        createdAt: Date(timeIntervalSince1970: baseSeconds + Double(index))
+        createdAt: Date(timeIntervalSince1970: baseSeconds + Double(index)),
+        actionKey: "nudge:stuck-agent:\(agentID):snap-\(index)"
       )
     }
   }

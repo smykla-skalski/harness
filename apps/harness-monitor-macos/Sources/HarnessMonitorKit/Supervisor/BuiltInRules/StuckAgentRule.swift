@@ -151,7 +151,7 @@ public struct StuckAgentRule: PolicyRule {
     let attempts =
       events
       .filter { $0.kind == "actionDispatched" && $0.ruleID == id }
-      .filter { retryAgentID(from: $0.id) == agentID }
+      .filter { retryAgentID(from: $0.actionKey ?? $0.id) == agentID }
     return RetryState(
       attemptCount: attempts.count,
       lastAttemptAt: attempts.map(\.createdAt).max()

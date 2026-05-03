@@ -147,7 +147,7 @@ public actor SupervisorService {
   }
 
   private struct TickResults {
-    var actionsByRule: [(ruleID: String, actions: [PolicyAction])] = []
+    var actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])] = []
     var failedRuleIDs: Set<String> = []
   }
 
@@ -185,7 +185,7 @@ public actor SupervisorService {
           await observer.didEvaluate(rule: evaluation.rule, actions: evaluation.actions)
         }
         if !evaluation.actions.isEmpty {
-          results.actionsByRule.append((evaluation.ruleID, evaluation.actions))
+          results.actionsByRule.append((evaluation.rule, evaluation.actions))
         }
       }
       return results
@@ -240,15 +240,19 @@ public actor SupervisorService {
   }
 
   private func dispatchActions(
-    _ actionsByRule: [(ruleID: String, actions: [PolicyAction])],
+    _ actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])],
     tickID: String,
     firedAt: Date,
     observers: [any PolicyObserver]
   ) async {
     for entry in actionsByRule {
-      recordFiredActions(forRuleID: entry.ruleID, actions: entry.actions, firedAt: firedAt)
+      recordFiredActions(forRuleID: entry.rule.id, actions: entry.actions, firedAt: firedAt)
       for action in entry.actions {
-        if shouldSuppress(action, at: clock.now()) {
+        let behavior = await registry.defaultBehavior(
+          for: entry.rule,
+          actionKey: action.actionKey
+        )
+        if shouldSuppress(action, behavior: behavior, at: clock.now()) {
           HarnessMonitorLogger.supervisorTrace(
             "supervisor.action.suppressed key=\(action.actionKey)"
           )
@@ -292,22 +296,15 @@ public actor SupervisorService {
     )
   }
 
-  private static func makeQuarantineDecision(for ruleID: String) -> PolicyAction.DecisionPayload {
-    PolicyAction.DecisionPayload(
-      id: "quarantine:\(ruleID)",
-      severity: .critical,
-      ruleID: ruleID,
-      sessionID: nil,
-      agentID: nil,
-      taskID: nil,
-      summary: "Rule \(ruleID) quarantined after repeated failures",
-      contextJSON: "{}",
-      suggestedActionsJSON: "[]"
-    )
-  }
-
-  private func shouldSuppress(_ action: PolicyAction, at now: Date) -> Bool {
-    action.isAutomaticSideEffect && suppressionActive(at: now)
+  private func shouldSuppress(
+    _ action: PolicyAction,
+    behavior: RuleDefaultBehavior,
+    at now: Date
+  ) -> Bool {
+    guard action.isAutomaticSideEffect else {
+      return false
+    }
+    return behavior == .cautious || suppressionActive(at: now)
   }
 
   private func suppressionActive(at now: Date) -> Bool {
@@ -368,7 +365,8 @@ public actor SupervisorService {
           id: $0.id,
           kind: $0.kind,
           ruleID: $0.ruleID,
-          createdAt: $0.createdAt
+          createdAt: $0.createdAt,
+          actionKey: Self.actionKey(from: $0.payloadJSON)
         )
       }
 

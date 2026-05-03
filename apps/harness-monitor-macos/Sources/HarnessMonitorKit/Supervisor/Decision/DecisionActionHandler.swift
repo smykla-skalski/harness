@@ -259,7 +259,7 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
         store.applyCodexRun(updatedRun)
       }
     default:
-      return
+      try await handleSupervisorCustomAction(action, store: store)
     }
   }
 

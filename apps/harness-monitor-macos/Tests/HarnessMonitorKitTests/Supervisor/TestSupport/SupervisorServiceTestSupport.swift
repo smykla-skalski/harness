@@ -116,7 +116,9 @@ struct AutoActionRule: PolicyRule {
   let version: Int = 1
   let parameters = PolicyParameterSchema(fields: [])
 
-  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
+  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior {
+    actionKey.hasPrefix("nudge:") ? .aggressive : .cautious
+  }
 
   func evaluate(
     snapshot: SessionsSnapshot,

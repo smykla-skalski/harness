@@ -225,6 +225,39 @@ final class SupervisorServiceTests: XCTestCase {
     XCTAssertEqual(payload.id, "decision-auto-action")
   }
 
+  func test_cautiousDefaultBehaviorOverrideSuppressesAutomaticSideEffects() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(AutoActionRule())
+    await registry.applyOverrides([
+      PolicyConfigOverride(
+        ruleID: "test.auto-action",
+        enabled: true,
+        defaultBehavior: .cautious,
+        parameters: [:]
+      )
+    ])
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let executor = try PolicyExecutor.fixture()
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: executor,
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+
+    let executions = await observer.executions
+    XCTAssertEqual(executions.count, 1, "cautious override should suppress automatic side effects")
+    guard case .queueDecision(let payload) = executions.first?.action else {
+      return XCTFail("cautious override should still allow decision queueing")
+    }
+    XCTAssertEqual(payload.id, "decision-auto-action")
+  }
+
   func test_stopDrainsInFlightTick() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()

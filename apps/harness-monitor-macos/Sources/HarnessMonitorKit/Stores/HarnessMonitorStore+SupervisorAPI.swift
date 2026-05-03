@@ -58,20 +58,24 @@ struct StoreAPIClient: SupervisorAPIClient {
     summary: String,
     decisionID: String?
   ) async {
-    guard let decisionID else {
-      _ = ruleID
-      return
-    }
     await MainActor.run {
       guard let controller = store.supervisorBindings.notificationController else {
         return
       }
       Task { @MainActor in
-        await controller.deliverSupervisorDecision(
-          severity: severity,
-          summary: summary,
-          decisionID: decisionID
-        )
+        if let decisionID {
+          await controller.deliverSupervisorDecision(
+            severity: severity,
+            summary: summary,
+            decisionID: decisionID
+          )
+        } else {
+          await controller.deliverSupervisorNotice(
+            severity: severity,
+            summary: summary,
+            ruleID: ruleID
+          )
+        }
       }
     }
   }

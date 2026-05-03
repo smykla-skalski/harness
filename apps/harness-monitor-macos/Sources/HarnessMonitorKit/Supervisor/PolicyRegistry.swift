@@ -63,6 +63,15 @@ extension PolicyRegistry {
     overrides[ruleID]?.defaultBehavior ?? .cautious
   }
 
+  /// Returns the live dispatch behavior for one rule action. Operator overrides win; otherwise
+  /// the rule's source default decides whether an automatic side effect may run immediately.
+  public func defaultBehavior(
+    for rule: any PolicyRule,
+    actionKey: String
+  ) -> RuleDefaultBehavior {
+    overrides[rule.id]?.defaultBehavior ?? rule.defaultBehavior(for: actionKey)
+  }
+
   public var observerList: [any PolicyObserver] {
     observers
   }

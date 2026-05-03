@@ -67,12 +67,20 @@ public struct SupervisorEventSummary: Sendable, Equatable, Hashable {
   public let kind: String
   public let ruleID: String?
   public let createdAt: Date
+  public let actionKey: String?
 
-  public init(id: String, kind: String, ruleID: String?, createdAt: Date) {
+  public init(
+    id: String,
+    kind: String,
+    ruleID: String?,
+    createdAt: Date,
+    actionKey: String? = nil
+  ) {
     self.id = id
     self.kind = kind
     self.ruleID = ruleID
     self.createdAt = createdAt
+    self.actionKey = actionKey
   }
 }
 

@@ -17,6 +17,10 @@ struct NudgeActionPayload: Decodable {
   let input: String?
 }
 
+struct SupervisorCustomActionPayload: Decodable {
+  let mode: String
+}
+
 struct DecisionContextEnvelope {
   let agentID: String?
 
@@ -63,7 +67,9 @@ enum StoreDecisionActionError: LocalizedError {
   case invalidCodexPayload
   case missingTargetMetadata(String)
   case daemonUnavailable
+  case daemonLogUnavailable
   case daemonRejected(any Error)
+  case unsupportedCustomAction(String)
 
   var errorDescription: String? {
     switch self {
@@ -79,8 +85,12 @@ enum StoreDecisionActionError: LocalizedError {
       "Cannot run action: missing target metadata (\(field))."
     case .daemonUnavailable:
       "Cannot run action: daemon unavailable."
+    case .daemonLogUnavailable:
+      "Cannot run action: daemon log is unavailable."
     case .daemonRejected(let error):
       "Action rejected by daemon: \(error.localizedDescription)"
+    case .unsupportedCustomAction(let mode):
+      "Cannot run action: unsupported custom action \(mode)."
     }
   }
 }
