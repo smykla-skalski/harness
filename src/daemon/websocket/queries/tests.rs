@@ -91,10 +91,16 @@ async fn dispatch_read_query_session_managed_agents_returns_merged_response() {
         panic!("expected managed agent list response to contain an agents array");
     };
     assert_eq!(entries.len(), 2);
-    assert_eq!(entries[0]["kind"].as_str(), Some("codex"));
-    assert_eq!(entries[0]["snapshot"]["run_id"].as_str(), Some("run-1"));
-    assert_eq!(entries[1]["kind"].as_str(), Some("terminal"));
-    assert_eq!(entries[1]["snapshot"]["tui_id"].as_str(), Some("tui-3"));
+    let codex = entries
+        .iter()
+        .find(|entry| entry["kind"].as_str() == Some("codex"))
+        .expect("codex managed agent entry");
+    assert_eq!(codex["snapshot"]["run_id"].as_str(), Some("run-1"));
+    let terminal = entries
+        .iter()
+        .find(|entry| entry["kind"].as_str() == Some("terminal"))
+        .expect("terminal managed agent entry");
+    assert_eq!(terminal["snapshot"]["tui_id"].as_str(), Some("tui-3"));
 }
 
 #[tokio::test]

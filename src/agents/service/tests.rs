@@ -5,6 +5,7 @@ use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
 
 use super::*;
+use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::signal::{
     DeliveryConfig, Signal, SignalPayload, SignalPriority, read_pending_signals,
 };
@@ -334,7 +335,10 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
             leader.agent_session_id.as_deref(),
             Some("claude-runtime-session")
         );
-        assert_eq!(leader.status, AgentStatus::disconnected_unknown());
+        assert_eq!(
+            leader.status,
+            AgentStatus::disconnected(DisconnectReason::UserCancelled)
+        );
         assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
         assert!(
             leader_id.is_none(),
