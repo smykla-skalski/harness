@@ -33,11 +33,14 @@ struct SessionCockpitTimelineSection: View {
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
       content(for: cachedPresentation)
     }
-    .onAppear {
-      rebuildPresentationIfNeeded(for: input, force: true)
-    }
-    .onChange(of: input) { _, newInput in
-      rebuildPresentationIfNeeded(for: newInput)
+    // .task(id:) hops state writes off the view-update phase. Synchronous
+    // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
+    // and @Observable (viewport) mutations during body eval, surfacing as an
+    // AttributeGraph cycle when ACP timeline bursts arrived faster than the
+    // run loop could drain (rdar://timeline-burst). Deferring keeps ~6.4/s
+    // body-update budget intact because rebuild only fires on input change.
+    .task(id: input) {
+      rebuildPresentationIfNeeded(for: input)
     }
   }
 
@@ -112,19 +115,49 @@ struct SessionCockpitTimelineSection: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    // The three modifiers below all use `deferOffViewUpdate { ... }` to hop
+    // state writes to the next run-loop turn. Synchronous writes here ran
+    // inside SwiftUI's view-update phase and produced an AttributeGraph cycle
+    // during ACP timeline bursts (writes to @State scrollCommand +
+    // @Observable viewport interleaved with parent body re-eval from store
+    // mutations). The helper is the single place that names the rule "no
+    // synchronous state mutation in lifecycle handlers on this view"; new
+    // handlers must route through it. Per-scroll cost is unchanged because
+    // scrollNodeIDs only flips on data update, not per scroll.
     .onAppear {
-      reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
+      deferOffViewUpdate {
+        reconcileTimelineAnchor(with: cachedPresentation.scrollNodeIDs)
+      }
       requestLatestWindowIfNeeded(presentation)
     }
     .onChange(of: sessionID) { _, _ in
-      viewport.clear()
-      scrollCommand = nil
-      pendingNavigationAfterLoad = nil
+      deferOffViewUpdate {
+        viewport.clear()
+        scrollCommand = nil
+        pendingNavigationAfterLoad = nil
+      }
       requestLatestWindow()
     }
     .onChange(of: presentation.scrollNodeIDs) { _, ids in
-      reconcileTimelineAnchor(with: ids)
-      completePendingNavigationIfNeeded(presentation)
+      deferOffViewUpdate {
+        reconcileTimelineAnchor(with: ids)
+        completePendingNavigationIfNeeded(cachedPresentation)
+      }
+    }
+  }
+
+  /// Run a state-mutating closure on the next run-loop turn instead of inside
+  /// SwiftUI's current view-update phase. Required for any write that touches
+  /// `@State` or `@Observable` storage read by this view's body or its
+  /// observable children — see the cycle context comment on `content(for:)`.
+  ///
+  /// Cost is one unstructured `Task` allocation per call. Callers must only
+  /// invoke this from change-event handlers (`.onAppear`, `.onChange`), never
+  /// from per-scroll publishes; the latter would allocate per frame and
+  /// regress the body-update budget.
+  private func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
+    Task { @MainActor in
+      work()
     }
   }
 
