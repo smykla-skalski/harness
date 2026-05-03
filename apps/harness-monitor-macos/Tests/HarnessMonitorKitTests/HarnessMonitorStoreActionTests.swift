@@ -288,6 +288,38 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.currentSuccessFeedbackMessage == "Observe session")
   }
 
+  @Test("Observe selected session refreshes summary state and triggers supervisor decisions")
+  func observeSelectedSessionRefreshesSummaryStateAndTriggersSupervisorDecisions() async throws {
+    let baselineDetail = PreviewFixtures.sessionDetail(
+      session: PreviewFixtures.summary,
+      signals: PreviewFixtures.signals,
+      observer: nil,
+      agentActivity: PreviewFixtures.agentActivity
+    )
+    let client = RecordingHarnessClient(detail: baselineDetail)
+    let store = await selectedActionStore(client: client)
+
+    let updatedSummary = observeResponseSummary(updatedAt: "2026-03-28T14:30:00Z")
+    client.detail = PreviewFixtures.sessionDetail(
+      session: updatedSummary,
+      signals: PreviewFixtures.signals,
+      observer: PreviewFixtures.observer,
+      agentActivity: PreviewFixtures.agentActivity
+    )
+
+    #expect(store.supervisorOpenDecisions.isEmpty)
+
+    await store.observeSelectedSession(actor: "observer-gwen")
+    try await Task.sleep(for: .milliseconds(150))
+
+    #expect(store.selectedSession?.observer?.openIssueCount == PreviewFixtures.observer.openIssueCount)
+    #expect(
+      store.sessionIndex.sessionSummary(for: PreviewFixtures.summary.sessionId)?.updatedAt
+        == updatedSummary.updatedAt
+    )
+    #expect(store.supervisorOpenDecisions.isEmpty == false)
+  }
+
   @Test("Mutation fallback refetches only the timeline")
   func mutationFallbackRefetchesOnlyTheTimeline() async {
     let client = RecordingHarnessClient()
@@ -385,5 +417,32 @@ struct HarnessMonitorStoreActionTests {
 
     #expect(store.isSessionActionInFlight == false)
     #expect(store.isBusy == false)
+  }
+
+  private func observeResponseSummary(updatedAt: String) -> SessionSummary {
+    let summary = PreviewFixtures.summary
+    return SessionSummary(
+      projectId: summary.projectId,
+      projectName: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      sessionId: summary.sessionId,
+      worktreePath: summary.worktreePath,
+      sharedPath: summary.sharedPath,
+      originPath: summary.originPath,
+      branchRef: summary.branchRef,
+      title: summary.title,
+      context: summary.context,
+      status: summary.status,
+      createdAt: summary.createdAt,
+      updatedAt: updatedAt,
+      lastActivityAt: updatedAt,
+      leaderId: summary.leaderId,
+      observeId: summary.observeId,
+      pendingLeaderTransfer: summary.pendingLeaderTransfer,
+      externalOrigin: summary.externalOrigin,
+      adoptedAt: summary.adoptedAt,
+      metrics: summary.metrics
+    )
   }
 }

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tokio::time::sleep;
 
 use super::{
-    CliError, Duration, ObserveSessionRequest, Path, PathBuf, SessionDetail,
+    CliError, Duration, ObserveLoopState, ObserveSessionRequest, Path, PathBuf, SessionDetail,
     apply_heuristic_gap_tasks_to_async_db, apply_issue_tasks_to_async_db, effective_project_dir,
     observe_actor_id, session_detail_from_async_daemon_db, session_not_found, session_observe,
     start_daemon_observe_loop, sync_resolved_liveness_async,
@@ -44,8 +44,10 @@ pub(crate) async fn observe_session_async(
     let issues = session_observe::scan_all_agents(&resolved.state, session_id, &project_dir)?;
     session_observe::persist_observer_snapshot(&resolved.state, &project_dir, &issues)?;
     apply_issue_tasks_to_async_db(async_db, &mut resolved, actor_id, &issues).await?;
-    async_db.sync_runtime_transcripts(&resolved).await?;
-    let _ = start_daemon_observe_loop(session_id, &project_dir, actor_id);
+    let observe_loop_state = start_daemon_observe_loop(session_id, &project_dir, actor_id);
+    if matches!(observe_loop_state, ObserveLoopState::Unavailable) {
+        async_db.sync_runtime_transcripts(&resolved).await?;
+    }
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
