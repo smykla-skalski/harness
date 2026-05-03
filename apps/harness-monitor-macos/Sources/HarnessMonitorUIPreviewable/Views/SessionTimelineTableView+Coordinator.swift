@@ -137,22 +137,21 @@ extension SessionTimelineTableView {
       // lastColumnWidth is always valid here — unlike scrollView.contentView.bounds.width
       // which may still be zero until AppKit completes its first layout pass.
       if lastColumnWidth > 1 {
-        let h = SessionTimelineTableCellView.measuredHeight(
+        let measuredHeight = SessionTimelineTableCellView.measuredHeight(
           for: rowData,
           columnWidth: lastColumnWidth
         )
-        rowHeightCache[rowData.id] = h
-        return h
+        rowHeightCache[rowData.id] = measuredHeight
+        return measuredHeight
       }
       return SessionTimelineTableMetrics.estimatedHeight(for: rowData)
     }
 
     func tableView(
       _ tableView: NSTableView,
-      viewFor tableColumn: NSTableColumn?,
+      viewFor _: NSTableColumn?,
       row: Int
     ) -> NSView? {
-      _ = tableColumn
       guard rows.indices.contains(row) else {
         return nil
       }

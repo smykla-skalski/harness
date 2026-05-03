@@ -37,13 +37,19 @@ public struct DecisionDetailView: View {
   private let decisionScope: DecisionWorkspaceScope?
   private let primaryActionFocusDecisionID: String?
   private let primaryActionFocusRequestTick: Int
+  private let primaryContentFocusScope: Namespace.ID?
+  private let primaryContentPagingResponderRequest: Int
+  private let prefersPrimaryContentFocus: Bool
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0
+    primaryActionFocusRequestTick: Int = 0,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    prefersPrimaryContentFocus: Bool = false
   ) {
     viewModel = nil
     store = nil
@@ -52,6 +58,9 @@ public struct DecisionDetailView: View {
     self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
+    self.primaryContentFocusScope = primaryContentFocusScope
+    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
+    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
     _selectedTab = selectedTab
   }
 
@@ -63,7 +72,10 @@ public struct DecisionDetailView: View {
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0
+    primaryActionFocusRequestTick: Int = 0,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    prefersPrimaryContentFocus: Bool = false
   ) {
     self.viewModel = viewModel
     self.store = store
@@ -72,6 +84,9 @@ public struct DecisionDetailView: View {
     self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
+    self.primaryContentFocusScope = primaryContentFocusScope
+    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
+    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
     _selectedTab = selectedTab
   }
 
@@ -84,7 +99,10 @@ public struct DecisionDetailView: View {
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0
+    primaryActionFocusRequestTick: Int = 0,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    prefersPrimaryContentFocus: Bool = false
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
@@ -94,7 +112,10 @@ public struct DecisionDetailView: View {
       observer: observer,
       decisionScope: decisionScope,
       primaryActionFocusDecisionID: primaryActionFocusDecisionID,
-      primaryActionFocusRequestTick: primaryActionFocusRequestTick
+      primaryActionFocusRequestTick: primaryActionFocusRequestTick,
+      primaryContentFocusScope: primaryContentFocusScope,
+      primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+      prefersPrimaryContentFocus: prefersPrimaryContentFocus
     )
   }
 
@@ -191,6 +212,13 @@ public struct DecisionDetailView: View {
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .harnessPrimaryContentFocusTarget(
+      focusScope: primaryContentFocusScope,
+      prefersDefaultFocus: prefersPrimaryContentFocus,
+      pagingResponderRequest: primaryContentPagingResponderRequest,
+      listIdentifier: HarnessMonitorAccessibility.decisionDetailScrollView,
+      listLabel: "Decision detail"
+    )
   }
 
   @ViewBuilder private var emptyState: some View {
@@ -200,6 +228,13 @@ public struct DecisionDetailView: View {
           .padding(HarnessMonitorTheme.spacingLG)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .harnessPrimaryContentFocusTarget(
+        focusScope: primaryContentFocusScope,
+        prefersDefaultFocus: prefersPrimaryContentFocus,
+        pagingResponderRequest: primaryContentPagingResponderRequest,
+        listIdentifier: HarnessMonitorAccessibility.decisionDetailScrollView,
+        listLabel: "Decision detail"
+      )
     } else {
       VStack(spacing: 12) {
         Image(systemName: "bell.badge")
@@ -216,78 +251,8 @@ public struct DecisionDetailView: View {
     }
   }
 
-  private func suggestedActions(
-    _ viewModel: DecisionDetailViewModel,
-    contextAdapter: DecisionKindContextAdapter
-  ) -> some View {
-    let effectiveActions = contextAdapter.suggestedActions(from: viewModel.suggestedActions)
-    let primaryActionID = primaryActionID(for: effectiveActions)
-    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Suggested Actions")
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if effectiveActions.isEmpty {
-        Text("No actions are available for this decision yet.")
-          .scaledFont(.callout)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      } else {
-        actionButtonGroup(
-          actions: effectiveActions,
-          primaryActionID: primaryActionID,
-          viewModel: viewModel,
-          contextAdapter: contextAdapter
-        )
-      }
-    }
-  }
-
   @ViewBuilder
-  private func actionButtonGroup(
-    actions: [SuggestedAction],
-    primaryActionID: String?,
-    viewModel: DecisionDetailViewModel,
-    contextAdapter: DecisionKindContextAdapter
-  ) -> some View {
-    let emphasizedPrimaryActionID =
-      primaryActionID.flatMap { candidateID in
-        actions.first { $0.id == candidateID && isProminentActionCandidate($0) }?.id
-      }
-    let wrappedActions = actions.filter { $0.id != emphasizedPrimaryActionID }
-
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      if let emphasizedPrimaryActionID,
-        let primaryAction = actions.first(where: { $0.id == emphasizedPrimaryActionID })
-      {
-        actionButton(
-          for: primaryAction,
-          viewModel: viewModel,
-          contextAdapter: contextAdapter,
-          isPrimaryFocusTarget: primaryActionID == emphasizedPrimaryActionID,
-          emphasizesAction: true,
-          fillsWidth: true
-        )
-      }
-      if !wrappedActions.isEmpty {
-        HarnessMonitorWrapLayout(
-          spacing: HarnessMonitorTheme.itemSpacing,
-          lineSpacing: HarnessMonitorTheme.spacingXS
-        ) {
-          ForEach(wrappedActions) { action in
-            actionButton(
-              for: action,
-              viewModel: viewModel,
-              contextAdapter: contextAdapter,
-              isPrimaryFocusTarget: action.id == primaryActionID,
-              emphasizesAction: false
-            )
-          }
-        }
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func actionButton(
+  func actionButton(
     for action: SuggestedAction,
     viewModel: DecisionDetailViewModel,
     contextAdapter: DecisionKindContextAdapter,

@@ -56,6 +56,14 @@ extension WorkspaceWindowView {
       .scaledFont(.system(.body, design: .monospaced))
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .padding(HarnessMonitorTheme.spacingMD)
+      .harnessPrimaryContentFocusTarget(
+        focusScope: currentPrimaryContentFocusTarget == .liveViewport
+          ? currentPrimaryContentFocusScope : nil,
+        prefersDefaultFocus: currentPrimaryContentFocusTarget == .liveViewport,
+        pagingResponderRequest: currentPrimaryContentPagingRequest,
+        listIdentifier: HarnessMonitorAccessibility.agentTuiViewport,
+        listLabel: "Terminal viewport"
+      )
     }
     .frame(
       maxWidth: .infinity,
@@ -68,7 +76,6 @@ extension WorkspaceWindowView {
     } action: { viewportSize in
       updateViewportGeometry(viewportSize, for: tui)
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiViewport)
   }
   func terminalError(_ error: String) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -339,6 +346,7 @@ extension WorkspaceWindowView {
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
         .focused(focusedFieldBinding, equals: field)
+        .harnessPreservePrimaryContentFocus()
         .accessibilityLabel(accessibilityLabel ?? placeholder)
         .accessibilityHint(accessibilityHint ?? "")
         .accessibilityIdentifier(accessibilityIdentifier)

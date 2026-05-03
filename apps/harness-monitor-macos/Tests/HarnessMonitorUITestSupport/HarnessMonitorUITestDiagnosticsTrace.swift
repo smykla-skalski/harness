@@ -101,7 +101,8 @@ func preservedAppTraceFileURLs() -> [URL] {
     return []
   }
 
-  return fileURLs
+  return
+    fileURLs
     .filter { $0.lastPathComponent.hasSuffix("-app-trace.jsonl") }
     .sorted { lhs, rhs in
       let lhsDate =
@@ -121,8 +122,10 @@ func appendDiagnosticsTrace(
   details: [String: String] = [:],
   artifactsDirectoryKey: String
 ) {
-  let fileURLs = [diagnosticsTraceFileURL(for: artifactsDirectoryKey), preservedDiagnosticsTraceFileURL()]
-    .compactMap { $0 }
+  let fileURLs = [
+    diagnosticsTraceFileURL(for: artifactsDirectoryKey), preservedDiagnosticsTraceFileURL(),
+  ]
+  .compactMap { $0 }
   guard !fileURLs.isEmpty else {
     return
   }
@@ -176,7 +179,7 @@ extension HarnessMonitorUITestCase {
     _ expectedEvents: [String],
     timeout: TimeInterval
   ) -> Bool {
-    return waitUntil(timeout: timeout) {
+    waitUntil(timeout: timeout) {
       let candidateFiles =
         [appTraceFileURL(for: Self.artifactsDirectoryKey)].compactMap { $0 }
         + preservedAppTraceFileURLs()
@@ -190,7 +193,8 @@ extension HarnessMonitorUITestCase {
         else {
           continue
         }
-        let events = contents
+        let events =
+          contents
           .split(whereSeparator: \.isNewline)
           .compactMap(Self.decodeTraceEvent(from:))
           .map(\.event)

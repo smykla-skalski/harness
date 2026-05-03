@@ -31,6 +31,13 @@ extension WorkspaceWindowView {
         paneContent(decisionScope: decisionScope)
           .padding(HarnessMonitorTheme.spacingLG)
       }
+      .harnessPrimaryContentFocusTarget(
+        focusScope: currentPrimaryContentFocusScope,
+        prefersDefaultFocus: currentPrimaryContentFocusTarget == .genericDetail,
+        pagingResponderRequest: currentPrimaryContentPagingRequest,
+        listIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
+        listLabel: "Workspace detail"
+      )
       .overlay { workspaceStateMarkerOverlay() }
     }
   }

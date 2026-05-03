@@ -1,32 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-enum SessionTimelinePlaceholderShimmer {
-  static let cycleDuration: TimeInterval = 1.15
-  private static let leadingPhase: CGFloat = -0.6
-  private static let trailingPhase: CGFloat = 1.8
-
-  static func shouldAnimate(reduceMotion: Bool, placeholderCount: Int) -> Bool {
-    !reduceMotion && placeholderCount > 0
-  }
-
-  static func phase(at date: Date) -> CGFloat {
-    let cycleProgress =
-      date.timeIntervalSinceReferenceDate
-      .truncatingRemainder(dividingBy: cycleDuration)
-      / cycleDuration
-    return leadingPhase + ((trailingPhase - leadingPhase) * cycleProgress)
-  }
-
-  static var restingPhase: CGFloat {
-    0
-  }
-}
-
-struct SessionTimelineContentIdentity: Hashable, Sendable {
-  let sessionID: String
-}
-
 struct SessionTimelinePresentationInput: Equatable {
   let sessionID: String
   let timelineCount: Int
@@ -66,5 +40,39 @@ struct SessionTimelinePresentationInput: Equatable {
       reduceMotion: false,
       dateTimeConfiguration: .default
     )
+  }
+}
+
+struct SessionTimelineContentIdentity: Hashable {
+  let sessionID: String
+}
+
+enum SessionTimelinePlaceholderShimmer {
+  static let cycleDuration: TimeInterval = 1.8
+  static let restingPhase: CGFloat = -0.6
+
+  static func shouldAnimate(reduceMotion: Bool, placeholderCount: Int) -> Bool {
+    !reduceMotion && placeholderCount > 0
+  }
+
+  static func phase(at date: Date = Date()) -> CGFloat {
+    let elapsedInCycle = date.timeIntervalSinceReferenceDate
+      .truncatingRemainder(dividingBy: cycleDuration)
+    let cycleProgress = elapsedInCycle / cycleDuration
+    return restingPhase + (CGFloat(cycleProgress) * 2.4)
+  }
+}
+
+extension SessionCockpitTimelineSection {
+  var contentIdentity: SessionTimelineContentIdentity {
+    SessionTimelineContentIdentity(sessionID: sessionID)
+  }
+
+  func loadWindow(_ request: TimelineWindowRequest) async {
+    await store.loadSelectedTimelineWindow(request: request)
+  }
+
+  var actionHandler: any DecisionActionHandler {
+    store.supervisorDecisionActionHandler()
   }
 }

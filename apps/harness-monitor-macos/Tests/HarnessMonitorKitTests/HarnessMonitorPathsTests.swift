@@ -122,7 +122,8 @@ struct HarnessMonitorPathsTests {
   func runtimeProfileCanBeInferredFromBundlePath() {
     let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let bundleURL = URL(
-      fileURLWithPath: "/tmp/repo/xcode-derived/profiles/my-profile/Build/Products/Debug/Harness Monitor.app",
+      fileURLWithPath:
+        "/tmp/repo/xcode-derived/profiles/my-profile/Build/Products/Debug/Harness Monitor.app",
       isDirectory: true
     )
     let environment = HarnessMonitorEnvironment(
@@ -150,15 +151,21 @@ struct HarnessMonitorPathsTests {
       profile: "bart-dev"
     )
     let expectedPort = HarnessMonitorPaths.codexBridgePort(using: environment)
+    let expectedPrefix = """
+      HARNESS_MONITOR_RUNTIME_PROFILE='bart-dev' \
+      HARNESS_DAEMON_DATA_HOME='\(expectedRoot.path)' \
+      HARNESS_CODEX_WS_PORT='\(expectedPort!)'
+      """
+    let expectedCommand = "\(expectedPrefix) harness bridge start"
 
     #expect(expectedPort != nil)
     #expect(
       HarnessMonitorPaths.commandEnvironmentPrefix(using: environment)
-        == "HARNESS_MONITOR_RUNTIME_PROFILE='bart-dev' HARNESS_DAEMON_DATA_HOME='\(expectedRoot.path)' HARNESS_CODEX_WS_PORT='\(expectedPort!)'"
+        == expectedPrefix
     )
     #expect(
       HarnessMonitorPaths.shellCommand("harness bridge start", using: environment)
-        == "HARNESS_MONITOR_RUNTIME_PROFILE='bart-dev' HARNESS_DAEMON_DATA_HOME='\(expectedRoot.path)' HARNESS_CODEX_WS_PORT='\(expectedPort!)' harness bridge start"
+        == expectedCommand
     )
   }
 

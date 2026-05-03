@@ -21,14 +21,7 @@ struct SessionCockpitTimelineSection: View {
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var viewport = SessionTimelineViewportModel()
 
-  private var contentIdentity: SessionTimelineContentIdentity {
-    SessionTimelineContentIdentity(sessionID: sessionID)
-  }
-
   var body: some View {
-    #if DEBUG
-      let _ = Self._printChanges()
-    #endif
     let input = presentationInput
     ViewBodySignposter.measure("SessionCockpitTimelineSection") {
       content(for: cachedPresentation)
@@ -42,14 +35,6 @@ struct SessionCockpitTimelineSection: View {
     .task(id: input) {
       rebuildPresentationIfNeeded(for: input)
     }
-  }
-
-  private func loadWindow(_ request: TimelineWindowRequest) async {
-    await store.loadSelectedTimelineWindow(request: request)
-  }
-
-  private var actionHandler: any DecisionActionHandler {
-    store.supervisorDecisionActionHandler()
   }
 
   private var presentationInput: SessionTimelinePresentationInput {
@@ -197,7 +182,11 @@ struct SessionCockpitTimelineSection: View {
   ) -> some View {
     Group {
       if presentation.rows.isEmpty {
-        timelinePlaceholderContent(for: presentation)
+        SessionTimelinePlaceholderScrollView(
+          presentation: presentation,
+          actionHandler: actionHandler,
+          contentIdentity: contentIdentity
+        )
       } else {
         GeometryReader { geo in
           SessionTimelineTableView(
@@ -219,28 +208,6 @@ struct SessionCockpitTimelineSection: View {
     }
     .frame(height: presentation.viewportHeight)
   }
-
-  private func timelinePlaceholderContent(
-    for presentation: SessionTimelineSectionPresentation
-  ) -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        SessionTimelineCards(
-          rows: [],
-          placeholderCount: presentation.placeholderCount,
-          shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
-          showsShimmer: presentation.shouldAnimatePlaceholders,
-          actionHandler: actionHandler
-        )
-      }
-      .id(contentIdentity)
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .scrollIndicators(.visible)
-    .scrollBounceBehavior(.always, axes: .vertical)
-    .scrollClipDisabled(false)
-  }
-
 }
 
 extension SessionCockpitTimelineSection {

@@ -44,7 +44,7 @@ public final class HarnessMonitorStore {
     }
   }
   public var pendingWorkspaceSelection: WorkspaceSelection?
-  var pendingWorkspaceDecisionFilterResetRequested = false
+  var pendingWorkspaceDecisionFilterReset = false
   var pendingWorkspaceCreateEntryPoint: WorkspaceCreateEntryPoint?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
