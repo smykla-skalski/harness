@@ -333,19 +333,88 @@ pub fn host_bridge_manifest() -> Result<HostBridgeManifest, CliError> {
     })
 }
 
+/// Like [`host_bridge_manifest`] but, when the daemon's own root has no
+/// running bridge, scans the same plausible-root list the bridge CLI uses
+/// ([`crate::daemon::discovery::candidate_daemon_locations`]) and adopts
+/// the first sibling root whose `bridge.lock` is held and `bridge.json`
+/// is readable - **as long as that sibling shares the daemon's profile
+/// family**.
+///
+/// Family classification ([`crate::daemon::discovery::profile_family_of`])
+/// keeps agent lanes hermetic: an agent daemon never sees a user/base
+/// bridge, a user/base daemon never sees an agent bridge, and two
+/// different agent ids never see each other.
+///
+/// This fixes the order-of-startup hazard where a non-agent bridge that
+/// fell back to the env-derived root was invisible to a sibling
+/// non-agent daemon, silently disabling ACP / agent-tui / codex even
+/// though the bridge is healthy.
+///
+/// # Errors
+/// Returns [`CliError`] when the persisted bridge state cannot be read.
+pub fn host_bridge_manifest_with_discovery() -> Result<HostBridgeManifest, CliError> {
+    use crate::daemon::discovery::{
+        candidate_daemon_locations, families_compatible, profile_family_of,
+    };
+
+    let primary = host_bridge_manifest()?;
+    if primary.running {
+        return Ok(primary);
+    }
+    let own_root = state::daemon_root();
+    let own_family = profile_family_of(&own_root);
+    for candidate in candidate_daemon_locations() {
+        if candidate.root == own_root {
+            continue;
+        }
+        if !families_compatible(&own_family, &profile_family_of(&candidate.root)) {
+            continue;
+        }
+        if let Some(state) = read_bridge_state_at(&candidate.root)?
+            && state::flock_is_held_at(&candidate.root.join(state::BRIDGE_LOCK_FILE))
+        {
+            log_sibling_bridge_adoption(&own_root, &candidate.root);
+            let report = status_report_from_state(&state);
+            return Ok(HostBridgeManifest {
+                running: true,
+                socket_path: report.socket_path,
+                capabilities: report.capabilities,
+            });
+        }
+    }
+    Ok(HostBridgeManifest::default())
+}
+
+fn read_bridge_state_at(root: &Path) -> Result<Option<BridgeState>, CliError> {
+    let path = root.join("bridge.json");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    read_json_typed(&path).map(Some)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_sibling_bridge_adoption(own_root: &Path, sibling_root: &Path) {
+    tracing::info!(
+        own_root = %own_root.display(),
+        sibling_root = %sibling_root.display(),
+        "host bridge: adopted sibling-root bridge state (cross-profile discovery)"
+    );
+}
+
 /// Return the live `codex` capability manifest, if present.
 ///
 /// # Errors
 /// Returns [`CliError`] when the bridge state cannot be read.
 pub fn running_codex_capability() -> Result<Option<HostBridgeCapabilityManifest>, CliError> {
-    let Some(running) = resolve_running_bridge(LivenessMode::LockOnly)? else {
+    let manifest = host_bridge_manifest_with_discovery()?;
+    if !manifest.running {
         return Ok(None);
-    };
-    Ok(running
-        .report
-        .capabilities
-        .get(BRIDGE_CAPABILITY_CODEX)
-        .cloned())
+    }
+    Ok(manifest.capabilities.get(BRIDGE_CAPABILITY_CODEX).cloned())
 }
 
 /// Return the live `codex` WebSocket endpoint, if present.

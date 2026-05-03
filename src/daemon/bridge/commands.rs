@@ -1,5 +1,7 @@
 use std::env::{current_exe, var_os};
 use std::ffi::{OsStr, OsString};
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use clap::Subcommand;
 use fs_err as fs;
@@ -17,6 +19,15 @@ use crate::infra::io::write_text;
 /// app-managed daemon is watching.
 const HARNESS_MONITOR_RUNTIME_PROFILE_ENV: &str = "HARNESS_MONITOR_RUNTIME_PROFILE";
 const AGENT_RUNTIME_PROFILE_PREFIX: &str = "agent-";
+
+/// Maximum time `bridge start` waits for a running daemon to appear at one
+/// of the candidate roots before falling back to the env-derived path.
+/// Override with `HARNESS_BRIDGE_START_DAEMON_WAIT_MS`. Default 4 seconds
+/// covers a normal `monitor:user` Xcode-launch race; agent lanes opt out
+/// via the existing skip rule.
+const BRIDGE_START_DAEMON_WAIT_DEFAULT: Duration = Duration::from_secs(4);
+const BRIDGE_START_DAEMON_WAIT_ENV: &str = "HARNESS_BRIDGE_START_DAEMON_WAIT_MS";
+const BRIDGE_START_DAEMON_WAIT_POLL: Duration = Duration::from_millis(150);
 
 use super::bridge_state::{
     clear_bridge_state, ensure_host_context, status_report, write_bridge_config,
@@ -86,12 +97,21 @@ fn should_skip_daemon_root_adoption(profile: &OsStr) -> bool {
 /// subcommand so its state writes target whatever daemon is actually
 /// running (sandboxed managed, `harness daemon dev`, or a plain
 /// `daemon serve`), regardless of which env vars the calling terminal
-/// had set. See [`crate::daemon::discovery`] for the scan algorithm.
+/// had set. See [`crate::daemon::discovery`] for the scan algorithm and
+/// the strict family rules that prevent agent ↔ user lane crosstalk.
 ///
-/// Adoption is skipped only for `agent-*` runtime profiles: those lanes
-/// are intentionally isolated and must not silently inherit a different
-/// daemon root. Personal profiles still adopt the live daemon root when
-/// needed so Xcode-launched apps and terminal bridge commands stay aligned.
+/// Adoption is skipped early for `agent-*` runtime profiles: even though
+/// [`discovery::adopt_running_daemon_root`] enforces family isolation
+/// itself, the early skip keeps the log line clean for agent lanes that
+/// always pin their own daemon root explicitly.
+///
+/// On `bridge-start`, when no daemon is yet running at the effective
+/// root, this function polls candidate roots up to
+/// [`BRIDGE_START_DAEMON_WAIT_DEFAULT`] (overridable via
+/// `HARNESS_BRIDGE_START_DAEMON_WAIT_MS`). This keeps user-launched
+/// orderings forgiving - the user can run `monitor:user:bridge:start`
+/// then click Run in Xcode, and the bridge still lands on the right
+/// daemon root once the app comes up.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
@@ -107,7 +127,20 @@ fn adopt_daemon_root_for_bridge_command(command: &'static str) {
         );
         return;
     }
-    match discovery::adopt_running_daemon_root() {
+    let outcome = if command == "bridge-start" {
+        adopt_with_daemon_wait(bridge_start_daemon_wait_timeout())
+    } else {
+        discovery::adopt_running_daemon_root()
+    };
+    log_adoption_outcome(command, &outcome);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_adoption_outcome(command: &'static str, outcome: &AdoptionOutcome) {
+    match outcome {
         AdoptionOutcome::AlreadyCoherent { root } => {
             tracing::debug!(
                 command,
@@ -131,6 +164,26 @@ fn adopt_daemon_root_for_bridge_command(command: &'static str) {
             );
         }
     }
+}
+
+fn adopt_with_daemon_wait(timeout: Duration) -> AdoptionOutcome {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let outcome = discovery::adopt_running_daemon_root();
+        if !matches!(outcome, AdoptionOutcome::NoRunningDaemon { .. }) {
+            return outcome;
+        }
+        if Instant::now() >= deadline {
+            return outcome;
+        }
+        sleep(BRIDGE_START_DAEMON_WAIT_POLL);
+    }
+}
+
+fn bridge_start_daemon_wait_timeout() -> Duration {
+    var_os(BRIDGE_START_DAEMON_WAIT_ENV)
+        .and_then(|raw| raw.to_string_lossy().trim().parse::<u64>().ok())
+        .map_or(BRIDGE_START_DAEMON_WAIT_DEFAULT, Duration::from_millis)
 }
 
 impl Execute for BridgeStartArgs {

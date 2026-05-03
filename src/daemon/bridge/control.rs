@@ -9,7 +9,7 @@ use crate::daemon::state;
 use crate::errors::CliError;
 
 use super::bridge_state::{
-    LivenessMode, ResolvedRunningBridge, clear_bridge_state, host_bridge_manifest,
+    LivenessMode, ResolvedRunningBridge, clear_bridge_state, host_bridge_manifest_with_discovery,
     resolve_running_bridge,
 };
 use super::client::BridgeClient;
@@ -188,7 +188,7 @@ fn build_manifest_watcher(
 pub(crate) fn compute_bridge_manifest_update(
     current: &state::DaemonManifest,
 ) -> Option<state::DaemonManifest> {
-    let host_bridge = host_bridge_manifest().ok()?;
+    let host_bridge = host_bridge_manifest_with_discovery().ok()?;
     if current.host_bridge == host_bridge {
         return None;
     }
