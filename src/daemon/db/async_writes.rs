@@ -1,4 +1,4 @@
-use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
+use sqlx::{QueryBuilder, Sqlite, Transaction, query, query_as, query_scalar};
 
 mod persist;
 mod sql;
@@ -9,8 +9,8 @@ use self::persist::{
 use self::sql::{
     ADVANCE_CHANGE_SEQUENCE_SQL, CURRENT_CHANGE_SEQUENCE_SQL, DELETE_SESSION_AGENTS_SQL,
     DELETE_SESSION_ROW_SQL, DELETE_SESSION_TASKS_SQL, ENSURE_SESSION_TIMELINE_STATE_SQL,
-    INSERT_AGENT_SQL, INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, INSERT_TASK_SQL,
-    MARK_SESSION_ACTIVE_SQL, NEXT_LOG_SEQUENCE_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL,
+    INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, INSERT_TASK_SQL, MARK_SESSION_ACTIVE_SQL,
+    NEXT_LOG_SEQUENCE_SQL, UPSERT_AGENT_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL,
     UPSERT_SESSION_SQL, UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
 };
 use super::{
@@ -358,18 +358,14 @@ async fn replace_agents(
     session_id: &str,
     agents: &BTreeMap<String, AgentRegistration>,
 ) -> Result<(), CliError> {
-    query(DELETE_SESSION_AGENTS_SQL)
-        .bind(session_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("delete async agents: {error}")))?;
+    delete_stale_agents(transaction, session_id, agents).await?;
 
     for (agent_id, agent) in agents {
         let capabilities_json = serde_json::to_string(&agent.capabilities).unwrap_or_default();
         let runtime_capabilities_json =
             serde_json::to_string(&agent.runtime_capabilities).unwrap_or_default();
 
-        query(INSERT_AGENT_SQL)
+        query(UPSERT_AGENT_SQL)
             .bind(agent_id)
             .bind(session_id)
             .bind(&agent.name)
@@ -400,8 +396,42 @@ async fn replace_agents(
             .bind(runtime_capabilities_json)
             .execute(transaction.as_mut())
             .await
-            .map_err(|error| db_error(format!("insert async agent {agent_id}: {error}")))?;
+            .map_err(|error| db_error(format!("upsert async agent {agent_id}: {error}")))?;
     }
+    Ok(())
+}
+
+async fn delete_stale_agents(
+    transaction: &mut Transaction<'_, Sqlite>,
+    session_id: &str,
+    agents: &BTreeMap<String, AgentRegistration>,
+) -> Result<(), CliError> {
+    if agents.is_empty() {
+        query(DELETE_SESSION_AGENTS_SQL)
+            .bind(session_id)
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("delete async agents: {error}")))?;
+        return Ok(());
+    }
+
+    let mut delete_query = QueryBuilder::<Sqlite>::new(
+        "DELETE FROM agents WHERE session_id = ",
+    );
+    delete_query.push_bind(session_id);
+    delete_query.push(" AND agent_id NOT IN (");
+    {
+        let mut separated = delete_query.separated(", ");
+        for agent_id in agents.keys() {
+            separated.push_bind(agent_id.as_str());
+        }
+    }
+    delete_query.push(")");
+    delete_query
+        .build()
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("delete stale async agents: {error}")))?;
     Ok(())
 }
 

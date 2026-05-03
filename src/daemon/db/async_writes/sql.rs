@@ -46,11 +46,25 @@ ON CONFLICT(session_id) DO NOTHING";
 
 pub(super) const DELETE_SESSION_AGENTS_SQL: &str = "DELETE FROM agents WHERE session_id = ?1";
 
-pub(super) const INSERT_AGENT_SQL: &str = "INSERT INTO agents (
+pub(super) const UPSERT_AGENT_SQL: &str = "INSERT INTO agents (
     agent_id, session_id, name, runtime, role, capabilities_json,
     status, agent_session_id, managed_agent_kind, managed_agent_id, joined_at, updated_at,
     last_activity_at, current_task_id, runtime_capabilities_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)";
+ ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+ON CONFLICT(session_id, agent_id) DO UPDATE SET
+    name = excluded.name,
+    runtime = excluded.runtime,
+    role = excluded.role,
+    capabilities_json = excluded.capabilities_json,
+    status = excluded.status,
+    agent_session_id = excluded.agent_session_id,
+    managed_agent_kind = excluded.managed_agent_kind,
+    managed_agent_id = excluded.managed_agent_id,
+    joined_at = excluded.joined_at,
+    updated_at = excluded.updated_at,
+    last_activity_at = excluded.last_activity_at,
+    current_task_id = excluded.current_task_id,
+    runtime_capabilities_json = excluded.runtime_capabilities_json";
 
 pub(super) const DELETE_SESSION_TASKS_SQL: &str = "DELETE FROM tasks WHERE session_id = ?1";
 
