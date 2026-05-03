@@ -2724,6 +2724,7 @@ dependencies = [
  "serde_yml",
  "sha2 0.11.0",
  "shell-words",
+ "signal-hook 0.3.18",
  "similar 3.1.0",
  "sqlx",
  "tabled",

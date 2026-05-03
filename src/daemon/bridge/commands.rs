@@ -1,4 +1,5 @@
-use std::env::current_exe;
+use std::env::{current_exe, var_os};
+use std::ffi::OsString;
 
 use clap::Subcommand;
 use fs_err as fs;
@@ -8,6 +9,13 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::discovery::{self, AdoptionOutcome};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
+
+/// When this env var is set the bridge is being launched against a
+/// dedicated profile (parallel agent lane, personal user lane, etc).
+/// In that case the bridge must keep its state at the profile-specific
+/// daemon root - cross-profile adoption silently routes state to a
+/// stranger daemon and leads to mismatched ports / lost manifests.
+const HARNESS_MONITOR_RUNTIME_PROFILE_ENV: &str = "HARNESS_MONITOR_RUNTIME_PROFILE";
 
 use super::bridge_state::{
     clear_bridge_state, ensure_host_context, status_report, write_bridge_config,
@@ -56,16 +64,39 @@ impl Execute for BridgeCommand {
     }
 }
 
+/// Return the active runtime profile when the env var is set to a
+/// non-empty value. Extracted as its own function so adoption-skip
+/// behavior is unit-testable without invoking the discovery scan.
+fn pinned_runtime_profile() -> Option<OsString> {
+    let profile = var_os(HARNESS_MONITOR_RUNTIME_PROFILE_ENV)?;
+    if profile.is_empty() {
+        return None;
+    }
+    Some(profile)
+}
+
 /// Adopt the running daemon's root for the duration of this bridge
 /// subcommand so its state writes target whatever daemon is actually
 /// running (sandboxed managed, `harness daemon dev`, or a plain
 /// `daemon serve`), regardless of which env vars the calling terminal
 /// had set. See [`crate::daemon::discovery`] for the scan algorithm.
+///
+/// Adoption is skipped when `HARNESS_MONITOR_RUNTIME_PROFILE` is set:
+/// the caller has explicitly opted into an isolated profile lane and
+/// must not silently inherit a different profile's daemon root.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 fn adopt_daemon_root_for_bridge_command(command: &'static str) {
+    if let Some(profile) = pinned_runtime_profile() {
+        tracing::info!(
+            command,
+            profile = %profile.to_string_lossy(),
+            "bridge: profile pinned via env, skipping daemon root adoption"
+        );
+        return;
+    }
     match discovery::adopt_running_daemon_root() {
         AdoptionOutcome::AlreadyCoherent { root } => {
             tracing::debug!(
@@ -230,5 +261,36 @@ impl BridgeReconfigureArgs {
         };
         request.validate()?;
         Ok(request)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HARNESS_MONITOR_RUNTIME_PROFILE_ENV, OsString, pinned_runtime_profile};
+
+    #[test]
+    fn pinned_runtime_profile_returns_value_when_env_is_set() {
+        temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, Some("agent-foo"), || {
+            assert_eq!(
+                pinned_runtime_profile(),
+                Some(OsString::from("agent-foo"))
+            );
+        });
+    }
+
+    #[test]
+    fn pinned_runtime_profile_is_none_when_env_is_unset() {
+        temp_env::with_var(
+            HARNESS_MONITOR_RUNTIME_PROFILE_ENV,
+            None::<&str>,
+            || assert_eq!(pinned_runtime_profile(), None),
+        );
+    }
+
+    #[test]
+    fn pinned_runtime_profile_is_none_when_env_is_empty() {
+        temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, Some(""), || {
+            assert_eq!(pinned_runtime_profile(), None);
+        });
     }
 }

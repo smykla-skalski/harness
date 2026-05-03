@@ -1,17 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::Permissions;
 use std::io::{BufRead, BufReader, ErrorKind, Write as _};
-use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener;
+use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use fs_err as fs;
 
+use crate::agents::acp::supervision::kill_process_group;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
 use crate::errors::{CliError, CliErrorKind};
 
@@ -108,6 +110,7 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
         config.persisted.clone(),
         capabilities,
     ));
+    super::shutdown_signals::install(Arc::clone(&server))?;
     write_bridge_config(&config.persisted)?;
     if config.capabilities.contains(&BridgeCapability::Codex) {
         server.enable_codex(config)?;
@@ -266,15 +269,8 @@ pub(crate) fn probe_codex_readiness(endpoint: &str, timeout: Duration) -> Result
     ))
 }
 
-fn kill_codex_process(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-fn ensure_codex_port_available(port: u16) -> Result<(), String> {
-    TcpListener::bind(("127.0.0.1", port))
-        .map(drop)
-        .map_err(|error| format!("127.0.0.1:{port} is unavailable: {error}"))
+pub(super) fn kill_codex_process_group(process: &mut BridgeCodexProcess) {
+    kill_process_group(process.pgid, &mut process.child);
 }
 
 #[expect(
@@ -355,7 +351,7 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
                 "error",
                 &format!("codex host bridge readiness timed out on {endpoint}: {probe_error}"),
             );
-            kill_codex_process(&mut process.child);
+            kill_codex_process_group(process);
             return Err(CliErrorKind::workflow_io(format!(
                 "codex app-server did not become ready on {endpoint}: {probe_error}"
             ))
@@ -375,7 +371,7 @@ pub(super) fn spawn_codex_process(
     port: u16,
 ) -> Result<BridgeCodexProcess, CliError> {
     let listen_address = format!("ws://127.0.0.1:{port}");
-    if let Err(error) = ensure_codex_port_available(port) {
+    if let Err(error) = super::stale_codex::ensure_codex_port_available(port, binary) {
         tracing::error!(
             binary_path = %binary.display(),
             endpoint = %listen_address,
@@ -395,23 +391,27 @@ pub(super) fn spawn_codex_process(
     let child = Command::new(binary)
         .args(["app-server", "--listen", &listen_address])
         .stdin(Stdio::null())
+        .process_group(0)
         .spawn()
         .map_err(|error| CliErrorKind::workflow_io(format!("spawn codex app-server: {error}")))?;
     let version = detect_codex_version(binary);
-    let pid = child.id();
+    let codex_pid = child.id();
+    let group_leader = codex_pid.cast_signed();
     tracing::info!(
         binary_path = %binary.display(),
         endpoint = %listen_address,
         port,
-        pid,
+        pid = codex_pid,
+        pgid = group_leader,
         "spawned codex app-server"
     );
     state::append_event_best_effort(
         "info",
-        &format!("starting codex host bridge on {listen_address} (pid {pid})"),
+        &format!("starting codex host bridge on {listen_address} (pid {codex_pid})"),
     );
     let mut process = BridgeCodexProcess {
         child,
+        pgid: group_leader,
         endpoint: listen_address,
         metadata: BridgeCodexMetadata {
             port,
