@@ -119,6 +119,8 @@ if (( $# == 0 )); then
   printf '\nNext commands:\n'
   printf '  mise run monitor:agent:build\n'
   printf '  mise run monitor:agent:test\n'
+  printf '  mise run monitor:agent:daemon:dev\n'
+  printf '  mise run monitor:agent:bridge:start\n'
   printf '  mise run monitor:agent:xcodebuild -- ...\n'
   printf '  mise run monitor:agent:xcodebuildmcp -- macos build --scheme HarnessMonitor\n'
   printf '  mise run monitor:agent:mcp\n'
