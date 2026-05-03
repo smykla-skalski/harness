@@ -30,12 +30,12 @@ use super::providers::{build_export_providers, telemetry_resource};
 /// Returns an error when telemetry export configuration cannot be resolved or
 /// when the tracing subscriber cannot be initialized.
 pub fn init_tracing_subscriber() -> Result<TelemetryGuard, CliError> {
-    let filter = crate::resolved_log_filter_from_env();
+    let service = runtime_service_from_current_process();
+    let filter = crate::resolved_log_filter_for_service(service)?;
     let (filter_layer, handle) = reload::Layer::new(filter);
     crate::set_log_filter_handle(handle);
 
     let use_json_format = env::var("HARNESS_LOG_FORMAT").ok().as_deref() == Some("json");
-    let service = runtime_service_from_current_process();
     let export = resolve_telemetry_config()?;
 
     if let Some(export) = export {

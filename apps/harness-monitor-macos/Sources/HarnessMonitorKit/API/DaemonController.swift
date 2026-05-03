@@ -328,7 +328,12 @@ public struct DaemonController: DaemonControlling {
     guard FileManager.default.fileExists(atPath: helperURL.path) else {
       return nil
     }
-    return try ManagedLaunchAgentBundleStamp(helperURL: helperURL)
+    let launchAgentPlistURL = Bundle.main.bundleURL
+      .appendingPathComponent(HarnessMonitorPaths.launchAgentBundleRelativePath)
+    return try ManagedLaunchAgentBundleStamp(
+      helperURL: helperURL,
+      launchAgentPlistURL: launchAgentPlistURL
+    )
   }
 
   func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {

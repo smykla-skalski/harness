@@ -70,6 +70,11 @@ pub fn auth_token_path() -> PathBuf {
 }
 
 #[must_use]
+pub fn config_path() -> PathBuf {
+    daemon_root().join("config.json")
+}
+
+#[must_use]
 pub fn events_path() -> PathBuf {
     daemon_root().join("events.jsonl")
 }

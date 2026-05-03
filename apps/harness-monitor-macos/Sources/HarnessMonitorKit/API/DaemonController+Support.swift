@@ -139,29 +139,84 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
   let inode: UInt64
   let fileSize: UInt64
   let modificationTimeIntervalSince1970: Double
+  let launchAgentPlistPath: String?
+  let launchAgentPlistDeviceIdentifier: UInt64?
+  let launchAgentPlistInode: UInt64?
+  let launchAgentPlistFileSize: UInt64?
+  let launchAgentPlistModificationTimeIntervalSince1970: Double?
 
   public init(
     helperPath: String,
     deviceIdentifier: UInt64,
     inode: UInt64,
     fileSize: UInt64,
-    modificationTimeIntervalSince1970: Double
+    modificationTimeIntervalSince1970: Double,
+    launchAgentPlistPath: String? = nil,
+    launchAgentPlistDeviceIdentifier: UInt64? = nil,
+    launchAgentPlistInode: UInt64? = nil,
+    launchAgentPlistFileSize: UInt64? = nil,
+    launchAgentPlistModificationTimeIntervalSince1970: Double? = nil
   ) {
     self.helperPath = helperPath
     self.deviceIdentifier = deviceIdentifier
     self.inode = inode
     self.fileSize = fileSize
     self.modificationTimeIntervalSince1970 = modificationTimeIntervalSince1970
+    self.launchAgentPlistPath = launchAgentPlistPath
+    self.launchAgentPlistDeviceIdentifier = launchAgentPlistDeviceIdentifier
+    self.launchAgentPlistInode = launchAgentPlistInode
+    self.launchAgentPlistFileSize = launchAgentPlistFileSize
+    self.launchAgentPlistModificationTimeIntervalSince1970 =
+      launchAgentPlistModificationTimeIntervalSince1970
   }
 
-  init(helperURL: URL) throws {
-    var fileStatus = stat()
-    guard helperURL.path.withCString({ stat($0, &fileStatus) }) == 0 else {
+  init(helperURL: URL, launchAgentPlistURL: URL? = nil) throws {
+    guard let helperMetadata = Self.fileMetadata(at: helperURL) else {
       throw DaemonControlError.harnessBinaryNotFound
     }
+    let launchAgentMetadata = launchAgentPlistURL.flatMap(Self.fileMetadata)
+    let launchAgentPlistPath =
+      launchAgentMetadata == nil ? nil : launchAgentPlistURL?.path
 
     self.init(
       helperPath: helperURL.path,
+      deviceIdentifier: helperMetadata.deviceIdentifier,
+      inode: helperMetadata.inode,
+      fileSize: helperMetadata.fileSize,
+      modificationTimeIntervalSince1970: helperMetadata.modificationTimeIntervalSince1970,
+      launchAgentPlistPath: launchAgentPlistPath,
+      launchAgentPlistDeviceIdentifier: launchAgentMetadata?.deviceIdentifier,
+      launchAgentPlistInode: launchAgentMetadata?.inode,
+      launchAgentPlistFileSize: launchAgentMetadata?.fileSize,
+      launchAgentPlistModificationTimeIntervalSince1970:
+        launchAgentMetadata?.modificationTimeIntervalSince1970
+    )
+  }
+
+  func matchesPublishedDaemonBinaryStamp(_ stamp: DaemonBinaryStamp?) -> Bool {
+    guard let stamp else {
+      return false
+    }
+    return helperPath == stamp.helperPath
+      && deviceIdentifier == stamp.deviceIdentifier
+      && inode == stamp.inode
+      && fileSize == stamp.fileSize
+      && modificationTimeIntervalSince1970 == stamp.modificationTimeIntervalSince1970
+  }
+
+  private static func fileMetadata(
+    at url: URL
+  ) -> (
+    deviceIdentifier: UInt64,
+    inode: UInt64,
+    fileSize: UInt64,
+    modificationTimeIntervalSince1970: Double
+  )? {
+    var fileStatus = stat()
+    guard url.path.withCString({ stat($0, &fileStatus) }) == 0 else {
+      return nil
+    }
+    return (
       deviceIdentifier: UInt64(fileStatus.st_dev),
       inode: UInt64(fileStatus.st_ino),
       fileSize: UInt64(fileStatus.st_size),

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 mod audit;
+mod config;
 mod locks;
 mod manifest;
 mod paths;
@@ -19,11 +20,15 @@ pub use crate::infra::persistence::flock::FlockGuard;
 pub use audit::{
     append_event, append_event_best_effort, diagnostics, ensure_auth_token, read_recent_events,
 };
+pub use config::{
+    DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,
+    parse_log_level, persist_log_level,
+};
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};
 pub use paths::{
-    auth_token_path, daemon_root, default_daemon_root, ensure_daemon_dirs, events_path,
-    launch_agent_path, legacy_launch_agent_path, lock_path, manifest_path,
+    auth_token_path, config_path, daemon_root, default_daemon_root, ensure_daemon_dirs,
+    events_path, launch_agent_path, legacy_launch_agent_path, lock_path, manifest_path,
     set_daemon_root_override,
 };
 
