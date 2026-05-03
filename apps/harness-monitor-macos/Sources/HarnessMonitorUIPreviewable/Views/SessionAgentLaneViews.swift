@@ -72,6 +72,7 @@ struct SessionAgentSummaryCard: View {
   let openAgent: (String) -> Void
   let tuiStatus: AgentTuiStatus?
   @State private var isDropTargeted = false
+  @State private var pendingDroppedTaskID: String?
 
   private var runtimeSymbol: ProviderBrandSymbol? {
     ProviderBrandSymbol(runtimeString: agent.runtime)
@@ -299,9 +300,13 @@ struct SessionAgentSummaryCard: View {
     store.contentUI.session.isTaskDragActive
       && taskDropAction.feedback.isActionable
       && !isDropTargeted
+      && pendingDroppedTaskID == nil
   }
 
   private var taskDropFeedback: AgentTaskDropFeedback? {
+    if pendingDroppedTaskID != nil {
+      return taskDropAction.pendingFeedback
+    }
     guard isDropTargeted else {
       return nil
     }
@@ -323,12 +328,19 @@ struct SessionAgentSummaryCard: View {
       store.reportDropRejection(taskDropAction.feedback.accessibilityLabel)
       return false
     }
+    let droppedTaskID = payload.taskID
+    pendingDroppedTaskID = droppedTaskID
     Task {
       await store.dropTask(
-        taskID: payload.taskID,
+        taskID: droppedTaskID,
         target: .agent(agentId: targetAgentID),
         queuePolicy: payload.queuePolicy
       )
+      await MainActor.run {
+        if pendingDroppedTaskID == droppedTaskID {
+          pendingDroppedTaskID = nil
+        }
+      }
     }
     return true
   }

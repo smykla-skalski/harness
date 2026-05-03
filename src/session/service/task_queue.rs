@@ -20,10 +20,9 @@ use super::{
 /// delivered. Callers (sync file path, daemon sync DB, daemon async DB) own
 /// fanning out the effects to the file system, the signal index, and the
 /// audit log via `write_task_start_signals` + `merge_signal_records`.
-/// Worker wake (TUI prompt) is the caller's responsibility too; the assign
-/// and drop paths do not yet wire `attempt_active_signal_delivery`, so a
-/// managed-TUI worker still wakes via the next signal-dir scan rather than
-/// an immediate kick.
+/// Daemon mutation layers may additionally try an immediate managed-TUI wake
+/// and wait for the ack, while pure file-service callers still rely on the
+/// next signal-dir scan.
 pub(crate) fn apply_drop_task_on_agent(
     state: &mut SessionState,
     task_id: &str,

@@ -118,6 +118,24 @@ struct SessionTaskSummaryCard: View {
     }
   }
 
+  private var isDropInFlight: Bool {
+    store.inFlightActionID == ActionID.dropTask(sessionID: sessionID, taskID: task.taskId).key
+  }
+
+  private var highlightsTaskCard: Bool {
+    isDragging || isDropInFlight
+  }
+
+  private var taskCardAccessibilityValue: String? {
+    if isDragging {
+      return "Dragging"
+    }
+    if isDropInFlight {
+      return "Delivering"
+    }
+    return nil
+  }
+
   var body: some View {
     Button {
       inspectTask(task.taskId)
@@ -137,8 +155,8 @@ struct SessionTaskSummaryCard: View {
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
         .strokeBorder(
-          isDragging ? HarnessMonitorTheme.accent : Color.clear,
-          lineWidth: isDragging ? 2 : 0
+          highlightsTaskCard ? HarnessMonitorTheme.accent : Color.clear,
+          lineWidth: highlightsTaskCard ? 2 : 0
         )
     }
     .opacity(isDragging ? 0.82 : 1)
@@ -153,7 +171,7 @@ struct SessionTaskSummaryCard: View {
       HarnessMonitorAccessibility.sessionTaskCard(task.taskId),
       kind: .row,
       label: task.title,
-      value: isDragging ? "Dragging" : nil,
+      value: taskCardAccessibilityValue,
       pressAction: { inspectTask(task.taskId) }
     )
     .contextMenu {
@@ -169,9 +187,9 @@ struct SessionTaskSummaryCard: View {
         Label("Copy Task ID", systemImage: "doc.on.doc")
       }
     }
-    .accessibilityValue(isDragging ? "Dragging" : "")
+    .accessibilityValue(taskCardAccessibilityValue ?? "")
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-    .animation(.easeOut(duration: 0.10), value: isDragging)
+    .animation(.easeOut(duration: 0.10), value: highlightsTaskCard)
     .onDisappear {
       if isDragging {
         store.contentUI.session.isTaskDragActive = false
@@ -194,7 +212,7 @@ struct SessionTaskSummaryCard: View {
   }
 
   private var cardSurface: some View {
-    SessionTaskCompactSummaryContent(task: task)
+    SessionTaskCompactSummaryContent(task: task, isDelivering: isDropInFlight)
       .frame(
         maxWidth: .infinity,
         alignment: .leading
@@ -243,6 +261,7 @@ private struct TaskDraggingOverlay: View {
 
 struct SessionTaskCompactSummaryContent: View {
   let task: WorkItem
+  var isDelivering = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -262,12 +281,22 @@ struct SessionTaskCompactSummaryContent: View {
           .foregroundStyle(HarnessMonitorTheme.onContrast)
       }
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(task.assignmentStateTitle)
-          .scaledFont(.caption.weight(.bold))
-          .foregroundStyle(task.assignmentStateColor)
-          .lineLimit(1)
+        if isDelivering {
+          HStack(spacing: HarnessMonitorTheme.spacingXS) {
+            HarnessMonitorSpinner(size: 12, tint: HarnessMonitorTheme.accent)
+            Text("Delivering...")
+              .scaledFont(.caption.weight(.bold))
+              .foregroundStyle(HarnessMonitorTheme.accent)
+              .lineLimit(1)
+          }
+        } else {
+          Text(task.assignmentStateTitle)
+            .scaledFont(.caption.weight(.bold))
+            .foregroundStyle(task.assignmentStateColor)
+            .lineLimit(1)
+        }
         Spacer(minLength: HarnessMonitorTheme.spacingXS)
-        Text(task.assignmentSummary)
+        Text(isDelivering ? "Updating assignment" : task.assignmentSummary)
           .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
