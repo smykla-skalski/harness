@@ -81,6 +81,7 @@ struct AcpPermissionModal: View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Button("Close") {
         store.presentingAcpPermissionBatch = nil
+        store.supervisorSelectedDecisionID = nil
       }
       .keyboardShortcut(payload.isRenderable ? .cancelAction : .defaultAction)
       .disabled(isResolving)

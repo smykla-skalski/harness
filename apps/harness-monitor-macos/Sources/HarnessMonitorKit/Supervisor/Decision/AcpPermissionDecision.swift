@@ -213,7 +213,8 @@ public struct AcpPermissionDecisionPayload: Codable, Equatable, Sendable {
   }
 
   public var selectionSummary: String {
-    "\(requestCount) of \(requestCount) selected"
+    let selectedCount = defaultResolutionState.selectedRequestIDs.count
+    return "\(selectedCount) of \(requestCount) selected"
   }
 
   public var defaultResolutionState: BatchResolutionState {

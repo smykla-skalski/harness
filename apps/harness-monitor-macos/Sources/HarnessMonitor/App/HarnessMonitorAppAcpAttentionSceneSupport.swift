@@ -303,22 +303,23 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
         if attentionState.showsToast(in: windowID),
           let attention = attentionState.activeToast
         {
-          AcpPermissionAttentionToastView(
-            attention: attention,
-            openDecisions: {
-              attentionState.routeAttention(
-                attention,
-                store: store,
-                openWindow: openWindow
-              )
-            },
-            dismiss: attentionState.dismissToast
-          )
-          .padding(.top, HarnessMonitorTheme.spacingSM)
-          .padding(.trailing, HarnessMonitorTheme.spacingLG)
-          .allowsHitTesting(true)
-          .zIndex(1_000)
-          .transition(AcpPermissionAttentionMotionPolicy.transition(reduceMotion: reduceMotion))
+          AcpPermissionAttentionToastView(attention: attention)
+            .environment(
+              \.acpToastOpenDecisions,
+              { @MainActor in
+                attentionState.routeAttention(
+                  attention,
+                  store: store,
+                  openWindow: openWindow
+                )
+              }
+            )
+            .environment(\.acpToastDismiss, { @MainActor in attentionState.dismissToast() })
+            .padding(.top, HarnessMonitorTheme.spacingSM)
+            .padding(.trailing, HarnessMonitorTheme.spacingLG)
+            .allowsHitTesting(true)
+            .zIndex(1_000)
+            .transition(AcpPermissionAttentionMotionPolicy.transition(reduceMotion: reduceMotion))
         }
       }
       .animation(

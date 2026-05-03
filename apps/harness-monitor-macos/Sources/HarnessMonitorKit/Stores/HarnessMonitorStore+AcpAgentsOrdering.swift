@@ -5,9 +5,17 @@ extension HarnessMonitorStore {
     _ snapshot: AcpAgentSnapshot,
     into snapshots: [AcpAgentSnapshot]
   ) -> [AcpAgentSnapshot] {
-    var updated = snapshots.filter { $0.acpId != snapshot.acpId }
-    updated.append(snapshot)
-    return sortedAcpAgents(updated)
+    var result = snapshots.filter { $0.acpId != snapshot.acpId }
+    let idx =
+      result.firstIndex { existing in
+        if snapshot.displayName != existing.displayName {
+          return snapshot.displayName.localizedStandardCompare(existing.displayName)
+            == .orderedAscending
+        }
+        return snapshot.acpId < existing.acpId
+      } ?? result.endIndex
+    result.insert(snapshot, at: idx)
+    return result
   }
 
   func sortedAcpAgents(_ snapshots: [AcpAgentSnapshot]) -> [AcpAgentSnapshot] {
