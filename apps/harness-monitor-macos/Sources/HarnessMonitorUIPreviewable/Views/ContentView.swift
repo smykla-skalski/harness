@@ -154,7 +154,7 @@ public struct ContentView<CornerContent: View>: View {
     ContentWindowToolbarModel(
       canNavigateBack: store.contentUI.toolbar.canNavigateBack,
       canNavigateForward: store.contentUI.toolbar.canNavigateForward,
-      canStartNewSession: store.connectionState == .online,
+      canCreateTask: store.areSelectedSessionActionsAvailable,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
       mcpStatus: store.contentUI.toolbar.mcpStatus

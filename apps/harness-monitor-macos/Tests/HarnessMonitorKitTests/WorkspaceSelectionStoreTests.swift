@@ -34,6 +34,18 @@ struct WorkspaceSelectionStoreTests {
     #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
   }
 
+  @Test("Create-agent workspace requests carry the create entry point")
+  func createAgentRequestCarriesEntryPoint() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.requestWorkspaceCreateEntryPoint(.agent)
+
+    let request = store.consumePendingWorkspaceSelectionRequest()
+
+    #expect(request?.selection == .create)
+    #expect(request?.createEntryPoint == .agent)
+    #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+  }
+
   @Test("Multiple pending requests keep the latest value")
   func latestRequestWins() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

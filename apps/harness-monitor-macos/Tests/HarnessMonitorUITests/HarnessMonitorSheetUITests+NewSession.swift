@@ -10,12 +10,12 @@ extension HarnessMonitorSheetUITests {
     let processID = try launchedMonitorPIDForNewSession()
     let logStart = Date()
 
-    tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
+    openNewSessionSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
     XCTAssertTrue(
       sheetRoot.waitForExistence(timeout: Self.actionTimeout),
-      "New Session sheet should appear from the toolbar action"
+      "New Session sheet should appear from the File menu command"
     )
 
     XCTAssertTrue(
@@ -32,13 +32,16 @@ extension HarnessMonitorSheetUITests {
       "New Session should show a visible Context label for the multiline field"
     )
 
-    let capabilityPicker = element(in: app, identifier: Accessibility.newSessionCapabilityPicker)
+    let capabilitySection = element(
+      in: app,
+      identifier: Accessibility.newSessionCapabilityPickerSection
+    )
     XCTAssertTrue(
-      capabilityPicker.waitForExistence(timeout: Self.fastActionTimeout)
-        || app.staticTexts["Start with"].firstMatch.waitForExistence(
+      capabilitySection.waitForExistence(timeout: Self.fastActionTimeout)
+        || app.staticTexts["Launch with"].firstMatch.waitForExistence(
           timeout: Self.fastActionTimeout
         ),
-      "New Session should surface the preferred leader capability picker"
+      "New Session should surface the inline preferred leader section"
     )
     XCTAssertTrue(
       waitForElement(
@@ -48,7 +51,7 @@ extension HarnessMonitorSheetUITests {
       "New Session should render the shared capability row experience"
     )
     XCTAssertTrue(
-      app.staticTexts["Start with"].firstMatch.waitForExistence(
+      app.staticTexts["Launch with"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
       ),
       "New Session should keep leader selection in the primary inline form flow"
@@ -97,27 +100,30 @@ extension HarnessMonitorSheetUITests {
         )
       }
     }
+
+    dismissNewSessionSheet(in: app, sheetRoot: sheetRoot)
   }
 
   func testNewSessionSheetPreviewSnapshots() throws {
     let app = launch(mode: "preview")
 
-    tapButton(in: app, identifier: Accessibility.sidebarNewSessionButton)
+    openNewSessionSheet(in: app)
 
     let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
     XCTAssertTrue(
       sheetRoot.waitForExistence(timeout: Self.actionTimeout),
-      "New Session sheet should appear from the toolbar action"
+      "New Session sheet should appear from the File menu command"
     )
 
     XCTAssertTrue(
-      app.staticTexts["Start with"].firstMatch.waitForExistence(
+      app.staticTexts["Launch with"].firstMatch.waitForExistence(
         timeout: Self.fastActionTimeout
       ),
       "The redesigned sheet should show the inline leader selection section "
         + "before capturing the preview snapshot"
     )
     recordDiagnosticsSnapshot(in: app, named: "new-session-sheet")
+    dismissNewSessionSheet(in: app, sheetRoot: sheetRoot)
   }
 
   private func launchedMonitorPIDForNewSession() throws -> pid_t {
@@ -139,6 +145,22 @@ extension HarnessMonitorSheetUITests {
       )
     }
     return mostRecent.processIdentifier
+  }
+
+  private func openNewSessionSheet(in app: XCUIApplication) {
+    let sheetRoot = element(in: app, identifier: Accessibility.newSessionSheet)
+    if sheetRoot.exists {
+      return
+    }
+    invokeMenuItem(in: app, menu: "File", title: "New Session")
+  }
+
+  private func dismissNewSessionSheet(in app: XCUIApplication, sheetRoot: XCUIElement) {
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !sheetRoot.exists },
+      "New Session sheet should dismiss after pressing Escape"
+    )
   }
 
   private func appKitLayoutRecursionWarningsForNewSession(

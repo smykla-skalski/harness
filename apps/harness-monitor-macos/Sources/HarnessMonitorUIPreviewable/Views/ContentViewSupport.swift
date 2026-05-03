@@ -75,7 +75,7 @@ public struct ContentDetailColumn: View {
     ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
-      canStartNewSession: false,
+      canCreateTask: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
       mcpStatus: store.contentUI.toolbar.mcpStatus

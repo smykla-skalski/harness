@@ -42,19 +42,70 @@ struct SidebarView: View {
   }
 }
 
-struct SidebarToolbarNewSessionToolbarItem: ToolbarContent {
-  let isEnabled: Bool
-  let presentNewSession: () -> Void
+struct SidebarToolbarCreateMenuToolbarItem: ToolbarContent {
+  let store: HarnessMonitorStore
+  let canCreateTask: Bool
+
+  private var createMenuAccessibilityValue: String {
+    canCreateTask
+      ? "New Agent and New Task available"
+      : "New Agent available. New Task unavailable until a writable session is selected"
+  }
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {
-      Button(action: presentNewSession) {
-        Label("New Session", systemImage: "plus")
-      }
-      .help("Start a new session")
-      .disabled(!isEnabled)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarNewSessionButton)
+      SidebarCreateMenu(
+        store: store,
+        canCreateTask: canCreateTask,
+        menuStateValue: createMenuAccessibilityValue
+      )
     }
+  }
+}
+
+private struct SidebarCreateMenu: View {
+  let store: HarnessMonitorStore
+  let canCreateTask: Bool
+  let menuStateValue: String
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    Menu {
+      Button("New Agent", action: openNewAgent)
+        .harnessMCPMenuItem(
+          HarnessMonitorAccessibility.sidebarCreateMenuNewAgentItem,
+          label: "New Agent"
+        )
+
+      Button("New Task", action: openNewTask)
+        .disabled(!canCreateTask)
+        .harnessMCPMenuItem(
+          HarnessMonitorAccessibility.sidebarCreateMenuNewTaskItem,
+          label: "New Task",
+          enabled: canCreateTask
+        )
+    } label: {
+      Label("Create", systemImage: "plus")
+    }
+    .help("Create agent or task")
+    .menuIndicator(.hidden)
+    .accessibilityLabel("Create")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarCreateMenuButton)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarCreateMenuButtonFrame)
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.sidebarCreateMenuButton,
+      label: "Create",
+      value: menuStateValue
+    )
+  }
+
+  private func openNewAgent() {
+    store.requestWorkspaceCreateEntryPoint(.agent)
+    openWindow(id: HarnessMonitorWindowID.workspace)
+  }
+
+  private func openNewTask() {
+    store.requestCreateTaskSheet()
   }
 }
 
