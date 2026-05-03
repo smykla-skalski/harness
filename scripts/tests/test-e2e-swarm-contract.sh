@@ -65,7 +65,7 @@ require_mise_task "e2e:swarm:inject-heuristic"
 require_mise_task "e2e:swarm:seed"
 require_mise_task "e2e:swarm:probe-runtimes"
 require_mise_task "e2e:swarm:gaps-open"
-require_mise_task "monitor:macos:test:swarm-e2e"
+require_mise_task "monitor:test:swarm-e2e"
 
 require_text ".mise.toml" 'harness-monitor-e2e swarm-full-flow --assert'
 require_text ".mise.toml" 'harness-monitor-e2e inject-heuristic'

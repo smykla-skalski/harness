@@ -46,12 +46,12 @@ use super::tasks::{
 
 mod async_agent_mutations;
 mod async_lifecycle_mutations;
-mod session_archive_tests;
 mod async_mutations;
 mod async_observe;
 mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
+mod session_archive_tests;
 mod task_review;
 mod telemetry;
 

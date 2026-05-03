@@ -7,7 +7,9 @@ use crate::daemon::http::sessions::{get_sessions, post_session_archive};
 use crate::daemon::protocol::SessionArchiveRequest;
 use harness_testkit::with_isolated_harness_env;
 
-use super::async_mutations::{init_git_project, start_async_http_session, test_http_state_with_empty_async_db};
+use super::async_mutations::{
+    init_git_project, start_async_http_session, test_http_state_with_empty_async_db,
+};
 use super::*;
 
 #[test]

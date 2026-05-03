@@ -1,10 +1,10 @@
 use std::time::Instant;
 
+use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post};
-use axum::Router;
 
 use crate::daemon::protocol::{
     SessionDetail, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse, http_paths,
@@ -19,14 +19,8 @@ use super::runtime_session::post_runtime_session;
 use super::{DaemonHttpState, require_async_db};
 
 pub(super) use super::sessions_mutations::{
-    broadcast_observe_session,
-    delete_session,
-    post_end_session,
-    post_leave_session,
-    post_observe_session,
-    post_session_archive,
-    post_session_join,
-    post_session_start,
+    broadcast_observe_session, delete_session, post_end_session, post_leave_session,
+    post_observe_session, post_session_archive, post_session_join, post_session_start,
     post_session_title,
 };
 
@@ -45,7 +39,10 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
             get(get_session).delete(delete_session),
         )
         .route(http_paths::SESSION_TIMELINE, get(get_timeline))
-        .route(http_paths::SESSION_STREAM, get(super::stream::stream_session))
+        .route(
+            http_paths::SESSION_STREAM,
+            get(super::stream::stream_session),
+        )
         .route(http_paths::SESSION_JOIN, post(post_session_join))
         .route(
             http_paths::SESSION_RUNTIME_SESSION,

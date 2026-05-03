@@ -151,13 +151,7 @@ fn detect_listener(port: u16) -> Option<StaleCodex> {
 
 fn lsof_listening_pid(port: u16) -> Option<i32> {
     let stdout = run_with_timeout(
-        Command::new("lsof").args([
-            "-nP",
-            "-iTCP",
-            &format!(":{port}"),
-            "-sTCP:LISTEN",
-            "-t",
-        ]),
+        Command::new("lsof").args(["-nP", "-iTCP", &format!(":{port}"), "-sTCP:LISTEN", "-t"]),
         SHELLOUT_TIMEOUT,
     )?;
     parse_first_pid(&stdout)
@@ -165,7 +159,8 @@ fn lsof_listening_pid(port: u16) -> Option<i32> {
 
 fn parse_first_pid(stdout: &str) -> Option<i32> {
     stdout
-        .lines().find_map(|line| line.trim().parse::<i32>().ok())
+        .lines()
+        .find_map(|line| line.trim().parse::<i32>().ok())
 }
 
 fn ps_ppid_and_command(pid: i32) -> Option<(i32, String)> {
