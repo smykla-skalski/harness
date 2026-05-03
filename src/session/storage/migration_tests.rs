@@ -320,44 +320,48 @@ fn migrate_v11_to_v12_backfills_tui_managed_agent_from_legacy_capability() {
 }
 
 #[test]
-fn migrate_v11_to_v12_rejects_blank_tui_marker_ids() {
-    let error = migrate_v11_to_v12(json!({
+fn migrate_v11_to_v12_quarantines_blank_tui_marker_ids() {
+    let migrated = migrate_v11_to_v12(json!({
         "schema_version": 11,
         "agents": {
             "agent-1": {
                 "agent_id": "agent-1",
-                "capabilities": ["agent-tui:   "]
+                "capabilities": ["review", "agent-tui:   "]
             }
         },
         "tasks": {}
     }))
-    .expect_err("blank marker should fail");
+    .expect("blank marker should be quarantined");
 
+    assert_eq!(migrated["schema_version"], json!(12));
+    assert_eq!(migrated["agents"]["agent-1"]["capabilities"], json!(["review"]));
     assert!(
-        error
-            .to_string()
-            .contains("session state agent 'agent-1' has malformed managed terminal capability")
+        migrated["agents"]["agent-1"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
     );
 }
 
 #[test]
-fn migrate_v11_to_v12_rejects_conflicting_tui_marker_ids() {
-    let error = migrate_v11_to_v12(json!({
+fn migrate_v11_to_v12_quarantines_conflicting_tui_marker_ids() {
+    let migrated = migrate_v11_to_v12(json!({
         "schema_version": 11,
         "agents": {
             "agent-1": {
                 "agent_id": "agent-1",
-                "capabilities": ["agent-tui:one", "agent-tui:two"]
+                "capabilities": ["review", "agent-tui:one", "agent-tui:two"]
             }
         },
         "tasks": {}
     }))
-    .expect_err("conflicting markers should fail");
+    .expect("conflicting markers should be quarantined");
 
+    assert_eq!(migrated["schema_version"], json!(12));
+    assert_eq!(migrated["agents"]["agent-1"]["capabilities"], json!(["review"]));
     assert!(
-        error.to_string().contains(
-            "session state agent 'agent-1' has conflicting managed terminal capabilities"
-        )
+        migrated["agents"]["agent-1"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
     );
 }
 
