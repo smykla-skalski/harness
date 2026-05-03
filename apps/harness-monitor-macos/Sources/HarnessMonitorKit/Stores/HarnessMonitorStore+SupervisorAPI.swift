@@ -13,17 +13,19 @@ struct StoreAPIClient: SupervisorAPIClient {
   }
 
   func nudgeAgent(agentID: String, input: String) async throws {
-    guard let client = await MainActor.run(body: { store.client }) else { return }
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
     let request = AgentTuiInputRequest(input: .text(input))
     _ = try await client.sendManagedAgentInput(agentID: agentID, request: request)
   }
 
   func assignTask(taskID: String, agentID: String) async throws {
-    guard
-      let client = await MainActor.run(body: { store.client }),
-      let location = await resolveTaskLocation(taskID: taskID)
-    else {
-      return
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
+    guard let location = await resolveTaskLocation(taskID: taskID) else {
+      throw StoreDecisionActionError.missingTargetMetadata("taskID")
     }
     _ = try await client.assignTask(
       sessionID: location.sessionID,
@@ -33,13 +35,15 @@ struct StoreAPIClient: SupervisorAPIClient {
   }
 
   func dropTask(taskID: String, reason: String) async throws {
-    guard
-      let client = await MainActor.run(body: { store.client }),
-      let location = await resolveTaskLocation(taskID: taskID),
-      let assignedAgentID = location.assignedAgentID
-    else {
+    guard let client = await MainActor.run(body: { store.client }) else {
+      throw StoreDecisionActionError.daemonUnavailable
+    }
+    guard let location = await resolveTaskLocation(taskID: taskID) else {
+      throw StoreDecisionActionError.missingTargetMetadata("taskID")
+    }
+    guard let assignedAgentID = location.assignedAgentID else {
       _ = reason
-      return
+      throw StoreDecisionActionError.missingTargetMetadata("assignedAgentID")
     }
     _ = try await client.dropTask(
       sessionID: location.sessionID,

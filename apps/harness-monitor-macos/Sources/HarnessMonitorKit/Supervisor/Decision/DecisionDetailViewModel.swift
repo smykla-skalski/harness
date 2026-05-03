@@ -161,7 +161,7 @@ public final class DecisionDetailViewModel {
 
   private static func parseContext(from json: String) -> [ContextSection] {
     guard let data = json.data(using: .utf8) else {
-      return [ContextSection(title: "Context details", lines: [json])]
+      return [ContextSection(title: "Raw context", lines: [json])]
     }
     let decoder = JSONDecoder()
     if let parsed = try? decoder.decode(ContextBlob.self, from: data) {
@@ -171,7 +171,7 @@ public final class DecisionDetailViewModel {
     guard !trimmed.isEmpty, trimmed != "{}", trimmed != "[]" else {
       return []
     }
-    return [ContextSection(title: "Context details", lines: [trimmed])]
+    return [ContextSection(title: "Raw context", lines: [trimmed])]
   }
 
   private static func buildDeeplinks(from decision: Decision) -> [Deeplink] {
@@ -228,13 +228,13 @@ private struct ContextBlob: Decodable {
       )
     }
     if let relatedTimeline, !relatedTimeline.isEmpty {
-      sections.append(.init(title: "Timeline", lines: relatedTimeline))
+      sections.append(.init(title: "Related timeline", lines: relatedTimeline))
     }
     if let observerIssues, !observerIssues.isEmpty {
-      sections.append(.init(title: "Attention signals", lines: observerIssues))
+      sections.append(.init(title: "Observer issues", lines: observerIssues))
     }
     if let recentActions, !recentActions.isEmpty {
-      sections.append(.init(title: "Recent actions", lines: recentActions))
+      sections.append(.init(title: "Recent supervisor actions", lines: recentActions))
     }
     return sections
   }

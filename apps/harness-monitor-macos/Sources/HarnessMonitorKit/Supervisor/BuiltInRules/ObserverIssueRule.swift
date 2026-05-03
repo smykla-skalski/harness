@@ -123,14 +123,16 @@ private struct ObserverBundle: Encodable {
     let id: String
     let code: String
     let severity: String
-    let firstSeen: Date
+    let firstSeen: Date?
+    let firstSeenKnown: Bool
     let count: Int
 
     init(issue: ObserverIssueSnapshot) {
       self.id = issue.id
       self.code = issue.code
       self.severity = issue.severityRaw
-      self.firstSeen = issue.firstSeen ?? Date(timeIntervalSince1970: 0)
+      self.firstSeen = issue.firstSeen
+      self.firstSeenKnown = issue.firstSeen != nil
       self.count = issue.count
     }
   }

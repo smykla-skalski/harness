@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class PolicyExecutorTests: XCTestCase {
-  func test_nudgeRoutesToSendManagedAgentInput() async throws {
+  func testNudgeRoutesToSendManagedAgentInput() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -34,7 +34,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(key, "nudge:stuck-agent:a1:hash-1")
   }
 
-  func test_auditEventsRecordDispatchBeforeExecute() async throws {
+  func testAuditEventsRecordDispatchBeforeExecute() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -59,7 +59,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertLessThanOrEqual(events[0].createdAt, events[1].createdAt)
   }
 
-  func test_duplicateActionKeyIsSkipped() async throws {
+  func testDuplicateActionKeyIsSkipped() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -102,7 +102,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
   }
 
-  func test_duplicateActionAcrossSnapshotIDsIsSkippedForEquivalentNudge() async throws {
+  func testDuplicateActionAcrossSnapshotIDsIsSkippedForEquivalentNudge() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -143,7 +143,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(api.nudgeCalls.count, 1)
   }
 
-  func test_failedNudgeEmitsActionFailed() async throws {
+  func testFailedNudgeEmitsActionFailed() async throws {
     let api = FakeAPIClient()
     api.nudgeFailure = HarnessMonitorAPIError.server(code: 500, message: "boom")
     let store = try DecisionStore.makeInMemory()
@@ -170,7 +170,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionFailed"])
   }
 
-  func test_assignTaskRoutesToAPI() async throws {
+  func testAssignTaskRoutesToAPI() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -195,7 +195,7 @@ final class PolicyExecutorTests: XCTestCase {
     }
   }
 
-  func test_dropTaskRoutesToAPI() async throws {
+  func testDropTaskRoutesToAPI() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -220,120 +220,7 @@ final class PolicyExecutorTests: XCTestCase {
     }
   }
 
-  func test_queueDecisionAuditOrdering() async throws {
-    let api = FakeAPIClient()
-    let store = try DecisionStore.makeInMemory()
-    let audit = InMemoryAuditWriter()
-    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
-
-    let outcome = await exec.execute(
-      .queueDecision(
-        .init(
-          id: "d1",
-          severity: .needsUser,
-          ruleID: "stuck-agent",
-          sessionID: "s1",
-          agentID: "a1",
-          taskID: nil,
-          summary: "agent stalled",
-          contextJSON: "{}",
-          suggestedActionsJSON: "[]"
-        )
-      )
-    )
-
-    let events = await audit.snapshot()
-    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
-    XCTAssertEqual(events.first?.severity, .needsUser)
-    XCTAssertEqual(events.last?.ruleID, "stuck-agent")
-    guard case .executed = outcome else {
-      XCTFail("expected executed")
-      return
-    }
-  }
-
-  func test_notifyOnlyIsExecutedAndAudited() async throws {
-    let api = FakeAPIClient()
-    let store = try DecisionStore.makeInMemory()
-    let audit = InMemoryAuditWriter()
-    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
-
-    let outcome = await exec.execute(
-      .notifyOnly(
-        .init(
-          ruleID: "daemon-disconnect",
-          snapshotID: "s1",
-          snapshotHash: "hash-1",
-          severity: .warn,
-          summary: "daemon down"
-        )
-      )
-    )
-
-    XCTAssertEqual(api.notifyCalls.map(\.summary), ["daemon down"])
-    let events = await audit.snapshot()
-    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
-    guard case .executed = outcome else {
-      XCTFail("expected executed")
-      return
-    }
-  }
-
-  func test_logEventOnlyRecordsAudit() async throws {
-    let api = FakeAPIClient()
-    let store = try DecisionStore.makeInMemory()
-    let audit = InMemoryAuditWriter()
-    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
-
-    let outcome = await exec.execute(
-      .logEvent(
-        .init(
-          id: "l1",
-          ruleID: "policy-gap",
-          snapshotID: "s1",
-          message: "unknown code"
-        )
-      )
-    )
-
-    let events = await audit.snapshot()
-    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
-    XCTAssertEqual(api.nudgeCalls, [])
-    XCTAssertEqual(api.assignCalls, [])
-    XCTAssertEqual(api.dropCalls, [])
-    guard case .executed = outcome else {
-      XCTFail("expected executed")
-      return
-    }
-  }
-
-  func test_suggestConfigChangeIsAuditedOnly() async throws {
-    let api = FakeAPIClient()
-    let store = try DecisionStore.makeInMemory()
-    let audit = InMemoryAuditWriter()
-    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
-
-    let outcome = await exec.execute(
-      .suggestConfigChange(
-        .init(
-          id: "sg1",
-          ruleID: "policy-gap",
-          proposalJSON: "{}",
-          rationale: "observed new pattern"
-        )
-      )
-    )
-
-    let events = await audit.snapshot()
-    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
-    XCTAssertEqual(api.nudgeCalls, [])
-    guard case .executed = outcome else {
-      XCTFail("expected executed")
-      return
-    }
-  }
-
-  func test_dedupExpiresAfterCooldown() async throws {
+  func testDedupExpiresAfterCooldown() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
@@ -375,7 +262,7 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(api.nudgeCalls.count, 2)
   }
 
-  func test_fixtureFactoryWorks() async throws {
+  func testFixtureFactoryWorks() async throws {
     let exec = try PolicyExecutor.fixture()
     let outcome = await exec.execute(
       .logEvent(

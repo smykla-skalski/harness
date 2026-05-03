@@ -19,6 +19,7 @@ struct NudgeActionPayload: Decodable {
 
 struct SupervisorCustomActionPayload: Decodable {
   let mode: String
+  let sessionID: String?
 }
 
 struct DecisionContextEnvelope {
@@ -68,6 +69,7 @@ enum StoreDecisionActionError: LocalizedError {
   case missingTargetMetadata(String)
   case daemonUnavailable
   case daemonLogUnavailable
+  case sessionActionFailed(String)
   case daemonRejected(any Error)
   case unsupportedCustomAction(String)
 
@@ -87,6 +89,8 @@ enum StoreDecisionActionError: LocalizedError {
       "Cannot run action: daemon unavailable."
     case .daemonLogUnavailable:
       "Cannot run action: daemon log is unavailable."
+    case .sessionActionFailed(let sessionID):
+      "Cannot run action: session action failed for \(sessionID)."
     case .daemonRejected(let error):
       "Action rejected by daemon: \(error.localizedDescription)"
     case .unsupportedCustomAction(let mode):

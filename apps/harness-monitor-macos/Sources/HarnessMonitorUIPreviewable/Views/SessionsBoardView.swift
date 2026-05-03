@@ -4,14 +4,23 @@ import SwiftUI
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  let primaryContentFocusScope: Namespace.ID?
+  let primaryContentPagingResponderRequest: Int
+  let prefersPrimaryContentFocus: Bool
 
   init(
     store: HarnessMonitorStore,
     sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    prefersPrimaryContentFocus: Bool = false
   ) {
     self.store = store
     self.sessionCatalog = sessionCatalog
+    self.primaryContentFocusScope = primaryContentFocusScope
+    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
+    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
   }
 
   var body: some View {
@@ -20,7 +29,12 @@ struct SessionsBoardView: View {
       verticalPadding: 24,
       constrainContentWidth: true,
       readableWidth: false,
-      topScrollEdgeEffect: .soft
+      topScrollEdgeEffect: .soft,
+      scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionsBoardScrollView,
+      scrollSurfaceLabel: "Sessions board",
+      primaryFocusScope: primaryContentFocusScope,
+      prefersDefaultFocus: prefersPrimaryContentFocus,
+      pagingResponderRequest: primaryContentPagingResponderRequest
     ) {
       VStack(alignment: .leading, spacing: 24) {
         SessionsBoardRecentSessionsSection(
@@ -38,7 +52,7 @@ struct SessionsBoardView: View {
         event: "mounted",
         details: [
           "recent_session_count": String(sessionCatalog.recentSessions.count),
-          "selected_session_id": store.selectedSessionID ?? "nil"
+          "selected_session_id": store.selectedSessionID ?? "nil",
         ]
       )
     }

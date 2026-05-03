@@ -15,18 +15,16 @@ source "$SCRIPT_DIR/lib/swift-tool-env.sh"
 source "$SCRIPT_DIR/lib/runtime-profile.sh"
 sanitize_xcode_only_swift_environment
 
-generation_inputs=(
+tuist_generation_inputs=(
   "$ROOT/Project.swift"
-  "$ROOT/Scripts/post-generate.sh"
-  "$ROOT/Scripts/patch-tuist-pbxproj.py"
 )
 
 if [ -f "$ROOT/Tuist.swift" ]; then
-  generation_inputs+=("$ROOT/Tuist.swift")
+  tuist_generation_inputs+=("$ROOT/Tuist.swift")
 fi
 
 while IFS= read -r path; do
-  generation_inputs+=("$path")
+  tuist_generation_inputs+=("$path")
 done < <(
   /usr/bin/find "$ROOT/Tuist" \
     -path "$ROOT/Tuist/.build" -prune -o \
@@ -34,13 +32,20 @@ done < <(
     | /usr/bin/sort
 )
 
-generation_outputs=(
+# These outputs are materialized by `tuist generate` itself. `post-generate.sh`
+# always runs below and patches/syncs shared metadata in-place, so script-only
+# changes must not force a full regenerate.
+tuist_generation_required_outputs=(
   "$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
-  "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings"
   "$ROOT/HarnessMonitor.xcworkspace/contents.xcworkspacedata"
-  "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings"
-  "$ROOT/buildServer.json"
-  "$REPO_ROOT/buildServer.json"
+)
+
+# `contents.xcworkspacedata` is effectively static for this single-project
+# workspace and often remains untouched across legitimate Tuist refreshes.
+# Using its mtime as a freshness oracle over-blocks non-owner agent lanes, so
+# track the pbxproj instead.
+tuist_generation_freshness_outputs=(
+  "$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 )
 
 remove_legacy_spotlight_link() {
@@ -114,14 +119,14 @@ should_generate() {
     return 0
   fi
 
-  for output in "${generation_outputs[@]}"; do
+  for output in "${tuist_generation_required_outputs[@]}"; do
     if [ ! -e "$output" ]; then
       return 0
     fi
   done
 
-  latest_input="$(latest_mtime "${generation_inputs[@]}")"
-  oldest_output="$(oldest_mtime "${generation_outputs[@]}")"
+  latest_input="$(latest_mtime "${tuist_generation_inputs[@]}")"
+  oldest_output="$(oldest_mtime "${tuist_generation_freshness_outputs[@]}")"
   (( latest_input > oldest_output ))
 }
 

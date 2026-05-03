@@ -237,6 +237,100 @@ class GenerateScriptTests(unittest.TestCase):
                 "non-owner profile lane must fail before invoking tuist",
             )
 
+    def test_profile_scoped_non_owner_lane_skips_regenerate_when_pbxproj_is_fresh(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            repo_root = temp_root / "repo"
+            app_root = repo_root / "apps" / "harness-monitor-macos"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            marker_path = temp_root / "post-generate.marker"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            build_settings = tuist_root / "ProjectDescriptionHelpers" / "BuildSettings.swift"
+            build_settings.parent.mkdir(parents=True, exist_ok=True)
+            build_settings.write_text("// test\n")
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            write_executable(
+                fake_post_generate,
+                "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
+            )
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            pbxproj_path = app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj"
+            workspace_path = (
+                app_root / "HarnessMonitor.xcworkspace" / "contents.xcworkspacedata"
+            )
+            pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
+            workspace_path.parent.mkdir(parents=True, exist_ok=True)
+            pbxproj_path.write_text("// generated\n")
+            workspace_path.write_text("<Workspace/>\n")
+
+            stale_timestamp = 1_000_000_000
+            fresh_input_timestamp = stale_timestamp + 100
+            fresh_pbxproj_timestamp = fresh_input_timestamp + 100
+
+            for input_path in (
+                app_root / "Project.swift",
+                build_settings,
+                fake_post_generate,
+                fake_patcher,
+                tuist_root / "Package.swift",
+            ):
+                os.utime(input_path, (fresh_input_timestamp, fresh_input_timestamp))
+            os.utime(workspace_path, (stale_timestamp, stale_timestamp))
+            os.utime(
+                pbxproj_path,
+                (fresh_pbxproj_timestamp, fresh_pbxproj_timestamp),
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "HARNESS_MONITOR_RUNTIME_PROFILE": "agent-foo",
+                    "POST_GENERATE_MARKER": str(marker_path),
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(marker_path.exists(), "post-generate should still run")
+            self.assertFalse(
+                captured_args_path.exists(),
+                "fresh pbxproj should let non-owner lanes skip tuist generate",
+            )
+
     def test_post_generate_writes_internal_workspace_settings_and_seeded_entitlements(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)

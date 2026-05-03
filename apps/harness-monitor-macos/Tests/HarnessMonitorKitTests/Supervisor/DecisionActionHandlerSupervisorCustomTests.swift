@@ -67,6 +67,41 @@ final class DecisionActionHandlerSupervisorCustomTests: XCTestCase {
     XCTAssertEqual(resolved?.statusRaw, "resolved")
   }
 
+  func test_closeSessionCustomActionResolvesWhenDaemonReportsAlreadyGone() async throws {
+    let sessionID = PreviewFixtures.summary.sessionId
+    let client = RecordingHarnessClient()
+    client.archiveSessionMutatesReadSnapshots = false
+    client.configureArchiveSessionError(
+      HarnessMonitorAPIError.server(
+        code: 400,
+        message: "session not active: session '\(sessionID)' not found"
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    let decisions = try DecisionStore.makeInMemory()
+    let handler = StoreDecisionActionHandler(store: store, decisions: decisions)
+    try await decisions.insert(
+      draft(
+        id: "idle-close",
+        action: SuggestedAction(
+          id: "close-session",
+          title: "Close session",
+          kind: .custom,
+          payloadJSON: #"{"mode":"closeSession","sessionID":"\#(sessionID)"}"#
+        )
+      )
+    )
+
+    await handler.resolve(
+      decisionID: "idle-close",
+      outcome: DecisionOutcome(chosenActionID: "close-session", note: nil)
+    )
+
+    XCTAssertTrue(store.sessions.isEmpty)
+    let resolved = try await decisions.decision(id: "idle-close")
+    XCTAssertEqual(resolved?.statusRaw, "resolved")
+  }
+
   private func draft(id: String, action: SuggestedAction) throws -> DecisionDraft {
     let data = try JSONEncoder().encode([action])
     let suggestedActionsJSON = try XCTUnwrap(String(data: data, encoding: .utf8))

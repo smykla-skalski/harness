@@ -221,6 +221,7 @@ extension WorkspaceWindowCreatePane {
               label: "Display name",
               value: formModel.name
             )
+            .harnessPreservePrimaryContentFocus()
         }
 
         AgentsCreateFieldBlock(
@@ -249,6 +250,7 @@ extension WorkspaceWindowCreatePane {
                   label: "Project directory override",
                   value: formModel.projectDir
                 )
+                .harnessPreservePrimaryContentFocus()
             }
 
             AgentsCreateFieldBlock(

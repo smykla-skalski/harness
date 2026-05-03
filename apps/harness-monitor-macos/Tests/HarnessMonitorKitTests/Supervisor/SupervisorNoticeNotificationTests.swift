@@ -14,7 +14,7 @@ final class SupervisorNoticeNotificationTests: XCTestCase {
     XCTAssertEqual(request.content.interruptionLevel, .active)
     XCTAssertEqual(
       request.content.categoryIdentifier,
-      HarnessMonitorNotificationCategoryID.statusActions
+      HarnessMonitorSupervisorNotificationID.noticeCategoryIdentifier
     )
     XCTAssertEqual(
       request.content.userInfo[HarnessMonitorSupervisorNotificationID.ruleIDKey] as? String,
@@ -24,5 +24,15 @@ final class SupervisorNoticeNotificationTests: XCTestCase {
     XCTAssertTrue(
       request.identifier.hasPrefix(HarnessMonitorSupervisorNotificationID.noticeRequestPrefix)
     )
+  }
+
+  func test_supervisorNoticeCategoryDoesNotExposeDeadActions() {
+    let categories = HarnessMonitorNotificationRequestFactory.categories()
+    let noticeCategory = categories.first {
+      $0.identifier == HarnessMonitorSupervisorNotificationID.noticeCategoryIdentifier
+    }
+
+    XCTAssertNotNil(noticeCategory)
+    XCTAssertTrue(noticeCategory?.actions.isEmpty ?? false)
   }
 }

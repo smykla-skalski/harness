@@ -103,7 +103,9 @@ struct HarnessMonitorStoreRemoveSessionTests {
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
-    #expect(store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId)
+    #expect(
+      store.contentUI.session.selectedSessionSummary?.sessionId == PreviewFixtures.summary.sessionId
+    )
 
     store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
     await store.confirmPendingAction()
@@ -141,8 +143,8 @@ struct HarnessMonitorStoreRemoveSessionTests {
             actor: "harness-app"
           )
         ]
-     )
-   }
+    )
+  }
 
   @Test("Daemon missing-session archive replies still remove the stale session locally")
   func missingSessionArchiveReplyStillRemovesSessionLocally() async {

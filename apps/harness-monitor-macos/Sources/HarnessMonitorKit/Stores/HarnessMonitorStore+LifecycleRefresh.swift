@@ -239,9 +239,10 @@ extension HarnessMonitorStore {
       synchronizeActionActor()
       if allowPreviewReadySelection,
         let previewReadySessionID = previewReadySessionID(
-        client: client,
-        sessions: filteredSnapshot.sessions
-      ) {
+          client: client,
+          sessions: filteredSnapshot.sessions
+        )
+      {
         Task { @MainActor [weak self] in
           await self?.selectSession(previewReadySessionID)
         }

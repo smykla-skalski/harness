@@ -51,7 +51,7 @@ public struct FailedNudgeLoopRule: PolicyRule {
           count: nextCount,
           latestAt: event.createdAt
         )
-      } else {
+      } else if event.kind == "actionExecuted" {
         streaks[agentID] = FailureStreak(
           agentID: agentID,
           count: 0,

@@ -112,7 +112,7 @@ extension HarnessMonitorStore {
       event: "confirm-current",
       details: [
         "pending_confirmation": pendingConfirmation?.uiTestTraceLabel ?? "nil",
-        "is_session_read_only": String(isSessionReadOnly)
+        "is_session_read_only": String(isSessionReadOnly),
       ]
     )
     guard !isSessionReadOnly else {
@@ -136,7 +136,7 @@ extension HarnessMonitorStore {
       details: [
         "captured_confirmation": pendingConfirmation.uiTestTraceLabel,
         "store_pending_confirmation": self.pendingConfirmation?.uiTestTraceLabel ?? "nil",
-        "is_session_read_only": String(isSessionReadOnly)
+        "is_session_read_only": String(isSessionReadOnly),
       ]
     )
     guard !isSessionReadOnly else {

@@ -95,6 +95,7 @@ final class UnassignedTaskRuleTests: XCTestCase {
       return
     }
     XCTAssertEqual(payload.ruleID, "unassigned-task")
+    XCTAssertEqual(payload.id, "unassigned-task:s1:t1")
     XCTAssertEqual(payload.severity, .needsUser)
     XCTAssertEqual(payload.sessionID, "s1")
     XCTAssertEqual(payload.taskID, "t1")
@@ -185,6 +186,45 @@ final class UnassignedTaskRuleTests: XCTestCase {
     )
     XCTAssertEqual(suggestions.map(\.title), ["Assign to agent-1", "Assign to agent-3"])
     XCTAssertEqual(Set(suggestions.map(\.kind)), [.assignTask])
+  }
+
+  func test_suggestedActionPayloadIsValidJSONForSpecialCharacters() async throws {
+    let rule = UnassignedTaskRule()
+    let now = Date.fixed
+    let snapshot = Fixtures.snapshot(
+      sessions: [
+        Fixtures.session(
+          id: "s1",
+          agents: [Fixtures.agent(id: #"agent-"quoted""#, statusRaw: "active")],
+          tasks: [
+            Fixtures.task(
+              id: #"task-\slash"#,
+              statusRaw: "open",
+              createdAt: now.addingTimeInterval(-600)
+            )
+          ]
+        )
+      ]
+    )
+    let actions = await rule.evaluate(snapshot: snapshot, context: context(now: now))
+    guard case .queueDecision(let payload) = actions.first else {
+      return XCTFail("Expected queueDecision")
+    }
+    let suggestions = try JSONDecoder().decode(
+      [SuggestedAction].self,
+      from: Data(payload.suggestedActionsJSON.utf8)
+    )
+
+    struct Payload: Decodable {
+      let agentID: String
+      let taskID: String
+    }
+    let decoded = try JSONDecoder().decode(
+      Payload.self,
+      from: Data(suggestions[0].payloadJSON.utf8)
+    )
+    XCTAssertEqual(decoded.agentID, #"agent-"quoted""#)
+    XCTAssertEqual(decoded.taskID, #"task-\slash"#)
   }
 
   // MARK: - No active agents

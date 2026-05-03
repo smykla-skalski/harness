@@ -6,6 +6,7 @@ extension HarnessMonitorAccessibility {
   public static let workspaceToolbarForceTick = "harness.toolbar.workspace.force-tick"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"
+  public static let decisionDetailScrollView = "harness.decisions.detail.scroll"
   public static let decisionPrimaryActionFocusState = "harness.decisions.primary-action.focus"
   public static let decisionDetailTabs = "harness.decisions.detail.tabs"
   public static let decisionContextPanel = "harness.decisions.context"

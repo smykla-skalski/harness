@@ -9,6 +9,7 @@ struct WorkspaceWindowRootView: View {
   private static let contentRevealPollInterval = Duration.milliseconds(25)
 
   let store: HarnessMonitorStore
+  let keyWindowObserver: KeyWindowObserver
   let notifications: HarnessMonitorUserNotificationController
   let acpAttentionState: AcpPermissionAttentionState
   let navigationBridge: WorkspaceWindowNavigationBridge
@@ -80,7 +81,10 @@ struct WorkspaceWindowRootView: View {
 
   @ViewBuilder private var rootContent: some View {
     if showsWorkspaceContent {
-      WorkspaceWindowView(store: store, navigationBridge: navigationBridge)
+      WorkspaceWindowView(
+        store: store,
+        navigationBridge: navigationBridge
+      )
     } else {
       WorkspaceWindowOpeningView()
     }

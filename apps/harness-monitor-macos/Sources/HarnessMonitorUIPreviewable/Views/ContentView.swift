@@ -16,8 +16,14 @@ public struct ContentView<CornerContent: View>: View {
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   private let toast: ToastSlice
   let auditBuildState: AuditBuildDisplayState?
+  @Environment(\.resetFocus)
+  private var resetFocus
+  @FocusedValue(\.harnessPreservePrimaryContentFocus)
+  private var preservesPrimaryContentFocus
+  @State private var primaryContentPagingResponderRequest = 0
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
+  @Namespace private var primaryContentFocusScope
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -51,6 +57,25 @@ public struct ContentView<CornerContent: View>: View {
     contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit"
   }
 
+  private var currentSessionContentPrimaryFocusTarget: SessionContentPrimaryFocusTarget {
+    if contentSessionDetail.presentedSessionDetail != nil {
+      return .cockpit
+    }
+    if contentSession.selectedSessionSummary != nil {
+      return .loading
+    }
+    return .dashboard
+  }
+
+  private var contentPrimaryContentFocusResetToken: String {
+    [
+      currentSessionContentPrimaryFocusTarget.rawValue,
+      store.selectedSessionID ?? "nil",
+      String(isStartupFocusParticipationEnabled),
+      keyWindowObserver?.snapshot.routingToken ?? "key=untracked",
+    ].joined(separator: "|")
+  }
+
   private var columnVisibilityProfilingLabel: String {
     if columnVisibility == .all {
       return "all"
@@ -62,6 +87,16 @@ public struct ContentView<CornerContent: View>: View {
     // equality bucket on macOS. This window drives explicit visibility, so the
     // ambiguous branch represents the middle two-column state.
     return "doubleColumn"
+  }
+
+  private var isContentWindowKey: Bool {
+    keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.main) ?? true
+  }
+
+  private var shouldSuppressPrimaryContentFocusReset: Bool {
+    preservesPrimaryContentFocus == true
+      || contentShell.presentedSheet != nil
+      || contentShell.pendingConfirmation != nil
   }
 
   @MainActor
@@ -106,6 +141,7 @@ public struct ContentView<CornerContent: View>: View {
     } detail: {
       detailColumn
     }
+    .focusScope(primaryContentFocusScope)
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(contentWindowToolbarBackgroundVisibility, for: .windowToolbar)
     .toolbar {
@@ -144,9 +180,12 @@ public struct ContentView<CornerContent: View>: View {
         event: "surface-changed",
         details: [
           "surface": currentSurfaceLabel,
-          "selected_session_id": store.selectedSessionID ?? "nil"
+          "selected_session_id": store.selectedSessionID ?? "nil",
         ]
       )
+    }
+    .task(id: contentPrimaryContentFocusResetToken) {
+      await resetPrimaryContentFocusIfNeeded()
     }
   }
 
@@ -231,8 +270,32 @@ public struct ContentView<CornerContent: View>: View {
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       dashboardUI: contentDashboard,
+      primaryContentFocusScope: primaryContentFocusScope,
+      primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+      primaryContentFocusTarget: currentSessionContentPrimaryFocusTarget,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
+  }
+
+  @MainActor
+  private func resetPrimaryContentFocusIfNeeded() async {
+    guard
+      isStartupFocusParticipationEnabled,
+      isContentWindowKey,
+      !shouldSuppressPrimaryContentFocusReset
+    else {
+      return
+    }
+    await Task.yield()
+    guard
+      isStartupFocusParticipationEnabled,
+      isContentWindowKey,
+      !shouldSuppressPrimaryContentFocusReset
+    else {
+      return
+    }
+    resetFocus(in: primaryContentFocusScope)
+    primaryContentPagingResponderRequest += 1
   }
 
   private func enableStartupFocusParticipation() {

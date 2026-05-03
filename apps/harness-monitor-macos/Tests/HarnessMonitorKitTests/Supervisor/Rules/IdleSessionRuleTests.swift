@@ -67,7 +67,9 @@ final class IdleSessionRuleTests: XCTestCase {
       return
     }
     XCTAssertEqual(payload.ruleID, "idle-session")
+    XCTAssertEqual(payload.id, "idle-session:s1")
     XCTAssertEqual(payload.sessionID, "s1")
+    XCTAssertEqual(payload.agentID, "a1")
     XCTAssertEqual(payload.severity, .warn)
   }
 
@@ -137,13 +139,17 @@ final class IdleSessionRuleTests: XCTestCase {
     XCTAssertEqual(suggested.count, 2)
     XCTAssertEqual(suggested[0].title, "Send check-in nudge")
     XCTAssertEqual(suggested[0].kind, .nudge)
+    XCTAssertTrue(suggested[0].payloadJSON.contains(#""agentID":"a1""#))
     XCTAssertEqual(suggested[1].title, "Close session")
     XCTAssertEqual(suggested[1].kind, .custom)
+    XCTAssertTrue(suggested[1].payloadJSON.contains(#""mode":"closeSession""#))
+    XCTAssertTrue(suggested[1].payloadJSON.contains(#""sessionID":"session-abc""#))
 
     // contextJSON round-trips canonical data for the Decisions UI.
     let contextData = Data(payload.contextJSON.utf8)
     let parsed = try JSONSerialization.jsonObject(with: contextData) as? [String: Any]
     XCTAssertEqual(parsed?["sessionID"] as? String, "session-abc")
+    XCTAssertEqual(parsed?["agentID"] as? String, "a1")
   }
 
   // MARK: - Idempotency via stable action key
@@ -174,7 +180,7 @@ final class IdleSessionRuleTests: XCTestCase {
     let actions1 = await rule.evaluate(snapshot: snapshot1, context: context(now: now))
     let actions2 = await rule.evaluate(snapshot: snapshot2, context: context(now: now))
     XCTAssertEqual(actions1.first?.actionKey, actions2.first?.actionKey)
-    XCTAssertEqual(actions1.first?.actionKey, "decision:idle-session:s1")
+    XCTAssertEqual(actions1.first?.actionKey, "decision:idle-session:idle-session:s1")
   }
 
   // MARK: - Parameter overrides

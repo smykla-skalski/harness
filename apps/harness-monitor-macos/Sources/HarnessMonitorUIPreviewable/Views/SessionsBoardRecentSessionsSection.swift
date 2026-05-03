@@ -102,7 +102,9 @@ private struct DashboardSessionCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardSessionCard(session.sessionId))
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.dashboardSessionCardFrame(session.sessionId))
+    .accessibilityFrameMarker(
+      HarnessMonitorAccessibility.dashboardSessionCardFrame(session.sessionId)
+    )
     .onHover { isHovered = $0 }
     .contextMenu {
       Button {
