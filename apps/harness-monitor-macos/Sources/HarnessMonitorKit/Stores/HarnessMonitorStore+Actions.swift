@@ -91,7 +91,7 @@ extension HarnessMonitorStore {
     let actionName = "Observe session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
     let actor = controlPlaneActionActor(for: actor)
-    return await mutateSelectedSession(
+    let didObserve = await mutateSelectedSession(
       actionName: actionName,
       actionID: ActionID.observeSession(sessionID: action.sessionID).key,
       using: action.client,
@@ -103,6 +103,15 @@ extension HarnessMonitorStore {
         )
       }
     )
+    if didObserve {
+      Task { @MainActor [weak self] in
+        guard let self else {
+          return
+        }
+        await self.runSupervisorTickNow()
+      }
+    }
+    return didObserve
   }
 
   @discardableResult
@@ -298,6 +307,7 @@ extension HarnessMonitorStore {
           showingCachedData: isShowingCachedData,
           cancelPendingTimelineRefresh: false
         )
+        _ = sessionIndex.applySessionSummary(detail.session)
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
         presentSuccessFeedback(actionName)
         return true

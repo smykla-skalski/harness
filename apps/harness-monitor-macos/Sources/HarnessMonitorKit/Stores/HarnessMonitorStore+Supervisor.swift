@@ -266,7 +266,7 @@ extension HarnessMonitorStore {
     return try await service.suppressAutoActions(during: operation)
   }
 
-  public func runSupervisorTickForTesting() async {
+  func runSupervisorTickNow() async {
     if supervisorStack == nil {
       await startSupervisor()
     }
@@ -274,6 +274,10 @@ extension HarnessMonitorStore {
       return
     }
     await stack.service.runOneTick()
+  }
+
+  public func runSupervisorTickForTesting() async {
+    await runSupervisorTickNow()
   }
 
   public func insertDecisionForTesting(_ draft: DecisionDraft) async throws {
