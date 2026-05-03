@@ -416,7 +416,22 @@ harness_monitor_current_xcode_user_data_dir() {
   if [[ -z "$user_name" ]]; then
     user_name="user"
   fi
-  user_name="${user_name//\//-}"
+  # Strip an email-style suffix and reduce to lowercase alphanumerics so
+  # the .xcuserdatad directory name follows the same shape as the
+  # runtime profile name (e.g. `bartsmykla`, never
+  # `bart.smykla@konghq.com`). The /Users/<USER>/ home prefix is fixed
+  # by the OS and remains the only place the raw account name appears.
+  if [[ "$user_name" == *"@"* ]]; then
+    user_name="${user_name%%@*}"
+  fi
+  user_name="$(
+    printf '%s' "$user_name" \
+      | tr '[:upper:]' '[:lower:]' \
+      | tr -cd '[:alnum:]'
+  )"
+  if [[ -z "$user_name" ]]; then
+    user_name="user"
+  fi
   printf '%s.xcuserdatad\n' "$user_name"
 }
 

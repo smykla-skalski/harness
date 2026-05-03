@@ -197,13 +197,13 @@ class RuntimeProfileHelperTests(unittest.TestCase):
                 app_root
                 / "HarnessMonitor.xcworkspace"
                 / "xcuserdata"
-                / "bart.smykla@konghq.com.xcuserdatad"
+                / "bartsmykla.xcuserdatad"
                 / "WorkspaceSettings.xcsettings",
                 app_root
                 / "HarnessMonitor.xcodeproj"
                 / "project.xcworkspace"
                 / "xcuserdata"
-                / "bart.smykla@konghq.com.xcuserdatad"
+                / "bartsmykla.xcuserdatad"
                 / "WorkspaceSettings.xcsettings",
             ):
                 with self.subTest(settings_path=settings_path):
