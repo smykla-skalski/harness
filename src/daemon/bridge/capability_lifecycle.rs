@@ -298,8 +298,7 @@ impl BridgeServer {
 
     fn stop_codex_process(codex: &mut Option<BridgeCodexProcess>) {
         if let Some(process) = codex.as_mut() {
-            let _ = process.child.kill();
-            let _ = process.child.wait();
+            super::runtime::kill_codex_process_group(process);
             codex.take();
         }
     }

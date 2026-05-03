@@ -7,6 +7,9 @@ HARNESS_MONITOR_RUNTIME_APP_GROUP_DEFAULT="Q498EB36N4.io.harnessmonitor"
 HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE=4600
 HARNESS_MONITOR_RUNTIME_CODEX_PORT_SPAN=20000
 HARNESS_MONITOR_RUNTIME_USER_DERIVED_DATA_FILE=".xcode-user-derived-data-path"
+HARNESS_MONITOR_RUNTIME_PORT_REGISTRY_FILE="profile-ports.list"
+HARNESS_MONITOR_RUNTIME_PORT_LOCK_RETRIES=200
+HARNESS_MONITOR_RUNTIME_PORT_LOCK_SLEEP="0.05"
 
 harness_monitor_trim_whitespace() {
   local value="$1"
@@ -174,15 +177,111 @@ harness_monitor_runtime_daemon_data_home() {
     "$profile"
 }
 
-harness_monitor_runtime_codex_ws_port() {
-  local profile hex_prefix hash_value
-  if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
-    printf '%s\n' "$HARNESS_CODEX_WS_PORT"
-    return 0
-  fi
+harness_monitor_port_registry_path() {
+  local app_group_id
+  app_group_id="$(harness_monitor_runtime_app_group_id)"
+  printf '%s/Library/Group Containers/%s/%s\n' \
+    "${HOME:?missing HOME}" \
+    "$app_group_id" \
+    "$HARNESS_MONITOR_RUNTIME_PORT_REGISTRY_FILE"
+}
 
-  profile="$(harness_monitor_runtime_profile || true)"
-  [[ -n "$profile" ]] || return 1
+harness_monitor_port_registry_lock_path() {
+  printf '%s.lock\n' "$(harness_monitor_port_registry_path)"
+}
+
+harness_monitor_port_lock_holder_path() {
+  printf '%s/holder.pid\n' "$1"
+}
+
+harness_monitor_port_lock_record_holder() {
+  local lock_path="$1"
+  local holder_path
+  holder_path="$(harness_monitor_port_lock_holder_path "$lock_path")"
+  printf '%s\n' "$$" > "$holder_path" 2>/dev/null || true
+}
+
+# Best-effort stale-lock recovery: if the holder PID stored inside the
+# lock directory belongs to a process that no longer exists, drop the
+# stale lock so the current caller can retry. Without this a crashed
+# bridge wedges every subsequent `bridge start` for `lock_retries *
+# lock_sleep` seconds.
+harness_monitor_port_lock_reclaim_if_stale() {
+  local lock_path="$1"
+  local holder_path holder_pid
+  holder_path="$(harness_monitor_port_lock_holder_path "$lock_path")"
+  [[ -f "$holder_path" ]] || return 1
+  holder_pid="$(cat "$holder_path" 2>/dev/null || true)"
+  [[ "$holder_pid" =~ ^[0-9]+$ ]] || return 1
+  if kill -0 "$holder_pid" 2>/dev/null; then
+    return 1
+  fi
+  rm -rf "$lock_path" 2>/dev/null || true
+  return 0
+}
+
+harness_monitor_acquire_port_lock() {
+  local lock_path attempt
+  lock_path="$(harness_monitor_port_registry_lock_path)"
+  mkdir -p "$(dirname "$lock_path")"
+  for ((attempt = 0; attempt < HARNESS_MONITOR_RUNTIME_PORT_LOCK_RETRIES; attempt += 1)); do
+    if mkdir "$lock_path" 2>/dev/null; then
+      harness_monitor_port_lock_record_holder "$lock_path"
+      printf '%s\n' "$lock_path"
+      return 0
+    fi
+    if harness_monitor_port_lock_reclaim_if_stale "$lock_path"; then
+      continue
+    fi
+    sleep "$HARNESS_MONITOR_RUNTIME_PORT_LOCK_SLEEP"
+  done
+  echo "Unable to acquire profile-port registry lock at $lock_path (delete the directory if no harness process holds it)" >&2
+  return 1
+}
+
+harness_monitor_release_port_lock() {
+  local lock_path="$1"
+  [[ -n "$lock_path" ]] || return 0
+  rm -f "$(harness_monitor_port_lock_holder_path "$lock_path")" 2>/dev/null || true
+  rmdir "$lock_path" 2>/dev/null || true
+}
+
+harness_monitor_port_registry_lookup() {
+  local registry_path="$1" profile="$2" line key value
+  [[ -f "$registry_path" ]] || return 1
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="$(harness_monitor_trim_whitespace "$line")"
+    [[ -n "$line" ]] || continue
+    [[ "$line" != \#* ]] || continue
+    key="${line%% *}"
+    value="${line#* }"
+    if [[ "$key" == "$profile" ]] && [[ "$value" =~ ^[0-9]+$ ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done < "$registry_path"
+  return 1
+}
+
+harness_monitor_port_registry_owner() {
+  local registry_path="$1" target_port="$2" line key value
+  [[ -f "$registry_path" ]] || return 1
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="$(harness_monitor_trim_whitespace "$line")"
+    [[ -n "$line" ]] || continue
+    [[ "$line" != \#* ]] || continue
+    key="${line%% *}"
+    value="${line#* }"
+    if [[ "$value" == "$target_port" ]]; then
+      printf '%s\n' "$key"
+      return 0
+    fi
+  done < "$registry_path"
+  return 1
+}
+
+harness_monitor_port_hash_candidate() {
+  local profile="$1" hex_prefix hash_value
   hex_prefix="$(
     printf '%s' "$profile" \
       | shasum -a 256 \
@@ -190,6 +289,79 @@ harness_monitor_runtime_codex_ws_port() {
   )"
   hash_value=$((16#$hex_prefix))
   printf '%s\n' "$((HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE + (hash_value % HARNESS_MONITOR_RUNTIME_CODEX_PORT_SPAN)))"
+}
+
+harness_monitor_port_registry_persist() {
+  local registry_path="$1" profile="$2" port="$3" tmp
+  mkdir -p "$(dirname "$registry_path")"
+  tmp="$registry_path.tmp.$$"
+  if [[ -f "$registry_path" ]]; then
+    awk -v profile="$profile" '
+      { sub(/[[:space:]]+$/, "") }
+      $0 == "" { next }
+      $0 ~ /^#/ { print; next }
+      $1 == profile { next }
+      { print }
+    ' "$registry_path" > "$tmp"
+  else
+    printf '# Harness Monitor profile port registry\n' > "$tmp"
+  fi
+  printf '%s %s\n' "$profile" "$port" >> "$tmp"
+  mv "$tmp" "$registry_path"
+}
+
+harness_monitor_port_registry_resolve() {
+  local registry_path="$1" profile="$2" candidate port owner upper
+  upper=$((HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE + HARNESS_MONITOR_RUNTIME_CODEX_PORT_SPAN))
+  candidate="$(harness_monitor_port_hash_candidate "$profile")"
+  port="$candidate"
+  while :; do
+    owner="$(harness_monitor_port_registry_owner "$registry_path" "$port" || true)"
+    if [[ -z "$owner" ]] || [[ "$owner" == "$profile" ]]; then
+      harness_monitor_port_registry_persist "$registry_path" "$profile" "$port" || return 1
+      printf '%s\n' "$port"
+      return 0
+    fi
+    port=$((port + 1))
+    if (( port >= upper )); then
+      port=$HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE
+    fi
+    if (( port == candidate )); then
+      echo "Profile port registry exhausted (range $HARNESS_MONITOR_RUNTIME_CODEX_PORT_BASE-$upper)" >&2
+      return 1
+    fi
+  done
+}
+
+harness_monitor_runtime_codex_ws_port() {
+  local profile registry_path port lock_path
+  if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
+    printf '%s\n' "$HARNESS_CODEX_WS_PORT"
+    return 0
+  fi
+
+  profile="$(harness_monitor_runtime_profile || true)"
+  [[ -n "$profile" ]] || return 1
+  registry_path="$(harness_monitor_port_registry_path)"
+
+  port="$(harness_monitor_port_registry_lookup "$registry_path" "$profile" || true)"
+  if [[ -n "$port" ]]; then
+    printf '%s\n' "$port"
+    return 0
+  fi
+
+  lock_path="$(harness_monitor_acquire_port_lock)" || return 1
+  port="$(harness_monitor_port_registry_lookup "$registry_path" "$profile" || true)"
+  if [[ -z "$port" ]]; then
+    port="$(harness_monitor_port_registry_resolve "$registry_path" "$profile" || true)"
+  fi
+  harness_monitor_release_port_lock "$lock_path"
+
+  if [[ -z "$port" ]]; then
+    echo "Unable to assign codex WS port for profile $profile" >&2
+    return 1
+  fi
+  printf '%s\n' "$port"
 }
 
 harness_monitor_runtime_launch_agent_label() {

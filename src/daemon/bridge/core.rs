@@ -162,6 +162,13 @@ impl BridgeResponse {
 
 pub(super) struct BridgeCodexProcess {
     pub(super) child: Child,
+    /// Process group leader id of the spawned codex child.
+    ///
+    /// Codex is spawned with `process_group(0)` so it heads its own group.
+    /// Bridge owns explicit shutdown via `killpg(pgid, SIGTERM)` so codex
+    /// dies with bridge instead of getting reparented to launchd and
+    /// holding the listening port.
+    pub(super) pgid: i32,
     pub(super) endpoint: String,
     pub(super) metadata: BridgeCodexMetadata,
 }
