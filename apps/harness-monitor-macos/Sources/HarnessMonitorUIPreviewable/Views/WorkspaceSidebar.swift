@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct WorkspaceSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
+  @Binding var columnVisibility: NavigationSplitViewVisibility
   let isStartupFocusParticipationEnabled: Bool
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
@@ -96,6 +98,14 @@ struct WorkspaceSidebar: View {
   }
 
   private func handleSearchFocusRequest() {
+    if columnVisibility == .detailOnly {
+      columnVisibility = .all
+      Task { @MainActor in
+        if let contentView = NSApp.keyWindow?.contentView {
+          NSAccessibility.post(element: contentView, notification: .layoutChanged)
+        }
+      }
+    }
     _ = searchPresentationState.requestPresentation(canPresent: true)
   }
 

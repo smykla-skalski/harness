@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -29,9 +28,6 @@ public struct WorkspaceWindowView: View {
   private var resetFocus
   @FocusedValue(\.harnessPreservePrimaryContentFocus)
   private var preservesPrimaryContentFocus
-  @FocusedValue(\.harnessPrimaryContentResetSuppression)
-  private var resetSuppression
-  @State private var sidebarVisibilityExpander = HarnessSidebarVisibilityExpander()
   @Environment(\.openWindow)
   var openWindow
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
@@ -257,8 +253,8 @@ public struct WorkspaceWindowView: View {
     keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.workspace) ?? true
   }
 
-  private var currentResetSuppression: PrimaryContentResetSuppression {
-    PrimaryContentResetSuppression(
+  private var shouldSuppressPrimaryContentFocusReset: Bool {
+    HarnessMonitorUIPreviewable.shouldSuppressPrimaryContentFocusReset(
       preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
       hasFocusedEditorField: stateFocusedField != nil,
       hasPresentedSheet: store.presentedSheet != nil,
@@ -358,29 +354,8 @@ public struct WorkspaceWindowView: View {
       .onDisappear {
         hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
-        sidebarVisibilityExpander.handler = nil
       }
       .acpPermissionPresentation(store: store)
-      .focusedSceneValue(\.harnessPrimaryContentResetSuppression, currentResetSuppression)
-      .focusedSceneValue(
-        \.harnessSidebarVisibilityRequest,
-        HarnessSidebarVisibilityRequest(
-          isCollapsed: columnVisibility == .detailOnly,
-          expander: sidebarVisibilityExpander
-        )
-      )
-      .task {
-        let binding = columnVisibilityBinding
-        sidebarVisibilityExpander.handler = {
-          guard binding.wrappedValue == .detailOnly else { return }
-          binding.wrappedValue = .all
-          Task { @MainActor in
-            if let contentView = NSApp.keyWindow?.contentView {
-              NSAccessibility.post(element: contentView, notification: .layoutChanged)
-            }
-          }
-        }
-      }
 
     return
       applyDismissAllVisibleDialog(to: content)
@@ -394,7 +369,7 @@ public struct WorkspaceWindowView: View {
       hasCompletedInitialWorkspacePreparation,
       isStartupFocusParticipationEnabled,
       isWorkspaceKeyWindow,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !shouldSuppressPrimaryContentFocusReset
     else {
       return
     }
@@ -403,7 +378,7 @@ public struct WorkspaceWindowView: View {
       hasCompletedInitialWorkspacePreparation,
       isStartupFocusParticipationEnabled,
       isWorkspaceKeyWindow,
-      !(resetSuppression ?? currentResetSuppression).isSuppressed
+      !shouldSuppressPrimaryContentFocusReset
     else {
       return
     }

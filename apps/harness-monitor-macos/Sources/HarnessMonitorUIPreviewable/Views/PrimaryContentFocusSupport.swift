@@ -287,3 +287,22 @@ final class PrimaryContentPagingResponderBridgeView: NSView {
     pendingRequests.removeAll()
   }
 }
+
+// Two callers today (main + workspace). When a third caller appears OR either
+// caller needs a second `extraSuppressor`, migrate to a `FocusedValues` entry
+// (`\.harnessPrimaryContentResetSuppression`, Phase 2 in the parity plan) and
+// delete this helper. Do not grow the parameter list.
+@MainActor
+func shouldSuppressPrimaryContentFocusReset(
+  preservesPrimaryContentFocus: Bool,
+  hasFocusedEditorField: Bool,
+  hasPresentedSheet: Bool,
+  hasPendingConfirmation: Bool,
+  extraSuppressor: Bool = false
+) -> Bool {
+  if preservesPrimaryContentFocus { return true }
+  if hasFocusedEditorField { return true }
+  if hasPresentedSheet { return true }
+  if hasPendingConfirmation { return true }
+  return extraSuppressor
+}

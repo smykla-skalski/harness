@@ -3,9 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class WorkspaceWindowKeyboardParityUITests:
-  HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting
-{
+final class WorkspaceWindowKeyboardParityUITests: HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting {
   func testSpaceKeyScrollsCreatePane() throws {
     let app = launchInCockpitPreview()
     openWorkspaceWindow(in: app)
