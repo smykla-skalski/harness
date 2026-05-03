@@ -12,20 +12,20 @@ public struct PrimaryContentResetSuppression: Equatable {
   public let hasFocusedEditorField: Bool
   public let hasPresentedSheet: Bool
   public let hasPendingConfirmation: Bool
-  public let extraSuppressor: Bool
+  public let hasDismissConfirmation: Bool
 
   public init(
     preservesPrimaryContentFocus: Bool,
     hasFocusedEditorField: Bool = false,
     hasPresentedSheet: Bool,
     hasPendingConfirmation: Bool,
-    extraSuppressor: Bool = false
+    hasDismissConfirmation: Bool = false
   ) {
     self.preservesPrimaryContentFocus = preservesPrimaryContentFocus
     self.hasFocusedEditorField = hasFocusedEditorField
     self.hasPresentedSheet = hasPresentedSheet
     self.hasPendingConfirmation = hasPendingConfirmation
-    self.extraSuppressor = extraSuppressor
+    self.hasDismissConfirmation = hasDismissConfirmation
   }
 
   public var isSuppressed: Bool {
@@ -33,7 +33,7 @@ public struct PrimaryContentResetSuppression: Equatable {
     if hasFocusedEditorField { return true }
     if hasPresentedSheet { return true }
     if hasPendingConfirmation { return true }
-    return extraSuppressor
+    return hasDismissConfirmation
   }
 }
 

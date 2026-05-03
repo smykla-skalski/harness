@@ -263,7 +263,7 @@ public struct WorkspaceWindowView: View {
       hasFocusedEditorField: stateFocusedField != nil,
       hasPresentedSheet: store.presentedSheet != nil,
       hasPendingConfirmation: store.pendingConfirmation != nil,
-      extraSuppressor: showDismissAllVisibleConfirmation
+      hasDismissConfirmation: showDismissAllVisibleConfirmation
     )
   }
 
@@ -394,6 +394,7 @@ public struct WorkspaceWindowView: View {
       hasCompletedInitialWorkspacePreparation,
       isStartupFocusParticipationEnabled,
       isWorkspaceKeyWindow,
+      // nil during startup or when window is not key; local fallback is correct in both cases.
       !(resetSuppression ?? currentResetSuppression).isSuppressed
     else {
       return
