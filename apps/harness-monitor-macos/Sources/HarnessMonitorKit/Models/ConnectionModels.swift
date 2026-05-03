@@ -74,10 +74,17 @@ public enum ConnectionQuality: String, Equatable, Sendable {
   }
 }
 
+public enum ConnectionLatencySource: String, Equatable, Sendable {
+  case transport
+  case request
+}
+
 public struct ConnectionMetrics: Equatable, Sendable {
   public var transportKind: TransportKind
-  public var latencyMs: Int?
-  public var averageLatencyMs: Int?
+  public var transportLatencyMs: Int?
+  public var averageTransportLatencyMs: Int?
+  public var requestLatencyMs: Int?
+  public var averageRequestLatencyMs: Int?
   public var messagesReceived: Int
   public var messagesSent: Int
   public var messagesPerSecond: Double
@@ -88,8 +95,66 @@ public struct ConnectionMetrics: Equatable, Sendable {
   public var isFallback: Bool
   public var fallbackReason: String?
 
+  public init(
+    transportKind: TransportKind,
+    latencyMs: Int? = nil,
+    averageLatencyMs: Int? = nil,
+    requestLatencyMs: Int? = nil,
+    averageRequestLatencyMs: Int? = nil,
+    messagesReceived: Int,
+    messagesSent: Int,
+    messagesPerSecond: Double,
+    connectedSince: Date?,
+    lastMessageAt: Date?,
+    reconnectAttempt: Int,
+    reconnectCount: Int,
+    isFallback: Bool,
+    fallbackReason: String?
+  ) {
+    self.transportKind = transportKind
+    transportLatencyMs = latencyMs
+    averageTransportLatencyMs = averageLatencyMs
+    self.requestLatencyMs = requestLatencyMs
+    self.averageRequestLatencyMs = averageRequestLatencyMs
+    self.messagesReceived = messagesReceived
+    self.messagesSent = messagesSent
+    self.messagesPerSecond = messagesPerSecond
+    self.connectedSince = connectedSince
+    self.lastMessageAt = lastMessageAt
+    self.reconnectAttempt = reconnectAttempt
+    self.reconnectCount = reconnectCount
+    self.isFallback = isFallback
+    self.fallbackReason = fallbackReason
+  }
+
+  public var latencyMs: Int? {
+    transportLatencyMs ?? requestLatencyMs
+  }
+
+  public var averageLatencyMs: Int? {
+    averageTransportLatencyMs ?? averageRequestLatencyMs
+  }
+
+  public var latencySource: ConnectionLatencySource? {
+    if transportLatencyMs != nil {
+      return .transport
+    }
+    if requestLatencyMs != nil {
+      return .request
+    }
+    return nil
+  }
+
   public var quality: ConnectionQuality {
     ConnectionQuality(latencyMs: latencyMs)
+  }
+
+  public var transportQuality: ConnectionQuality {
+    ConnectionQuality(latencyMs: transportLatencyMs)
+  }
+
+  public var requestQuality: ConnectionQuality {
+    ConnectionQuality(latencyMs: requestLatencyMs)
   }
 
   public static let initial: Self = {

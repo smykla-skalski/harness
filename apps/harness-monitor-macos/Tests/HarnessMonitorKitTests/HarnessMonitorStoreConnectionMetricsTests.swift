@@ -26,8 +26,10 @@ struct HarnessMonitorStoreMetricsTests {
 
     let store = await makeBootstrappedStore(client: client)
 
-    #expect((store.connectionMetrics.latencyMs ?? 0) >= 20)
-    #expect((store.connectionMetrics.averageLatencyMs ?? 0) >= 20)
+    #expect(store.connectionMetrics.transportLatencyMs == nil)
+    #expect((store.connectionMetrics.requestLatencyMs ?? 0) >= 20)
+    #expect((store.connectionMetrics.averageRequestLatencyMs ?? 0) >= 20)
+    #expect(store.connectionMetrics.latencySource == .request)
     #expect(store.connectionMetrics.connectedSince != nil)
     #expect(client.readCallCount(.transportLatency) == 0)
 
@@ -46,15 +48,41 @@ struct HarnessMonitorStoreMetricsTests {
     store.connectionProbeInterval = .milliseconds(30)
 
     await store.bootstrap()
-    store.connectionMetrics.latencyMs = nil
-    store.connectionMetrics.averageLatencyMs = nil
+    store.connectionMetrics.transportLatencyMs = nil
+    store.connectionMetrics.averageTransportLatencyMs = nil
 
     try? await Task.sleep(for: .milliseconds(120))
 
-    #expect(store.connectionMetrics.latencyMs == 143)
-    #expect((store.connectionMetrics.averageLatencyMs ?? 0) > 0)
-    #expect((store.connectionMetrics.averageLatencyMs ?? 0) <= 143)
+    #expect(store.connectionMetrics.transportLatencyMs == 143)
+    #expect((store.connectionMetrics.averageTransportLatencyMs ?? 0) > 0)
+    #expect((store.connectionMetrics.averageTransportLatencyMs ?? 0) <= 143)
+    #expect(store.connectionMetrics.latencySource == .transport)
     #expect(client.readCallCount(.transportLatency) > 1)
+
+    store.stopAllStreams()
+  }
+
+  @Test("Diagnostics refresh records request latency without overwriting transport RTT")
+  func diagnosticsRefreshKeepsTransportLatencySeparate() async {
+    let client = RecordingHarnessClient()
+    client.configureHealthDelay(.milliseconds(15))
+    client.configureDiagnosticsDelay(.milliseconds(180))
+    client.configureTransportLatencyMs(143)
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.connectionProbeInterval = .milliseconds(30)
+
+    await store.bootstrap()
+    try? await Task.sleep(for: .milliseconds(120))
+
+    await store.refresh(using: client, preserveSelection: false)
+
+    #expect(store.connectionMetrics.transportLatencyMs == 143)
+    #expect((store.connectionMetrics.requestLatencyMs ?? 0) >= 150)
+    #expect(store.connectionMetrics.latencyMs == 143)
+    #expect(store.connectionMetrics.latencySource == .transport)
 
     store.stopAllStreams()
   }

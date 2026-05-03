@@ -47,8 +47,12 @@ struct PreferencesConnectionMetrics: View {
 private struct PreferencesConnectionMetricsSection: View {
   let metrics: ConnectionMetrics
 
-  private var latencyText: String {
-    metrics.latencyMs.map { "\($0)ms" } ?? "--"
+  private var transportLatencyText: String {
+    metrics.transportLatencyMs.map { "\($0)ms" } ?? "--"
+  }
+
+  private var requestLatencyText: String {
+    metrics.requestLatencyMs.map { "\($0)ms" } ?? "--"
   }
 
   private var rateText: String {
@@ -64,7 +68,8 @@ private struct PreferencesConnectionMetricsSection: View {
   var body: some View {
     Section("Metrics") {
       LabeledContent("Transport", value: metrics.transportKind.title)
-      LabeledContent("Latency", value: latencyText)
+      LabeledContent("Transport RTT", value: transportLatencyText)
+      LabeledContent("Request Latency", value: requestLatencyText)
       LabeledContent("Messages In", value: "\(metrics.messagesReceived)")
       LabeledContent("Messages Out", value: "\(metrics.messagesSent)")
       LabeledContent("Uptime") {

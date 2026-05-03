@@ -23,7 +23,7 @@ pub fn build_config_payload() -> WsConfigPayload {
         personas: persona::all(),
         runtime_models: models::all_catalogs(),
         acp_agents: catalog::acp_agents().into_iter().cloned().collect(),
-        runtime_probe: Some(probe::probe_acp_agents_cached()),
+        runtime_probe: probe::cached_probe_snapshot(),
     }
 }
 
@@ -54,7 +54,12 @@ fn config_push_event(payload: Value) -> WsPushEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::acp::probe::{
+        AcpAuthState, AcpRuntimeProbe, AcpRuntimeProbeResponse, lock_probe_cache_for_tests,
+        replace_probe_cache_for_tests,
+    };
     use axum::extract::ws::Message;
+    use std::time::Duration;
 
     #[test]
     fn build_config_payload_includes_known_personas() {
@@ -86,6 +91,22 @@ mod tests {
 
     #[test]
     fn build_config_push_frame_serializes_with_config_event_and_seq_zero() {
+        let _guard = lock_probe_cache_for_tests();
+        replace_probe_cache_for_tests(
+            Some(AcpRuntimeProbeResponse {
+                probes: vec![AcpRuntimeProbe {
+                    agent_id: "copilot".to_string(),
+                    display_name: "GitHub Copilot".to_string(),
+                    binary_present: true,
+                    auth_state: AcpAuthState::Ready,
+                    version: Some("1.0.0".to_string()),
+                    install_hint: None,
+                }],
+                checked_at: "2026-05-03T20:00:00Z".to_string(),
+            }),
+            Duration::ZERO,
+            false,
+        );
         let frame = build_config_push_frame().expect("config frame");
         let Message::Text(text) = frame else {
             panic!("config frame should be a text message");
@@ -101,5 +122,17 @@ mod tests {
         assert!(!payload.runtime_models.is_empty());
         assert!(!payload.acp_agents.is_empty());
         assert!(payload.runtime_probe.is_some());
+        replace_probe_cache_for_tests(None, Duration::ZERO, false);
+    }
+
+    #[test]
+    fn build_config_payload_omits_runtime_probe_until_cache_is_ready() {
+        let _guard = lock_probe_cache_for_tests();
+        replace_probe_cache_for_tests(None, Duration::ZERO, true);
+
+        let payload = build_config_payload();
+
+        assert!(payload.runtime_probe.is_none());
+        replace_probe_cache_for_tests(None, Duration::ZERO, false);
     }
 }

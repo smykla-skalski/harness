@@ -6,6 +6,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::workspace::utc_now;
 
@@ -45,7 +46,14 @@ struct ProbeCacheEntry {
     response: AcpRuntimeProbeResponse,
 }
 
-static PROBE_CACHE: LazyLock<Mutex<Option<ProbeCacheEntry>>> = LazyLock::new(|| Mutex::new(None));
+#[derive(Default)]
+struct ProbeCacheState {
+    entry: Option<ProbeCacheEntry>,
+    refreshing: bool,
+}
+
+static PROBE_CACHE: LazyLock<Mutex<ProbeCacheState>> =
+    LazyLock::new(|| Mutex::new(ProbeCacheState::default()));
 
 /// Return cached ACP probe results for the current daemon process.
 ///
@@ -53,18 +61,71 @@ static PROBE_CACHE: LazyLock<Mutex<Option<ProbeCacheEntry>>> = LazyLock::new(|| 
 /// Panics if the process-wide probe cache mutex is poisoned.
 #[must_use]
 pub fn probe_acp_agents_cached() -> AcpRuntimeProbeResponse {
-    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
-    if let Some(entry) = cache.as_ref()
-        && entry.cached_at.elapsed() < PROBE_CACHE_TTL
-    {
-        return entry.response.clone();
+    cached_probe_snapshot().unwrap_or_else(pending_probe_response)
+}
+
+/// Return the latest cached ACP probe results without blocking request paths.
+///
+/// Fresh cache entries are returned directly. Stale entries are returned
+/// immediately while a background refresh runs. When no cached data is
+/// available yet, this returns `None` and schedules the first refresh.
+///
+/// # Panics
+/// Panics if the process-wide probe cache mutex is poisoned.
+#[must_use]
+pub fn cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
+    let mut should_refresh = false;
+    let snapshot = {
+        let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+        let cached = cache
+            .entry
+            .as_ref()
+            .map(|entry| (probe_cache_entry_is_fresh(entry), entry.response.clone()));
+        match cached {
+            Some((true, response)) => Some(response),
+            Some((false, response)) => {
+                if !cache.refreshing {
+                    cache.refreshing = true;
+                    should_refresh = true;
+                }
+                Some(response)
+            }
+            None => {
+                if !cache.refreshing {
+                    cache.refreshing = true;
+                    should_refresh = true;
+                }
+                None
+            }
+        }
+    };
+
+    if should_refresh {
+        spawn_probe_cache_refresh();
     }
-    let response = probe_acp_agents();
-    *cache = Some(ProbeCacheEntry {
-        cached_at: Instant::now(),
-        response: response.clone(),
-    });
-    response
+
+    snapshot
+}
+
+/// Best-effort cache warm-up for the ACP runtime probe.
+///
+/// # Panics
+/// Panics if the process-wide probe cache mutex is poisoned.
+pub fn schedule_probe_cache_refresh() {
+    let should_refresh = {
+        let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+        let entry_is_fresh = cache.entry.as_ref().is_some_and(probe_cache_entry_is_fresh);
+        if entry_is_fresh || cache.refreshing {
+            false
+        } else {
+            cache.refreshing = true;
+            true
+        }
+    };
+
+    if should_refresh {
+        spawn_probe_cache_refresh();
+    }
 }
 
 #[must_use]
@@ -127,11 +188,81 @@ fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
     child.wait_with_output()
 }
 
+fn pending_probe_response() -> AcpRuntimeProbeResponse {
+    AcpRuntimeProbeResponse {
+        probes: Vec::new(),
+        checked_at: utc_now(),
+    }
+}
+
+fn probe_cache_entry_is_fresh(entry: &ProbeCacheEntry) -> bool {
+    entry.cached_at.elapsed() < PROBE_CACHE_TTL
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn spawn_probe_cache_refresh() {
+    if let Err(error) = spawn_probe_cache_refresh_thread() {
+        clear_probe_cache_refresh_flag();
+        warn!(%error, "failed to spawn ACP runtime probe refresh");
+    }
+}
+
+fn spawn_probe_cache_refresh_thread() -> io::Result<()> {
+    thread::Builder::new()
+        .name("acp-probe-refresh".to_string())
+        .spawn(|| {
+            let response = probe_acp_agents();
+            store_probe_cache(response);
+        })?;
+    Ok(())
+}
+
+fn clear_probe_cache_refresh_flag() {
+    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+    cache.refreshing = false;
+}
+
+fn store_probe_cache(response: AcpRuntimeProbeResponse) {
+    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+    cache.entry = Some(ProbeCacheEntry {
+        cached_at: Instant::now(),
+        response,
+    });
+    cache.refreshing = false;
+}
+
 fn version_from_output(stdout: &[u8], stderr: &[u8]) -> Option<String> {
     let text = if stdout.is_empty() { stderr } else { stdout };
     let version = String::from_utf8_lossy(text);
     let version = version.lines().next()?.trim();
     (!version.is_empty()).then(|| version.to_string())
+}
+
+#[cfg(test)]
+static PROBE_CACHE_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+#[cfg(test)]
+pub(crate) fn lock_probe_cache_for_tests() -> std::sync::MutexGuard<'static, ()> {
+    PROBE_CACHE_TEST_LOCK
+        .lock()
+        .expect("ACP probe cache test lock")
+}
+
+#[cfg(test)]
+pub(crate) fn replace_probe_cache_for_tests(
+    response: Option<AcpRuntimeProbeResponse>,
+    age: Duration,
+    refreshing: bool,
+) {
+    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+    cache.entry = response.map(|response| ProbeCacheEntry {
+        cached_at: Instant::now() - age,
+        response,
+    });
+    cache.refreshing = refreshing;
 }
 
 #[cfg(test)]
@@ -170,5 +301,39 @@ mod tests {
         let probe = probe_descriptor(&descriptor("printf", &["fake 1.2.3\n"]));
         assert!(probe.binary_present);
         assert_eq!(probe.version.as_deref(), Some("fake 1.2.3"));
+    }
+
+    #[test]
+    fn cached_probe_snapshot_returns_seeded_entry_without_refreshing() {
+        let _guard = lock_probe_cache_for_tests();
+        let response = AcpRuntimeProbeResponse {
+            probes: vec![AcpRuntimeProbe {
+                agent_id: "copilot".to_string(),
+                display_name: "GitHub Copilot".to_string(),
+                binary_present: true,
+                auth_state: AcpAuthState::Ready,
+                version: Some("1.0.0".to_string()),
+                install_hint: None,
+            }],
+            checked_at: "2026-05-03T20:00:00Z".to_string(),
+        };
+        replace_probe_cache_for_tests(Some(response.clone()), Duration::ZERO, false);
+
+        assert_eq!(cached_probe_snapshot(), Some(response));
+
+        replace_probe_cache_for_tests(None, Duration::ZERO, false);
+    }
+
+    #[test]
+    fn cached_probe_returns_pending_response_while_refresh_is_in_flight() {
+        let _guard = lock_probe_cache_for_tests();
+        replace_probe_cache_for_tests(None, Duration::ZERO, true);
+
+        let response = probe_acp_agents_cached();
+
+        assert!(response.probes.is_empty());
+        assert!(!response.checked_at.is_empty());
+
+        replace_probe_cache_for_tests(None, Duration::ZERO, false);
     }
 }

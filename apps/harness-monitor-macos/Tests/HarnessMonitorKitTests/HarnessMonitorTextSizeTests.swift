@@ -284,7 +284,7 @@ struct ConnectionToolbarBadgeLayoutTests {
 
     var connected = disconnected
     connected.connectedSince = Date(timeIntervalSinceReferenceDate: 123_456)
-    connected.latencyMs = 24
+    connected.transportLatencyMs = 24
 
     let disconnectedSize = fittingSize(for: ConnectionToolbarBadge(metrics: disconnected))
     let connectedSize = fittingSize(for: ConnectionToolbarBadge(metrics: connected))

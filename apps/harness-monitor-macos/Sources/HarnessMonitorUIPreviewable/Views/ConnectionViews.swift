@@ -179,7 +179,7 @@ struct ConnectionToolbarBadge: View {
   }
 
   private var showsLatencyValue: Bool {
-    showsConnectionDetails && metrics.latencyMs != nil
+    showsConnectionDetails && metrics.transportLatencyMs != nil
   }
 
   private var transportLabel: String {
@@ -187,7 +187,7 @@ struct ConnectionToolbarBadge: View {
   }
 
   private var latencyLabel: String {
-    guard let latencyMs = metrics.latencyMs else {
+    guard let latencyMs = metrics.transportLatencyMs else {
       return "--ms"
     }
     if latencyMs >= 1_000 {
@@ -200,8 +200,13 @@ struct ConnectionToolbarBadge: View {
     guard showsConnectionDetails else {
       return "Connection unavailable"
     }
-    if let latency = metrics.latencyMs {
-      return "Connection: \(metrics.transportKind.shortTitle), latency \(latency) milliseconds"
+    if let latency = metrics.transportLatencyMs {
+      return
+        "Connection: \(metrics.transportKind.shortTitle), transport latency \(latency) milliseconds"
+    }
+    if let requestLatency = metrics.requestLatencyMs {
+      return
+        "Connection: \(metrics.transportKind.shortTitle), transport latency unavailable, last request latency \(requestLatency) milliseconds"
     }
     return "Connection: \(metrics.transportKind.title)"
   }

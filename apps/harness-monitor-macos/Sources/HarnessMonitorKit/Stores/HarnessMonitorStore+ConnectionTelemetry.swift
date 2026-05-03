@@ -203,7 +203,8 @@ extension HarnessMonitorStore {
     connectionMetrics = .initial
     connectionMetrics.transportKind = transport
     connectionMetrics.isFallback = transport == .httpSSE
-    latencySamplesMs.removeAll(keepingCapacity: true)
+    transportLatencySamplesMs.removeAll(keepingCapacity: true)
+    requestLatencySamplesMs.removeAll(keepingCapacity: true)
     trafficSampleTimes.removeAll(keepingCapacity: true)
   }
 
@@ -221,7 +222,10 @@ extension HarnessMonitorStore {
     connectionState = .offline(message)
     stopConnectionProbe()
     connectionMetrics.connectedSince = nil
-    connectionMetrics.latencyMs = nil
+    connectionMetrics.transportLatencyMs = nil
+    connectionMetrics.averageTransportLatencyMs = nil
+    connectionMetrics.requestLatencyMs = nil
+    connectionMetrics.averageRequestLatencyMs = nil
     connectionMetrics.lastMessageAt = nil
     connectionMetrics.messagesPerSecond = 0
     connectionMetrics.reconnectAttempt = 0
@@ -229,15 +233,15 @@ extension HarnessMonitorStore {
 
   func recordRequestSuccess(
     latencyMs: Int? = nil,
-    updatesLatency: Bool = false,
+    latencySource: ConnectionLatencySource? = nil,
     countsTowardsTraffic: Bool = true,
     recordedAt: Date = .now
   ) {
     guard maintainsLiveDaemonObservation else {
       return
     }
-    if updatesLatency, let latencyMs {
-      updateLatency(latencyMs)
+    if let latencyMs, let latencySource {
+      updateLatency(latencyMs, source: latencySource)
     }
     guard countsTowardsTraffic else {
       return
@@ -320,7 +324,7 @@ extension HarnessMonitorStore {
             consecutiveFailures = 0
             recordRequestSuccess(
               latencyMs: transportLatencyMs,
-              updatesLatency: true,
+              latencySource: .transport,
               countsTowardsTraffic: false
             )
             await refreshBridgeStateFromManifest(at: manifestURL)
@@ -332,7 +336,7 @@ extension HarnessMonitorStore {
           consecutiveFailures = 0
           recordRequestSuccess(
             latencyMs: sample.latencyMs,
-            updatesLatency: true,
+            latencySource: .request,
             countsTowardsTraffic: false
           )
           await refreshBridgeStateFromManifest(at: manifestURL)
@@ -364,14 +368,36 @@ extension HarnessMonitorStore {
     connectionProbeTask = nil
   }
 
-  private func updateLatency(_ latencyMs: Int) {
-    connectionMetrics.latencyMs = latencyMs
-    latencySamplesMs.append(latencyMs)
-    if latencySamplesMs.count > Self.maxLatencySamples {
-      latencySamplesMs.removeFirst(latencySamplesMs.count - Self.maxLatencySamples)
+  private func updateLatency(
+    _ latencyMs: Int,
+    source: ConnectionLatencySource
+  ) {
+    switch source {
+    case .transport:
+      connectionMetrics.transportLatencyMs = latencyMs
+      connectionMetrics.averageTransportLatencyMs = appendLatencySample(
+        latencyMs,
+        to: &transportLatencySamplesMs
+      )
+    case .request:
+      connectionMetrics.requestLatencyMs = latencyMs
+      connectionMetrics.averageRequestLatencyMs = appendLatencySample(
+        latencyMs,
+        to: &requestLatencySamplesMs
+      )
     }
-    let total = latencySamplesMs.reduce(0, +)
-    connectionMetrics.averageLatencyMs = total / max(latencySamplesMs.count, 1)
+  }
+
+  private func appendLatencySample(
+    _ latencyMs: Int,
+    to samples: inout [Int]
+  ) -> Int {
+    samples.append(latencyMs)
+    if samples.count > Self.maxLatencySamples {
+      samples.removeFirst(samples.count - Self.maxLatencySamples)
+    }
+    let total = samples.reduce(0, +)
+    return total / max(samples.count, 1)
   }
 
   private func appendTrafficSamples(count: Int, at timestamp: Date) {
