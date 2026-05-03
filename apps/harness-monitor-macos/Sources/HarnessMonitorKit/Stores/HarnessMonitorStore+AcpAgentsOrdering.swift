@@ -76,7 +76,8 @@ extension HarnessMonitorStore {
   ) -> [AcpPermissionBatch] {
     var result = batches.filter { $0.batchId != batch.batchId }
     let idx =
-      result.firstIndex { existing in acpPermissionBatchPrecedes(batch, existing) } ?? result.endIndex
+      result.firstIndex { existing in acpPermissionBatchPrecedes(batch, existing) }
+      ?? result.endIndex
     result.insert(batch, at: idx)
     return result
   }
