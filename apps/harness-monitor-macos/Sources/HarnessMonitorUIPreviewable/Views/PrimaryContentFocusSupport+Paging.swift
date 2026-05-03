@@ -80,14 +80,10 @@ extension PrimaryContentPagingResponderBridgeView {
     let beforeY = scrollView.documentVisibleRect.minY
     let metrics = pagingMetrics(for: scrollView, visibleRect: scrollView.documentVisibleRect)
     switch action {
-    case .pageDown:
+    case .pageDown, .scrollPageDown:
       scrollView.pageDown(sender)
-    case .pageUp:
+    case .pageUp, .scrollPageUp:
       scrollView.pageUp(sender)
-    case .scrollPageDown:
-      scrollView.scrollPageDown(sender)
-    case .scrollPageUp:
-      scrollView.scrollPageUp(sender)
     }
 
     var afterY = scrollView.documentVisibleRect.minY
