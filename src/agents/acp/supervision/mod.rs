@@ -4,7 +4,7 @@
 //!
 //! - `initialize` deadline: 30s default
 //! - `session/prompt` deadline: 10 min default (configurable per descriptor)
-//! - Pending-request watchdog: 60s no-events default, only Active while a
+//! - Pending-request watchdog: 5 min no-events default, only Active while a
 //!   daemon-issued request (initialize, `new_session`, prompt) is awaiting an
 //!   agent response. Paused for idle agents and while any agent-initiated
 //!   `Client` call is in flight (daemon is the one processing then).
@@ -41,7 +41,7 @@ pub const DEFAULT_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DEFAULT_PROMPT_TIMEOUT: Duration = Duration::from_mins(10);
 
 /// Default watchdog timeout (no events from agent).
-pub const DEFAULT_WATCHDOG_TIMEOUT: Duration = Duration::from_mins(1);
+pub const DEFAULT_WATCHDOG_TIMEOUT: Duration = Duration::from_mins(5);
 
 /// Grace period between SIGTERM and SIGKILL.
 pub const SIGTERM_GRACE_PERIOD: Duration = Duration::from_secs(3);
@@ -457,6 +457,13 @@ pub async fn watchdog_loop(supervisor: Arc<AcpSessionSupervisor>) -> Option<Disc
 
         if supervisor.should_fire_watchdog() {
             supervisor.mark_watchdog_fired();
+            warn!(
+                pending_requests = supervisor.pending_request_count(),
+                in_flight_calls = supervisor.in_flight_call_count(),
+                elapsed_secs = supervisor.elapsed_since_last_event().as_secs(),
+                timeout_secs = supervisor.config().watchdog_timeout.as_secs(),
+                "watchdog fired: agent silent while daemon request pending"
+            );
             return Some(DisconnectReason::WatchdogFired);
         }
     }

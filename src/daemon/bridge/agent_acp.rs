@@ -94,10 +94,9 @@ impl BridgeServer {
         &self,
         action: impl FnOnce() -> Result<T, CliError>,
     ) -> Result<T, CliError> {
-        let runtime = self.acp_runtime.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("bridge ACP runtime lock poisoned: {error}"))
-        })?;
-        let _guard = runtime.enter();
+        // EnterGuard is per-thread (!Send) and must not cross an await point.
+        // The closure must be fully synchronous — no block_on, no async closures.
+        let _guard = self.acp_runtime.enter();
         action()
     }
 
