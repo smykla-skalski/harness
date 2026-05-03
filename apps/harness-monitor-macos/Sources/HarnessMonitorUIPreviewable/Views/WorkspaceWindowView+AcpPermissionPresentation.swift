@@ -27,14 +27,39 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
       return
     }
     let payload = store.acpPermissionDecisionPayload(for: batch)
+    HarnessMonitorUITestTrace.record(
+      component: "acp.permission-route",
+      event: "workspace.begin",
+      details: [
+        "batch_id": batch.batchId,
+        "decision_id": payload.decisionID,
+        "renderable": String(payload.isRenderable),
+      ]
+    )
     store.presentingAcpPermissionBatch = nil
     guard payload.isRenderable else {
       store.supervisorSelectedDecisionID = nil
+      HarnessMonitorUITestTrace.record(
+        component: "acp.permission-route",
+        event: "workspace.not-renderable",
+        details: [
+          "batch_id": batch.batchId,
+          "decision_id": payload.decisionID,
+        ]
+      )
       return
     }
     store.requestWorkspaceDecisionSelection(decisionID: payload.decisionID)
     store.supervisorSelectedDecisionID = payload.decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: payload.decisionID)
+    HarnessMonitorUITestTrace.record(
+      component: "acp.permission-route",
+      event: "workspace.ready",
+      details: [
+        "batch_id": batch.batchId,
+        "decision_id": payload.decisionID,
+      ]
+    )
     openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

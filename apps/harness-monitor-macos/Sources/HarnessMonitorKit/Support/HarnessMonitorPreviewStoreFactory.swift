@@ -58,6 +58,7 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   public static func makeStore(
     for scenario: Scenario,
+    environment: HarnessMonitorEnvironment = .current,
     hostBridgeOverride: PreviewHostBridgeOverride? = nil,
     codexStartBehavior: PreviewCodexStartBehavior = .unsupported,
     actionDelay: Duration? = nil,
@@ -76,6 +77,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(
         fixtures: configuration.fixtures,
+        environment: environment,
         isDaemonRunning: isDaemonRunning,
         isLaunchAgentInstalled: !configuration.fixtures.sessions.isEmpty,
         hostBridgeOverride: hostBridgeOverride,
@@ -100,6 +102,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     )
     store.client = PreviewHarnessClient(
       fixtures: configuration.fixtures,
+      environment: environment,
       isLaunchAgentInstalled: !configuration.fixtures.sessions.isEmpty,
       hostBridgeState: PreviewHostBridgeState(override: hostBridgeOverride),
       actionDelay: actionDelay,
@@ -110,13 +113,18 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
     store.timeline = configuration.timeline
-    seedSelectedSessionState(store: store, configuration: configuration)
+    seedSelectedSessionState(
+      store: store,
+      configuration: configuration,
+      environment: environment
+    )
     store.isSelectionLoading = false
     store.isShowingCachedData = configuration.isShowingCachedData
     store.persistedSessionCount = configuration.persistedSessionCount
     store.lastPersistedSnapshotAt = configuration.lastPersistedSnapshotAt
     seedAcpBridgeOutageIfNeeded(
       store: store,
+      environment: environment,
       hostBridgeOverride: hostBridgeOverride
     )
     store.synchronizeActionActor()
@@ -125,7 +133,8 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   private static func seedSelectedSessionState(
     store: HarnessMonitorStore,
-    configuration: PreviewStoreConfiguration
+    configuration: PreviewStoreConfiguration,
+    environment: HarnessMonitorEnvironment = .current
   ) {
     guard let selectedSessionID = configuration.selectedSessionID else {
       return
@@ -141,17 +150,21 @@ public enum HarnessMonitorPreviewStoreFactory {
       .tuis
     store.selectedAgentTuis = sortedAgentTuis
     store.selectAgentTui(tuiID: sortedAgentTuis.first?.tuiId)
-    seedPendingAcpIfNeeded(store: store, sessionID: selectedSessionID)
+    seedPendingAcpIfNeeded(
+      store: store,
+      sessionID: selectedSessionID,
+      environment: environment
+    )
   }
 
   private static func seedPendingAcpIfNeeded(
     store: HarnessMonitorStore,
-    sessionID: String
+    sessionID: String,
+    environment: HarnessMonitorEnvironment
   ) {
     let seedsPendingAcp =
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-      || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-        == "1"
+      environment.values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+      || environment.values["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
     guard seedsPendingAcp else {
       return
     }
@@ -165,11 +178,14 @@ public enum HarnessMonitorPreviewStoreFactory {
       sessionID: sessionID,
       sampledAt: previewAcpInspectSampledAt(),
       agents: [
-        PreviewHarnessClientState.inspectSnapshot(from: previewAcpAgent)
+        PreviewHarnessClientState.inspectSnapshot(
+          from: previewAcpAgent,
+          environment: environment
+        )
       ]
     )
     let presentsPermissionOnStart =
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
+      environment.values["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
     if presentsPermissionOnStart {
       store.presentingAcpPermissionBatch = pendingBatch
     }
@@ -178,9 +194,10 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   private static func seedAcpBridgeOutageIfNeeded(
     store: HarnessMonitorStore,
+    environment: HarnessMonitorEnvironment,
     hostBridgeOverride: PreviewHostBridgeOverride?
   ) {
-    guard ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1" else {
+    guard environment.values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1" else {
       return
     }
     guard hostBridgeOverride?.bridgeStatus.running == false else {

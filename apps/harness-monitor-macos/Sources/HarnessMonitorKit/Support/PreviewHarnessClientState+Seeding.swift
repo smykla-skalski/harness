@@ -2,9 +2,10 @@ import Foundation
 
 extension PreviewHarnessClientState {
   static func seededAgentTuisBySessionID(
-    fixtures: PreviewHarnessClient.Fixtures
+    fixtures: PreviewHarnessClient.Fixtures,
+    environment: HarnessMonitorEnvironment
   ) -> [String: [AgentTuiSnapshot]] {
-    guard let overrideStatus = previewAgentTuiRefreshStatus() else {
+    guard let overrideStatus = previewAgentTuiRefreshStatus(environment: environment) else {
       return fixtures.agentTuisBySessionID
     }
     return fixtures.agentTuisBySessionID.mapValues { snapshots in
@@ -33,9 +34,11 @@ extension PreviewHarnessClientState {
     }
   }
 
-  static func previewAgentTuiRefreshStatus() -> AgentTuiStatus? {
+  static func previewAgentTuiRefreshStatus(
+    environment: HarnessMonitorEnvironment
+  ) -> AgentTuiStatus? {
     guard
-      let rawValue = ProcessInfo.processInfo.environment[agentTuiRefreshStatusEnvironmentKey]?
+      let rawValue = environment.values[agentTuiRefreshStatusEnvironmentKey]?
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .lowercased(),
       !rawValue.isEmpty
@@ -46,13 +49,10 @@ extension PreviewHarnessClientState {
   }
 
   static func seededAcpAgentsBySessionID(
-    fixtures: PreviewHarnessClient.Fixtures
+    fixtures: PreviewHarnessClient.Fixtures,
+    environment: HarnessMonitorEnvironment
   ) -> [String: [AcpAgentSnapshot]] {
-    guard
-      ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
-        || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
-          == "1"
-    else {
+    guard seedsPendingAcp(in: environment) else {
       return [:]
     }
     guard
@@ -118,5 +118,10 @@ extension PreviewHarnessClientState {
       createdAt: Self.mutationTimestamp,
       updatedAt: Self.mutationTimestamp
     )
+  }
+
+  static func seedsPendingAcp(in environment: HarnessMonitorEnvironment) -> Bool {
+    environment.values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] == "1"
+      || environment.values["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"] == "1"
   }
 }

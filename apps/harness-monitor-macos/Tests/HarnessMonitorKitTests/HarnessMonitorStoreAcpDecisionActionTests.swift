@@ -227,6 +227,45 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
     XCTAssertTrue(store.pendingAcpPermissionBatches.isEmpty)
   }
 
+  func test_terminalRemovalSwitchesClearSupersededPendingSetsImmediately() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    let batch = AcpPermissionBatch(
+      batchId: "batch-terminal-switch",
+      acpId: "acp-1",
+      sessionId: sessionID,
+      requests: [
+        AcpPermissionItem(
+          requestId: "request-terminal-switch",
+          sessionId: sessionID,
+          toolCall: .object(["kind": .string("write"), "path": .string("README.md")]),
+          options: [.string("allow"), .string("deny")]
+        )
+      ],
+      createdAt: "2026-04-28T00:00:01Z",
+      expiresAt: "2026-04-28T00:05:00Z"
+    )
+    let store = try await selectedActionStoreWithPersistence(client: client)
+    store.applyAcpAgent(
+      makeAcpSnapshot(acpID: "acp-1", sessionID: sessionID, pendingBatches: [batch])
+    )
+    let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
+
+    store.removeAcpPermissionBatch(batch, reason: .timeout)
+    XCTAssertTrue(store.acpPermissionPendingTimeoutDecisionIDs.contains(decisionID))
+    XCTAssertFalse(store.acpPermissionPendingShutdownDecisionIDs.contains(decisionID))
+
+    store.removeAcpPermissionBatch(batch, reason: .shutdown)
+    XCTAssertFalse(store.acpPermissionPendingTimeoutDecisionIDs.contains(decisionID))
+    XCTAssertTrue(store.acpPermissionPendingShutdownDecisionIDs.contains(decisionID))
+
+    store.removeAcpPermissionBatch(batch, reason: .timeout)
+    XCTAssertTrue(store.acpPermissionPendingTimeoutDecisionIDs.contains(decisionID))
+    XCTAssertFalse(store.acpPermissionPendingShutdownDecisionIDs.contains(decisionID))
+
+    await store.stopSupervisor()
+  }
+
   func test_shutdownRemovalResolvesCancelledDecisionWithAuditAnnotation() async throws {
     let client = RecordingHarnessClient()
     let sessionID = PreviewFixtures.summary.sessionId

@@ -22,6 +22,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   ) {
     self.init(
       fixtures: fixtures,
+      environment: .current,
       isLaunchAgentInstalled: isLaunchAgentInstalled,
       hostBridgeState: PreviewHostBridgeState(override: nil),
       actionDelay: nil,
@@ -31,13 +32,14 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
 
   init(
     fixtures: Fixtures,
+    environment: HarnessMonitorEnvironment = .current,
     isLaunchAgentInstalled: Bool,
     hostBridgeState: PreviewHostBridgeState,
     actionDelay: Duration? = nil,
     codexStartBehavior: PreviewCodexStartBehavior = .unsupported
   ) {
     self.fixtures = fixtures
-    self.state = PreviewHarnessClientState(fixtures: fixtures)
+    self.state = PreviewHarnessClientState(fixtures: fixtures, environment: environment)
     self.isLaunchAgentInstalled = isLaunchAgentInstalled
     self.hostBridgeState = hostBridgeState
     self.actionDelay = actionDelay
@@ -47,6 +49,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   public convenience init() {
     self.init(
       fixtures: .populated,
+      environment: .current,
       isLaunchAgentInstalled: true,
       hostBridgeState: PreviewHostBridgeState(override: nil),
       actionDelay: nil,

@@ -5,6 +5,7 @@ actor PreviewHarnessClientState {
   static let agentTuiRefreshStatusEnvironmentKey =
     "HARNESS_MONITOR_PREVIEW_AGENT_TUI_REFRESH_STATUS"
 
+  let environment: HarnessMonitorEnvironment
   private var sessionSummaries: [SessionSummary]
   private var detailsBySessionID: [String: SessionDetail]
   private var coreDetailsBySessionID: [String: SessionDetail]
@@ -18,13 +19,23 @@ actor PreviewHarnessClientState {
   let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
 
-  init(fixtures: PreviewHarnessClient.Fixtures) {
+  init(
+    fixtures: PreviewHarnessClient.Fixtures,
+    environment: HarnessMonitorEnvironment = .current
+  ) {
+    self.environment = environment
     self.sessionSummaries = fixtures.sessions
     self.detailsBySessionID = fixtures.detailsBySessionID
     self.coreDetailsBySessionID = fixtures.coreDetailsBySessionID
     self.timelinesBySessionID = fixtures.timelinesBySessionID
-    self.agentTuisBySessionID = Self.seededAgentTuisBySessionID(fixtures: fixtures)
-    self.acpAgentsBySessionID = Self.seededAcpAgentsBySessionID(fixtures: fixtures)
+    self.agentTuisBySessionID = Self.seededAgentTuisBySessionID(
+      fixtures: fixtures,
+      environment: environment
+    )
+    self.acpAgentsBySessionID = Self.seededAcpAgentsBySessionID(
+      fixtures: fixtures,
+      environment: environment
+    )
     self.codexRunsBySessionID = fixtures.codexRunsBySessionID
     self.nextAgentTuiSequence = max(
       fixtures.agentTuisBySessionID.values.flatMap(\.self).count,

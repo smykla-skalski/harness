@@ -31,6 +31,10 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("select-session-cockpit")
   }
 
+  func testPermissionModalHitchRate() {
+    measureScenario("permission-modal")
+  }
+
   func testRefreshAndSearchHitchRate() {
     measureScenario("refresh-and-search")
   }
@@ -204,6 +208,30 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testPermissionModalScenarioAuditState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "permission-modal")
+    let window = mainWindow(in: launched)
+    let decisionID = "acp-permission:preview-acp-permission-1"
+    let decisionRow = element(in: launched, identifier: Accessibility.decisionRow(decisionID))
+    let legacyModal = element(in: launched, identifier: Accessibility.acpPermissionModal)
+
+    waitForScenarioCompletion(
+      app: launched,
+      scenario: "permission-modal"
+    )
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(decisionRow, timeout: Self.uiTimeout),
+      "Permission perf scenario did not surface the routed ACP decision row"
+    )
+    XCTAssertFalse(legacyModal.exists)
+    assertAuditBuildState(in: launched, scenario: "permission-modal")
+
+    launched.terminate()
+  }
+
   func testRefreshAndSearchScenarioState() {
     assertSearchHeavyScenarioState("refresh-and-search")
   }
@@ -288,9 +316,14 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
         let stateText = self.markerText(perfState)
         return
           stateText.contains("scenario=\(scenario)")
-          && stateText.contains("status=completed")
+          && (stateText.contains("status=completed") || stateText.contains("status=failed"))
       },
-      "Expected perf scenario \(scenario) to complete within \(Self.actionTimeout)s"
+      "Expected perf scenario \(scenario) to finish within \(Self.actionTimeout)s"
+    )
+    let stateText = markerText(perfState)
+    XCTAssertFalse(
+      stateText.contains("status=failed"),
+      "Perf scenario \(scenario) failed early: \(stateText)"
     )
   }
 
@@ -387,6 +420,8 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     switch scenario {
     case "launch-dashboard", "select-session-cockpit":
       "dashboard-landing"
+    case "permission-modal":
+      "cockpit"
     case "refresh-and-search", "sidebar-overflow-search":
       "overflow"
     case "timeline-burst":

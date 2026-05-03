@@ -30,6 +30,27 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     XCTAssertEqual(value, true)
   }
 
+  @MainActor
+  func testResolvePermissionPerfScenarioSeedsPreviewAcpBatch() {
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        "HARNESS_MONITOR_UI_TESTS": "1",
+        HarnessMonitorPerfScenario.environmentKey: HarnessMonitorPerfScenario.permissionModal
+          .rawValue,
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let configuration = HarnessMonitorAppConfiguration.resolve(baseEnvironment: testEnv)
+
+    XCTAssertEqual(configuration.perfScenario, .permissionModal)
+    XCTAssertEqual(configuration.store.selectedAcpAgents.count, 1)
+    XCTAssertEqual(
+      configuration.store.pendingAcpPermissionBatches.first?.batchId,
+      "preview-acp-permission-1"
+    )
+  }
+
   func testAppDelegateDetectsHostedXCTestLaunches() {
     XCTAssertTrue(
       HarnessMonitorAppDelegate.isTestHarnessRun(

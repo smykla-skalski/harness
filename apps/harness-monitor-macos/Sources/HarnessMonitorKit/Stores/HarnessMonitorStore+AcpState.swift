@@ -209,11 +209,15 @@ extension HarnessMonitorStore {
       acpPermissionTerminalOutcomesByID.removeValue(forKey: decisionID)
     }
     if reason == .timeout {
+      cancelAcpPermissionShutdownResolutionTask(for: decisionID)
+      acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
       let inserted = acpPermissionPendingTimeoutDecisionIDs.insert(decisionID).inserted
       if inserted {
         scheduleAcpPermissionDeadlineResolution(for: batch, decisionID: decisionID)
       }
     } else if reason == .shutdown {
+      cancelAcpPermissionDeadlineResolutionTask(for: decisionID)
+      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
       let inserted = acpPermissionPendingShutdownDecisionIDs.insert(decisionID).inserted
       if inserted {
         scheduleAcpPermissionShutdownResolution(for: batch, decisionID: decisionID)
@@ -221,6 +225,7 @@ extension HarnessMonitorStore {
     } else {
       acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
       acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+      cancelAcpPermissionTerminalResolutionTasks(for: decisionID)
     }
     standaloneAcpPermissionBatches.removeAll { $0.batchId == batch.batchId }
     selectedAcpAgents = selectedAcpAgents.map { snapshot in
@@ -252,9 +257,6 @@ extension HarnessMonitorStore {
     resolvingAcpPermissionBatchID = nil
     acpPermissionPayloadsByDecisionID = [:]
     acpPermissionResolutionStateByDecisionID = [:]
-    acpPermissionPendingTimeoutDecisionIDs = []
-    acpPermissionPendingShutdownDecisionIDs = []
-    acpPermissionTerminalOutcomesByID = [:]
-    invalidateAcpPermissionDecisionSync()
+    stopAcpPermissionDecisionProcessing()
   }
 }

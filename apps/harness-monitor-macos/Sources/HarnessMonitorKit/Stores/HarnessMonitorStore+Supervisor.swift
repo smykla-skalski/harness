@@ -200,6 +200,7 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.supervisorTrace("supervisor.stop skipped — not running")
       return
     }
+    stopAcpPermissionDecisionProcessing()
     supervisorStack = nil
 
     stack.relayTask.cancel()

@@ -20,8 +20,13 @@ extension HarnessMonitorStore {
     }
     acpPermissionDecisionSyncGeneration &+= 1
     let generation = acpPermissionDecisionSyncGeneration
-    acpPermissionDecisionSyncTask = Task { @MainActor in
-      await self.performAcpPermissionDecisionSync(
+    let task = makeCancellationAwareAcpPermissionTask { store in
+      defer {
+        if store.acpPermissionDecisionSyncGeneration == generation {
+          store.acpPermissionDecisionSyncTask = nil
+        }
+      }
+      await store.performAcpPermissionDecisionSync(
         decisionStore: decisionStore,
         payloads: payloads,
         staleDecisionIDs: staleDecisionIDs,
@@ -29,6 +34,7 @@ extension HarnessMonitorStore {
         generation: generation
       )
     }
+    acpPermissionDecisionSyncTask = task
   }
 
   private func performAcpPermissionDecisionSync(
@@ -75,6 +81,8 @@ extension HarnessMonitorStore {
         staleDecisionIDs: staleDecisionIDs,
         protectedDecisionIDs: protectedDecisionIDs
       )
+    } catch is CancellationError {
+      return
     } catch {
       reportFailure("list-open", nil, error)
       return
@@ -88,6 +96,8 @@ extension HarnessMonitorStore {
       }
       do {
         try await decisionStore.dismiss(id: decisionID)
+      } catch is CancellationError {
+        return
       } catch {
         reportFailure("dismiss", decisionID, error)
       }
@@ -106,6 +116,8 @@ extension HarnessMonitorStore {
       }
       do {
         try await decisionStore.upsertOpen(payload.decisionDraft)
+      } catch is CancellationError {
+        return
       } catch {
         reportFailure("upsert", payload.decisionID, error)
       }
@@ -142,82 +154,11 @@ extension HarnessMonitorStore {
     for batch: AcpPermissionBatch,
     decisionID: String
   ) {
-    Task { @MainActor in
-      guard let decisionStore = self.supervisorDecisionStore else {
-        self.acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
-        return
-      }
-
-      do {
-        guard
-          let initialDecision = try await prepareAcpPermissionDecisionForTerminalResolution(
-            decisionID: decisionID,
-            in: decisionStore,
-            fallbackDraft: makeAcpPermissionDecisionPayload(for: batch).decisionDraft
-          )
-        else {
-          self.removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-          self.acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
-          return
-        }
-        let decision: Decision
-        if Self.isAcpPermissionDecisionUnresolved(initialDecision) {
-          decision = initialDecision
-        } else if initialDecision.statusRaw == "dismissed",
-          let payload = self.acpPermissionDecisionPayload(for: decisionID)
-        {
-          try await decisionStore.upsertOpen(payload.decisionDraft)
-          guard
-            let reopenedDecision = try await waitForAcpPermissionDecision(
-              id: decisionID,
-              in: decisionStore
-            ),
-            Self.isAcpPermissionDecisionUnresolved(reopenedDecision)
-          else {
-            self.removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-            self.acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
-            return
-          }
-          decision = reopenedDecision
-        } else {
-          self.removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-          self.acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
-          return
-        }
-        let timeoutOutcome = DecisionOutcome(
-          chosenActionID: nil,
-          note: "client_deadline_exceeded"
-        )
-        try await decisionStore.resolveTerminal(
-          id: decisionID,
-          outcome: timeoutOutcome
-        )
-        if try await decisionResolvedWithTimeoutOutcome(
-          decisionID: decisionID,
-          expected: timeoutOutcome,
-          decisionStore: decisionStore
-        ) {
-          appendAcpPermissionDeadlineAudit(
-            for: batch,
-            decisionID: decisionID,
-            agentID: decision.agentID
-          )
-        }
-        removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-        supervisorDecisionRefreshTick &+= 1
-      } catch {
-        reportAcpPermissionDecisionStoreFailure(
-          operation: "timeout-resolve",
-          decisionID: decisionID,
-          error: error
-        )
-        removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-        acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
-        scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
-        return
-      }
-
-      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+    startAcpPermissionDeadlineResolutionTask(decisionID: decisionID) { store in
+      await store.performAcpPermissionDeadlineResolution(
+        for: batch,
+        decisionID: decisionID
+      )
     }
   }
 
@@ -225,59 +166,149 @@ extension HarnessMonitorStore {
     for batch: AcpPermissionBatch,
     decisionID: String
   ) {
-    Task { @MainActor in
-      guard let decisionStore = self.supervisorDecisionStore else {
-        self.acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+    startAcpPermissionShutdownResolutionTask(decisionID: decisionID) { store in
+      await store.performAcpPermissionShutdownResolution(
+        for: batch,
+        decisionID: decisionID
+      )
+    }
+  }
+
+  private func performAcpPermissionDeadlineResolution(
+    for batch: AcpPermissionBatch,
+    decisionID: String
+  ) async {
+    guard let decisionStore = supervisorDecisionStore else {
+      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+      return
+    }
+
+    do {
+      guard
+        let initialDecision = try await prepareAcpPermissionDecisionForTerminalResolution(
+          decisionID: decisionID,
+          in: decisionStore,
+          fallbackDraft: makeAcpPermissionDecisionPayload(for: batch).decisionDraft
+        )
+      else {
+        removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+        acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
         return
       }
+      try Task.checkCancellation()
 
-      do {
-        guard
-          let decision = try await prepareAcpPermissionDecisionForTerminalResolution(
-            decisionID: decisionID,
-            in: decisionStore,
-            fallbackDraft: makeAcpPermissionDecisionPayload(for: batch).decisionDraft
-          )
-        else {
-          self.removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-          self.acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
-          return
-        }
-        let shutdownOutcome = DecisionOutcome(
-          chosenActionID: nil,
-          note: "daemon_shutdown"
-        )
-        try await decisionStore.resolveTerminal(
-          id: decisionID,
-          outcome: shutdownOutcome
-        )
-        if try await decisionResolvedWithTimeoutOutcome(
-          decisionID: decisionID,
-          expected: shutdownOutcome,
-          decisionStore: decisionStore
-        ) {
-          appendAcpPermissionShutdownAudit(
-            for: batch,
-            decisionID: decisionID,
-            agentID: decision.agentID
-          )
-        }
+      guard
+        Self.isAcpPermissionDecisionUnresolved(initialDecision)
+          || initialDecision.statusRaw == "dismissed"
+      else {
         removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
-        supervisorDecisionRefreshTick &+= 1
-      } catch {
-        reportAcpPermissionDecisionStoreFailure(
-          operation: "shutdown-resolve",
+        acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+        return
+      }
+      let decision = initialDecision
+
+      let timeoutOutcome = DecisionOutcome(
+        chosenActionID: nil,
+        note: "client_deadline_exceeded"
+      )
+      try Task.checkCancellation()
+      try await decisionStore.resolveTerminal(id: decisionID, outcome: timeoutOutcome)
+      try Task.checkCancellation()
+      if try await decisionResolvedWithTimeoutOutcome(
+        decisionID: decisionID,
+        expected: timeoutOutcome,
+        decisionStore: decisionStore
+      ) {
+        try Task.checkCancellation()
+        appendAcpPermissionDeadlineAudit(
+          for: batch,
           decisionID: decisionID,
-          error: error
+          agentID: decision.agentID
         )
+      }
+      removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+      supervisorDecisionRefreshTick &+= 1
+    } catch is CancellationError {
+      return
+    } catch {
+      reportAcpPermissionDecisionStoreFailure(
+        operation: "timeout-resolve",
+        decisionID: decisionID,
+        error: error
+      )
+      removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+      acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+      scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+      return
+    }
+
+    acpPermissionPendingTimeoutDecisionIDs.remove(decisionID)
+  }
+
+  private func performAcpPermissionShutdownResolution(
+    for batch: AcpPermissionBatch,
+    decisionID: String
+  ) async {
+    guard let decisionStore = supervisorDecisionStore else {
+      acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+      return
+    }
+
+    do {
+      guard
+        let decision = try await prepareAcpPermissionDecisionForTerminalResolution(
+          decisionID: decisionID,
+          in: decisionStore,
+          fallbackDraft: makeAcpPermissionDecisionPayload(for: batch).decisionDraft
+        )
+      else {
         removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
         acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
-        scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+        return
+      }
+      try Task.checkCancellation()
+      guard
+        Self.isAcpPermissionDecisionUnresolved(decision)
+          || decision.statusRaw == "dismissed"
+      else {
+        removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+        acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
         return
       }
 
+      let shutdownOutcome = DecisionOutcome(chosenActionID: nil, note: "daemon_shutdown")
+      try Task.checkCancellation()
+      try await decisionStore.resolveTerminal(id: decisionID, outcome: shutdownOutcome)
+      try Task.checkCancellation()
+      if try await decisionResolvedWithTimeoutOutcome(
+        decisionID: decisionID,
+        expected: shutdownOutcome,
+        decisionStore: decisionStore
+      ) {
+        try Task.checkCancellation()
+        appendAcpPermissionShutdownAudit(
+          for: batch,
+          decisionID: decisionID,
+          agentID: decision.agentID
+        )
+      }
+      removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
+      supervisorDecisionRefreshTick &+= 1
+    } catch is CancellationError {
+      return
+    } catch {
+      reportAcpPermissionDecisionStoreFailure(
+        operation: "shutdown-resolve",
+        decisionID: decisionID,
+        error: error
+      )
+      removeAcpPermissionDecisionArtifacts(decisionID: decisionID)
       acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
+      scheduleAcpPermissionDecisionSync(staleDecisionIDs: [decisionID])
+      return
     }
+
+    acpPermissionPendingShutdownDecisionIDs.remove(decisionID)
   }
 
   func reportAcpPermissionDecisionStoreFailure(

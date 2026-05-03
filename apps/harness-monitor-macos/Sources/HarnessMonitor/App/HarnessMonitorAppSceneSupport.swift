@@ -143,6 +143,7 @@ private enum HarnessMonitorPerfScenarioStatus: String {
   case bootstrapping
   case running
   case completed
+  case failed
 }
 
 private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
@@ -153,13 +154,21 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   private var openWindow
   @State private var hasRunPerfScenario = false
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
+  @State private var perfScenarioFailureReason: String?
   private var perfScenarioStateText: String? {
     guard shouldPublishPerfScenarioState,
       let perfScenario
     else {
       return nil
     }
-    return "scenario=\(perfScenario.rawValue), status=\(perfScenarioStatus.rawValue)"
+    var fields = [
+      "scenario=\(perfScenario.rawValue)",
+      "status=\(perfScenarioStatus.rawValue)",
+    ]
+    if let perfScenarioFailureReason {
+      fields.append("reason=\(perfScenarioFailureReason)")
+    }
+    return fields.joined(separator: ", ")
   }
   private var shouldPublishPerfScenarioState: Bool {
     HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
@@ -191,29 +200,42 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
 
     if perfScenario.includesBootstrapInMeasurement {
       publishPerfScenarioStatus(.running)
-      await HarnessMonitorPerfDriver.run(
+      let result = await HarnessMonitorPerfDriver.run(
         scenario: perfScenario,
         store: store,
         openWindow: openWindow
       )
-      publishPerfScenarioStatus(.completed)
+      publishPerfScenarioResult(result)
       return
     }
     publishPerfScenarioStatus(.bootstrapping)
     await store.bootstrapIfNeeded()
     publishPerfScenarioStatus(.running)
-    await HarnessMonitorPerfDriver.run(
+    let result = await HarnessMonitorPerfDriver.run(
       scenario: perfScenario,
       store: store,
       openWindow: openWindow
     )
-    publishPerfScenarioStatus(.completed)
+    publishPerfScenarioResult(result)
   }
   private func publishPerfScenarioStatus(_ status: HarnessMonitorPerfScenarioStatus) {
     guard shouldPublishPerfScenarioState else {
       return
     }
     perfScenarioStatus = status
+    if status != .failed {
+      perfScenarioFailureReason = nil
+    }
+  }
+
+  private func publishPerfScenarioResult(_ result: HarnessMonitorPerfDriver.ScenarioResult) {
+    switch result {
+    case .completed:
+      publishPerfScenarioStatus(.completed)
+    case .failed(let reason):
+      perfScenarioFailureReason = reason
+      publishPerfScenarioStatus(.failed)
+    }
   }
 }
 
