@@ -222,6 +222,13 @@ stale_scan_pid_runtime_profile() {
   local profile
 
   profile="$(stale_scan_process_env_value "$pid" HARNESS_MONITOR_RUNTIME_PROFILE || true)"
+  if [[ -z "$profile" ]] && declare -F harness_monitor_profile_from_path >/dev/null; then
+    profile="$(
+      harness_monitor_profile_from_path \
+        "$(stale_scan_process_env_value "$pid" HARNESS_DAEMON_DATA_HOME || true)" \
+        || true
+    )"
+  fi
   if declare -F harness_monitor_sanitize_profile >/dev/null; then
     profile="$(harness_monitor_sanitize_profile "$profile")"
   fi
@@ -261,6 +268,9 @@ stale_scan_orphan_harness_build_pids() {
   done < <(stale_scan_matching_pids build)
 }
 
+# Live holders are stale only when they are unscoped. Scope is declared either
+# directly via HARNESS_MONITOR_RUNTIME_PROFILE or indirectly via a profile-shaped
+# HARNESS_DAEMON_DATA_HOME.
 stale_scan_live_lock_holder_is_stale() {
   local pid="$1"
   local profile
@@ -277,6 +287,56 @@ stale_scan_root_conflicting_lock_holder_pids() {
       echo "$pid"
     fi
   done < <(stale_scan_root_lock_holder_pids "$root")
+}
+
+stale_scan_root_has_live_lock_holder() {
+  local root="$1"
+  local pid
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    return 0
+  done < <(stale_scan_root_lock_holder_pids "$root")
+  return 1
+}
+
+# Current lane means "same effective runtime scope as this cleanup/check
+# invocation". Profile-scoped lanes only match the same profile; unscoped lanes
+# only match unscoped holders. This lets the safe cleanup preserve the current
+# lane's Codex WS listener without letting unrelated profiled holders mask stale
+# shared listeners on the default port.
+stale_scan_pid_in_current_lane() {
+  local pid="$1"
+  local current_profile pid_profile
+  current_profile="$(stale_scan_current_runtime_profile || true)"
+  pid_profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
+  if [[ -n "$current_profile" ]]; then
+    [[ "$pid_profile" == "$current_profile" ]]
+    return
+  fi
+  [[ -z "$pid_profile" ]]
+}
+
+stale_scan_root_has_current_lane_lock_holder() {
+  local root="$1"
+  local pid
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    if stale_scan_pid_in_current_lane "$pid"; then
+      return 0
+    fi
+  done < <(stale_scan_root_lock_holder_pids "$root")
+  return 1
+}
+
+stale_scan_any_root_has_current_lane_lock_holder() {
+  local root
+  while read -r root; do
+    [[ -n "$root" ]] || continue
+    if stale_scan_root_has_current_lane_lock_holder "$root"; then
+      return 0
+    fi
+  done < <(stale_scan_daemon_roots)
+  return 1
 }
 
 stale_scan_gate_pid_conflicts_with_current_lane() {
@@ -487,6 +547,11 @@ stale_scan_foreign_tcp_listeners() {
   listeners="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u || true)"
   [[ -n "$listeners" ]] || return 0
 
+  local current_lane_has_live_root=0
+  if stale_scan_any_root_has_current_lane_lock_holder; then
+    current_lane_has_live_root=1
+  fi
+
   local pid desc
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
@@ -497,17 +562,25 @@ stale_scan_foreign_tcp_listeners() {
     if [[ "$desc" == *"Harness Monitor"* ]]; then
       continue
     fi
+    if (( current_lane_has_live_root == 1 )) && [[ "$desc" == *"codex app-server"* ]]; then
+      continue
+    fi
     echo "$pid"
   done <<<"$listeners"
 }
 
-# Emit pids for Codex app-server listeners on the given port. These are spawned
-# by the host bridge and can survive as parentless processes when the bridge is
-# terminated by a stale-state reset instead of a graceful shutdown.
+# Emit pids for Codex app-server listeners on the given port only when the
+# current cleanup/check lane no longer has a live Harness lock holder. A live
+# current-lane bridge/daemon is allowed to keep its WS listener in plain
+# `clean:stale`; stale parentless listeners are still cleanup targets.
 stale_scan_codex_app_server_listener_pids() {
   local port="$1"
   command -v lsof >/dev/null 2>&1 || return 0
   stale_scan_ensure_ps
+
+  if stale_scan_any_root_has_current_lane_lock_holder; then
+    return 0
+  fi
 
   local listeners
   listeners="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u || true)"

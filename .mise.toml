@@ -12,8 +12,12 @@ description = "Fail fast if the dev environment has stale processes, /tmp bridge
 run = "./scripts/check-no-stale-state.sh"
 
 [tasks."clean:stale"]
-description = "Reset a polluted dev environment (quits Monitor, stops launchd daemon, kills orphan target/debug harness processes, wipes /tmp bridge sockets, stale bridge state, and non-approved DerivedData bundles)"
+description = "Safely scrub stale dev state without quitting Harness Monitor or stopping live daemon work"
 run = "./scripts/clean-stale-state.sh"
+
+[tasks."clean:stale:full"]
+description = "Quit Harness Monitor and stop live daemon work while resetting stale shared dev state"
+run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
 [tasks."version:show"]
 description = "Print the canonical harness package version"
@@ -156,6 +160,10 @@ run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
 description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile"
 depends = ["monitor:user:generate"]
 run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
+
+[tasks."monitor:user:reset"]
+description = "Quit Harness Monitor and reset the current user's isolated runtime profile plus stale bridge/daemon state"
+run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/clean-stale-state.sh"
 
 [tasks."monitor:user:xcode-native"]
 description = "Ensure the xcode-native Xcode MCP bridge is installed, healthy, and attached to the current user workspace"

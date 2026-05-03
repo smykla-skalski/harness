@@ -83,7 +83,13 @@ mise run monitor:generate
 mise run monitor:build
 ```
 
-Use the same env prefix when starting an external daemon or manual bridge from another terminal. Running `clean:stale` without the profile env still performs the broader shared-root cleanup.
+Use the same env prefix when starting an external daemon or manual bridge from another terminal. `mise run clean:stale` is the safe shared scrub: it removes orphan/temp pollution but does not quit a live Harness Monitor session or stop live daemon work. When you want a full reset of your personal profiled lane, use:
+
+```bash
+mise run monitor:user:reset
+```
+
+If you explicitly want the broader destructive shared reset, use `mise run clean:stale:full`.
 
 If you do not want to manage that env manually, use the user-scoped tasks instead:
 
@@ -101,6 +107,7 @@ mise run monitor:user:build
 mise run monitor:user:test
 mise run monitor:user:daemon:dev
 mise run monitor:user:bridge:start
+mise run monitor:user:reset
 ```
 
 `monitor:user:bootstrap` does the same setup as `monitor:user`; `monitor:user:profile` just reprints the chosen profile info later without regenerating anything.

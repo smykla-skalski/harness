@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# One-shot reset for a polluted Harness dev environment.
+# One-shot stale cleanup for a polluted Harness dev environment.
 # Preserves user data: harness.db, auth-token, manifest.json, events.jsonl.
-# Wipes everything a stale dev run can leak: orphan processes, /tmp sockets,
-# and bridge state files. Xcode UI's default DerivedData bundle is left alone
-# so regens and resets do not destroy its fetched SourcePackages cache.
+# By default this is a safe scrub: orphan processes, /tmp sockets, and bridge
+# state in dead roots. Full live reset (quit Harness Monitor, stop launchd,
+# kill live lock holders) is opt-in via HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1.
+# Xcode UI's default DerivedData bundle is left alone so regens and resets do
+# not destroy its fetched SourcePackages cache.
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -19,6 +21,15 @@ export STALE_SCAN_ROOT STALE_SCAN_COMMON_REPO_ROOT
 source "$ROOT/scripts/lib/stale-scan.sh"
 
 readonly MONITOR_APP_PATTERN='/Harness Monitor[.]app/Contents/MacOS/Harness Monitor'
+readonly MONITOR_OSASCRIPT_BIN="${HARNESS_MONITOR_OSASCRIPT_BIN:-/usr/bin/osascript}"
+
+allow_live_monitor_reset() {
+  [[ "${HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET:-0}" == "1" ]]
+}
+
+monitor_app_pids() {
+  pgrep -f "$MONITOR_APP_PATTERN" 2>/dev/null || true
+}
 
 signal_pids() {
   local signal="$1"
@@ -83,26 +94,43 @@ block_live_repo_gate_helpers() {
 }
 
 quit_monitor_app() {
-  if stale_scan_is_profile_scoped; then
-    return
-  fi
-  if ! pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; then
-    return
-  fi
+  allow_live_monitor_reset || return 0
+
+  local pids=()
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(monitor_app_pids)
+  (( ${#pids[@]} > 0 )) || return 0
+
   echo "quitting Harness Monitor app..."
-  /usr/bin/osascript -e 'tell application "Harness Monitor" to quit' >/dev/null 2>&1 || true
+  "$MONITOR_OSASCRIPT_BIN" -e 'tell application "Harness Monitor" to quit' >/dev/null 2>&1 || true
+
   local waited=0
-  while (( waited < 5 )) && pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; do
+  while (( waited < 5 )); do
+    pids=()
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] && pids+=("$pid")
+    done < <(monitor_app_pids)
+    (( ${#pids[@]} == 0 )) && return 0
     sleep 1
     waited=$((waited + 1))
   done
-  if pgrep -f "$MONITOR_APP_PATTERN" >/dev/null 2>&1; then
-    echo "  graceful quit timed out; sending SIGTERM"
-    pkill -TERM -f "$MONITOR_APP_PATTERN" 2>/dev/null || true
+
+  pids=()
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && pids+=("$pid")
+  done < <(monitor_app_pids)
+  if (( ${#pids[@]} == 0 )); then
+    return
   fi
+
+  echo "  graceful quit timed out; sending SIGTERM"
+  signal_pids TERM "${pids[@]}"
 }
 
 stop_launchd_daemon() {
+  allow_live_monitor_reset || return 0
   local uid
   local launchd_label
   launchd_label="${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-io.harnessmonitor.daemon}"
@@ -190,6 +218,7 @@ kill_orphan_monitor_wrapper_processes() {
 }
 
 kill_live_harness_processes() {
+  allow_live_monitor_reset || return 0
   local root="$1"
   local pids=()
   local pid
@@ -252,6 +281,10 @@ remove_tmp_bridge_artifacts() {
 wipe_bridge_state_in_root() {
   local root="$1"
   [[ -d "$root" ]] || return 0
+  if stale_scan_root_has_live_lock_holder "$root"; then
+    echo "  skipping $root; live harness lock holder still present"
+    return 0
+  fi
   local removed=0
   local name
   for name in bridge.json bridge.lock bridge-config.json bridge.sock; do
@@ -266,7 +299,7 @@ wipe_bridge_state_in_root() {
 }
 
 wipe_stale_bridge_state() {
-  echo "wiping stale bridge state files..."
+  echo "wiping stale bridge state files in roots with no live harness lock holder..."
   local daemon_root
   while IFS= read -r daemon_root; do
     [[ -n "$daemon_root" ]] || continue
