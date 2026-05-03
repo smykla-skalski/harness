@@ -288,6 +288,7 @@ public struct ContentView<CornerContent: View>: View {
     guard
       isStartupFocusParticipationEnabled,
       isContentWindowKey,
+      // nil during startup or when window is not key; local fallback is correct in both cases.
       !(resetSuppression ?? currentResetSuppression).isSuppressed
     else {
       return
