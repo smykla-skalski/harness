@@ -213,6 +213,22 @@ spawn_labelled_with_runtime_profile_and_open_lock() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
+spawn_labelled_with_daemon_data_home_and_open_lock() {
+  local daemon_data_home="$1"
+  local label="$2"
+  local lock_path="$3"
+  mkdir -p "$(dirname "$lock_path")"
+  : >"$lock_path"
+  # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
+  nohup env HARNESS_DAEMON_DATA_HOME="$daemon_data_home" \
+    bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
+    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
+}
+
 kill_spawned_repo_gate_fixtures() {
   stale_scan_refresh_ps
   local gate_pids pid
@@ -502,7 +518,36 @@ scenario_profiled_live_lock_holder_not_stale() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 10b: unscoped live lock holders remain cleanup targets for the
+# Scenario 10b: data-home-scoped live lock holders are deliberate isolated work
+# even if the runtime-profile env is absent.
+# ---------------------------------------------------------------------------
+scenario_data_home_scoped_live_lock_holder_not_stale() {
+  start_test "data-home-scoped live lock holder is not stale pollution"
+  local daemon_data_home="$SANDBOX/runtime-profiles/bartsmykla"
+  local fake_root="$daemon_data_home/harness/daemon"
+  local lock_path="$fake_root/bridge.lock"
+  spawn_labelled_with_daemon_data_home_and_open_lock \
+    "$daemon_data_home" \
+    "/opt/fake/harness bridge start" \
+    "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local holders conflicting
+  holders="$(stale_scan_root_lock_holder_pids "$fake_root")"
+  conflicting="$(stale_scan_root_conflicting_lock_holder_pids "$fake_root")"
+  local ok=1
+  assert_in_list "$pid" "lock-holder pid" "$holders" || ok=0
+  assert_not_in_list "$pid" "conflicting lock-holder pid" "$conflicting" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10c: unscoped live lock holders remain cleanup targets for the
 # broader shared-root stale cleanup path.
 # ---------------------------------------------------------------------------
 scenario_unscoped_live_lock_holder_still_stale() {
@@ -520,6 +565,224 @@ scenario_unscoped_live_lock_holder_still_stale() {
   local conflicting
   conflicting="$(stale_scan_root_conflicting_lock_holder_pids "$fake_root")"
   assert_in_list "$pid" "conflicting lock-holder pid" "$conflicting" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10d: default clean:stale is now the safe scrub. It must preserve
+# live shared Monitor state while still reaping orphan build processes.
+# ---------------------------------------------------------------------------
+scenario_clean_stale_safe_mode_preserves_live_shared_state() {
+  start_test "clean:stale safe scrub preserves live shared Monitor state"
+  local fake_home="$SANDBOX/clean-safe-home-$RUN_ID"
+  local fake_bin="$SANDBOX/clean-safe-bin-$RUN_ID"
+  local app_group_id="$STALE_SCAN_APP_GROUP_ID"
+  local legacy_root="$fake_home/Library/Application Support/harness/daemon"
+  local legacy_lock="$legacy_root/daemon.lock"
+  local legacy_state="$legacy_root/bridge.json"
+  local launchctl_log="$SANDBOX/clean-safe-launchctl-$RUN_ID.log"
+  local osascript_log="$SANDBOX/clean-safe-osascript-$RUN_ID.log"
+  local output status=0
+  local live_pid orphan_pid codex_pid codex_port codex_port_file
+
+  mkdir -p "$fake_bin" "$legacy_root"
+  cat >"$fake_bin/pgrep" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  cat >"$fake_bin/launchctl" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$launchctl_log"
+exit 0
+EOF
+  cat >"$fake_bin/osascript" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$osascript_log"
+exit 0
+EOF
+  chmod +x "$fake_bin/pgrep" "$fake_bin/launchctl" "$fake_bin/osascript"
+  printf '{"bridge":"legacy"}\n' >"$legacy_state"
+
+  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$legacy_lock" || {
+    fail "spawn live holder failed"
+    return
+  }
+  live_pid="$LAST_SPAWN_PID"
+  spawn_target_harness "target/release" bridge || {
+    fail "spawn orphan build failed"
+    return
+  }
+  orphan_pid="$LAST_SPAWN_PID"
+  codex_port="$(allocate_free_tcp_port)"
+  codex_port_file="$SANDBOX/codex-safe-$RUN_ID.port"
+  spawn_codex_app_server_listener "$codex_port" "$codex_port_file" || {
+    fail "spawn codex app-server failed"
+    return
+  }
+  codex_pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  output="$(
+    env \
+      -u HARNESS_DAEMON_DATA_HOME \
+      -u HARNESS_MONITOR_RUNTIME_PROFILE \
+      HOME="$fake_home" \
+      PATH="$fake_bin:$PATH" \
+      HARNESS_APP_GROUP_ID="$app_group_id" \
+      HARNESS_CODEX_WS_PORT="$codex_port" \
+      HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 \
+      HARNESS_STALE_CLEANUP_LEASE_HELD=1 \
+      HARNESS_MONITOR_OSASCRIPT_BIN="$fake_bin/osascript" \
+      HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL="io.harnessmonitor.daemon.test" \
+      "$ROOT/scripts/clean-stale-state.sh" 2>&1
+  )" || status=$?
+
+  if (( status != 0 )); then
+    fail "clean-stale-state.sh failed: $output"
+    return
+  fi
+
+  sleep 0.3
+  if ! kill -0 "$live_pid" 2>/dev/null; then
+    fail "live shared holder died during safe clean:stale"
+    return
+  fi
+  if kill -0 "$orphan_pid" 2>/dev/null; then
+    fail "orphan build process survived safe clean:stale"
+    return
+  fi
+  if ! kill -0 "$codex_pid" 2>/dev/null; then
+    fail "live codex app-server died during safe clean:stale"
+    return
+  fi
+  if [[ ! -e "$legacy_lock" || ! -e "$legacy_state" ]]; then
+    fail "safe clean:stale wiped live shared root"
+    return
+  fi
+  if grep -Fq -- "quitting Harness Monitor app..." <<<"$output"; then
+    fail "safe clean:stale attempted to quit the app"
+    return
+  fi
+  if grep -Fq -- "stopping launchd daemon" <<<"$output"; then
+    fail "safe clean:stale attempted to stop launchd"
+    return
+  fi
+  if [[ -s "$launchctl_log" || -s "$osascript_log" ]]; then
+    fail "safe clean:stale called live-reset tools unexpectedly"
+    return
+  fi
+  pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10e: full clean:stale reset preserves a profiled live bridge root
+# while still reaping stale unscoped holders and orphan build processes.
+# ---------------------------------------------------------------------------
+scenario_clean_stale_full_reset_preserves_profiled_bridge_end_to_end() {
+  start_test "clean:stale full reset preserves profiled bridge while reaping stale shared holders"
+  local fake_home="$SANDBOX/clean-home-$RUN_ID"
+  local fake_bin="$SANDBOX/clean-bin-$RUN_ID"
+  local app_group_id="$STALE_SCAN_APP_GROUP_ID"
+  local shared_root="$fake_home/Library/Group Containers/$app_group_id/harness/daemon"
+  local legacy_root="$fake_home/Library/Application Support/harness/daemon"
+  local shared_lock="$shared_root/bridge.lock"
+  local legacy_lock="$legacy_root/daemon.lock"
+  local shared_state="$shared_root/bridge.json"
+  local legacy_state="$legacy_root/bridge.json"
+  local output status=0
+  local profiled_pid unscoped_pid orphan_pid codex_pid codex_port codex_port_file
+
+  mkdir -p "$fake_bin" "$shared_root" "$legacy_root"
+  cat >"$fake_bin/pgrep" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  cat >"$fake_bin/launchctl" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$fake_bin/pgrep" "$fake_bin/launchctl"
+  printf '{"bridge":"profiled"}\n' >"$shared_state"
+  printf '{"bridge":"legacy"}\n' >"$legacy_state"
+
+  spawn_labelled_with_runtime_profile_and_open_lock \
+    "bartsmykla" \
+    "$SANDBOX/target/debug/harness bridge" \
+    "$shared_lock" || {
+    fail "spawn profiled holder failed"
+    return
+  }
+  profiled_pid="$LAST_SPAWN_PID"
+  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$legacy_lock" || {
+    fail "spawn unscoped holder failed"
+    return
+  }
+  unscoped_pid="$LAST_SPAWN_PID"
+  spawn_target_harness "target/release" bridge || {
+    fail "spawn orphan build failed"
+    return
+  }
+  orphan_pid="$LAST_SPAWN_PID"
+  codex_port="$(allocate_free_tcp_port)"
+  codex_port_file="$SANDBOX/codex-full-$RUN_ID.port"
+  spawn_codex_app_server_listener "$codex_port" "$codex_port_file" || {
+    fail "spawn codex app-server failed"
+    return
+  }
+  codex_pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  output="$(
+    env \
+      -u HARNESS_DAEMON_DATA_HOME \
+      -u HARNESS_MONITOR_RUNTIME_PROFILE \
+      HOME="$fake_home" \
+      PATH="$fake_bin:$PATH" \
+      HARNESS_APP_GROUP_ID="$app_group_id" \
+      HARNESS_CODEX_WS_PORT="$codex_port" \
+      HARNESS_CHECK_IGNORE_REPO_GATE_HELPERS=1 \
+      HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 \
+      HARNESS_STALE_CLEANUP_LEASE_HELD=1 \
+      HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL="io.harnessmonitor.daemon.test" \
+      "$ROOT/scripts/clean-stale-state.sh" 2>&1
+  )" || status=$?
+
+  if (( status != 0 )); then
+    fail "clean-stale-state.sh failed: $output"
+    return
+  fi
+
+  sleep 0.3
+  if ! kill -0 "$profiled_pid" 2>/dev/null; then
+    fail "profiled bridge pid died during clean:stale"
+    return
+  fi
+  if kill -0 "$unscoped_pid" 2>/dev/null; then
+    fail "unscoped live holder survived clean:stale"
+    return
+  fi
+  if kill -0 "$orphan_pid" 2>/dev/null; then
+    fail "orphan build process survived clean:stale"
+    return
+  fi
+  if kill -0 "$codex_pid" 2>/dev/null; then
+    fail "stale codex app-server survived full clean:stale"
+    return
+  fi
+  if [[ ! -e "$shared_lock" || ! -e "$shared_state" ]]; then
+    fail "profiled live root was wiped during clean:stale"
+    return
+  fi
+  local legacy_holders
+  legacy_holders="$(stale_scan_root_lock_holder_pids "$legacy_root")"
+  if [[ -n "$legacy_holders" ]]; then
+    fail "legacy stale root still has live lock holders after clean:stale"
+    return
+  fi
+  if [[ -e "$legacy_state" ]]; then
+    fail "legacy stale bridge state was not wiped during clean:stale"
+    return
+  fi
+  pass
 }
 
 # ---------------------------------------------------------------------------
@@ -993,6 +1256,50 @@ time.sleep(300)
   return 1
 }
 
+allocate_free_tcp_port() {
+  python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+spawn_codex_app_server_listener() {
+  local port="$1"
+  local port_file="$2"
+  local bin_dir="$SANDBOX/codex-bin-$RUN_ID"
+  mkdir -p "$bin_dir"
+  local script_path="$bin_dir/codex"
+  cat >"$script_path" <<'EOF'
+import socket, sys, time
+listen = sys.argv[sys.argv.index("--listen") + 1]
+port = int(listen.rsplit(":", 1)[1].split("/", 1)[0])
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+with open(sys.argv[-1], "w") as f:
+    f.write(str(port))
+sys.stdout.close()
+time.sleep(300)
+EOF
+
+  nohup python3 "$script_path" app-server --listen "ws://127.0.0.1:$port" "$port_file" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "codex app-server" || return 1
+  local attempts=0
+  while (( attempts < 60 )); do
+    [[ -s "$port_file" ]] && return 0
+    sleep 0.05
+    attempts=$((attempts + 1))
+  done
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Scenario 27: foreign process listening on the Codex WS port is flagged.
 # ---------------------------------------------------------------------------
@@ -1080,52 +1387,19 @@ scenario_codex_ws_port_env() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 30: bridge-spawned Codex app-server listener is detected for cleanup.
+# Scenario 30: orphan bridge-spawned Codex app-server listener is detected for
+# cleanup when the current lane has no live lock holder.
 # ---------------------------------------------------------------------------
 scenario_codex_app_server_listener_detected() {
   start_test "codex app-server listener on Codex port is detected for cleanup"
-  local bin_dir="$SANDBOX/codex-bin-$RUN_ID"
-  mkdir -p "$bin_dir"
-  local script_path="$bin_dir/codex"
-  cat >"$script_path" <<'EOF'
-import socket, sys, time
-listen = sys.argv[sys.argv.index("--listen") + 1]
-port = int(listen.rsplit(":", 1)[1].split("/", 1)[0])
-s = socket.socket()
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(("127.0.0.1", port))
-s.listen(1)
-with open(sys.argv[-1], "w") as f:
-    f.write(str(port))
-sys.stdout.close()
-time.sleep(300)
-EOF
-
   local port
-  port="$(python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-)"
+  port="$(allocate_free_tcp_port)"
   local port_file="$SANDBOX/codex-$RUN_ID.port"
-  nohup python3 "$script_path" app-server --listen "ws://127.0.0.1:$port" "$port_file" >/dev/null 2>&1 &
-  local pid=$!
-  SPAWNED_PIDS+=("$pid")
-  wait_for_pid_registered "$pid" || { fail "codex app-server fixture never started"; return; }
-  wait_for_pid_argv_contains "$pid" "codex app-server" || {
-    fail "codex app-server fixture argv did not settle"
+  spawn_codex_app_server_listener "$port" "$port_file" || {
+    fail "codex app-server fixture never bound"
     return
   }
-  local attempts=0
-  while (( attempts < 60 )); do
-    [[ -s "$port_file" ]] && break
-    sleep 0.05
-    attempts=$((attempts + 1))
-  done
-  [[ -s "$port_file" ]] || { fail "codex app-server fixture never bound"; return; }
+  local pid="$LAST_SPAWN_PID"
 
   stale_scan_refresh_ps
   local codex_pids
@@ -1134,7 +1408,42 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 31: parentless xcodebuild wrapper without surviving lease metadata
+# Scenario 31: live current-lane Codex app-server listener is not stale while
+# its owning Harness lock holder is still alive.
+# ---------------------------------------------------------------------------
+scenario_live_codex_app_server_listener_not_stale() {
+  start_test "live codex app-server listener on current lane is not stale"
+  local daemon_data_home="$SANDBOX/runtime-profiles/codex-live"
+  local fake_root="$daemon_data_home/harness/daemon"
+  local lock_path="$fake_root/bridge.lock"
+  local port port_file pid
+
+  spawn_labelled_with_daemon_data_home_and_open_lock \
+    "$daemon_data_home" \
+    "/opt/fake/harness bridge start" \
+    "$lock_path" || {
+    fail "spawn live holder failed"
+    return
+  }
+  port="$(allocate_free_tcp_port)"
+  port_file="$SANDBOX/codex-live-$RUN_ID.port"
+  spawn_codex_app_server_listener "$port" "$port_file" || {
+    fail "codex app-server fixture never bound"
+    return
+  }
+  pid="$LAST_SPAWN_PID"
+
+  stale_scan_refresh_ps
+  local codex_pids foreign ok=1
+  codex_pids="$(HARNESS_DAEMON_DATA_HOME="$daemon_data_home" stale_scan_codex_app_server_listener_pids "$port")"
+  foreign="$(HARNESS_DAEMON_DATA_HOME="$daemon_data_home" stale_scan_foreign_tcp_listeners "$port")"
+  assert_not_in_list "$pid" "codex app-server listener pid" "$codex_pids" || ok=0
+  assert_not_in_list "$pid" "foreign listener pid" "$foreign" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 32: parentless xcodebuild wrapper without surviving lease metadata
 # is detected as a stale orphan.
 # ---------------------------------------------------------------------------
 scenario_orphan_monitor_wrapper_detected() {
@@ -1225,11 +1534,11 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and the
-# planted marker disappears. The "exit 0" happy-path end-state is only
+# Scenario 30: HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script in safe mode
+# and the planted marker disappears. The "exit 0" happy-path end-state is only
 # reachable when no other pollution exists, which is not the case mid-suite;
 # we assert the invariants we control (marker gone, autoclean banner, fake
-# clean stdout) and accept either exit 0 or 1 as success.
+# clean stdout, safe-reset env) and accept either exit 0 or 1 as success.
 # ---------------------------------------------------------------------------
 scenario_autoclean_success() {
   start_test "HARNESS_CHECK_AUTOCLEAN=1 invokes the clean script and removes the marker"
@@ -1242,6 +1551,7 @@ scenario_autoclean_success() {
   cat >"$clean_script" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+echo "fake clean allow_live_reset=\${HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET:-unset}"
 rm -f "$marker"
 echo "fake clean removed marker"
 EOF
@@ -1261,6 +1571,10 @@ EOF
   fi
   if ! grep -Fq -- "fake clean removed marker" <<<"$output"; then
     fail "expected fake clean stdout to surface; output: $output"
+    return
+  fi
+  if ! grep -Fq -- "fake clean allow_live_reset=0" <<<"$output"; then
+    fail "expected autoclean to force safe cleanup mode; output: $output"
     return
   fi
   if (( status != 0 && status != 1 )); then
@@ -1562,7 +1876,10 @@ run_all() {
   scenario_lock_holding_build_process_not_orphaned
   scenario_lock_holder
   scenario_profiled_live_lock_holder_not_stale
+  scenario_data_home_scoped_live_lock_holder_not_stale
   scenario_unscoped_live_lock_holder_still_stale
+  scenario_clean_stale_safe_mode_preserves_live_shared_state
+  scenario_clean_stale_full_reset_preserves_profiled_bridge_end_to_end
   scenario_pid_describe_format
   scenario_ancestor_exclusion
   scenario_common_root_gate_helper_detection
@@ -1585,6 +1902,7 @@ run_all() {
   scenario_harness_ws_listener_not_flagged
   scenario_codex_ws_port_env
   scenario_codex_app_server_listener_detected
+  scenario_live_codex_app_server_listener_not_stale
   scenario_orphan_monitor_wrapper_detected
   scenario_monitor_wrapper_with_owner_metadata_not_flagged
   scenario_xcodebuild_lock_live_mutator_detected

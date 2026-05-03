@@ -4,11 +4,13 @@
 # so CI and local runs never build or test on top of stale state.
 #
 # When HARNESS_CHECK_AUTOCLEAN=1 is set, a detected pollution triggers one
-# automatic clean:stale pass followed by a re-scan. The gate still fails if
-# pollution persists after the cleanup, so runaway state is never silently
-# absorbed. Healthy parallel agents are not pollution; coordination belongs to
-# resource-specific lease locks, not argv/cwd heuristics, but auto-clean must
-# still not race other repo-local build/check helpers on shared state.
+# automatic safe clean:stale pass followed by a re-scan. Auto-clean never takes
+# the destructive live-reset path (quit Monitor / stop launchd / kill live lock
+# holders); if live shared state is the blocker, the gate still fails and
+# points the user at the explicit reset task. Healthy parallel agents are not
+# pollution; coordination belongs to resource-specific lease locks, not argv/cwd
+# heuristics, but auto-clean must still not race other repo-local build/check
+# helpers on shared state.
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -28,7 +30,7 @@ LEASE_LOCK_RESOURCE="stale-state-cleanup:${COMMON_REPO_ROOT}"
 LEASE_LOCK_WAITER_ID="check-stale-$$"
 source "$ROOT/scripts/lib/lease-lock.sh"
 
-readonly RESET_HINT="run 'mise run clean:stale' to reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
+readonly RESET_HINT="run 'mise run clean:stale' for a safe scrub, 'mise run monitor:user:reset' or 'mise run clean:stale:full' for a live reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
 # Allow tests to redirect autoclean to a sandbox-safe stub. Production runs
 # always resolve this to scripts/clean-stale-state.sh.
 readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
@@ -220,7 +222,7 @@ if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
     done
     echo "---"
   } >&2
-  if ! env HARNESS_STALE_CLEANUP_LEASE_HELD=1 "$CLEAN_SCRIPT" >&2; then
+  if ! env HARNESS_STALE_CLEANUP_LEASE_HELD=1 HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=0 "$CLEAN_SCRIPT" >&2; then
     echo "error: auto-clean failed; dev state still stale" >&2
     report_stale
     exit 1

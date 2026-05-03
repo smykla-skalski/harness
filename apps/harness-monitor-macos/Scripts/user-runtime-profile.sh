@@ -69,6 +69,7 @@ if (( $# == 0 )); then
   printf '  mise run monitor:user:test\n'
   printf '  mise run monitor:user:daemon:dev\n'
   printf '  mise run monitor:user:bridge:start\n'
+  printf '  mise run monitor:user:reset\n'
   exit 0
 fi
 
