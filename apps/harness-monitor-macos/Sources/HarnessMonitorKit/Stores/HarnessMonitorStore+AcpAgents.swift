@@ -140,8 +140,18 @@ extension HarnessMonitorStore {
   ) {
     recordRequestSuccess()
     clearHostBridgeIssue(for: "acp")
-    applyAcpAgent(snapshot)
-    presentSuccessFeedback(actionName)
+    switch applyAcpAgent(snapshot) {
+    case .applied:
+      presentSuccessFeedback(actionName)
+    case .droppedSessionMismatch:
+      presentSuccessFeedback(
+        Self.acpAgentStartedInOtherSessionMessage(actionName: actionName)
+      )
+    }
+  }
+
+  static func acpAgentStartedInOtherSessionMessage(actionName: String) -> String {
+    "\(actionName) in another session. Reselect that session to view it."
   }
 
   private func measureAcpAgentStart(
