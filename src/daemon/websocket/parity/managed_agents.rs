@@ -1,3 +1,5 @@
+use crate::feature_flags;
+
 use super::{
     AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,
     CodexSteerRequest, DaemonHttpState, ManagedAgentSnapshot, WsRequest, WsResponse,
@@ -60,6 +62,13 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if !feature_flags::acp_enabled_from_env() {
+        return error_response(
+            &request.id,
+            "ACP_DISABLED",
+            "ACP managed-agent routes are disabled",
+        );
+    }
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };

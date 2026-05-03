@@ -175,6 +175,25 @@ async fn map_json_maps_codex_unavailable_to_503() {
     assert_eq!(body["hint"], "run: harness bridge start");
 }
 
+#[tokio::test]
+async fn map_json_maps_acp_disabled_to_503() {
+    let error = CliErrorKind::acp_disabled().into();
+    let (status, body) = response_body(Err(error)).await;
+
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"]["code"], "ACP_DISABLED");
+}
+
+#[tokio::test]
+async fn map_json_maps_session_scope_denied_to_403() {
+    let error =
+        CliErrorKind::session_scope_denied("agent 'x' belongs to a different session").into();
+    let (status, body) = response_body(Err(error)).await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
+}
+
 #[test]
 fn request_logging_uses_debug_activity_level() {
     assert_eq!(request_activity_log_level(), tracing::Level::DEBUG);

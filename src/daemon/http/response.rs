@@ -48,6 +48,28 @@ pub(crate) fn error_status_and_body(error: &CliError) -> (StatusCode, serde_json
             }),
         );
     }
+    if error.code() == "ACP_DISABLED" {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({
+                "error": {
+                    "code": "ACP_DISABLED",
+                    "message": error.message(),
+                }
+            }),
+        );
+    }
+    if error.code() == "SESSION_SCOPE_DENIED" {
+        return (
+            StatusCode::FORBIDDEN,
+            serde_json::json!({
+                "error": {
+                    "code": "SESSION_SCOPE_DENIED",
+                    "message": error.message(),
+                }
+            }),
+        );
+    }
     (
         StatusCode::BAD_REQUEST,
         serde_json::json!({
@@ -84,6 +106,8 @@ pub(super) fn timed_json<T: serde::Serialize>(
         Err(error) if error.code() == "SANDBOX001" => 501,
         Err(error) if error.code() == "CODEX001" => 503,
         Err(error) if error.code() == "KSRCLI092" => 409,
+        Err(error) if error.code() == "ACP_DISABLED" => 503,
+        Err(error) if error.code() == "SESSION_SCOPE_DENIED" => 403,
         Err(_) => 400,
     };
     record_daemon_http_metrics(method, path, status, duration_ms);

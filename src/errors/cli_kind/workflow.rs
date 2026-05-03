@@ -52,4 +52,14 @@ impl CliErrorKind {
     pub fn invalid_project_dir(path: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::invalid_project_dir(path))
     }
+
+    #[must_use]
+    pub fn acp_disabled() -> Self {
+        Self::Workflow(WorkflowError::acp_disabled())
+    }
+
+    #[must_use]
+    pub fn session_scope_denied(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::session_scope_denied(detail))
+    }
 }
