@@ -70,5 +70,9 @@ public enum WorkspaceSelection: Hashable, Sendable {
   }
 }
 
+public enum WorkspaceCreateEntryPoint: Hashable, Sendable {
+  case agent
+}
+
 @available(*, deprecated, renamed: "WorkspaceSelection")
 public typealias AgentTuiSheetSelection = WorkspaceSelection

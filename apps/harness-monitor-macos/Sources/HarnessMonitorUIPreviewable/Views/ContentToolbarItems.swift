@@ -4,7 +4,7 @@ import SwiftUI
 struct ContentWindowToolbarModel: Equatable {
   let canNavigateBack: Bool
   let canNavigateForward: Bool
-  let canStartNewSession: Bool
+  let canCreateTask: Bool
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
   let mcpStatus: HarnessMonitorMCPStatusSnapshot
@@ -29,9 +29,9 @@ struct ContentWindowToolbarItems: ToolbarContent {
 
   @ToolbarContentBuilder var body: some ToolbarContent {
     ContentNavigationToolbar(store: store, model: model)
-    SidebarToolbarNewSessionToolbarItem(
-      isEnabled: model.canStartNewSession,
-      presentNewSession: { store.presentedSheet = .newSession }
+    SidebarToolbarCreateMenuToolbarItem(
+      store: store,
+      canCreateTask: model.canCreateTask
     )
   }
 }

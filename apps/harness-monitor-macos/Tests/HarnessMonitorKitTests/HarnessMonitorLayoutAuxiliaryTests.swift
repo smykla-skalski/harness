@@ -117,7 +117,7 @@ struct ContentWindowToolbarModelTests {
     let enabled = ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
-      canStartNewSession: false,
+      canCreateTask: false,
       isRefreshing: false,
       sleepPreventionEnabled: true,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(
@@ -128,7 +128,7 @@ struct ContentWindowToolbarModelTests {
     let disabled = ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
-      canStartNewSession: false,
+      canCreateTask: false,
       isRefreshing: false,
       sleepPreventionEnabled: false,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(

@@ -4,19 +4,31 @@ extension HarnessMonitorStore {
   public struct PendingWorkspaceSelectionRequest: Equatable {
     public let selection: WorkspaceSelection
     public let resetDecisionFilters: Bool
+    public let createEntryPoint: WorkspaceCreateEntryPoint?
 
-    public init(selection: WorkspaceSelection, resetDecisionFilters: Bool) {
+    public init(
+      selection: WorkspaceSelection,
+      resetDecisionFilters: Bool,
+      createEntryPoint: WorkspaceCreateEntryPoint?
+    ) {
       self.selection = selection
       self.resetDecisionFilters = resetDecisionFilters
+      self.createEntryPoint = createEntryPoint
     }
   }
 
   public func requestWorkspaceSelection(
     _ selection: WorkspaceSelection,
-    resetDecisionFilters: Bool = false
+    resetDecisionFilters: Bool = false,
+    createEntryPoint: WorkspaceCreateEntryPoint? = nil
   ) {
     pendingWorkspaceSelection = selection
     pendingWorkspaceDecisionFilterResetRequested = resetDecisionFilters
+    pendingWorkspaceCreateEntryPoint = createEntryPoint
+  }
+
+  public func requestWorkspaceCreateEntryPoint(_ entryPoint: WorkspaceCreateEntryPoint) {
+    requestWorkspaceSelection(.create, createEntryPoint: entryPoint)
   }
 
   public func requestWorkspaceDecisionSelection(
@@ -39,14 +51,17 @@ extension HarnessMonitorStore {
   public func consumePendingWorkspaceSelectionRequest() -> PendingWorkspaceSelectionRequest? {
     guard let selection = pendingWorkspaceSelection else {
       pendingWorkspaceDecisionFilterResetRequested = false
+      pendingWorkspaceCreateEntryPoint = nil
       return nil
     }
     pendingWorkspaceSelection = nil
     let request = PendingWorkspaceSelectionRequest(
       selection: selection,
-      resetDecisionFilters: pendingWorkspaceDecisionFilterResetRequested
+      resetDecisionFilters: pendingWorkspaceDecisionFilterResetRequested,
+      createEntryPoint: pendingWorkspaceCreateEntryPoint
     )
     pendingWorkspaceDecisionFilterResetRequested = false
+    pendingWorkspaceCreateEntryPoint = nil
     return request
   }
 
