@@ -21,6 +21,7 @@ use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use self::runtime_helpers::{report_protocol_result, route_session_notification};
+use self::session_start::initialize_and_bind_runtime_session;
 use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
@@ -35,6 +36,7 @@ mod commands;
 mod context;
 mod runtime_helpers;
 mod session_guard;
+mod session_start;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
@@ -290,26 +292,17 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         session_guard,
         manager,
     } = args;
-    let initialize_timeout = supervisor.config().initialize_timeout;
     let prompt_timeout = supervisor.config().prompt_timeout;
-
-    send_initialize(&supervisor, &connection, initialize_timeout).await?;
-    let acp_session_id = send_new_session(&supervisor, &connection, project_dir).await?;
-    let registered = manager
-        .bind_orchestration_runtime_session_async(
-            &session_id,
-            &acp_id,
-            &runtime_name,
-            &acp_session_id.to_string(),
-        )
-        .await
-        .map_err(|error| AcpError::new(-32603, format!("bind ACP runtime session: {error}")))?;
-    if !registered {
-        return Err(AcpError::new(
-            -32603,
-            format!("bind ACP runtime session: missing orchestration agent for '{acp_id}'"),
-        ));
-    }
+    let acp_session_id = initialize_and_bind_runtime_session(
+        &manager,
+        &supervisor,
+        &connection,
+        project_dir,
+        &session_id,
+        &acp_id,
+        &runtime_name,
+    )
+    .await?;
     let target = RouteTarget { acp_id, session_id };
     session_guard.start_session(&acp_session_id, target.clone());
     let run_result = async {

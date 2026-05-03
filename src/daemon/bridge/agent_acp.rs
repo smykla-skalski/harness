@@ -36,7 +36,7 @@ impl BridgeServer {
         session_id: Option<&str>,
     ) -> Result<AcpAgentInspectResponse, CliError> {
         self.ensure_acp_capability()?;
-        self.with_acp_runtime(|| Ok(self.acp_agent_manager.inspect(session_id)))
+        self.with_acp_runtime(|| self.acp_agent_manager.inspect(session_id))
     }
 
     pub(super) fn get_acp(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {

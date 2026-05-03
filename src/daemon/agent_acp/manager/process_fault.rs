@@ -6,72 +6,70 @@ use std::time::Instant;
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot, ActiveAcpSession, PROCESS_KEY_BACKOFF};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::protocol::StreamEvent;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::AgentStatus;
 
 const ACP_PROCESS_FAULT_POLICY_ENV: &str = "HARNESS_ACP_PROCESS_FAULT_POLICY";
 
 impl AcpAgentManagerHandle {
-    pub(super) fn process_fault_events(
-        &self,
-        snapshot: &AcpAgentSnapshot,
-        event: StreamEvent,
-    ) -> Vec<StreamEvent> {
-        let _lifecycle = self
-            .state
-            .process_lifecycle
-            .lock()
-            .expect("ACP process lifecycle lock");
-        self.process_fault_events_locked(snapshot, event)
-    }
-
     pub(super) fn process_fault_events_locked(
         &self,
         snapshot: &AcpAgentSnapshot,
         event: StreamEvent,
-    ) -> Vec<StreamEvent> {
-        let affected_session_ids = self.disconnect_process_siblings(snapshot);
-        self.remove_process_if_empty(&snapshot.process_key);
-        let event = self.apply_process_fault_policy(snapshot, event);
-        process_fault_fanout_events(event, affected_session_ids)
+    ) -> Result<Vec<StreamEvent>, CliError> {
+        let (affected_session_ids, sibling_snapshots) =
+            self.disconnect_process_siblings(snapshot)?;
+        for sibling_snapshot in sibling_snapshots {
+            self.sync_orchestration_disconnect_best_effort(&sibling_snapshot);
+        }
+        self.remove_process_if_empty(&snapshot.process_key)?;
+        let event = self.apply_process_fault_policy(snapshot, event)?;
+        Ok(process_fault_fanout_events(event, affected_session_ids))
     }
 
-    fn sessions_for_process_key(&self, process_key: &str) -> Vec<Arc<ActiveAcpSession>> {
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
+    fn sessions_for_process_key(
+        &self,
+        process_key: &str,
+    ) -> Result<Vec<Arc<ActiveAcpSession>>, CliError> {
+        Ok(self
+            .sessions_guard()?
             .values()
             .filter(|session| session.process_key() == process_key)
             .cloned()
-            .collect()
+            .collect())
     }
 
-    fn disconnect_process_siblings(&self, snapshot: &AcpAgentSnapshot) -> Vec<String> {
+    fn disconnect_process_siblings(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+    ) -> Result<(Vec<String>, Vec<AcpAgentSnapshot>), CliError> {
         let AgentStatus::Disconnected { reason, .. } = &snapshot.status else {
-            return vec![snapshot.session_id.clone()];
+            return Ok((vec![snapshot.session_id.clone()], Vec::new()));
         };
         let mut affected = BTreeSet::new();
-        for session in self.sessions_for_process_key(&snapshot.process_key) {
+        let mut disconnected_siblings = Vec::new();
+        for session in self.sessions_for_process_key(&snapshot.process_key)? {
             let sibling = session.snapshot_with_live_counts();
             if sibling.acp_id == snapshot.acp_id || !sibling.status.is_disconnected() {
                 affected.insert(sibling.session_id.clone());
             }
             if sibling.acp_id != snapshot.acp_id && !sibling.status.is_disconnected() {
                 session.disconnect(reason.clone(), false);
+                disconnected_siblings.push(session.snapshot_with_live_counts());
             }
         }
-        affected.into_iter().collect()
+        Ok((affected.into_iter().collect(), disconnected_siblings))
     }
 
     fn apply_process_fault_policy(
         &self,
         snapshot: &AcpAgentSnapshot,
         mut event: StreamEvent,
-    ) -> StreamEvent {
+    ) -> Result<StreamEvent, CliError> {
         if !process_fault_policy_enabled() {
-            return event;
+            return Ok(event);
         }
-        let (backoff_applied, quarantine_applied) = self.record_process_fault(snapshot);
+        let (backoff_applied, quarantine_applied) = self.record_process_fault(snapshot)?;
         if let serde_json::Value::Object(payload) = &mut event.payload {
             payload.insert(
                 "restart_applied".to_string(),
@@ -86,12 +84,36 @@ impl AcpAgentManagerHandle {
                 serde_json::Value::Bool(quarantine_applied),
             );
         }
-        event
+        Ok(event)
     }
 
-    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> (bool, bool) {
+    pub(in crate::daemon::agent_acp) fn ensure_process_key_start_allowed(
+        &self,
+        process_key: &str,
+    ) -> Result<(), CliError> {
+        if let Some(until) = self
+            .process_key_backoff_until_guard()?
+            .get(process_key)
+            .copied()
+            && until > Instant::now()
+        {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "ACP process key is in backoff after recent faults: {process_key}"
+            ))
+            .into());
+        }
+        if self.quarantined_process_keys_guard()?.contains(process_key) {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "ACP process key is quarantined after repeated faults: {process_key}"
+            ))
+            .into());
+        }
+        Ok(())
+    }
+
+    fn record_process_fault(&self, snapshot: &AcpAgentSnapshot) -> Result<(bool, bool), CliError> {
         let AgentStatus::Disconnected { reason, .. } = &snapshot.status else {
-            return (false, false);
+            return Ok((false, false));
         };
         if !matches!(
             reason,
@@ -102,32 +124,20 @@ impl AcpAgentManagerHandle {
                 | DisconnectReason::PromptTimeout
                 | DisconnectReason::WatchdogFired
         ) {
-            return (false, false);
+            return Ok((false, false));
         }
         let process_key = fault_policy_process_key(&snapshot.process_key);
-        self.state
-            .process_key_backoff_until
-            .lock()
-            .expect("ACP process key backoff lock")
+        self.process_key_backoff_until_guard()?
             .insert(process_key.clone(), Instant::now() + PROCESS_KEY_BACKOFF);
-        let mut failures = self
-            .state
-            .process_key_failures
-            .lock()
-            .expect("ACP process key failures lock");
+        let mut failures = self.process_key_failures_guard()?;
         let failure_count = failures.entry(process_key.clone()).or_insert(0);
         *failure_count = failure_count.saturating_add(1);
         if *failure_count < 3 {
-            return (true, false);
+            return Ok((true, false));
         }
         drop(failures);
-        let quarantined = self
-            .state
-            .quarantined_process_keys
-            .lock()
-            .expect("ACP quarantined process keys lock")
-            .insert(process_key);
-        (true, quarantined)
+        let quarantined = self.quarantined_process_keys_guard()?.insert(process_key);
+        Ok((true, quarantined))
     }
 }
 

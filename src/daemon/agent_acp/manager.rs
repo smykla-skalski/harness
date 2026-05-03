@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
@@ -36,10 +36,13 @@ pub(in crate::daemon::agent_acp) struct AcpOrchestrationRegistration {
     pub display_name: String,
 }
 
+mod locks;
 mod orchestration;
 mod process_fault;
 mod process_pool;
 mod session_access;
+#[cfg(test)]
+mod shutdown_tests;
 #[cfg(test)]
 mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
@@ -150,6 +153,7 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     pub(in crate::daemon::agent_acp) async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
     pub(in crate::daemon::agent_acp) process_lifecycle: Mutex<()>,
+    pub(in crate::daemon::agent_acp) shutdown_requested: AtomicBool,
     pub(in crate::daemon::agent_acp) sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
     pub(in crate::daemon::agent_acp) processes: Mutex<BTreeMap<String, Arc<ActiveAcpProcess>>>,
     pub(in crate::daemon::agent_acp) sandbox_event_poller_running: AtomicBool,
@@ -183,6 +187,7 @@ impl AcpAgentManagerHandle {
                 db,
                 async_db,
                 process_lifecycle: Mutex::new(()),
+                shutdown_requested: AtomicBool::new(false),
                 sessions: Mutex::new(BTreeMap::new()),
                 processes: Mutex::new(BTreeMap::new()),
                 sandbox_event_poller_running: AtomicBool::new(false),
@@ -256,10 +261,13 @@ impl AcpAgentManagerHandle {
         if service::sandboxed_from_env() {
             return self.list_via_bridge(session_id);
         }
-        let sessions = self.sessions_for(session_id);
+        let sessions = self.sessions_for(session_id)?;
         let mut snapshots = Vec::with_capacity(sessions.len());
         for session in sessions {
-            snapshots.push(self.refresh_session_snapshot(&session));
+            let snapshot = self.refresh_session_snapshot(&session)?;
+            if !snapshot.status.is_disconnected() {
+                snapshots.push(snapshot);
+            }
         }
         snapshots.sort_by(|a, b| {
             b.updated_at
@@ -271,39 +279,36 @@ impl AcpAgentManagerHandle {
 
     /// Inspect live ACP sessions without starting or stopping anything.
     ///
-    /// # Panics
-    /// Panics if the ACP sessions mutex is poisoned.
-    #[must_use]
-    pub fn inspect(&self, session_id: Option<&str>) -> AcpAgentInspectResponse {
+    /// # Errors
+    /// Returns [`CliError`] when the live session registry is unavailable.
+    pub fn inspect(&self, session_id: Option<&str>) -> Result<AcpAgentInspectResponse, CliError> {
         if service::sandboxed_from_env() {
-            return self.inspect_via_bridge(session_id);
+            return Ok(self.inspect_via_bridge(session_id));
         }
         let sessions = self
-            .state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
+            .sessions_guard()?
             .values()
             .filter(|session| session_id.is_none_or(|id| session.session_id() == id))
             .cloned()
             .collect::<Vec<_>>();
-        let mut agents = sessions
-            .into_iter()
-            .map(|session| {
-                self.refresh_session_snapshot(&session);
-                session.inspect_snapshot()
-            })
-            .collect::<Vec<_>>();
+        let mut agents = Vec::with_capacity(sessions.len());
+        for session in sessions {
+            let snapshot = self.refresh_session_snapshot(&session)?;
+            if snapshot.status.is_disconnected() {
+                continue;
+            }
+            agents.push(session.inspect_snapshot());
+        }
         agents.sort_by(|a, b| {
             b.last_update_at
                 .cmp(&a.last_update_at)
                 .then_with(|| a.acp_id.cmp(&b.acp_id))
         });
-        AcpAgentInspectResponse {
+        Ok(AcpAgentInspectResponse {
             agents,
             available: true,
             issue_message: None,
-        }
+        })
     }
 
     /// Load one ACP session snapshot.
@@ -315,26 +320,19 @@ impl AcpAgentManagerHandle {
             return self.get_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
-        Ok(self.refresh_session_snapshot(&session))
+        self.refresh_session_snapshot(&session)
     }
 
     /// Stop an ACP session and fail every pending permission with daemon shutdown.
     ///
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
-    ///
-    /// # Panics
-    /// Panics if the ACP process lifecycle mutex is poisoned.
     pub fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
         if service::sandboxed_from_env() {
             return self.stop_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
-        let _lifecycle = self
-            .state
-            .process_lifecycle
-            .lock()
-            .expect("ACP process lifecycle lock");
+        let _lifecycle = self.process_lifecycle_guard()?;
         let before = session.snapshot_with_live_counts();
         if before.status.is_disconnected() {
             return Ok(before);
@@ -345,7 +343,7 @@ impl AcpAgentManagerHandle {
         })?;
         if session.process().logical_session_count() == 0 {
             session.terminate_process(pending_permissions);
-            self.remove_process_if_empty(&process_key);
+            self.remove_process_if_empty(&process_key)?;
         }
         let snapshot = session.snapshot_with_live_counts();
         self.sync_orchestration_disconnect_best_effort(&snapshot);
@@ -355,63 +353,66 @@ impl AcpAgentManagerHandle {
 
     /// Fail all live ACP sessions for daemon shutdown.
     ///
-    /// # Panics
-    /// Panics if the ACP sessions mutex is poisoned.
-    pub fn shutdown_all(&self) {
+    /// # Errors
+    /// Returns [`CliError`] when the live ACP registry cannot be drained
+    /// cleanly during daemon shutdown.
+    pub fn shutdown_all(&self) -> Result<(), CliError> {
         if service::sandboxed_from_env() {
             Self::shutdown_all_via_bridge();
-            return;
+            return Ok(());
         }
-        let sessions: Vec<_> = self
-            .state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .values()
-            .cloned()
-            .collect();
+        let _lifecycle = self.process_lifecycle_guard()?;
+        self.state.shutdown_requested.store(true, Ordering::SeqCst);
+        let sessions: Vec<_> = self.sessions_guard()?.values().cloned().collect();
         for session in sessions {
-            let _lifecycle = self
-                .state
-                .process_lifecycle
-                .lock()
-                .expect("ACP process lifecycle lock");
             let process_key = session.process_key();
             let pending_permissions = session.disconnect(DisconnectReason::DaemonShutdown, false);
             let snapshot = session.snapshot_with_live_counts();
             self.sync_orchestration_disconnect_best_effort(&snapshot);
             if session.process().logical_session_count() == 0 {
                 session.terminate_process(pending_permissions);
-                self.remove_process_if_empty(&process_key);
+                self.remove_process_if_empty(&process_key)?;
             }
         }
+        Ok(())
+    }
+
+    pub(in crate::daemon::agent_acp) fn start_requested_after_shutdown(&self) -> bool {
+        self.state.shutdown_requested.load(Ordering::SeqCst)
     }
 
     pub(in crate::daemon::agent_acp) fn disconnect_forwarded_session(
         &self,
         active: &Weak<ActiveAcpSession>,
         reason: DisconnectReason,
-    ) {
+    ) -> Result<(), CliError> {
         let Some(session) = active.upgrade() else {
-            return;
+            return Ok(());
         };
         let (snapshot, incidents) = {
-            let _lifecycle = self
-                .state
-                .process_lifecycle
-                .lock()
-                .expect("ACP process lifecycle lock");
+            let _lifecycle = self.process_lifecycle_guard()?;
+            let before = session.snapshot_with_live_counts();
+            if before.status.is_disconnected() {
+                return Ok(());
+            }
             session.refresh();
-            let pending_permissions = session.disconnect(reason, false);
+            let mut snapshot = session.snapshot_with_live_counts();
+            let pending_permissions = if snapshot.status.is_disconnected() {
+                0
+            } else {
+                let pending_permissions = session.disconnect(reason, false);
+                snapshot = session.snapshot_with_live_counts();
+                pending_permissions
+            };
             let process_key = session.process_key();
-            let snapshot = session.snapshot_with_live_counts();
-            let incidents = process_incident_from_snapshot(&snapshot)
-                .map_or_else(Vec::new, |event| {
-                    self.process_fault_events_locked(&snapshot, event)
-                });
+            let incidents = if let Some(event) = process_incident_from_snapshot(&snapshot) {
+                self.process_fault_events_locked(&snapshot, event)?
+            } else {
+                Vec::new()
+            };
             if session.process().logical_session_count() == 0 {
                 session.terminate_process(pending_permissions);
-                self.remove_process_if_empty(&process_key);
+                self.remove_process_if_empty(&process_key)?;
             }
             (snapshot, incidents)
         };
@@ -426,6 +427,7 @@ impl AcpAgentManagerHandle {
             session_id: Some(snapshot.session_id),
             payload,
         });
+        Ok(())
     }
 
     /// Count ACP sessions that are still live after a refresh pass.
@@ -433,79 +435,61 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the sandbox bridge inspect call fails.
     ///
-    /// # Panics
-    /// Panics if the ACP sessions mutex is poisoned.
     pub fn count_live_sessions(&self) -> Result<usize, CliError> {
         if service::sandboxed_from_env() {
             return Self::live_session_count_via_bridge();
         }
-        Ok(self
-            .state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .values()
-            .filter(|session| {
-                !self
-                    .refresh_session_snapshot(session)
-                    .status
-                    .is_disconnected()
-            })
-            .count())
-    }
-
-    fn refresh_session_snapshot(&self, session: &Arc<ActiveAcpSession>) -> AcpAgentSnapshot {
-        let before = session.snapshot_with_live_counts();
-        session.refresh();
-        let after = session.snapshot_with_live_counts();
-        if !before.status.is_disconnected() && after.status.is_disconnected() {
-            self.sync_orchestration_disconnect_best_effort(&after);
-        }
-        if !before.status.is_disconnected()
-            && after.status.is_disconnected()
-            && let Some(event) = process_incident_from_snapshot(&after)
-        {
-            for event in self.process_fault_events(&after, event) {
-                let _ = self.state.sender.send(event);
+        let sessions: Vec<_> = self.sessions_guard()?.values().cloned().collect();
+        let mut live = 0;
+        for session in sessions {
+            if !self
+                .refresh_session_snapshot(&session)?
+                .status
+                .is_disconnected()
+            {
+                live += 1;
             }
         }
-        after
+        Ok(live)
     }
 
-    pub(in crate::daemon::agent_acp) fn ensure_process_key_start_allowed(
+    fn refresh_session_snapshot(
         &self,
-        process_key: &str,
-    ) -> Result<(), CliError> {
-        if let Some(until) = self
-            .state
-            .process_key_backoff_until
-            .lock()
-            .expect("ACP process key backoff lock")
-            .get(process_key)
-            .copied()
-            && until > Instant::now()
-        {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "ACP process key is in backoff after recent faults: {process_key}"
-            ))
-            .into());
+        session: &Arc<ActiveAcpSession>,
+    ) -> Result<AcpAgentSnapshot, CliError> {
+        let (after, incidents, disconnected) = {
+            let _lifecycle = self.process_lifecycle_guard()?;
+            let before = session.snapshot_with_live_counts();
+            if before.status.is_disconnected() {
+                return Ok(before);
+            }
+            session.refresh();
+            let after = session.snapshot_with_live_counts();
+            let disconnected = after.status.is_disconnected();
+            let incidents =
+                if disconnected && let Some(event) = process_incident_from_snapshot(&after) {
+                    self.process_fault_events_locked(&after, event)?
+                } else {
+                    Vec::new()
+                };
+            (after, incidents, disconnected)
+        };
+        if disconnected {
+            self.sync_orchestration_disconnect_best_effort(&after);
         }
-        if self
-            .state
-            .quarantined_process_keys
-            .lock()
-            .expect("ACP quarantined process keys lock")
-            .contains(process_key)
-        {
-            return Err(CliErrorKind::session_agent_conflict(format!(
-                "ACP process key is quarantined after repeated faults: {process_key}"
-            ))
-            .into());
+        for event in incidents {
+            let _ = self.state.sender.send(event);
         }
-        Ok(())
+        Ok(after)
     }
 }
 
+#[cfg(test)]
+mod disconnect_tests;
+#[cfg(test)]
+mod lock_recovery_tests;
+#[cfg(test)]
+mod multiplexing_fault_tests;
 #[cfg(test)]
 mod multiplexing_tests;
 #[cfg(test)]

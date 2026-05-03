@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::{Child, ExitStatus};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -67,53 +67,38 @@ impl ActiveAcpProcess {
     }
 
     pub(super) fn set_protocol_disconnect_task(&self, task: JoinHandle<()>) {
-        *self
-            .protocol_disconnect_task
-            .lock()
-            .expect("ACP protocol disconnect task lock") = Some(task);
+        *recover_lock(
+            &self.protocol_disconnect_task,
+            "ACP protocol disconnect task lock",
+        ) = Some(task);
     }
 
     pub(super) fn set_watchdog_task(&self, task: JoinHandle<()>) {
-        *self.watchdog_task.lock().expect("ACP watchdog task lock") = Some(task);
+        *recover_lock(&self.watchdog_task, "ACP watchdog task lock") = Some(task);
     }
 
     pub(super) fn add_logical_session(&self, acp_id: &str) {
-        self.logical_acp_ids
-            .lock()
-            .expect("ACP process logical session lock")
+        recover_lock(&self.logical_acp_ids, "ACP process logical session lock")
             .insert(acp_id.to_string());
     }
 
     pub(super) fn remove_logical_session(&self, acp_id: &str) {
-        self.logical_acp_ids
-            .lock()
-            .expect("ACP process logical session lock")
-            .remove(acp_id);
+        recover_lock(&self.logical_acp_ids, "ACP process logical session lock").remove(acp_id);
     }
 
     pub(in crate::daemon::agent_acp) fn logical_session_count(&self) -> usize {
-        self.logical_acp_ids
-            .lock()
-            .expect("ACP process logical session lock")
-            .len()
+        recover_lock(&self.logical_acp_ids, "ACP process logical session lock").len()
     }
 
     pub(super) fn refresh_disconnect_reason(&self) -> Option<DisconnectReason> {
-        if let Some(reason) = self
-            .disconnect_reason
-            .lock()
-            .expect("ACP process disconnect lock")
-            .clone()
+        if let Some(reason) =
+            recover_lock(&self.disconnect_reason, "ACP process disconnect lock").clone()
         {
             return Some(reason);
         }
-        let mut child_guard = self.child.lock().expect("ACP child lock");
+        let mut child_guard = recover_lock(&self.child, "ACP child lock");
         let Some(child) = child_guard.as_mut() else {
-            return self
-                .disconnect_reason
-                .lock()
-                .expect("ACP process disconnect lock")
-                .clone();
+            return recover_lock(&self.disconnect_reason, "ACP process disconnect lock").clone();
         };
         let Ok(Some(status)) = child.try_wait() else {
             return None;
@@ -122,24 +107,18 @@ impl ActiveAcpProcess {
         drop(child_guard.take());
         self.abort_non_protocol_tasks();
         self.supervisor.mark_done();
-        *self
-            .disconnect_reason
-            .lock()
-            .expect("ACP process disconnect lock") = Some(reason.clone());
+        *recover_lock(&self.disconnect_reason, "ACP process disconnect lock") =
+            Some(reason.clone());
         Some(reason)
     }
 
     pub(super) fn kill_child(&self, pending_permissions: usize) {
-        let mut child = self.child.lock().expect("ACP child lock");
+        let mut child = recover_lock(&self.child, "ACP child lock");
         if let Some(mut child) = child.take() {
-            let pgid = self.supervisor.pgid();
-            let handle = thread::spawn(move || {
-                if pending_permissions > 0 {
-                    thread::sleep(PERMISSION_SHUTDOWN_FLUSH_GRACE);
-                }
-                kill_process_group(pgid, &mut child);
-            });
-            let _ = handle.join();
+            if pending_permissions > 0 {
+                thread::sleep(PERMISSION_SHUTDOWN_FLUSH_GRACE);
+            }
+            kill_process_group(self.supervisor.pgid(), &mut child);
         }
     }
 
@@ -161,6 +140,24 @@ impl ActiveAcpProcess {
     pub(super) fn request_cancel(&self) {
         self.protocol_handle.cancel();
         thread::sleep(PROTOCOL_CANCEL_FLUSH_GRACE);
+    }
+
+    pub(super) fn shutdown(&self, pending_permissions: usize) {
+        if self.logical_session_count() > 0 {
+            self.request_cancel();
+        }
+        self.abort_tasks();
+        self.kill_child(pending_permissions);
+        self.stderr_tail.shutdown();
+    }
+
+    pub(super) fn shutdown_immediate(&self) {
+        if self.logical_session_count() > 0 {
+            self.protocol_handle.cancel();
+        }
+        self.abort_tasks();
+        self.kill_child(0);
+        self.stderr_tail.shutdown();
     }
 
     pub(super) fn attach_protocol_session(
@@ -201,18 +198,36 @@ impl ActiveAcpProcess {
 
 impl Drop for ActiveAcpProcess {
     fn drop(&mut self) {
-        if self.logical_session_count() > 0 {
-            self.request_cancel();
-        }
-        self.abort_tasks();
-        self.kill_child(0);
+        // Graceful teardown belongs to the explicit shutdown path. Drop keeps a
+        // best-effort immediate cleanup fallback so leaked sessions do not keep
+        // child processes alive.
+        self.shutdown_immediate();
     }
 }
 
 fn abort_task(task: &Mutex<Option<JoinHandle<()>>>, lock_name: &str) {
-    if let Some(task) = task.lock().expect(lock_name).take() {
+    if let Some(task) = recover_lock(task, lock_name).take() {
         task.abort();
     }
+}
+
+fn recover_lock<'a, T>(mutex: &'a Mutex<T>, lock_name: &str) -> MutexGuard<'a, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(error) => recover_poisoned_lock(error, lock_name),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn recover_poisoned_lock<'a, T>(
+    error: PoisonError<MutexGuard<'a, T>>,
+    lock_name: &str,
+) -> MutexGuard<'a, T> {
+    tracing::warn!(%error, lock = lock_name, "recovering poisoned ACP process lock");
+    error.into_inner()
 }
 
 fn process_exit_reason(status: ExitStatus) -> DisconnectReason {

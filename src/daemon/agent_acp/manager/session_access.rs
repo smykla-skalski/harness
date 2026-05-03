@@ -39,7 +39,7 @@ impl AcpAgentManagerHandle {
         if service::sandboxed_from_env() {
             return self.pending_permission_count_via_bridge(acp_id);
         }
-        let sessions = self.state.sessions.lock().ok()?;
+        let sessions = self.sessions_guard().ok()?;
         sessions
             .get(acp_id)
             .map(|session| session.pending_permission_count())
@@ -51,32 +51,27 @@ impl AcpAgentManagerHandle {
         if service::sandboxed_from_env() {
             return self.pending_permission_batches_via_bridge(acp_id);
         }
-        let sessions = self.state.sessions.lock().ok()?;
+        let sessions = self.sessions_guard().ok()?;
         sessions
             .get(acp_id)
             .map(|session| session.pending_permission_batches())
     }
 
     pub(super) fn session(&self, acp_id: &str) -> Result<Arc<ActiveAcpSession>, CliError> {
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
-            .get(acp_id)
-            .cloned()
-            .ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("ACP session '{acp_id}' not found")).into()
-            })
+        self.sessions_guard()?.get(acp_id).cloned().ok_or_else(|| {
+            CliErrorKind::session_not_active(format!("ACP session '{acp_id}' not found")).into()
+        })
     }
 
-    pub(super) fn sessions_for(&self, session_id: &str) -> Vec<Arc<ActiveAcpSession>> {
-        self.state
-            .sessions
-            .lock()
-            .expect("ACP sessions lock")
+    pub(super) fn sessions_for(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<Arc<ActiveAcpSession>>, CliError> {
+        Ok(self
+            .sessions_guard()?
             .values()
             .filter(|session| session.session_id() == session_id)
             .cloned()
-            .collect()
+            .collect())
     }
 }

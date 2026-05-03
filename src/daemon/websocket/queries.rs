@@ -60,8 +60,13 @@ fn dispatch_config_query(request_id: &str) -> WsResponse {
 }
 
 fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    state.acp_agent_manager.shutdown_all();
-    dispatch_query(request_id, service::request_shutdown)
+    dispatch_query_result(
+        request_id,
+        state
+            .acp_agent_manager
+            .shutdown_all()
+            .and_then(|()| service::request_shutdown()),
+    )
 }
 
 async fn dispatch_session_read_query(
@@ -261,7 +266,7 @@ fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> W
     let session_id = extract_string_param(&request.params, "session_id");
     dispatch_query_result(
         &request.id,
-        Ok(state.acp_agent_manager.inspect(session_id.as_deref())),
+        state.acp_agent_manager.inspect(session_id.as_deref()),
     )
 }
 

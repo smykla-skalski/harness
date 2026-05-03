@@ -9,7 +9,7 @@ use super::{
 };
 use crate::agents::kind::DisconnectReason;
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::{AgentStatus, ManagedAgentRef};
+use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
 
 impl AcpAgentManagerHandle {
     pub(in crate::daemon::agent_acp) fn register_orchestration_agent(
@@ -22,9 +22,7 @@ impl AcpAgentManagerHandle {
         agent_session_id: Option<&str>,
     ) -> Result<AcpOrchestrationRegistration, CliError> {
         let db = self.db()?;
-        let db = db.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
-        })?;
+        let db = Self::daemon_db_guard(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
             return Err(service::session_not_found(session_id));
         };
@@ -54,6 +52,13 @@ impl AcpAgentManagerHandle {
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
+        log_registered_orchestration_agent(
+            session_id,
+            acp_id,
+            &agent_id,
+            &descriptor.id,
+            agent_session_id,
+        );
         Ok(AcpOrchestrationRegistration {
             agent_id,
             display_name: display_name.to_string(),
@@ -68,9 +73,7 @@ impl AcpAgentManagerHandle {
         agent_session_id: &str,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = db.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
-        })?;
+        let db = Self::daemon_db_guard(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
             return Ok(false);
         };
@@ -83,6 +86,7 @@ impl AcpAgentManagerHandle {
             &now,
         )?;
         if !registered {
+            log_skipped_runtime_bind(session_id, acp_id, runtime_name, agent_session_id);
             return Ok(false);
         }
         let project_id = db
@@ -91,7 +95,74 @@ impl AcpAgentManagerHandle {
         db.save_session_state(&project_id, &state)?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
+        log_bound_runtime_session(session_id, acp_id, runtime_name, agent_session_id);
         Ok(true)
+    }
+
+    pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        agent_id: &str,
+        reason_label: &str,
+    ) -> Result<bool, CliError> {
+        let db = self.db()?;
+        let db = Self::daemon_db_guard(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Ok(false);
+        };
+        if !should_rollback_incomplete_registration(&state, acp_id, agent_id) {
+            return Ok(false);
+        }
+        let now = utc_now();
+        if !orchestration_service::apply_rollback_joined_agent(&mut state, agent_id, &now) {
+            return Ok(false);
+        }
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&service::build_log_entry(
+            session_id,
+            orchestration_service::log_agent_disconnected(agent_id, reason_label),
+            None,
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        log_rolled_back_incomplete_registration(session_id, acp_id, agent_id, reason_label);
+        Ok(true)
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration_best_effort(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        agent_id: &str,
+        reason_label: &str,
+    ) {
+        match self.rollback_orchestration_registration(session_id, acp_id, agent_id, reason_label) {
+            Ok(true) => {}
+            Ok(false) => tracing::debug!(
+                session_id,
+                acp_id,
+                agent_id,
+                reason = reason_label,
+                "skipped ACP orchestration rollback because registration was already complete or missing"
+            ),
+            Err(error) => tracing::warn!(
+                session_id,
+                acp_id,
+                agent_id,
+                reason = reason_label,
+                %error,
+                "failed to roll back ACP orchestration registration after startup error"
+            ),
+        }
     }
 
     pub(in crate::daemon::agent_acp) async fn bind_orchestration_runtime_session_async(
@@ -166,21 +237,27 @@ impl AcpAgentManagerHandle {
         stderr_tail: Option<&String>,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = db.lock().map_err(|error| {
-            CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}"))
-        })?;
+        let db = Self::daemon_db_guard(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(&snapshot.session_id)? else {
             return Ok(false);
         };
         let now = utc_now();
-        let disconnected = orchestration_service::apply_agent_disconnected_with_reason(
-            &mut state,
-            &snapshot.agent_id,
-            reason.clone(),
-            stderr_tail.cloned(),
-            &now,
-        );
-        if !disconnected {
+        let rolled_back =
+            should_rollback_incomplete_registration(&state, &snapshot.acp_id, &snapshot.agent_id)
+                && orchestration_service::apply_rollback_joined_agent(
+                    &mut state,
+                    &snapshot.agent_id,
+                    &now,
+                );
+        if !rolled_back
+            && !orchestration_service::apply_agent_disconnected_with_reason(
+                &mut state,
+                &snapshot.agent_id,
+                reason.clone(),
+                stderr_tail.cloned(),
+                &now,
+            )
+        {
             return Ok(false);
         }
         let project_id = db
@@ -198,6 +275,14 @@ impl AcpAgentManagerHandle {
         ))?;
         db.bump_change(&snapshot.session_id)?;
         db.bump_change("global")?;
+        if rolled_back {
+            log_rolled_back_incomplete_registration(
+                &snapshot.session_id,
+                &snapshot.acp_id,
+                &snapshot.agent_id,
+                disconnect_reason_label(reason),
+            );
+        }
         Ok(true)
     }
 
@@ -226,6 +311,95 @@ fn disconnected_status_parts(
 
 fn disconnect_reason_label(reason: &DisconnectReason) -> &'static str {
     reason.log_label()
+}
+
+fn should_rollback_incomplete_registration(
+    state: &SessionState,
+    acp_id: &str,
+    agent_id: &str,
+) -> bool {
+    state.agents.get(agent_id).is_some_and(|agent| {
+        agent.managed_agent.as_ref() == Some(&ManagedAgentRef::acp(acp_id))
+            && agent.agent_session_id.is_none()
+    })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in leaf logging helper"
+)]
+fn log_registered_orchestration_agent(
+    session_id: &str,
+    acp_id: &str,
+    agent_id: &str,
+    runtime_name: &str,
+    agent_session_id: Option<&str>,
+) {
+    tracing::info!(
+        session_id,
+        acp_id,
+        agent_id,
+        runtime_name,
+        runtime_session_bound = agent_session_id.is_some(),
+        "registered ACP orchestration agent"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in leaf logging helper"
+)]
+fn log_bound_runtime_session(
+    session_id: &str,
+    acp_id: &str,
+    runtime_name: &str,
+    agent_session_id: &str,
+) {
+    tracing::info!(
+        session_id,
+        acp_id,
+        runtime_name,
+        runtime_session_id = agent_session_id,
+        "bound ACP runtime session into orchestration"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in leaf logging helper"
+)]
+fn log_skipped_runtime_bind(
+    session_id: &str,
+    acp_id: &str,
+    runtime_name: &str,
+    agent_session_id: &str,
+) {
+    tracing::debug!(
+        session_id,
+        acp_id,
+        runtime_name,
+        runtime_session_id = agent_session_id,
+        "skipped ACP runtime bind because orchestration registration was missing or unchanged"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in leaf logging helper"
+)]
+fn log_rolled_back_incomplete_registration(
+    session_id: &str,
+    acp_id: &str,
+    agent_id: &str,
+    reason_label: &str,
+) {
+    tracing::warn!(
+        session_id,
+        acp_id,
+        agent_id,
+        reason = reason_label,
+        "rolled back incomplete ACP orchestration registration"
+    );
 }
 
 #[expect(

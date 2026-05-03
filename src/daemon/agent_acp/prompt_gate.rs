@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct PromptOwner {
@@ -41,7 +41,7 @@ impl PromptBusy {
 
 impl PromptGate {
     pub(super) fn acquire(&self, owner: PromptOwner) -> Result<PromptLease, PromptBusy> {
-        let mut guard = self.owner.lock().expect("ACP prompt gate lock");
+        let mut guard = recover_lock(&self.owner);
         if let Some(existing) = guard.clone() {
             return Err(PromptBusy { owner: existing });
         }
@@ -53,11 +53,29 @@ impl PromptGate {
     }
 
     fn release(&self, owner: &PromptOwner) {
-        let mut guard = self.owner.lock().expect("ACP prompt gate lock");
+        let mut guard = recover_lock(&self.owner);
         if guard.as_ref() == Some(owner) {
             *guard = None;
         }
     }
+}
+
+fn recover_lock(owner: &Mutex<Option<PromptOwner>>) -> MutexGuard<'_, Option<PromptOwner>> {
+    match owner.lock() {
+        Ok(guard) => guard,
+        Err(error) => recover_poisoned_lock(error),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn recover_poisoned_lock(
+    error: PoisonError<MutexGuard<'_, Option<PromptOwner>>>,
+) -> MutexGuard<'_, Option<PromptOwner>> {
+    tracing::warn!(%error, "recovering poisoned ACP prompt gate lock");
+    error.into_inner()
 }
 
 impl Drop for PromptLease {
