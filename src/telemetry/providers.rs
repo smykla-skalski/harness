@@ -6,8 +6,12 @@ use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig, WithTonicCo
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::error::OTelSdkResult;
 use opentelemetry_sdk::logs::{LogBatch, LogExporter as SdkLogExporter, SdkLoggerProvider};
-use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
+use opentelemetry_sdk::metrics::data::ResourceMetrics;
+use opentelemetry_sdk::metrics::exporter::PushMetricExporter as SdkPushMetricExporter;
+use opentelemetry_sdk::metrics::{SdkMeterProvider, Temporality};
+use opentelemetry_sdk::trace::{
+    RandomIdGenerator, Sampler, SdkTracerProvider, SpanData, SpanExporter as SdkSpanExporter,
+};
 use std::future::{Future, ready};
 use std::time::Duration;
 
@@ -20,11 +24,12 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::config::{ExportProtocol, ResolvedTelemetryConfig, RuntimeService};
 
-// BatchLogProcessor spawns a plain OS thread and calls
-// `futures_executor::block_on(exporter.export(batch))`.  Tonic channels require a
-// tokio reactor, so that call panics.  This wrapper captures the runtime handle and
-// runs the inner export on it via `handle.block_on`, which is safe from non-tokio
-// threads.  It returns an already-resolved `Ready` future so the outer
+// BatchLogProcessor / BatchSpanProcessor / PeriodicReader each spawn a plain OS
+// thread and call `futures_executor::block_on(exporter.export(...))`.  Tonic
+// channels require a tokio reactor, so that call panics with
+// "there is no reactor running".  These wrappers capture the runtime handle and
+// run the inner export on it via `handle.block_on`, which is safe from non-tokio
+// threads.  They return an already-resolved `Ready` future so the outer
 // `futures_executor::block_on` has nothing to drive itself.
 #[derive(Debug)]
 struct TokioLogExporter<E> {
@@ -33,23 +38,67 @@ struct TokioLogExporter<E> {
 }
 
 impl<E: SdkLogExporter> SdkLogExporter for TokioLogExporter<E> {
-    fn export(
-        &self,
-        batch: LogBatch<'_>,
-    ) -> impl Future<Output = OTelSdkResult> + Send {
+    fn export(&self, batch: LogBatch<'_>) -> impl Future<Output = OTelSdkResult> + Send {
         let result = self.handle.block_on(self.inner.export(batch));
         ready(result)
     }
 
-    fn shutdown_with_timeout(
-        &self,
-        timeout: Duration,
-    ) -> OTelSdkResult {
+    fn shutdown_with_timeout(&self, timeout: Duration) -> OTelSdkResult {
         self.inner.shutdown_with_timeout(timeout)
     }
 
     fn set_resource(&mut self, resource: &Resource) {
         self.inner.set_resource(resource);
+    }
+}
+
+#[derive(Debug)]
+struct TokioSpanExporter<E> {
+    inner: E,
+    handle: TokioHandle,
+}
+
+impl<E: SdkSpanExporter> SdkSpanExporter for TokioSpanExporter<E> {
+    fn export(&self, batch: Vec<SpanData>) -> impl Future<Output = OTelSdkResult> + Send {
+        let result = self.handle.block_on(self.inner.export(batch));
+        ready(result)
+    }
+
+    fn shutdown_with_timeout(&mut self, timeout: Duration) -> OTelSdkResult {
+        self.inner.shutdown_with_timeout(timeout)
+    }
+
+    fn force_flush(&mut self) -> OTelSdkResult {
+        self.inner.force_flush()
+    }
+
+    fn set_resource(&mut self, resource: &Resource) {
+        self.inner.set_resource(resource);
+    }
+}
+
+#[derive(Debug)]
+struct TokioMetricExporter<E> {
+    inner: E,
+    handle: TokioHandle,
+}
+
+impl<E: SdkPushMetricExporter> SdkPushMetricExporter for TokioMetricExporter<E> {
+    fn export(&self, metrics: &ResourceMetrics) -> impl Future<Output = OTelSdkResult> + Send {
+        let result = self.handle.block_on(self.inner.export(metrics));
+        ready(result)
+    }
+
+    fn force_flush(&self) -> OTelSdkResult {
+        self.inner.force_flush()
+    }
+
+    fn shutdown_with_timeout(&self, timeout: Duration) -> OTelSdkResult {
+        self.inner.shutdown_with_timeout(timeout)
+    }
+
+    fn temporality(&self) -> Temporality {
+        self.inner.temporality()
     }
 }
 
@@ -137,11 +186,15 @@ fn build_tracer_provider(
         }
     };
 
+    let handle = TokioHandle::current();
     Ok(SdkTracerProvider::builder()
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::AlwaysOn)))
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource)
-        .with_batch_exporter(exporter)
+        .with_batch_exporter(TokioSpanExporter {
+            inner: exporter,
+            handle,
+        })
         .build())
 }
 
@@ -181,9 +234,13 @@ fn build_meter_provider(
         }
     };
 
+    let handle = TokioHandle::current();
     Ok(SdkMeterProvider::builder()
         .with_resource(resource)
-        .with_periodic_exporter(exporter)
+        .with_periodic_exporter(TokioMetricExporter {
+            inner: exporter,
+            handle,
+        })
         .build())
 }
 
