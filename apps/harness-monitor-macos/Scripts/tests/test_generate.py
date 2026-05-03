@@ -18,11 +18,30 @@ SWIFT_TOOL_ENV_SOURCE = APP_ROOT / "Scripts" / "lib" / "swift-tool-env.sh"
 NON_INDEXABLE_ROOTS_SOURCE = APP_ROOT / "Scripts" / "lib" / "non-indexable-roots.sh"
 XCODE_VERSION_SOURCE = APP_ROOT / "Scripts" / "lib" / "xcode-version.sh"
 RUNTIME_PROFILE_SOURCE = APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh"
+AGENT_SESSION_ENV_KEYS = (
+    "HARNESS_AGENT_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CLAUDE_SESSION_ID",
+    "GEMINI_SESSION_ID",
+    "COPILOT_SESSION_ID",
+    "OPENCODE_SESSION_ID",
+    "VIBE_SESSION_ID",
+)
 
 
 def write_executable(path: Path, content: str) -> None:
     path.write_text(content)
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+def base_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in AGENT_SESSION_ENV_KEYS:
+        env.pop(key, None)
+    env.pop("HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE", None)
+    env.pop("HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE", None)
+    return env
 
 
 class GenerateScriptTests(unittest.TestCase):
@@ -64,7 +83,7 @@ class GenerateScriptTests(unittest.TestCase):
                 "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n",
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "CAPTURED_TUIST_ENV": str(captured_env_path),
@@ -154,7 +173,7 @@ class GenerateScriptTests(unittest.TestCase):
             for output in outputs:
                 os.utime(output, (fresh_timestamp, fresh_timestamp))
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "PATH": "/usr/bin:/bin",
@@ -209,7 +228,7 @@ class GenerateScriptTests(unittest.TestCase):
                 "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n",
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "CAPTURED_TUIST_ARGS": str(captured_args_path),
@@ -305,7 +324,7 @@ class GenerateScriptTests(unittest.TestCase):
                 (fresh_pbxproj_timestamp, fresh_pbxproj_timestamp),
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "CAPTURED_TUIST_ARGS": str(captured_args_path),
@@ -373,7 +392,7 @@ class GenerateScriptTests(unittest.TestCase):
                 plistlib.dumps(ui_test_host_entitlements)
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
@@ -488,7 +507,7 @@ class GenerateScriptTests(unittest.TestCase):
                 plistlib.dumps(ui_test_host_entitlements)
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
@@ -610,7 +629,7 @@ class GenerateScriptTests(unittest.TestCase):
                 f"{saved_profile_root}\n"
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
@@ -772,7 +791,7 @@ class GenerateScriptTests(unittest.TestCase):
             pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
             pbxproj_path.write_text(user_pbxproj_marker)
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
@@ -943,7 +962,7 @@ class GenerateScriptTests(unittest.TestCase):
                 "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
             )
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "CAPTURED_TUIST_ARGS": str(captured_args_path),
