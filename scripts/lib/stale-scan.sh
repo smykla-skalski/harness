@@ -229,6 +229,56 @@ stale_scan_pid_runtime_profile() {
   printf '%s\n' "$profile"
 }
 
+stale_scan_pid_harness_lock_paths() {
+  local pid="$1"
+  lsof -a -p "$pid" -Fn 2>/dev/null \
+    | sed -n 's/^n//p' \
+    | awk '/(^|\/)harness\/daemon\/(daemon|bridge)\.lock$/ { print }'
+}
+
+stale_scan_pid_holds_harness_lock() {
+  local pid="$1"
+  local lock_path
+  while IFS= read -r lock_path; do
+    [[ -n "$lock_path" ]] || continue
+    return 0
+  done < <(stale_scan_pid_harness_lock_paths "$pid")
+  return 1
+}
+
+# Cargo-built harness daemon/bridge processes are only stale "orphans" when
+# they are no longer anchoring a real Harness daemon/bridge root. Live bridges
+# started through `monitor:user:bridge:start` still match the build bucket, but
+# they must survive clean:stale while holding their lock.
+stale_scan_orphan_harness_build_pids() {
+  local pid
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    if stale_scan_pid_holds_harness_lock "$pid"; then
+      continue
+    fi
+    echo "$pid"
+  done < <(stale_scan_matching_pids build)
+}
+
+stale_scan_live_lock_holder_is_stale() {
+  local pid="$1"
+  local profile
+  profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
+  [[ -z "$profile" ]]
+}
+
+stale_scan_root_conflicting_lock_holder_pids() {
+  local root="$1"
+  local pid
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    if stale_scan_live_lock_holder_is_stale "$pid"; then
+      echo "$pid"
+    fi
+  done < <(stale_scan_root_lock_holder_pids "$root")
+}
+
 stale_scan_gate_pid_conflicts_with_current_lane() {
   local pid="$1"
   local current_profile pid_profile
