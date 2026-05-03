@@ -39,6 +39,9 @@ public struct ContentDetailColumn: View {
   public let contentSession: HarnessMonitorStore.ContentSessionSlice
   public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  public let primaryContentFocusScope: Namespace.ID?
+  public let primaryContentPagingResponderRequest: Int
+  public let primaryContentFocusTarget: SessionContentPrimaryFocusTarget
   public let toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
 
   public init(
@@ -50,6 +53,9 @@ public struct ContentDetailColumn: View {
     contentSession: HarnessMonitorStore.ContentSessionSlice,
     contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    primaryContentFocusTarget: SessionContentPrimaryFocusTarget,
     toolbarGlassReproConfiguration: ToolbarGlassReproConfiguration
   ) {
     self.store = store
@@ -60,6 +66,9 @@ public struct ContentDetailColumn: View {
     self.contentSession = contentSession
     self.contentSessionDetail = contentSessionDetail
     self.dashboardUI = dashboardUI
+    self.primaryContentFocusScope = primaryContentFocusScope
+    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
+    self.primaryContentFocusTarget = primaryContentFocusTarget
     self.toolbarGlassReproConfiguration = toolbarGlassReproConfiguration
   }
 
@@ -127,6 +136,9 @@ public struct ContentDetailColumn: View {
     SessionContentContainer(
       store: store,
       dashboardUI: dashboardUI,
+      primaryContentFocusScope: primaryContentFocusScope,
+      primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+      primaryContentFocusTarget: primaryContentFocusTarget,
       state: SessionContentState(
         detail: contentSessionDetail.presentedSessionDetail,
         summary: contentSession.selectedSessionSummary,

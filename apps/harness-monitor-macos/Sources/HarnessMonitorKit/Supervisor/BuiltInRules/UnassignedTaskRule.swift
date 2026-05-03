@@ -4,6 +4,12 @@ import Foundation
 /// when the session has tasks in `open` while ≥ 1 agent is `active`; cautious default queues a
 /// decision with suggested "Assign to {agentID}" actions.
 public struct UnassignedTaskRule: PolicyRule {
+  private static let payloadEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
   public let id = "unassigned-task"
   public let name = "Unassigned Task"
   public let version = 1
@@ -71,7 +77,7 @@ public struct UnassignedTaskRule: PolicyRule {
     guard ageSeconds > Double(input.thresholdSeconds) else { return nil }
 
     let payload = PolicyAction.DecisionPayload(
-      id: task.id,
+      id: "\(id):\(sessionID):\(task.id)",
       severity: .needsUser,
       ruleID: id,
       sessionID: sessionID,
@@ -118,16 +124,18 @@ public struct UnassignedTaskRule: PolicyRule {
         id: "assign-\(taskID)-\(agent.id)",
         title: "Assign to \(agent.id)",
         kind: .assignTask,
-        payloadJSON: #"{"agentID":"\#(agent.id)","taskID":"\#(taskID)"}"#
+        payloadJSON: encode(UnassignedTaskActionPayload(agentID: agent.id, taskID: taskID))
       )
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
+    return encode(actions, fallback: "[]")
+  }
+
+  private func encode<T: Encodable>(_ value: T, fallback: String = "{}") -> String {
     guard
-      let data = try? encoder.encode(actions),
+      let data = try? Self.payloadEncoder.encode(value),
       let string = String(data: data, encoding: .utf8)
     else {
-      return "[]"
+      return fallback
     }
     return string
   }
@@ -137,4 +145,9 @@ private struct ActionInput {
   let activeAgents: [AgentSnapshot]
   let snapshotID: String
   let thresholdSeconds: Int
+}
+
+private struct UnassignedTaskActionPayload: Encodable {
+  let agentID: String
+  let taskID: String
 }

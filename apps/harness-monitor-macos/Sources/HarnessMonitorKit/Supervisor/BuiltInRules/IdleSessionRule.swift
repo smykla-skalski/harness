@@ -10,6 +10,12 @@ import Foundation
 /// session id, so the executor's cool-down window dedupes repeat ticks until the decision
 /// resolves or the session becomes active again.
 public struct IdleSessionRule: PolicyRule {
+  private static let payloadEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
   public let id = "idle-session"
   public let name = "Idle Session"
   public let version = 1
@@ -79,60 +85,94 @@ public struct IdleSessionRule: PolicyRule {
     idleSeconds: Int
   ) -> PolicyAction.DecisionPayload {
     let summary = "Session \(session.id) has had no activity for over \(idleSeconds)s."
+    let nudgeAgentID = session.agents.min { $0.id < $1.id }?.id
     return PolicyAction.DecisionPayload(
-      id: session.id,
+      id: "\(id):\(session.id)",
       severity: .warn,
       ruleID: id,
       sessionID: session.id,
-      agentID: nil,
+      agentID: nudgeAgentID,
       taskID: nil,
       summary: summary,
-      contextJSON: contextJSON(sessionID: session.id, thresholdSeconds: idleSeconds),
-      suggestedActionsJSON: Self.suggestedActionsJSON
+      contextJSON: contextJSON(
+        sessionID: session.id,
+        agentID: nudgeAgentID,
+        thresholdSeconds: idleSeconds
+      ),
+      suggestedActionsJSON: suggestedActionsJSON(
+        sessionID: session.id,
+        nudgeAgentID: nudgeAgentID
+      )
     )
   }
 
-  private func contextJSON(sessionID: String, thresholdSeconds: Int) -> String {
-    let object: [String: Any] = [
-      "sessionID": sessionID,
-      "ruleID": id,
-      "sessionIdleThreshold": thresholdSeconds,
-    ]
+  private func contextJSON(
+    sessionID: String,
+    agentID: String?,
+    thresholdSeconds: Int
+  ) -> String {
+    encode(
+      IdleSessionContextPayload(
+        sessionID: sessionID,
+        agentID: agentID,
+        ruleID: id,
+        sessionIdleThreshold: thresholdSeconds
+      )
+    )
+  }
+
+  private func suggestedActionsJSON(sessionID: String, nudgeAgentID: String?) -> String {
+    var actions: [SuggestedAction] = []
+    if let nudgeAgentID {
+      actions.append(
+        SuggestedAction(
+          id: "idle-session.nudge.\(nudgeAgentID)",
+          title: "Send check-in nudge",
+          kind: .nudge,
+          payloadJSON: encode(
+            IdleSessionNudgePayload(
+              agentID: nudgeAgentID,
+              input: "Quick check-in from Harness Monitor supervisor for idle session \(sessionID)."
+            )
+          )
+        )
+      )
+    }
+    actions.append(
+      SuggestedAction(
+        id: "idle-session.close.\(sessionID)",
+        title: "Close session",
+        kind: .custom,
+        payloadJSON: encode(IdleSessionCustomPayload(mode: "closeSession", sessionID: sessionID))
+      )
+    )
+    return encode(actions, fallback: "[]")
+  }
+
+  private func encode<T: Encodable>(_ value: T, fallback: String = "{}") -> String {
     guard
-      let data = try? JSONSerialization.data(
-        withJSONObject: object,
-        options: [.sortedKeys]
-      ),
+      let data = try? Self.payloadEncoder.encode(value),
       let string = String(data: data, encoding: .utf8)
     else {
-      return "{}"
+      return fallback
     }
     return string
   }
+}
 
-  private static let suggestedActionsJSON: String = {
-    let actions = [
-      SuggestedAction(
-        id: "idle-session.nudge",
-        title: "Send check-in nudge",
-        kind: .nudge,
-        payloadJSON: "{}"
-      ),
-      SuggestedAction(
-        id: "idle-session.close",
-        title: "Close session",
-        kind: .custom,
-        payloadJSON: "{}"
-      ),
-    ]
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    guard
-      let data = try? encoder.encode(actions),
-      let string = String(data: data, encoding: .utf8)
-    else {
-      return "[]"
-    }
-    return string
-  }()
+private struct IdleSessionContextPayload: Encodable {
+  let sessionID: String
+  let agentID: String?
+  let ruleID: String
+  let sessionIdleThreshold: Int
+}
+
+private struct IdleSessionNudgePayload: Encodable {
+  let agentID: String
+  let input: String
+}
+
+private struct IdleSessionCustomPayload: Encodable {
+  let mode: String
+  let sessionID: String
 }

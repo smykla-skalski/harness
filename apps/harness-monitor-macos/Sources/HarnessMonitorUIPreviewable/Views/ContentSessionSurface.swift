@@ -14,9 +14,18 @@ struct SessionContentState {
   let isExtensionsLoading: Bool
 }
 
+public enum SessionContentPrimaryFocusTarget: String {
+  case dashboard
+  case cockpit
+  case loading
+}
+
 struct SessionContentContainer: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let primaryContentFocusScope: Namespace.ID?
+  let primaryContentPagingResponderRequest: Int
+  let primaryContentFocusTarget: SessionContentPrimaryFocusTarget
   let state: SessionContentState
 
   private var mode: SessionContentMode {
@@ -36,7 +45,10 @@ struct SessionContentContainer: View {
         SessionsBoardView(
           store: store,
           sessionCatalog: store.sessionIndex.catalog,
-          dashboardUI: dashboardUI
+          dashboardUI: dashboardUI,
+          primaryContentFocusScope: primaryContentFocusScope,
+          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+          prefersPrimaryContentFocus: primaryContentFocusTarget == .dashboard
         )
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
@@ -48,10 +60,18 @@ struct SessionContentContainer: View {
           isSessionStatusStale: state.isSessionStatusStale,
           isSessionReadOnly: state.isSessionReadOnly,
           isTimelineLoading: state.isTimelineLoading,
-          isExtensionsLoading: state.isExtensionsLoading
+          isExtensionsLoading: state.isExtensionsLoading,
+          primaryContentFocusScope: primaryContentFocusScope,
+          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+          prefersPrimaryContentFocus: primaryContentFocusTarget == .cockpit
         )
       case .loading(let summary):
-        SessionCockpitLoadingSurface(summary: summary)
+        SessionCockpitLoadingSurface(
+          summary: summary,
+          primaryContentFocusScope: primaryContentFocusScope,
+          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
+          prefersPrimaryContentFocus: primaryContentFocusTarget == .loading
+        )
       }
     }
   }
@@ -66,6 +86,9 @@ private enum SessionContentMode {
 
 private struct SessionCockpitLoadingSurface: View {
   let summary: SessionSummary
+  let primaryContentFocusScope: Namespace.ID?
+  let primaryContentPagingResponderRequest: Int
+  let prefersPrimaryContentFocus: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -81,6 +104,11 @@ private struct SessionCockpitLoadingSurface: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Loading \(summary.displayTitle)")
+    .harnessPrimaryContentFocusTarget(
+      focusScope: primaryContentFocusScope,
+      prefersDefaultFocus: prefersPrimaryContentFocus,
+      pagingResponderRequest: primaryContentPagingResponderRequest
+    )
   }
 }
 
@@ -90,6 +118,9 @@ private struct SessionCockpitLoadingSurface: View {
   SessionContentContainer(
     store: store,
     dashboardUI: store.contentUI.dashboard,
+    primaryContentFocusScope: nil,
+    primaryContentPagingResponderRequest: 0,
+    primaryContentFocusTarget: .dashboard,
     state: .init(
       detail: nil,
       summary: nil,
@@ -112,6 +143,9 @@ private struct SessionCockpitLoadingSurface: View {
   SessionContentContainer(
     store: store,
     dashboardUI: store.contentUI.dashboard,
+    primaryContentFocusScope: nil,
+    primaryContentPagingResponderRequest: 0,
+    primaryContentFocusTarget: .cockpit,
     state: .init(
       detail: store.selectedSession,
       summary: store.selectedSessionSummary,

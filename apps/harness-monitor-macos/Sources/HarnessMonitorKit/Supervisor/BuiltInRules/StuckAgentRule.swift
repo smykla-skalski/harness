@@ -73,8 +73,8 @@ public struct StuckAgentRule: PolicyRule {
       )
     )
 
-    return snapshot.sessions.compactMap { session in
-      action(
+    return snapshot.sessions.flatMap { session in
+      actions(
         for: session,
         snapshot: snapshot,
         context: context,
@@ -83,23 +83,39 @@ public struct StuckAgentRule: PolicyRule {
     }
   }
 
-  private func action(
+  private func actions(
     for session: SessionSnapshot,
     snapshot: SessionsSnapshot,
     context: PolicyContext,
     config: RuleConfig
-  ) -> PolicyAction? {
-    guard
-      let match = firstMatchingAgent(in: session, thresholdSeconds: config.thresholdSeconds)
-    else {
-      return nil
+  ) -> [PolicyAction] {
+    matchingAgents(in: session, thresholdSeconds: config.thresholdSeconds).compactMap { match in
+      action(
+        for: match,
+        sessionID: session.id,
+        snapshot: snapshot,
+        context: context,
+        config: config
+      )
     }
+  }
 
-    let retries = retryState(for: match.agent.id, events: context.history.recentEvents)
+  private func action(
+    for match: MatchedAgentTask,
+    sessionID: String,
+    snapshot: SessionsSnapshot,
+    context: PolicyContext,
+    config: RuleConfig
+  ) -> PolicyAction? {
+    let retries = retryState(
+      for: match.agent.id,
+      events: context.history.recentEvents,
+      since: match.agent.lastActivityAt
+    )
     if retries.attemptCount >= config.maxRetries {
       let action = escalationDecision(
         match: match,
-        sessionID: session.id,
+        sessionID: sessionID,
         thresholdSeconds: config.thresholdSeconds,
         maxRetries: config.maxRetries
       )
@@ -115,17 +131,13 @@ public struct StuckAgentRule: PolicyRule {
       return nil
     }
 
-    let action = nudge(match: match, snapshot: snapshot)
-    guard !context.recentActionKeys.contains(action.actionKey) else {
-      return nil
-    }
-    return action
+    return nudge(match: match, snapshot: snapshot)
   }
 
-  private func firstMatchingAgent(
+  private func matchingAgents(
     in session: SessionSnapshot,
     thresholdSeconds: Int
-  ) -> MatchedAgentTask? {
+  ) -> [MatchedAgentTask] {
     let tasksByID = Dictionary(uniqueKeysWithValues: session.tasks.map { ($0.id, $0) })
     return session.agents
       .sorted { $0.id < $1.id }
@@ -141,16 +153,22 @@ public struct StuckAgentRule: PolicyRule {
         }
         return MatchedAgentTask(agent: agent, task: task, idleSeconds: idleSeconds)
       }
-      .first
   }
 
   private func retryState(
     for agentID: String,
-    events: [SupervisorEventSummary]
+    events: [SupervisorEventSummary],
+    since lastActivityAt: Date?
   ) -> RetryState {
     let attempts =
       events
-      .filter { $0.kind == "actionDispatched" && $0.ruleID == id }
+      .filter {
+        ($0.kind == "actionDispatched" || $0.kind == "actionSuppressed") && $0.ruleID == id
+      }
+      .filter { event in
+        guard let lastActivityAt else { return true }
+        return event.createdAt > lastActivityAt
+      }
       .filter { retryAgentID(from: $0.actionKey ?? $0.id) == agentID }
     return RetryState(
       attemptCount: attempts.count,

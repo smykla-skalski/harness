@@ -104,7 +104,7 @@ enum HarnessMonitorAppStoreFactory {
         event: "preview-scenario-override",
         details: [
           "raw_value": previewScenario.rawValue,
-          "scenario": String(describing: previewScenario.scenario)
+          "scenario": String(describing: previewScenario.scenario),
         ]
       )
       return HarnessMonitorPreviewStoreFactory.makeStore(

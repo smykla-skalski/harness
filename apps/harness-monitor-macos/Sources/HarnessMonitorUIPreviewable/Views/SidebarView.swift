@@ -67,7 +67,8 @@ private struct SidebarCreateMenu: View {
   let store: HarnessMonitorStore
   let canCreateTask: Bool
   let menuStateValue: String
-  @Environment(\.openWindow) private var openWindow
+  @Environment(\.openWindow)
+  private var openWindow
 
   var body: some View {
     Menu {
@@ -175,38 +176,38 @@ struct SidebarSessionListColumn: View {
     Binding(
       get: { renderedSidebarSelectionID },
       set: { newValue in
+        HarnessMonitorUITestTrace.record(
+          component: "sidebar.selection-binding",
+          event: "set",
+          details: [
+            "new_value": newValue ?? "nil",
+            "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
+            "rendered_selection_id": renderedSidebarSelectionID ?? "nil",
+          ]
+        )
+        if newValue == nil, shouldIgnoreFilteredSidebarDeselection {
           HarnessMonitorUITestTrace.record(
             component: "sidebar.selection-binding",
-            event: "set",
+            event: "ignored-nil-clear",
             details: [
-              "new_value": newValue ?? "nil",
               "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
-              "rendered_selection_id": renderedSidebarSelectionID ?? "nil"
+              "rendered_selection_id": renderedSidebarSelectionID ?? "nil",
             ]
           )
-          if newValue == nil, shouldIgnoreFilteredSidebarDeselection {
-            HarnessMonitorUITestTrace.record(
-              component: "sidebar.selection-binding",
-              event: "ignored-nil-clear",
-              details: [
-                "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
-                "rendered_selection_id": renderedSidebarSelectionID ?? "nil"
-              ]
-            )
-            return
-          }
-          guard sidebarUI.selectedSessionID != newValue else {
-            HarnessMonitorUITestTrace.record(
-              component: "sidebar.selection-binding",
-              event: "ignored-duplicate",
-              details: [
-                "new_value": newValue ?? "nil"
-              ]
-            )
-            return
-          }
-          store.selectSessionFromList(newValue)
+          return
         }
+        guard sidebarUI.selectedSessionID != newValue else {
+          HarnessMonitorUITestTrace.record(
+            component: "sidebar.selection-binding",
+            event: "ignored-duplicate",
+            details: [
+              "new_value": newValue ?? "nil"
+            ]
+          )
+          return
+        }
+        store.selectSessionFromList(newValue)
+      }
     )
   }
 

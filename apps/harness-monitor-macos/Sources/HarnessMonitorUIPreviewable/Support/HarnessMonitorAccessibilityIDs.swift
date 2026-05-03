@@ -52,6 +52,7 @@ public enum HarnessMonitorAccessibility {
   }
 
   public static let sessionsBoardRoot = "harness.board.root"
+  public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
   public static let contentRoot = "harness.content.root"
   public static let preferencesRoot = "harness.preferences.root"
@@ -188,6 +189,7 @@ public enum HarnessMonitorAccessibility {
     "harness.window.workspace.decisions.clear-filters"
   public static let workspaceDecisionFilterState =
     "harness.window.workspace.decisions.filter-state"
+  public static let workspaceDetailScrollView = "harness.window.workspace.detail.scroll"
   public static let agentTuiSheet = "harness.sheet.agent-tui"
   public static let agentTuiState = "harness.sheet.agent-tui.state"
   public static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"

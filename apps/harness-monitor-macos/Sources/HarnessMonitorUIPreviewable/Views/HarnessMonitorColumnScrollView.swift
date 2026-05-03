@@ -12,6 +12,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
   public let constrainContentWidth: Bool
   public let readableWidth: Bool
   public let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
+  public let scrollSurfaceIdentifier: String?
+  public let scrollSurfaceLabel: String?
+  public let primaryFocusScope: Namespace.ID?
+  public let prefersDefaultFocus: Bool
+  public let pagingResponderRequest: Int
   private let content: Content
   private let underlay: Underlay?
   private let overlay: Overlay?
@@ -25,6 +30,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    scrollSurfaceIdentifier: String? = nil,
+    scrollSurfaceLabel: String? = nil,
+    primaryFocusScope: Namespace.ID? = nil,
+    prefersDefaultFocus: Bool = false,
+    pagingResponderRequest: Int = 0,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, Overlay == EmptyView {
     self.horizontalPadding = horizontalPadding
@@ -32,6 +42,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
+    self.scrollSurfaceLabel = scrollSurfaceLabel
+    self.primaryFocusScope = primaryFocusScope
+    self.prefersDefaultFocus = prefersDefaultFocus
+    self.pagingResponderRequest = pagingResponderRequest
     self.content = content()
     underlay = nil
     overlay = nil
@@ -43,6 +58,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    scrollSurfaceIdentifier: String? = nil,
+    scrollSurfaceLabel: String? = nil,
+    primaryFocusScope: Namespace.ID? = nil,
+    prefersDefaultFocus: Bool = false,
+    pagingResponderRequest: Int = 0,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder content: () -> Content
   ) where Overlay == EmptyView {
@@ -51,6 +71,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
+    self.scrollSurfaceLabel = scrollSurfaceLabel
+    self.primaryFocusScope = primaryFocusScope
+    self.prefersDefaultFocus = prefersDefaultFocus
+    self.pagingResponderRequest = pagingResponderRequest
     self.content = content()
     self.underlay = underlay()
     overlay = nil
@@ -62,6 +87,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    scrollSurfaceIdentifier: String? = nil,
+    scrollSurfaceLabel: String? = nil,
+    primaryFocusScope: Namespace.ID? = nil,
+    prefersDefaultFocus: Bool = false,
+    pagingResponderRequest: Int = 0,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView {
@@ -70,6 +100,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
+    self.scrollSurfaceLabel = scrollSurfaceLabel
+    self.primaryFocusScope = primaryFocusScope
+    self.prefersDefaultFocus = prefersDefaultFocus
+    self.pagingResponderRequest = pagingResponderRequest
     self.content = content()
     underlay = nil
     self.overlay = overlay()
@@ -81,6 +116,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    scrollSurfaceIdentifier: String? = nil,
+    scrollSurfaceLabel: String? = nil,
+    primaryFocusScope: Namespace.ID? = nil,
+    prefersDefaultFocus: Bool = false,
+    pagingResponderRequest: Int = 0,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
@@ -90,6 +130,11 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
+    self.scrollSurfaceLabel = scrollSurfaceLabel
+    self.primaryFocusScope = primaryFocusScope
+    self.prefersDefaultFocus = prefersDefaultFocus
+    self.pagingResponderRequest = pagingResponderRequest
     self.content = content()
     self.underlay = underlay()
     self.overlay = overlay()
@@ -137,6 +182,13 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     }
     .scrollClipDisabled(underlay != nil)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
+    .harnessPrimaryContentFocusTarget(
+      focusScope: primaryFocusScope,
+      prefersDefaultFocus: prefersDefaultFocus,
+      pagingResponderRequest: pagingResponderRequest,
+      listIdentifier: scrollSurfaceIdentifier,
+      listLabel: scrollSurfaceLabel
+    )
   }
 }
 

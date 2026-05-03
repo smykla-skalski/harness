@@ -18,6 +18,16 @@ extension StoreDecisionActionHandler {
       guard store.openDaemonLog() else {
         throw StoreDecisionActionError.daemonLogUnavailable
       }
+    case "closeSession":
+      guard let sessionID = payload.sessionID?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !sessionID.isEmpty
+      else {
+        throw StoreDecisionActionError.missingTargetMetadata("sessionID")
+      }
+      let removed = await store.removeSession(sessionID: sessionID, actorID: "harness-supervisor")
+      guard removed else {
+        throw StoreDecisionActionError.sessionActionFailed(sessionID)
+      }
     case "investigate", "investigateManually":
       return
     default:

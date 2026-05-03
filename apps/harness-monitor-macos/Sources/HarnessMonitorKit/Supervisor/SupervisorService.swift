@@ -8,7 +8,7 @@ import SwiftData
 public actor SupervisorService {
   private static let quarantineErrorThreshold = 5
   private static let quarantineWindowTicks = 10
-  private let store: HarnessMonitorStore?
+  let store: HarnessMonitorStore?
   private let registry: PolicyRegistry
   private let executor: PolicyExecutor
   private let clock: any SupervisorClock
@@ -16,6 +16,7 @@ public actor SupervisorService {
 
   private var tickTask: Task<Void, Never>?
   private var running = false, tickInProgress = false
+  private var tickWaiters: [CheckedContinuation<Void, Never>] = []
   private var autoActionsSuppressed = false
   private var quietHoursWindow: SupervisorQuietHoursWindow?
 
@@ -25,7 +26,8 @@ public actor SupervisorService {
   private var dispatchedQuarantineDecisions: Set<String> = []
   private var ruleLastFiredAt: [String: Date] = [:]
   private var ruleRecentActionKeys: [String: Set<String>] = [:]
-  private var tickLatencySamplesMs: [Double] = []
+  private var ruleRecentSuppressedActionKeys: [String: Set<String>] = [:]
+  var tickLatencySamplesMs: [Double] = []
   private var lastSnapshotID: String?
   private var lastObserverCount = 0
 
@@ -58,15 +60,14 @@ public actor SupervisorService {
   public func stop() async {
     guard running else { return }
     running = false
-    if !tickInProgress {
-      tickTask?.cancel()
-    }
+    tickTask?.cancel()
+    await awaitCurrentTick()
     _ = await tickTask?.value
     tickTask = nil
     HarnessMonitorLogger.supervisorTrace("supervisor.stop")
   }
 
-  public func runOneTick() async { await tickBody() }
+  public func runOneTick() async { await runTickSerialized() }
 
   public func suppressAutoActions<Result>(
     during operation: @Sendable () async throws -> Result
@@ -80,7 +81,12 @@ public actor SupervisorService {
     quietHoursWindow = window
   }
 
-  public func awaitCurrentTick() async { await Task.yield() }
+  public func awaitCurrentTick() async {
+    guard tickInProgress else { return }
+    await withCheckedContinuation { continuation in
+      tickWaiters.append(continuation)
+    }
+  }
 
   public func quarantinedRuleIDs() -> Set<String> { quarantined }
 
@@ -101,15 +107,40 @@ public actor SupervisorService {
   private func runLoop() async {
     while running && !Task.isCancelled {
       do {
-        try await clock.sleep(for: .seconds(Int(interval)))
+        try await clock.sleep(for: Self.sleepDuration(for: interval))
       } catch {
         return
       }
       guard running && !Task.isCancelled else { return }
-      tickInProgress = true
-      defer { tickInProgress = false }
-      await tickBody()
+      await runTickSerialized()
     }
+  }
+
+  private func runTickSerialized() async {
+    guard !tickInProgress else {
+      await awaitCurrentTick()
+      return
+    }
+    tickInProgress = true
+    await tickBody()
+    tickInProgress = false
+    resumeTickWaiters()
+  }
+
+  private func resumeTickWaiters() {
+    let waiters = tickWaiters
+    tickWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  private static func sleepDuration(for interval: TimeInterval) -> Duration {
+    guard interval.isFinite, interval > 0 else {
+      return .milliseconds(1)
+    }
+    let milliseconds = min(Double(Int64.max), (interval * 1_000).rounded(.up))
+    return .milliseconds(Int64(max(1.0, milliseconds)))
   }
 
   private func tickBody() async {
@@ -120,6 +151,9 @@ public actor SupervisorService {
       defer { span.end() }
     #endif
     let now = clock.now()
+    if !suppressionActive(at: now) {
+      ruleRecentSuppressedActionKeys.removeAll()
+    }
     let snapshot = await buildSnapshot(now: now)
     HarnessMonitorLogger.supervisorDebug("supervisor.tick snapshot=\(snapshot.id)")
     let rules = await registry.allRules
@@ -129,10 +163,12 @@ public actor SupervisorService {
     for observer in observers {
       await observer.willTick(snapshot)
     }
+    let history = await historyWindow()
     let results = await evaluateRules(
       rules,
       snapshot: snapshot,
       now: now,
+      history: history,
       observers: observers
     )
     advanceFailureWindow(with: results.failedRuleIDs)
@@ -142,6 +178,11 @@ public actor SupervisorService {
       tickID: snapshot.id,
       firedAt: now,
       observers: observers
+    )
+    await dispatchObserverSuggestions(
+      from: observers,
+      history: history,
+      tickID: snapshot.id
     )
     recordTickLatency(startedAt: tickStartedAt)
   }
@@ -155,9 +196,9 @@ public actor SupervisorService {
     _ rules: [any PolicyRule],
     snapshot: SessionsSnapshot,
     now: Date,
+    history: PolicyHistoryWindow,
     observers: [any PolicyObserver]
   ) async -> TickResults {
-    let history = await historyWindow()
     let quarantinedSnapshot = quarantined
     let armedSnapshot = injectedFailures
 
@@ -246,7 +287,7 @@ public actor SupervisorService {
     observers: [any PolicyObserver]
   ) async {
     for entry in actionsByRule {
-      recordFiredActions(forRuleID: entry.rule.id, actions: entry.actions, firedAt: firedAt)
+      var dispatchedActions: [PolicyAction] = []
       for action in entry.actions {
         let behavior = await registry.defaultBehavior(
           for: entry.rule,
@@ -256,15 +297,32 @@ public actor SupervisorService {
           HarnessMonitorLogger.supervisorTrace(
             "supervisor.action.suppressed key=\(action.actionKey)"
           )
+          await executor.recordSuppressed(action, tickID: tickID)
+          recordSuppressedAction(forRuleID: entry.rule.id, action: action)
           continue
         }
         await dispatch(action, tickID: tickID, observers: observers)
+        dispatchedActions.append(action)
       }
+      recordFiredActions(forRuleID: entry.rule.id, actions: dispatchedActions, firedAt: firedAt)
     }
     for ruleID in quarantined where wasQuarantinedThisTick(ruleID) {
       let decision = Self.makeQuarantineDecision(for: ruleID)
       await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
       dispatchedQuarantineDecisions.insert(ruleID)
+    }
+  }
+
+  private func dispatchObserverSuggestions(
+    from observers: [any PolicyObserver],
+    history: PolicyHistoryWindow,
+    tickID: String
+  ) async {
+    for observer in observers {
+      let suggestions = await observer.proposeConfigSuggestion(history: history)
+      for suggestion in suggestions {
+        await dispatch(.suggestConfigChange(suggestion), tickID: tickID, observers: observers)
+      }
     }
   }
 
@@ -322,10 +380,22 @@ public actor SupervisorService {
     PolicyContext(
       now: now,
       lastFiredAt: ruleLastFiredAt[ruleID],
-      recentActionKeys: ruleRecentActionKeys[ruleID] ?? [],
+      recentActionKeys: recentActionKeys(forRuleID: ruleID, at: now),
       parameters: await registry.parameters(forRule: ruleID),
       history: history
     )
+  }
+
+  private func recentActionKeys(forRuleID ruleID: String, at now: Date) -> Set<String> {
+    var actionKeys = ruleRecentActionKeys[ruleID] ?? []
+    if suppressionActive(at: now) {
+      actionKeys.formUnion(ruleRecentSuppressedActionKeys[ruleID] ?? [])
+    }
+    return actionKeys
+  }
+
+  private func recordSuppressedAction(forRuleID ruleID: String, action: PolicyAction) {
+    ruleRecentSuppressedActionKeys[ruleID, default: []].insert(action.actionKey)
   }
 
   private func recordFiredActions(
@@ -333,86 +403,11 @@ public actor SupervisorService {
     actions: [PolicyAction],
     firedAt: Date
   ) {
-    ruleRecentActionKeys[ruleID] = Set(actions.map(\.actionKey))
     guard !actions.isEmpty else {
       return
     }
+    ruleRecentActionKeys[ruleID] = Set(actions.map(\.actionKey))
     ruleLastFiredAt[ruleID] = firedAt
   }
 
-  private func historyWindow() async -> PolicyHistoryWindow {
-    guard let store else {
-      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
-    }
-    return await MainActor.run {
-      Self.historyWindow(from: store.modelContext)
-    }
-  }
-
-  @MainActor
-  private static func historyWindow(from context: ModelContext?) -> PolicyHistoryWindow {
-    guard let context else {
-      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
-    }
-
-    do {
-      var eventDescriptor = FetchDescriptor<SupervisorEvent>(
-        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-      )
-      eventDescriptor.fetchLimit = 64
-      let recentEvents = try context.fetch(eventDescriptor).map {
-        SupervisorEventSummary(
-          id: $0.id,
-          kind: $0.kind,
-          ruleID: $0.ruleID,
-          createdAt: $0.createdAt,
-          actionKey: Self.actionKey(from: $0.payloadJSON)
-        )
-      }
-
-      var decisionDescriptor = FetchDescriptor<Decision>(
-        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-      )
-      decisionDescriptor.fetchLimit = 64
-      let decisions = try context.fetch(decisionDescriptor)
-      let recentDecisions: [DecisionSummary] = decisions.compactMap { decision in
-        guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
-          return nil
-        }
-        return DecisionSummary(
-          id: decision.id,
-          ruleID: decision.ruleID,
-          severity: severity,
-          createdAt: decision.createdAt
-        )
-      }
-
-      return PolicyHistoryWindow(
-        recentEvents: recentEvents,
-        recentDecisions: recentDecisions
-      )
-    } catch {
-      HarnessMonitorLogger.supervisorWarning(
-        "supervisor.history_load_failed error=\(String(describing: error))"
-      )
-      return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
-    }
-  }
-
-  private func recordTickLatency(startedAt: Date) {
-    tickLatencySamplesMs.append(Date().timeIntervalSince(startedAt) * 1_000)
-    if tickLatencySamplesMs.count > 32 {
-      tickLatencySamplesMs.removeFirst(tickLatencySamplesMs.count - 32)
-    }
-  }
-
-  private func percentile(_ value: Double) -> Double {
-    guard !tickLatencySamplesMs.isEmpty else {
-      return 0
-    }
-    let sorted = tickLatencySamplesMs.sorted()
-    let lastIndex = sorted.count - 1
-    let index = Int((Double(lastIndex) * value).rounded(.down))
-    return sorted[max(0, min(lastIndex, index))]
-  }
 }

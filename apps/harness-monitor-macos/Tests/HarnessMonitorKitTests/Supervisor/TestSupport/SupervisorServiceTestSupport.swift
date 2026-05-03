@@ -151,6 +151,53 @@ struct AutoActionRule: PolicyRule {
   }
 }
 
+struct AutoOnlyRule: PolicyRule {
+  let id: String = "test.auto-only"
+  let name: String = "Auto Only"
+  let version: Int = 1
+  let parameters = PolicyParameterSchema(fields: [])
+
+  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior {
+    _ = actionKey
+    return .aggressive
+  }
+
+  func evaluate(
+    snapshot: SessionsSnapshot,
+    context: PolicyContext
+  ) async -> [PolicyAction] {
+    let action = PolicyAction.nudgeAgent(
+      .init(
+        agentID: "agent-1",
+        prompt: "wake up",
+        ruleID: id,
+        snapshotID: snapshot.id,
+        snapshotHash: snapshot.hash
+      )
+    )
+    guard !context.recentActionKeys.contains(action.actionKey) else {
+      return []
+    }
+    return [action]
+  }
+}
+
+struct SuggestionObserver: PolicyObserver {
+  func proposeConfigSuggestion(
+    history: PolicyHistoryWindow
+  ) async -> [PolicyAction.ConfigSuggestion] {
+    _ = history
+    return [
+      .init(
+        id: "suggestion-1",
+        ruleID: "observer",
+        proposalJSON: #"{"enabled":true}"#,
+        rationale: "test suggestion"
+      )
+    ]
+  }
+}
+
 actor RuleGate {
   private var isReleased = false
   private var waiters: [CheckedContinuation<Void, Never>] = []

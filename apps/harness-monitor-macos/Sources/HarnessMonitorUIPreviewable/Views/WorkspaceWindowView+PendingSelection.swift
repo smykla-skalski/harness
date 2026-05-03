@@ -12,7 +12,7 @@ extension WorkspaceWindowView {
     }
     if pending.resetDecisionFilters {
       WorkspaceDecisionFilterDefaults.reset()
-      decisionFilters = Self.initialDecisionFilters
+      resetDecisionFiltersToInitialState()
     }
     applyProgrammaticSelection(pending.selection, recordHistory: true)
     return true

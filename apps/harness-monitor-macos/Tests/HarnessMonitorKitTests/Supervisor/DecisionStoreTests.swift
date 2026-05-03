@@ -62,6 +62,88 @@ final class DecisionStoreTests: XCTestCase {
     XCTAssertNotNil(decision?.resolutionJSON)
   }
 
+  func test_upsertOpenDoesNotMutateTerminalResolvedDecision() async throws {
+    let store = try DecisionStore.makeInMemory()
+    let rewrittenActionsJSON = """
+      [{"id":"new","kind":"custom","payloadJSON":"{}","title":"New"}]
+      """
+    try await store.insert(
+      .fixture(
+        id: "d1",
+        summary: "original",
+        contextJSON: #"{"generation":1}"#,
+        suggestedActionsJSON: #"[]"#
+      )
+    )
+    try await store.resolveTerminal(
+      id: "d1",
+      outcome: DecisionOutcome(chosenActionID: nil, note: "daemon_shutdown")
+    )
+
+    let result = try await store.upsertOpen(
+      .fixture(
+        id: "d1",
+        severity: .critical,
+        summary: "rewritten",
+        contextJSON: #"{"generation":2}"#,
+        suggestedActionsJSON: rewrittenActionsJSON
+      )
+    )
+
+    XCTAssertEqual(result, .unchanged)
+    let decision = try await store.decision(id: "d1")
+    XCTAssertEqual(decision?.statusRaw, "resolved")
+    XCTAssertEqual(decision?.summary, "original")
+    XCTAssertEqual(decision?.contextJSON, #"{"generation":1}"#)
+    XCTAssertEqual(decision?.suggestedActionsJSON, #"[]"#)
+    XCTAssertTrue(decision?.resolutionJSON?.contains("daemon_shutdown") == true)
+  }
+
+  func test_upsertOpenPreservesFutureSnoozeWithoutReopening() async throws {
+    let store = try DecisionStore.makeInMemory()
+    let snoozedUntil = Date().addingTimeInterval(3_600)
+    try await store.insert(.fixture(id: "d1", summary: "original"))
+    try await store.snooze(id: "d1", until: snoozedUntil)
+
+    let result = try await store.upsertOpen(.fixture(id: "d1", summary: "updated"))
+
+    XCTAssertEqual(result, .updated)
+    let decision = try await store.decision(id: "d1")
+    XCTAssertEqual(decision?.statusRaw, "snoozed")
+    XCTAssertEqual(decision?.snoozedUntil, snoozedUntil)
+    XCTAssertEqual(decision?.summary, "updated")
+    let open = try await store.openDecisions()
+    XCTAssertTrue(open.isEmpty)
+  }
+
+  func test_upsertOpenDoesNotReopenResolvedDecision() async throws {
+    let store = try DecisionStore.makeInMemory()
+    try await store.insert(.fixture(id: "d1", summary: "original"))
+    try await store.resolve(id: "d1", outcome: DecisionOutcome(chosenActionID: "close", note: nil))
+
+    let result = try await store.upsertOpen(.fixture(id: "d1", summary: "tick-fired-late"))
+
+    XCTAssertNotEqual(result, .reopened)
+    let decision = try await store.decision(id: "d1")
+    XCTAssertEqual(decision?.statusRaw, "resolved")
+    let open = try await store.openDecisions()
+    XCTAssertTrue(open.isEmpty)
+  }
+
+  func test_upsertOpenDoesNotReopenDismissedDecision() async throws {
+    let store = try DecisionStore.makeInMemory()
+    try await store.insert(.fixture(id: "d1", summary: "original"))
+    try await store.dismiss(id: "d1")
+
+    let result = try await store.upsertOpen(.fixture(id: "d1", summary: "tick-fired-late"))
+
+    XCTAssertNotEqual(result, .reopened)
+    let decision = try await store.decision(id: "d1")
+    XCTAssertEqual(decision?.statusRaw, "dismissed")
+    let open = try await store.openDecisions()
+    XCTAssertTrue(open.isEmpty)
+  }
+
   func test_dismissMovesOutOfOpen() async throws {
     let store = try DecisionStore.makeInMemory()
     try await store.insert(.fixture(id: "d1"))

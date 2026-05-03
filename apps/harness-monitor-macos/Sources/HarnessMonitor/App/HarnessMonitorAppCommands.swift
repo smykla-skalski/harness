@@ -57,11 +57,16 @@ struct HarnessMonitorAppCommands: Commands {
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
     CommandGroup(after: .textEditing) {
-      Button("Find in Sessions") {
+      let menuLabel = sidebarSearchFocus?.menuLabel ?? .findGeneric
+      let isAvailable = sidebarSearchFocus?.isAvailable == true
+      Button {
         sidebarSearchFocus?.invoke()
+      } label: {
+        Text(menuLabel.localizedTitle)
       }
       .keyboardShortcut("f", modifiers: .command)
-      .disabled(sidebarSearchFocus?.isAvailable != true)
+      .disabled(!isAvailable)
+      .accessibilityHint(isAvailable ? "" : "Search isn't available on this view")
     }
   }
 

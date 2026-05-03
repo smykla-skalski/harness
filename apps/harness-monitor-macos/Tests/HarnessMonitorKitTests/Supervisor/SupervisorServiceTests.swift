@@ -258,6 +258,99 @@ final class SupervisorServiceTests: XCTestCase {
     XCTAssertEqual(payload.id, "decision-auto-action")
   }
 
+  func test_quietHoursSuppressionDoesNotRecordAutomaticActionAsFired() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(AutoOnlyRule())
+    let audit = InMemoryAuditWriter()
+    let executor = PolicyExecutor(
+      api: FakeAPIClient(),
+      decisions: try DecisionStore.makeInMemory(),
+      audit: audit
+    )
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: executor,
+      clock: clock,
+      interval: 10
+    )
+    await service.setQuietHoursWindow(SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0))
+
+    await service.runOneTick()
+    await service.runOneTick()
+    let suppressedExecutions = await observer.executions
+    XCTAssertTrue(suppressedExecutions.isEmpty)
+    let events = await audit.snapshot()
+    let suppressedEvents = events.filter { $0.kind == "actionSuppressed" }
+    XCTAssertEqual(suppressedEvents.count, 1)
+
+    await service.setQuietHoursWindow(nil)
+    await service.runOneTick()
+
+    let executions = await observer.executions
+    XCTAssertEqual(executions.count, 1)
+    guard case .nudgeAgent = executions.first?.action else {
+      return XCTFail("automatic nudge should dispatch immediately after quiet hours end")
+    }
+  }
+
+  func test_observerConfigSuggestionsAreDispatched() async throws {
+    let registry = PolicyRegistry()
+    let observer = SpyObserver()
+    await registry.registerObserver(SuggestionObserver())
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10
+    )
+
+    await service.runOneTick()
+
+    let executions = await observer.executions
+    XCTAssertEqual(executions.count, 1)
+    guard case .suggestConfigChange(let payload) = executions.first?.action else {
+      return XCTFail("observer suggestion should dispatch as suggestConfigChange")
+    }
+    XCTAssertEqual(payload.id, "suggestion-1")
+  }
+
+  func test_overlappingTicksCoalesceBehindInFlightTick() async throws {
+    let registry = PolicyRegistry()
+    let gate = RuleGate()
+    await registry.register(SlowRule(gate: gate))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10
+    )
+
+    let firstTick = Task { await service.runOneTick() }
+    let deadline = Date().addingTimeInterval(2)
+    while await gate.waitCount == 0 && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    let waitCount = await gate.waitCount
+    XCTAssertEqual(waitCount, 1)
+
+    let secondTick = Task { await service.runOneTick() }
+    await gate.release()
+    _ = await firstTick.value
+    _ = await secondTick.value
+
+    let evaluations = await observer.evaluations
+    XCTAssertEqual(evaluations.count, 1, "second tick should await the in-flight tick")
+  }
+
   func test_stopDrainsInFlightTick() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()

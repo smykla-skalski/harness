@@ -169,6 +169,7 @@ struct HarnessMonitorApp: App {
     Window("Workspace", id: HarnessMonitorWindowID.workspace) {
       WorkspaceWindowRootView(
         store: store,
+        keyWindowObserver: keyWindowObserver,
         notifications: notificationController,
         acpAttentionState: acpAttentionState,
         navigationBridge: workspaceNavigationBridge,

@@ -88,6 +88,45 @@ final class StuckAgentRuleTests: XCTestCase {
     XCTAssertTrue(payload.prompt.contains("task-1"))
   }
 
+  func test_emitsActionsForEveryStuckAgentInStableOrder() async {
+    let rule = StuckAgentRule()
+    let snapshot = Fixtures.snapshot(
+      id: "snap-1",
+      hash: "hash-1",
+      sessions: [
+        Fixtures.session(
+          id: "session-1",
+          agents: [
+            Fixtures.agent(
+              id: "agent-b",
+              statusRaw: "active",
+              idleSeconds: 300,
+              currentTaskID: "task-b"
+            ),
+            Fixtures.agent(
+              id: "agent-a",
+              statusRaw: "active",
+              idleSeconds: 300,
+              currentTaskID: "task-a"
+            ),
+          ],
+          tasks: [
+            Fixtures.task(id: "task-a", statusRaw: "in_progress", createdAt: .fixed),
+            Fixtures.task(id: "task-b", statusRaw: "in_progress", createdAt: .fixed),
+          ]
+        )
+      ]
+    )
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context())
+
+    let agentIDs = actions.compactMap { action -> String? in
+      guard case .nudgeAgent(let payload) = action else { return nil }
+      return payload.agentID
+    }
+    XCTAssertEqual(agentIDs, ["agent-a", "agent-b"])
+  }
+
   func test_respectsRetryIntervalFromHistory() async {
     let rule = StuckAgentRule()
     let now = Date.fixed
@@ -155,6 +194,41 @@ final class StuckAgentRuleTests: XCTestCase {
     XCTAssertEqual(suggestions.last?.kind, .dismiss)
   }
 
+  func test_activityAfterPreviousRetriesStartsNewRetryEpisode() async {
+    let rule = StuckAgentRule()
+    let now = Date.fixed
+    let lastActivityAt = now.addingTimeInterval(-300)
+    let snapshot = stuckSnapshot(idleSeconds: 300, lastActivityAt: lastActivityAt)
+    let actions = await rule.evaluate(
+      snapshot: snapshot,
+      context: context(
+        now: now,
+        history: [
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-1",
+            kind: "actionDispatched",
+            createdAt: lastActivityAt.addingTimeInterval(-300)
+          ),
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-2",
+            kind: "actionDispatched",
+            createdAt: lastActivityAt.addingTimeInterval(-200)
+          ),
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-3",
+            kind: "actionDispatched",
+            createdAt: lastActivityAt.addingTimeInterval(-100)
+          ),
+        ]
+      )
+    )
+
+    XCTAssertEqual(actions.count, 1)
+    guard case .nudgeAgent = actions.first else {
+      return XCTFail("old retry history before agent activity should not force escalation")
+    }
+  }
+
   func test_parameterOverridesCanForceImmediateEscalation() async {
     let rule = StuckAgentRule()
     let now = Date.fixed
@@ -185,19 +259,36 @@ final class StuckAgentRuleTests: XCTestCase {
     }
   }
 
-  func test_recentActionKeySkipsDuplicateNudge() async {
+  func test_recentActionKeyDoesNotBlockRetryAfterHistoryInterval() async {
     let rule = StuckAgentRule()
+    let now = Date.fixed
     let snapshot = stuckSnapshot(idleSeconds: 300)
-    let actionKey = "nudge:stuck-agent:agent-1:hash-1"
+    let actionKey = "nudge:stuck-agent:agent-1:hash-old"
     let actions = await rule.evaluate(
       snapshot: snapshot,
-      context: context(recentActionKeys: [actionKey])
+      context: context(
+        now: now,
+        recentActionKeys: [actionKey],
+        history: [
+          event(
+            actionKey: actionKey,
+            kind: "actionDispatched",
+            createdAt: now.addingTimeInterval(-500)
+          )
+        ]
+      )
     )
 
-    XCTAssertTrue(actions.isEmpty)
+    XCTAssertEqual(actions.count, 1)
+    guard case .nudgeAgent = actions.first else {
+      return XCTFail("retry history outside the interval should allow another nudge")
+    }
   }
 
-  private func stuckSnapshot(idleSeconds: Int?) -> SessionsSnapshot {
+  private func stuckSnapshot(
+    idleSeconds: Int?,
+    lastActivityAt: Date? = nil
+  ) -> SessionsSnapshot {
     Fixtures.snapshot(
       id: "snap-1",
       hash: "hash-1",
@@ -208,6 +299,7 @@ final class StuckAgentRuleTests: XCTestCase {
             Fixtures.agent(
               id: "agent-1",
               statusRaw: "active",
+              lastActivityAt: lastActivityAt,
               idleSeconds: idleSeconds,
               currentTaskID: "task-1"
             )

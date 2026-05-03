@@ -38,6 +38,7 @@ extension HarnessMonitorUITestAccessibility {
   static let workspaceDecisionClearFiltersButton =
     "harness.window.workspace.decisions.clear-filters"
   static let workspaceDecisionFilterState = "harness.window.workspace.decisions.filter-state"
+  static let workspaceDetailScrollView = "harness.window.workspace.detail.scroll"
   static let workspacePersonaPicker = "harness.window.workspace.persona"
   static let workspaceModelPicker = "harness.window.workspace.model"
   static let workspaceCustomModelField = "harness.window.workspace.model.custom"

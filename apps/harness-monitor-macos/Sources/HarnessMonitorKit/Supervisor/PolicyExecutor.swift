@@ -123,6 +123,16 @@ public actor PolicyExecutor {
     }
   }
 
+  public func recordSuppressed(_ action: PolicyAction, tickID: String) async {
+    let record = auditRecord(
+      id: UUID().uuidString,
+      kind: "actionSuppressed",
+      action: action,
+      tickID: tickID
+    )
+    await audit.append(record)
+  }
+
   // MARK: - Private helpers
 
   private func pruneExpiredKeys() {
@@ -158,7 +168,6 @@ public actor PolicyExecutor {
       try await api.dropTask(taskID: payload.taskID, reason: payload.reason)
 
     case .queueDecision(let payload):
-      let exists = try await decisions.decision(id: payload.id) != nil
       let draft = DecisionDraft(
         id: payload.id,
         severity: payload.severity,
@@ -170,8 +179,8 @@ public actor PolicyExecutor {
         contextJSON: payload.contextJSON,
         suggestedActionsJSON: payload.suggestedActionsJSON
       )
-      if !exists {
-        try await decisions.insert(draft)
+      let result = try await decisions.upsertOpen(draft)
+      if result == .inserted || result == .reopened {
         await api.postNotification(
           ruleID: payload.ruleID,
           severity: payload.severity,

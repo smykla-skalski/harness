@@ -121,7 +121,7 @@ enum HarnessMonitorNotificationRequestFactory {
     content.subtitle = severity.supervisorNotificationSubtitle
     content.body = summary
     content.threadIdentifier = HarnessMonitorSupervisorNotificationID.threadIdentifier
-    content.categoryIdentifier = HarnessMonitorNotificationCategoryID.statusActions
+    content.categoryIdentifier = HarnessMonitorSupervisorNotificationID.noticeCategoryIdentifier
     content.interruptionLevel = severity.supervisorInterruptionLevel
     content.relevanceScore = severity.supervisorRelevanceScore
     content.sound = preferences.requestSound(for: severity)
@@ -255,6 +255,14 @@ enum HarnessMonitorNotificationRequestFactory {
         categorySummaryFormat: "%u Harness Monitor permission requests",
         options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
       ),
+      UNNotificationCategory(
+        identifier: HarnessMonitorSupervisorNotificationID.noticeCategoryIdentifier,
+        actions: [],
+        intentIdentifiers: [],
+        hiddenPreviewsBodyPlaceholder: "Harness Monitor supervisor notice",
+        categorySummaryFormat: "%u Harness Monitor supervisor notices",
+        options: [.hiddenPreviewsShowTitle, .hiddenPreviewsShowSubtitle, .customDismissAction]
+      ),
     ]
     for severity in DecisionSeverity.allCases {
       categories.insert(
@@ -342,6 +350,7 @@ public enum HarnessMonitorSupervisorNotificationID {
   public static let decisionIDKey = "io.harnessmonitor.supervisor.decisionID"
   public static let ruleIDKey = "io.harnessmonitor.supervisor.ruleID"
   public static let severityKey = "io.harnessmonitor.supervisor.severity"
+  public static let noticeCategoryIdentifier = "io.harnessmonitor.supervisor.category.notice"
 
   public static func category(for severity: DecisionSeverity) -> String {
     switch severity {

@@ -40,6 +40,13 @@ public actor DecisionStore {
     static let dismissed = "dismissed"
   }
 
+  public enum UpsertResult: Sendable, Hashable {
+    case inserted
+    case updated
+    case reopened
+    case unchanged
+  }
+
   /// Broadcast channel of decision lifecycle events. Buffered so slow consumers do not block
   /// mutations — the most recent events survive under `.bufferingNewest`.
   nonisolated public let events: AsyncStream<DecisionEvent>
@@ -94,13 +101,18 @@ public actor DecisionStore {
     yield(.init(kind: .inserted, decisionID: draft.id))
   }
 
-  public func upsertOpen(_ draft: DecisionDraft) async throws {
-    let eventKind: DecisionEvent.Kind? = try withMutationContext { context in
+  @discardableResult
+  public func upsertOpen(_ draft: DecisionDraft) async throws -> UpsertResult {
+    let result: UpsertResult = try withMutationContext { context in
       if let decision = try fetchDecision(id: draft.id, context: context) {
-        guard apply(draft, to: decision, reopen: true) else {
-          return nil
+        guard !hasTerminalResolutionOutcome(decision) else {
+          return .unchanged
         }
-        return DecisionEvent.Kind.updated
+        return apply(
+          draft,
+          to: decision,
+          reopen: shouldReopen(decision, now: Date())
+        )
       }
       let model = Decision(
         id: draft.id,
@@ -114,10 +126,17 @@ public actor DecisionStore {
         suggestedActionsJSON: draft.suggestedActionsJSON
       )
       context.insert(model)
-      return DecisionEvent.Kind.inserted
+      return .inserted
     }
-    guard let eventKind else { return }
-    yield(.init(kind: eventKind, decisionID: draft.id))
+    switch result {
+    case .inserted:
+      yield(.init(kind: .inserted, decisionID: draft.id))
+    case .updated, .reopened:
+      yield(.init(kind: .updated, decisionID: draft.id))
+    case .unchanged:
+      break
+    }
+    return result
   }
 
   nonisolated public func openDecisions() async throws -> [Decision] {
@@ -242,12 +261,23 @@ public actor DecisionStore {
     decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed
   }
 
+  nonisolated private func shouldReopen(_ decision: Decision, now: Date) -> Bool {
+    guard decision.statusRaw == Status.snoozed else {
+      return false
+    }
+    guard let snoozedUntil = decision.snoozedUntil else {
+      return true
+    }
+    return snoozedUntil <= now
+  }
+
   nonisolated private func apply(
     _ draft: DecisionDraft,
     to decision: Decision,
     reopen: Bool
-  ) -> Bool {
+  ) -> UpsertResult {
     var changed = false
+    var reopened = false
     if decision.severityRaw != draft.severity.rawValue {
       decision.severityRaw = draft.severity.rawValue
       changed = true
@@ -284,9 +314,13 @@ public actor DecisionStore {
       decision.statusRaw = Status.open
       decision.snoozedUntil = nil
       decision.resolutionJSON = nil
+      reopened = true
       changed = true
     }
-    return changed
+    if reopened {
+      return .reopened
+    }
+    return changed ? .updated : .unchanged
   }
 
   nonisolated private func hasTerminalResolutionOutcome(_ decision: Decision) -> Bool {

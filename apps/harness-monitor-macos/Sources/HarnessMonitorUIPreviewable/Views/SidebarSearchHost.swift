@@ -106,9 +106,11 @@ struct SidebarSearchHost: View {
         \.harnessSidebarSearchFocusAction,
         HarnessSidebarSearchFocus(
           isAvailable: canPresentSearch,
+          menuLabel: .findInSessions,
           dispatcher: searchFocusDispatcher
         )
       )
+      .harnessPreservePrimaryContentFocus(searchPresentationState.isPresented)
       .task {
         searchFocusDispatcher.handler = {
           _ = searchPresentationState.requestPresentation(canPresent: true)

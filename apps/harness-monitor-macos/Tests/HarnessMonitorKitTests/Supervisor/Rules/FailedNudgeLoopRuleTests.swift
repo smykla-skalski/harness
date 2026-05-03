@@ -89,6 +89,61 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     XCTAssertTrue(actions.isEmpty)
   }
 
+  func test_dispatchRowsDoNotBreakConsecutiveFailureStreak() async {
+    let rule = FailedNudgeLoopRule()
+    let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
+    let base = 1_700_000_000.0
+    let events = (0..<3).flatMap { index in
+      [
+        SupervisorEventSummary(
+          id: UUID().uuidString,
+          kind: "actionDispatched",
+          ruleID: "stuck-agent",
+          createdAt: Date(timeIntervalSince1970: base + Double(index * 2)),
+          actionKey: "nudge:stuck-agent:agent-a:snap-\(index)"
+        ),
+        SupervisorEventSummary(
+          id: UUID().uuidString,
+          kind: "actionFailed",
+          ruleID: "stuck-agent",
+          createdAt: Date(timeIntervalSince1970: base + Double(index * 2 + 1)),
+          actionKey: "nudge:stuck-agent:agent-a:snap-\(index)"
+        ),
+      ]
+    }
+    let context = FailedNudgeLoopRuleFixtures.context(events: events)
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context)
+
+    XCTAssertEqual(actions.count, 1)
+  }
+
+  func test_successfulNudgeBreaksConsecutiveFailureStreak() async {
+    let rule = FailedNudgeLoopRule()
+    let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
+    let events =
+      FailedNudgeLoopRuleFixtures.failures(agentID: "agent-a", count: 2)
+      + [
+        SupervisorEventSummary(
+          id: UUID().uuidString,
+          kind: "actionExecuted",
+          ruleID: "stuck-agent",
+          createdAt: Date(timeIntervalSince1970: 1_700_000_010),
+          actionKey: "nudge:stuck-agent:agent-a:snap-success"
+        )
+      ]
+      + FailedNudgeLoopRuleFixtures.failures(
+        agentID: "agent-a",
+        count: 2,
+        startingAt: 1_700_000_020
+      )
+    let context = FailedNudgeLoopRuleFixtures.context(events: events)
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context)
+
+    XCTAssertTrue(actions.isEmpty)
+  }
+
   func test_countsPerAgentIndependently() async {
     let rule = FailedNudgeLoopRule()
     let snapshot = FailedNudgeLoopRuleFixtures.snapshot()

@@ -12,8 +12,9 @@ extension HarnessMonitorStore {
         "session_id": sessionID,
         "selected_session_id": selectedSessionID ?? "nil",
         "selected_summary_id": selectedSessionSummary?.sessionId ?? "nil",
-        "presented_detail_id": contentUI.sessionDetail.presentedSessionDetail?.session.sessionId ?? "nil",
-        "clears_presentation": String(clearsPresentation)
+        "presented_detail_id": contentUI.sessionDetail.presentedSessionDetail?.session.sessionId
+          ?? "nil",
+        "clears_presentation": String(clearsPresentation),
       ]
     )
     locallyRemovedSessionIDs.insert(sessionID)
@@ -41,7 +42,7 @@ extension HarnessMonitorStore {
         "session_id": sessionID,
         "remaining_session_count": String(updatedSessions.count),
         "remaining_project_count": String(updatedProjects.count),
-        "selected_session_id": selectedSessionID ?? "nil"
+        "selected_session_id": selectedSessionID ?? "nil",
       ]
     )
     return (updatedProjects, updatedSessions)

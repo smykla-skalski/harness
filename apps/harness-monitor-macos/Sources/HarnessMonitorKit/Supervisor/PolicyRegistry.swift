@@ -23,9 +23,9 @@ public actor PolicyRegistry {
   }
 
   public func applyOverrides(_ overrides: [PolicyConfigOverride]) {
-    self.overrides = Dictionary(
-      uniqueKeysWithValues: overrides.map { ($0.ruleID, $0) }
-    )
+    self.overrides = overrides.reduce(into: [:]) { merged, override in
+      merged[override.ruleID] = override
+    }
   }
 
   public func clearOverrides() {
