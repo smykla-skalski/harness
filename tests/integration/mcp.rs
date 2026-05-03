@@ -194,7 +194,7 @@ fn read_response_with_id(
 
 #[cfg(target_os = "macos")]
 #[test]
-fn mcp_serve_initialize_lists_all_ten_tools() {
+fn mcp_serve_initialize_lists_all_registered_tools() {
     let mut child = spawn_server();
     let mut stdout = child.stdout.take().expect("take stdout");
     let mut reader = BufReader::new(&mut stdout);
@@ -241,6 +241,7 @@ fn mcp_serve_initialize_lists_all_ten_tools() {
             "move_mouse",
             "click",
             "click_element",
+            "press_element",
             "scroll",
             "drag_drop",
             "type_text",
