@@ -8,6 +8,9 @@ extension WorkspaceWindowView {
       viewModel: viewModel,
       displayState: displayState,
       focusedFieldBinding: focusedFieldBinding,
+      primaryContentFocusScope: currentPrimaryContentFocusScope,
+      primaryContentPagingResponderRequest: currentPrimaryContentPagingRequest,
+      prefersPrimaryContentFocus: currentPrimaryContentFocusTarget == .create,
       startAction: { startTui() },
       acpUnavailableBanner: acpUnavailableBanner,
       agentTuiUnavailableBanner: agentTuiUnavailableBanner,
@@ -29,13 +32,27 @@ struct WorkspaceWindowCreatePane<
   let viewModel: ViewModel
   let displayState: DisplayState
   let focusedFieldBinding: FocusState<Field?>.Binding
+  let primaryContentFocusScope: Namespace.ID?
+  let primaryContentPagingResponderRequest: Int
+  let prefersPrimaryContentFocus: Bool
   let startAction: () -> Void
   let acpUnavailableBanner: AcpUnavailableBanner
   let agentTuiUnavailableBanner: AgentTuiBanner
   let codexUnavailableBanner: CodexBanner
 
   var body: some View {
-    ScrollView {
+    HarnessMonitorColumnScrollView(
+      horizontalPadding: HarnessMonitorTheme.spacingLG,
+      verticalPadding: HarnessMonitorTheme.spacingLG,
+      constrainContentWidth: false,
+      readableWidth: false,
+      topScrollEdgeEffect: .soft,
+      scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
+      scrollSurfaceLabel: "New agent pane",
+      primaryFocusScope: primaryContentFocusScope,
+      prefersDefaultFocus: prefersPrimaryContentFocus,
+      pagingResponderRequest: primaryContentPagingResponderRequest
+    ) {
       // Keep MCP-tracked controls instantiated even while this pane scrolls.
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createPaneHeader
@@ -49,15 +66,9 @@ struct WorkspaceWindowCreatePane<
           codexCreateContent
         }
       }
-      .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .scrollIndicators(.automatic)
     .accessibilityElement(children: .contain)
-    .harnessMCPList(
-      HarnessMonitorAccessibility.agentTuiLaunchPane,
-      label: "New agent pane"
-    )
   }
 }
 

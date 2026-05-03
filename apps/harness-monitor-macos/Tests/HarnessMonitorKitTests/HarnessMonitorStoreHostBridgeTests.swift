@@ -78,10 +78,15 @@ struct HarnessMonitorStoreHostBridgeTests {
     }
 
     let store = await makeBootstrappedStore()
+    let expectedCommand = """
+      HARNESS_MONITOR_RUNTIME_PROFILE='dev-profile' \
+      HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' \
+      HARNESS_CODEX_WS_PORT='31337' harness bridge start
+      """
 
     #expect(
       store.hostBridgeStartCommand(for: "codex")
-        == "HARNESS_MONITOR_RUNTIME_PROFILE='dev-profile' HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' HARNESS_CODEX_WS_PORT='31337' harness bridge start"
+        == expectedCommand
     )
   }
 

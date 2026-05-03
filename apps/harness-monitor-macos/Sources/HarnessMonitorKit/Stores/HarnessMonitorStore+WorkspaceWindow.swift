@@ -23,7 +23,7 @@ extension HarnessMonitorStore {
     createEntryPoint: WorkspaceCreateEntryPoint? = nil
   ) {
     pendingWorkspaceSelection = selection
-    pendingWorkspaceDecisionFilterResetRequested = resetDecisionFilters
+    pendingWorkspaceDecisionFilterReset = resetDecisionFilters
     pendingWorkspaceCreateEntryPoint = createEntryPoint
   }
 
@@ -50,17 +50,17 @@ extension HarnessMonitorStore {
 
   public func consumePendingWorkspaceSelectionRequest() -> PendingWorkspaceSelectionRequest? {
     guard let selection = pendingWorkspaceSelection else {
-      pendingWorkspaceDecisionFilterResetRequested = false
+      pendingWorkspaceDecisionFilterReset = false
       pendingWorkspaceCreateEntryPoint = nil
       return nil
     }
     pendingWorkspaceSelection = nil
     let request = PendingWorkspaceSelectionRequest(
       selection: selection,
-      resetDecisionFilters: pendingWorkspaceDecisionFilterResetRequested,
+      resetDecisionFilters: pendingWorkspaceDecisionFilterReset,
       createEntryPoint: pendingWorkspaceCreateEntryPoint
     )
-    pendingWorkspaceDecisionFilterResetRequested = false
+    pendingWorkspaceDecisionFilterReset = false
     pendingWorkspaceCreateEntryPoint = nil
     return request
   }

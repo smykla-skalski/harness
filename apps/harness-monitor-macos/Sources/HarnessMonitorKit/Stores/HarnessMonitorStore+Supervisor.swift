@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-private final class SupervisorStack {
+final class SupervisorStack {
   let decisionStore: DecisionStore
   let registry: PolicyRegistry
   let executor: PolicyExecutor
@@ -64,7 +64,7 @@ private enum SupervisorNullActionHandlerKey {
 }
 
 extension HarnessMonitorStore {
-  fileprivate var _stack: SupervisorStack? {
+  var supervisorStack: SupervisorStack? {
     get {
       objc_getAssociatedObject(self, &SupervisorStackKey.key) as? SupervisorStack
     }
@@ -94,7 +94,7 @@ extension HarnessMonitorStore {
     return created
   }
 
-  fileprivate var _supervisorStartTask: Task<Void, Never>? {
+  var supervisorStartTask: Task<Void, Never>? {
     get {
       objc_getAssociatedObject(self, &SupervisorStartTaskKey.key) as? Task<Void, Never>
     }
@@ -108,7 +108,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  fileprivate var _cachedNullActionHandler: NullDecisionActionHandler? {
+  fileprivate var cachedNullActionHandler: NullDecisionActionHandler? {
     get {
       objc_getAssociatedObject(self, &SupervisorNullActionHandlerKey.key)
         as? NullDecisionActionHandler
@@ -124,7 +124,7 @@ extension HarnessMonitorStore {
   }
 
   public var supervisorDecisionStore: DecisionStore? {
-    _stack?.decisionStore
+    supervisorStack?.decisionStore
   }
 
   public func requestObserverFocusInDecisions() {
@@ -163,24 +163,24 @@ extension HarnessMonitorStore {
   }
 
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {
-    if let stack = _stack {
+    if let stack = supervisorStack {
       return stack.actionHandler(for: self)
     }
-    if let cached = _cachedNullActionHandler {
+    if let cached = cachedNullActionHandler {
       return cached
     }
     let handler = NullDecisionActionHandler()
-    _cachedNullActionHandler = handler
+    cachedNullActionHandler = handler
     return handler
   }
 
   public func startSupervisor() async {
-    guard _stack == nil else {
+    guard supervisorStack == nil else {
       HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
       return
     }
 
-    if let startTask = _supervisorStartTask {
+    if let startTask = supervisorStartTask {
       await startTask.value
       return
     }
@@ -191,116 +191,16 @@ extension HarnessMonitorStore {
       }
       await self.performSupervisorStartup()
     }
-    _supervisorStartTask = startTask
+    supervisorStartTask = startTask
     await startTask.value
   }
 
-  private func performSupervisorStartup() async {
-    defer { _supervisorStartTask = nil }
-
-    guard _stack == nil else {
-      HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
-      return
-    }
-
-    HarnessMonitorLogger.supervisorTrace("supervisor.start")
-
-    let decisionStore: DecisionStore
-    if let container = modelContext?.container {
-      decisionStore = DecisionStore(container: container)
-    } else {
-      do {
-        decisionStore = try DecisionStore.makeInMemory()
-      } catch {
-        HarnessMonitorLogger.supervisorError(
-          "supervisor.start failed to create DecisionStore: \(error.localizedDescription)"
-        )
-        return
-      }
-    }
-
-    let registry = PolicyRegistry()
-    await registry.registerDefaults()
-    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
-
-    let apiClient = StoreAPIClient(store: self)
-    let auditWriter: any SupervisorAuditWriter
-    let auditRetention: SupervisorAuditRetention?
-    if let container = modelContext?.container {
-      auditWriter = SwiftDataSupervisorAuditWriter(container: container)
-      auditRetention = SupervisorAuditRetention(container: container)
-    } else {
-      auditWriter = NoOpSupervisorAuditWriter()
-      auditRetention = nil
-    }
-
-    let executor = PolicyExecutor(
-      api: apiClient,
-      decisions: decisionStore,
-      audit: auditWriter
-    )
-
-    let service = SupervisorService(
-      store: self,
-      registry: registry,
-      executor: executor,
-      clock: nil,
-      interval: SupervisorPreferencesDefaults.defaultIntervalSeconds
-    )
-    await service.setQuietHoursWindow(SupervisorPreferencesDefaults.quietHoursWindow())
-
-    let lifecycle = SupervisorLifecycle(
-      interval: SupervisorPreferencesDefaults.defaultIntervalSeconds,
-      tolerance: SupervisorPreferencesDefaults.schedulerTolerance
-    )
-    lifecycle.onTick = { [weak service] in
-      await service?.runOneTick()
-    }
-
-    do {
-      try await seedSupervisorDecisionsIfNeeded(decisionStore)
-    } catch {
-      HarnessMonitorLogger.supervisorWarning(
-        "supervisor.seed_decisions_failed error=\(String(describing: error))"
-      )
-    }
-
-    let relayTask = Task { @MainActor [weak self] in
-      guard let self else {
-        return
-      }
-      await self.refreshSupervisorDecisionSurfaces(decisions: decisionStore)
-      for await _ in decisionStore.events {
-        guard !Task.isCancelled else {
-          return
-        }
-        await self.refreshSupervisorDecisionSurfaces(decisions: decisionStore)
-      }
-    }
-
-    let stack = SupervisorStack(
-      decisionStore: decisionStore,
-      registry: registry,
-      executor: executor,
-      service: service,
-      lifecycle: lifecycle,
-      auditRetention: auditRetention,
-      relayTask: relayTask
-    )
-    _stack = stack
-
-    await service.start()
-    auditRetention?.startBackgroundCompaction()
-
-    HarnessMonitorLogger.supervisorTrace("supervisor.started")
-  }
-
   public func stopSupervisor() async {
-    guard let stack = _stack else {
+    guard let stack = supervisorStack else {
       HarnessMonitorLogger.supervisorTrace("supervisor.stop skipped — not running")
       return
     }
-    _stack = nil
+    supervisorStack = nil
 
     stack.relayTask.cancel()
     stack.lifecycle.stopBackgroundActivity()
@@ -321,7 +221,7 @@ extension HarnessMonitorStore {
 
   public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {
     UserDefaults.standard.set(enabled, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
-    guard let stack = _stack else {
+    guard let stack = supervisorStack else {
       return
     }
     if enabled {
@@ -333,7 +233,7 @@ extension HarnessMonitorStore {
   }
 
   public func setSupervisorQuietHoursWindow(_ window: SupervisorQuietHoursWindow?) {
-    guard let service = _stack?.service else {
+    guard let service = supervisorStack?.service else {
       return
     }
     Task {
@@ -342,14 +242,14 @@ extension HarnessMonitorStore {
   }
 
   public func refreshSupervisorPolicyOverrides() async {
-    guard let registry = _stack?.registry else {
+    guard let registry = supervisorStack?.registry else {
       return
     }
     await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
   }
 
   public func supervisorLiveTickSnapshot() async -> DecisionLiveTickSnapshot {
-    guard let service = _stack?.service else {
+    guard let service = supervisorStack?.service else {
       return .placeholder
     }
     return await service.liveTickSnapshot()
@@ -358,39 +258,39 @@ extension HarnessMonitorStore {
   public func withSupervisorAutoActionsSuppressed<Result: Sendable>(
     _ operation: @escaping @Sendable () async throws -> Result
   ) async rethrows -> Result {
-    guard let service = _stack?.service else {
+    guard let service = supervisorStack?.service else {
       return try await operation()
     }
     return try await service.suppressAutoActions(during: operation)
   }
 
   public func runSupervisorTickForTesting() async {
-    if _stack == nil {
+    if supervisorStack == nil {
       await startSupervisor()
     }
-    guard let stack = _stack else {
+    guard let stack = supervisorStack else {
       return
     }
     await stack.service.runOneTick()
   }
 
   public func insertDecisionForTesting(_ draft: DecisionDraft) async throws {
-    guard let stack = _stack else {
+    guard let stack = supervisorStack else {
       return
     }
     try await stack.decisionStore.insert(draft)
   }
 
   public func isSupervisorBackgroundActivityScheduledForTesting() -> Bool {
-    _stack?.lifecycle.isBackgroundActivityScheduled ?? false
+    supervisorStack?.lifecycle.isBackgroundActivityScheduled ?? false
   }
 
   public func isSupervisorAuditRetentionScheduledForTesting() -> Bool {
-    _stack?.auditRetention?.isBackgroundActivityScheduled ?? false
+    supervisorStack?.auditRetention?.isBackgroundActivityScheduled ?? false
   }
 
   public func isSupervisorAutoActionSuppressedForTesting(at date: Date) async -> Bool {
-    guard let service = _stack?.service else {
+    guard let service = supervisorStack?.service else {
       return false
     }
     return await service.isAutoActionSuppressed(at: date)
@@ -399,7 +299,7 @@ extension HarnessMonitorStore {
   public func applySupervisorQuietHoursWindowForTesting(
     _ window: SupervisorQuietHoursWindow?
   ) async {
-    guard let service = _stack?.service else {
+    guard let service = supervisorStack?.service else {
       return
     }
     await applySupervisorQuietHoursWindow(window, service: service)
@@ -410,24 +310,6 @@ extension HarnessMonitorStore {
     service: SupervisorService
   ) async {
     await service.setQuietHoursWindow(window)
-  }
-
-  private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
-    let openDecisions = (try? await decisions.openDecisions()) ?? []
-    var counts: [DecisionSeverity: Int] = [:]
-    for decision in openDecisions {
-      guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
-        continue
-      }
-      counts[severity, default: 0] += 1
-    }
-    supervisorOpenDecisions = openDecisions
-    supervisorToolbarSlice.refresh(counts: counts)
-    supervisorBindings.pendingDecisionsBadgeSync?(openDecisions.count)
-    if let controller = supervisorBindings.notificationController {
-      await controller.syncAppBadgeCount(openDecisions.count)
-    }
-    supervisorDecisionRefreshTick &+= 1
   }
 
   private func enqueueNotificationResolution(

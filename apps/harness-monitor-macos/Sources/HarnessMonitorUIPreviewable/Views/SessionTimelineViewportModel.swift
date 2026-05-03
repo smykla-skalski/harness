@@ -11,15 +11,12 @@ final class SessionTimelineViewportModel {
   var visibleAnchorID: String?
   private(set) var visibilityStats: SessionTimelineVisibilityStats = .empty
 
-  @ObservationIgnored
-  private var lastViewport = SessionTimelineTableViewportStats.initial(
+  @ObservationIgnored private var lastViewport = SessionTimelineTableViewportStats.initial(
     estimatedVisibleRows: 0,
     totalRows: 0
   )
-  @ObservationIgnored
-  private var presentationLoadedCount = 0
-  @ObservationIgnored
-  private var presentationTotalCount = 0
+  @ObservationIgnored private var presentationLoadedCount = 0
+  @ObservationIgnored private var presentationTotalCount = 0
 
   func recordViewportStats(_ stats: SessionTimelineTableViewportStats) {
     lastViewport = stats

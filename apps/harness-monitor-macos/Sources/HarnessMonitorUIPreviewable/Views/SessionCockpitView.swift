@@ -11,8 +11,39 @@ struct SessionCockpitView: View {
   let isSessionReadOnly: Bool
   let isTimelineLoading: Bool
   let isExtensionsLoading: Bool
+  let primaryContentFocusScope: Namespace.ID?
+  let primaryContentPagingResponderRequest: Int
+  let prefersPrimaryContentFocus: Bool
   @Environment(\.openWindow)
   private var openWindow
+
+  init(
+    store: HarnessMonitorStore,
+    detail: SessionDetail,
+    timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
+    tuiStatusByAgent: [String: AgentTuiStatus],
+    isSessionStatusStale: Bool,
+    isSessionReadOnly: Bool,
+    isTimelineLoading: Bool,
+    isExtensionsLoading: Bool,
+    primaryContentFocusScope: Namespace.ID? = nil,
+    primaryContentPagingResponderRequest: Int = 0,
+    prefersPrimaryContentFocus: Bool = false
+  ) {
+    self.store = store
+    self.detail = detail
+    self.timeline = timeline
+    self.timelineWindow = timelineWindow
+    self.tuiStatusByAgent = tuiStatusByAgent
+    self.isSessionStatusStale = isSessionStatusStale
+    self.isSessionReadOnly = isSessionReadOnly
+    self.isTimelineLoading = isTimelineLoading
+    self.isExtensionsLoading = isExtensionsLoading
+    self.primaryContentFocusScope = primaryContentFocusScope
+    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
+    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
+  }
 
   private func openAgent(_ agentID: String) {
     store.requestWorkspaceSelection(
@@ -30,16 +61,18 @@ struct SessionCockpitView: View {
   }
 
   var body: some View {
-    #if DEBUG
-      let _ = Self._printChanges()
-    #endif
-    return ViewBodySignposter.measure("SessionCockpitView") {
+    ViewBodySignposter.measure("SessionCockpitView") {
       HarnessMonitorColumnScrollView(
         horizontalPadding: 24,
         verticalPadding: HarnessMonitorTheme.spacingXL,
         constrainContentWidth: true,
         readableWidth: false,
-        topScrollEdgeEffect: .soft
+        topScrollEdgeEffect: .soft,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionCockpitScrollView,
+        scrollSurfaceLabel: "Session cockpit scroll view",
+        primaryFocusScope: primaryContentFocusScope,
+        prefersDefaultFocus: prefersPrimaryContentFocus,
+        pagingResponderRequest: primaryContentPagingResponderRequest
       ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(
@@ -72,11 +105,6 @@ struct SessionCockpitView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .harnessTrackMCPElement(
-        HarnessMonitorAccessibility.sessionCockpitScrollView,
-        kind: .list,
-        label: "Session cockpit scroll view"
-      )
     }
   }
 
