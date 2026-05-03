@@ -17,6 +17,7 @@ PREPARE_APP_ENTITLEMENTS_SOURCE = APP_ROOT / "Scripts" / "prepare-app-entitlemen
 SWIFT_TOOL_ENV_SOURCE = APP_ROOT / "Scripts" / "lib" / "swift-tool-env.sh"
 NON_INDEXABLE_ROOTS_SOURCE = APP_ROOT / "Scripts" / "lib" / "non-indexable-roots.sh"
 XCODE_VERSION_SOURCE = APP_ROOT / "Scripts" / "lib" / "xcode-version.sh"
+RUNTIME_PROFILE_SOURCE = APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh"
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -52,6 +53,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
             write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
             fake_patcher.write_text("# test\n")
             write_executable(
@@ -113,6 +115,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
             write_executable(
                 fake_post_generate,
                 "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
@@ -170,6 +173,69 @@ class GenerateScriptTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(marker_path.exists(), "post-generate should still run")
+
+    def test_profile_scoped_non_owner_lane_refuses_to_regenerate_shared_project(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            repo_root = temp_root / "repo"
+            app_root = repo_root / "apps" / "harness-monitor-macos"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            tuist_root.mkdir(parents=True)
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            (app_root / "Tuist.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "HARNESS_MONITOR_RUNTIME_PROFILE": "agent-foo",
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn(
+                "must not regenerate the shared Harness Monitor Xcode project",
+                completed.stderr,
+            )
+            self.assertFalse(
+                captured_args_path.exists(),
+                "non-owner profile lane must fail before invoking tuist",
+            )
 
     def test_post_generate_writes_internal_workspace_settings_and_seeded_entitlements(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -586,6 +652,7 @@ class GenerateScriptTests(unittest.TestCase):
 
             user_owned_marker = "USER-OWNED-SHARED-DERIVED-DATA"
             user_build_server_marker = "USER-OWNED-BUILD-SERVER"
+            user_pbxproj_marker = "USER-OWNED-PBXPROJ"
             shared_settings_paths = (
                 app_root
                 / "HarnessMonitor.xcworkspace"
@@ -607,6 +674,9 @@ class GenerateScriptTests(unittest.TestCase):
             )
             for build_server_path in build_server_paths:
                 build_server_path.write_text(user_build_server_marker)
+            pbxproj_path = app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj"
+            pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
+            pbxproj_path.write_text(user_pbxproj_marker)
 
             env = os.environ.copy()
             env.update(
@@ -645,6 +715,11 @@ class GenerateScriptTests(unittest.TestCase):
                         user_build_server_marker,
                         "agent post-generate must not overwrite buildServer.json",
                     )
+            self.assertEqual(
+                pbxproj_path.read_text(),
+                user_pbxproj_marker,
+                "agent post-generate must not overwrite shared project metadata",
+            )
 
     def test_removes_legacy_spotlight_project_links_before_generation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -764,6 +839,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
             write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
             fake_patcher.write_text("# test\n")
             write_executable(

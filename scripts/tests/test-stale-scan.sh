@@ -171,6 +171,18 @@ spawn_labelled() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
+spawn_labelled_with_runtime_profile() {
+  local profile="$1"
+  local label="$2"
+  # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
+  nohup env HARNESS_MONITOR_RUNTIME_PROFILE="$profile" \
+    bash -c 'exec -a "$1" sleep 300' bash-spawner "$label" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
+}
+
 kill_spawned_repo_gate_fixtures() {
   stale_scan_refresh_ps
   local gate_pids pid
@@ -491,6 +503,69 @@ scenario_common_root_gate_helper_detection() {
   stale_scan_refresh_ps
 
   assert_in_list "$sibling_pid" "common-root sibling gate pid" "$gate_pids" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10c: profile-scoped lanes only conflict with same-profile repo gate
+# helpers; other isolated profiles are allowed to coexist in the same checkout.
+# ---------------------------------------------------------------------------
+scenario_profile_scoped_gate_helper_ignores_other_profiles() {
+  start_test "profile-scoped repo gate helper scan ignores other profiles"
+  local saved_profile_set=0
+  local saved_profile=""
+  local saved_daemon_data_home_set=0
+  local saved_daemon_data_home=""
+  local gate_pids user_pid agent_pid unscoped_pid
+  local ok=1
+
+  if [[ -n "${HARNESS_MONITOR_RUNTIME_PROFILE+x}" ]]; then
+    saved_profile_set=1
+    saved_profile="$HARNESS_MONITOR_RUNTIME_PROFILE"
+  fi
+  if [[ -n "${HARNESS_DAEMON_DATA_HOME+x}" ]]; then
+    saved_daemon_data_home_set=1
+    saved_daemon_data_home="$HARNESS_DAEMON_DATA_HOME"
+  fi
+
+  export HARNESS_MONITOR_RUNTIME_PROFILE="bartsmykla"
+  unset HARNESS_DAEMON_DATA_HOME
+
+  pushd "$ROOT" >/dev/null || {
+    fail "pushd $ROOT failed"
+    return
+  }
+  spawn_labelled_with_runtime_profile "bartsmykla" \
+    "apps/harness-monitor-macos/Scripts/test-swift.sh" || ok=0
+  user_pid="$LAST_SPAWN_PID"
+  spawn_labelled_with_runtime_profile "agent-sibling" \
+    "apps/harness-monitor-macos/Scripts/build-for-testing.sh" || ok=0
+  agent_pid="$LAST_SPAWN_PID"
+  spawn_labelled "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" || ok=0
+  unscoped_pid="$LAST_SPAWN_PID"
+  popd >/dev/null || {
+    fail "popd failed"
+    ok=0
+  }
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  gate_pids="$(stale_scan_repo_gate_pids "$$")"
+
+  if (( saved_profile_set )); then
+    export HARNESS_MONITOR_RUNTIME_PROFILE="$saved_profile"
+  else
+    unset HARNESS_MONITOR_RUNTIME_PROFILE
+  fi
+  if (( saved_daemon_data_home_set )); then
+    export HARNESS_DAEMON_DATA_HOME="$saved_daemon_data_home"
+  else
+    unset HARNESS_DAEMON_DATA_HOME
+  fi
+
+  assert_in_list "$user_pid" "same-profile gate pid" "$gate_pids" || ok=0
+  assert_not_in_list "$agent_pid" "other-profile gate pid" "$gate_pids" || ok=0
+  assert_in_list "$unscoped_pid" "unscoped gate pid" "$gate_pids" || ok=0
   if (( ok )); then pass; fi
 }
 
@@ -1374,6 +1449,7 @@ run_all() {
   scenario_pid_describe_format
   scenario_ancestor_exclusion
   scenario_common_root_gate_helper_detection
+  scenario_profile_scoped_gate_helper_ignores_other_profiles
   scenario_congested_env
   scenario_end_to_end_detection
   scenario_clean_tmp_removal_is_idempotent
