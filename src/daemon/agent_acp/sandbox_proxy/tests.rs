@@ -174,6 +174,8 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
             terminal_count: 0,
             prompt_deadline_remaining_ms: 0,
         }],
+        available: true,
+        issue_message: None,
     };
     let merged = reconcile_sessions(known, &inspect);
     assert_eq!(merged, vec!["sess-new".to_string(), "sess-old".to_string()]);
@@ -188,6 +190,8 @@ fn distinct_process_keys_for_session_dedupes_and_sorts_keys() {
             inspect_snapshot("sess-1", "pk-a"),
             inspect_snapshot("sess-2", "pk-z"),
         ],
+        available: true,
+        issue_message: None,
     };
     assert_eq!(
         distinct_process_keys_for_session(&inspect, "sess-1"),

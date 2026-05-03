@@ -13,6 +13,10 @@ extension RecordingHarnessClient {
   }
 
   func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
+    recordAcpInspectCall(for: sessionID)
+    if let response = dequeueConfiguredAcpInspectResponse(for: sessionID) {
+      return response
+    }
     let snapshots = configuredAcpSnapshots(for: sessionID)
     return AcpAgentInspectResponse(
       agents: snapshots.map { snapshot in

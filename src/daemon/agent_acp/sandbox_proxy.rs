@@ -29,6 +29,7 @@ const SANDBOX_ACP_IDLE_INSPECT_POLLS: usize = 20;
 struct AcpAgentsReconciledPayload {
     session_id: String,
     agents: Vec<AcpAgentSnapshot>,
+    inspect: AcpAgentInspectResponse,
 }
 
 impl AcpAgentManagerHandle {
@@ -291,6 +292,7 @@ impl AcpAgentManagerHandle {
             let payload = AcpAgentsReconciledPayload {
                 session_id: session_id.clone(),
                 agents: agents_by_session.remove(&session_id).unwrap_or_default(),
+                inspect: inspect_for_session(&inspect, &session_id),
             };
             if let Some(event) = reconciled_event(&payload) {
                 let _ = self.sender().send(event);
@@ -336,7 +338,27 @@ impl AcpAgentManagerHandle {
 )]
 fn log_empty_inspect_with_error(error: &CliError, message: &str) -> AcpAgentInspectResponse {
     tracing::warn!(%error, "{message}");
-    AcpAgentInspectResponse { agents: Vec::new() }
+    AcpAgentInspectResponse {
+        agents: Vec::new(),
+        available: false,
+        issue_message: Some(message.to_string()),
+    }
+}
+
+fn inspect_for_session(
+    inspect: &AcpAgentInspectResponse,
+    session_id: &str,
+) -> AcpAgentInspectResponse {
+    AcpAgentInspectResponse {
+        agents: inspect
+            .agents
+            .iter()
+            .filter(|agent| agent.session_id == session_id)
+            .cloned()
+            .collect(),
+        available: inspect.available,
+        issue_message: inspect.issue_message.clone(),
+    }
 }
 
 #[expect(

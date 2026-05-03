@@ -186,6 +186,8 @@ mod tests {
                 inspect_snapshot("sess-1", "acp-2", "agent-2"),
                 inspect_snapshot("sess-2", "acp-3", "agent-3"),
             ],
+            available: true,
+            issue_message: None,
         };
 
         let sessions = response

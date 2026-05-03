@@ -106,6 +106,33 @@ public struct AcpInspectSample: Equatable, Sendable {
   }
 }
 
+public enum AcpRuntimeInspectPhase: String, Equatable, Sendable {
+  case ready
+  case waiting
+  case retrying
+  case stalled
+  case unavailable
+}
+
+public struct AcpRuntimeInspectStatus: Equatable, Sendable {
+  public let phase: AcpRuntimeInspectPhase
+  public let shortLabel: String
+  public let detail: String
+  public let accessibilityValue: String
+
+  public init(
+    phase: AcpRuntimeInspectPhase,
+    shortLabel: String,
+    detail: String,
+    accessibilityValue: String
+  ) {
+    self.phase = phase
+    self.shortLabel = shortLabel
+    self.detail = detail
+    self.accessibilityValue = accessibilityValue
+  }
+}
+
 public struct AcpAgentRuntimeState: Equatable, Identifiable, Sendable {
   public let identity: AcpRuntimeIdentity
   public let snapshot: AcpAgentSnapshot?
@@ -184,7 +211,7 @@ public struct AcpAgentRuntimeState: Equatable, Identifiable, Sendable {
   }
 
   public var watchdogDisplayState: String {
-    watchdogState ?? "syncing"
+    watchdogState ?? "unknown"
   }
 
   public var pid: UInt32? {

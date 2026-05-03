@@ -100,6 +100,7 @@ public final class HarnessMonitorStore {
   public var selectedAcpInspectObservedAt: Date? {
     selectedAcpInspectState?.sampledAt
   }
+  var selectedAcpInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry] = [:]
   public var liveToolCallAnnouncementRowIDs: Set<String> = []
   public var toolCallTimelineOverflowNotice: ToolCallTimelineOverflowNotice?
   @ObservationIgnored var acpAgentDescriptorsByID: [String: AcpAgentDescriptor] = [:]
@@ -143,6 +144,8 @@ public final class HarnessMonitorStore {
   var bootstrapWarmUpTimeout: Duration = .seconds(15)
   var initialConnectRefreshRetryGracePeriod: Duration = .seconds(2)
   var initialConnectRefreshRetryInterval: Duration = .milliseconds(200)
+  var acpInspectGracePeriod: Duration = .seconds(2)
+  var acpInspectRecoveryDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
   var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)
@@ -173,6 +176,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var timelineLoadingGateTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
+  @ObservationIgnored var acpInspectRecoveryTask: Task<Void, Never>?
   var selectionTask: Task<Void, Never>?
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []
@@ -196,6 +200,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackSequence: UInt64 = 0
   @ObservationIgnored var selectedSessionRefreshFallbackSequence: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshSequence: UInt64 = 0
+  @ObservationIgnored var acpInspectRecoverySequence: UInt64 = 0
   @ObservationIgnored var timelineLoadingGateStartedAt: ContinuousClock.Instant?
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?

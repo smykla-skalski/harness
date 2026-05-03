@@ -181,9 +181,120 @@ struct WebSocketProtocolAcpTests {
     }
     let snapshot = try #require(response.agents.first)
     #expect(event.sessionId == "session-1")
+    #expect(response.available)
     #expect(snapshot.agentId == "worker-codex")
     #expect(snapshot.pendingPermissions == 2)
     #expect(snapshot.promptDeadlineRemainingMs == 45_000)
+  }
+
+  @Test("Daemon push event decodes ACP reconcile payload with inline inspect telemetry")
+  func daemonPushEventDecodesAcpReconcileInlineInspectTelemetry() throws {
+    let json = """
+      {
+        "event": "acp_agents_reconciled",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:01:00Z",
+        "payload": {
+          "session_id": "session-1",
+          "agents": [
+            {
+              "acp_id": "acp-1",
+              "session_id": "session-1",
+              "agent_id": "worker-codex",
+              "display_name": "worker-codex",
+              "status": "active",
+              "pid": 41001,
+              "pgid": 41001,
+              "project_dir": "/tmp/project",
+              "process_key": "pk-1",
+              "pending_permissions": 0,
+              "permission_queue_depth": 0,
+              "pending_permission_batches": [],
+              "permission_mode": "allow_edits",
+              "permission_log_path": null,
+              "terminal_count": 1,
+              "created_at": "2026-04-28T00:00:00Z",
+              "updated_at": "2026-04-28T00:00:45Z"
+            }
+          ],
+          "inspect": {
+            "agents": [
+              {
+                "acp_id": "acp-1",
+                "session_id": "session-1",
+                "agent_id": "worker-codex",
+                "display_name": "worker-codex",
+                "pid": 41001,
+                "pgid": 41001,
+                "uptime_ms": 93000,
+                "last_update_at": "2026-04-28T00:00:40Z",
+                "last_client_call_at": "2026-04-28T00:00:35Z",
+                "watchdog_state": "active",
+                "permission_mode": "allow_edits",
+                "pending_permissions": 0,
+                "permission_queue_depth": 0,
+                "terminal_count": 1,
+                "prompt_deadline_remaining_ms": 0
+              }
+            ]
+          }
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpAgentsReconciled(let payload) = event.kind else {
+      Issue.record("Expected ACP reconcile, got \(event.kind)")
+      return
+    }
+    #expect(payload.sessionId == "session-1")
+    #expect(payload.inspect?.available == true)
+    #expect(payload.inspect?.agents.first?.agentId == "worker-codex")
+  }
+
+  @Test("Daemon push event decodes ACP reconcile payload without inline inspect telemetry")
+  func daemonPushEventDecodesAcpReconcileWithoutInlineInspectTelemetry() throws {
+    let json = """
+      {
+        "event": "acp_agents_reconciled",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:01:00Z",
+        "payload": {
+          "session_id": "session-1",
+          "agents": [
+            {
+              "acp_id": "acp-1",
+              "session_id": "session-1",
+              "agent_id": "worker-codex",
+              "display_name": "worker-codex",
+              "status": "active",
+              "pid": 41001,
+              "pgid": 41001,
+              "project_dir": "/tmp/project",
+              "process_key": "pk-1",
+              "pending_permissions": 0,
+              "permission_queue_depth": 0,
+              "pending_permission_batches": [],
+              "permission_mode": "allow_edits",
+              "permission_log_path": null,
+              "terminal_count": 1,
+              "created_at": "2026-04-28T00:00:00Z",
+              "updated_at": "2026-04-28T00:00:45Z"
+            }
+          ]
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpAgentsReconciled(let payload) = event.kind else {
+      Issue.record("Expected ACP reconcile, got \(event.kind)")
+      return
+    }
+
+    #expect(payload.sessionId == "session-1")
+    #expect(payload.agents.map(\.agentId) == ["worker-codex"])
+    #expect(payload.inspect == nil)
   }
 
   @Test("Daemon push event decodes sessionless ACP bridge resync incident")

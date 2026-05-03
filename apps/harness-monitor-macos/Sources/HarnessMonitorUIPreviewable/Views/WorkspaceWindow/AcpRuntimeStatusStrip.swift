@@ -7,25 +7,9 @@ enum AcpRuntimePresentation: Equatable {
   case compact
 }
 
-struct AcpRuntimeView: View {
-  let runtimeState: AcpAgentRuntimeState
-  let presentation: AcpRuntimePresentation
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-      AcpRuntimeStatusStrip(
-        runtimeState: runtimeState,
-        presentation: presentation
-      )
-      if presentation == .full {
-        AcpRuntimeDisclosure(runtimeState: runtimeState)
-      }
-    }
-  }
-}
-
 struct AcpRuntimeStatusStrip: View {
   let runtimeState: AcpAgentRuntimeState
+  let inspectStatus: AcpRuntimeInspectStatus
   let presentation: AcpRuntimePresentation
 
   @State private var lastWatchdogAnnouncement: AcpRuntimeWatchdogAnnouncement?
@@ -132,15 +116,33 @@ struct AcpRuntimeStatusStrip: View {
   }
 
   @ViewBuilder private var statusChips: some View {
+    if inspectStatus.phase != .ready {
+      AcpRuntimeChip(
+        title: "Inspect",
+        value: inspectStatus.shortLabel,
+        systemImage: AcpRuntimeInspectPresentation.systemImage(for: inspectStatus.phase),
+        tint: AcpRuntimeInspectPresentation.tint(for: inspectStatus.phase),
+        accessibilityLabel: "Runtime inspect",
+        accessibilityValue: inspectStatus.accessibilityValue
+      )
+    }
+
     AcpRuntimeChip(
       title: "Watchdog",
-      value: AcpRuntimeWatchdogAnnouncementPolicy.label(for: runtimeState.watchdogDisplayState),
+      value:
+        runtimeState.hasInspect
+        ? AcpRuntimeWatchdogAnnouncementPolicy.label(for: runtimeState.watchdogDisplayState)
+        : "Unknown",
       systemImage: "shield.lefthalf.filled",
-      tint: AcpRuntimeWatchdogAnnouncementPolicy.tint(for: runtimeState.watchdogDisplayState),
+      tint:
+        runtimeState.hasInspect
+        ? AcpRuntimeWatchdogAnnouncementPolicy.tint(for: runtimeState.watchdogDisplayState)
+        : HarnessMonitorTheme.secondaryInk,
       accessibilityLabel: "Watchdog",
-      accessibilityValue: AcpRuntimeWatchdogAnnouncementPolicy.label(
-        for: runtimeState.watchdogDisplayState
-      )
+      accessibilityValue:
+        runtimeState.hasInspect
+        ? AcpRuntimeWatchdogAnnouncementPolicy.label(for: runtimeState.watchdogDisplayState)
+        : "Unknown"
     )
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.agentRuntimeWatchdog(runtimeState.agentId)
@@ -180,6 +182,38 @@ struct AcpRuntimeStatusStrip: View {
     case .announce(let message, let announcement):
       AccessibilityNotification.Announcement(message).post()
       lastWatchdogAnnouncement = announcement
+    }
+  }
+}
+
+private enum AcpRuntimeInspectPresentation {
+  static func tint(for phase: AcpRuntimeInspectPhase) -> Color {
+    switch phase {
+    case .ready:
+      HarnessMonitorTheme.success
+    case .waiting:
+      HarnessMonitorTheme.secondaryInk
+    case .retrying:
+      HarnessMonitorTheme.accent
+    case .stalled:
+      HarnessMonitorTheme.caution
+    case .unavailable:
+      HarnessMonitorTheme.danger
+    }
+  }
+
+  static func systemImage(for phase: AcpRuntimeInspectPhase) -> String {
+    switch phase {
+    case .ready:
+      "checkmark.circle"
+    case .waiting:
+      "clock"
+    case .retrying:
+      "arrow.triangle.2.circlepath"
+    case .stalled:
+      "pause.circle"
+    case .unavailable:
+      "exclamationmark.triangle"
     }
   }
 }

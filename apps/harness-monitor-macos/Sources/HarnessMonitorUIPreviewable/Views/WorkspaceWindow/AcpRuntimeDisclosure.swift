@@ -15,11 +15,13 @@ struct AcpRuntimeDisclosure: View {
   private var dateTimeConfiguration
 
   let runtimeState: AcpAgentRuntimeState
+  let inspectStatus: AcpRuntimeInspectStatus
 
   @SceneStorage private var isExpanded: Bool
 
-  init(runtimeState: AcpAgentRuntimeState) {
+  init(runtimeState: AcpAgentRuntimeState, inspectStatus: AcpRuntimeInspectStatus) {
     self.runtimeState = runtimeState
+    self.inspectStatus = inspectStatus
     _isExpanded = SceneStorage(
       wrappedValue: false,
       Self.sceneStorageKey(
@@ -41,7 +43,7 @@ struct AcpRuntimeDisclosure: View {
         Text("Runtime details")
           .scaledFont(.caption.weight(.semibold))
         if runtimeState.hasInspect == false {
-          Text("Syncing…")
+          Text(inspectStatus.shortLabel)
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
@@ -84,7 +86,7 @@ struct AcpRuntimeDisclosure: View {
         ]
       )
     } else {
-      Text("Waiting for the daemon to publish the latest ACP runtime inspect snapshot.")
+      Text(inspectStatus.detail)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -97,7 +99,7 @@ struct AcpRuntimeDisclosure: View {
   }
 
   private var accessibilityStatus: String {
-    runtimeState.hasInspect ? "Sampled \(sampledAtLabel)" : "Syncing"
+    runtimeState.hasInspect ? "Sampled \(sampledAtLabel)" : inspectStatus.accessibilityValue
   }
 
   private var sampledAtLabel: String {

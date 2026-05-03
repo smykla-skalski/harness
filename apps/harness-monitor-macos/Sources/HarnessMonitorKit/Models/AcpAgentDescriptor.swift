@@ -126,9 +126,30 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
 
 public struct AcpAgentInspectResponse: Codable, Equatable, Sendable {
   public let agents: [AcpAgentInspectSnapshot]
+  public let available: Bool
+  public let issueMessage: String?
 
-  public init(agents: [AcpAgentInspectSnapshot]) {
+  public init(
+    agents: [AcpAgentInspectSnapshot],
+    available: Bool = true,
+    issueMessage: String? = nil
+  ) {
     self.agents = agents
+    self.available = available
+    self.issueMessage = issueMessage
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case agents
+    case available
+    case issueMessage
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    agents = try container.decode([AcpAgentInspectSnapshot].self, forKey: .agents)
+    available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
+    issueMessage = try container.decodeIfPresent(String.self, forKey: .issueMessage)
   }
 }
 
