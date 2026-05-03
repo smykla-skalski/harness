@@ -183,6 +183,36 @@ spawn_labelled_with_runtime_profile() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
+spawn_labelled_with_open_lock() {
+  local label="$1"
+  local lock_path="$2"
+  mkdir -p "$(dirname "$lock_path")"
+  : >"$lock_path"
+  # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
+  nohup bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
+    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
+}
+
+spawn_labelled_with_runtime_profile_and_open_lock() {
+  local profile="$1"
+  local label="$2"
+  local lock_path="$3"
+  mkdir -p "$(dirname "$lock_path")"
+  : >"$lock_path"
+  # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
+  nohup env HARNESS_MONITOR_RUNTIME_PROFILE="$profile" \
+    bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
+    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+  LAST_SPAWN_PID=$!
+  SPAWNED_PIDS+=("$LAST_SPAWN_PID")
+  wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
+  wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
+}
+
 kill_spawned_repo_gate_fixtures() {
   stale_scan_refresh_ps
   local gate_pids pid
@@ -215,6 +245,16 @@ spawn_target_harness() {
   local dir="$SANDBOX/$subpath"
   mkdir -p "$dir"
   spawn_labelled "$dir/harness $subcommand"
+  wait_for_pid_in_bucket "$LAST_SPAWN_PID" build || return 1
+}
+
+spawn_target_harness_with_open_lock() {
+  local subpath="$1"
+  local subcommand="$2"
+  local lock_path="$3"
+  local dir="$SANDBOX/$subpath"
+  mkdir -p "$dir"
+  spawn_labelled_with_open_lock "$dir/harness $subcommand" "$lock_path"
   wait_for_pid_in_bucket "$LAST_SPAWN_PID" build || return 1
 }
 
@@ -383,6 +423,31 @@ scenario_profile_scoped_daemon_root() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 9b: cargo-built harness daemon/bridge processes that still hold a
+# real Harness lock are live work, not orphan cleanup targets.
+# ---------------------------------------------------------------------------
+scenario_lock_holding_build_process_not_orphaned() {
+  start_test "lock-holding cargo-built harness process is not treated as orphan"
+  local fake_root="$SANDBOX/profile-build-root-$RUN_ID/harness/daemon"
+  local lock_path="$fake_root/bridge.lock"
+  spawn_target_harness_with_open_lock "target/debug" bridge "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local build_pids orphans
+  build_pids="$(stale_scan_matching_pids build)"
+  orphans="$(stale_scan_orphan_harness_build_pids)"
+  local ok=1
+  assert_in_list "$pid" "build-bucket pid" "$build_pids" || ok=0
+  assert_not_in_list "$pid" "orphan build pid" "$orphans" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 10: custom-root lock holder detection via lsof
 # ---------------------------------------------------------------------------
 scenario_lock_holder() {
@@ -406,6 +471,55 @@ scenario_lock_holder() {
   local holders
   holders="$(stale_scan_root_lock_holder_pids "$fake_root")"
   assert_in_list "$holder_pid" "lock-holder pid" "$holders" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10a: profile-scoped live lock holders are deliberate isolated work
+# and must not be treated as stale cleanup targets.
+# ---------------------------------------------------------------------------
+scenario_profiled_live_lock_holder_not_stale() {
+  start_test "profile-scoped live lock holder is not stale pollution"
+  local fake_root="$SANDBOX/profile-live-root-$RUN_ID/harness/daemon"
+  local lock_path="$fake_root/bridge.lock"
+  spawn_labelled_with_runtime_profile_and_open_lock \
+    "bartsmykla" \
+    "/opt/fake/harness bridge start" \
+    "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local holders conflicting
+  holders="$(stale_scan_root_lock_holder_pids "$fake_root")"
+  conflicting="$(stale_scan_root_conflicting_lock_holder_pids "$fake_root")"
+  local ok=1
+  assert_in_list "$pid" "lock-holder pid" "$holders" || ok=0
+  assert_not_in_list "$pid" "conflicting lock-holder pid" "$conflicting" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10b: unscoped live lock holders remain cleanup targets for the
+# broader shared-root stale cleanup path.
+# ---------------------------------------------------------------------------
+scenario_unscoped_live_lock_holder_still_stale() {
+  start_test "unscoped live lock holder remains stale cleanup target"
+  local fake_root="$SANDBOX/unscoped-live-root-$RUN_ID/harness/daemon"
+  local lock_path="$fake_root/bridge.lock"
+  spawn_labelled_with_open_lock "/opt/fake/harness bridge start" "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+
+  sleep 0.3
+  stale_scan_refresh_ps
+  local conflicting
+  conflicting="$(stale_scan_root_conflicting_lock_holder_pids "$fake_root")"
+  assert_in_list "$pid" "conflicting lock-holder pid" "$conflicting" && pass
 }
 
 # ---------------------------------------------------------------------------
@@ -1445,7 +1559,10 @@ run_all() {
   scenario_tmp_artifacts
   scenario_profile_scoped_tmp_artifacts_are_ignored
   scenario_profile_scoped_daemon_root
+  scenario_lock_holding_build_process_not_orphaned
   scenario_lock_holder
+  scenario_profiled_live_lock_holder_not_stale
+  scenario_unscoped_live_lock_holder_still_stale
   scenario_pid_describe_format
   scenario_ancestor_exclusion
   scenario_common_root_gate_helper_detection

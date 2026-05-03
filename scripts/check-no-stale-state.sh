@@ -82,9 +82,10 @@ collect_stale_lines() {
   stale_lines=()
 
   # 1. Orphan cargo-built harness daemon/bridge processes from any target dir
-  #    (covers debug, release, and dev/<triple>/{debug,release}).
+  #    (covers debug, release, and dev/<triple>/{debug,release}). Live bridges
+  #    that still hold a Harness lock are foreground work, not stale orphans.
   local orphans
-  orphans="$(stale_scan_matching_pids build)"
+  orphans="$(stale_scan_orphan_harness_build_pids)"
   append_pid_block "orphan local cargo-built harness processes" "$orphans"
 
   # 1b. Parentless xcodebuild-with-lock wrapper shells with no surviving lease
@@ -93,13 +94,15 @@ collect_stale_lines() {
   monitor_wrapper_orphans="$(stale_scan_orphan_monitor_wrapper_pids)"
   append_pid_block "orphan xcodebuild wrapper shells with no lease metadata" "$monitor_wrapper_orphans"
 
-  # 2. Live installed harness daemon/bridge processes only count as stale
-  #    when they still hold the well-known locks under the real Harness roots.
+  # 2. Live unscoped harness daemon/bridge processes only count as stale when
+  #    they still hold the well-known locks under the real Harness roots.
+  #    Profile-scoped bridges/daemons are deliberate isolated work and must not
+  #    be swept by shared stale cleanup.
   if ! should_skip_live_daemon_lock_holder_check; then
     local daemon_root lock_holders
     while IFS= read -r daemon_root; do
       [[ -n "$daemon_root" ]] || continue
-      lock_holders="$(stale_scan_root_lock_holder_pids "$daemon_root")"
+      lock_holders="$(stale_scan_root_conflicting_lock_holder_pids "$daemon_root")"
       append_pid_block "live harness lock holders in $daemon_root" "$lock_holders"
     done < <(stale_scan_daemon_roots)
   fi

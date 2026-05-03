@@ -123,7 +123,7 @@ kill_orphan_harness_processes() {
     pids=()
     while IFS= read -r pid; do
       [[ -n "$pid" ]] && pids+=("$pid")
-    done < <(stale_scan_matching_pids build)
+    done < <(stale_scan_orphan_harness_build_pids)
     (( ${#pids[@]} > 0 )) || return 0
 
     if (( attempt == 0 )); then
@@ -195,7 +195,7 @@ kill_live_harness_processes() {
   local pid
   while IFS= read -r pid; do
     [[ -n "$pid" ]] && pids+=("$pid")
-  done < <(stale_scan_root_lock_holder_pids "$root")
+  done < <(stale_scan_root_conflicting_lock_holder_pids "$root")
   (( ${#pids[@]} > 0 )) || return 0
 
   echo "stopping live harness lock holders in $root..."
@@ -205,7 +205,7 @@ kill_live_harness_processes() {
   pids=()
   while IFS= read -r pid; do
     [[ -n "$pid" ]] && pids+=("$pid")
-  done < <(stale_scan_root_lock_holder_pids "$root")
+  done < <(stale_scan_root_conflicting_lock_holder_pids "$root")
   (( ${#pids[@]} > 0 )) || return 0
 
   echo "force-stopping stubborn harness lock holders in $root..."
