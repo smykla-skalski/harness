@@ -58,4 +58,86 @@ extension HarnessMonitorStoreTests {
 
     #expect(store.currentFailureFeedbackMessage != nil)
   }
+
+  @Test("ACP bridge doctor clears the outage when inspect succeeds")
+  func acpBridgeDoctorClearsOutageWhenInspectSucceeds() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.selectedSessionID = PreviewFixtures.summary.sessionId
+    let initialInspectCallCount = client.acpInspectCallCount(
+      for: PreviewFixtures.summary.sessionId
+    )
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/harness-bridge.sock",
+        capabilities: [
+          "acp": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "http",
+            endpoint: "http://127.0.0.1:4546"
+          )
+        ]
+      )
+    )
+    store.markHostBridgeIssue(for: "acp", statusCode: 503)
+
+    #expect(store.contentUI.chrome.acpBridgeBanner != nil)
+
+    await store.runAcpBridgeDoctor()
+
+    #expect(
+      client.acpInspectCallCount(for: PreviewFixtures.summary.sessionId)
+        == initialInspectCallCount + 1
+    )
+    #expect(store.acpBridgeHTTPIncident == nil)
+    #expect(store.contentUI.chrome.acpBridgeBanner == nil)
+    #expect(store.currentSuccessFeedbackMessage == "ACP bridge recovered")
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
+
+  @Test("ACP bridge doctor surfaces the ACP inspect failure")
+  func acpBridgeDoctorSurfacesInspectFailure() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.selectedSessionID = PreviewFixtures.summary.sessionId
+    let initialInspectCallCount = client.acpInspectCallCount(
+      for: PreviewFixtures.summary.sessionId
+    )
+    client.lock.withLock {
+      client.acpInspectResponsesBySessionID[PreviewFixtures.summary.sessionId] = [
+        AcpAgentInspectResponse(
+          agents: [],
+          available: false,
+          issueMessage: "ACP runtime probe unavailable."
+        )
+      ]
+    }
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/harness-bridge.sock",
+        capabilities: [
+          "acp": HostBridgeCapabilityManifest(
+            healthy: true,
+            transport: "http",
+            endpoint: "http://127.0.0.1:4546"
+          )
+        ]
+      )
+    )
+    store.markHostBridgeIssue(for: "acp", statusCode: 503)
+
+    #expect(store.contentUI.chrome.acpBridgeBanner != nil)
+
+    await store.runAcpBridgeDoctor()
+
+    #expect(
+      client.acpInspectCallCount(for: PreviewFixtures.summary.sessionId)
+        == initialInspectCallCount + 1
+    )
+    #expect(store.contentUI.chrome.acpBridgeBanner != nil)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+    #expect(store.currentFailureFeedbackMessage == "ACP runtime probe unavailable.")
+  }
 }

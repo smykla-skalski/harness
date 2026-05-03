@@ -166,7 +166,7 @@ private struct ContentAcpBridgeBanner: View {
             isLoading: store.isDiagnosticsRefreshInFlight,
             accessibilityIdentifier: HarnessMonitorAccessibility.contentAcpBridgeRunDoctorButton
           ) {
-            await store.refreshDiagnostics()
+            await store.runAcpBridgeDoctor()
           }
         }
       }

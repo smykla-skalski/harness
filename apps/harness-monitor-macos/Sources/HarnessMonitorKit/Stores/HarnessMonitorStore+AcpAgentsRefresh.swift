@@ -1,6 +1,43 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private enum AcpInspectRefreshOutcome {
+    case available
+    case unavailable(String)
+    case failed(String)
+    case ignored
+  }
+
+  public func runAcpBridgeDoctor() async {
+    guard isDiagnosticsRefreshInFlight == false else {
+      return
+    }
+    isDiagnosticsRefreshInFlight = true
+    defer { isDiagnosticsRefreshInFlight = false }
+
+    guard let client, let sessionID = selectedSessionID else {
+      await refreshDiagnostics()
+      return
+    }
+
+    switch await refreshAcpInspectOutcome(
+      using: client,
+      sessionID: sessionID,
+      shouldScheduleRecovery: false
+    ) {
+    case .available:
+      if acpBridgeBannerState == nil {
+        presentSuccessFeedback("ACP bridge recovered")
+      } else {
+        presentFailureFeedback(acpHostBridgeFailureMessage())
+      }
+    case .unavailable(let message), .failed(let message):
+      presentFailureFeedback(message)
+    case .ignored:
+      break
+    }
+  }
+
   func refreshAcpAgents(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
@@ -49,49 +86,24 @@ extension HarnessMonitorStore {
     sessionID: String,
     shouldScheduleRecovery: Bool = true
   ) async -> Bool {
-    do {
-      let measuredInspect = try await Self.measureOperation {
-        try await client.acpInspect(sessionID: sessionID)
-      }
-      guard selectedSessionID == sessionID else {
-        return true
-      }
-      if measuredInspect.value.available {
-        recordRequestSuccess()
-        clearHostBridgeIssue(for: "acp")
-      } else if daemonStatus?.manifest?.sandboxed == true {
-        markHostBridgeIssue(for: "acp", statusCode: 503)
-        HarnessMonitorLogger.store.info(
-          """
-          managed ACP inspect unavailable: \
-          \(measuredInspect.value.issueMessage ?? self.acpHostBridgeFailureMessage(), privacy: .public)
-          """
-        )
-      }
-      replaceAcpInspect(
-        measuredInspect.value,
-        sessionID: sessionID,
-        sampledAt: Date(),
-        shouldScheduleRecovery: shouldScheduleRecovery
+    switch await refreshAcpInspectOutcome(
+      using: client,
+      sessionID: sessionID,
+      shouldScheduleRecovery: shouldScheduleRecovery
+    ) {
+    case .available:
+      return true
+    case .unavailable(let message):
+      HarnessMonitorLogger.store.info(
+        "managed ACP inspect unavailable: \(message, privacy: .public)"
       )
-      return measuredInspect.value.available
-    } catch {
-      guard selectedSessionID == sessionID else {
-        return false
-      }
-      if let apiError = error as? HarnessMonitorAPIError,
-        case .server(let code, _) = apiError,
-        code == 501 || code == 503
-      {
-        self.markHostBridgeIssue(for: "acp", statusCode: code)
-        HarnessMonitorLogger.store.info(
-          "managed ACP inspect unavailable: \(self.acpHostBridgeFailureMessage(), privacy: .public)"
-        )
-        return false
-      }
+      return false
+    case .failed(let message):
       HarnessMonitorLogger.store.warning(
-        "managed ACP inspect refresh failed: \(error.localizedDescription, privacy: .public)"
+        "managed ACP inspect refresh failed: \(message, privacy: .public)"
       )
+      return false
+    case .ignored:
       return false
     }
   }
@@ -109,6 +121,51 @@ extension HarnessMonitorStore {
     presentingAcpPermissionBatch != nil
       || ProcessInfo.processInfo.environment["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"]
         == "1"
+  }
+
+  private func refreshAcpInspectOutcome(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String,
+    shouldScheduleRecovery: Bool
+  ) async -> AcpInspectRefreshOutcome {
+    do {
+      let measuredInspect = try await Self.measureOperation {
+        try await client.acpInspect(sessionID: sessionID)
+      }
+      guard selectedSessionID == sessionID else {
+        return .ignored
+      }
+
+      let response = measuredInspect.value
+      if response.available {
+        recordRequestSuccess()
+        clearHostBridgeIssue(for: "acp")
+      } else if daemonStatus?.manifest?.sandboxed == true {
+        markHostBridgeIssue(for: "acp", statusCode: 503)
+      }
+      replaceAcpInspect(
+        response,
+        sessionID: sessionID,
+        sampledAt: Date(),
+        shouldScheduleRecovery: shouldScheduleRecovery
+      )
+      guard response.available == false else {
+        return .available
+      }
+      return .unavailable(response.issueMessage ?? acpHostBridgeFailureMessage())
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return .ignored
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        case .server(let code, _) = apiError,
+        code == 501 || code == 503
+      {
+        self.markHostBridgeIssue(for: "acp", statusCode: code)
+        return .unavailable(acpHostBridgeFailureMessage())
+      }
+      return .failed(error.localizedDescription)
+    }
   }
 
   func reconcileAcpPermissionDecisions() {
