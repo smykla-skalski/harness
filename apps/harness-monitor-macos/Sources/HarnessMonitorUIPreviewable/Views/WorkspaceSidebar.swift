@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct WorkspaceSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
+  @Binding var columnVisibility: NavigationSplitViewVisibility
   let isStartupFocusParticipationEnabled: Bool
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
@@ -34,6 +36,8 @@ struct WorkspaceSidebar: View {
   @AppStorage(WorkspaceDecisionFilterDefaults.searchScopeKey)
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
+  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
+  @State private var searchPresentationState = SidebarSearchPresentationState()
   @Environment(\.fontScale)
   private var fontScale
 
@@ -62,6 +66,13 @@ struct WorkspaceSidebar: View {
     )
   }
 
+  private var searchPresentation: Binding<Bool> {
+    Binding(
+      get: { searchPresentationState.isPresented },
+      set: { searchPresentationState.isPresented = $0 }
+    )
+  }
+
   private var decisionFiltersMenuEnabled: Bool {
     decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
   }
@@ -86,6 +97,24 @@ struct WorkspaceSidebar: View {
     selection.isDecisionRoute
   }
 
+  private func handleSearchFocusRequest() {
+    if columnVisibility == .detailOnly {
+      columnVisibility = .all
+      Task { @MainActor in
+        if let contentView = NSApp.keyWindow?.contentView {
+          NSAccessibility.post(element: contentView, notification: .layoutChanged)
+        }
+      }
+    }
+    _ = searchPresentationState.requestPresentation(canPresent: true)
+  }
+
+  private func applyPendingSearchPresentationIfNeeded() {
+    _ = searchPresentationState.applyPendingPresentationIfNeeded(
+      canPresent: isStartupFocusParticipationEnabled && showsDecisionSearchChrome
+    )
+  }
+
   var body: some View {
     searchableSidebarList
       .toolbar {
@@ -95,11 +124,32 @@ struct WorkspaceSidebar: View {
           setSelectedSeverities: setDecisionSeverities
         )
       }
+      .focusedSceneValue(
+        \.harnessSidebarSearchFocusAction,
+        HarnessSidebarSearchFocus(
+          isAvailable: isStartupFocusParticipationEnabled && showsDecisionSearchChrome,
+          menuLabel: showsDecisionSearchChrome ? .findInDecisions : .findGeneric,
+          dispatcher: searchFocusDispatcher
+        )
+      )
+      .harnessPreservePrimaryContentFocus(searchPresentationState.isPresented)
+      .task {
+        searchFocusDispatcher.handler = { handleSearchFocusRequest() }
+      }
+      .onDisappear {
+        searchFocusDispatcher.handler = nil
+      }
       .task {
         await hydratePersistedDecisionFiltersIfNeeded()
       }
       .onChange(of: decisionFilters) { _, newValue in
         syncPersistedDecisionPreferences(from: newValue)
+      }
+      .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, _ in
+        applyPendingSearchPresentationIfNeeded()
+      }
+      .onChange(of: showsDecisionSearchChrome) { _, _ in
+        applyPendingSearchPresentationIfNeeded()
       }
   }
 
@@ -108,6 +158,7 @@ struct WorkspaceSidebar: View {
       sidebarList
         .searchable(
           text: decisionSearchText,
+          isPresented: searchPresentation,
           placement: .sidebar,
           prompt: Text("Search decisions")
         )

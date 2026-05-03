@@ -10,8 +10,16 @@ struct HarnessSidebarSearchFocusTests {
   func valuesWithSameDispatcherAndAvailabilityAreEqual() {
     let dispatcher = HarnessSidebarSearchFocusDispatcher()
 
-    let first = HarnessSidebarSearchFocus(isAvailable: true, dispatcher: dispatcher)
-    let second = HarnessSidebarSearchFocus(isAvailable: true, dispatcher: dispatcher)
+    let first = HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
+    let second = HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
 
     #expect(first == second)
   }
@@ -20,8 +28,16 @@ struct HarnessSidebarSearchFocusTests {
   func differingAvailabilityComparesAsUnequal() {
     let dispatcher = HarnessSidebarSearchFocusDispatcher()
 
-    let available = HarnessSidebarSearchFocus(isAvailable: true, dispatcher: dispatcher)
-    let unavailable = HarnessSidebarSearchFocus(isAvailable: false, dispatcher: dispatcher)
+    let available = HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
+    let unavailable = HarnessSidebarSearchFocus(
+      isAvailable: false,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
 
     #expect(available != unavailable)
   }
@@ -30,10 +46,12 @@ struct HarnessSidebarSearchFocusTests {
   func differingDispatcherReferencesCompareAsUnequal() {
     let first = HarnessSidebarSearchFocus(
       isAvailable: true,
+      menuLabel: .findInSessions,
       dispatcher: HarnessSidebarSearchFocusDispatcher()
     )
     let second = HarnessSidebarSearchFocus(
       isAvailable: true,
+      menuLabel: .findInSessions,
       dispatcher: HarnessSidebarSearchFocusDispatcher()
     )
 
@@ -46,7 +64,11 @@ struct HarnessSidebarSearchFocusTests {
     var callCount = 0
     dispatcher.handler = { callCount += 1 }
 
-    let focus = HarnessSidebarSearchFocus(isAvailable: true, dispatcher: dispatcher)
+    let focus = HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
     focus.invoke()
     focus.invoke()
 
@@ -59,7 +81,11 @@ struct HarnessSidebarSearchFocusTests {
     var callCount = 0
     dispatcher.handler = { callCount += 1 }
 
-    let focus = HarnessSidebarSearchFocus(isAvailable: false, dispatcher: dispatcher)
+    let focus = HarnessSidebarSearchFocus(
+      isAvailable: false,
+      menuLabel: .findInSessions,
+      dispatcher: dispatcher
+    )
     focus.invoke()
 
     #expect(callCount == 0)

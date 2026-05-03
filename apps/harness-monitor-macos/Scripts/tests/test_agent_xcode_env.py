@@ -123,9 +123,36 @@ class AgentXcodeEnvTests(unittest.TestCase):
 
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn(
-                "Agent sessions must use an isolated agent-* runtime profile",
+                "Agent sessions must use their own isolated runtime profile",
                 completed.stderr,
             )
+
+    def test_rejects_foreign_agent_runtime_profile_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            _, script_path = prepare_agent_script_root(temp_root)
+            home_dir = temp_root / "home"
+            home_dir.mkdir()
+
+            env = base_env()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "HARNESS_MONITOR_RUNTIME_PROFILE": "agent-foreign-session",
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(script_path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("targets a different agent session", completed.stderr)
 
     def test_blocks_xcode_ide_without_explicit_agent_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

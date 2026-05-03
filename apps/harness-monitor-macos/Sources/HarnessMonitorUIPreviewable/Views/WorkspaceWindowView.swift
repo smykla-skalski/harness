@@ -49,6 +49,7 @@ public struct WorkspaceWindowView: View {
   @State private var reopenBatch: ReopenBatchState?
   @State private var decisionInspectorVisible = false
   @State private var decisionInspectorPreferredVisibility = false
+  @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var primaryContentPagingResponderRequest = 0
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
@@ -158,6 +159,10 @@ public struct WorkspaceWindowView: View {
     primaryContentFocusScope
   }
 
+  var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+    $columnVisibility
+  }
+
   var decisionFiltersBinding: Binding<DecisionsSidebarViewModel.FilterState> {
     $decisionFilters
   }
@@ -249,11 +254,13 @@ public struct WorkspaceWindowView: View {
   }
 
   private var shouldSuppressPrimaryContentFocusReset: Bool {
-    stateFocusedField != nil
-      || preservesPrimaryContentFocus == true
-      || store.presentedSheet != nil
-      || store.pendingConfirmation != nil
-      || showDismissAllVisibleConfirmation
+    HarnessMonitorUIPreviewable.shouldSuppressPrimaryContentFocusReset(
+      preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
+      hasFocusedEditorField: stateFocusedField != nil,
+      hasPresentedSheet: store.presentedSheet != nil,
+      hasPendingConfirmation: store.pendingConfirmation != nil,
+      extraSuppressor: showDismissAllVisibleConfirmation
+    )
   }
 
   func toggleDecisionInspector() {
@@ -285,6 +292,7 @@ public struct WorkspaceWindowView: View {
     let content =
       splitView
       .focusScope(primaryContentFocusScope)
+      // Workspace is workbench-shaped (sidebar drives detail); main window uses .prominentDetail.
       .navigationSplitViewStyle(.balanced)
       .toolbar {
         agentTuiNavigationToolbarItems
