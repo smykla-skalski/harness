@@ -86,9 +86,9 @@ harness_monitor_runtime_profile() {
     "${XCODEBUILD_DERIVED_DATA_PATH:-}" \
     "${TARGET_BUILD_DIR:-}" \
     "${BUILT_PRODUCTS_DIR:-}" \
-      "${BUILD_DIR:-}" \
-      "${PROJECT_TEMP_DIR:-}" \
-      "${TARGET_TEMP_DIR:-}"; do
+    "${BUILD_DIR:-}" \
+    "${PROJECT_TEMP_DIR:-}" \
+    "${TARGET_TEMP_DIR:-}"; do
     candidate="$(harness_monitor_profile_from_path "$path" || true)"
     if [[ -n "$candidate" ]]; then
       harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
@@ -180,9 +180,10 @@ harness_monitor_is_agent_runtime_profile() {
   [[ -n "$profile" && "$profile" == agent-* ]]
 }
 
-# Agent sessions may only resolve onto `agent-*` lanes unless a caller
-# explicitly opts into a shared/user profile. Apply the rule uniformly no
-# matter whether the profile came from env, an inherited path, or fallback.
+# Agent sessions may only resolve onto their own `agent-<session>` lane by
+# default. Apply the rule uniformly whether the profile came from env, an
+# inherited path, or fallback, and require an explicit opt-in for shared/user
+# lanes instead of silently reusing someone else's state.
 harness_monitor_validate_resolved_runtime_profile() {
   local profile="$1"
   local default_profile
@@ -193,23 +194,32 @@ harness_monitor_validate_resolved_runtime_profile() {
   if ! harness_monitor_agent_session_id >/dev/null 2>&1; then
     return 0
   fi
-  if harness_monitor_allow_non_agent_runtime_profile; then
-    return 0
+
+  default_profile="$(harness_monitor_default_agent_runtime_profile || true)"
+  if [[ -z "$default_profile" ]]; then
+    printf '%s\n' \
+      "Unable to derive the current agent runtime profile while validating resolved profile '$profile'." \
+      >&2
+    return 1
   fi
-  if harness_monitor_is_agent_runtime_profile "$profile"; then
+  if [[ "$profile" == "$default_profile" ]]; then
     return 0
   fi
 
-  default_profile="$(harness_monitor_default_agent_runtime_profile || true)"
-  if [[ -n "$default_profile" ]]; then
+  if harness_monitor_is_agent_runtime_profile "$profile"; then
     printf '%s\n' \
-      "Agent sessions must use an isolated agent-* runtime profile. Resolved profile '$profile' is not allowed. Unset HARNESS_MONITOR_RUNTIME_PROFILE to use '$default_profile' automatically, or set HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE=1 only for an intentional shared/user lane." \
+      "Agent sessions must stay on their own isolated runtime profile '$default_profile'. Resolved profile '$profile' targets a different agent session and is not allowed. Unset HARNESS_MONITOR_RUNTIME_PROFILE or clear inherited build-path env to use '$default_profile' automatically." \
       >&2
-  else
-    printf '%s\n' \
-      "Agent sessions must use an isolated agent-* runtime profile. Resolved profile '$profile' is not allowed." \
-      >&2
+    return 1
   fi
+
+  if harness_monitor_allow_non_agent_runtime_profile; then
+    return 0
+  fi
+
+  printf '%s\n' \
+    "Agent sessions must use their own isolated runtime profile '$default_profile'. Resolved profile '$profile' is not allowed. Unset HARNESS_MONITOR_RUNTIME_PROFILE or clear inherited build-path env to use '$default_profile' automatically, or set HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE=1 only for an intentional shared/user lane." \
+    >&2
   return 1
 }
 

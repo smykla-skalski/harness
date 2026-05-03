@@ -43,11 +43,12 @@ extension WorkspaceWindowView {
     decisionScope: DecisionWorkspaceScope,
     selection: Binding<WorkspaceSelection>
   ) -> some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
       WorkspaceSidebar(
         store: store,
         selection: selection,
         decisionFilters: decisionFiltersBinding,
+        columnVisibility: columnVisibilityBinding,
         isStartupFocusParticipationEnabled: startupFocusParticipationEnabled,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,

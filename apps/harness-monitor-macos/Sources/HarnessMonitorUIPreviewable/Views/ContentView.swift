@@ -94,9 +94,12 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   private var shouldSuppressPrimaryContentFocusReset: Bool {
-    preservesPrimaryContentFocus == true
-      || contentShell.presentedSheet != nil
-      || contentShell.pendingConfirmation != nil
+    HarnessMonitorUIPreviewable.shouldSuppressPrimaryContentFocusReset(
+      preservesPrimaryContentFocus: preservesPrimaryContentFocus == true,
+      hasFocusedEditorField: false,
+      hasPresentedSheet: contentShell.presentedSheet != nil,
+      hasPendingConfirmation: contentShell.pendingConfirmation != nil
+    )
   }
 
   @MainActor

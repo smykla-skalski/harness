@@ -181,6 +181,7 @@ struct HarnessMonitorApp: App {
       .modifier(HarnessMonitorMainWindowLauncherBinder())
     }
     .windowStyle(.titleBar)
+    .windowToolbarStyle(.unified)
     .defaultSize(width: 1_140, height: 700)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }

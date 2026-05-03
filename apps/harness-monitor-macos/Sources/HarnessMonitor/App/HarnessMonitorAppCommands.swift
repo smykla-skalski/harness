@@ -67,6 +67,7 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("f", modifiers: .command)
       .disabled(!isAvailable)
       .accessibilityHint(isAvailable ? "" : "Search isn't available on this view")
+      .accessibilityHelp(isAvailable ? "" : "Search isn't available on this view")
     }
   }
 

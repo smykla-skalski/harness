@@ -24,6 +24,30 @@ AGENT_SESSION_ENV_KEYS = (
     "OPENCODE_SESSION_ID",
     "VIBE_SESSION_ID",
 )
+CURRENT_AGENT_SESSION_ID = "sess-agent-123"
+CURRENT_AGENT_PROFILE = f"agent-{CURRENT_AGENT_SESSION_ID}"
+FOREIGN_AGENT_PROFILE = "agent-foreign-session"
+NON_AGENT_PROFILE_RAW = "Bart Dev"
+NON_AGENT_PROFILE = "bart-dev"
+PROFILE_SOURCE_PATH_SUFFIXES = {
+    "XCODEBUILD_DERIVED_DATA_PATH": (),
+    "TARGET_BUILD_DIR": ("Build", "Products", "Debug", "HarnessMonitor.app"),
+    "BUILT_PRODUCTS_DIR": ("Build", "Products", "Debug"),
+    "BUILD_DIR": ("Build",),
+    "PROJECT_TEMP_DIR": ("Build", "Intermediates.noindex", "HarnessMonitor.build"),
+    "TARGET_TEMP_DIR": (
+        "Build",
+        "Intermediates.noindex",
+        "HarnessMonitor.build",
+        "Objects-normal",
+        "arm64",
+    ),
+}
+PROFILE_SOURCE_KEYS = (
+    "HARNESS_MONITOR_RUNTIME_PROFILE",
+    "HARNESS_DAEMON_DATA_HOME",
+    *PROFILE_SOURCE_PATH_SUFFIXES.keys(),
+)
 
 
 def run_helper(script: str, env: dict[str, str]) -> str:
@@ -59,6 +83,34 @@ def base_env() -> dict[str, str]:
     env.pop("HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE", None)
     env.pop("HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE", None)
     return env
+
+
+def agent_session_env(home_dir: Path) -> dict[str, str]:
+    env = base_env()
+    env.update(
+        {
+            "HOME": str(home_dir),
+            "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
+        }
+    )
+    return env
+
+
+def profile_source_env_value(source_key: str, profile: str, home_dir: Path) -> str:
+    if source_key == "HARNESS_MONITOR_RUNTIME_PROFILE":
+        return profile
+    if source_key == "HARNESS_DAEMON_DATA_HOME":
+        return str(
+            home_dir
+            / "Library"
+            / "Group Containers"
+            / DEFAULT_APP_GROUP_ID
+            / "runtime-profiles"
+            / profile
+        )
+
+    profile_root = Path("/tmp") / "xcode-derived" / "profiles" / profile
+    return str(profile_root.joinpath(*PROFILE_SOURCE_PATH_SUFFIXES[source_key]))
 
 
 class RuntimeProfileHelperTests(unittest.TestCase):
@@ -164,11 +216,11 @@ class RuntimeProfileHelperTests(unittest.TestCase):
 
     def test_default_agent_profile_uses_agent_session_id(self) -> None:
         env = base_env()
-        env["CODEX_SESSION_ID"] = "sess-agent-123"
+        env["CODEX_SESSION_ID"] = CURRENT_AGENT_SESSION_ID
 
         output = run_helper("harness_monitor_default_agent_runtime_profile", env)
 
-        self.assertEqual(output, "agent-sess-agent-123")
+        self.assertEqual(output, CURRENT_AGENT_PROFILE)
 
     def test_runtime_profile_defaults_to_agent_session_profile_when_unset(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -178,7 +230,7 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             env.update(
                 {
                     "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
                 }
             )
 
@@ -191,71 +243,90 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             )
             profile, derived_data_path, label = output.splitlines()
 
-            self.assertEqual(profile, "agent-sess-agent-123")
+            self.assertEqual(profile, CURRENT_AGENT_PROFILE)
             self.assertEqual(
                 derived_data_path,
-                "/repo-common/xcode-derived/profiles/agent-sess-agent-123",
+                f"/repo-common/xcode-derived/profiles/{CURRENT_AGENT_PROFILE}",
             )
-            self.assertEqual(label, "io.harnessmonitor.daemon.agent-sess-agent-123")
+            self.assertEqual(label, f"io.harnessmonitor.daemon.{CURRENT_AGENT_PROFILE}")
 
-    def test_runtime_profile_rejects_path_derived_non_agent_profile_in_agent_session(
-        self,
-    ) -> None:
+    def test_agent_runtime_profile_source_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             home_dir = Path(tmp_dir) / "home"
             home_dir.mkdir(parents=True)
 
             cases = (
-                ("XCODEBUILD_DERIVED_DATA_PATH", "/tmp/xcode-derived/profiles/Bart Dev"),
                 (
-                    "HARNESS_DAEMON_DATA_HOME",
-                    str(
-                        home_dir
-                        / "Library"
-                        / "Group Containers"
-                        / DEFAULT_APP_GROUP_ID
-                        / "runtime-profiles"
-                        / "Bart Dev"
-                    ),
+                    "current-session-profile",
+                    CURRENT_AGENT_PROFILE,
+                    {},
+                    0,
+                    CURRENT_AGENT_PROFILE,
+                    None,
+                ),
+                (
+                    "foreign-agent-profile",
+                    FOREIGN_AGENT_PROFILE,
+                    {},
+                    1,
+                    None,
+                    "targets a different agent session",
+                ),
+                (
+                    "non-agent-profile",
+                    NON_AGENT_PROFILE_RAW,
+                    {},
+                    1,
+                    None,
+                    f"Resolved profile '{NON_AGENT_PROFILE}' is not allowed.",
+                ),
+                (
+                    "non-agent-profile-with-override",
+                    NON_AGENT_PROFILE_RAW,
+                    {"HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE": "1"},
+                    0,
+                    NON_AGENT_PROFILE,
+                    None,
+                ),
+                (
+                    "foreign-agent-profile-with-non-agent-override",
+                    FOREIGN_AGENT_PROFILE,
+                    {"HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE": "1"},
+                    1,
+                    None,
+                    "targets a different agent session",
                 ),
             )
 
-            for env_key, env_value in cases:
-                with self.subTest(env_key=env_key):
-                    env = base_env()
-                    env.update(
-                        {
-                            "HOME": str(home_dir),
-                            "CODEX_SESSION_ID": "sess-agent-123",
-                            env_key: env_value,
-                        }
-                    )
+            for source_key in PROFILE_SOURCE_KEYS:
+                for (
+                    case_name,
+                    profile_input,
+                    extra_env,
+                    expected_returncode,
+                    expected_output,
+                    expected_error,
+                ) in cases:
+                    with self.subTest(source_key=source_key, case=case_name):
+                        env = agent_session_env(home_dir)
+                        env[source_key] = profile_source_env_value(
+                            source_key, profile_input, home_dir
+                        )
+                        env.update(extra_env)
 
-                    completed = run_helper_result("harness_monitor_runtime_profile", env)
+                        completed = run_helper_result(
+                            "harness_monitor_runtime_profile", env
+                        )
 
-                    self.assertNotEqual(completed.returncode, 0)
-                    self.assertIn(
-                        "Agent sessions must use an isolated agent-* runtime profile",
-                        completed.stderr,
-                    )
-
-    def test_runtime_profile_allows_non_agent_override_when_opted_in(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            home_dir = Path(tmp_dir) / "home"
-            home_dir.mkdir()
-            env = base_env()
-            env.update(
-                {
-                    "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": "sess-agent-123",
-                    "HARNESS_MONITOR_RUNTIME_PROFILE": "Bart Dev",
-                    "HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE": "1",
-                }
-            )
-
-            output = run_helper("harness_monitor_runtime_profile", env)
-
-            self.assertEqual(output, "bart-dev")
+                        self.assertEqual(
+                            completed.returncode,
+                            expected_returncode,
+                            completed.stderr,
+                        )
+                        if expected_output is not None:
+                            self.assertEqual(completed.stdout.strip(), expected_output)
+                        if expected_error is not None:
+                            self.assertIn(expected_error, completed.stderr)
 
     def test_user_runtime_profile_script_prints_profile_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -349,7 +420,7 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             env.update(
                 {
                     "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
                 }
             )
 
@@ -388,9 +459,9 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             env.update(
                 {
                     "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
                     "HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE": "1",
-                    "HARNESS_MONITOR_USER_RUNTIME_PROFILE": "Bart Dev",
+                    "HARNESS_MONITOR_USER_RUNTIME_PROFILE": NON_AGENT_PROFILE_RAW,
                 }
             )
 
