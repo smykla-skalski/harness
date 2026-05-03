@@ -30,6 +30,13 @@ export HARNESS_MONITOR_RUNTIME_PROFILE
 HARNESS_MONITOR_RUNTIME_PROFILE="$(resolve_user_runtime_profile)"
 harness_monitor_apply_runtime_profile_environment
 
+# Mark this lane as the workspace owner so the post-generate hook writes
+# the shared WorkspaceSettings.xcsettings to the user profile's
+# DerivedData. Agent lanes (agent-xcode-env.sh) intentionally leave this
+# unset so their `tuist generate` does not overwrite the user's shared
+# Xcode workspace state.
+export HARNESS_MONITOR_OWNS_WORKSPACE=1
+
 persist_user_derived_data_path() {
   harness_monitor_store_user_derived_data_path \
     "$ROOT" \

@@ -70,28 +70,46 @@ seed_generated_app_entitlements() {
   PROJECT_TEMP_DIR="$project_temp_dir" /bin/bash "$ROOT/Scripts/prepare-app-entitlements.sh"
 }
 
-write_build_server_config \
-  "$ROOT/buildServer.json" \
-  "./Scripts/run-xcode-build-server.sh" \
-  "HarnessMonitor.xcworkspace" \
-  "$(build_server_build_root_for_app_root)"
+# buildServer.json is tracked, shared, and consumed by the operator's
+# IDE (sourcekit-lsp via VS Code, Neovim, etc.). Only the user lane (set
+# via `user-runtime-profile.sh`) writes it, so agent `tuist generate`
+# runs do not flip the operator's IDE build_root over to the agent's
+# isolated DerivedData. Agents driving xcodebuild from the CLI use the
+# `XCODEBUILD_DERIVED_DATA_PATH` env directly and never read this file.
+if [[ "${HARNESS_MONITOR_OWNS_WORKSPACE:-0}" == "1" ]]; then
+  write_build_server_config \
+    "$ROOT/buildServer.json" \
+    "./Scripts/run-xcode-build-server.sh" \
+    "HarnessMonitor.xcworkspace" \
+    "$(build_server_build_root_for_app_root)"
 
-write_build_server_config \
-  "$REPO_ROOT/buildServer.json" \
-  "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
-  "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
-  "$(build_server_build_root_for_repo_root)"
+  write_build_server_config \
+    "$REPO_ROOT/buildServer.json" \
+    "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh" \
+    "apps/harness-monitor-macos/HarnessMonitor.xcworkspace" \
+    "$(build_server_build_root_for_repo_root)"
+fi
 
 ensure_monitor_build_artifact_roots_non_indexable "$REPO_ROOT"
 ensure_non_indexable_directory "$DERIVED_DATA_PATH"
 
-harness_monitor_write_workspace_settings \
-  "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
-  "$DERIVED_DATA_PATH"
+# Shared WorkspaceSettings.xcsettings is per-repo, not per-runtime-profile.
+# When agents call `tuist generate` from their isolated profile, they must
+# not overwrite the shared file with their agent-specific DerivedData
+# path (the workspace would then point Xcode UI at a stranger profile's
+# build dir for every other user). Only the user lane (which sets
+# `HARNESS_MONITOR_OWNS_WORKSPACE=1` via `user-runtime-profile.sh`) gets
+# to write the shared settings. Per-profile overrides for the calling
+# lane still land in `xcuserdata/<user>.xcuserdatad/` below.
+if [[ "${HARNESS_MONITOR_OWNS_WORKSPACE:-0}" == "1" ]]; then
+  harness_monitor_write_workspace_settings \
+    "$ROOT/HarnessMonitor.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
+    "$DERIVED_DATA_PATH"
 
-harness_monitor_write_workspace_settings \
-  "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
-  "$DERIVED_DATA_PATH"
+  harness_monitor_write_workspace_settings \
+    "$ROOT/HarnessMonitor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings" \
+    "$DERIVED_DATA_PATH"
+fi
 
 USER_DERIVED_DATA_PATH="$(harness_monitor_saved_user_derived_data_path "$ROOT" || true)"
 if [[ -n "$USER_DERIVED_DATA_PATH" ]]; then

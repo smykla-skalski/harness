@@ -14,7 +14,7 @@
     "./Scripts/run-xcode-build-server.sh"
   ],
   "workspace": "HarnessMonitor.xcworkspace",
-  "build_root": "../../xcode-derived",
+  "build_root": "../../xcode-derived/profiles/bartsmykla",
   "scheme": "HarnessMonitor",
   "kind": "xcode"
 }
