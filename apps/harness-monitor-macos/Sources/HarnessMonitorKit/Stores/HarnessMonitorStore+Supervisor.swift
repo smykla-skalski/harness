@@ -225,6 +225,7 @@ extension HarnessMonitorStore {
       return
     }
     if enabled {
+      stack.lifecycle.startBackgroundActivity()
       stack.auditRetention?.startBackgroundCompaction()
     } else {
       stack.lifecycle.stopBackgroundActivity()

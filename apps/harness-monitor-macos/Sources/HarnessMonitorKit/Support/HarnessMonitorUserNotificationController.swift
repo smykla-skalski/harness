@@ -2,31 +2,6 @@ import Foundation
 import Observation
 import UserNotifications
 
-public protocol HarnessMonitorUserNotificationCenter: AnyObject {
-  var delegate: UNUserNotificationCenterDelegate? { get set }
-
-  func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
-  func notificationSettings() async -> UNNotificationSettings
-  func pendingNotificationRequests() async -> [UNNotificationRequest]
-  func deliveredNotifications() async -> [UNNotification]
-  func notificationCategories() async -> Set<UNNotificationCategory>
-  func add(_ request: UNNotificationRequest) async throws
-  func removeAllPendingNotificationRequests()
-  func removeAllDeliveredNotifications()
-  func setBadgeCount(_ newBadgeCount: Int) async throws
-  func setNotificationCategories(_ categories: Set<UNNotificationCategory>)
-}
-
-extension UNUserNotificationCenter: HarnessMonitorUserNotificationCenter {}
-
-private final class HarnessMonitorUserNotificationCenterBox: @unchecked Sendable {
-  let base: any HarnessMonitorUserNotificationCenter
-
-  init(_ base: any HarnessMonitorUserNotificationCenter) {
-    self.base = base
-  }
-}
-
 @MainActor
 @Observable
 public final class HarnessMonitorUserNotificationController: NSObject,
@@ -142,6 +117,43 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     summary: String,
     decisionID: String
   ) async {
+    await deliverSupervisorNotification(
+      severity: severity,
+      successMessage: "Scheduled supervisor decision \(decisionID).",
+      failureMessage: "Scheduling supervisor decision failed"
+    ) {
+      try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
+        severity: severity,
+        summary: summary,
+        decisionID: decisionID
+      )
+    }
+  }
+
+  public func deliverSupervisorNotice(
+    severity: DecisionSeverity,
+    summary: String,
+    ruleID: String
+  ) async {
+    await deliverSupervisorNotification(
+      severity: severity,
+      successMessage: "Scheduled supervisor notice for \(ruleID).",
+      failureMessage: "Scheduling supervisor notice failed"
+    ) {
+      try await HarnessMonitorNotificationRequestFactory.makeSupervisorNoticeRequest(
+        severity: severity,
+        summary: summary,
+        ruleID: ruleID
+      )
+    }
+  }
+
+  private func deliverSupervisorNotification(
+    severity: DecisionSeverity,
+    successMessage: String,
+    failureMessage: String,
+    makeRequest: () async throws -> UNNotificationRequest
+  ) async {
     await performNotificationOperation {
       let preferences = SupervisorNotificationPreferences.load()
       guard preferences.allowsAnyDelivery(for: severity) else {
@@ -150,16 +162,12 @@ public final class HarnessMonitorUserNotificationController: NSObject,
       }
       do {
         registerCategories()
-        let request = try await HarnessMonitorNotificationRequestFactory.makeSupervisorRequest(
-          severity: severity,
-          summary: summary,
-          decisionID: decisionID
-        )
+        let request = try await makeRequest()
         try await centerBox.base.add(request)
-        lastResult = "Scheduled supervisor decision \(decisionID)."
+        lastResult = successMessage
         await refreshStatus()
       } catch {
-        lastResult = "Scheduling supervisor decision failed: \(error.localizedDescription)"
+        lastResult = "\(failureMessage): \(error.localizedDescription)"
       }
     }
   }

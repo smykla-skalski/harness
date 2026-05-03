@@ -239,10 +239,11 @@ final class StuckAgentRuleTests: XCTestCase {
     createdAt: Date
   ) -> SupervisorEventSummary {
     SupervisorEventSummary(
-      id: actionKey,
+      id: UUID().uuidString,
       kind: kind,
       ruleID: "stuck-agent",
-      createdAt: createdAt
+      createdAt: createdAt,
+      actionKey: actionKey
     )
   }
 }

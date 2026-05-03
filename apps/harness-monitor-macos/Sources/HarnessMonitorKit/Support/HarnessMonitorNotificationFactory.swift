@@ -110,6 +110,30 @@ enum HarnessMonitorNotificationRequestFactory {
     return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
   }
 
+  static func makeSupervisorNoticeRequest(
+    severity: DecisionSeverity,
+    summary: String,
+    ruleID: String
+  ) async throws -> UNNotificationRequest {
+    let preferences = SupervisorNotificationPreferences.load()
+    let content = UNMutableNotificationContent()
+    content.title = "Harness Monitor"
+    content.subtitle = severity.supervisorNotificationSubtitle
+    content.body = summary
+    content.threadIdentifier = HarnessMonitorSupervisorNotificationID.threadIdentifier
+    content.categoryIdentifier = HarnessMonitorNotificationCategoryID.statusActions
+    content.interruptionLevel = severity.supervisorInterruptionLevel
+    content.relevanceScore = severity.supervisorRelevanceScore
+    content.sound = preferences.requestSound(for: severity)
+    content.userInfo = [
+      HarnessMonitorSupervisorNotificationID.ruleIDKey: ruleID,
+      HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,
+    ]
+    let identifier =
+      "\(HarnessMonitorSupervisorNotificationID.noticeRequestPrefix)\(ruleID).\(UUID().uuidString)"
+    return UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+  }
+
   static func makeAcpPermissionRequest(
     agentName: String,
     decisionID: String
@@ -314,7 +338,9 @@ enum HarnessMonitorNotificationRequestFactory {
 public enum HarnessMonitorSupervisorNotificationID {
   public static let threadIdentifier = "io.harnessmonitor.supervisor"
   public static let requestPrefix = "io.harnessmonitor.supervisor.decision."
+  public static let noticeRequestPrefix = "io.harnessmonitor.supervisor.notice."
   public static let decisionIDKey = "io.harnessmonitor.supervisor.decisionID"
+  public static let ruleIDKey = "io.harnessmonitor.supervisor.ruleID"
   public static let severityKey = "io.harnessmonitor.supervisor.severity"
 
   public static func category(for severity: DecisionSeverity) -> String {

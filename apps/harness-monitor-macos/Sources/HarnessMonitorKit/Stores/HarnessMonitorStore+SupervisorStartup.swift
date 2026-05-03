@@ -97,6 +97,7 @@ extension HarnessMonitorStore {
     supervisorStack = stack
 
     await service.start()
+    lifecycle.startBackgroundActivity()
     auditRetention?.startBackgroundCompaction()
 
     HarnessMonitorLogger.supervisorTrace("supervisor.started")

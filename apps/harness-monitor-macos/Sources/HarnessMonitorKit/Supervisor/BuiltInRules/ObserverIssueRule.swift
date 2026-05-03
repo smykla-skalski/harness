@@ -66,7 +66,9 @@ public struct ObserverIssueRule: PolicyRule {
     let minimumSeverity = minSeverity(in: context)
     let windowStart = context.now.addingTimeInterval(-TimeInterval(issueWindow(in: context)))
     return session.observerIssues.filter { issue in
-      guard let firstSeen = issue.firstSeen, firstSeen >= windowStart else { return false }
+      if let firstSeen = issue.firstSeen, firstSeen < windowStart {
+        return false
+      }
       return severity(for: issue).sortKey >= minimumSeverity.sortKey
     }
   }
@@ -128,7 +130,7 @@ private struct ObserverBundle: Encodable {
       self.id = issue.id
       self.code = issue.code
       self.severity = issue.severityRaw
-      self.firstSeen = issue.firstSeen ?? .distantPast
+      self.firstSeen = issue.firstSeen ?? Date(timeIntervalSince1970: 0)
       self.count = issue.count
     }
   }

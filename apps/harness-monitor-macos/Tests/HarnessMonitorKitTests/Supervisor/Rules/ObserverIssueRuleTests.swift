@@ -5,8 +5,8 @@ import XCTest
 
 /// TDD cover for `ObserverIssueRule` (source plan Task 14).
 /// Trigger contract: at least `minCount` observer issues with severity ≥ `minSeverity` whose
-/// `firstSeen` falls inside the last `issueWindow` seconds emit one cautious `.queueDecision`
-/// action per session that bundles the related issue codes/ids into `contextJSON`.
+/// `firstSeen` falls inside the last `issueWindow` seconds, or comes from a live summary that has
+/// no timestamp, emit one cautious `.queueDecision` action per session.
 final class ObserverIssueRuleTests: XCTestCase {
   private let now = Date.fixed
 
@@ -73,6 +73,25 @@ final class ObserverIssueRuleTests: XCTestCase {
     )
 
     XCTAssertTrue(actions.isEmpty)
+  }
+
+  func test_emitsDecisionForLiveObserverIssuesWithoutFirstSeenTimestamp() async {
+    let rule = ObserverIssueRule()
+    let snapshot = makeSnapshot(
+      sessionID: "s1",
+      issues: [
+        makeUntimestampedIssue(id: "i1", code: "obs.slow_tool"),
+        makeUntimestampedIssue(id: "i2", code: "obs.retry_storm"),
+        makeUntimestampedIssue(id: "i3", code: "obs.stall"),
+      ]
+    )
+
+    let actions = await rule.evaluate(
+      snapshot: snapshot,
+      context: makeContext(parameters: [:])
+    )
+
+    XCTAssertEqual(actions.count, 1)
   }
 
   // MARK: - contextJSON bundle
@@ -275,6 +294,16 @@ final class ObserverIssueRuleTests: XCTestCase {
       severityRaw: severity,
       code: code,
       firstSeen: now.addingTimeInterval(firstSeenOffset),
+      count: 1
+    )
+  }
+
+  private func makeUntimestampedIssue(id: String, code: String) -> ObserverIssueSnapshot {
+    ObserverIssueSnapshot(
+      id: id,
+      severityRaw: "warn",
+      code: code,
+      firstSeen: nil,
       count: 1
     )
   }
