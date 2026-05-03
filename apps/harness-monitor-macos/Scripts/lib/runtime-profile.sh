@@ -76,6 +76,7 @@ harness_monitor_runtime_profile() {
   local candidate path
   candidate="$(harness_monitor_sanitize_profile "${HARNESS_MONITOR_RUNTIME_PROFILE:-}")"
   if [[ -n "$candidate" ]]; then
+    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
     printf '%s\n' "$candidate"
     return 0
   fi
@@ -85,15 +86,23 @@ harness_monitor_runtime_profile() {
     "${XCODEBUILD_DERIVED_DATA_PATH:-}" \
     "${TARGET_BUILD_DIR:-}" \
     "${BUILT_PRODUCTS_DIR:-}" \
-    "${BUILD_DIR:-}" \
-    "${PROJECT_TEMP_DIR:-}" \
-    "${TARGET_TEMP_DIR:-}"; do
+      "${BUILD_DIR:-}" \
+      "${PROJECT_TEMP_DIR:-}" \
+      "${TARGET_TEMP_DIR:-}"; do
     candidate="$(harness_monitor_profile_from_path "$path" || true)"
     if [[ -n "$candidate" ]]; then
+      harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
       printf '%s\n' "$candidate"
       return 0
     fi
   done
+
+  candidate="$(harness_monitor_default_agent_runtime_profile || true)"
+  if [[ -n "$candidate" ]]; then
+    harness_monitor_validate_resolved_runtime_profile "$candidate" || return 1
+    printf '%s\n' "$candidate"
+    return 0
+  fi
 
   return 1
 }
@@ -152,6 +161,56 @@ harness_monitor_default_agent_runtime_profile() {
   profile="$(harness_monitor_sanitize_profile "agent-$session_id")"
   [[ -n "$profile" ]] || return 1
   printf '%s\n' "$profile"
+}
+
+harness_monitor_env_flag_enabled() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+harness_monitor_allow_non_agent_runtime_profile() {
+  harness_monitor_env_flag_enabled "${HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE:-0}"
+}
+
+harness_monitor_is_agent_runtime_profile() {
+  local profile
+  profile="$(harness_monitor_sanitize_profile "$1")"
+  [[ -n "$profile" && "$profile" == agent-* ]]
+}
+
+# Agent sessions may only resolve onto `agent-*` lanes unless a caller
+# explicitly opts into a shared/user profile. Apply the rule uniformly no
+# matter whether the profile came from env, an inherited path, or fallback.
+harness_monitor_validate_resolved_runtime_profile() {
+  local profile="$1"
+  local default_profile
+
+  profile="$(harness_monitor_sanitize_profile "$profile")"
+  [[ -n "$profile" ]] || return 1
+
+  if ! harness_monitor_agent_session_id >/dev/null 2>&1; then
+    return 0
+  fi
+  if harness_monitor_allow_non_agent_runtime_profile; then
+    return 0
+  fi
+  if harness_monitor_is_agent_runtime_profile "$profile"; then
+    return 0
+  fi
+
+  default_profile="$(harness_monitor_default_agent_runtime_profile || true)"
+  if [[ -n "$default_profile" ]]; then
+    printf '%s\n' \
+      "Agent sessions must use an isolated agent-* runtime profile. Resolved profile '$profile' is not allowed. Unset HARNESS_MONITOR_RUNTIME_PROFILE to use '$default_profile' automatically, or set HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE=1 only for an intentional shared/user lane." \
+      >&2
+  else
+    printf '%s\n' \
+      "Agent sessions must use an isolated agent-* runtime profile. Resolved profile '$profile' is not allowed." \
+      >&2
+  fi
+  return 1
 }
 
 harness_monitor_runtime_app_group_id() {

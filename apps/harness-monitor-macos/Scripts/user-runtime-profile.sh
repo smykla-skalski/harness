@@ -10,6 +10,22 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
 source "$SCRIPT_DIR/lib/runtime-profile.sh"
 
+allow_agent_user_lane() {
+  harness_monitor_env_flag_enabled "${HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE:-0}"
+}
+
+reject_agent_user_lane() {
+  if allow_agent_user_lane; then
+    return 0
+  fi
+  if harness_monitor_agent_session_id >/dev/null 2>&1; then
+    printf '%s\n' \
+      "Agent sessions must not use the Harness Monitor user profile lane. Use 'mise run monitor:agent:*' or 'apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...' instead. If you intentionally need the user lane from an agent, set HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE=1." \
+      >&2
+    exit 1
+  fi
+}
+
 resolve_user_runtime_profile() {
   local profile
   profile="$(harness_monitor_sanitize_profile "${HARNESS_MONITOR_RUNTIME_PROFILE:-}")"
@@ -25,6 +41,8 @@ resolve_user_runtime_profile() {
   fi
   printf '%s\n' "$profile"
 }
+
+reject_agent_user_lane
 
 export HARNESS_MONITOR_RUNTIME_PROFILE
 HARNESS_MONITOR_RUNTIME_PROFILE="$(resolve_user_runtime_profile)"

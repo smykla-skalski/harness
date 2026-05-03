@@ -13,6 +13,16 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 AGENT_SCRIPT_SOURCE = APP_ROOT / "Scripts" / "agent-xcode-env.sh"
 RUNTIME_PROFILE_SOURCE = APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh"
 COMMON_REPO_ROOT_SOURCE = APP_ROOT.parents[1] / "scripts" / "lib" / "common-repo-root.sh"
+AGENT_SESSION_ENV_KEYS = (
+    "HARNESS_AGENT_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CLAUDE_SESSION_ID",
+    "GEMINI_SESSION_ID",
+    "COPILOT_SESSION_ID",
+    "OPENCODE_SESSION_ID",
+    "VIBE_SESSION_ID",
+)
 
 
 def prepare_agent_script_root(temp_root: Path) -> tuple[Path, Path]:
@@ -35,6 +45,15 @@ def prepare_agent_script_root(temp_root: Path) -> tuple[Path, Path]:
     return repo_root, scripts_root / "agent-xcode-env.sh"
 
 
+def base_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in AGENT_SESSION_ENV_KEYS:
+        env.pop(key, None)
+    env.pop("HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE", None)
+    env.pop("HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE", None)
+    return env
+
+
 class AgentXcodeEnvTests(unittest.TestCase):
     def test_prints_isolated_agent_profile_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -43,7 +62,7 @@ class AgentXcodeEnvTests(unittest.TestCase):
             home_dir = temp_root / "home"
             home_dir.mkdir()
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HOME": str(home_dir),
@@ -78,6 +97,36 @@ class AgentXcodeEnvTests(unittest.TestCase):
             )
             self.assertIn("mise run monitor:agent:xcodebuildmcp", completed.stdout)
 
+    def test_rejects_non_agent_runtime_profile_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            _, script_path = prepare_agent_script_root(temp_root)
+            home_dir = temp_root / "home"
+            home_dir.mkdir()
+
+            env = base_env()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "CODEX_SESSION_ID": "sess-agent-123",
+                    "HARNESS_MONITOR_RUNTIME_PROFILE": "claude-main",
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(script_path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn(
+                "Agent sessions must use an isolated agent-* runtime profile",
+                completed.stderr,
+            )
+
     def test_blocks_xcode_ide_without_explicit_agent_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -85,7 +134,7 @@ class AgentXcodeEnvTests(unittest.TestCase):
             home_dir = temp_root / "home"
             home_dir.mkdir()
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HOME": str(home_dir),
@@ -116,7 +165,7 @@ class AgentXcodeEnvTests(unittest.TestCase):
             developer_dir = temp_root / "Xcode-Agent.app" / "Contents" / "Developer"
             developer_dir.mkdir(parents=True)
 
-            env = os.environ.copy()
+            env = base_env()
             env.update(
                 {
                     "HOME": str(home_dir),

@@ -18,6 +18,52 @@ ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 readonly ROOT
 STALE_SCAN_ROOT="$ROOT"
 export STALE_SCAN_ROOT
+AGENT_SESSION_ENV_KEYS=(
+  HARNESS_AGENT_ID
+  CODEX_SESSION_ID
+  CODEX_THREAD_ID
+  CLAUDE_SESSION_ID
+  GEMINI_SESSION_ID
+  COPILOT_SESSION_ID
+  OPENCODE_SESSION_ID
+  VIBE_SESSION_ID
+)
+ISOLATED_TEST_ENV_KEYS=(
+  HARNESS_MONITOR_RUNTIME_PROFILE
+  HARNESS_DAEMON_DATA_HOME
+  HARNESS_CODEX_WS_PORT
+  HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL
+  HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE
+  HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE
+)
+SAVED_AGENT_SESSION_ENV=()
+
+unset_agent_session_env() {
+  local key
+  for key in "${AGENT_SESSION_ENV_KEYS[@]}"; do
+    if [[ -n "${!key+x}" ]]; then
+      SAVED_AGENT_SESSION_ENV+=("$key=${!key}")
+      unset "$key"
+    fi
+  done
+  for key in "${ISOLATED_TEST_ENV_KEYS[@]}"; do
+    if [[ -n "${!key+x}" ]]; then
+      SAVED_AGENT_SESSION_ENV+=("$key=${!key}")
+      unset "$key"
+    fi
+  done
+}
+
+restore_agent_session_env() {
+  local entry key value
+  for entry in "${SAVED_AGENT_SESSION_ENV[@]}"; do
+    key="${entry%%=*}"
+    value="${entry#*=}"
+    export "$key=$value"
+  done
+}
+
+unset_agent_session_env
 # shellcheck source=scripts/lib/stale-scan.sh
 source "$ROOT/scripts/lib/stale-scan.sh"
 
@@ -44,6 +90,7 @@ cleanup() {
     rm -f "$marker"
   done
   rm -rf "$SANDBOX"
+  restore_agent_session_env
 }
 trap cleanup EXIT
 
@@ -1392,6 +1439,7 @@ scenario_codex_ws_port_env() {
 # ---------------------------------------------------------------------------
 scenario_codex_app_server_listener_detected() {
   start_test "codex app-server listener on Codex port is detected for cleanup"
+  local daemon_data_home="$SANDBOX/runtime-profiles/codex-detect"
   local port
   port="$(allocate_free_tcp_port)"
   local port_file="$SANDBOX/codex-$RUN_ID.port"
@@ -1403,7 +1451,7 @@ scenario_codex_app_server_listener_detected() {
 
   stale_scan_refresh_ps
   local codex_pids
-  codex_pids="$(stale_scan_codex_app_server_listener_pids "$port")"
+  codex_pids="$(HARNESS_DAEMON_DATA_HOME="$daemon_data_home" stale_scan_codex_app_server_listener_pids "$port")"
   assert_in_list "$pid" "codex app-server listener pid" "$codex_pids" && pass
 }
 
