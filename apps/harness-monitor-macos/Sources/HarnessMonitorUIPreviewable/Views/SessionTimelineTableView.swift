@@ -6,16 +6,17 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
   let visibleRowCount: Int
   let renderedRowCount: Int
   let anchorRowID: String?
+  let firstVisibleEventOffset: Int?
+  let lastVisibleEventOffset: Int?
 
-  static func initial(
-    estimatedVisibleRows: Int,
-    totalRows: Int
-  ) -> Self {
-    let count = min(max(estimatedVisibleRows, 0), max(totalRows, 0))
+  static func initial(estimatedVisibleEvents: Int) -> Self {
+    let count = max(estimatedVisibleEvents, 0)
     return Self(
       visibleRowCount: count,
       renderedRowCount: count,
-      anchorRowID: nil
+      anchorRowID: nil,
+      firstVisibleEventOffset: count == 0 ? nil : 0,
+      lastVisibleEventOffset: count == 0 ? nil : count - 1
     )
   }
 }

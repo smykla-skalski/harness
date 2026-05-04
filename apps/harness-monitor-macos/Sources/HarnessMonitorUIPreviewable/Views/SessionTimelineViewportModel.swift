@@ -12,9 +12,9 @@ final class SessionTimelineViewportModel {
   private(set) var visibilityStats: SessionTimelineVisibilityStats = .empty
 
   @ObservationIgnored private var lastViewport = SessionTimelineTableViewportStats.initial(
-    estimatedVisibleRows: 0,
-    totalRows: 0
+    estimatedVisibleEvents: 0
   )
+  @ObservationIgnored private var presentationWindowStart = 0
   @ObservationIgnored private var presentationLoadedCount = 0
   @ObservationIgnored private var presentationTotalCount = 0
 
@@ -32,24 +32,27 @@ final class SessionTimelineViewportModel {
     }
   }
 
-  func updatePresentationCounts(loaded: Int, total: Int) {
+  func updatePresentationCounts(windowStart: Int, loaded: Int, total: Int) {
     let clampedLoaded = max(0, loaded)
     let clampedTotal = max(0, total)
+    let maximumWindowStart = max(0, clampedTotal - max(clampedLoaded, 1))
+    let clampedWindowStart = max(0, min(windowStart, maximumWindowStart))
     guard
-      presentationLoadedCount != clampedLoaded
+      presentationWindowStart != clampedWindowStart
+        || presentationLoadedCount != clampedLoaded
         || presentationTotalCount != clampedTotal
     else {
       return
     }
+    presentationWindowStart = clampedWindowStart
     presentationLoadedCount = clampedLoaded
     presentationTotalCount = clampedTotal
     rebuildStats()
   }
 
-  func recordInitialViewport(estimatedVisibleRows: Int, totalRows: Int) {
+  func recordInitialViewport(estimatedVisibleEvents: Int) {
     let stats = SessionTimelineTableViewportStats.initial(
-      estimatedVisibleRows: estimatedVisibleRows,
-      totalRows: totalRows
+      estimatedVisibleEvents: min(max(estimatedVisibleEvents, 0), presentationLoadedCount)
     )
     recordViewportStats(stats)
   }
@@ -58,9 +61,9 @@ final class SessionTimelineViewportModel {
     visibleAnchorID = nil
     visibilityStats = .empty
     lastViewport = SessionTimelineTableViewportStats.initial(
-      estimatedVisibleRows: 0,
-      totalRows: 0
+      estimatedVisibleEvents: 0
     )
+    presentationWindowStart = 0
     presentationLoadedCount = 0
     presentationTotalCount = 0
   }
@@ -70,10 +73,35 @@ final class SessionTimelineViewportModel {
       visibleRowCount: lastViewport.visibleRowCount,
       renderedRowCount: lastViewport.renderedRowCount,
       loadedEventCount: presentationLoadedCount,
-      totalEventCount: presentationTotalCount
+      totalEventCount: presentationTotalCount,
+      firstVisibleEventNumber: absoluteEventNumber(
+        forLoadedOffset: lastViewport.firstVisibleEventOffset
+      ),
+      lastVisibleEventNumber: absoluteEventNumber(
+        forLoadedOffset: lastViewport.lastVisibleEventOffset
+      )
     )
     if visibilityStats != next {
       visibilityStats = next
     }
+  }
+
+  private func absoluteEventNumber(forLoadedOffset offset: Int?) -> Int? {
+    guard
+      let offset,
+      presentationTotalCount > 0,
+      presentationLoadedCount > 0
+    else {
+      return nil
+    }
+    let availableCount = min(
+      presentationLoadedCount,
+      max(0, presentationTotalCount - presentationWindowStart)
+    )
+    guard availableCount > 0 else {
+      return nil
+    }
+    let clampedOffset = max(0, min(offset, availableCount - 1))
+    return presentationWindowStart + clampedOffset + 1
   }
 }

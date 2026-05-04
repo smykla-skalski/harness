@@ -84,12 +84,15 @@ struct SessionCockpitTimelineSection: View {
     )
     cachedPresentationInput = input
     viewport.updatePresentationCounts(
+      windowStart: cachedPresentation.navigation.windowStart,
       loaded: cachedPresentation.navigation.loadedCount,
       total: cachedPresentation.navigation.totalCount
     )
     viewport.recordInitialViewport(
-      estimatedVisibleRows: cachedPresentation.fallbackVisibleRowCount,
-      totalRows: cachedPresentation.rows.count
+      estimatedVisibleEvents: min(
+        cachedPresentation.navigation.loadedCount,
+        cachedPresentation.fallbackVisibleRowCount
+      )
     )
   }
 
