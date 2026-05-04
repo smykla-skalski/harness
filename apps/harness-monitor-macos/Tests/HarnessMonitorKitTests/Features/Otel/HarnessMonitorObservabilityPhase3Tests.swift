@@ -1,274 +1,168 @@
 import Foundation
-import Testing
+import XCTest
 
 @testable import HarnessMonitorKit
 
-@Suite("Harness Monitor observability Phase 3 cache and resource metrics")
-struct HarnessMonitorObservabilityPhase3Tests {
+final class HarnessMonitorObservabilityPhase3Tests: XCTestCase {
+
+  private static var _server: GRPCCollectorServer!
+  private static var _temporaryHome: URL!
+  private static var _environment: HarnessMonitorEnvironment!
+
+  private var collector: GRPCCollectorServer { Self._server }
+
+  override class func setUp() {
+    super.setUp()
+    _server = try! GRPCCollectorServer()
+    (_temporaryHome, _environment) = try! makeTestEnvironment(collector: _server)
+  }
+
+  override class func tearDown() {
+    _server.shutdown()
+    try? FileManager.default.removeItem(at: _temporaryHome)
+    super.tearDown()
+  }
+
+  override func setUp() {
+    super.setUp()
+    collector.resetAllCollectors()
+    HarnessMonitorTelemetry.shared.resetForTests()
+    HarnessMonitorTelemetry.shared.bootstrap(using: Self._environment)
+  }
 
   // MARK: - Cache Read Instrumentation
 
-  @Test("Cache read records hit metric")
-  func cacheReadRecordsHitMetric() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testCacheReadRecordsHitMetric() async throws {
     HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_detail",
-      hit: true,
-      durationMs: 5.0
+      operation: "load_session_detail", hit: true, durationMs: 5.0
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
-    let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_cache_hits_total"))
+    XCTAssertTrue(
+      collector.metricCollector.metricNames.contains("harness_monitor_cache_hits_total")
+    )
   }
 
-  @Test("Cache read records miss metric")
-  func cacheReadRecordsMissMetric() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testCacheReadRecordsMissMetric() async throws {
     HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_detail",
-      hit: false,
-      durationMs: 10.0
+      operation: "load_session_detail", hit: false, durationMs: 10.0
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
-    let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_cache_misses_total"))
+    XCTAssertTrue(
+      collector.metricCollector.metricNames.contains("harness_monitor_cache_misses_total")
+    )
   }
 
-  @Test("Cache read records duration histogram")
-  func cacheReadRecordsDurationHistogram() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testCacheReadRecordsDurationHistogram() async throws {
     HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "load_session_list",
-      hit: true,
-      durationMs: 25.0
+      operation: "load_session_list", hit: true, durationMs: 25.0
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
-    let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_cache_read_duration_ms"))
+    XCTAssertTrue(
+      collector.metricCollector.metricNames.contains("harness_monitor_cache_read_duration_ms")
+    )
   }
 
-  @Test("Cache operation includes operation attribute")
-  func cacheOperationIncludesOperationAttribute() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testCacheOperationIncludesOperationAttribute() async throws {
     HarnessMonitorTelemetry.shared.recordCacheRead(
-      operation: "hydration_queue",
-      hit: true,
-      durationMs: 15.0
+      operation: "hydration_queue", hit: true, durationMs: 15.0
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
     let dataPoints = collector.metricCollector.dataPointsForMetric(
       "harness_monitor_cache_hits_total"
     )
-    let hasOperation = dataPoints.contains { dp in
-      dp.attributes["cache.operation"] == "hydration_queue"
-    }
-    #expect(hasOperation)
+    XCTAssertTrue(dataPoints.contains { $0.attributes["cache.operation"] == "hydration_queue" })
   }
 
   // MARK: - Resource Metrics
 
-  @Test("Resource metrics records memory gauges")
-  func resourceMetricsRecordsMemoryGauges() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testResourceMetricsRecordsMemoryGauges() async throws {
     HarnessMonitorTelemetry.shared.recordResourceMetrics(
-      residentMemoryBytes: 50_000_000,
-      virtualMemoryBytes: 200_000_000
+      residentMemoryBytes: 50_000_000, virtualMemoryBytes: 200_000_000
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
     let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_memory_resident_bytes"))
-    #expect(metricNames.contains("harness_monitor_memory_virtual_bytes"))
+    XCTAssertTrue(metricNames.contains("harness_monitor_memory_resident_bytes"))
+    XCTAssertTrue(metricNames.contains("harness_monitor_memory_virtual_bytes"))
   }
 
   // MARK: - API Error Metrics
 
-  @Test("API error records counter with error type")
-  func apiErrorRecordsCounterWithErrorType() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testAPIErrorRecordsCounterWithErrorType() async throws {
     HarnessMonitorTelemetry.shared.recordAPIError(
-      endpoint: "/v1/sessions",
-      method: "GET",
-      errorType: "timeout",
-      statusCode: nil
+      endpoint: "/v1/sessions", method: "GET", errorType: "timeout", statusCode: nil
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
     let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_api_errors_total"))
-
+    XCTAssertTrue(metricNames.contains("harness_monitor_api_errors_total"))
     let dataPoints = collector.metricCollector.dataPointsForMetric(
       "harness_monitor_api_errors_total"
     )
-    let hasErrorType = dataPoints.contains { dp in
-      dp.attributes["error.type"] == "timeout"
-    }
-    #expect(hasErrorType)
+    XCTAssertTrue(dataPoints.contains { $0.attributes["error.type"] == "timeout" })
   }
 
-  @Test("Decoding error records counter with entity")
-  func decodingErrorRecordsCounterWithEntity() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testDecodingErrorRecordsCounterWithEntity() async throws {
     HarnessMonitorTelemetry.shared.recordDecodingError(
-      entity: "SessionDetail",
-      reason: "keyNotFound"
+      entity: "SessionDetail", reason: "keyNotFound"
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
     let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_decoding_errors_total"))
-
+    XCTAssertTrue(metricNames.contains("harness_monitor_decoding_errors_total"))
     let dataPoints = collector.metricCollector.dataPointsForMetric(
       "harness_monitor_decoding_errors_total"
     )
-    let hasEntity = dataPoints.contains { dp in
-      dp.attributes["error.entity"] == "SessionDetail"
-    }
-    #expect(hasEntity)
+    XCTAssertTrue(dataPoints.contains { $0.attributes["error.entity"] == "SessionDetail" })
   }
 
-  @Test("Timeout error records counter with operation")
-  func timeoutErrorRecordsCounterWithOperation() async throws {
-    let collector = try GRPCCollectorServer()
-    defer {
-      collector.shutdown()
-      HarnessMonitorTelemetry.shared.resetForTests()
-    }
-
-    let (temporaryHome, environment) = try makeTestEnvironment(collector: collector)
-    defer { try? FileManager.default.removeItem(at: temporaryHome) }
-
-    HarnessMonitorTelemetry.shared.resetForTests()
-    HarnessMonitorTelemetry.shared.bootstrap(using: environment)
-
+  func testTimeoutErrorRecordsCounterWithOperation() async throws {
     HarnessMonitorTelemetry.shared.recordTimeoutError(
-      operation: "http_request",
-      durationMs: 30000.0
+      operation: "http_request", durationMs: 30000.0
     )
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.metricCollector.hasReceivedMetrics
+      self.collector.metricCollector.hasReceivedMetrics
     }
 
     let metricNames = collector.metricCollector.metricNames
-    #expect(metricNames.contains("harness_monitor_timeout_errors_total"))
-
+    XCTAssertTrue(metricNames.contains("harness_monitor_timeout_errors_total"))
     let dataPoints = collector.metricCollector.dataPointsForMetric(
       "harness_monitor_timeout_errors_total"
     )
-    let hasOperation = dataPoints.contains { dp in
-      dp.attributes["timeout.operation"] == "http_request"
-    }
-    #expect(hasOperation)
+    XCTAssertTrue(dataPoints.contains { $0.attributes["timeout.operation"] == "http_request" })
   }
 }

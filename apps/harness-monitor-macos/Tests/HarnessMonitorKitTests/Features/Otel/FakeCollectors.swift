@@ -33,6 +33,12 @@ final class GRPCCollectorServer: @unchecked Sendable {
     self.endpoint = endpoint
   }
 
+  func resetAllCollectors() {
+    traceCollector.reset()
+    logCollector.reset()
+    metricCollector.reset()
+  }
+
   func shutdown() {
     try? server.close().wait()
     try? group.syncShutdownGracefully()
@@ -102,6 +108,10 @@ final class FakeTraceCollector: Opentelemetry_Proto_Collector_Trace_V1_TraceServ
     Opentelemetry_Proto_Collector_Trace_V1_TraceServiceServerInterceptorFactoryProtocol?
   private let lock = NSLock()
   private(set) var receivedSpans = [Opentelemetry_Proto_Trace_V1_ResourceSpans]()
+
+  func reset() {
+    lock.withLock { receivedSpans.removeAll() }
+  }
 
   var hasReceivedSpans: Bool {
     lock.withLock {
@@ -192,6 +202,10 @@ final class FakeLogCollector: Opentelemetry_Proto_Collector_Logs_V1_LogsServiceP
     Opentelemetry_Proto_Collector_Logs_V1_LogsServiceServerInterceptorFactoryProtocol?
   private(set) var receivedLogs = [Opentelemetry_Proto_Logs_V1_ResourceLogs]()
 
+  func reset() {
+    receivedLogs.removeAll()
+  }
+
   var hasReceivedLogs: Bool {
     receivedLogs.isEmpty == false
   }
@@ -225,6 +239,10 @@ final class FakeMetricCollector: Opentelemetry_Proto_Collector_Metrics_V1_Metric
     Opentelemetry_Proto_Collector_Metrics_V1_MetricsServiceServerInterceptorFactoryProtocol?
   private let lock = NSLock()
   private(set) var receivedMetrics = [Opentelemetry_Proto_Metrics_V1_ResourceMetrics]()
+
+  func reset() {
+    lock.withLock { receivedMetrics.removeAll() }
+  }
 
   var hasReceivedMetrics: Bool {
     lock.withLock {
