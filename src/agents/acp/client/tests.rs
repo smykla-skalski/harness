@@ -18,8 +18,9 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 use super::{
-    BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_CAP_REACHED, PERMISSION_TIMEOUT,
-    READ_DENIED, TERMINAL_DENIED, TERMINAL_NOT_FOUND, WRITE_DENIED,
+    BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_CAP_REACHED,
+    PERMISSION_RUNTIME_UNSUPPORTED, PERMISSION_TIMEOUT, READ_DENIED, TERMINAL_DENIED,
+    TERMINAL_NOT_FOUND, WRITE_DENIED,
 };
 use crate::agents::acp::permission::{PermissionMode, standard_permission_options};
 
@@ -499,6 +500,7 @@ fn error_codes_are_distinct() {
         READ_DENIED,
         PERMISSION_TIMEOUT,
         PERMISSION_CAP_REACHED,
+        PERMISSION_RUNTIME_UNSUPPORTED,
         DAEMON_SHUTDOWN,
     ];
     let unique: BTreeSet<_> = codes.iter().collect();

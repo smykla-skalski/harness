@@ -40,8 +40,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::RecvTimeoutError;
-use std::sync::mpsc::sync_channel;
+use std::time::Duration;
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
@@ -50,14 +49,18 @@ use agent_client_protocol::schema::{
     TerminalOutputResponse, WaitForTerminalExitRequest, WaitForTerminalExitResponse,
     WriteTextFileRequest, WriteTextFileResponse,
 };
+use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::oneshot;
+use tokio::task::block_in_place;
+use tokio::time::timeout;
 
 use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
 use super::permission::{
-    PermissionMode, is_allow_outcome, record_terminal_decision, record_write_decision,
-    recording_permission_gateway, stdin_permission_gateway,
+    PermissionBridgeResult, PermissionMode, is_allow_outcome, record_terminal_decision,
+    record_write_decision, recording_permission_gateway, stdin_permission_gateway,
 };
 use permission_gate::{terminal_permission_request, write_permission_request};
 use terminal::TerminalManager;
@@ -82,6 +85,9 @@ pub const PERMISSION_TIMEOUT: i32 = -32006;
 
 /// JSON-RPC error code: permission bridge concurrency cap reached.
 pub const PERMISSION_CAP_REACHED: i32 = -32007;
+
+/// JSON-RPC error code: permission wait requires a blocking thread.
+pub const PERMISSION_RUNTIME_UNSUPPORTED: i32 = -32008;
 
 /// JSON-RPC error code: daemon shutdown in progress.
 pub const DAEMON_SHUTDOWN: i32 = -32099;
@@ -433,7 +439,8 @@ impl HarnessAcpClient {
                 })
             }
             PermissionMode::DaemonBridge { tx, deadline } => {
-                let (response_tx, response_rx) = sync_channel(1);
+                ensure_permission_bridge_wait_runtime_supported()?;
+                let (response_tx, response_rx) = oneshot::channel();
                 tx.try_send(super::permission::PermissionBridgeRequest {
                     request: request.clone(),
                     deadline: *deadline,
@@ -447,19 +454,7 @@ impl HarnessAcpClient {
                         ClientError::new(DAEMON_SHUTDOWN, "permission bridge disconnected")
                     }
                 })?;
-
-                match response_rx.recv_timeout(*deadline) {
-                    Ok(Ok(response)) => Ok(response),
-                    Ok(Err(error)) => Err(ClientError::new(error.code, error.message)),
-                    Err(RecvTimeoutError::Timeout) => Err(ClientError::new(
-                        PERMISSION_TIMEOUT,
-                        "permission response timed out",
-                    )),
-                    Err(RecvTimeoutError::Disconnected) => Err(ClientError::new(
-                        DAEMON_SHUTDOWN,
-                        "permission bridge disconnected",
-                    )),
-                }
+                wait_permission_bridge_response(*deadline, response_rx)
             }
         }
     }
@@ -489,8 +484,68 @@ impl ClientError {
     pub(super) fn is_permission_gateway_error(&self) -> bool {
         matches!(
             self.code,
-            PERMISSION_TIMEOUT | DAEMON_SHUTDOWN | PERMISSION_CAP_REACHED
+            PERMISSION_TIMEOUT
+                | DAEMON_SHUTDOWN
+                | PERMISSION_CAP_REACHED
+                | PERMISSION_RUNTIME_UNSUPPORTED
         )
+    }
+}
+
+fn ensure_permission_bridge_wait_runtime_supported() -> ClientResult<()> {
+    let Ok(current) = Handle::try_current() else {
+        return Ok(());
+    };
+    if matches!(current.runtime_flavor(), RuntimeFlavor::CurrentThread) {
+        return Err(ClientError::new(
+            PERMISSION_RUNTIME_UNSUPPORTED,
+            "daemon bridge permission waits must run on a blocking thread outside tokio current-thread runtimes",
+        ));
+    }
+    Ok(())
+}
+
+// Raw synchronous waits are supported outside Tokio and on Tokio multi-thread
+// runtimes. Current-thread runtimes must move the whole client call to
+// spawn_blocking so the bridge worker is never starved by the waiter.
+fn wait_permission_bridge_response(
+    deadline: Duration,
+    response_rx: oneshot::Receiver<PermissionBridgeResult>,
+) -> ClientResult<RequestPermissionResponse> {
+    let future = async move {
+        match timeout(deadline, response_rx).await {
+            Ok(Ok(Ok(response))) => Ok(response),
+            Ok(Ok(Err(error))) => Err(ClientError::new(error.code, error.message)),
+            Ok(Err(_)) => Err(ClientError::new(
+                DAEMON_SHUTDOWN,
+                "permission bridge disconnected",
+            )),
+            Err(_) => Err(ClientError::new(
+                PERMISSION_TIMEOUT,
+                "permission response timed out",
+            )),
+        }
+    };
+
+    match Handle::try_current() {
+        Ok(current) => match current.runtime_flavor() {
+            RuntimeFlavor::MultiThread => block_in_place(|| current.block_on(future)),
+            RuntimeFlavor::CurrentThread => Err(ClientError::new(
+                PERMISSION_RUNTIME_UNSUPPORTED,
+                "daemon bridge permission waits must run on a blocking thread outside tokio current-thread runtimes",
+            )),
+            _ => current.block_on(future),
+        },
+        Err(_) => Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| {
+                ClientError::new(
+                    PERMISSION_TIMEOUT,
+                    format!("build permission wait runtime: {error}"),
+                )
+            })?
+            .block_on(future),
     }
 }
 

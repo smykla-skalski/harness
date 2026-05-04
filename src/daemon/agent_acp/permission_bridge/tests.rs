@@ -1,9 +1,8 @@
-use std::sync::mpsc::sync_channel;
-
 use agent_client_protocol::schema::{
     RequestPermissionRequest, ToolCallUpdate, ToolCallUpdateFields,
 };
 use tokio::sync::broadcast;
+use tokio::sync::oneshot;
 
 use super::*;
 use crate::agents::acp::permission::standard_permission_options;
@@ -12,7 +11,7 @@ fn permission_request(
     id: &str,
 ) -> (
     PermissionBridgeRequest,
-    std::sync::mpsc::Receiver<PermissionBridgeResult>,
+    oneshot::Receiver<PermissionBridgeResult>,
 ) {
     permission_request_for_session(id, "acp-session")
 }
@@ -22,9 +21,9 @@ fn permission_request_for_session(
     acp_session_id: &str,
 ) -> (
     PermissionBridgeRequest,
-    std::sync::mpsc::Receiver<PermissionBridgeResult>,
+    oneshot::Receiver<PermissionBridgeResult>,
 ) {
-    let (tx, rx) = sync_channel(1);
+    let (tx, rx) = oneshot::channel();
     let tool_call = ToolCallUpdate::new(id.to_string(), ToolCallUpdateFields::new());
     let request = RequestPermissionRequest::new(
         acp_session_id.to_string(),
@@ -39,6 +38,15 @@ fn permission_request_for_session(
         },
         rx,
     )
+}
+
+async fn recv_permission_result(
+    rx: oneshot::Receiver<PermissionBridgeResult>,
+) -> PermissionBridgeResult {
+    tokio::time::timeout(Duration::from_millis(100), rx)
+        .await
+        .expect("permission response should arrive")
+        .expect("permission response channel should stay open")
 }
 
 #[tokio::test]
@@ -57,8 +65,8 @@ async fn coalesces_concurrent_requests_into_one_batch() {
     assert_eq!(batches[0].requests.len(), 2);
     let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
     assert_eq!(bridge.expiration_task_count(), 0);
-    assert!(rx_a.recv().expect("response a").is_ok());
-    assert!(rx_b.recv().expect("response b").is_ok());
+    assert!(recv_permission_result(rx_a).await.is_ok());
+    assert!(recv_permission_result(rx_b).await.is_ok());
 }
 
 #[tokio::test]
@@ -115,8 +123,8 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
     let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
-    assert!(rx_a.recv().expect("response a").is_ok());
-    assert!(rx_b.recv().expect("response b").is_ok());
+    assert!(recv_permission_result(rx_a).await.is_ok());
+    assert!(recv_permission_result(rx_b).await.is_ok());
 }
 
 #[tokio::test]
@@ -136,8 +144,8 @@ async fn rejects_past_cap() {
     let rejected = receivers
         .pop()
         .expect("ninth receiver")
-        .recv()
-        .expect("ninth response")
+        .await
+        .expect("ninth response channel should stay open")
         .expect_err("ninth rejected");
     assert_eq!(rejected.code, PERMISSION_CAP_REACHED);
     bridge.shutdown_pending();
@@ -172,15 +180,8 @@ async fn shutdown_errors_queued_requests_before_they_become_batches() {
     bridge.shutdown_pending();
     tokio::task::yield_now().await;
 
-    let received = tokio::time::timeout(
-        Duration::from_millis(100),
-        tokio::task::spawn_blocking(move || rx.recv()),
-    )
-    .await
-    .expect("queued response should arrive after shutdown")
-    .expect("queued response wait should not panic");
-    let error = received
-        .expect("queued response")
+    let error = recv_permission_result(rx)
+        .await
         .expect_err("queued request should receive daemon shutdown");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 }
@@ -195,9 +196,8 @@ async fn shutdown_errors_pending_requests() {
     tokio::time::sleep(Duration::from_millis(20)).await;
     bridge.shutdown_pending();
 
-    let error = rx
-        .recv()
-        .expect("shutdown response")
+    let error = recv_permission_result(rx)
+        .await
         .expect_err("shutdown error");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 }
@@ -214,15 +214,8 @@ async fn shutdown_cancels_pending_expiration_tasks_without_timeout() {
     bridge.shutdown_pending();
     assert_eq!(bridge.expiration_task_count(), 0);
 
-    let received = tokio::time::timeout(
-        Duration::from_millis(100),
-        tokio::task::spawn_blocking(move || rx.recv()),
-    )
-    .await
-    .expect("shutdown response should arrive")
-    .expect("shutdown response wait should not panic");
-    let error = received
-        .expect("shutdown response")
+    let error = recv_permission_result(rx)
+        .await
         .expect_err("shutdown should fail pending batch");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 
@@ -253,15 +246,8 @@ async fn timeout_removes_pending_batch_and_broadcasts_removal() {
     bridge.tx.send(request).await.expect("send request");
     tokio::time::sleep(Duration::from_millis(30)).await;
 
-    let received = tokio::time::timeout(
-        Duration::from_millis(100),
-        tokio::task::spawn_blocking(move || rx.recv()),
-    )
-    .await
-    .expect("timeout response should arrive")
-    .expect("timeout response wait should not panic");
-    let error = received
-        .expect("timeout response")
+    let error = recv_permission_result(rx)
+        .await
         .expect_err("permission timeout");
     assert_eq!(error.code, PERMISSION_TIMEOUT);
     assert_eq!(bridge.pending_permission_count(), 0);
@@ -284,15 +270,8 @@ async fn zero_deadline_timeouts_leave_no_stale_expiration_handles() {
         request.deadline = Duration::ZERO;
 
         bridge.tx.send(request).await.expect("send request");
-        let received = tokio::time::timeout(
-            Duration::from_millis(100),
-            tokio::task::spawn_blocking(move || rx.recv()),
-        )
-        .await
-        .expect("timeout response should arrive")
-        .expect("timeout response wait should not panic");
-        let error = received
-            .expect("timeout response")
+        let error = recv_permission_result(rx)
+            .await
             .expect_err("permission timeout");
         assert_eq!(error.code, PERMISSION_TIMEOUT);
         assert_eq!(bridge.expiration_task_count(), 0);
@@ -340,15 +319,8 @@ async fn permission_bridge_cancel_on_drop_rejects_pending_batches_without_timeou
     tokio::time::sleep(Duration::from_millis(20)).await;
     drop(bridge);
 
-    let received = tokio::time::timeout(
-        Duration::from_millis(100),
-        tokio::task::spawn_blocking(move || rx.recv()),
-    )
-    .await
-    .expect("drop response should arrive")
-    .expect("drop response wait should not panic");
-    let error = received
-        .expect("drop response")
+    let error = recv_permission_result(rx)
+        .await
         .expect_err("drop should fail pending batch");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 

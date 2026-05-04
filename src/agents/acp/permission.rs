@@ -6,7 +6,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::SyncSender;
 use std::time::Duration;
 
 use agent_client_protocol::schema::{
@@ -16,7 +15,7 @@ use agent_client_protocol::schema::{
 };
 use serde::Serialize;
 use serde_json::json;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc::Sender, oneshot};
 
 use crate::workspace::{harness_data_root, utc_now};
 
@@ -81,7 +80,7 @@ pub struct PermissionBridgeRequest {
     /// Maximum time to keep the request pending in the daemon bridge.
     pub deadline: Duration,
     /// Channel to receive the user's response.
-    pub response_tx: SyncSender<PermissionBridgeResult>,
+    pub response_tx: oneshot::Sender<PermissionBridgeResult>,
 }
 
 /// Result sent back by the daemon permission bridge.

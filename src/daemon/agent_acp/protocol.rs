@@ -210,13 +210,22 @@ async fn run_protocol(args: RunProtocolArgs) {
         )
         .on_receive_request(
             async move |request: WriteTextFileRequest, responder, _connection| {
-                respond_client_result(responder, write_context.write_text_file(&request))
+                respond_client_result(
+                    responder,
+                    write_context.clone().write_text_file(request).await,
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
             async move |request: CreateTerminalRequest, responder, _connection| {
-                respond_client_result(responder, create_terminal_context.create_terminal(&request))
+                respond_client_result(
+                    responder,
+                    create_terminal_context
+                        .clone()
+                        .create_terminal(request)
+                        .await,
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )
