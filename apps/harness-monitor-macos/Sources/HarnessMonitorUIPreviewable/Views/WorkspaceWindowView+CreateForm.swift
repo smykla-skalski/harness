@@ -135,7 +135,6 @@ struct WorkspaceWindowCreatePane: View {
       // Keep MCP-tracked controls instantiated even while this pane scrolls.
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createPaneHeader
-        createModeCard
 
         switch viewModel.createMode {
         case .terminal:
@@ -278,9 +277,14 @@ extension WorkspaceWindowCreatePane {
 
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(viewModel.createMode.headerTitle)
-        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(viewModel.createMode.headerTitle)
+          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        createModeCard
+          .fixedSize(horizontal: true, vertical: false)
+      }
       Text(createPaneDescription)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
