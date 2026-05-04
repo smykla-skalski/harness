@@ -41,9 +41,8 @@ enum SessionTimelineTableMetrics {
   }
 
   static func rowBottomPadding(for row: SessionTimelineRow) -> CGFloat {
-    usesSimpleWideLayout(for: row)
-      ? HarnessMonitorTheme.spacingXS
-      : HarnessMonitorTheme.itemSpacing
+    let _ = row
+    return HarnessMonitorTheme.itemSpacing
   }
 
   static func usesSimpleWideLayout(for row: SessionTimelineRow) -> Bool {

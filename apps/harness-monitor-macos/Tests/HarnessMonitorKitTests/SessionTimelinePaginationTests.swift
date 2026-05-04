@@ -178,6 +178,28 @@ struct SessionTimelineNavigationTests {
     #expect(!SessionTimelineTableMetrics.prefersCompactLayout(for: livenessRow))
   }
 
+  @Test("Timeline rows use consistent bottom spacing across layouts")
+  @MainActor
+  func timelineRowsUseConsistentBottomSpacingAcrossLayouts() {
+    let rows = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: PreviewFixtures.summary.sessionId,
+        entries: PreviewFixtures.signalSquishTimeline,
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )
+
+    let livenessRow = try! #require(rows.first { $0.node.sourceLabel == "liveness_synced" })
+    let signalRow = try! #require(rows.first { $0.node.sourceLabel == "signal_acknowledged" })
+    let observeRow = try! #require(rows.first { $0.node.sourceLabel == "observe_snapshot" })
+
+    #expect(SessionTimelineTableMetrics.rowBottomPadding(for: livenessRow) == HarnessMonitorTheme.itemSpacing)
+    #expect(SessionTimelineTableMetrics.rowBottomPadding(for: signalRow) == HarnessMonitorTheme.itemSpacing)
+    #expect(SessionTimelineTableMetrics.rowBottomPadding(for: observeRow) == HarnessMonitorTheme.itemSpacing)
+  }
+
   @Test("Signal timeline rows keep minimum breathing room for compact and wide cards")
   @MainActor
   func signalTimelineRowsKeepMinimumBreathingRoomForCompactAndWideCards() {
