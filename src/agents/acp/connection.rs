@@ -9,6 +9,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use agent_client_protocol::schema::SessionNotification;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -18,14 +19,20 @@ use tokio::task::{JoinError, JoinHandle};
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
-use crate::agents::runtime::event::ConversationEvent;
+use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 
 use super::events::materialise_batch;
 use super::program::resolve_program;
 use super::ring::{RingConfig, SessionRing};
-use super::supervision::AcpSessionSupervisor;
+use super::supervision::{AcpSessionSupervisor, WatchdogEventEmitter, WatchdogState};
 
 /// Batch of materialised events ready for downstream consumption.
+///
+/// `raw_count == 0` is the synthetic-batch marker: the batch did not come from
+/// agent stdout but from a daemon-side producer (e.g. `SupervisorEventSink`
+/// emitting watchdog transitions). Downstream consumers that meter agent
+/// throughput should filter on `raw_count > 0`; consumers that surface
+/// supervisor signal must NOT filter synthetic batches out.
 #[derive(Debug)]
 pub struct EventBatch {
     /// Harness ACP logical session id.
@@ -34,7 +41,8 @@ pub struct EventBatch {
     pub session_id: String,
     /// The conversation events in this batch.
     pub events: Vec<ConversationEvent>,
-    /// Number of raw updates that produced these events.
+    /// Number of raw updates that produced these events. Zero on synthetic
+    /// batches emitted by daemon-side producers.
     pub raw_count: usize,
 }
 
@@ -90,6 +98,86 @@ impl AcpConnectionHandle {
     }
 }
 
+/// Sink that materialises supervisor watchdog transitions into the same
+/// conversation event stream used by the ACP receive loop.
+///
+/// Each emit produces a single-event `EventBatch` with `raw_count: 0` so
+/// downstream consumers can distinguish synthetic supervisor events from
+/// agent stdout.
+///
+/// **Sequence-space contract:** `SupervisorEventSink::sequence` is a
+/// SEPARATE counter from the receive loop's transcript sequence. Both
+/// counters start at 0 and increment independently. Downstream consumers
+/// MUST key on `(entry_kind, sequence)` and never on `sequence` alone.
+/// `entries.rs::conversation_entry` already encodes this: the synthesized
+/// `entry_id` is `format!("{runtime}-{agent_id}-{entry_kind}-{sequence}")`,
+/// where `entry_kind` includes `agent_watchdog_state` for supervisor events
+/// and disjoint kind strings for transcript events, so collisions are
+/// impossible by construction.
+pub struct SupervisorEventSink {
+    tx: mpsc::Sender<EventBatch>,
+    agent_name: String,
+    session_id: String,
+    /// Synthetic-event sequence space, disjoint from the receive loop's
+    /// transcript sequence. See type-level doc for the contract.
+    sequence: AtomicU64,
+}
+
+impl SupervisorEventSink {
+    /// Build a sink bound to the supplied event channel and identity.
+    #[must_use]
+    pub fn new(tx: mpsc::Sender<EventBatch>, agent_name: String, session_id: String) -> Self {
+        Self {
+            tx,
+            agent_name,
+            session_id,
+            sequence: AtomicU64::new(0),
+        }
+    }
+
+    fn emit(&self, kind: ConversationEventKind, terminal: bool) {
+        let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
+        let event = ConversationEvent {
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
+            sequence,
+            kind,
+            agent: self.agent_name.clone(),
+            session_id: self.session_id.clone(),
+        };
+        let batch = EventBatch {
+            acp_id: self.session_id.clone(),
+            session_id: self.session_id.clone(),
+            events: vec![event],
+            raw_count: 0,
+        };
+        if let Err(err) = self.tx.try_send(batch) {
+            // Terminal transitions (Fired/Done) must surface in production logs
+            // because the operator's fault-isolation story depends on them.
+            // Non-terminal transitions stay at debug to avoid noise during
+            // routine activity bursts that fill the channel.
+            if terminal {
+                warn!(error = %err, session_id = %self.session_id, "supervisor event sink dropped TERMINAL watchdog batch (receiver full or closed)");
+            } else {
+                debug!(error = %err, "supervisor event sink dropped batch (receiver full or closed)");
+            }
+        }
+    }
+}
+
+impl WatchdogEventEmitter for SupervisorEventSink {
+    fn emit_state(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>) {
+        let terminal = matches!(to, WatchdogState::Fired | WatchdogState::Done);
+        self.emit(
+            ConversationEventKind::WatchdogState {
+                from: from.as_str().to_string(),
+                to: to.as_str().to_string(),
+                reason: reason.map(str::to_string),
+            },
+            terminal,
+        );
+    }
+}
+
 /// Spawn the receive loop for an ACP child process.
 ///
 /// Reads NDJSON from the child's stdout, batches notifications using the ring
@@ -115,6 +203,13 @@ pub fn spawn_receive_loop(
     let async_stdout = ChildStdout::from_std(stdout).expect("failed to convert stdout to async");
 
     let (tx, rx) = mpsc::channel(config.channel_buffer);
+
+    let supervisor_sink = Arc::new(SupervisorEventSink::new(
+        tx.clone(),
+        agent_name.clone(),
+        session_id.clone(),
+    ));
+    supervisor.attach_event_emitter(supervisor_sink);
 
     let task = tokio::spawn(receive_loop(
         async_stdout,
