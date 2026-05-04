@@ -203,6 +203,91 @@ fn session_detail_async_reconciles_orphaned_active_session_without_state_file() 
 }
 
 #[test]
+fn background_liveness_refresh_updates_async_summary_without_explicit_read() {
+    with_temp_project(|project| {
+        let state = start_active_file_session(
+            "daemon background liveness refresh",
+            "",
+            project,
+            Some("claude"),
+            Some("daemon-background-liveness-refresh"),
+        )
+        .expect("start active session");
+        let leader_id = state.leader_id.clone().expect("leader id");
+        let leader = state.agents.get(&leader_id).expect("leader agent");
+
+        age_leader_state_activity(project, &state.session_id, 1_200);
+        let leader_log = write_agent_log_file(
+            project,
+            "claude",
+            leader
+                .agent_session_id
+                .as_deref()
+                .expect("leader runtime session"),
+        );
+        set_log_mtime_seconds_ago(&leader_log, 1_200);
+
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &state.session_id).await;
+            clear_session_liveness_refresh_cache_entry(&state.session_id);
+
+            let baseline_change_seq = async_db
+                .load_change_tracking_since(0)
+                .await
+                .expect("load initial change tracking")
+                .into_iter()
+                .map(|(_, change_seq)| change_seq)
+                .max()
+                .unwrap_or(0);
+
+            let summary_before = async_db
+                .list_session_summaries()
+                .await
+                .expect("list summaries before background refresh")
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("summary before background refresh");
+            assert_eq!(summary_before.status, SessionStatus::Active);
+            assert_eq!(summary_before.leader_id.as_deref(), state.leader_id.as_deref());
+            assert_eq!(summary_before.metrics.agent_count, 1);
+            assert_eq!(summary_before.metrics.active_agent_count, 1);
+
+            reconcile_active_session_liveness_background_async(Some(async_db.as_ref()))
+                .await
+                .expect("refresh background liveness");
+
+            let summary_after = async_db
+                .list_session_summaries()
+                .await
+                .expect("list summaries after background refresh")
+                .into_iter()
+                .find(|summary| summary.session_id == state.session_id)
+                .expect("summary after background refresh");
+            assert_eq!(summary_after.status, SessionStatus::LeaderlessDegraded);
+            assert!(summary_after.leader_id.is_none());
+            assert_eq!(summary_after.metrics.agent_count, 0);
+            assert_eq!(summary_after.metrics.active_agent_count, 0);
+
+            let changes = async_db
+                .load_change_tracking_since(baseline_change_seq)
+                .await
+                .expect("load background liveness changes");
+            assert!(
+                changes
+                    .iter()
+                    .any(|(scope, _)| scope == &format!("session:{}", state.session_id)),
+                "background liveness refresh should bump the session scope"
+            );
+            assert!(
+                changes.iter().any(|(scope, _)| scope == "global"),
+                "background liveness refresh should bump the global scope"
+            );
+        });
+    });
+}
+
+#[test]
 fn list_sessions_keeps_recent_db_only_session_live_without_state_file() {
     with_temp_project(|project| {
         let (db, state) = setup_db_only_session(project);

@@ -59,6 +59,18 @@ pub(super) async fn reconcile_active_session_liveness_for_reads_async(
     Ok(())
 }
 
+pub(crate) fn reconcile_active_session_liveness_background(
+    db: Option<&DaemonDb>,
+) -> Result<(), CliError> {
+    reconcile_active_session_liveness_for_reads(true, db)
+}
+
+pub(crate) async fn reconcile_active_session_liveness_background_async(
+    async_db: Option<&AsyncDaemonDb>,
+) -> Result<(), CliError> {
+    reconcile_active_session_liveness_for_reads_async(true, async_db).await
+}
+
 pub(crate) fn stale_session_ids_for_liveness_refresh(
     cache: &mut BTreeMap<String, Instant>,
     session_ids: BTreeSet<String>,

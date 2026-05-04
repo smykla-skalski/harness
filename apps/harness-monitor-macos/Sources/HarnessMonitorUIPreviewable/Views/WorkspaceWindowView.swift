@@ -273,8 +273,26 @@ public struct WorkspaceWindowView: View {
       decisionScope: decisionScope,
       selection: $viewModel.selection
     )
-    let content =
-      splitView
+    let content = configuredWorkspaceContent(
+      splitView,
+      decisionScope: decisionScope,
+      viewModel: viewModel
+    )
+
+    return
+      applyDismissAllVisibleDialog(to: content)
+      .navigationTitle(workspaceNavigationTitle(for: viewModel.selection))
+      .navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+  }
+
+  private func configuredWorkspaceContent<Content: View>(
+    _ splitView: Content,
+    decisionScope: DecisionWorkspaceScope,
+    viewModel: ViewModel
+  ) -> some View {
+    splitView
       .focusScope(primaryContentFocusScope)
       // Workspace is workbench-shaped (sidebar drives detail); main window uses .prominentDetail.
       .navigationSplitViewStyle(.balanced)
@@ -313,6 +331,9 @@ public struct WorkspaceWindowView: View {
       }
       .onChange(of: store.supervisorDecisionRefreshTick) { _, _ in
         handleSupervisorDecisionRefresh()
+      }
+      .onChange(of: store.supervisorLiveTickRefreshTick) { _, _ in
+        Task { await handleSupervisorLiveTickRefresh() }
       }
       .onChange(of: store.supervisorSelectedDecisionID) { _, _ in
         syncSupervisorDecisionRoute(recordHistory: true)
@@ -357,27 +378,28 @@ public struct WorkspaceWindowView: View {
       .task {
         let binding = columnVisibilityBinding
         sidebarVisibilityExpander.handler = {
-          guard binding.wrappedValue == .detailOnly else { return }
-          binding.wrappedValue = .all
-          // Capture the workspace contentView synchronously before the async hop so
-          // the notification targets this window even if key focus shifts in 50ms.
-          // asyncAfter(0.05) gives SwiftUI a full rendering cycle to commit the
-          // column-visibility change before VoiceOver re-scans the AX tree.
-          let contentView = NSApp.keyWindow?.contentView
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            if let contentView {
-              NSAccessibility.post(element: contentView, notification: .layoutChanged)
-            }
-          }
+          restoreSidebarVisibility(using: binding)
         }
       }
+  }
 
-    return
-      applyDismissAllVisibleDialog(to: content)
-      .navigationTitle(workspaceNavigationTitle(for: viewModel.selection))
-      .navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+  private func restoreSidebarVisibility(
+    using binding: Binding<NavigationSplitViewVisibility>
+  ) {
+    guard binding.wrappedValue == .detailOnly else {
+      return
+    }
+    binding.wrappedValue = .all
+    // Capture the workspace contentView synchronously before the async hop so
+    // the notification targets this window even if key focus shifts in 50ms.
+    // asyncAfter(0.05) gives SwiftUI a full rendering cycle to commit the
+    // column-visibility change before VoiceOver re-scans the AX tree.
+    let contentView = NSApp.keyWindow?.contentView
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+      if let contentView {
+        NSAccessibility.post(element: contentView, notification: .layoutChanged)
+      }
+    }
   }
 
   private func workspaceNavigationTitle(for selection: WorkspaceSelection) -> String {

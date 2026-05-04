@@ -32,6 +32,10 @@ extension WorkspaceWindowView {
     }
   }
 
+  func handleSupervisorLiveTickRefresh() async {
+    await currentDecisionsRuntime.refreshLiveTick(from: store)
+  }
+
   func handleSelectedTuiChange(
     _ selectedTuiID: String?,
     viewModel: ViewModel

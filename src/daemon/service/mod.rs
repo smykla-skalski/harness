@@ -307,7 +307,8 @@ pub(crate) use read_reconciliation::*;
 #[cfg(test)]
 pub(crate) use sessions::session_timeline_window;
 pub(crate) use sessions::{
-    list_projects_async, list_sessions_async, resolve_runtime_session_agent_async,
+    list_projects_async, list_sessions_async, reconcile_active_session_liveness_background,
+    reconcile_active_session_liveness_background_async, resolve_runtime_session_agent_async,
     session_detail_async, session_detail_core_async, session_detail_from_async_daemon_db,
     session_detail_from_daemon_db, session_extensions_async, session_timeline_window_async,
 };

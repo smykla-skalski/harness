@@ -21,9 +21,11 @@ public final class HarnessMonitorStore {
   public var supervisorSelectedDecisionID: String?
   public var supervisorOpenDecisions: [Decision] = []
   public var supervisorDecisionRefreshTick: Int = 0
+  public internal(set) var supervisorLiveTickRefreshTick: Int = 0
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
   public var supervisorPrimaryActionFocusRequestTick: Int = 0
+  var supervisorLiveTick: DecisionLiveTickSnapshot = .placeholder
 
   public var persistenceError: String? {
     didSet {
