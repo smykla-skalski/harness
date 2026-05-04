@@ -423,6 +423,40 @@ fn terminal_wait_returns_when_background_child_keeps_pty_open() {
 }
 
 #[test]
+#[cfg(unix)]
+fn terminal_release_kills_background_child_that_ignores_sigterm() {
+    let (temp, client) = setup_client();
+    let leaked = temp.path().join("artifacts/should-not-exist.txt");
+    let script = format!(
+        "sh -c 'trap \"\" TERM; sleep 1; printf leaked > \"{}\"' & exit 0",
+        leaked.display()
+    );
+
+    let terminal = client
+        .handle_create_terminal(
+            &CreateTerminalRequest::new("test-session", "sh").args(vec!["-c".to_string(), script]),
+        )
+        .expect("create terminal")
+        .terminal_id;
+
+    client
+        .handle_wait_for_terminal_exit(&WaitForTerminalExitRequest::new(
+            "test-session",
+            terminal.clone(),
+        ))
+        .expect("wait terminal");
+    client
+        .handle_release_terminal(&ReleaseTerminalRequest::new("test-session", terminal))
+        .expect("release terminal");
+
+    thread::sleep(Duration::from_millis(1200));
+    assert!(
+        !leaked.exists(),
+        "release should kill lingering background descendants"
+    );
+}
+
+#[test]
 fn terminal_cap_enforced() {
     let (_temp, client) = setup_client();
 

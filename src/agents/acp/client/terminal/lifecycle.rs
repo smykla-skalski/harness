@@ -1,5 +1,6 @@
 use std::thread;
-use std::time::{Duration, Instant};
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 use agent_client_protocol::schema::TerminalExitStatus;
 use nix::sys::signal::{Signal, killpg};
@@ -7,13 +8,52 @@ use nix::unistd::Pid;
 use portable_pty::ExitStatus as PtyExitStatus;
 use tracing::warn;
 
-use super::TerminalState;
 use super::output::wait_for_output_drain;
+use super::{
+    SharedTerminalChild, SharedTerminalState, TerminalLifecycleWait, TerminalState,
+    TerminalWaitSignal,
+};
 use crate::agents::acp::client::{ClientError, ClientResult};
 
+pub(super) fn spawn_exit_monitor(
+    child: SharedTerminalChild,
+    signal: std::sync::Arc<TerminalWaitSignal>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        loop {
+            if signal.exit_status().is_some() || signal.lifecycle_error().is_some() {
+                return;
+            }
+
+            let wait_result = {
+                let mut child = child.lock().unwrap();
+                child.try_wait()
+            };
+
+            match wait_result {
+                Ok(Some(status)) => {
+                    signal.finish_exit(terminal_exit_status(&status));
+                    return;
+                }
+                Ok(None) => {
+                    let snapshot = signal.snapshot();
+                    let _ = signal.wait_for_change(snapshot, Duration::from_millis(50));
+                }
+                Err(error) => {
+                    signal.fail_poll(format!("failed to poll terminal: {error}"));
+                    return;
+                }
+            }
+        }
+    })
+}
+
 pub(super) fn refresh_exit_status(state: &mut TerminalState) -> ClientResult<()> {
-    if state.exit_status.is_some() {
+    if state.signal.exit_status().is_some() {
         return Ok(());
+    }
+    if let Some(error) = state.signal.lifecycle_error() {
+        return Err(ClientError::terminal_denied(error));
     }
     if state.spawned_at.elapsed() >= state.wall_clock_limit {
         terminate_running_terminal(state);
@@ -22,49 +62,43 @@ pub(super) fn refresh_exit_status(state: &mut TerminalState) -> ClientResult<()>
             state.wall_clock_limit.as_secs()
         )));
     }
-    poll_terminal_exit_status(state)
+    Ok(())
 }
 
 pub(super) fn wait_for_terminal_exit_state(
-    state: &mut TerminalState,
+    state: &SharedTerminalState,
 ) -> ClientResult<TerminalExitStatus> {
     loop {
-        refresh_exit_status(state)?;
-        if let Some(exit_status) = &state.exit_status {
-            return Ok(exit_status.clone());
+        let (signal, remaining) = {
+            let mut state = state.lock().unwrap();
+            refresh_exit_status(&mut state)?;
+            if let Some(exit_status) = state.signal.exit_status() {
+                return Ok(exit_status);
+            }
+            (
+                std::sync::Arc::clone(&state.signal),
+                state
+                    .wall_clock_limit
+                    .saturating_sub(state.spawned_at.elapsed()),
+            )
+        };
+        match signal.wait_for_exit_or_error(remaining) {
+            TerminalLifecycleWait::Exit(exit_status) => return Ok(exit_status),
+            TerminalLifecycleWait::LifecycleError(error) => {
+                return Err(ClientError::terminal_denied(error));
+            }
+            TerminalLifecycleWait::TimedOut => {}
         }
-        thread::sleep(Duration::from_millis(50));
     }
 }
 
 pub(super) fn terminate_terminal(state: &mut TerminalState) {
-    if state.exit_status.is_some() || poll_terminal_exit(state, Duration::ZERO).unwrap_or(false) {
+    if state.signal.exit_status().is_some() || wait_for_terminal_exit_signal(state, Duration::ZERO)
+    {
         close_reader(state);
         return;
     }
     terminate_running_terminal(state);
-}
-
-fn terminate_running_terminal(state: &mut TerminalState) {
-    #[cfg(unix)]
-    if let Some(pgid) = state.pgid {
-        send_signals_and_drain(pgid, state);
-    } else {
-        let _ = state.child.kill();
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = state.child.kill();
-    }
-
-    if state.exit_status.is_none()
-        && let Ok(status) = state.child.wait()
-    {
-        state.exit_status = Some(terminal_exit_status(&status));
-    }
-
-    close_reader(state);
 }
 
 #[cfg(unix)]
@@ -76,11 +110,12 @@ fn send_signals_and_drain(pgid: i32, state: &mut TerminalState) {
     if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM) {
         warn!(pgid, error = %e, "SIGTERM to terminal process group failed");
     }
-    if !poll_terminal_exit(state, Duration::from_secs(3)).unwrap_or(false)
+    if !wait_for_terminal_exit_signal(state, Duration::from_secs(3))
         && let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL)
     {
         warn!(pgid, error = %e, "SIGKILL to terminal process group failed");
     }
+    let _ = wait_for_terminal_exit_signal(state, Duration::from_millis(250));
 }
 
 #[expect(
@@ -89,51 +124,83 @@ fn send_signals_and_drain(pgid: i32, state: &mut TerminalState) {
 )]
 pub(super) fn terminate_process_group(state: &TerminalState) {
     #[cfg(unix)]
-    if let Some(pgid) = state.pgid
-        && let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM)
-    {
-        warn!(pgid, error = %e, "SIGTERM to terminal process group failed");
-    }
-}
-
-fn poll_terminal_exit_status(state: &mut TerminalState) -> ClientResult<()> {
-    match state.child.try_wait() {
-        Ok(Some(status)) => finish_terminal(state, &status),
-        Ok(None) => {}
-        Err(error) => {
-            return Err(ClientError::terminal_denied(format!(
-                "failed to poll terminal: {error}"
-            )));
+    if let Some(pgid) = state.pgid {
+        if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM) {
+            warn!(pgid, error = %e, "SIGTERM to terminal process group failed");
         }
-    }
-    Ok(())
-}
-
-fn poll_terminal_exit(state: &mut TerminalState, timeout: Duration) -> ClientResult<bool> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        match state.child.try_wait() {
-            Ok(Some(status)) => {
-                finish_terminal(state, &status);
-                return Ok(true);
-            }
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(Duration::from_millis(50));
-            }
-            Ok(None) => return Ok(false),
-            Err(error) => {
-                return Err(ClientError::terminal_denied(format!(
-                    "failed to poll terminal: {error}"
-                )));
-            }
+        if !wait_for_reader_close(&state.signal, Duration::from_millis(250))
+            && let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL)
+        {
+            warn!(pgid, error = %e, "SIGKILL to terminal process group failed");
         }
+        let _ = wait_for_reader_close(&state.signal, Duration::from_millis(250));
     }
 }
 
-fn finish_terminal(state: &mut TerminalState, status: &PtyExitStatus) {
-    state.exit_status = Some(terminal_exit_status(status));
-    wait_for_output_drain(&state.output, Duration::from_millis(50));
+fn wait_for_terminal_exit_signal(state: &TerminalState, timeout: Duration) -> bool {
+    match state.signal.wait_for_exit_or_error(timeout) {
+        TerminalLifecycleWait::Exit(_) => true,
+        TerminalLifecycleWait::LifecycleError(_) | TerminalLifecycleWait::TimedOut => false,
+    }
+}
+
+fn wait_for_reader_close(signal: &TerminalWaitSignal, timeout: Duration) -> bool {
+    let start = std::time::Instant::now();
+    let mut snapshot = signal.snapshot();
+    while !snapshot.reader_closed && start.elapsed() < timeout {
+        let remaining = timeout.saturating_sub(start.elapsed());
+        let next = signal.wait_for_change(snapshot, remaining);
+        if next.generation == snapshot.generation && next.reader_closed == snapshot.reader_closed {
+            return next.reader_closed;
+        }
+        snapshot = next;
+    }
+    snapshot.reader_closed
+}
+
+fn kill_child(state: &TerminalState) {
+    let _ = state.child.lock().unwrap().kill();
+}
+
+fn block_on_child_exit(state: &TerminalState) {
+    if state.signal.exit_status().is_some() {
+        return;
+    }
+    let wait_result = {
+        let mut child = state.child.lock().unwrap();
+        child.wait()
+    };
+    match wait_result {
+        Ok(status) => state.signal.finish_exit(terminal_exit_status(&status)),
+        Err(error) => state
+            .signal
+            .fail_poll(format!("failed to wait terminal: {error}")),
+    }
+}
+
+fn finish_terminal(state: &mut TerminalState) {
+    wait_for_output_drain(&state.signal, Duration::from_millis(50));
     close_reader(state);
+}
+
+fn terminate_running_terminal(state: &mut TerminalState) {
+    #[cfg(unix)]
+    if let Some(pgid) = state.pgid {
+        send_signals_and_drain(pgid, state);
+    } else {
+        kill_child(state);
+    }
+
+    #[cfg(not(unix))]
+    {
+        kill_child(state);
+    }
+
+    if state.signal.exit_status().is_none() {
+        block_on_child_exit(state);
+    }
+
+    finish_terminal(state);
 }
 
 fn terminal_exit_status(status: &PtyExitStatus) -> TerminalExitStatus {
@@ -150,4 +217,5 @@ pub(super) fn close_reader(state: &mut TerminalState) {
     // Dropping the handle detaches the reader. Joining can hang if a terminal
     // descendant keeps the PTY slave open after the direct child exits.
     state.reader_thread.take();
+    state.lifecycle_thread.take();
 }
