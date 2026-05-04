@@ -85,7 +85,7 @@ struct AgentDetailSection: View {
   }
 
   private var agentTimelineEntries: [TimelineEntry] {
-    Array(store.timeline.filter { $0.agentId == agent.agentId }.prefix(8))
+    store.timeline.filter { $0.agentId == agent.agentId }
   }
 
   private var pendingDecisionAttention: AcpDecisionAttention? {
@@ -259,29 +259,15 @@ struct AgentDetailSection: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
       }
-      InspectorSection(title: "Recent Activity") {
-        if agentTimelineEntries.isEmpty {
-          Text("No recent activity")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        } else {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            ForEach(agentTimelineEntries) { entry in
-              VStack(alignment: .leading, spacing: 2) {
-                Text(entry.summary)
-                  .scaledFont(.subheadline)
-                HStack(spacing: HarnessMonitorTheme.spacingXS) {
-                  Text(humanizedWorkspaceLabel(entry.kind))
-                    .scaledFont(.caption.weight(.semibold))
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                  Text(formatTimestamp(entry.recordedAt))
-                    .scaledFont(.caption)
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                }
-              }
-            }
-          }
-        }
+      InspectorSection(title: "Live transcript") {
+        MonitorTimelineSection(
+          host: .agent(agent.agentId),
+          timeline: agentTimelineEntries,
+          timelineWindow: nil,
+          decisions: [],
+          isTimelineLoading: false,
+          store: store
+        )
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailTimeline)
