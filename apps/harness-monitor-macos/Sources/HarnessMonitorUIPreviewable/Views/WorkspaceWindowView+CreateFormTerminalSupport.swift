@@ -318,10 +318,7 @@ extension WorkspaceWindowCreatePane {
     option: AgentCapabilityOption,
     context: TerminalConfigurationContext
   ) -> some View {
-    AgentsConfigPillFlow(
-      spacing: HarnessMonitorTheme.spacingSM,
-      lineSpacing: HarnessMonitorTheme.spacingSM
-    ) {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if option.transportChoices.count > 1 {
         terminalTransportPill(option: option, context: context)
       }
@@ -336,6 +333,7 @@ extension WorkspaceWindowCreatePane {
         terminalFallbackRolePill
       }
       terminalPersonaPill
+      Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -352,10 +350,14 @@ extension WorkspaceWindowCreatePane {
       accessibilityLabel: "Transport"
     ) {
       ForEach(option.transportChoices) { transportChoice in
+        let isCurrent = context.selection.wrappedValue == transportChoice.id
         Button {
           context.selection.wrappedValue = transportChoice.id
         } label: {
-          Text(transportChoice.id.isAcp ? "ACP" : "Terminal")
+          checkmarkLabel(
+            text: transportChoice.id.isAcp ? "ACP" : "Terminal",
+            isSelected: isCurrent
+          )
         }
         .disabled(!option.isEnabled(transportChoice))
       }
@@ -372,6 +374,7 @@ extension WorkspaceWindowCreatePane {
     let state: AgentsConfigPillState =
       context.modelBinding.wrappedValue == RuntimeCustomModel.tag ? .set
       : (isCatalogDefault ? .default : .set)
+    let currentSelection = context.modelBinding.wrappedValue
     return AgentsConfigPill(
       label: label,
       value: label,
@@ -379,12 +382,16 @@ extension WorkspaceWindowCreatePane {
       accessibilityLabel: "Model"
     ) {
       ForEach(context.catalogModels) { model in
-        Button(model.displayName) {
+        Button {
           context.modelBinding.wrappedValue = model.id
+        } label: {
+          checkmarkLabel(text: model.displayName, isSelected: currentSelection == model.id)
         }
       }
-      Button("Custom...") {
+      Button {
         context.modelBinding.wrappedValue = RuntimeCustomModel.tag
+      } label: {
+        checkmarkLabel(text: "Custom...", isSelected: currentSelection == RuntimeCustomModel.tag)
       }
     }
   }
@@ -393,8 +400,8 @@ extension WorkspaceWindowCreatePane {
     context: TerminalConfigurationContext
   ) -> some View {
     let current = context.effortBinding.wrappedValue
-    let valueText = current.isEmpty ? "Default" : current.capitalized
-    let label = "Effort \(valueText)"
+    let valueText = current.isEmpty ? "Effort" : current.capitalized
+    let label = valueText
     let defaultEffort = WorkspaceWindowView.defaultEffortLevel(from: context.effortValues)
     let state: AgentsConfigPillState = current == defaultEffort ? .default : .set
     return AgentsConfigPill(
@@ -404,8 +411,10 @@ extension WorkspaceWindowCreatePane {
       accessibilityLabel: "Effort"
     ) {
       ForEach(context.effortValues, id: \.self) { level in
-        Button(level.capitalized) {
+        Button {
           context.effortBinding.wrappedValue = level
+        } label: {
+          checkmarkLabel(text: level.capitalized, isSelected: current == level)
         }
       }
     }
@@ -414,7 +423,7 @@ extension WorkspaceWindowCreatePane {
   private var terminalRolePill: some View {
     @Bindable var formModel = viewModel
     let role = formModel.selectedRole
-    let label = "Role: \(role.title)"
+    let label = role.title
     let state: AgentsConfigPillState = role == .worker ? .default : .set
     return AgentsConfigPill(
       label: label,
@@ -423,8 +432,10 @@ extension WorkspaceWindowCreatePane {
       accessibilityLabel: "Role in session"
     ) {
       ForEach(SessionRole.allCases, id: \.self) { option in
-        Button(option.title) {
+        Button {
           formModel.selectedRole = option
+        } label: {
+          checkmarkLabel(text: option.title, isSelected: role == option)
         }
       }
     }
@@ -433,7 +444,7 @@ extension WorkspaceWindowCreatePane {
   private var terminalFallbackRolePill: some View {
     @Bindable var formModel = viewModel
     let role = formModel.selectedAcpFallbackRole
-    let label = "Fallback: \(role.title)"
+    let label = "Fallback \(role.title)"
     let state: AgentsConfigPillState = role == .worker ? .default : .set
     return AgentsConfigPill(
       label: label,
@@ -442,8 +453,10 @@ extension WorkspaceWindowCreatePane {
       accessibilityLabel: "Fallback role"
     ) {
       ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { option in
-        Button(option.title) {
+        Button {
           formModel.selectedAcpFallbackRole = option
+        } label: {
+          checkmarkLabel(text: option.title, isSelected: role == option)
         }
       }
     }
@@ -464,14 +477,27 @@ extension WorkspaceWindowCreatePane {
       state: state,
       accessibilityLabel: "Persona"
     ) {
-      Button("None") {
+      Button {
         formModel.selectedPersonaID = ""
+      } label: {
+        checkmarkLabel(text: "None", isSelected: selected == nil || selected?.isEmpty == true)
       }
       ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
-        Button(persona.name) {
+        Button {
           formModel.selectedPersonaID = persona.identifier
+        } label: {
+          checkmarkLabel(text: persona.name, isSelected: selected == persona.identifier)
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private func checkmarkLabel(text: String, isSelected: Bool) -> some View {
+    if isSelected {
+      Label(text, systemImage: "checkmark")
+    } else {
+      Text(text)
     }
   }
 
