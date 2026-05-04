@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::agent_acp::protocol::session_guard::RouteTarget;
 
 #[test]
 fn session_route_guard_rejects_before_initialization() {

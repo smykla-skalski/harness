@@ -40,7 +40,7 @@ mod session_start;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
-use session_guard::{RouteTarget, SessionRouteGuard};
+use session_guard::SessionRouteGuard;
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
 pub(super) struct SpawnedAcpProtocol {
@@ -302,6 +302,10 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         manager,
     } = args;
     let prompt_timeout = supervisor.config().prompt_timeout;
+    // The route is registered inside `initialize_and_bind_runtime_session` between the
+    // runtime's `new_session` response and the orchestration bind, so notifications fired
+    // by the runtime during the bind window land on the route guard instead of being
+    // dropped with `routing_not_initialized`.
     let acp_session_id = initialize_and_bind_runtime_session(
         &manager,
         &supervisor,
@@ -310,10 +314,9 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         &session_id,
         &acp_id,
         &runtime_name,
+        &session_guard,
     )
     .await?;
-    let target = RouteTarget { acp_id, session_id };
-    session_guard.start_session(&acp_session_id, target.clone());
     let run_result = async {
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
             let cancelled = send_prompt_or_cancel(
