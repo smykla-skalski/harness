@@ -165,43 +165,34 @@ extension WorkspaceWindowCreatePane {
 
   private var createModeCard: some View {
     @Bindable var formModel = viewModel
-    return AgentsCreateSectionCard {
-      AgentsCreateFieldBlock(
-        title: "Create",
-        help: "Choose whether this window starts an agent or a Codex run."
-      ) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          Picker("Create", selection: $formModel.createMode) {
-            ForEach(AgentTuiCreateMode.allCases) { mode in
-              Text(mode.title)
-                .tag(mode)
-                .accessibilityIdentifier(
-                  HarnessMonitorAccessibility.segmentedOption(
-                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                    option: mode.title
-                  )
-                )
-                .harnessMCPButton(
-                  HarnessMonitorAccessibility.segmentedOption(
-                    HarnessMonitorAccessibility.agentTuiCreateModePicker,
-                    option: mode.title
-                  ),
-                  label: mode.title,
-                  pressAction: { formModel.createMode = mode }
-                )
-            }
-          }
-          .pickerStyle(.segmented)
-          .harnessNativeFormControl()
-          .harnessMCPButton(
-            HarnessMonitorAccessibility.agentTuiCreateModePicker,
-            label: "Create"
+    return Picker("Create", selection: $formModel.createMode) {
+      ForEach(AgentTuiCreateMode.allCases) { mode in
+        Text(mode.title)
+          .tag(mode)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.agentTuiCreateModePicker,
+              option: mode.title
+            )
           )
-
-          AgentsCreateSummaryFactsView(facts: createSummaryFacts)
-        }
+          .harnessMCPButton(
+            HarnessMonitorAccessibility.segmentedOption(
+              HarnessMonitorAccessibility.agentTuiCreateModePicker,
+              option: mode.title
+            ),
+            label: mode.title,
+            pressAction: { formModel.createMode = mode }
+          )
       }
     }
+    .labelsHidden()
+    .pickerStyle(.segmented)
+    .harnessNativeFormControl()
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.agentTuiCreateModePicker,
+      label: "Create"
+    )
+    .accessibilityLabel("Create")
   }
 
   @ViewBuilder
@@ -215,33 +206,6 @@ extension WorkspaceWindowCreatePane {
         .frame(maxWidth: leadingMaxWidth, alignment: .leading)
       trailing()
     }
-  }
-
-  private var createSummaryFacts: [AgentsCreateSummaryFact] {
-    switch viewModel.createMode {
-    case .terminal:
-      terminalCreateSummaryFacts
-    case .codex:
-      codexCreateSummaryFacts
-    }
-  }
-
-  private var terminalCreateSummaryFacts: [AgentsCreateSummaryFact] {
-    [
-      AgentsCreateSummaryFact(title: "Provider", value: selectedAgentLaunchTitle),
-      AgentsCreateSummaryFact(title: "Starts with", value: selectedTransportSummaryTitle),
-    ]
-  }
-
-  var selectedTransportSummaryTitle: String {
-    guard let option = selectedCapabilityOption else {
-      return "Choose a provider"
-    }
-
-    let selectedChoice = option.transportChoice(
-      for: option.normalizedSelection(for: viewModel.selectedLaunchSelection)
-    )
-    return selectedChoice.id.isAcp ? "Project Access" : "Terminal"
   }
 
 }

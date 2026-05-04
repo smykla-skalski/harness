@@ -2,19 +2,6 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension WorkspaceWindowCreatePane {
-  var codexCreateSummaryFacts: [AgentsCreateSummaryFact] {
-    var facts = [
-      AgentsCreateSummaryFact(title: "Run mode", value: viewModel.codexMode.title),
-      AgentsCreateSummaryFact(title: "Model", value: selectedCodexModelTitle),
-    ]
-
-    if let selectedEffort = selectedCodexEffortTitle {
-      facts.append(AgentsCreateSummaryFact(title: "Effort", value: selectedEffort))
-    }
-
-    return facts
-  }
-
   var codexCreateContent: some View {
     createPaneColumns(leadingMaxWidth: 360) {
       codexPromptCard
@@ -27,37 +14,6 @@ extension WorkspaceWindowCreatePane {
     }
   }
 
-  private var selectedCodexModelTitle: String {
-    let selectedModelID =
-      viewModel.selectedCodexModel
-      ?? codexRuntimeCatalog?.default
-      ?? RuntimeCustomModel.tag
-    if selectedModelID == RuntimeCustomModel.tag {
-      return "Custom model"
-    }
-    return codexRuntimeCatalog?.models.first { $0.id == selectedModelID }?.displayName
-      ?? selectedModelID
-  }
-
-  private var selectedCodexEffortTitle: String? {
-    let selectedModelID =
-      viewModel.selectedCodexModel
-      ?? codexRuntimeCatalog?.default
-      ?? RuntimeCustomModel.tag
-    let availableEffortValues =
-      codexRuntimeCatalog.map {
-        WorkspaceWindowView.effortValues(catalog: $0, selectedModelId: selectedModelID)
-      }
-      ?? WorkspaceWindowView.allEffortLevels
-    guard !availableEffortValues.isEmpty else {
-      return nil
-    }
-    let selectedEffort =
-      viewModel.selectedCodexEffort
-      ?? WorkspaceWindowView.defaultEffortLevel(from: availableEffortValues)
-    return selectedEffort.capitalized
-  }
-
   private var codexRuntimeCatalog: RuntimeModelCatalog? {
     viewModel.availableRuntimeModels.first { $0.runtime == "codex" }
   }
@@ -66,10 +22,7 @@ extension WorkspaceWindowCreatePane {
     @Bindable var formModel = viewModel
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Prompt",
-          description: "Describe the work clearly so Codex can start with the right context."
-        )
+        AgentsCreateSectionHeading(title: "Prompt")
 
         multilineEditor(
           placeholder: "Ask Codex to investigate or patch this session",
@@ -114,10 +67,7 @@ extension WorkspaceWindowCreatePane {
 
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Configuration",
-          description: "Choose the Codex mode, model, and reasoning level for this run."
-        )
+        AgentsCreateSectionHeading(title: "Configuration")
 
         codexModePicker(formModel: formModel)
         codexModelPicker(

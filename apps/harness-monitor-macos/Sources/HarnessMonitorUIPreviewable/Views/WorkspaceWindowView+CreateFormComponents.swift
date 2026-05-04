@@ -31,47 +31,24 @@ struct AgentsCreateSectionCard<Content: View>: View {
 
 struct AgentsCreateSectionHeading: View {
   let title: String
-  let description: String
+  let description: String?
+
+  init(title: String, description: String? = nil) {
+    self.title = title
+    self.description = description
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(title)
         .scaledFont(.headline)
         .accessibilityAddTraits(.isHeader)
-      Text(description)
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-}
-
-struct AgentsCreateSummaryFact: Identifiable, Equatable {
-  let title: String
-  let value: String
-
-  var id: String { title }
-}
-
-struct AgentsCreateSummaryFactsView: View {
-  let facts: [AgentsCreateSummaryFact]
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      ForEach(facts) { fact in
-        summaryFact(fact)
+      if let description {
+        Text(description)
+          .scaledFont(.subheadline)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
       }
-    }
-  }
-
-  private func summaryFact(_ fact: AgentsCreateSummaryFact) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text(fact.title)
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(fact.value)
-        .scaledFont(.body.weight(.semibold))
-        .fixedSize(horizontal: false, vertical: true)
     }
   }
 }
@@ -132,7 +109,7 @@ struct AgentsCreateProviderRow: View {
   }
 
   private var accessibilityRowLabel: String {
-    "\(option.accessibilityLabel), capabilities: \(capabilitySummary)"
+    "\(option.title), \(option.availabilityState.compactTitle), capabilities: \(capabilitySummary)"
   }
 
   private var subtitle: String {
@@ -204,11 +181,6 @@ struct AgentsCreateProviderRow: View {
               systemImage: option.availabilityState.symbolName
             )
           }
-
-          Text("Capabilities: \(capabilitySummary)")
-            .scaledFont(.caption2)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(2)
         }
         .padding(HarnessMonitorTheme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,8 +202,7 @@ struct AgentsCreateProviderRow: View {
         tint: isSelected ? HarnessMonitorTheme.accent : nil,
         extraHoverHint: isSelected
       )
-      .accessibilityLabel(option.title)
-      .accessibilityHint(isSelected ? "Selected provider" : "Select provider")
+      .accessibilityHidden(true)
       .harnessMCPButton(
         HarnessMonitorAccessibility.segmentedOption(
           HarnessMonitorAccessibility.agentTuiRuntimePicker,
@@ -242,9 +213,11 @@ struct AgentsCreateProviderRow: View {
         pressAction: { selection = normalizedSelection }
       )
     }
-    .accessibilityElement(children: .contain)
+    .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityRowLabel)
+    .accessibilityHint(isSelected ? "Selected provider" : "Select provider")
     .accessibilityValue(isSelected ? "Selected" : "")
+    .accessibilityAddTraits(.isButton)
     .harnessMCPRow(
       HarnessMonitorAccessibility.agentCapabilityRow(option.id),
       label: accessibilityRowLabel,

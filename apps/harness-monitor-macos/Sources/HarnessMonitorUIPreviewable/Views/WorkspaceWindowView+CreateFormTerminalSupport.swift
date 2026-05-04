@@ -3,12 +3,7 @@ import SwiftUI
 
 extension WorkspaceWindowCreatePane {
   var selectedAgentLaunchTitle: String {
-    switch viewModel.selectedLaunchSelection {
-    case .tui(let runtime):
-      runtime.title
-    case .acp(let id):
-      viewModel.availableAcpAgents.first { $0.id == id }?.displayName ?? "Agent"
-    }
+    selectedCapabilityOption?.title ?? "Agent"
   }
 
   var agentCapabilityOptions: [AgentCapabilityOption] {
@@ -168,10 +163,7 @@ extension WorkspaceWindowCreatePane {
   }
 
   func terminalModelField(context: TerminalConfigurationContext) -> some View {
-    AgentsCreateFieldBlock(
-      title: "Model",
-      help: "Choose the default model for the selected provider."
-    ) {
+    AgentsCreateFieldBlock(title: "Model") {
       Picker(selectedTerminalModelMenuTitle(context: context), selection: context.modelBinding) {
         ForEach(context.catalogModels) { model in
           Text(model.displayName)
@@ -214,11 +206,6 @@ extension WorkspaceWindowCreatePane {
       .accessibilityLabel("Model")
       .harnessMCPButton(HarnessMonitorAccessibility.workspaceModelPicker, label: "Model")
 
-      Text(selectedTerminalModelStateText(context: context))
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
-
       if context.modelBinding.wrappedValue == RuntimeCustomModel.tag {
         TextField("Provider-specific model id", text: context.customModelBinding)
           .harnessNativeFormControl()
@@ -230,23 +217,6 @@ extension WorkspaceWindowCreatePane {
           .harnessPreservePrimaryContentFocus()
       }
     }
-  }
-
-  func selectedTerminalModelStateText(context: TerminalConfigurationContext) -> String {
-    let selectedModelID = context.modelBinding.wrappedValue
-    if selectedModelID == RuntimeCustomModel.tag {
-      let customModelID = context.customModelBinding.wrappedValue.trimmingCharacters(
-        in: .whitespacesAndNewlines
-      )
-      if customModelID.isEmpty {
-        return "Custom model selected. Enter the provider-specific id below."
-      }
-      return "Using custom model \(customModelID)."
-    }
-
-    let displayName =
-      context.catalogModels.first { $0.id == selectedModelID }?.displayName ?? selectedModelID
-    return "Using \(displayName)."
   }
 
   func selectedTerminalModelMenuTitle(context: TerminalConfigurationContext) -> String {
@@ -297,10 +267,7 @@ extension WorkspaceWindowCreatePane {
   @ViewBuilder
   func terminalEffortField(context: TerminalConfigurationContext) -> some View {
     if !context.effortValues.isEmpty {
-      AgentsCreateFieldBlock(
-        title: "Effort",
-        help: "Reasoning effort only appears for models that expose it."
-      ) {
+      AgentsCreateFieldBlock(title: "Effort") {
         Picker("Effort", selection: context.effortBinding) {
           ForEach(Array(context.effortValues.enumerated()), id: \.offset) { _, level in
             Text(level.capitalized)
@@ -336,12 +303,13 @@ extension WorkspaceWindowCreatePane {
   ) -> some View {
     AgentsCreateFieldBlock(title: title) {
       Stepper(
-        title == "Rows" ? "Rows \(value.wrappedValue)" : "Cols \(value.wrappedValue)",
+        "\(title) \(value.wrappedValue)",
         value: value,
         in: range,
         step: step
       )
       .harnessNativeFormControl()
+      .accessibilityLabel(title)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

@@ -15,10 +15,7 @@ extension WorkspaceWindowCreatePane {
     @Bindable var formModel = viewModel
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Provider",
-          description: "Choose the provider that should open when this agent starts."
-        )
+        AgentsCreateSectionHeading(title: "Provider")
 
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
           ForEach(agentCapabilityOptions) { option in
@@ -67,10 +64,7 @@ extension WorkspaceWindowCreatePane {
 
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Configuration",
-          description: "Choose how \(option.title) joins this session and which defaults it uses."
-        )
+        AgentsCreateSectionHeading(title: "Configuration")
         terminalTransportChoicesSection(option: option, context: context)
         terminalTransportNotice(option: option, choice: context.choice)
         terminalModelField(context: context)
@@ -82,10 +76,7 @@ extension WorkspaceWindowCreatePane {
 
   var roleMenu: some View {
     @Bindable var formModel = viewModel
-    return AgentsCreateFieldBlock(
-      title: "Role in session",
-      help: "Choose how this agent joins the current session."
-    ) {
+    return AgentsCreateFieldBlock(title: "Role in session") {
       Picker("Role", selection: $formModel.selectedRole) {
         ForEach(SessionRole.allCases, id: \.self) { role in
           Text(role.title)
@@ -115,10 +106,7 @@ extension WorkspaceWindowCreatePane {
 
   var personaMenu: some View {
     @Bindable var formModel = viewModel
-    return AgentsCreateFieldBlock(
-      title: "Persona (optional)",
-      help: "Apply one only when you want a consistent behavior template."
-    ) {
+    return AgentsCreateFieldBlock(title: "Persona (optional)") {
       Picker("Persona", selection: $formModel.selectedPersonaID) {
         Text("None")
           .tag("")
@@ -166,10 +154,7 @@ extension WorkspaceWindowCreatePane {
 
   var acpFallbackRoleMenu: some View {
     @Bindable var formModel = viewModel
-    return AgentsCreateFieldBlock(
-      title: "If leader already exists",
-      help: "Choose how project access joins when another leader is active."
-    ) {
+    return AgentsCreateFieldBlock(title: "If a leader already runs in this session") {
       Picker("Fallback role", selection: $formModel.selectedAcpFallbackRole) {
         ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
           Text(role.title)
@@ -204,10 +189,7 @@ extension WorkspaceWindowCreatePane {
     @Bindable var formModel = viewModel
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Details",
-          description: "Name this launch or seed the first message before the agent opens."
-        )
+        AgentsCreateSectionHeading(title: "Details")
 
         AgentsCreateFieldBlock(
           title: "Display name",
@@ -281,12 +263,7 @@ extension WorkspaceWindowCreatePane {
     @Bindable var formModel = viewModel
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(
-          title: "Terminal size",
-          description:
-            "Adjust the starting viewport only when the default size "
-            + "does not fit your workflow."
-        )
+        AgentsCreateSectionHeading(title: "Terminal size")
 
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           terminalSizeStepper(
