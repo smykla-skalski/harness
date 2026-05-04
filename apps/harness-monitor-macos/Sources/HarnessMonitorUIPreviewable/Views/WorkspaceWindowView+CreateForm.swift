@@ -222,8 +222,22 @@ extension WorkspaceWindowCreatePane {
     else {
       return nil
     }
+    let leaderName = resolvedLeaderDisplayName(for: leaderID)
     let fallback = viewModel.selectedAcpFallbackRole.title
-    return "Will demote the current leader (\(leaderID)) to \(fallback)."
+    return "Will demote the current leader \(leaderName) to \(fallback)."
+  }
+
+  private func resolvedLeaderDisplayName(for leaderID: String) -> String {
+    if let runtime = store.acpRuntimeState(for: leaderID) {
+      let name = runtime.agentName
+      if !name.isEmpty, name != leaderID {
+        return "\u{201C}\(name)\u{201D}"
+      }
+    }
+    if let descriptor = viewModel.availableAcpAgents.first(where: { $0.id == leaderID }) {
+      return "\u{201C}\(descriptor.displayName)\u{201D}"
+    }
+    return "(\(leaderID))"
   }
 
   var launchActionTitle: String {
