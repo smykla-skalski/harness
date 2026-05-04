@@ -325,6 +325,10 @@ extension WorkspaceWindowCreatePane {
   }
 
   func applySavedLaunchPresetIfFresh() {
+    guard let snapshot = LaunchPresetDefaults.read() else { return }
+    if let restoredMode = AgentTuiCreateMode(rawValue: snapshot.mode.rawValue) {
+      viewModel.createMode = restoredMode
+    }
     guard
       viewModel.prompt.isEmpty,
       viewModel.codexPrompt.isEmpty,
@@ -334,7 +338,6 @@ extension WorkspaceWindowCreatePane {
     else {
       return
     }
-    guard let snapshot = LaunchPresetDefaults.read() else { return }
     if let providerKey = snapshot.providerStorageKey,
       let parsed = AgentLaunchSelection(storageKey: providerKey)
     {
