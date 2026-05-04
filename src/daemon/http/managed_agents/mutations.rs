@@ -15,7 +15,7 @@ use crate::daemon::protocol::{
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent};
+use super::{ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent, ensure_terminal_agent};
 
 pub(super) async fn post_terminal_agent_start(
     Path(session_id): Path<String>,
@@ -245,13 +245,15 @@ pub(super) async fn post_acp_permission(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_acp_agent(&state, &agent_id)
-        .and_then(|()| {
-            state
-                .acp_agent_manager
-                .resolve_permission_batch(&agent_id, &batch_id, &request)
-        })
-        .map(ManagedAgentSnapshot::Acp);
+    let result = ensure_acp_enabled().and_then(|()| {
+        ensure_acp_agent(&state, &agent_id)
+            .and_then(|()| {
+                state
+                    .acp_agent_manager
+                    .resolve_permission_batch(&agent_id, &batch_id, &request)
+            })
+            .map(ManagedAgentSnapshot::Acp)
+    });
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_ACP_PERMISSION,

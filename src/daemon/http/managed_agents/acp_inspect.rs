@@ -7,11 +7,12 @@ use serde::Deserialize;
 
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::protocol::http_paths;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
+use super::{ensure_acp_enabled, resolve_acp_inspect_session_scope};
 
 #[derive(Debug, Deserialize)]
 pub(super) struct AcpInspectQuery {
@@ -33,21 +34,13 @@ pub(super) async fn get_acp_inspect(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result: Result<AcpAgentInspectResponse, CliError> = (|| {
-        if let (Some(required), Some(explicit)) = (&query.require_session_id, &query.session_id)
-            && required != explicit
-        {
-            return Err(CliErrorKind::session_scope_denied(
-                "require_session_id does not match session_id",
-            )
-            .into());
-        }
-        let effective = query
-            .session_id
-            .as_deref()
-            .or(query.require_session_id.as_deref());
+    let result: Result<AcpAgentInspectResponse, CliError> = ensure_acp_enabled().and_then(|()| {
+        let effective = resolve_acp_inspect_session_scope(
+            query.session_id.as_deref(),
+            query.require_session_id.as_deref(),
+        )?;
         super::acp_inspect_response(&state, effective)
-    })();
+    });
     timed_json(
         "GET",
         http_paths::MANAGED_AGENTS_ACP_INSPECT,

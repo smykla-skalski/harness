@@ -127,6 +127,63 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
 }
 
 #[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-inspect-disabled".into(),
+            method: "managed_agent.acp_inspect".into(),
+            params: serde_json::json!({}),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_inspect_rejects_conflicting_require_session_id() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-acp-inspect-conflict".into(),
+        method: "managed_agent.acp_inspect".into(),
+        params: serde_json::json!({
+            "session_id": "session-a",
+            "require_session_id": "session-b",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    let error = response.error.expect("scope denied error");
+    assert_eq!(error.code, "SESSION_SCOPE_DENIED");
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_inspect_uses_require_session_id_as_filter() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-acp-inspect-filter".into(),
+        method: "managed_agent.acp_inspect".into(),
+        params: serde_json::json!({
+            "require_session_id": "sess-test-1",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("ACP inspect response");
+    assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
+}
+
+#[tokio::test]
 async fn dispatch_read_query_session_timeline_summary_scope_returns_window_metadata() {
     let state = test_http_state_with_db();
     seed_sample_timeline(&state);

@@ -99,6 +99,50 @@ async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() 
     );
 }
 
+#[tokio::test]
+async fn dispatch_managed_agent_stop_acp_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-stop-acp-disabled".into(),
+            method: "managed_agent.stop_acp".into(),
+            params: json!({
+                "agent_id": "acp-worker",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_stop_acp(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_resolve_acp_permission_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-resolve-acp-disabled".into(),
+            method: "managed_agent.resolve_acp_permission".into(),
+            params: json!({
+                "agent_id": "acp-worker",
+                "batch_id": "batch-1",
+                "decision": "approve_all",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_resolve_acp_permission(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
 #[test]
 fn session_adopt_reports_poisoned_db_lock_as_ws_error() {
     let temp = tempdir().expect("tempdir");

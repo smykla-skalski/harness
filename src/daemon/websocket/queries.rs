@@ -4,8 +4,9 @@ use tokio::sync::broadcast;
 
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{
-    AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, managed_agent_list_response,
-    managed_agent_snapshot, require_async_db,
+    AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, ensure_acp_enabled,
+    managed_agent_list_response, managed_agent_snapshot, require_async_db,
+    resolve_acp_inspect_session_scope,
 };
 use crate::daemon::protocol::{
     StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
@@ -222,9 +223,16 @@ fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpSt
 
 fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let session_id = extract_string_param(&request.params, "session_id");
+    let require_session_id = extract_string_param(&request.params, "require_session_id");
     dispatch_query_result(
         &request.id,
-        acp_inspect_response(state, session_id.as_deref()),
+        ensure_acp_enabled().and_then(|()| {
+            let effective = resolve_acp_inspect_session_scope(
+                session_id.as_deref(),
+                require_session_id.as_deref(),
+            )?;
+            acp_inspect_response(state, effective)
+        }),
     )
 }
 

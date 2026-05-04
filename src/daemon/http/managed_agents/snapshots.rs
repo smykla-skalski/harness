@@ -6,6 +6,8 @@ use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 
+// These helpers only assemble managed-agent payloads. Transport-specific auth,
+// feature gates, and response shaping stay in the HTTP/WS wrappers.
 pub(crate) fn acp_inspect_response(
     state: &DaemonHttpState,
     session_id: Option<&str>,

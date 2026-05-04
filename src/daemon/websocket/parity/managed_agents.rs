@@ -1,5 +1,5 @@
 use crate::errors::CliError;
-use crate::feature_flags;
+use crate::daemon::http::ensure_acp_enabled;
 
 use super::{
     AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,
@@ -63,12 +63,8 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    if !feature_flags::acp_enabled_from_env() {
-        return error_response(
-            &request.id,
-            "ACP_DISABLED",
-            "ACP managed-agent routes are disabled",
-        );
+    if let Err(error) = ensure_acp_enabled() {
+        return error_response(&request.id, error.code(), &error.message());
     }
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -308,6 +304,9 @@ pub(crate) async fn dispatch_managed_agent_stop_acp(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Err(error) = ensure_acp_enabled() {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
@@ -330,6 +329,9 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Err(error) = ensure_acp_enabled() {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
