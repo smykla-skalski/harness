@@ -31,7 +31,7 @@ struct AcpRuntimeStatusStrip: View {
     switch presentation {
     case .full:
       if let projectDir = runtimeState.projectDir, projectDir.isEmpty == false {
-        projectDir
+        abbreviateHomePath(projectDir)
       } else {
         "ACP runtime active"
       }

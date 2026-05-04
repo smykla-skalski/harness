@@ -192,10 +192,7 @@ struct AgentDetailSection: View {
       if !agent.runtimeCapabilities.hookPoints.isEmpty {
         InspectorSection(title: "Hook Points") {
           InspectorBadgeColumn(
-            values: agent.runtimeCapabilities.hookPoints.map { hook in
-              let context = hook.supportsContextInjection ? "context" : "no-context"
-              return "\(hook.name) · \(hook.typicalLatencySeconds)s · \(context)"
-            }
+            values: agent.runtimeCapabilities.hookPoints.map(humanizedHookLabel(for:))
           )
         }
       }
@@ -219,8 +216,15 @@ struct AgentDetailSection: View {
           }
         }
       }
-      InspectorSection(title: "Persona") {
-        if let persona = agent.persona {
+      if agent.persona == nil && assignedTasks.isEmpty {
+        Text("No persona, no assigned tasks.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityElement(children: .combine)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
+      }
+      if let persona = agent.persona {
+        InspectorSection(title: "Persona") {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             Text(persona.name)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
@@ -228,20 +232,12 @@ struct AgentDetailSection: View {
               .scaledFont(.subheadline)
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           }
-        } else {
-          Text("No persona assigned")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
       }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
-      InspectorSection(title: "Assigned Tasks") {
-        if assignedTasks.isEmpty {
-          Text("No assigned tasks")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        } else {
+      if !assignedTasks.isEmpty {
+        InspectorSection(title: "Assigned Tasks") {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
             ForEach(assignedTasks) { task in
               VStack(alignment: .leading, spacing: 2) {
@@ -254,9 +250,9 @@ struct AgentDetailSection: View {
             }
           }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
       }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
       InspectorSection(title: "Recent Activity") {
         if agentTimelineEntries.isEmpty {
           Text("No recent activity")
@@ -441,6 +437,29 @@ struct AgentDetailSection: View {
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
     openWindow(id: HarnessMonitorWindowID.workspace)
+  }
+
+  static func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
+    let trigger: String
+    switch hook.name {
+    case "BeforeTool":
+      trigger = "before each tool call"
+    case "AfterTool":
+      trigger = "after each tool call"
+    case "BeforePrompt":
+      trigger = "before each prompt"
+    case "AfterPrompt":
+      trigger = "after each prompt"
+    default:
+      trigger = "on \(hook.name)"
+    }
+    let contextSuffix = hook.supportsContextInjection
+      ? " (with context injection)" : " (no context)"
+    return "Runs \(hook.typicalLatencySeconds)s \(trigger)\(contextSuffix)"
+  }
+
+  private func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
+    Self.humanizedHookLabel(for: hook)
   }
 
 }
