@@ -128,7 +128,7 @@ struct AgentsCreateProviderRow: View {
 
   private var subtitle: String {
     if currentChoice.id.isAcp {
-      return "Starts with project access."
+      return "Starts via ACP."
     }
     if let projectAccessStatusText {
       return "Starts in Terminal. \(projectAccessStatusText)"
@@ -143,19 +143,19 @@ struct AgentsCreateProviderRow: View {
 
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Project access is also available."
+      return "ACP is also available."
     case .checkingAccess:
-      return "Project access is still being checked."
+      return "ACP is still being checked."
     case .setupRequired:
-      return "Project access needs CLI setup."
+      return "ACP needs CLI setup."
     case .bridgeAccessRequired:
-      return "Project access needs bridge setup."
+      return "ACP needs bridge setup."
     case .terminalOnly:
-      return "Project access isn't available for this provider yet."
+      return "ACP isn't available for this provider yet."
     case .unavailable:
       return
         option.projectAccessGuidanceText
-        ?? "Project access isn't available for this provider yet."
+        ?? "ACP isn't available for this provider yet."
     }
   }
 
@@ -267,7 +267,7 @@ struct AgentsCreateTransportChoiceButton: View {
   let unavailableReason: String?
 
   private var shortTitle: String {
-    choice.id.isAcp ? "Project Access" : "Terminal"
+    choice.id.isAcp ? "ACP" : "Terminal"
   }
 
   var body: some View {

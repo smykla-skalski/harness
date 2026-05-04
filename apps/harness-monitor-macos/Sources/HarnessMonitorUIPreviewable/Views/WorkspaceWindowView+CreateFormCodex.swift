@@ -240,7 +240,7 @@ extension WorkspaceWindowCreatePane {
     }
     let normalizedSelection = option.normalizedSelection(for: viewModel.selectedLaunchSelection)
     let choice = option.transportChoice(for: normalizedSelection)
-    let transport = choice.id.isAcp ? "Project Access" : "Terminal"
+    let transport = choice.id.isAcp ? "ACP" : "Terminal"
     let role = viewModel.selectedRole.title
     var fragments = [option.title, transport, role]
     let runtime = normalizedSelection.preferredRuntime
