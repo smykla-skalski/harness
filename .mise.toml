@@ -181,6 +181,10 @@ run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh restart"
 description = "Show recent xcode-native bridge logs (pass extra xcode-cli-ctl logs args after --)"
 run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh logs"
 
+[tasks."monitor:debug:attributegraph"]
+description = "Attach LLDB to a running Harness Monitor process and break on AttributeGraph cycle logging (pass -- --pid <pid> or --process-name <name>)"
+run = "apps/harness-monitor-macos/Scripts/attach-attributegraph-breakpoint.sh"
+
 [tasks."monitor:xcodebuild"]
 description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"
 run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"

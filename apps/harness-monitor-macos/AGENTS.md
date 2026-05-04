@@ -46,6 +46,7 @@ Validation expectations (run from repo root):
 For Harness Monitor macOS and UI regressions:
 
 - Start with real data. Reproduce with the smallest targeted build/test command and collect the preserved app/UI traces, screenshots, and failure artifacts before changing behavior.
+- For live `AttributeGraph: cycle detected through attribute` warnings, use `mise run monitor:debug:attributegraph` to attach LLDB, break on `print_cycle`, print all thread backtraces, and leave the app stopped for copy/paste inspection.
 - If the signal path is weak - bare `XCTAssertTrue`, missing preserved traces, cleaned-up artifacts, or ambiguous failures - stop and improve observability first. Fix the test/tracing surface before patching product code.
 - Correlate the failure across layers before editing: UI-test host trace, preserved app trace, and the concrete source path that emitted the event.
 - Reuse known-good setups. Compare against existing passing tests, fixtures, preview scenarios, and launch helpers before inventing a new launch path or interaction flow.
