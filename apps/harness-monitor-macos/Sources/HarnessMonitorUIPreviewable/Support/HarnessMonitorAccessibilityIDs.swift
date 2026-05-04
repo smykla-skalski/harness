@@ -76,6 +76,8 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesTextSizePicker = "harness.preferences.text-size"
   public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
   public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
+  public static let preferencesTimelineFilterPersistencePicker =
+    "harness.preferences.timeline.filter-persistence"
   public static let preferencesMCPSection = "harness.preferences.mcp"
   public static let preferencesMCPRegistryHostToggle =
     "harness.preferences.mcp.registry-host"
@@ -146,6 +148,12 @@ public enum HarnessMonitorAccessibility {
     "harness.session.timeline.navigation.status"
   public static let sessionTimelineVisibleStatus =
     "harness.session.timeline.navigation.visible-status"
+  public static let sessionTimelineFilterBar = "harness.session.timeline.filters"
+  public static let sessionTimelineFilterSearch = "harness.session.timeline.filters.search"
+  public static let sessionTimelineFilterScopeMenu = "harness.session.timeline.filters.scope"
+  public static let sessionTimelineFilterMoreButton = "harness.session.timeline.filters.more"
+  public static let sessionTimelineFilterClearButton = "harness.session.timeline.filters.clear"
+  public static let sessionTimelineFilterState = "harness.session.timeline.filters.state"
   public static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
   public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"

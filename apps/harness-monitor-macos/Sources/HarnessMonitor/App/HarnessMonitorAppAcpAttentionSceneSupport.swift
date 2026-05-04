@@ -186,6 +186,41 @@ final class AcpPermissionAttentionState {
     )
   }
 
+  func routePresentedBatchIfNeeded(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) {
+    guard let batch = store.presentingAcpPermissionBatch else {
+      return
+    }
+    let payload = store.acpPermissionDecisionPayload(for: batch)
+    store.presentingAcpPermissionBatch = nil
+    guard payload.isRenderable else {
+      store.supervisorSelectedDecisionID = nil
+      publishRouteEvent(
+        source: "presenting-batch-not-renderable",
+        decisionID: payload.decisionID,
+        batchID: batch.batchId
+      )
+      return
+    }
+    handledBatchIDs.insert(batch.batchId)
+    if activeToast?.batchID == batch.batchId {
+      activeToast = nil
+    }
+    publishRouteEvent(
+      source: "presenting-batch",
+      decisionID: payload.decisionID,
+      batchID: batch.batchId
+    )
+    routeToDecision(
+      decisionID: payload.decisionID,
+      store: store,
+      openWindow: openWindow,
+      activatesApp: false
+    )
+  }
+
   private var prefersUserNotificationDelivery: Bool {
     switch previewContextOverride {
     case .foreground:
@@ -202,6 +237,16 @@ final class AcpPermissionAttentionState {
     lastRouteSource = source
     lastRouteDecisionID = decisionID
     lastRouteBatchID = batchID
+    HarnessMonitorUITestTrace.record(
+      component: "acp.permission-route",
+      event: "route-event",
+      details: [
+        "source": source,
+        "decision_id": decisionID,
+        "batch_id": batchID ?? "nil",
+        "tick": String(routeEventTick),
+      ]
+    )
   }
 
   private func routeToDecision(
@@ -213,6 +258,15 @@ final class AcpPermissionAttentionState {
     store.requestWorkspaceDecisionSelection(decisionID: decisionID)
     store.supervisorSelectedDecisionID = decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+    HarnessMonitorUITestTrace.record(
+      component: "acp.permission-route",
+      event: "route-dispatch",
+      details: [
+        "decision_id": decisionID,
+        "source": lastRouteSource,
+        "activates_app": String(activatesApp),
+      ]
+    )
     if activatesApp {
       Self.activateHarnessMonitorApp()
     }
@@ -291,6 +345,7 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
   private var observationKey: String {
     [
       store.pendingAcpPermissionBatches.map(\.batchId).joined(separator: "|"),
+      store.presentingAcpPermissionBatch?.batchId ?? "nil",
       "\(store.supervisorDecisionRefreshTick)",
       store.supervisorSelectedDecisionID ?? "nil",
       attentionState.routingToken,
@@ -336,6 +391,12 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
       }
       .task(id: observationKey) {
         attentionState.reconcile(store: store)
+      }
+      .task(id: store.presentingAcpPermissionBatch?.batchId) {
+        attentionState.routePresentedBatchIfNeeded(
+          store: store,
+          openWindow: openWindow
+        )
       }
       .task(id: notifications.decisionRequestTick) {
         attentionState.routeNotificationRequestIfNeeded(

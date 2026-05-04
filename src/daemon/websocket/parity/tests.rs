@@ -121,7 +121,8 @@ async fn dispatch_managed_agent_stop_acp_returns_acp_disabled_when_feature_flag_
 }
 
 #[tokio::test]
-async fn dispatch_managed_agent_resolve_acp_permission_returns_acp_disabled_when_feature_flag_off() {
+async fn dispatch_managed_agent_resolve_acp_permission_returns_acp_disabled_when_feature_flag_off()
+{
     temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
         let state = super::super::test_support::test_ws_state();
         let request = WsRequest {

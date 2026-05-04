@@ -24,24 +24,39 @@ func recordStandaloneDiagnosticsSnapshot(
     activity.add(hierarchyAttachment)
   }
 
-  guard let artifactsDirectory = diagnosticsArtifactsDirectory(for: artifactsDirectoryKey) else {
+  let stem = sanitizedDiagnosticsComponent(name)
+  let bundleStem = sanitizedDiagnosticsComponent(
+    (Bundle.main.bundleIdentifier ?? "harnessmonitor-uitests")
+      .replacingOccurrences(of: ".", with: "-")
+  )
+  let preservedStem = "\(bundleStem)-\(ProcessInfo.processInfo.processIdentifier)-\(stem)"
+  let outputDirectories = [
+    diagnosticsArtifactsDirectory(for: artifactsDirectoryKey),
+    preservedDiagnosticsDirectoryURL(),
+  ]
+  .compactMap { $0 }
+  guard !outputDirectories.isEmpty else {
     return
   }
-
-  let stem = sanitizedDiagnosticsComponent(name)
   do {
-    try FileManager.default.createDirectory(
-      at: artifactsDirectory,
-      withIntermediateDirectories: true
-    )
-    let screenshotURL = artifactsDirectory.appendingPathComponent("\(stem).png")
-    let hierarchyURL = artifactsDirectory.appendingPathComponent("\(stem).txt")
-    try screenshot.pngRepresentation.write(to: screenshotURL)
-    try hierarchy.write(
-      to: hierarchyURL,
-      atomically: true,
-      encoding: .utf8
-    )
+    for directory in outputDirectories {
+      try FileManager.default.createDirectory(
+        at: directory,
+        withIntermediateDirectories: true
+      )
+      let fileStem =
+        directory == diagnosticsArtifactsDirectory(for: artifactsDirectoryKey)
+        ? stem
+        : preservedStem
+      let screenshotURL = directory.appendingPathComponent("\(fileStem).png")
+      let hierarchyURL = directory.appendingPathComponent("\(fileStem).txt")
+      try screenshot.pngRepresentation.write(to: screenshotURL)
+      try hierarchy.write(
+        to: hierarchyURL,
+        atomically: true,
+        encoding: .utf8
+      )
+    }
   } catch {
     appendDiagnosticsTrace(
       component: "ui-diagnostics",
@@ -83,8 +98,16 @@ private func sanitizedDiagnosticsComponent(_ value: String) -> String {
 
 @MainActor
 private func diagnosticsScreenshot(in app: XCUIApplication) -> XCUIScreenshot {
-  let mainWindow = app.windows.matching(identifier: "main").firstMatch
-  let window = mainWindow.exists ? mainWindow : app.windows.firstMatch
+  let chromeWindows = app.windows.containing(
+    .any,
+    identifier: HarnessMonitorUITestAccessibility.appChromeRoot
+  )
+  let window =
+    chromeWindows.firstMatch.exists
+    ? chromeWindows.firstMatch
+    : app.windows.matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "main-")
+    ).firstMatch
   if window.exists {
     return window.screenshot()
   }

@@ -106,10 +106,10 @@ pub(crate) fn resolve_acp_inspect_session_scope<'a>(
     if let (Some(required), Some(explicit)) = (require_session_id, session_id)
         && required != explicit
     {
-        return Err(
-            CliErrorKind::session_scope_denied("require_session_id does not match session_id")
-                .into(),
-        );
+        return Err(CliErrorKind::session_scope_denied(
+            "require_session_id does not match session_id",
+        )
+        .into());
     }
     Ok(session_id.or(require_session_id))
 }
@@ -190,7 +190,9 @@ mod tests {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
             let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
             let response = reqwest::Client::new()
-                .post(format!("{base_url}/v1/sessions/test-session/managed-agents/acp"))
+                .post(format!(
+                    "{base_url}/v1/sessions/test-session/managed-agents/acp"
+                ))
                 .bearer_auth("token")
                 .json(&json!({
                     "agent": "copilot",
@@ -273,7 +275,9 @@ mod tests {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
             let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
             let response = reqwest::Client::new()
-                .post(format!("{base_url}/v1/sessions/test-session/managed-agents/acp"))
+                .post(format!(
+                    "{base_url}/v1/sessions/test-session/managed-agents/acp"
+                ))
                 .json(&json!({
                     "agent": "copilot",
                     "role": "worker",

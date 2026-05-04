@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 extension HarnessMonitorUITestCase {
@@ -41,17 +42,19 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
+    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !identifier.isEmpty,
+      let coordinate = visibleFrameMarkerCoordinate(in: app, identifier: identifier)
+    {
+      return coordinate
+    }
     if let coordinate = clampedWindowCoordinate(in: app, for: element) {
       return coordinate
     }
     if let coordinate = centerCoordinate(in: app, for: element) {
       return coordinate
     }
-    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !identifier.isEmpty else {
-      return nil
-    }
-    return visibleFrameMarkerCoordinate(in: app, identifier: identifier)
+    return nil
   }
 
   private func visibleFrameMarkerCoordinate(
@@ -83,6 +86,16 @@ extension HarnessMonitorUITestCase {
       return nil
     }
 
+    recordCoordinateResolution(
+      in: app,
+      element: frameMarker,
+      source: "frame-marker-center",
+      origin: "window",
+      containingWindow: containingWindow,
+      targetFrame: targetFrame,
+      visibleFrame: visibleFrame,
+      targetPoint: targetPoint
+    )
     let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
     return origin.withOffset(
       CGVector(
@@ -113,6 +126,16 @@ extension HarnessMonitorUITestCase {
     )
     let targetFrame = clampedFrame.isEmpty ? visibleFrame : clampedFrame
     let targetPoint = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+    recordCoordinateResolution(
+      in: app,
+      element: element,
+      source: "window-clamped-center",
+      origin: "window",
+      containingWindow: containingWindow,
+      targetFrame: targetFrame,
+      visibleFrame: visibleFrame,
+      targetPoint: targetPoint
+    )
     let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
     return origin.withOffset(
       CGVector(
@@ -173,5 +196,53 @@ extension HarnessMonitorUITestCase {
       )
     )
     return (start, end)
+  }
+
+  private func recordCoordinateResolution(
+    in app: XCUIApplication,
+    element: XCUIElement,
+    source: String,
+    origin: String,
+    containingWindow: XCUIElement,
+    targetFrame: CGRect,
+    visibleFrame: CGRect,
+    targetPoint: CGPoint
+  ) {
+    var details: [String: String] = [
+      "source": source,
+      "origin": origin,
+      "element_identifier": element.identifier,
+      "element_label": element.label,
+      "element_type": String(describing: element.elementType),
+      "element_frame": frameSummary(element.frame),
+      "target_frame": frameSummary(targetFrame),
+      "visible_frame": frameSummary(visibleFrame),
+      "target_point": pointSummary(targetPoint),
+      "window_identifier": containingWindow.identifier,
+      "window_frame": frameSummary(containingWindow.frame),
+    ]
+    if !containingWindow.label.isEmpty {
+      details["window_label"] = containingWindow.label
+    }
+    recordDiagnosticsTrace(
+      component: "ui-tap",
+      event: "coordinate.resolve",
+      app: app,
+      details: details
+    )
+  }
+
+  private func frameSummary(_ frame: CGRect) -> String {
+    String(
+      format: "x=%.1f y=%.1f w=%.1f h=%.1f",
+      frame.origin.x,
+      frame.origin.y,
+      frame.size.width,
+      frame.size.height
+    )
+  }
+
+  private func pointSummary(_ point: CGPoint) -> String {
+    String(format: "x=%.1f y=%.1f", point.x, point.y)
   }
 }

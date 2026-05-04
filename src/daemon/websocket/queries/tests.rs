@@ -127,7 +127,8 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
 }
 
 #[tokio::test]
-async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when_feature_flag_off() {
+async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when_feature_flag_off()
+{
     temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
         let state = test_http_state_with_db();
         let request = WsRequest {

@@ -219,6 +219,9 @@ public struct PreferencesGeneralSection: View {
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
   private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
     .defaultCustomTimeZoneIdentifier
+  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
+  private var timelineFilterPersistenceModeRawValue =
+    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   public init(store: HarnessMonitorStore, overview: PreferencesGeneralOverviewState) {
@@ -315,6 +318,24 @@ public struct PreferencesGeneralSection: View {
       } footer: {
         Text("Every timestamp in Harness Monitor uses this timezone-aware display format")
           .accessibilityIdentifier("harness.preferences.footer.datetime")
+      }
+
+      Section {
+        Picker("Filter persistence", selection: $timelineFilterPersistenceModeRawValue) {
+          ForEach(SessionTimelineFilterPersistenceMode.allCases) { mode in
+            Text(mode.label).tag(mode.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.preferencesTimelineFilterPersistencePicker
+        )
+      } header: {
+        Text("Timeline")
+      } footer: {
+        Text(
+          "Controls whether Session cockpit timeline filters reset each time, restore per window and session, or reopen app-wide."
+        )
       }
 
       PreferencesLoggingSection(store: store)

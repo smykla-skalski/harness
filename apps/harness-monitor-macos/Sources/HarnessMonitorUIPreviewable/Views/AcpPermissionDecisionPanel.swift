@@ -50,13 +50,14 @@ struct AcpPermissionDecisionPanel: View {
                     .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
                     .lineLimit(1)
                 }
-              }
-              .toggleStyle(.checkbox)
-              .disabled(isResolving || onSelectionChanged == nil)
-              .accessibilityIdentifier(requestAccessibilityID(request.id))
-              .accessibilityLabel(request.title)
-              .accessibilityHint(accessibilityHint(for: request))
-            }
+               }
+               .toggleStyle(.checkbox)
+               .disabled(isResolving || onSelectionChanged == nil)
+               .accessibilityIdentifier(requestAccessibilityID(request.id))
+               .accessibilityFrameMarker("\(requestAccessibilityID(request.id)).frame")
+               .accessibilityLabel(request.title)
+               .accessibilityHint(accessibilityHint(for: request))
+             }
           }
         }
         .frame(maxHeight: 220)
