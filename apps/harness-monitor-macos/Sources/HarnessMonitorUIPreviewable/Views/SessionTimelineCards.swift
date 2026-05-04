@@ -90,6 +90,11 @@ private struct SessionTimelineNodeRow: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: SessionTimelineTableMetrics.minimumCardHeight(for: row),
+        alignment: .topLeading
+      )
       .background(SessionTimelineCardBackground(tint: cardTint))
       .alignmentGuide(.sessionTimelineMarkerCenter) { _ in
         SessionTimelineLayout.singleLineMarkerCenterY

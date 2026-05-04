@@ -92,7 +92,27 @@ extension PreviewFixtures {
       sessionTimelineEntry(
         .init(
           id: "preview-liveness-1",
-          recordedAt: "2026-05-03T20:02:00Z",
+          recordedAt: "2026-05-03T21:28:11Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 1 disconnected, 0 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-2",
+          recordedAt: "2026-05-03T21:02:03Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 0 disconnected, 1 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-3",
+          recordedAt: "2026-05-03T21:02:03Z",
           kind: "liveness_synced",
           agentID: "harness-app",
           taskID: nil,
@@ -102,7 +122,7 @@ extension PreviewFixtures {
       sessionTimelineEntry(
         .init(
           id: "preview-signal-ack-copilot-expired",
-          recordedAt: "2026-05-03T20:00:24Z",
+          recordedAt: "2026-05-03T21:00:24Z",
           kind: "signal_acknowledged",
           agentID: "copilot-20260503203910393668000",
           taskID: nil,
@@ -111,8 +131,8 @@ extension PreviewFixtures {
         )),
       sessionTimelineEntry(
         .init(
-          id: "preview-liveness-2",
-          recordedAt: "2026-05-03T19:56:36Z",
+          id: "preview-liveness-4",
+          recordedAt: "2026-05-03T20:56:36Z",
           kind: "liveness_synced",
           agentID: "harness-app",
           taskID: nil,
@@ -122,7 +142,7 @@ extension PreviewFixtures {
       sessionTimelineEntry(
         .init(
           id: "preview-signal-ack-gemini-expired-1",
-          recordedAt: "2026-05-03T19:55:00Z",
+          recordedAt: "2026-05-03T20:55:00Z",
           kind: "signal_acknowledged",
           agentID: "gemini-20260503201702585333000",
           taskID: nil,
@@ -132,7 +152,7 @@ extension PreviewFixtures {
       sessionTimelineEntry(
         .init(
           id: "preview-signal-ack-gemini-expired-2",
-          recordedAt: "2026-05-03T19:54:59Z",
+          recordedAt: "2026-05-03T20:55:00Z",
           kind: "signal_acknowledged",
           agentID: "gemini-20260503201702585333000",
           taskID: nil,
@@ -141,32 +161,12 @@ extension PreviewFixtures {
         )),
       sessionTimelineEntry(
         .init(
-          id: "preview-liveness-3",
-          recordedAt: "2026-05-03T19:50:00Z",
+          id: "preview-liveness-5",
+          recordedAt: "2026-05-03T20:50:00Z",
           kind: "liveness_synced",
           agentID: "harness-app",
           taskID: nil,
           summary: "Liveness sync: 1 disconnected, 0 idled",
-          payload: .object(["status": .string("synced")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-signal-sent-copilot",
-          recordedAt: "2026-05-03T19:40:26Z",
-          kind: "signal_sent",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "sig-20260503204520733172000 sent to copilot-20260503203910393668000: request_action",
-          payload: .object(["command": .string("request_action")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-liveness-4",
-          recordedAt: "2026-05-03T19:40:20Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "Liveness sync: 0 disconnected, 1 idled",
           payload: .object(["status": .string("synced")])
         )),
     ]

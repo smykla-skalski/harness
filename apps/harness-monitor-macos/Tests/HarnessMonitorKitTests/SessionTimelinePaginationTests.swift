@@ -119,6 +119,26 @@ struct SessionTimelineNavigationTests {
     )
   }
 
+  @Test("Timeline table measurement uses synchronous mode only for preview launches")
+  func timelineTableMeasurementUsesSynchronousModeOnlyForPreviewLaunches() {
+    #expect(
+      SessionTimelineTableMeasurementMode.resolve(
+        environment: [HarnessMonitorLaunchMode.xcodePreviewEnvironmentKey: "1"]
+      ) == .synchronous
+    )
+    #expect(
+      SessionTimelineTableMeasurementMode.resolve(environment: [:]) == .incremental
+    )
+    #expect(
+      SessionTimelineTableMeasurementMode.resolve(
+        environment: [
+          HarnessMonitorLaunchMode.environmentKey: HarnessMonitorLaunchMode.live.rawValue,
+          HarnessMonitorLaunchMode.xcodePreviewEnvironmentKey: "1",
+        ]
+      ) == .incremental
+    )
+  }
+
   @Test("Signal timeline rows prefer compact layout while liveness rows stay wide")
   @MainActor
   func signalTimelineRowsPreferCompactLayoutWhileLivenessRowsStayWide() {
@@ -156,6 +176,35 @@ struct SessionTimelineNavigationTests {
 
     #expect(SessionTimelineTableMetrics.prefersCompactLayout(for: signalRow))
     #expect(!SessionTimelineTableMetrics.prefersCompactLayout(for: livenessRow))
+  }
+
+  @Test("Signal timeline rows keep minimum breathing room for compact and wide cards")
+  @MainActor
+  func signalTimelineRowsKeepMinimumBreathingRoomForCompactAndWideCards() {
+    let rows = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: PreviewFixtures.summary.sessionId,
+        entries: PreviewFixtures.signalSquishTimeline,
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )
+
+    let livenessRow = try! #require(rows.first { $0.node.sourceLabel == "liveness_synced" })
+    let signalRow = try! #require(rows.first { $0.node.sourceLabel == "signal_acknowledged" })
+
+    let livenessHeight = SessionTimelineTableCellView.measuredHeight(
+      for: livenessRow,
+      columnWidth: 945
+    )
+    let signalHeight = SessionTimelineTableCellView.measuredHeight(
+      for: signalRow,
+      columnWidth: 945
+    )
+
+    #expect(livenessHeight >= SessionTimelineTableMetrics.minimumCardHeight(for: livenessRow))
+    #expect(signalHeight >= SessionTimelineTableMetrics.minimumCardHeight(for: signalRow))
   }
 
   @Test("Table scroll restoration preserves anchor offset after rows insert above")
