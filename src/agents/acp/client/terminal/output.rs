@@ -2,24 +2,29 @@ use std::io::{ErrorKind, Read as StdRead};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use super::TerminalOutputState;
+use super::{TerminalOutputState, TerminalWaitSignal};
 
 pub(super) fn spawn_output_reader(
     mut reader: Box<dyn StdRead + Send>,
     output: Arc<Mutex<TerminalOutputState>>,
+    signal: Arc<TerminalWaitSignal>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
-                Ok(n) => append_with_limit(&output, &buf[..n]),
+                Ok(n) => {
+                    append_with_limit(&output, &buf[..n]);
+                    signal.note_output_updated();
+                }
                 Err(error) if error.kind() == ErrorKind::Interrupted => {}
                 Err(_) => break,
             }
         }
+        signal.note_reader_closed();
     })
 }
 
@@ -40,15 +45,18 @@ pub(super) fn append_with_limit(output: &Mutex<TerminalOutputState>, data: &[u8]
     }
 }
 
-pub(super) fn wait_for_output_drain(output: &Mutex<TerminalOutputState>, timeout: Duration) {
-    let start = Instant::now();
-    let mut previous_len = output.lock().unwrap().output.len();
+pub(super) fn wait_for_output_drain(signal: &TerminalWaitSignal, timeout: Duration) {
+    let start = std::time::Instant::now();
+    let mut snapshot = signal.snapshot();
     while start.elapsed() < timeout {
-        thread::sleep(Duration::from_millis(5));
-        let len = output.lock().unwrap().output.len();
-        if len > 0 && len == previous_len {
+        if snapshot.reader_closed {
             return;
         }
-        previous_len = len;
+        let remaining = timeout.saturating_sub(start.elapsed());
+        let next = signal.wait_for_change(snapshot, remaining);
+        if next.generation == snapshot.generation && next.reader_closed == snapshot.reader_closed {
+            return;
+        }
+        snapshot = next;
     }
 }

@@ -3,8 +3,8 @@
 //! Unix-specific process group handling uses `killpg(2)`.
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::collections::hash_map::Entry;
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -27,8 +27,8 @@ mod policy;
 mod tests;
 
 use lifecycle::{
-    close_reader, refresh_exit_status, terminate_process_group, terminate_terminal,
-    wait_for_terminal_exit_state,
+    close_reader, refresh_exit_status, spawn_exit_monitor, terminate_process_group,
+    terminate_terminal, wait_for_terminal_exit_state,
 };
 use output::spawn_output_reader;
 use policy::denied_binary_name;
@@ -39,36 +39,161 @@ pub(super) struct TerminalOutputState {
     pub(super) output_limit: u64,
 }
 
-type SharedTerminalState = Arc<Mutex<TerminalState>>;
+pub(super) type SharedTerminalChild = Arc<Mutex<Box<dyn PtyChild + Send + Sync>>>;
+pub(super) type SharedTerminalState = Arc<Mutex<TerminalState>>;
+
+enum TerminalSlot {
+    Reserved,
+    Ready(SharedTerminalState),
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct TerminalWaitSnapshot {
+    generation: u64,
+    reader_closed: bool,
+}
+
+pub(super) enum TerminalLifecycleWait {
+    TimedOut,
+    Exit(TerminalExitStatus),
+    LifecycleError(String),
+}
+
+struct TerminalWaitState {
+    generation: u64,
+    reader_closed: bool,
+    exit_status: Option<TerminalExitStatus>,
+    lifecycle_error: Option<String>,
+}
+
+pub(super) struct TerminalWaitSignal {
+    state: Mutex<TerminalWaitState>,
+    condvar: Condvar,
+}
+
+impl TerminalWaitSignal {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(TerminalWaitState {
+                generation: 0,
+                reader_closed: false,
+                exit_status: None,
+                lifecycle_error: None,
+            }),
+            condvar: Condvar::new(),
+        }
+    }
+
+    pub(super) fn snapshot(&self) -> TerminalWaitSnapshot {
+        let state = self.state.lock().unwrap();
+        TerminalWaitSnapshot {
+            generation: state.generation,
+            reader_closed: state.reader_closed,
+        }
+    }
+
+    pub(super) fn wait_for_change(
+        &self,
+        snapshot: TerminalWaitSnapshot,
+        timeout: Duration,
+    ) -> TerminalWaitSnapshot {
+        let state = self.state.lock().unwrap();
+        let state = self
+            .condvar
+            .wait_timeout_while(state, timeout, |state| {
+                state.generation == snapshot.generation
+                    && state.reader_closed == snapshot.reader_closed
+            })
+            .unwrap()
+            .0;
+        TerminalWaitSnapshot {
+            generation: state.generation,
+            reader_closed: state.reader_closed,
+        }
+    }
+
+    pub(super) fn wait_for_exit_or_error(&self, timeout: Duration) -> TerminalLifecycleWait {
+        let state = self.state.lock().unwrap();
+        let state = self
+            .condvar
+            .wait_timeout_while(state, timeout, |state| {
+                state.exit_status.is_none() && state.lifecycle_error.is_none()
+            })
+            .unwrap()
+            .0;
+        if let Some(exit_status) = state.exit_status.clone() {
+            TerminalLifecycleWait::Exit(exit_status)
+        } else if let Some(error) = state.lifecycle_error.clone() {
+            TerminalLifecycleWait::LifecycleError(error)
+        } else {
+            TerminalLifecycleWait::TimedOut
+        }
+    }
+
+    pub(super) fn note_output_updated(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.generation += 1;
+        self.condvar.notify_all();
+    }
+
+    pub(super) fn note_reader_closed(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.reader_closed = true;
+        state.generation += 1;
+        self.condvar.notify_all();
+    }
+
+    pub(super) fn finish_exit(&self, exit_status: TerminalExitStatus) {
+        let mut state = self.state.lock().unwrap();
+        state.exit_status = Some(exit_status);
+        state.generation += 1;
+        self.condvar.notify_all();
+    }
+
+    pub(super) fn fail_poll(&self, error: String) {
+        let mut state = self.state.lock().unwrap();
+        state.lifecycle_error = Some(error);
+        state.generation += 1;
+        self.condvar.notify_all();
+    }
+
+    pub(super) fn exit_status(&self) -> Option<TerminalExitStatus> {
+        self.state.lock().unwrap().exit_status.clone()
+    }
+
+    pub(super) fn lifecycle_error(&self) -> Option<String> {
+        self.state.lock().unwrap().lifecycle_error.clone()
+    }
+}
 
 /// State for a spawned terminal process.
 pub struct TerminalState {
     /// The child process.
-    pub child: Box<dyn PtyChild + Send + Sync>,
+    pub child: SharedTerminalChild,
     /// Master PTY handle kept alive for the terminal lifetime.
     pub master: Option<Box<dyn MasterPty + Send>>,
     /// Background reader for the PTY output stream.
     pub reader_thread: Option<JoinHandle<()>>,
+    /// Background lifecycle monitor for exit detection.
+    pub lifecycle_thread: Option<JoinHandle<()>>,
     /// Process group id (pgid) for signal delivery.
     pub pgid: Option<i32>,
     /// Accumulated output buffer and truncation state.
     output: Arc<Mutex<TerminalOutputState>>,
+    /// Wakeup signal for exit/output lifecycle changes.
+    pub signal: Arc<TerminalWaitSignal>,
     /// Wall-clock start for enforcing the per-terminal lifetime cap.
     spawned_at: Instant,
     /// Maximum wall-clock lifetime for this terminal.
     wall_clock_limit: Duration,
-    /// Exit status if the process has exited.
-    pub exit_status: Option<TerminalExitStatus>,
 }
 
 /// Terminal manager holding active terminals.
 pub struct TerminalManager {
     /// Active terminals keyed by id.
-    terminals: Mutex<HashMap<String, SharedTerminalState>>,
+    terminals: Mutex<HashMap<String, TerminalSlot>>,
     /// Counter for generating terminal ids.
     counter: Mutex<u64>,
-    /// Active terminal slots, including terminals being spawned.
-    active_slots: Mutex<usize>,
     /// Maximum terminals per session.
     cap: usize,
     /// Maximum wall-clock per terminal.
@@ -86,7 +211,6 @@ impl TerminalManager {
         Self {
             terminals: Mutex::new(HashMap::new()),
             counter: Mutex::new(0),
-            active_slots: Mutex::new(0),
             cap,
             wall_clock_limit,
         }
@@ -105,19 +229,24 @@ impl TerminalManager {
     ) -> ClientResult<CreateTerminalResponse> {
         self.validate_create_request(request, denied_binaries)?;
 
-        self.reserve_slot()?;
+        let terminal_id = self.reserve_slot()?;
 
-        let (terminal_id, state) = match self.spawn_terminal(request, &request.command) {
+        let state = match self.spawn_terminal(request, &request.command) {
             Ok(terminal) => terminal,
             Err(error) => {
-                self.release_slot();
+                self.discard_slot(&terminal_id);
                 return Err(error);
             }
         };
 
         {
             let mut terminals = self.terminals.lock().unwrap();
-            terminals.insert(terminal_id.clone(), Arc::new(Mutex::new(state)));
+            let Some(slot) = terminals.get_mut(&terminal_id) else {
+                return Err(ClientError::terminal_denied(format!(
+                    "reserved terminal slot for '{terminal_id}' disappeared"
+                )));
+            };
+            *slot = TerminalSlot::Ready(state);
         }
 
         Ok(CreateTerminalResponse::new(TerminalId::new(terminal_id)))
@@ -134,13 +263,6 @@ impl TerminalManager {
             )));
         }
 
-        if *self.active_slots.lock().unwrap() >= self.cap {
-            return Err(ClientError::terminal_denied(format!(
-                "terminal cap reached ({})",
-                self.cap
-            )));
-        }
-
         Ok(())
     }
 
@@ -148,7 +270,7 @@ impl TerminalManager {
         &self,
         request: &CreateTerminalRequest,
         command: &str,
-    ) -> ClientResult<(String, TerminalState)> {
+    ) -> ClientResult<SharedTerminalState> {
         let mut cmd = CommandBuilder::new(command);
         cmd.args(&request.args);
 
@@ -184,31 +306,33 @@ impl TerminalManager {
         #[cfg(not(unix))]
         let pgid = None;
 
-        let terminal_id = {
-            let mut counter = self.counter.lock().unwrap();
-            *counter += 1;
-            format!("terminal-{}", *counter)
-        };
-
         let output = Arc::new(Mutex::new(TerminalOutputState {
             output: Vec::new(),
             truncated: false,
             output_limit: request.output_byte_limit.unwrap_or(1024 * 1024),
         }));
-        let reader_thread = spawn_output_reader(reader, Arc::clone(&output));
-
-        let state = TerminalState {
-            child,
+        let signal = Arc::new(TerminalWaitSignal::new());
+        let child = Arc::new(Mutex::new(child));
+        let state = Arc::new(Mutex::new(TerminalState {
+            child: Arc::clone(&child),
             master: Some(pair.master),
-            reader_thread: Some(reader_thread),
+            reader_thread: None,
+            lifecycle_thread: None,
             pgid,
-            output,
+            output: Arc::clone(&output),
+            signal: Arc::clone(&signal),
             spawned_at: Instant::now(),
             wall_clock_limit: self.wall_clock_limit,
-            exit_status: None,
-        };
+        }));
+        let reader_thread = spawn_output_reader(reader, Arc::clone(&output), Arc::clone(&signal));
+        let lifecycle_thread = spawn_exit_monitor(child, signal);
+        {
+            let mut state_guard = state.lock().unwrap();
+            state_guard.reader_thread = Some(reader_thread);
+            state_guard.lifecycle_thread = Some(lifecycle_thread);
+        }
 
-        Ok((terminal_id, state))
+        Ok(state)
     }
 
     /// Handle `terminal/output`.
@@ -233,8 +357,8 @@ impl TerminalManager {
             output.truncated,
         );
 
-        if let Some(ref exit_status) = state.exit_status {
-            response = response.exit_status(exit_status.clone());
+        if let Some(exit_status) = state.signal.exit_status() {
+            response = response.exit_status(exit_status);
         }
 
         Ok(response)
@@ -252,11 +376,8 @@ impl TerminalManager {
     ) -> ClientResult<WaitForTerminalExitResponse> {
         let terminal_id = request.terminal_id.0.as_ref();
 
-        let exit_status = {
-            let state = self.terminal_state(terminal_id, &request.terminal_id)?;
-            let mut state = state.lock().unwrap();
-            wait_for_terminal_exit_state(&mut state)?
-        };
+        let state = self.terminal_state(terminal_id, &request.terminal_id)?;
+        let exit_status = wait_for_terminal_exit_state(&state)?;
 
         Ok(WaitForTerminalExitResponse::new(exit_status))
     }
@@ -272,7 +393,7 @@ impl TerminalManager {
         let state = self.terminal_state(terminal_id, &request.terminal_id)?;
         let mut state = state.lock().unwrap();
 
-        if state.exit_status.is_some() {
+        if state.signal.exit_status().is_some() {
             return Ok(KillTerminalResponse::new());
         }
 
@@ -294,15 +415,15 @@ impl TerminalManager {
 
         let state = {
             let mut terminals = self.terminals.lock().unwrap();
-            terminals
-                .remove(terminal_id)
-                .ok_or_else(|| ClientError::terminal_not_found(&request.terminal_id))?
+            match terminals.remove(terminal_id) {
+                Some(TerminalSlot::Ready(state)) => state,
+                _ => return Err(ClientError::terminal_not_found(&request.terminal_id)),
+            }
         };
-        self.release_slot();
 
         let mut state = state.lock().unwrap();
         let _ = refresh_exit_status(&mut state);
-        if state.exit_status.is_none() {
+        if state.signal.exit_status().is_none() {
             terminate_terminal(&mut state);
         } else {
             terminate_process_group(&state);
@@ -313,21 +434,33 @@ impl TerminalManager {
         Ok(ReleaseTerminalResponse::new())
     }
 
-    fn reserve_slot(&self) -> ClientResult<()> {
-        let mut slots = self.active_slots.lock().unwrap();
-        if *slots >= self.cap {
+    fn reserve_slot(&self) -> ClientResult<String> {
+        let mut terminals = self.terminals.lock().unwrap();
+        if terminals.len() >= self.cap {
             return Err(ClientError::terminal_denied(format!(
                 "terminal cap ({}) reached",
                 self.cap
             )));
         }
-        *slots += 1;
-        Ok(())
+        loop {
+            let terminal_id = {
+                let mut counter = self.counter.lock().unwrap();
+                *counter += 1;
+                format!("terminal-{}", *counter)
+            };
+            match terminals.entry(terminal_id.clone()) {
+                Entry::Occupied(_) => continue,
+                entry => {
+                    entry.or_insert_with(|| TerminalSlot::Reserved);
+                    return Ok(terminal_id);
+                }
+            }
+        }
     }
 
-    fn release_slot(&self) {
-        let mut slots = self.active_slots.lock().unwrap();
-        *slots = slots.saturating_sub(1);
+    fn discard_slot(&self, terminal_id: &str) {
+        let mut terminals = self.terminals.lock().unwrap();
+        terminals.remove(terminal_id);
     }
 
     fn terminal_state(
@@ -338,7 +471,10 @@ impl TerminalManager {
         let terminals = self.terminals.lock().unwrap();
         terminals
             .get(terminal_id)
-            .cloned()
+            .and_then(|slot| match slot {
+                TerminalSlot::Reserved => None,
+                TerminalSlot::Ready(state) => Some(Arc::clone(state)),
+            })
             .ok_or_else(|| ClientError::terminal_not_found(schema_id))
     }
 }
