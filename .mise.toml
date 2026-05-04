@@ -215,11 +215,11 @@ run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d
 
 [tasks."monitor:user:daemon:dev"]
 description = "Run `harness daemon dev` with the current user's isolated runtime profile"
-run = "RUST_LOG=trace apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
+run = "RUST_LOG=trace apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- daemon dev 2>&1 | tee \"tmp/logs/$(date +%y%m%d%H%M)-monitor-user-daemon-dev.log\""
 
 [tasks."monitor:user:bridge:start"]
 description = "Run `harness bridge start` with the current user's isolated runtime profile"
-run = "RUST_LOG=trace HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+run = "RUST_LOG=trace HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/cargo-local.sh run --quiet -- bridge start 2>&1 | tee \"tmp/logs/$(date +%y%m%d%H%M)-monitor-user-bridge-start.log\""
 
 [tasks."monitor:agent"]
 description = "Print the current agent's isolated Xcode / XcodeBuildMCP profile and exact next commands"
