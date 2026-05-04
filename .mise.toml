@@ -215,7 +215,7 @@ run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d
 
 [tasks."monitor:user:daemon:dev"]
 description = "Run `harness daemon dev` with the current user's isolated runtime profile"
-env = { RUST_LOG = "harness=trace,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
+env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
 run = '''
   log="tmp/logs/$(date +%y%m%d%H%M)-monitor-user-daemon-dev.log"
   apps/harness-monitor-macos/Scripts/user-runtime-profile.sh \
@@ -226,7 +226,7 @@ run = '''
 
 [tasks."monitor:user:bridge:start"]
 description = "Run `harness bridge start` with the current user's isolated runtime profile"
-env = { RUST_LOG = "harness=trace,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn", HARNESS_RUN_STEP_ACCEPT_STATUSES = "130,143" }
+env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn", HARNESS_RUN_STEP_ACCEPT_STATUSES = "130,143" }
 run = '''
   log="tmp/logs/$(date +%y%m%d%H%M)-monitor-user-bridge-start.log"
   apps/harness-monitor-macos/Scripts/user-runtime-profile.sh \
@@ -261,11 +261,11 @@ run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp mcp"
 
 [tasks."monitor:agent:daemon:dev"]
 description = "Run `harness daemon dev` with the current agent's isolated runtime profile"
-run = "RUST_LOG='harness=trace,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
+run = "RUST_LOG='harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
 
 [tasks."monitor:agent:bridge:start"]
 description = "Run `harness bridge start` with the current agent's isolated runtime profile"
-run = "RUST_LOG='harness=trace,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+run = "RUST_LOG='harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
 
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
