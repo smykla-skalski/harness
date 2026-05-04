@@ -203,6 +203,39 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
+  @Test("Store ACP start rolls repeated other-session notices into one toast count")
+  func storeAcpStartRollsRepeatedOtherSessionNotices() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.toast.dismissAll()
+    store.selectedSessionID = nil
+
+    _ = await store.startAcpAgent(
+      agentID: "copilot",
+      role: .worker,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: nil,
+      prompt: nil,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+    _ = await store.startAcpAgent(
+      agentID: "copilot",
+      role: .worker,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: nil,
+      prompt: nil,
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+
+    #expect(store.toast.activeFeedback.count == 1)
+    #expect(
+      store.currentSuccessFeedbackMessage
+        == HarnessMonitorStore.acpAgentStartedInOtherSessionMessage(actionName: "Agent started")
+    )
+    #expect(store.toast.activeFeedback.first?.repeatCount == 2)
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
+
   @Test("Store ACP start enables ACP host bridge and retries when bridge is already running")
   func storeAcpStartEnablesHostBridgeCapabilityAndRetries() async {
     let client = RecordingHarnessClient()

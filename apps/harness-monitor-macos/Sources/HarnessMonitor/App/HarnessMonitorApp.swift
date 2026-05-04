@@ -120,9 +120,10 @@ struct HarnessMonitorApp: App {
   // WindowGroups also lights up `.trackWindow`, SwiftData-backed children,
   // and notification observers, all of which dispatch main-actor work that
   // the preview agent reaps off-main and crashes with `BUG IN CLIENT OF
-  // LIBDISPATCH`. Render an inert placeholder for any non-live launch.
+  // LIBDISPATCH`. The UI-test host also launches in `.preview`, but it still
+  // needs the full scene tree so XCUITest can exercise the app.
   private var rendersLiveSceneContent: Bool {
-    launchMode == .live
+    launchMode == .live || isUITesting
   }
 
   private var allowsWindowRestoration: Bool {
@@ -132,6 +133,7 @@ struct HarnessMonitorApp: App {
   @ViewBuilder private var mainWindowSceneContent: some View {
     if rendersLiveSceneContent {
       mainWindowContent
+        .acpPermissionPresentation(store: store)
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
     } else {

@@ -68,6 +68,20 @@ struct ToastSliceTests {
     #expect(slice.activeFeedback.count == 1)
     #expect(firstID == secondID)
     #expect(slice.activeFeedback.first?.issuedAt != originalIssuedAt)
+    #expect(slice.activeFeedback.first?.repeatCount == 1)
+  }
+
+  @Test("Identical rolled-up success increments the visible repeat count")
+  func rollupDuplicatesIncrementRepeatCount() async {
+    let clock = ManualClock()
+    let slice = ToastSlice(clock: clock)
+    let firstID = slice.presentSuccess("Agent started in another session.", rollupDuplicates: true)
+    clock.advance(by: .seconds(1))
+    let secondID = slice.presentSuccess("Agent started in another session.", rollupDuplicates: true)
+
+    #expect(slice.activeFeedback.count == 1)
+    #expect(firstID == secondID)
+    #expect(slice.activeFeedback.first?.repeatCount == 2)
   }
 
   @Test("Same message different severity is not deduped")

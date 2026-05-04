@@ -145,7 +145,8 @@ extension HarnessMonitorStore {
       presentSuccessFeedback(actionName)
     case .droppedSessionMismatch:
       presentSuccessFeedback(
-        Self.acpAgentStartedInOtherSessionMessage(actionName: actionName)
+        Self.acpAgentStartedInOtherSessionMessage(actionName: actionName),
+        rollupDuplicates: true
       )
     }
   }

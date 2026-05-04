@@ -48,6 +48,19 @@ private struct HarnessMonitorFeedbackToastRow: View {
         .foregroundStyle(HarnessMonitorTheme.ink)
         .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, alignment: .leading)
+      if feedback.repeatCount > 1 {
+        Text("\(feedback.repeatCount)")
+          .scaledFont(.caption.weight(.semibold))
+          .monospacedDigit()
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+          .background {
+            Capsule(style: .continuous)
+              .fill(tintColor.opacity(0.16))
+          }
+          .accessibilityLabel("Repeated \(feedback.repeatCount) times")
+      }
       Button {
         toast.dismiss(id: feedback.id)
       } label: {
@@ -78,13 +91,6 @@ private struct HarnessMonitorFeedbackToastRow: View {
     switch feedback.severity {
     case .success: HarnessMonitorTheme.success
     case .failure: HarnessMonitorTheme.danger
-    }
-  }
-
-  private var announcementLabel: String {
-    switch feedback.severity {
-    case .success: "Success. \(feedback.message)"
-    case .failure: "Action failed. \(feedback.message)"
     }
   }
 }
