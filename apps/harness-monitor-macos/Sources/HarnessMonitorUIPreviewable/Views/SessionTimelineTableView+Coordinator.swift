@@ -222,7 +222,17 @@ extension SessionTimelineTableView {
           owner: self
         ) as? SessionTimelineTableCellView
         ?? SessionTimelineTableCellView()
-      cell.update(row: rows[row], actionHandler: actionHandler, fontScale: fontScale)
+      let connectorVisibility = SessionTimelineTableMetrics.connectorVisibility(
+        rowIndex: row,
+        rowCount: rows.count
+      )
+      cell.update(
+        row: rows[row],
+        actionHandler: actionHandler,
+        fontScale: fontScale,
+        showsConnectorAbove: connectorVisibility.showsConnectorAbove,
+        showsConnectorBelow: connectorVisibility.showsConnectorBelow
+      )
       return cell
     }
 
