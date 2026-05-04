@@ -284,7 +284,7 @@ struct SessionTimelineNavigationControls: View {
       Label(title, systemImage: systemImage)
     }
     .harnessActionButtonStyle(variant: .bordered, tint: nil)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
     .disabled(!isEnabled)
     .accessibilityIdentifier(identifier)
   }

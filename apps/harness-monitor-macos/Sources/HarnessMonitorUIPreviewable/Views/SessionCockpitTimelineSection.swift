@@ -11,6 +11,8 @@ struct SessionCockpitTimelineSection: View {
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
@@ -73,6 +75,7 @@ struct SessionCockpitTimelineSection: View {
       isTimelineLoading: isTimelineLoading,
       filterSignature: filters.signature,
       reduceMotion: reduceMotion,
+      textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
     )
   }
@@ -106,6 +109,7 @@ struct SessionCockpitTimelineSection: View {
       filters: filters,
       isTimelineLoading: isTimelineLoading,
       reduceMotion: reduceMotion,
+      textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
     )
     cachedPresentation = SessionTimelinePresentationRetention.resolved(
