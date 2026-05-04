@@ -1,7 +1,13 @@
 import AppKit
 import Combine
 import HarnessMonitorKit
+import OSLog
 import SwiftUI
+
+private struct CachedRowHeight {
+  let width: CGFloat
+  let height: CGFloat
+}
 
 extension SessionTimelineTableView {
   // Coordinator pushes viewport state into `viewport` via methods only; it
@@ -13,9 +19,8 @@ extension SessionTimelineTableView {
     weak var viewport: SessionTimelineViewportModel?
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
-    private var rowHeightCache: [String: CGFloat] = [:]
+    private var rowHeightCache: [String: CachedRowHeight] = [:]
     private var lastColumnWidth: CGFloat = 0
-    private var lastPreMeasuredWidth: CGFloat = 0
     private var rows: [SessionTimelineRow] = []
     private var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
@@ -32,6 +37,19 @@ extension SessionTimelineTableView {
     )
     private var pendingPublish = false
     private var cancellables = Set<AnyCancellable>()
+    private var measurementTask: Task<Void, Never>?
+    private var measurementGeneration: Int = 0
+    // Wall-clock budget for one synchronous measurement chunk. Each row's
+    // SwiftUI hosting layout is variable cost (5-30ms+ depending on row
+    // shape), so a fixed row count silently breaks the 100ms session-switch
+    // budget on heavy variants. Yielding once a chunk has spent this many
+    // milliseconds keeps the main-thread block bounded by clock time.
+    private static let measurementChunkBudgetMs: Double = 12.0
+    private static let signposter = OSSignposter(
+      subsystem: "io.harnessmonitor",
+      category: "perf"
+    )
+    private static let widthEqualityTolerance: CGFloat = 0.5
 
     init(
       viewport: SessionTimelineViewportModel,
@@ -39,6 +57,16 @@ extension SessionTimelineTableView {
     ) {
       self.viewport = viewport
       self.scrollBoundaryChanged = scrollBoundaryChanged
+    }
+
+    func cancelMeasurement(reason: StaticString = "external") {
+      guard let task = measurementTask else { return }
+      Self.signposter.emitEvent(
+        "session_timeline.measurement.cancelled",
+        "generation=\(measurementGeneration, privacy: .public) reason=\(reason, privacy: .public)"
+      )
+      task.cancel()
+      measurementTask = nil
     }
 
     func configure(tableView: NSTableView, scrollView: NSScrollView) {
@@ -82,28 +110,39 @@ extension SessionTimelineTableView {
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
       let rowsChanged = rowSnapshot != nextSnapshot
       if rowsChanged {
-        for rowIndex in 0..<tableView.numberOfRows {
-          guard self.rows.indices.contains(rowIndex) else { continue }
-          let rowID = self.rows[rowIndex].id
-          rowHeightCache[rowID] = tableView.rect(ofRow: rowIndex).height
+        let nextIDs = Set(rows.map(\.id))
+        let priorIDs = Set(self.rows.map(\.id))
+        let willReuseAny = !nextIDs.isDisjoint(with: priorIDs)
+        let updateInterval = Self.signposter.beginInterval(
+          "session_timeline.update_rows_changed",
+          id: Self.signposter.makeSignpostID(),
+          "row_count=\(rows.count, privacy: .public) reused_any=\(willReuseAny ? "true" : "false", privacy: .public) width=\(Int(resolvedColumnWidth), privacy: .public)"
+        )
+        defer {
+          Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
         }
 
-        // Measure with the scroll view's clip width, not the outer SwiftUI width.
-        // The always-visible vertical scroller shrinks the real proposal enough to
-        // flip ViewThatFits into compact mode for long signal rows; if measurement
-        // uses the larger width, AppKit caches a short row that clips the source
-        // label and detail once rendered.
-        if resolvedColumnWidth > 1 {
-          lastPreMeasuredWidth = resolvedColumnWidth
-          autoreleasepool {
-            for row in rows where rowHeightCache[row.id] == nil {
-              rowHeightCache[row.id] = SessionTimelineTableCellView.measuredHeight(
-                for: row,
-                columnWidth: resolvedColumnWidth
-              )
-            }
+        cancelMeasurement(reason: "rows_changed")
+
+        // Snapshot heights from currently-displayed rows whose IDs survive,
+        // tagged with the width those measurements were taken at. Skip the
+        // walk entirely when no IDs carry over (typical session swap), since
+        // tableView.rect(ofRow:) drives AppKit layout work for each call.
+        if willReuseAny {
+          for rowIndex in 0..<tableView.numberOfRows {
+            guard self.rows.indices.contains(rowIndex) else { continue }
+            let rowID = self.rows[rowIndex].id
+            guard nextIDs.contains(rowID) else { continue }
+            rowHeightCache[rowID] = CachedRowHeight(
+              width: lastColumnWidth,
+              height: tableView.rect(ofRow: rowIndex).height
+            )
           }
         }
+
+        // Drop cached heights for IDs that are not in the next rows array so
+        // the cache stays bounded across many session swaps.
+        rowHeightCache = rowHeightCache.filter { nextIDs.contains($0.key) }
 
         self.rows = rows
         rowIndexByID = Dictionary(
@@ -114,6 +153,19 @@ extension SessionTimelineTableView {
         rowSnapshot = nextSnapshot
         tableView.reloadData()
         tableView.layoutSubtreeIfNeeded()
+
+        // Defer per-row SwiftUI hosting-view measurement off the main thread
+        // hop. Rows that miss the cache (or carry an entry tagged with a
+        // different column width) return estimatedHeight from heightOfRow for
+        // the first frame, which keeps session switch cost bounded by the
+        // estimate-fan-out (microseconds per row) instead of the full hosting-
+        // view layout cost (single-digit-to-tens-of-ms per row, multi-second
+        // on large timelines). The background pass measures visible rows
+        // first, then below-viewport, then above-viewport, calling
+        // noteHeightOfRows per chunk so layout converges without blocking.
+        if resolvedColumnWidth > 1 {
+          scheduleIncrementalMeasurement(columnWidth: resolvedColumnWidth)
+        }
       }
       resizeColumn(in: scrollView, columnWidth: resolvedColumnWidth)
 
@@ -135,21 +187,15 @@ extension SessionTimelineTableView {
         return SessionTimelineTableMetrics.estimatedBaseRowHeight
       }
       let rowData = rows[row]
-      if let cached = rowHeightCache[rowData.id] {
-        return cached
+      if let cached = rowHeightCache[rowData.id],
+        abs(cached.width - lastColumnWidth) < Self.widthEqualityTolerance
+      {
+        return cached.height
       }
-      // Lazy path: cache was nil (width was ≤1 when rowsChanged ran).
-      // resizeColumn sets lastColumnWidth before calling noteHeightOfRows, so
-      // lastColumnWidth is always valid here — unlike scrollView.contentView.bounds.width
-      // which may still be zero until AppKit completes its first layout pass.
-      if lastColumnWidth > 1 {
-        let measuredHeight = SessionTimelineTableCellView.measuredHeight(
-          for: rowData,
-          columnWidth: lastColumnWidth
-        )
-        rowHeightCache[rowData.id] = measuredHeight
-        return measuredHeight
-      }
+      // Cache miss (or width tag stale): return the static estimate without
+      // invoking the SwiftUI hosting-view layout. The incremental measurement
+      // task fills in real heights asynchronously and calls noteHeightOfRows
+      // per chunk so layout converges without blocking the session switch.
       return SessionTimelineTableMetrics.estimatedHeight(for: rowData)
     }
 
@@ -193,21 +239,153 @@ extension SessionTimelineTableView {
       guard let tableView, let column = tableView.tableColumns.first else { return }
       guard columnWidth > 1, column.width != columnWidth else { return }
       let isFirstRealWidth = lastColumnWidth <= 1
+      let widthChanged =
+        !isFirstRealWidth && abs(columnWidth - lastColumnWidth) > Self.widthEqualityTolerance
+      let needsFullRefresh = isFirstRealWidth || widthChanged
       lastColumnWidth = columnWidth
       column.width = columnWidth
-      if isFirstRealWidth {
-        // First layout with a valid width. If rowsChanged already pre-measured at
-        // this exact width, the cache is correct — just notify AppKit. Otherwise
-        // (columnWidth changed between pre-measure and resizeColumn, edge case),
-        // discard stale cache so heightOfRow remeasures at the current width.
-        if lastPreMeasuredWidth != columnWidth {
-          for row in rows { rowHeightCache.removeValue(forKey: row.id) }
-        }
+      if needsFullRefresh {
+        // Width-tagged cache lookups will treat any prior entries as stale and
+        // fall back to estimate, so no explicit cache flush is required - the
+        // background measurement pass overwrites entries with the new width.
+        cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
         tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+        scheduleIncrementalMeasurement(columnWidth: columnWidth)
       } else {
-        // Subsequent window resize: updating visible rows is sufficient.
+        // Same width but column reapplied (e.g., row reload). Visible rows are
+        // sufficient to refresh layout.
         invalidateVisibleRowHeights()
       }
+    }
+
+    private func scheduleIncrementalMeasurement(columnWidth: CGFloat) {
+      guard columnWidth > 1, !rows.isEmpty else {
+        return
+      }
+      let snapshot = rows
+      let visibleRange = visibleRowIndexRange()
+      let measurementOrder = orderedMeasurementIndexes(
+        rowCount: snapshot.count,
+        visibleRange: visibleRange
+      )
+      // Skip rows that already have a cached entry tagged with this width,
+      // so partial updates don't redo work for unchanged rows.
+      let outstanding = measurementOrder.filter { index in
+        guard snapshot.indices.contains(index) else { return false }
+        let id = snapshot[index].id
+        guard let cached = rowHeightCache[id] else { return true }
+        return abs(cached.width - columnWidth) >= Self.widthEqualityTolerance
+      }
+      guard !outstanding.isEmpty else {
+        return
+      }
+      cancelMeasurement(reason: "reschedule")
+      self.measurementGeneration &+= 1
+      let generation = self.measurementGeneration
+      let totalOutstanding = outstanding.count
+      Self.signposter.emitEvent(
+        "session_timeline.measurement.scheduled",
+        "generation=\(generation, privacy: .public) outstanding=\(totalOutstanding, privacy: .public) width=\(Int(columnWidth), privacy: .public)"
+      )
+      let task = Task { @MainActor [weak self] in
+        guard let self else { return }
+        var cursor = 0
+        while cursor < outstanding.count {
+          if Task.isCancelled { return }
+          let chunkInterval = Self.signposter.beginInterval(
+            "session_timeline.measurement.chunk",
+            id: Self.signposter.makeSignpostID(),
+            "generation=\(generation, privacy: .public) cursor=\(cursor, privacy: .public)"
+          )
+          var changedIndexes = IndexSet()
+          var measuredInChunk = 0
+          autoreleasepool {
+            let chunkStart = ContinuousClock.now
+            while cursor < outstanding.count {
+              let rowIndex = outstanding[cursor]
+              cursor += 1
+              guard self.rows.indices.contains(rowIndex),
+                self.rows[rowIndex].id == snapshot[rowIndex].id
+              else { continue }
+              let row = snapshot[rowIndex]
+              if let cached = self.rowHeightCache[row.id],
+                abs(cached.width - columnWidth) < Self.widthEqualityTolerance
+              {
+                continue
+              }
+              let height = SessionTimelineTableCellView.measuredHeight(
+                for: row,
+                columnWidth: columnWidth
+              )
+              self.rowHeightCache[row.id] = CachedRowHeight(
+                width: columnWidth,
+                height: height
+              )
+              changedIndexes.insert(rowIndex)
+              measuredInChunk += 1
+              let elapsedMs = Self.elapsedMilliseconds(since: chunkStart)
+              if elapsedMs >= Self.measurementChunkBudgetMs {
+                break
+              }
+            }
+          }
+          if !changedIndexes.isEmpty {
+            self.tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
+          }
+          Self.signposter.endInterval(
+            "session_timeline.measurement.chunk",
+            chunkInterval,
+            "measured=\(measuredInChunk, privacy: .public) remaining=\(outstanding.count - cursor, privacy: .public)"
+          )
+          await Task.yield()
+        }
+        if !Task.isCancelled {
+          Self.signposter.emitEvent(
+            "session_timeline.measurement.completed",
+            "generation=\(generation, privacy: .public) measured=\(totalOutstanding, privacy: .public)"
+          )
+          self.measurementTask = nil
+        }
+      }
+      measurementTask = task
+    }
+
+    private static func elapsedMilliseconds(since start: ContinuousClock.Instant) -> Double {
+      let duration = start.duration(to: ContinuousClock.now)
+      let (seconds, attoseconds) = duration.components
+      return Double(seconds) * 1_000.0 + Double(attoseconds) / 1_000_000_000_000_000.0
+    }
+
+    private func visibleRowIndexRange() -> Range<Int>? {
+      guard let tableView, let scrollView else { return nil }
+      let bounds = scrollView.contentView.bounds
+      guard bounds.height > 0 else { return nil }
+      let visibleRows = tableView.rows(in: bounds)
+      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return nil }
+      let lower = max(0, visibleRows.location)
+      let upper = min(rows.count, lower + visibleRows.length)
+      return lower < upper ? lower..<upper : nil
+    }
+
+    private func orderedMeasurementIndexes(
+      rowCount: Int,
+      visibleRange: Range<Int>?
+    ) -> [Int] {
+      guard rowCount > 0 else { return [] }
+      guard let visibleRange else {
+        return Array(0..<rowCount)
+      }
+      var indexes: [Int] = []
+      indexes.reserveCapacity(rowCount)
+      indexes.append(contentsOf: visibleRange)
+      let belowStart = visibleRange.upperBound
+      if belowStart < rowCount {
+        indexes.append(contentsOf: belowStart..<rowCount)
+      }
+      if visibleRange.lowerBound > 0 {
+        indexes.append(contentsOf: 0..<visibleRange.lowerBound)
+      }
+      return indexes
     }
 
     private func performPendingScrollCommand() -> Bool {
@@ -273,7 +451,9 @@ extension SessionTimelineTableView {
       let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
       guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return }
       let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
-      // Evict cached heights so heightOfRow remeasures at the new column width.
+      // Evict cached heights for visible rows so heightOfRow falls back to
+      // estimate; the background measurement pass will replace them with
+      // current-width values.
       for row in rowRange where rows.indices.contains(row) {
         rowHeightCache.removeValue(forKey: rows[row].id)
       }
