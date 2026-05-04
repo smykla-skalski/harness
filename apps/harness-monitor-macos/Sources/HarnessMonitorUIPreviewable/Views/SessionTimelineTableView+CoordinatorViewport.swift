@@ -111,6 +111,27 @@ extension SessionTimelineTableView.Coordinator {
     )
   }
 
+  @discardableResult
+  func normalizePinnedLatestViewportIfNeeded() -> Bool {
+    guard
+      let scrollView,
+      let tableView
+    else {
+      return false
+    }
+    let visibleMinY = scrollView.contentView.bounds.minY
+    guard visibleMinY > 0 else {
+      return false
+    }
+    let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    guard visibleRows.location == 0 else {
+      return false
+    }
+    scrollView.contentView.scroll(to: .zero)
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    return true
+  }
+
   func publishViewportState() {
     guard let tableView, let scrollView else {
       return
@@ -129,6 +150,9 @@ extension SessionTimelineTableView.Coordinator {
     if lastViewportStats != stats {
       lastViewportStats = stats
       viewport?.recordViewportStats(stats)
+    }
+    if measurementTask == nil, visibleRowsNeedMeasurement(columnWidth: lastColumnWidth) {
+      scheduleIncrementalMeasurement(columnWidth: lastColumnWidth)
     }
 
     let boundaryState = SessionTimelineScrollBoundaryState(

@@ -65,7 +65,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
       )
       sizingHost.frame = NSRect(x: 0, y: 0, width: columnWidth, height: 2_000)
       sizingHost.layoutSubtreeIfNeeded()
-      let measured = sizingHost.fittingSize.height
+      let measured = ceil(sizingHost.fittingSize.height)
       return measured > 4 ? measured : SessionTimelineTableMetrics.estimatedHeight(for: row)
     }
   }
