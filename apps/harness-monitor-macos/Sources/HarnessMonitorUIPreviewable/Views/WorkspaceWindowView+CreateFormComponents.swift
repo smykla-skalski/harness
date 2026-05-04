@@ -10,6 +10,20 @@ struct AgentsCreateSectionCard<Content: View>: View {
 
   var body: some View {
     content
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+struct AgentsCreateProviderGridCard<Content: View>: View {
+  private let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    content
       .padding(HarnessMonitorTheme.cardPadding)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
