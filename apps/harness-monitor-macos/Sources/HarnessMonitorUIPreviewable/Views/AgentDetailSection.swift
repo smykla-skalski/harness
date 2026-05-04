@@ -385,14 +385,55 @@ struct AgentDetailSection: View {
           signalCommand = ""
         }
       }
+      .onChange(of: signalCommand) { _, newValue in
+        UserDefaults.standard.set(newValue, forKey: Self.draftCommandKey(agentID: agent.agentId))
+      }
+      .onChange(of: signalMessage) { _, newValue in
+        UserDefaults.standard.set(newValue, forKey: Self.draftMessageKey(agentID: agent.agentId))
+      }
+      .onChange(of: signalActionHint) { _, newValue in
+        UserDefaults.standard.set(newValue, forKey: Self.draftActionHintKey(agentID: agent.agentId))
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .task(id: agent.agentId) { hydrateDraft() }
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.workspaceDetailCard,
       label: agent.name,
       value: agent.agentId
     )
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
+  }
+
+  static func draftCommandKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).command"
+  }
+
+  static func draftMessageKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).message"
+  }
+
+  static func draftActionHintKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).actionHint"
+  }
+
+  private func hydrateDraft() {
+    let defaults = UserDefaults.standard
+    let savedCommand = defaults.string(forKey: Self.draftCommandKey(agentID: agent.agentId)) ?? ""
+    let savedMessage = defaults.string(forKey: Self.draftMessageKey(agentID: agent.agentId)) ?? ""
+    let savedActionHint =
+      defaults.string(forKey: Self.draftActionHintKey(agentID: agent.agentId)) ?? ""
+    if savedCommand.isEmpty {
+      signalCommand = SendUpdateAction.injectContext.rawCommand
+      selectedSendAction = .injectContext
+    } else {
+      signalCommand = savedCommand
+      selectedSendAction =
+        savedCommand == SendUpdateAction.injectContext.rawCommand
+        ? .injectContext : .custom
+    }
+    signalMessage = savedMessage
+    signalActionHint = savedActionHint
   }
 
   @ViewBuilder
