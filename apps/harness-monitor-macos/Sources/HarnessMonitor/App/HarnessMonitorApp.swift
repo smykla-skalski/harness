@@ -41,7 +41,12 @@ struct HarnessMonitorApp: App {
       configuration.isUITesting
       || configuration.environment.isXCTestProcess
       || HarnessMonitorAppDelegate.isCurrentTestHarnessRun()
-    if !isTestRun {
+    // Preview/playground shells run an ad-hoc signed copy of the bundle from
+    // /private/tmp and lack entitlements. Skip every filesystem/telemetry
+    // side effect that the canvas does not need; the preview shell crashes
+    // (libdispatch BUG, NSAssertion) when these touch sandboxed services.
+    let runsLiveSideEffects = configuration.launchMode == .live && !isTestRun
+    if runsLiveSideEffects {
       do {
         try HarnessMonitorPaths.ensureHarnessRootNonIndexable(using: configuration.environment)
       } catch {
@@ -49,16 +54,18 @@ struct HarnessMonitorApp: App {
           "Failed to mark harness root non-indexable: \(String(describing: error), privacy: .public)"
         )
       }
-    }
-    do {
-      try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
-    } catch {
-      HarnessMonitorLogger.store.warning(
-        "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
-      )
+      do {
+        try HarnessMonitorPaths.migrateLegacyGeneratedCaches(using: configuration.environment)
+      } catch {
+        HarnessMonitorLogger.store.warning(
+          "Failed to migrate generated caches: \(String(describing: error), privacy: .public)"
+        )
+      }
     }
     #if HARNESS_FEATURE_OTEL
-      HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
+      if runsLiveSideEffects {
+        HarnessMonitorTelemetry.shared.bootstrap(using: configuration.environment)
+      }
     #endif
     container = configuration.container
     isUITesting = configuration.isUITesting
@@ -70,17 +77,16 @@ struct HarnessMonitorApp: App {
     // UNUserNotificationCenter.current() asserts inside the Xcode preview shell
     // (ad-hoc signed copy at /private/tmp/...) and aborts the agent before the
     // canvas ever mounts. Use the stub controller for any non-live launch.
-    let useStubNotificationController = isTestRun || configuration.launchMode != .live
     let notificationController =
-      useStubNotificationController
-      ? HarnessMonitorUserNotificationController.preview(
-        environment: configuration.environment
-      )
-      : {
+      runsLiveSideEffects
+      ? {
         let controller = HarnessMonitorUserNotificationController()
         controller.activate()
         return controller
       }()
+      : HarnessMonitorUserNotificationController.preview(
+        environment: configuration.environment
+      )
     self.notificationController = notificationController
     let keyWindowObserver = KeyWindowObserver()
     self.keyWindowObserver = keyWindowObserver

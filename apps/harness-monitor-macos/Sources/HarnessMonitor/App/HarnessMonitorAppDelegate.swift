@@ -22,18 +22,25 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   override init() {
     super.init()
-    // dup2(STDERR) breaks the Xcode preview/playground IPC pipe, which crashes the
-    // preview agent with `BUG IN CLIENT OF LIBDISPATCH` once SwiftUI hands off to
-    // NSPreviewTargetWindow. Restrict capture to real shipping launches.
-    if launchMode == .live && !isTestHarnessRun {
+    // Preview/playground shells run an ad-hoc signed copy of the bundle from
+    // /private/tmp and tear down on a non-main thread. dup2(STDERR), MCP
+    // background tasks, and SIGTERM/SIGINT/SIGHUP DispatchSource handlers
+    // either collide with Xcode's preview IPC pipe or fire main-actor blocks
+    // off the main queue, both of which trip libdispatch BUG and abort the
+    // canvas. Restrict every live-only side effect to shipping launches.
+    if runsLiveSideEffects {
       standardErrorWarningCapture.start()
+      installSignalHandlers()
     }
-    installSignalHandlers()
     let environment = Self.launchEnvironment()
     let keepsAnimations = environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] == "1"
     if isTestHarnessRun && !keepsAnimations {
       disableAnimationsForUITesting()
     }
+  }
+
+  private var runsLiveSideEffects: Bool {
+    launchMode == .live && !isTestHarnessRun
   }
 
   func applicationWillFinishLaunching(_ notification: Notification) {
@@ -45,10 +52,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    if !isTestHarnessRun {
+    // MCP startup spins up background HTTP/IPC tasks that bind sandboxed
+    // services - those abort under the preview shell and the user-facing
+    // symptom is "Harness Monitor crashed" in the canvas.
+    if runsLiveSideEffects {
       mcpStartupController.start()
     }
-    guard !hidesDockIconForPerfRuns, !isTestHarnessRun else {
+    guard runsLiveSideEffects, !hidesDockIconForPerfRuns else {
       return
     }
     Task { @MainActor in
