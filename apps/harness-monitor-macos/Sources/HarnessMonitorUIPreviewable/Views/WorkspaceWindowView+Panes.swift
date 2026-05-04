@@ -73,6 +73,24 @@ extension WorkspaceWindowView {
       .id("workspace.agent.\(agentID)")
     } else {
       unavailableSessionPane
+        .onAppear {
+          let availableIDs = (store.selectedSession?.agents ?? [])
+            .map(\.agentId)
+            .joined(separator: ",")
+          let acpAgentIDs = store.selectedAcpAgents
+            .map { "agentId=\($0.agentId)/acpId=\($0.acpId)" }
+            .joined(separator: ",")
+          HarnessMonitorLogger.store.warning(
+            """
+            agent detail pane miss \
+            requestedAgentID=\(agentID, privacy: .public) \
+            selectedSessionID=\(store.selectedSessionID ?? "<nil>", privacy: .public) \
+            sessionDetailID=\(store.selectedSession?.session.sessionId ?? "<nil>", privacy: .public) \
+            sessionAgentIDs=[\(availableIDs, privacy: .public)] \
+            selectedAcpAgents=[\(acpAgentIDs, privacy: .public)]
+            """
+          )
+        }
     }
   }
 
