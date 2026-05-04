@@ -4,6 +4,8 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
+  override nonisolated class var reuseLaunchedApp: Bool { true }
+
   func testDatabaseSectionStatisticsButtonsAndConfirmations() throws {
     let app = launch(mode: "preview")
 

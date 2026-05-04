@@ -7,6 +7,8 @@ final class WorkspaceWindowTerminalSizeUITests:
   HarnessMonitorUITestCase,
   WorkspaceWindowUITestSupporting
 {
+  override nonisolated class var reuseLaunchedApp: Bool { true }
+
   func testTerminalSizeRemainsStableAfterStartAndSelection() throws {
     let app = launchInCockpitPreview()
     openWorkspaceWindow(in: app)

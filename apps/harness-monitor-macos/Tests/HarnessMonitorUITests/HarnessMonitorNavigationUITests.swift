@@ -4,6 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorNavigationUITests: HarnessMonitorUITestCase {
+  override nonisolated class var reuseLaunchedApp: Bool { true }
 
   /// Reproduces the reported issue: after selecting a session from the
   /// dashboard, the toolbar back button remains disabled (greyed out)

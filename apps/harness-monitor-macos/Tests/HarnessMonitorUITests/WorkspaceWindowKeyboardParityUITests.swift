@@ -6,6 +6,8 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 final class WorkspaceWindowKeyboardParityUITests:
   HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting
 {
+  override nonisolated class var reuseLaunchedApp: Bool { true }
+
   func testSpaceKeyScrollsCreatePane() throws {
     let app = launchInCockpitPreview()
     openWorkspaceWindow(in: app)
