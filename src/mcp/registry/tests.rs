@@ -115,7 +115,7 @@ async fn request_returns_unavailable_when_socket_missing() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn request_times_out_when_server_is_silent() {
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
