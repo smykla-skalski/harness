@@ -65,8 +65,8 @@ async fn coalesces_concurrent_requests_into_one_batch() {
     assert_eq!(batches[0].requests.len(), 2);
     let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
     assert_eq!(bridge.expiration_task_count(), 0);
-    assert!(recv_permission_result(rx_a).await.is_ok());
-    assert!(recv_permission_result(rx_b).await.is_ok());
+    recv_permission_result(rx_a).await.expect("rx_a should be approved");
+    recv_permission_result(rx_b).await.expect("rx_b should be approved");
 }
 
 #[tokio::test]
@@ -123,8 +123,8 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
     let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
-    assert!(recv_permission_result(rx_a).await.is_ok());
-    assert!(recv_permission_result(rx_b).await.is_ok());
+    recv_permission_result(rx_a).await.expect("rx_a should be approved");
+    recv_permission_result(rx_b).await.expect("rx_b should be approved");
 }
 
 #[tokio::test]
