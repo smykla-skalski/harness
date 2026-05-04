@@ -9,10 +9,12 @@
 //!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
 //! - `HARNESS_FEATURE_ACP=0` disables ACP managed-agent start routes. ACP is
 //!   enabled by default now that the blocking permission modal has landed.
+//! - `harness daemon serve --disable-acp` / `--enable-acp` applies the same
+//!   gate as a process-scoped override without mutating the caller shell env.
 //!
-//! Resolution order: explicit CLI override (when supplied) wins over env vars,
-//! env vars over the disabled-by-default baseline. Truthy values match the
-//! existing harness convention used by `HARNESS_OTEL_EXPORT`.
+//! Resolution order: explicit process-scoped daemon override (when supplied)
+//! wins over env vars, env vars over the disabled-by-default baseline. Truthy
+//! values match the existing harness convention used by `HARNESS_OTEL_EXPORT`.
 //!
 //! Removal trigger: drop this whole module, the two CLI args on `BootstrapArgs`
 //! and `GenerateAgentAssetsArgs`, the `flags` parameter threaded through
@@ -23,6 +25,8 @@
 //! module with a tracking issue. See AGENTS.md / CLAUDE.md for the convention
 //! statement.
 
+use std::sync::{Mutex, MutexGuard};
+
 use crate::workspace::normalized_env_value;
 
 /// Env var that re-enables suite-lifecycle hooks in generated configs.
@@ -30,10 +34,46 @@ pub const SUITE_HOOKS_ENV: &str = "HARNESS_FEATURE_SUITE_HOOKS";
 /// Env var that enables ACP managed-agent runtime routes before the modal ships.
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 
+static ACP_RUNTIME_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
+
 /// Whether ACP managed-agent routes are enabled.
 #[must_use]
 pub fn acp_enabled_from_env() -> bool {
+    if let Some(value) = *acp_runtime_override_slot() {
+        return value;
+    }
     normalized_env_value(ACP_ENV).is_none_or(|value| env_value_truthy(&value))
+}
+
+/// Apply a process-scoped ACP enablement override for the lifetime of the guard.
+///
+/// This is used by `harness daemon serve` / `daemon dev` so one daemon process
+/// can explicitly opt in or out without mutating the caller's shell env. The
+/// override wins over `HARNESS_FEATURE_ACP` while the guard is alive.
+#[must_use]
+pub(crate) fn scoped_acp_enabled_override(value: Option<bool>) -> AcpRuntimeOverrideGuard {
+    let mut slot = acp_runtime_override_slot();
+    let previous = *slot;
+    *slot = value;
+    drop(slot);
+    AcpRuntimeOverrideGuard { previous }
+}
+
+fn acp_runtime_override_slot() -> MutexGuard<'static, Option<bool>> {
+    match ACP_RUNTIME_OVERRIDE.lock() {
+        Ok(slot) => slot,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+pub(crate) struct AcpRuntimeOverrideGuard {
+    previous: Option<bool>,
+}
+
+impl Drop for AcpRuntimeOverrideGuard {
+    fn drop(&mut self) {
+        *acp_runtime_override_slot() = self.previous;
+    }
 }
 
 /// Toggles for the optional hook families written into runtime configs.
@@ -93,6 +133,8 @@ fn env_value_truthy(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static ACP_OVERRIDE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn with_clean_env<R>(body: impl FnOnce() -> R) -> R {
         temp_env::with_vars(
@@ -161,6 +203,20 @@ mod tests {
             assert!(acp_enabled_from_env());
         });
         temp_env::with_var(ACP_ENV, Some("false"), || {
+            assert!(!acp_enabled_from_env());
+        });
+    }
+
+    #[test]
+    fn scoped_acp_override_wins_over_env_and_resets_after_drop() {
+        let _guard = ACP_OVERRIDE_TEST_LOCK.lock().expect("override test lock");
+        temp_env::with_var(ACP_ENV, Some("0"), || {
+            assert!(!acp_enabled_from_env());
+
+            let override_guard = scoped_acp_enabled_override(Some(true));
+            assert!(acp_enabled_from_env());
+
+            drop(override_guard);
             assert!(!acp_enabled_from_env());
         });
     }
