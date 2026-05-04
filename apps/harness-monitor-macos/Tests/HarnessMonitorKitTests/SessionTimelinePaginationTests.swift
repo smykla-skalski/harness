@@ -865,8 +865,8 @@ struct SessionTimelineNavigationTests {
     #expect(pending.isSatisfied(sessionID: "sess-pagination", navigation: latestNavigation))
   }
 
-  @Test("Visibility status keeps visible and loaded counts stable")
-  func visibilityStatusKeepsVisibleAndLoadedCountsStable() {
+  @Test("Visibility status shows loaded event counts only")
+  func visibilityStatusShowsLoadedEventCountsOnly() {
     let stats = SessionTimelineVisibilityStats(
       visibleRowCount: 6,
       renderedRowCount: 15,
@@ -874,7 +874,7 @@ struct SessionTimelineNavigationTests {
       totalEventCount: 80
     )
 
-    #expect(stats.statusText == "Visible rows 6 | Loaded events 24/80")
+    #expect(stats.statusText == "Loaded events 24/80")
   }
 
   @Test("Timeline content identity changes only across sessions")
