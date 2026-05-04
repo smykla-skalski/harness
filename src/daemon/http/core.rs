@@ -11,11 +11,12 @@ use axum::extract::Query;
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::bridge::reconfigure_bridge;
 use crate::daemon::protocol::{
-    HostBridgeReconfigureRequest, ReadinessResponse, RuntimeSessionResolutionResponse,
-    SetLogLevelRequest, http_paths,
+    DaemonTelemetryRequest, HostBridgeReconfigureRequest, ReadinessResponse,
+    RuntimeSessionResolutionResponse, SetLogLevelRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
+use crate::errors::CliErrorKind;
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
@@ -27,6 +28,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         .route(http_paths::HEALTH, get(get_health))
         .route(http_paths::READY, get(get_ready))
         .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
+        .route(http_paths::DAEMON_TELEMETRY, post(post_daemon_telemetry))
         .route(http_paths::CONFIG, get(get_config))
         .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
         .route(
@@ -178,6 +180,36 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
         .shutdown_all()
         .and_then(|()| service::request_shutdown());
     timed_json("POST", http_paths::DAEMON_STOP, &request_id, start, result)
+}
+
+pub(super) async fn post_daemon_telemetry(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<DaemonTelemetryRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = if let Some(db) = state.db.get() {
+        match db.lock() {
+            Ok(db) => service::record_telemetry(&request, Some(&db)),
+            Err(error) => Err(CliErrorKind::workflow_io(format!(
+                "telemetry daemon db lock poisoned: {error}"
+            ))
+            .into()),
+        }
+    } else {
+        service::record_telemetry(&request, None)
+    };
+    timed_json(
+        "POST",
+        http_paths::DAEMON_TELEMETRY,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 async fn post_bridge_reconfigure(

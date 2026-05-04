@@ -2,6 +2,7 @@ mod scrub;
 mod summarize;
 mod types;
 
+pub use scrub::scrub;
 pub use summarize::{normalize_tool_output, summarize_tool_input};
 pub use types::{AuditAppendRequest, AuditEntry, AuditPhaseContext};
 

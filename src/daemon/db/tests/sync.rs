@@ -487,7 +487,7 @@ fn bump_change_normalizes_raw_session_scope() {
 #[test]
 fn append_daemon_event_inserts() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    db.append_daemon_event("info", "test message")
+    db.append_daemon_event("2026-05-04T15:00:00Z", "info", "test message")
         .expect("append event");
 
     let count: i64 = db

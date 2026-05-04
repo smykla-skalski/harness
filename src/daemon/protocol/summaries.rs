@@ -74,6 +74,35 @@ pub struct HostBridgeReconfigureRequest {
     pub force: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DaemonTelemetryKind {
+    DecodeFailure,
+}
+
+impl DaemonTelemetryKind {
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::DecodeFailure => "decode_failure",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonTelemetryRequest {
+    pub kind: DaemonTelemetryKind,
+    pub source: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sample: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonTelemetryResponse {
+    pub recorded_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,

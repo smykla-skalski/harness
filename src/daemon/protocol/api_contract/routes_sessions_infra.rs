@@ -26,6 +26,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::DAEMON_TELEMETRY,
+        parity: HttpRouteParity::Exempt {
+            reason: "client decode-failure telemetry is HTTP ingestion only",
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::CONFIG,
         parity: HttpRouteParity::Rpc {

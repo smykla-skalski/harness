@@ -4,6 +4,9 @@ use super::{
     StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
 use crate::agents::acp::probe::probe_acp_agents_cached;
+use crate::daemon::db::DaemonDb;
+use crate::daemon::protocol::{DaemonTelemetryRequest, DaemonTelemetryResponse};
+use crate::run::audit::scrub;
 
 /// Build a point-in-time daemon status report.
 ///
@@ -236,6 +239,52 @@ pub fn get_log_level() -> Result<LogLevelResponse, CliError> {
     Ok(LogLevelResponse {
         level: current_log_level(),
         filter,
+    })
+}
+
+/// Record client-side decode failure telemetry into daemon diagnostics.
+///
+/// # Errors
+/// Returns [`CliError`] when validation fails or the daemon audit event cannot
+/// be persisted.
+pub fn record_telemetry(
+    request: &DaemonTelemetryRequest,
+    db: Option<&DaemonDb>,
+) -> Result<DaemonTelemetryResponse, CliError> {
+    let source = request.source.trim();
+    if source.is_empty() {
+        return Err(CliErrorKind::workflow_parse("telemetry source cannot be empty").into());
+    }
+    let message = request.message.trim();
+    if message.is_empty() {
+        return Err(CliErrorKind::workflow_parse("telemetry message cannot be empty").into());
+    }
+    let scrubbed_source = scrub(source);
+
+    let mut event_message = format!(
+        "client telemetry {} from {}: {}",
+        request.kind.as_str(),
+        scrubbed_source,
+        scrub(message)
+    );
+    if let Some(sample) = request.sample.as_deref().map(str::trim)
+        && !sample.is_empty()
+    {
+        event_message.push_str(" sample=");
+        event_message.push_str(&scrub(sample));
+    }
+
+    let event = state::DaemonAuditEvent {
+        recorded_at: utc_now(),
+        level: "warn".to_string(),
+        message: event_message,
+    };
+    state::append_event_entry(&event)?;
+    if let Some(db) = db {
+        db.append_daemon_event(&event.recorded_at, &event.level, &event.message)?;
+    }
+    Ok(DaemonTelemetryResponse {
+        recorded_at: event.recorded_at,
     })
 }
 

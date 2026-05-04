@@ -2,6 +2,7 @@ use std::io::{BufRead as _, BufReader, Write as _};
 use std::os::unix::net::UnixListener;
 use std::thread;
 
+use chrono::DateTime;
 use tempfile::tempdir;
 
 use super::{BridgeClient, BridgeResponse};
@@ -28,6 +29,7 @@ fn acp_event_buffer_requires_resync_after_epoch_or_continuity_change() {
     let initial = buffer.events_since(None, None, None);
     assert_eq!(initial.bridge_epoch, "epoch-a");
     assert_eq!(initial.continuity, 0);
+    assert!(DateTime::parse_from_rfc3339(&initial.daemon_perceived_now).is_ok());
     assert!(!initial.requires_resync);
 
     let stale_epoch = buffer.events_since(Some(1), Some("epoch-old"), Some(0));
@@ -42,6 +44,20 @@ fn acp_event_buffer_requires_resync_after_epoch_or_continuity_change() {
     let ahead_cursor = buffer.events_since(Some(99), Some("epoch-a"), Some(0));
     assert!(ahead_cursor.requires_resync);
     assert!(ahead_cursor.truncated);
+}
+
+#[test]
+fn acp_subscribe_resume_includes_daemon_perceived_now_heartbeat() {
+    let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
+    buffer.push(stream_event("acp_agent_started", "sess-1"));
+    buffer.push(stream_event("acp_agent_started", "sess-2"));
+
+    let resumed = buffer.events_since(Some(1), Some("epoch-a"), Some(0));
+
+    assert_eq!(resumed.next_seq, 2);
+    assert_eq!(resumed.events.len(), 1);
+    assert_eq!(resumed.events[0].payload["session_id"], "sess-2");
+    assert!(DateTime::parse_from_rfc3339(&resumed.daemon_perceived_now).is_ok());
 }
 
 #[test]
@@ -119,6 +135,7 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
         let payload = serde_json::json!({
             "bridge_epoch": "epoch-a",
             "continuity": 3,
+            "daemon_perceived_now": "2026-05-04T14:45:00Z",
             "next_seq": 8,
             "truncated": false,
             "requires_resync": false,
@@ -142,6 +159,7 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
         .expect("events_since");
     assert_eq!(response.bridge_epoch, "epoch-a");
     assert_eq!(response.continuity, 3);
+    assert_eq!(response.daemon_perceived_now, "2026-05-04T14:45:00Z");
     assert_eq!(response.next_seq, 8);
     assert!(!response.requires_resync);
     server.join().expect("server thread");
