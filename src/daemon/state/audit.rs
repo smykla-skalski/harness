@@ -1,3 +1,14 @@
+// TRIPWIRE: `DaemonAuditEvent` keeps a free-form `message: String`. ACP
+// wake-decision records currently encode `kind=value k=v ...` into that
+// string via the `record_wake_event` helper in `service/wake_route.rs` so
+// spelling drift across call sites is contained in one file. If a second
+// programmatic consumer of these events lands (per-reason metrics,
+// alerting on `acp_wake.failed` rates, dashboards), promote
+// `DaemonAuditEvent` to a typed enum
+// (`DaemonAuditEvent::AcpWake { kind: WakeEventKind, fields }`) before
+// adding that consumer; do not write a regex parser against the message
+// string.
+
 use std::fs;
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;

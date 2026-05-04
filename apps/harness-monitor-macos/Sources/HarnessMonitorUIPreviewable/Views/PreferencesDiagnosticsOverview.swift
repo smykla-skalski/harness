@@ -12,6 +12,8 @@ struct PreferencesDiagnosticsOverview: View {
   let lastExternalSessionAttachOutcome: String?
   let lastExternalSessionAttachSucceeded: Bool?
   let lastEvent: DaemonAuditEvent?
+  let repairLaunchAgent: (() async -> Void)?
+  @State private var isRepairInFlight = false
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -68,6 +70,35 @@ struct PreferencesDiagnosticsOverview: View {
             .scaledFont(.caption)
             .foregroundStyle(.secondary)
         }
+        if let repairLaunchAgent {
+          LabeledContent("Repair") {
+            Button {
+              guard !isRepairInFlight else { return }
+              isRepairInFlight = true
+              Task {
+                await repairLaunchAgent()
+                isRepairInFlight = false
+              }
+            } label: {
+              Text(isRepairInFlight ? "Repairing…" : "Repair Launch Agent Registration")
+            }
+            .disabled(isRepairInFlight)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.preferencesLaunchAgentRepairButton
+            )
+          }
+          Text(
+            "In managed mode, unregisters then re-registers the SMAppService "
+              + "launch agent. In external mode, only unregisters to clean up "
+              + "an orphan registration. Use this to recover from xpcproxy "
+              + "spawn-fail loops (EX_CONFIG / stale BTM uuid). Watch the Status "
+              + "row above for the new PID after the action completes; it also "
+              + "reloads the plist so daemon stderr starts landing in "
+              + "~/Library/Logs/io.harnessmonitor.daemon.stderr.log."
+          )
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+        }
       }
     }
 
@@ -122,7 +153,8 @@ struct PreferencesDiagnosticsOverview: View {
       externalSessionCount: store.sessions.filter { $0.externalOrigin != nil }.count,
       lastExternalSessionAttachOutcome: store.lastExternalSessionAttachOutcome?.message,
       lastExternalSessionAttachSucceeded: store.lastExternalSessionAttachOutcome?.succeeded,
-      lastEvent: store.diagnostics?.workspace.lastEvent
+      lastEvent: store.diagnostics?.workspace.lastEvent,
+      repairLaunchAgent: { await store.repairLaunchAgent() }
     )
   }
   .preferencesDetailFormStyle()

@@ -9,6 +9,7 @@ use super::{
 };
 use crate::agents::runtime::AgentRuntime;
 use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
+use crate::daemon::service::{WakeEventLevel, record_wake_event};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
@@ -41,10 +42,6 @@ impl AcpAgentManagerHandle {
     /// a single live wake per signal even under a storm of `task.drop` calls.
     /// Coalesced wakes return immediately at `info!`. The agent will still
     /// see the file signal on its next poll.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
     pub fn dispatch_wake_prompt(
         &self,
         runtime: &'static dyn AgentRuntime,
@@ -53,25 +50,42 @@ impl AcpAgentManagerHandle {
         let session = match self.session(&prompt.acp_id) {
             Ok(session) => session,
             Err(error) => {
-                tracing::warn!(%error, acp_id = %prompt.acp_id, "ACP wake skipped: session not active");
+                record_wake_event(
+                    WakeEventLevel::Warn,
+                    "skipped",
+                    &[
+                        ("acp_id", &prompt.acp_id),
+                        ("signal_id", &prompt.signal_id),
+                        ("reason", &"session_not_active"),
+                        ("error", &error),
+                    ],
+                );
                 return;
             }
         };
         if !self.try_reserve_wake(&prompt.acp_id, &prompt.signal_id) {
-            tracing::info!(
-                acp_id = %prompt.acp_id,
-                signal_id = %prompt.signal_id,
-                "ACP wake coalesced: in-flight wake already issuing session/prompt"
+            record_wake_event(
+                WakeEventLevel::Info,
+                "coalesced",
+                &[
+                    ("acp_id", &prompt.acp_id),
+                    ("signal_id", &prompt.signal_id),
+                ],
             );
             return;
         }
         let manager = self.clone();
+        let acp_id_for_diag = prompt.acp_id.clone();
         let thread_name = format!("acp-wake-{}", prompt.acp_id);
         if let Err(error) = thread::Builder::new()
             .name(thread_name)
             .spawn(move || run_wake_prompt(&manager, runtime, &session, prompt))
         {
-            tracing::error!(%error, "failed to spawn ACP wake thread");
+            record_wake_event(
+                WakeEventLevel::Error,
+                "thread_spawn_failed",
+                &[("acp_id", &acp_id_for_diag), ("error", &error)],
+            );
         }
     }
 
@@ -159,10 +173,6 @@ impl AcpAgentManagerHandle {
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
 fn run_wake_prompt(
     manager: &AcpAgentManagerHandle,
     runtime: &'static dyn AgentRuntime,
@@ -185,11 +195,15 @@ fn run_wake_prompt(
     );
     match result {
         Ok(returned_session_id) => {
-            tracing::info!(
-                acp_id = %acp_id,
-                protocol_session_id = %returned_session_id,
-                signal_id = %signal_id,
-                "ACP wake prompt dispatched"
+            record_wake_event(
+                WakeEventLevel::Info,
+                "dispatched",
+                &[
+                    ("acp_id", &acp_id),
+                    ("protocol_session_id", &returned_session_id),
+                    ("signal_id", &signal_id),
+                    ("agent_id", &agent_id),
+                ],
             );
             record_wake_accept(
                 runtime,
@@ -200,21 +214,22 @@ fn run_wake_prompt(
                 &acp_id,
             );
         }
-        Err(error) => tracing::warn!(
-            %error,
-            acp_id = %acp_id,
-            protocol_session_id = %protocol_session_id,
-            signal_id = %signal_id,
-            "ACP wake prompt failed"
-        ),
+        Err(error) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "failed",
+                &[
+                    ("acp_id", &acp_id),
+                    ("protocol_session_id", &protocol_session_id),
+                    ("signal_id", &signal_id),
+                    ("error", &error),
+                ],
+            );
+        }
     }
     manager.release_wake(&acp_id, &signal_id);
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
 fn record_wake_accept(
     runtime: &'static dyn AgentRuntime,
     project_dir: &Path,
@@ -232,12 +247,26 @@ fn record_wake_accept(
         session_id: protocol_session_id.to_string(),
         details: Some("acp wake prompt acknowledged via session/prompt".into()),
     };
-    if let Err(error) = acknowledge_signal(&signal_dir, &ack) {
-        tracing::warn!(
-            %error,
-            acp_id,
-            signal_id,
-            "ACP wake ack write failed; reconciler will pick up via file fallback"
-        );
+    match acknowledge_signal(&signal_dir, &ack) {
+        Ok(()) => record_wake_event(
+            WakeEventLevel::Info,
+            "accepted",
+            &[
+                ("acp_id", &acp_id),
+                ("protocol_session_id", &protocol_session_id),
+                ("signal_id", &signal_id),
+                ("agent_id", &agent_id),
+            ],
+        ),
+        Err(error) => record_wake_event(
+            WakeEventLevel::Warn,
+            "ack_write_failed",
+            &[
+                ("acp_id", &acp_id),
+                ("protocol_session_id", &protocol_session_id),
+                ("signal_id", &signal_id),
+                ("error", &error),
+            ],
+        ),
     }
 }

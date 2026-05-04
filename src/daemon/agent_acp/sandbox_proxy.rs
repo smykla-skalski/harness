@@ -303,7 +303,7 @@ fn log_empty_inspect_with_error(error: &CliError, message: &str) -> AcpAgentInsp
     tracing::warn!(%error, "{message}");
     AcpAgentInspectResponse {
         agents: Vec::new(),
-        daemon_perceived_now: Some(crate::workspace::utc_now()),
+        daemon_perceived_now: Some(utc_now()),
         available: false,
         issue_message: Some(message.to_string()),
     }

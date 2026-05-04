@@ -9,6 +9,7 @@ public protocol DaemonControlling: Sendable {
   func installLaunchAgent() async throws -> String
   func removeLaunchAgent() async throws -> String
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState
+  func repairLaunchAgentRegistration() async throws -> String
   func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState
   func launchAgentSnapshot() async -> LaunchAgentStatus
   func awaitLaunchAgentState(
@@ -315,6 +316,44 @@ public struct DaemonController: DaemonControlling {
       clearManagedLaunchAgentOwner()
       return "launch agent removed"
     }
+  }
+
+  /// Force re-registration of the SMAppService launch agent to recover from
+  /// stale BTM uuid records (xpcproxy `EX_CONFIG` spawn-fail loops). Always
+  /// unregisters first, regardless of `ownership`, so external-daemon users
+  /// can clean up an orphan managed registration without changing modes.
+  /// In `.managed` mode the unregister is followed by a fresh register so
+  /// the helper is reachable again on the next launchd spawn cycle.
+  public func repairLaunchAgentRegistration() async throws -> String {
+    let preState = launchAgentManager.registrationState()
+    switch preState {
+    case .enabled, .requiresApproval:
+      try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp()
+      clearManagedLaunchAgentOwner()
+    case .notRegistered, .notFound:
+      break
+    }
+
+    guard ownership == .managed else {
+      return preState == .notRegistered || preState == .notFound
+        ? "launch agent not registered"
+        : "launch agent unregistered"
+    }
+
+    try launchAgentManager.register()
+    let postState = launchAgentManager.registrationState()
+    if postState == .enabled {
+      try persistCurrentManagedLaunchAgentBundleStamp()
+      try persistCurrentManagedLaunchAgentOwner()
+      return "launch agent re-registered"
+    }
+    if postState == .requiresApproval {
+      return "launch agent re-registered; approval required in System Settings"
+    }
+    throw DaemonControlError.commandFailed(
+      "launch agent re-registration did not complete"
+    )
   }
 
   public static func defaultEndpointProbe(_ endpoint: URL) async -> Bool {

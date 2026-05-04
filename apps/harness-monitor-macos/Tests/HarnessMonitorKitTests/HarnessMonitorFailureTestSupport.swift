@@ -161,6 +161,13 @@ actor FailingDaemonController: DaemonControlling {
     }
     return "removed"
   }
+
+  func repairLaunchAgentRegistration() async throws -> String {
+    if let actionError {
+      throw actionError
+    }
+    return "launch agent re-registered"
+  }
 }
 
 final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable {

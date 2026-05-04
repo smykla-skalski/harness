@@ -283,6 +283,7 @@ pub use sessions::{
 };
 pub(crate) use signals::try_wake_started_workers;
 pub use wake_route::WakeDispatch;
+pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 pub use signals::{cancel_signal, send_signal};
 pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,

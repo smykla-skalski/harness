@@ -61,6 +61,10 @@ actor DelayedWarmUpDaemonController: DaemonControlling {
     "launch agent removed"
   }
 
+  func repairLaunchAgentRegistration() async throws -> String {
+    "launch agent re-registered"
+  }
+
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     .enabled
   }
