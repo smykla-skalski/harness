@@ -110,16 +110,20 @@ private struct SessionTimelineNodeRow: View {
       if SessionTimelineTableMetrics.prefersCompactLayout(for: row) {
         compactContent
       } else {
-        ViewThatFits(in: .horizontal) {
-          wideContent
-          compactContent
-        }
+        wideContent
       }
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityIdentifier(node.accessibilityIdentifier)
   }
+  // ViewThatFits removed: combining `ViewThatFits(in: .horizontal)` with the
+  // `.fixedSize` badge strip inside a LazyVStack reproduces an AttributeGraph
+  // cycle on macOS 26 SwiftUI. The cycle drives `NSHostingView` async-
+  // DisplayLink layout to iterate the ForEach off the MainActor, which trips
+  // `_swift_task_checkIsolatedSwift` and crashes the app via libdispatch BUG.
+  // `prefersCompactLayout(for:)` already encodes the size decision; a
+  // deterministic branch is enough.
 
   private var wideContent: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
