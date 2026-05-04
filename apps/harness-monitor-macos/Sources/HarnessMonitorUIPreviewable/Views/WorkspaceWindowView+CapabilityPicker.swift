@@ -94,13 +94,7 @@ extension WorkspaceWindowView {
     runtime: AgentTuiRuntime,
     descriptor: AcpAgentDescriptor?
   ) -> [AgentCapabilityTransportChoice] {
-    var choices = [
-      AgentCapabilityTransportChoice(
-        id: .tui(runtime),
-        title: "Terminal screen",
-        capabilities: ["streaming", "multi-turn"]
-      )
-    ]
+    var choices: [AgentCapabilityTransportChoice] = []
     if let descriptor {
       choices.append(
         AgentCapabilityTransportChoice(
@@ -110,6 +104,13 @@ extension WorkspaceWindowView {
         )
       )
     }
+    choices.append(
+      AgentCapabilityTransportChoice(
+        id: .tui(runtime),
+        title: "Terminal screen",
+        capabilities: ["streaming", "multi-turn"]
+      )
+    )
     return choices
   }
 
