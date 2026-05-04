@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
 
@@ -12,7 +11,7 @@ use agent_client_protocol::schema::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
-use tokio::sync::{Notify, broadcast::Sender as BroadcastSender};
+use tokio::sync::{Notify, broadcast::Sender as BroadcastSender, oneshot};
 use tokio::time::sleep;
 
 use crate::agents::acp::client::{DAEMON_SHUTDOWN, PERMISSION_CAP_REACHED, PERMISSION_TIMEOUT};
@@ -82,7 +81,7 @@ struct PendingBatch {
 struct PendingResponder {
     request_id: String,
     options: Vec<PermissionOption>,
-    response_tx: SyncSender<PermissionBridgeResult>,
+    response_tx: oneshot::Sender<PermissionBridgeResult>,
 }
 
 impl PermissionBridgeHandle {
@@ -174,7 +173,7 @@ impl PermissionBridgeHandle {
     ) -> Option<AcpPermissionBatch> {
         let pending = self.state.lock_pending().remove(batch_id)?;
         self.runtime.cancel_expiration_task(batch_id);
-        for responder in &pending.responders {
+        for responder in pending.responders {
             let allow = decision.allows(&responder.request_id);
             let response = response_for_options(&responder.options, allow);
             let _ = responder.response_tx.send(Ok(response));
@@ -331,9 +330,9 @@ fn enqueue_or_reject_batch(
     let pending_count = PermissionBridgeState::pending_responder_count_locked(&pending);
     for request in requests {
         if state.shutdown.load(Ordering::SeqCst) {
-            reject_request(&request.response_tx, daemon_shutdown_error());
+            reject_request(request.response_tx, daemon_shutdown_error());
         } else if pending_count + accepted.len() >= state.cap {
-            reject_request(&request.response_tx, permission_cap_error(state.cap));
+            reject_request(request.response_tx, permission_cap_error(state.cap));
         } else {
             accepted.push(request);
         }
@@ -414,19 +413,22 @@ fn expire_batch(state: &PermissionBridgeState, batch_id: &str) {
     state.broadcast("acp_permission_timeout", &pending.batch);
 }
 
-fn reject_request(response_tx: &SyncSender<PermissionBridgeResult>, error: PermissionBridgeError) {
+fn reject_request(
+    response_tx: oneshot::Sender<PermissionBridgeResult>,
+    error: PermissionBridgeError,
+) {
     let _ = response_tx.send(Err(error));
 }
 
 fn reject_requests(requests: Vec<PermissionBridgeRequest>, error: &PermissionBridgeError) {
     for request in requests {
-        reject_request(&request.response_tx, error.clone());
+        reject_request(request.response_tx, error.clone());
     }
 }
 
 fn reject_queued_requests(rx: &mut mpsc::Receiver<PermissionBridgeRequest>) {
     while let Ok(request) = rx.try_recv() {
-        reject_request(&request.response_tx, daemon_shutdown_error());
+        reject_request(request.response_tx, daemon_shutdown_error());
     }
 }
 

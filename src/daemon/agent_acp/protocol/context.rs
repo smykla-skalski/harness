@@ -44,26 +44,34 @@ impl ProtocolContext {
         })
     }
 
-    pub(super) fn write_text_file(
-        &self,
-        request: &WriteTextFileRequest,
+    pub(super) async fn write_text_file(
+        self,
+        request: WriteTextFileRequest,
     ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_write_text_file(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join write_text_file",
+            move |client| client.handle_write_text_file(&request),
+        )
+        .await
     }
 
-    pub(super) fn create_terminal(
-        &self,
-        request: &CreateTerminalRequest,
+    pub(super) async fn create_terminal(
+        self,
+        request: CreateTerminalRequest,
     ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
-            self.client.handle_create_terminal(request)
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join create_terminal",
+            move |client| client.handle_create_terminal(&request),
+        )
+        .await
     }
 
     pub(super) fn terminal_output(
@@ -116,13 +124,13 @@ impl ProtocolContext {
     ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        spawn_blocking(move || {
-            with_client_call(&self.supervisor, || {
-                self.client.handle_request_permission(&request)
-            })
-        })
+        spawn_blocking_client_call(
+            self.supervisor,
+            self.client,
+            "join permission bridge",
+            move |client| client.handle_request_permission(&request),
+        )
         .await
-        .map_err(|error| ClientError::new(-32603, format!("join permission bridge: {error}")))?
     }
 }
 
@@ -160,4 +168,18 @@ fn with_client_call<T>(
 ) -> ClientResult<T> {
     let _guard = supervisor.enter_client_call();
     work()
+}
+
+async fn spawn_blocking_client_call<T>(
+    supervisor: Arc<AcpSessionSupervisor>,
+    client: Arc<HarnessAcpClient>,
+    join_label: &'static str,
+    work: impl FnOnce(&HarnessAcpClient) -> ClientResult<T> + Send + 'static,
+) -> ClientResult<T>
+where
+    T: Send + 'static,
+{
+    spawn_blocking(move || with_client_call(&supervisor, || work(client.as_ref())))
+        .await
+        .map_err(|error| ClientError::new(-32603, format!("{join_label}: {error}")))?
 }
