@@ -65,28 +65,35 @@ extension WorkspaceWindowCreatePane {
     )
 
     return AgentsCreateSectionCard {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(title: "Configuration")
-
-        codexModePicker(formModel: formModel)
-        codexModelPicker(
-          modelBinding: modelBinding,
-          customModelBinding: customModelBinding,
-          catalogModels: catalogModels
-        )
-        codexEffortPicker(effortValues: effortValues, effortBinding: effortBinding)
+      DisclosureGroup {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          codexModePicker(formModel: formModel)
+          codexModelPicker(
+            modelBinding: modelBinding,
+            customModelBinding: customModelBinding,
+            catalogModels: catalogModels
+          )
+          codexEffortPicker(effortValues: effortValues, effortBinding: effortBinding)
+        }
+        .padding(.top, HarnessMonitorTheme.spacingSM)
+      } label: {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Configure")
+            .scaledFont(.headline)
+            .accessibilityAddTraits(.isHeader)
+          Text(codexLaunchSummaryChipText)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
       }
     }
   }
 
   private func codexModePicker(formModel: ViewModel) -> some View {
     @Bindable var formModel = formModel
-    return AgentsCreateFieldBlock(
-      title: "Run mode",
-      help:
-        "Report is best for investigation, workspace write for direct patches, "
-        + "and approval for gated edits."
-    ) {
+    return AgentsCreateFieldBlock(title: "Run mode") {
       Picker("Run mode", selection: $formModel.codexMode) {
         ForEach(CodexRunMode.allCases) { mode in
           Text(mode.title)
@@ -121,10 +128,7 @@ extension WorkspaceWindowCreatePane {
     customModelBinding: Binding<String>,
     catalogModels: [RuntimeModel]
   ) -> some View {
-    AgentsCreateFieldBlock(
-      title: "Model",
-      help: "Pick the default Codex model for this thread."
-    ) {
+    AgentsCreateFieldBlock(title: "Model") {
       Picker("Model", selection: modelBinding) {
         ForEach(catalogModels) { model in
           Text(model.displayName)
@@ -188,10 +192,7 @@ extension WorkspaceWindowCreatePane {
     effortBinding: Binding<String>
   ) -> some View {
     if !effortValues.isEmpty {
-      AgentsCreateFieldBlock(
-        title: "Effort",
-        help: "Reasoning effort only appears for models that expose it."
-      ) {
+      AgentsCreateFieldBlock(title: "Effort") {
         Picker("Effort", selection: effortBinding) {
           ForEach(Array(effortValues.enumerated()), id: \.offset) { _, level in
             Text(level.capitalized)
