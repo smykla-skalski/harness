@@ -185,7 +185,10 @@ async fn task_assign_response(
             task_id,
             request,
             async_db.as_ref(),
-            Some(&state.agent_tui_manager),
+            service::WakeDispatch::new(
+                Some(&state.agent_tui_manager),
+                Some(&state.acp_agent_manager),
+            ),
         )
         .await;
     }
@@ -195,7 +198,10 @@ async fn task_assign_response(
         task_id,
         request,
         db_guard.as_deref(),
-        Some(&state.agent_tui_manager),
+        service::WakeDispatch::new(
+            Some(&state.agent_tui_manager),
+            Some(&state.acp_agent_manager),
+        ),
     )
 }
 
@@ -211,7 +217,10 @@ async fn task_drop_response(
             task_id,
             request,
             async_db.as_ref(),
-            Some(&state.agent_tui_manager),
+            service::WakeDispatch::new(
+                Some(&state.agent_tui_manager),
+                Some(&state.acp_agent_manager),
+            ),
         )
         .await;
     }
@@ -221,7 +230,10 @@ async fn task_drop_response(
         task_id,
         request,
         db_guard.as_deref(),
-        Some(&state.agent_tui_manager),
+        service::WakeDispatch::new(
+            Some(&state.agent_tui_manager),
+            Some(&state.acp_agent_manager),
+        ),
     )
 }
 
@@ -237,7 +249,10 @@ async fn task_queue_policy_response(
             task_id,
             request,
             async_db.as_ref(),
-            Some(&state.agent_tui_manager),
+            service::WakeDispatch::new(
+                Some(&state.agent_tui_manager),
+                Some(&state.acp_agent_manager),
+            ),
         )
         .await;
     }
@@ -247,7 +262,10 @@ async fn task_queue_policy_response(
         task_id,
         request,
         db_guard.as_deref(),
-        Some(&state.agent_tui_manager),
+        service::WakeDispatch::new(
+            Some(&state.agent_tui_manager),
+            Some(&state.acp_agent_manager),
+        ),
     )
 }
 
@@ -263,7 +281,10 @@ async fn task_update_response(
             task_id,
             request,
             async_db.as_ref(),
-            Some(&state.agent_tui_manager),
+            service::WakeDispatch::new(
+                Some(&state.agent_tui_manager),
+                Some(&state.acp_agent_manager),
+            ),
         )
         .await;
     }
@@ -273,7 +294,10 @@ async fn task_update_response(
         task_id,
         request,
         db_guard.as_deref(),
-        Some(&state.agent_tui_manager),
+        service::WakeDispatch::new(
+            Some(&state.agent_tui_manager),
+            Some(&state.acp_agent_manager),
+        ),
     )
 }
 

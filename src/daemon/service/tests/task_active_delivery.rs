@@ -124,7 +124,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                         queue_policy: crate::session::types::TaskQueuePolicy::Locked,
                     },
                     &async_db,
-                    Some(&manager),
+                    crate::daemon::service::WakeDispatch::new(Some(&manager), None),
                 )
                 .await
                 .expect("drop task");

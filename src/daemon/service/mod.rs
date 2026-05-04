@@ -29,6 +29,7 @@ use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::AbortHandle;
 
+use super::agent_acp::AcpAgentManagerHandle;
 use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
 use super::codex_controller::CodexControllerHandle;
@@ -102,14 +103,21 @@ const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
-struct ActiveSignalDelivery<'a> {
+/// Per-signal coordinates for active wake delivery.
+///
+/// Deliberately holds no DB handle — that field used to live here but
+/// `&DaemonDb` carries `RefCell<rusqlite::Connection>` which is `!Sync`,
+/// so binding the struct once across an await pulled a non-Send future
+/// into `tokio::spawn`. Callers that need to record acks pass
+/// `Option<&DaemonDb>` as a separate argument.
+#[derive(Clone, Copy)]
+struct SignalCoords<'a> {
     session_id: &'a str,
     agent_id: &'a str,
     signal: &'a agents_runtime::signal::Signal,
     runtime: &'a dyn agents_runtime::AgentRuntime,
     project_dir: &'a Path,
     signal_session_id: &'a str,
-    db: Option<&'a super::db::DaemonDb>,
 }
 
 struct ManagedTuiWake<'a> {
@@ -227,6 +235,7 @@ mod sessions;
 mod signals;
 mod signals_async;
 mod signals_async_send;
+mod wake_route;
 mod status;
 mod sync_support;
 
@@ -273,6 +282,7 @@ pub use sessions::{
     session_timeline,
 };
 pub(crate) use signals::try_wake_started_workers;
+pub use wake_route::WakeDispatch;
 pub use signals::{cancel_signal, send_signal};
 pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,

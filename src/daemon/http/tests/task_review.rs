@@ -106,7 +106,7 @@ fn post_task_submit_for_review_accepts_worker_actor() {
                     agent_id: worker_id.clone(),
                 },
                 async_db.as_ref(),
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("assign task");
@@ -119,7 +119,7 @@ fn post_task_submit_for_review_accepts_worker_actor() {
                     note: None,
                 },
                 async_db.as_ref(),
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("move task in progress");

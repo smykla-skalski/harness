@@ -1,7 +1,8 @@
+use super::super::wake_route::WakeDispatch;
 use super::super::{
-    AgentTuiManagerHandle, SessionDetail, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
-    db::AsyncDaemonDb, session_service, sync_file_state_from_async_db, utc_now,
+    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest, db::AsyncDaemonDb, session_service,
+    sync_file_state_from_async_db, utc_now,
 };
 use super::super::{CliError, session_detail_from_async_daemon_db};
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
@@ -50,7 +51,7 @@ pub(crate) async fn assign_task_async(
     task_id: &str,
     request: &TaskAssignRequest,
     async_db: &AsyncDaemonDb,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let effects = async_db
@@ -72,7 +73,7 @@ pub(crate) async fn assign_task_async(
         &request.actor,
         &effects,
         None,
-        agent_tui_manager,
+        dispatch,
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
@@ -128,7 +129,7 @@ pub(crate) async fn drop_task_async(
     task_id: &str,
     request: &TaskDropRequest,
     async_db: &AsyncDaemonDb,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let effects = async_db
@@ -151,7 +152,7 @@ pub(crate) async fn drop_task_async(
         &request.actor,
         &effects,
         None,
-        agent_tui_manager,
+        dispatch,
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
@@ -167,7 +168,7 @@ pub(crate) async fn update_task_queue_policy_async(
     task_id: &str,
     request: &TaskQueuePolicyRequest,
     async_db: &AsyncDaemonDb,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let effects = async_db
@@ -189,7 +190,7 @@ pub(crate) async fn update_task_queue_policy_async(
         &request.actor,
         &effects,
         None,
-        agent_tui_manager,
+        dispatch,
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
@@ -204,7 +205,7 @@ pub(crate) async fn update_task_async(
     task_id: &str,
     request: &TaskUpdateRequest,
     async_db: &AsyncDaemonDb,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let (from_status, effects) = async_db
@@ -233,7 +234,7 @@ pub(crate) async fn update_task_async(
             from_status,
             request.status,
         )),
-        agent_tui_manager,
+        dispatch,
     )
     .await?;
     session_detail_from_async_daemon_db(session_id, async_db).await

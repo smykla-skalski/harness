@@ -141,7 +141,7 @@ fn submit_review_async_concurrent_reviewers_close_quorum_without_lost_state() {
                     agent_id: worker_id.clone(),
                 },
                 &async_db,
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("assign task");
@@ -154,7 +154,7 @@ fn submit_review_async_concurrent_reviewers_close_quorum_without_lost_state() {
                     note: None,
                 },
                 &async_db,
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("move task in_progress");

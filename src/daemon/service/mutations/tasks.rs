@@ -1,6 +1,7 @@
+use super::super::wake_route::WakeDispatch;
 use super::super::{
-    AgentTuiManagerHandle, CliError, SessionDetail, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
+    CliError, SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
+    TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
     append_task_drop_effect_logs, build_log_entry, effective_project_dir, index,
     project_dir_for_db_session, session_detail, session_detail_from_daemon_db, session_not_found,
     session_service, task_drop_effect_signal_records, try_wake_started_workers, utc_now,
@@ -61,7 +62,7 @@ pub fn assign_task(
     task_id: &str,
     request: &TaskAssignRequest,
     db: Option<&super::super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -91,7 +92,7 @@ pub fn assign_task(
             session_id,
             &project_dir,
             Some(db),
-            agent_tui_manager,
+            dispatch,
         );
         db.bump_change(session_id)?;
         db.bump_change("global")?;
@@ -120,7 +121,7 @@ pub fn drop_task(
     task_id: &str,
     request: &TaskDropRequest,
     db: Option<&super::super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -151,7 +152,7 @@ pub fn drop_task(
             session_id,
             &project_dir,
             Some(db),
-            agent_tui_manager,
+            dispatch,
         );
         db.bump_change(session_id)?;
         db.bump_change("global")?;
@@ -181,7 +182,7 @@ pub fn update_task_queue_policy(
     task_id: &str,
     request: &TaskQueuePolicyRequest,
     db: Option<&super::super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -211,7 +212,7 @@ pub fn update_task_queue_policy(
             session_id,
             &project_dir,
             Some(db),
-            agent_tui_manager,
+            dispatch,
         );
         db.bump_change(session_id)?;
         db.bump_change("global")?;
@@ -239,7 +240,7 @@ pub fn update_task(
     task_id: &str,
     request: &TaskUpdateRequest,
     db: Option<&super::super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -278,7 +279,7 @@ pub fn update_task(
             session_id,
             &project_dir,
             Some(db),
-            agent_tui_manager,
+            dispatch,
         );
         db.bump_change(session_id)?;
         db.bump_change("global")?;

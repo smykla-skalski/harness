@@ -47,7 +47,10 @@ pub(super) async fn dispatch_task_assign(
                 &task_id,
                 &body,
                 db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .map_err(Into::into)
         },
@@ -58,7 +61,10 @@ pub(super) async fn dispatch_task_assign(
                 &task_id,
                 &body,
                 &async_db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .await
             .map_err(Into::into)
@@ -78,7 +84,10 @@ pub(super) async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpSt
                 &task_id,
                 &body,
                 db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .map_err(Into::into)
         },
@@ -89,7 +98,10 @@ pub(super) async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpSt
                 &task_id,
                 &body,
                 &async_db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .await
             .map_err(Into::into)
@@ -112,7 +124,10 @@ pub(super) async fn dispatch_task_queue_policy(
                 &task_id,
                 &body,
                 db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .map_err(Into::into)
         },
@@ -123,7 +138,10 @@ pub(super) async fn dispatch_task_queue_policy(
                 &task_id,
                 &body,
                 &async_db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .await
             .map_err(Into::into)
@@ -146,7 +164,10 @@ pub(super) async fn dispatch_task_update(
                 &task_id,
                 &body,
                 db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .map_err(Into::into)
         },
@@ -157,7 +178,10 @@ pub(super) async fn dispatch_task_update(
                 &task_id,
                 &body,
                 &async_db,
-                Some(&state.agent_tui_manager),
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
             )
             .await
             .map_err(Into::into)
