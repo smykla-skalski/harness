@@ -119,8 +119,22 @@ extension HarnessMonitorStore {
     public var timeline: [TimelineEntry] = [] {
       didSet {
         guard oldValue != timeline else { return }
+        rebuildAgentTimelinePartition()
         onChanged?(.timeline)
       }
+    }
+    // Per-agent partition rebuilt only on `timeline` writes so view body reads
+    // stay O(1) instead of scanning the full timeline on every render.
+    public private(set) var agentTimelinesById: [String: [TimelineEntry]] = [:]
+
+    private func rebuildAgentTimelinePartition() {
+      var partition: [String: [TimelineEntry]] = [:]
+      partition.reserveCapacity(agentTimelinesById.count)
+      for entry in timeline {
+        guard let agentID = entry.agentId else { continue }
+        partition[agentID, default: []].append(entry)
+      }
+      agentTimelinesById = partition
     }
     public var timelineWindow: TimelineWindowResponse? {
       didSet {
