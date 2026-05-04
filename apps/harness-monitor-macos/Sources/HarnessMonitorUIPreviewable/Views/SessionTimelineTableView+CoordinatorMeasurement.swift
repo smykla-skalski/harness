@@ -7,6 +7,22 @@ struct CachedRowHeight {
   let height: CGFloat
 }
 
+enum SessionTimelineTableMeasurementMode: Equatable {
+  case incremental
+  case synchronous
+
+  static func resolve(environment: [String: String]) -> Self {
+    switch HarnessMonitorLaunchMode(environment: environment) {
+    case .preview:
+      .synchronous
+    case .live, .empty:
+      .incremental
+    }
+  }
+
+  static let current = resolve(environment: ProcessInfo.processInfo.environment)
+}
+
 extension SessionTimelineTableView.Coordinator {
   // Wall-clock budget for one synchronous measurement chunk. Each row's
   // SwiftUI hosting layout is variable cost (5-30ms+ depending on row
@@ -91,5 +107,47 @@ extension SessionTimelineTableView.Coordinator {
       )
       self.measurementTask = nil
     }
+  }
+
+  func measureSynchronously(
+    outstanding: [Int],
+    snapshot: [SessionTimelineRow],
+    columnWidth: CGFloat,
+    generation: Int,
+    totalOutstanding: Int
+  ) {
+    var changedIndexes = IndexSet()
+    autoreleasepool {
+      for rowIndex in outstanding {
+        guard self.rows.indices.contains(rowIndex),
+          self.rows[rowIndex].id == snapshot[rowIndex].id
+        else { continue }
+        let row = snapshot[rowIndex]
+        if let cached = self.rowHeightCache[row.id],
+          abs(cached.width - columnWidth) < Self.widthEqualityTolerance
+        {
+          continue
+        }
+        let height = SessionTimelineTableCellView.measuredHeight(
+          for: row,
+          columnWidth: columnWidth
+        )
+        self.rowHeightCache[row.id] = CachedRowHeight(
+          width: columnWidth,
+          height: height
+        )
+        changedIndexes.insert(rowIndex)
+      }
+    }
+    if !changedIndexes.isEmpty {
+      self.tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
+      self.tableView?.layoutSubtreeIfNeeded()
+      self.scrollView?.layoutSubtreeIfNeeded()
+    }
+    Self.signposter.emitEvent(
+      "session_timeline.measurement.completed",
+      "g=\(generation, privacy: .public) m=\(totalOutstanding, privacy: .public)"
+    )
+    self.measurementTask = nil
   }
 }

@@ -275,6 +275,16 @@ extension SessionTimelineTableView {
         "session_timeline.measurement.scheduled",
         "g=\(generation, privacy: .public) c=\(totalOutstanding, privacy: .public) w=\(cw, privacy: .public)"
       )
+      if SessionTimelineTableMeasurementMode.current == .synchronous {
+        measureSynchronously(
+          outstanding: outstanding,
+          snapshot: snapshot,
+          columnWidth: columnWidth,
+          generation: generation,
+          totalOutstanding: totalOutstanding
+        )
+        return
+      }
       let task = Task { @MainActor [weak self] in
         guard let self else { return }
         await self.runMeasurementTask(
