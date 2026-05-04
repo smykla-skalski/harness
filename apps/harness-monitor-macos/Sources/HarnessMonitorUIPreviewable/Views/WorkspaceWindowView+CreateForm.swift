@@ -155,24 +155,29 @@ struct WorkspaceWindowCreatePane: View {
 
 extension WorkspaceWindowCreatePane {
   var launchFloorBar: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-      Text(launchSummaryChipText)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .accessibilityLabel("Launch summary: \(launchSummaryChipText)")
-      Spacer(minLength: HarnessMonitorTheme.spacingMD)
-      HarnessMonitorActionButton(
-        title: "Start \(launchActionTitle)",
-        variant: .prominent,
-        accessibilityIdentifier: launchButtonAccessibilityIdentifier,
-        fillsWidth: false
-      ) {
-        startAction()
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      if let warning = launchDemotionWarningText {
+        Label {
+          Text(warning)
+            .scaledFont(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle.fill")
+        }
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
       }
-      .keyboardShortcut(.defaultAction)
-      .disabled(!canStartCurrentMode)
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+        Text(launchSummaryChipText)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .accessibilityLabel("Launch summary: \(launchSummaryChipText)")
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        launchActionButton
+      }
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingLG)
     .padding(.vertical, HarnessMonitorTheme.spacingMD)
@@ -184,6 +189,38 @@ extension WorkspaceWindowCreatePane {
         .frame(height: 1)
     }
     .accessibilityElement(children: .contain)
+  }
+
+  @ViewBuilder private var launchActionButton: some View {
+    let button = HarnessMonitorActionButton(
+      title: "Start \(launchActionTitle)",
+      variant: .prominent,
+      accessibilityIdentifier: launchButtonAccessibilityIdentifier,
+      fillsWidth: false
+    ) {
+      startAction()
+    }
+    .disabled(!canStartCurrentMode)
+    if launchDemotionWarningText == nil {
+      button.keyboardShortcut(.defaultAction)
+    } else {
+      button
+    }
+  }
+
+  var launchDemotionWarningText: String? {
+    guard
+      viewModel.createMode == .terminal,
+      viewModel.selectedRole == .leader,
+      let sessionID = resolvedCreateSessionID,
+      let summary = store.sessionIndex.sessionSummary(for: sessionID),
+      let leaderID = summary.leaderId,
+      !leaderID.isEmpty
+    else {
+      return nil
+    }
+    let fallback = viewModel.selectedAcpFallbackRole.title
+    return "Will demote the current leader (\(leaderID)) to \(fallback)."
   }
 
   var launchActionTitle: String {
