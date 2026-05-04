@@ -47,10 +47,7 @@ extension WorkspaceWindowCreatePane {
 
   @ViewBuilder private var terminalConfigurationColumn: some View {
     if let option = selectedCapabilityOption {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        terminalDetailsCard
-        terminalConfigurationCard(option: option)
-      }
+      terminalSelectedColumn(option: option)
     } else {
       AgentsCreateSectionCard {
         AgentsCreateSectionHeading(
@@ -63,15 +60,46 @@ extension WorkspaceWindowCreatePane {
     }
   }
 
-  private func terminalConfigurationCard(option: AgentCapabilityOption) -> some View {
+  private func terminalSelectedColumn(option: AgentCapabilityOption) -> some View {
+    @Bindable var formModel = viewModel
     let context = terminalConfigurationContext(for: option)
-
     return AgentsCreateSectionCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        AgentsCreateSectionHeading(title: "Details")
+
+        AgentsCreateFieldBlock(
+          title: "Display name",
+          help: nil
+        ) {
+          TextField("Optional display name", text: $formModel.name)
+            .harnessNativeTextField()
+            .focused(focusedFieldBinding, equals: .name)
+            .harnessMCPTextField(
+              HarnessMonitorAccessibility.agentTuiNameField,
+              label: "Display name",
+              value: formModel.name
+            )
+            .harnessPreservePrimaryContentFocus()
+        }
+
+        AgentsCreateFieldBlock(
+          title: "Initial prompt",
+          help: nil
+        ) {
+          multilineEditor(
+            placeholder: "Optional first prompt to submit inside the terminal agent",
+            text: $formModel.prompt,
+            field: .prompt,
+            minHeight: 84,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
+          )
+        }
+
+        terminalAdvancedOverrides
+
         terminalConfigPillRow(option: option, context: context)
         terminalTransportNotice(option: option, choice: context.choice)
         terminalCustomModelField(context: context)
-        terminalAdvancedOverrides
       }
     }
   }
@@ -240,43 +268,6 @@ extension WorkspaceWindowCreatePane {
       )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var terminalDetailsCard: some View {
-    @Bindable var formModel = viewModel
-    return AgentsCreateSectionCard {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(title: "Details")
-
-        AgentsCreateFieldBlock(
-          title: "Display name",
-          help: nil
-        ) {
-          TextField("Optional display name", text: $formModel.name)
-            .harnessNativeTextField()
-            .focused(focusedFieldBinding, equals: .name)
-            .harnessMCPTextField(
-              HarnessMonitorAccessibility.agentTuiNameField,
-              label: "Display name",
-              value: formModel.name
-            )
-            .harnessPreservePrimaryContentFocus()
-        }
-
-        AgentsCreateFieldBlock(
-          title: "Initial prompt",
-          help: nil
-        ) {
-          multilineEditor(
-            placeholder: "Optional first prompt to submit inside the terminal agent",
-            text: $formModel.prompt,
-            field: .prompt,
-            minHeight: 84,
-            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
-          )
-        }
-      }
-    }
   }
 
 }
