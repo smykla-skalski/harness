@@ -26,7 +26,8 @@ public struct InspectorFactGrid: View {
     ) {
       ForEach(facts) { fact in
         VStack(alignment: .leading, spacing: 4) {
-          Text(fact.title.uppercased())
+          Text(fact.title)
+            .textCase(.uppercase)
             .scaledFont(.caption2.weight(.bold))
             .tracking(HarnessMonitorTheme.uppercaseTracking)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -36,6 +37,9 @@ public struct InspectorFactGrid: View {
         }
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
         .harnessCellPadding()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(fact.title)
+        .accessibilityValue(fact.value)
       }
     }
   }
@@ -55,6 +59,7 @@ public struct InspectorSection<Content: View>: View {
       Text(title)
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityAddTraits(.isHeader)
       content
     }
   }
