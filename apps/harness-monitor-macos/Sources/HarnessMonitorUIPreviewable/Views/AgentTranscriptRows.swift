@@ -1,0 +1,59 @@
+import HarnessMonitorKit
+import SwiftUI
+
+// Lightweight transcript view for the agent detail pane. Skips the cockpit's
+// filter controls, window navigation, viewport tracking, scroll-boundary
+// loader, and AppStorage/SceneStorage filter persistence; renders the inner
+// row cluster directly. Used in place of MonitorTimelineSection when the
+// surface only needs "stream the recent transcript for this agent" without
+// the cockpit's load-profile defenses.
+struct AgentTranscriptRows: View {
+  let agentID: String
+  let timeline: [TimelineEntry]
+  let store: HarnessMonitorStore
+
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+
+  private var presentation: SessionTimelineSectionPresentation {
+    SessionTimelineSectionPresentation(
+      sessionID: "agent:\(agentID)",
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      filters: SessionTimelineFilterState(),
+      isTimelineLoading: false,
+      reduceMotion: reduceMotion,
+      textSizeIndex: textSizeIndex,
+      dateTimeConfiguration: dateTimeConfiguration
+    )
+  }
+
+  var body: some View {
+    let presentation = self.presentation
+    if presentation.showsEmptyState {
+      AgentDetailEmptyState(
+        title: "No transcript yet",
+        systemImage: "text.line.first.and.arrowtriangle.forward",
+        description: "The agent has not streamed any recent transcript events.",
+        tint: HarnessMonitorTheme.secondaryInk
+      )
+    } else {
+      ScrollView {
+        SessionTimelineCards(
+          rows: presentation.rows,
+          placeholderCount: 0,
+          shimmerPhase: 0,
+          showsShimmer: false,
+          actionHandler: store.supervisorDecisionActionHandler()
+        )
+        .padding(HarnessMonitorTheme.spacingSM)
+      }
+      .frame(height: min(presentation.viewportHeight, 320))
+    }
+  }
+}
