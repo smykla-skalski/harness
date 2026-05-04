@@ -52,6 +52,7 @@ mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
 mod session_archive_tests;
+mod shutdown;
 mod task_review;
 mod telemetry;
 
@@ -127,6 +128,7 @@ pub(super) fn test_http_state_with_db() -> DaemonHttpState {
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(
             sender, db_slot, async_db, false,
         ),
+        managed_agent_mutation_locks: super::ManagedAgentMutationLocks::default(),
     }
 }
 
@@ -161,6 +163,7 @@ fn test_http_state_with_sync_db_only(db_path: &std::path::Path) -> DaemonHttpSta
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        managed_agent_mutation_locks: super::ManagedAgentMutationLocks::default(),
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::errors::CliError;
 use crate::feature_flags;
 
 use super::{
@@ -82,10 +83,13 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
             );
         }
     };
-    let result = state
-        .acp_agent_manager
-        .start(&session_id, &body)
-        .map(ManagedAgentSnapshot::Acp);
+    let result = with_managed_agent_lock(state, &session_id, &body.agent, || {
+        state
+            .acp_agent_manager
+            .start(&session_id, &body)
+            .map(ManagedAgentSnapshot::Acp)
+    })
+    .await;
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -106,9 +110,18 @@ pub(crate) async fn dispatch_managed_agent_input(
             );
         }
     };
-    let result = ensure_terminal_agent(state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.input(&agent_id, &body))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match terminal_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .agent_tui_manager
+                    .input(&agent_id, &body)
+                    .map(ManagedAgentSnapshot::Terminal)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -129,9 +142,18 @@ pub(crate) async fn dispatch_managed_agent_resize(
             );
         }
     };
-    let result = ensure_terminal_agent(state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.resize(&agent_id, &body))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match terminal_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .agent_tui_manager
+                    .resize(&agent_id, &body)
+                    .map(ManagedAgentSnapshot::Terminal)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -142,15 +164,31 @@ pub(crate) async fn dispatch_managed_agent_stop(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
-    let result = if state.acp_agent_manager.get(&agent_id).is_ok() {
-        state
-            .acp_agent_manager
-            .stop(&agent_id)
-            .map(ManagedAgentSnapshot::Acp)
+    let result = if let Ok(session_id) = state
+        .acp_agent_manager
+        .get(&agent_id)
+        .map(|snapshot| snapshot.session_id)
+    {
+        with_managed_agent_lock(state, &session_id, &agent_id, || {
+            state
+                .acp_agent_manager
+                .stop(&agent_id)
+                .map(ManagedAgentSnapshot::Acp)
+        })
+        .await
     } else {
-        ensure_terminal_agent(state, &agent_id)
-            .and_then(|()| state.agent_tui_manager.stop(&agent_id))
-            .map(ManagedAgentSnapshot::Terminal)
+        match terminal_session_id(state, &agent_id) {
+            Ok(session_id) => {
+                with_managed_agent_lock(state, &session_id, &agent_id, || {
+                    state
+                        .agent_tui_manager
+                        .stop(&agent_id)
+                        .map(ManagedAgentSnapshot::Terminal)
+                })
+                .await
+            }
+            Err(error) => Err(error),
+        }
     };
     dispatch_managed_agent_response(request, state, result).await
 }
@@ -162,9 +200,18 @@ pub(crate) async fn dispatch_managed_agent_ready(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
-    let result = ensure_terminal_agent(state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.signal_ready(&agent_id))
-        .map(ManagedAgentSnapshot::Terminal);
+    let result = match terminal_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .agent_tui_manager
+                    .signal_ready(&agent_id)
+                    .map(ManagedAgentSnapshot::Terminal)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -185,9 +232,18 @@ pub(crate) async fn dispatch_managed_agent_steer_codex(
             );
         }
     };
-    let result = ensure_codex_agent(state, &agent_id)
-        .and_then(|()| state.codex_controller.steer(&agent_id, &body))
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .codex_controller
+                    .steer(&agent_id, &body)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -198,9 +254,18 @@ pub(crate) async fn dispatch_managed_agent_interrupt_codex(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
-    let result = ensure_codex_agent(state, &agent_id)
-        .and_then(|()| state.codex_controller.interrupt(&agent_id))
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .codex_controller
+                    .interrupt(&agent_id)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -224,13 +289,18 @@ pub(crate) async fn dispatch_managed_agent_resolve_codex_approval(
             );
         }
     };
-    let result = ensure_codex_agent(state, &agent_id)
-        .and_then(|()| {
-            state
-                .codex_controller
-                .resolve_approval(&agent_id, &approval_id, &body)
-        })
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .codex_controller
+                    .resolve_approval(&agent_id, &approval_id, &body)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -241,9 +311,18 @@ pub(crate) async fn dispatch_managed_agent_stop_acp(
     let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
-    let result = ensure_acp_agent(state, &agent_id)
-        .and_then(|()| state.acp_agent_manager.stop(&agent_id))
-        .map(ManagedAgentSnapshot::Acp);
+    let result = match acp_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .acp_agent_manager
+                    .stop(&agent_id)
+                    .map(ManagedAgentSnapshot::Acp)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -267,12 +346,54 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
             );
         }
     };
-    let result = ensure_acp_agent(state, &agent_id)
-        .and_then(|()| {
-            state
-                .acp_agent_manager
-                .resolve_permission_batch(&agent_id, &batch_id, &decision)
-        })
-        .map(ManagedAgentSnapshot::Acp);
+    let result = match acp_session_id(state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(state, &session_id, &agent_id, || {
+                state
+                    .acp_agent_manager
+                    .resolve_permission_batch(&agent_id, &batch_id, &decision)
+                    .map(ManagedAgentSnapshot::Acp)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
+}
+
+async fn with_managed_agent_lock<T>(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+    action: impl FnOnce() -> Result<T, CliError>,
+) -> Result<T, CliError> {
+    let _guard = state
+        .managed_agent_mutation_locks
+        .lock(session_id, agent_id)
+        .await;
+    action()
+}
+
+fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_terminal_agent(state, agent_id)?;
+    state
+        .agent_tui_manager
+        .get(agent_id)
+        .map(|snapshot| snapshot.session_id)
+}
+
+fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_codex_agent(state, agent_id)?;
+    state
+        .codex_controller
+        .run(agent_id)
+        .map(|snapshot| snapshot.session_id)
+}
+
+fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_acp_agent(state, agent_id)?;
+    state
+        .acp_agent_manager
+        .get(agent_id)
+        .map(|snapshot| snapshot.session_id)
 }

@@ -77,6 +77,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
             async_db_slot,
             false,
         ),
+        managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }
 }
 

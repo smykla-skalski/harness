@@ -96,7 +96,6 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let acp_agent_manager =
         AcpAgentManagerHandle::new_with_async_db(sender.clone(), db.clone(), async_db.clone());
     let _bridge_watcher = bridge::spawn_manifest_watcher();
-
     let app_state = DaemonHttpState {
         token,
         sender,
@@ -109,6 +108,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         codex_controller,
         agent_tui_manager,
         acp_agent_manager,
+        managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
     };
     let _acp_inspect_push = spawn_acp_inspect_publisher(
         app_state.sender.clone(),

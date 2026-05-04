@@ -121,6 +121,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             async_db.clone(),
         ),
         agent_tui_manager: AgentTuiManagerHandle::new_with_async_db(sender, db, async_db, false),
+        managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }
 
@@ -179,6 +180,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         codex_controller,
         acp_agent_manager,
         agent_tui_manager,
+        managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }
 

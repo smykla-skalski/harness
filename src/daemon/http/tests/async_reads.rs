@@ -82,6 +82,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
             async_db_slot,
             false,
         ),
+        managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
     }
 }
 
