@@ -17,6 +17,7 @@ final class SessionTimelineViewportModel {
   @ObservationIgnored private var presentationWindowStart = 0
   @ObservationIgnored private var presentationLoadedCount = 0
   @ObservationIgnored private var presentationTotalCount = 0
+  @ObservationIgnored private var presentationFilteredMatchCount: Int?
 
   func recordViewportStats(_ stats: SessionTimelineTableViewportStats) {
     lastViewport = stats
@@ -32,21 +33,29 @@ final class SessionTimelineViewportModel {
     }
   }
 
-  func updatePresentationCounts(windowStart: Int, loaded: Int, total: Int) {
+  func updatePresentationCounts(
+    windowStart: Int,
+    loaded: Int,
+    total: Int,
+    filteredMatchCount: Int?
+  ) {
     let clampedLoaded = max(0, loaded)
     let clampedTotal = max(0, total)
     let maximumWindowStart = max(0, clampedTotal - max(clampedLoaded, 1))
     let clampedWindowStart = max(0, min(windowStart, maximumWindowStart))
+    let clampedFilteredMatchCount = filteredMatchCount.map { max(0, $0) }
     guard
       presentationWindowStart != clampedWindowStart
         || presentationLoadedCount != clampedLoaded
         || presentationTotalCount != clampedTotal
+        || presentationFilteredMatchCount != clampedFilteredMatchCount
     else {
       return
     }
     presentationWindowStart = clampedWindowStart
     presentationLoadedCount = clampedLoaded
     presentationTotalCount = clampedTotal
+    presentationFilteredMatchCount = clampedFilteredMatchCount
     rebuildStats()
   }
 
@@ -66,6 +75,7 @@ final class SessionTimelineViewportModel {
     presentationWindowStart = 0
     presentationLoadedCount = 0
     presentationTotalCount = 0
+    presentationFilteredMatchCount = nil
   }
 
   private func rebuildStats() {
@@ -79,6 +89,13 @@ final class SessionTimelineViewportModel {
       ),
       lastVisibleEventNumber: absoluteEventNumber(
         forLoadedOffset: lastViewport.lastVisibleEventOffset
+      ),
+      filteredMatchCount: presentationFilteredMatchCount,
+      firstVisibleMatchNumber: visibleMatchNumber(
+        forRowOffset: lastViewport.firstVisibleMatchOffset
+      ),
+      lastVisibleMatchNumber: visibleMatchNumber(
+        forRowOffset: lastViewport.lastVisibleMatchOffset
       )
     )
     if visibilityStats != next {
@@ -103,5 +120,17 @@ final class SessionTimelineViewportModel {
     }
     let clampedOffset = max(0, min(offset, availableCount - 1))
     return presentationWindowStart + clampedOffset + 1
+  }
+
+  private func visibleMatchNumber(forRowOffset offset: Int?) -> Int? {
+    guard
+      let offset,
+      let presentationFilteredMatchCount,
+      presentationFilteredMatchCount > 0
+    else {
+      return nil
+    }
+    let clampedOffset = max(0, min(offset, presentationFilteredMatchCount - 1))
+    return clampedOffset + 1
   }
 }

@@ -17,6 +17,7 @@ struct SessionTimelinePresentationInput: Equatable {
   let firstDecisionID: String?
   let lastDecisionID: String?
   let isTimelineLoading: Bool
+  let filterSignature: String
   let reduceMotion: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
 
@@ -37,9 +38,67 @@ struct SessionTimelinePresentationInput: Equatable {
       firstDecisionID: nil,
       lastDecisionID: nil,
       isTimelineLoading: false,
+      filterSignature: "",
       reduceMotion: false,
       dateTimeConfiguration: .default
     )
+  }
+}
+
+struct SessionTimelineFilterHydrationInput: Equatable {
+  let sessionID: String
+  let appStateRawValue: String
+  let sceneRegistryRawValue: String
+}
+
+struct SessionTimelineFilterPersistenceSnapshot: Equatable, Sendable {
+  let appStateRawValue: String
+  let sceneRegistryRawValue: String
+}
+
+enum SessionTimelineFilterPersistenceResolver {
+  static func hydrate(
+    mode: SessionTimelineFilterPersistenceMode,
+    input: SessionTimelineFilterHydrationInput
+  ) -> SessionTimelineFilterState {
+    switch mode {
+    case .ephemeral:
+      .init()
+    case .application:
+      SessionTimelineFilterState.decode(from: input.appStateRawValue) ?? .init()
+    case .sessionWindow:
+      SessionTimelineStoredFilterRegistry
+        .decode(from: input.sceneRegistryRawValue)
+        .state(for: input.sessionID) ?? .init()
+    }
+  }
+
+  static func persist(
+    mode: SessionTimelineFilterPersistenceMode,
+    state: SessionTimelineFilterState,
+    sessionID: String,
+    appStateRawValue: String,
+    sceneRegistryRawValue: String
+  ) -> SessionTimelineFilterPersistenceSnapshot {
+    switch mode {
+    case .ephemeral:
+      return SessionTimelineFilterPersistenceSnapshot(
+        appStateRawValue: appStateRawValue,
+        sceneRegistryRawValue: sceneRegistryRawValue
+      )
+    case .application:
+      return SessionTimelineFilterPersistenceSnapshot(
+        appStateRawValue: state.encodedString() ?? "",
+        sceneRegistryRawValue: sceneRegistryRawValue
+      )
+    case .sessionWindow:
+      var registry = SessionTimelineStoredFilterRegistry.decode(from: sceneRegistryRawValue)
+      registry.set(state, for: sessionID)
+      return SessionTimelineFilterPersistenceSnapshot(
+        appStateRawValue: appStateRawValue,
+        sceneRegistryRawValue: registry.encodedString() ?? ""
+      )
+    }
   }
 }
 

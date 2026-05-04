@@ -8,6 +8,7 @@ struct SessionTimelineSectionPresentation {
   private static let maximumViewportHeight: CGFloat = 470
 
   let navigation: SessionTimelineWindowNavigation
+  let filterSnapshot: SessionTimelineFilterSnapshot
   let rows: [SessionTimelineRow]
   let placeholderCount: Int
   let shouldAnimatePlaceholders: Bool
@@ -16,6 +17,7 @@ struct SessionTimelineSectionPresentation {
 
   private init(
     navigation: SessionTimelineWindowNavigation,
+    filterSnapshot: SessionTimelineFilterSnapshot,
     rows: [SessionTimelineRow],
     placeholderCount: Int,
     shouldAnimatePlaceholders: Bool,
@@ -23,6 +25,7 @@ struct SessionTimelineSectionPresentation {
     scrollNodeIDs: [String]
   ) {
     self.navigation = navigation
+    self.filterSnapshot = filterSnapshot
     self.rows = rows
     self.placeholderCount = placeholderCount
     self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
@@ -37,6 +40,7 @@ struct SessionTimelineSectionPresentation {
         timelineWindow: nil,
         isLoading: false
       ),
+      filterSnapshot: .empty,
       rows: [],
       placeholderCount: 0,
       shouldAnimatePlaceholders: false,
@@ -51,6 +55,7 @@ struct SessionTimelineSectionPresentation {
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
     decisions: [Decision],
+    filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
     reduceMotion: Bool,
     dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
@@ -60,17 +65,21 @@ struct SessionTimelineSectionPresentation {
       timelineWindow: timelineWindow,
       isLoading: isTimelineLoading
     )
-    let nodes = SessionTimelineNodeBuilder(
+    let sourceNodes = SessionTimelineNodeBuilder(
       sessionID: sessionID,
       entries: timeline,
       decisions: decisions
     )
     .build()
-    let placeholderCount = isTimelineLoading && nodes.isEmpty ? navigation.limit : 0
-    let loadedCount = nodes.count + placeholderCount
+    let filterSnapshot = SessionTimelineFilterSnapshot(
+      nodes: sourceNodes,
+      filters: filters,
+      configuration: dateTimeConfiguration
+    )
+    let placeholderCount = isTimelineLoading && sourceNodes.isEmpty ? navigation.limit : 0
+    let loadedCount = filterSnapshot.nodes.count + placeholderCount
     let visibleRows = min(max(loadedCount, 1), Self.maximumVisibleRows)
 
-    let rows = SessionTimelineRow.rows(for: nodes, configuration: dateTimeConfiguration)
     let shouldAnimatePlaceholders = SessionTimelinePlaceholderShimmer.shouldAnimate(
       reduceMotion: reduceMotion,
       placeholderCount: placeholderCount
@@ -82,11 +91,12 @@ struct SessionTimelineSectionPresentation {
       Self.maximumViewportHeight
     )
     self.navigation = navigation
-    self.rows = rows
+    self.filterSnapshot = filterSnapshot
+    rows = filterSnapshot.rows
     self.placeholderCount = placeholderCount
     self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
     self.viewportHeight = viewportHeight
-    self.scrollNodeIDs = nodes.map(\.id)
+    scrollNodeIDs = filterSnapshot.nodes.map(\.id)
   }
 
   var showsEmptyState: Bool {
@@ -95,6 +105,17 @@ struct SessionTimelineSectionPresentation {
 
   var rowIDs: [String] {
     rows.map(\.id)
+  }
+
+  var showsFilteredEmptyState: Bool {
+    filterSnapshot.summary.isFiltered
+      && filterSnapshot.sourceNodeCount > 0
+      && rows.isEmpty
+      && !navigation.isLoading
+  }
+
+  var filterMatchCountForVisibilityStats: Int? {
+    filterSnapshot.summary.isFiltered ? filterSnapshot.filteredNodeCount : nil
   }
 
   var fallbackVisibleRowCount: Int {

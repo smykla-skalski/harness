@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 
-enum SessionTimelineTone: String, Equatable, Sendable {
+enum SessionTimelineTone: String, CaseIterable, Equatable, Sendable {
   case info
   case success
   case warning
@@ -96,10 +96,50 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   let timestamp: Date
   let rawTimestamp: String?
   let sourceLabel: String
+  let entryKind: String?
   let title: String
   let detail: String?
+  let agentID: String?
+  let taskID: String?
   let eventTone: SessionTimelineTone?
   let decision: SessionTimelineDecisionSnapshot?
+  let semanticProperties: Set<SessionTimelineSemanticProperty>
+  let rawPayloadKeys: Set<String>
+  let toolCallMetadata: ToolCallTimelineEntryMetadata?
+
+  init(
+    identity: Identity,
+    kind: Kind,
+    timestamp: Date,
+    rawTimestamp: String?,
+    sourceLabel: String,
+    entryKind: String? = nil,
+    title: String,
+    detail: String?,
+    agentID: String? = nil,
+    taskID: String? = nil,
+    eventTone: SessionTimelineTone?,
+    decision: SessionTimelineDecisionSnapshot?,
+    semanticProperties: Set<SessionTimelineSemanticProperty> = [],
+    rawPayloadKeys: Set<String> = [],
+    toolCallMetadata: ToolCallTimelineEntryMetadata? = nil
+  ) {
+    self.identity = identity
+    self.kind = kind
+    self.timestamp = timestamp
+    self.rawTimestamp = rawTimestamp
+    self.sourceLabel = sourceLabel
+    self.entryKind = entryKind
+    self.title = title
+    self.detail = detail
+    self.agentID = agentID
+    self.taskID = taskID
+    self.eventTone = eventTone
+    self.decision = decision
+    self.semanticProperties = semanticProperties
+    self.rawPayloadKeys = rawPayloadKeys
+    self.toolCallMetadata = toolCallMetadata
+  }
 
   var id: String {
     switch identity {

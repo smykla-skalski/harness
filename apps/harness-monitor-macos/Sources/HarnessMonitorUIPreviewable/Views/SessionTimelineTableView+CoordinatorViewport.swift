@@ -143,12 +143,15 @@ extension SessionTimelineTableView.Coordinator {
     let visibleRows = tableView.rows(in: visibleRect)
     let visibleRowCount = max(0, visibleRows.length)
     let visibleEventOffsets = visibleEventOffsets(for: visibleRows)
+    let visibleMatchOffsets = visibleMatchOffsets(for: visibleRows)
     let stats = SessionTimelineTableViewportStats(
       visibleRowCount: visibleRowCount,
       renderedRowCount: visibleRowCount,
       anchorRowID: anchorRowID(for: visibleRows),
       firstVisibleEventOffset: visibleEventOffsets?.lowerBound,
-      lastVisibleEventOffset: visibleEventOffsets?.upperBound
+      lastVisibleEventOffset: visibleEventOffsets?.upperBound,
+      firstVisibleMatchOffset: visibleMatchOffsets?.lowerBound,
+      lastVisibleMatchOffset: visibleMatchOffsets?.upperBound
     )
     if lastViewportStats != stats {
       lastViewportStats = stats
@@ -215,5 +218,16 @@ extension SessionTimelineTableView.Coordinator {
       return nil
     }
     return firstVisibleEventOffset...lastVisibleEventOffset
+  }
+
+  func visibleMatchOffsets(for visibleRows: NSRange) -> ClosedRange<Int>? {
+    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+      return nil
+    }
+    let upperBound = visibleRows.location + visibleRows.length
+    guard visibleRows.location < upperBound else {
+      return nil
+    }
+    return visibleRows.location...(upperBound - 1)
   }
 }
